@@ -137,6 +137,20 @@ public sealed class PackLoaderTests : IDisposable
     }
 
     [Fact]
+    public void Loads_an_end_to_end_gate()
+    {
+        packs.Add(
+            "backend.database.postgres",
+            PackFixture.DefaultManifest("backend.database.postgres").Replace("kind: unit-test", "kind: end-to-end-test", StringComparison.Ordinal),
+            PackFixture.DefaultFiles);
+
+        var result = Load();
+
+        result.Errors.ShouldBeEmpty();
+        result.Packs["backend.database.postgres"].Gates.ShouldHaveSingleItem().Kind.ShouldBe(GateKind.EndToEndTest);
+    }
+
+    [Fact]
     public void Rejects_a_value_of_the_wrong_type()
     {
         packs.Add(
