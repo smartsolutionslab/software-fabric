@@ -4,4 +4,8 @@
     <RootNamespace>Fabric.Core</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
 </Project>
