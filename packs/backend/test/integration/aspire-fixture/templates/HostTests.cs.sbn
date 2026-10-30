@@ -24,10 +24,11 @@ public class HostTests(AspireFixture aspire)
     private static readonly TimeSpan ResourceTimeout = TimeSpan.FromMinutes(2);
 
     [Fact]
-    public async Task Every_resource_becomes_healthy()
+    public async Task Every_health_checked_resource_becomes_healthy()
     {
+        // Aspire adds helper resources of its own (a project rebuilder, for one) that never report health.
         var resources = aspire.App.Services.GetRequiredService<DistributedApplicationModel>().Resources
-            .Where(resource => resource is not ParameterResource)
+            .Where(resource => resource.Annotations.OfType<HealthCheckAnnotation>().Any())
             .Select(resource => resource.Name)
             .ToList();
 
