@@ -11,6 +11,12 @@ namespace Fabric.Core.Packs;
 /// </summary>
 public static partial class Composer
 {
+    /// <summary>
+    /// Contributions are Scriban code (function definitions), not output: the renderer makes them available to every
+    /// template instead of rendering the slot.
+    /// </summary>
+    public const string TemplateFunctionsSlot = "templates.functions";
+
     /// <summary>Filled by the generator with every selected pack's <c>agents.agents-md</c>.</summary>
     public const string AgentSectionsSlot = "agents.sections";
 

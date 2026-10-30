@@ -26,11 +26,12 @@ public static partial class Renderer
 
         List<string> errors = [];
         var model = Model(catalog, choices, name);
+        var functions = Functions(composition);
 
         var slots = new ScriptObject();
-        foreach (var (slot, entries) in composition.Slots)
+        foreach (var (slot, entries) in composition.Slots.Where(slot => slot.Key != Composer.TemplateFunctionsSlot))
         {
-            var parts = entries.Select(entry => RenderTemplate(entry.Pack, entry.Contribution.Template, errors, model));
+            var parts = entries.Select(entry => RenderTemplate(entry.Pack, entry.Contribution.Template, functions, errors, model));
             var separator = composition.SlotSeparators?.GetValueOrDefault(slot) ?? "\n";
             slots.SetValue(slot, string.Join(separator, parts.OfType<string>()), readOnly: true);
         }
@@ -44,7 +45,7 @@ public static partial class Renderer
                 scope["module"] = Module(catalog, module, choices.Modules[module]);
             }
 
-            if (RenderTemplate(file.Pack, file.File.Template, errors, model, scope) is { } content)
+            if (RenderTemplate(file.Pack, file.File.Template, functions, errors, model, scope) is { } content)
             {
                 files.Add(new RenderedFile(file.Target, content));
             }
@@ -55,10 +56,16 @@ public static partial class Renderer
             : new RenderedProject([.. files.OrderBy(file => file.Path, StringComparer.Ordinal)], []);
     }
 
-    private static string? RenderTemplate(PackManifest pack, string templatePath, List<string> errors, params ScriptObject[] globals)
+    /// <summary>The Scriban code packs contribute to <see cref="Composer.TemplateFunctionsSlot"/>, as a prefix that outputs nothing.</summary>
+    private static string Functions(Composition composition) =>
+        composition.Slots.TryGetValue(Composer.TemplateFunctionsSlot, out var entries) && entries.Count > 0
+            ? "{{~ " + string.Join('\n', entries.Select(entry => File.ReadAllText(Path.Combine(entry.Pack.Directory, entry.Contribution.Template)))) + " }}"
+            : string.Empty;
+
+    private static string? RenderTemplate(PackManifest pack, string templatePath, string functions, List<string> errors, params ScriptObject[] globals)
     {
         var label = $"{pack.Option}: {templatePath}";
-        var template = Template.Parse(File.ReadAllText(Path.Combine(pack.Directory, templatePath)), templatePath);
+        var template = Template.Parse(functions + File.ReadAllText(Path.Combine(pack.Directory, templatePath)), templatePath);
         if (template.HasErrors)
         {
             errors.Add($"{label}: {string.Join("; ", template.Messages)}");

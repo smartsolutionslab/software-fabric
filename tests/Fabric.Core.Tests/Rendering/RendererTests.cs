@@ -229,4 +229,47 @@ public sealed class RendererTests : IDisposable
 
         rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("a\n\nb\n");
     }
+
+    [Fact]
+    public void Functions_contributed_to_templates_functions_are_available_in_every_template()
+    {
+        var guards = Pack("backend.guards.ensure-that", ("functions.sbn", "func not_null(name)\n  ret \"Ensure.That(\" + name + \").IsNotNull();\"\nend"));
+        var owner = Pack("base.core", ("t.sbn", "{{ not_null \"services\" }}\n"), ("section.sbn", "{{ not_null \"model\" }}"));
+
+        var rendered = Renderer.Render(
+            Catalog,
+            Compose(
+                [Composed(owner, "t.sbn", "a.cs")],
+                new()
+                {
+                    [Composer.TemplateFunctionsSlot] = [new(guards, new(Composer.TemplateFunctionsSlot, "functions.sbn", 0))],
+                    ["sections"] = [new(owner, new("sections", "section.sbn", 0))],
+                }),
+            Choices,
+            "shop");
+
+        rendered.Errors.ShouldBeEmpty();
+        rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("Ensure.That(services).IsNotNull();\n");
+    }
+
+    [Fact]
+    public void A_slot_contribution_can_use_the_contributed_functions_too()
+    {
+        var guards = Pack("backend.guards.ensure-that", ("functions.sbn", "func shout(text)\n  ret text + \"!\"\nend"));
+        var owner = Pack("base.core", ("t.sbn", "{{ slots[\"sections\"] }}"), ("section.sbn", "{{ shout \"hi\" }}"));
+
+        var rendered = Renderer.Render(
+            Catalog,
+            Compose(
+                [Composed(owner, "t.sbn", "a.txt")],
+                new()
+                {
+                    [Composer.TemplateFunctionsSlot] = [new(guards, new(Composer.TemplateFunctionsSlot, "functions.sbn", 0))],
+                    ["sections"] = [new(owner, new("sections", "section.sbn", 0))],
+                }),
+            Choices,
+            "shop");
+
+        rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("hi!");
+    }
 }
