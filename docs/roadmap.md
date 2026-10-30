@@ -32,3 +32,25 @@ Each is one issue, one PR. Tests first.
 
 **Gate after M0:** review of the slot list and the rule evaluator before
 any real pack is written.
+
+## M1 tasks
+
+Profile `saas-standard-react`: 37 packs plus the base. Each task is one
+branch; tests first. Docker is available, so generated projects run their
+Aspire integration tests here and in CI.
+
+| # | Task | Done when |
+|---|---|---|
+| M1-01 | Slot set (`docs/slots.md`), ADR-0005, and the generator changes it needs: slot separators, generator-written ADRs / AGENTS.md sections / agent briefs, project name | Slot set approved at the gate; generator changes tested against the fixtures |
+| M1-02 | Base pack: repo skeleton, Aspire AppHost and ServiceDefaults, BuildingBlocks, Contracts, per-module csproj skeletons, `build.proj`, AGENTS.md, CLAUDE.md, CI. A test helper generates a real profile with empty stand-ins for packs not written yet | `saas-standard-react` generates with stand-ins and `dotnet build build.proj` passes |
+| M1-03 | Backend core: modular-monolith, minimal-apis, rest, result, hand-rolled mediator, postgres, ef-core, keycloak | Host starts under Aspire; an endpoint answers |
+| M1-04 | Modules: ddd (light), cqrs logical, integration-events | `fabric add-module billing` in a generated project builds and its tests pass |
+| M1-05 | Messaging and tenancy: rabbitmq, wolverine (with outbox), tenancy column | An integration event crosses two modules; a tenant cannot read another's rows |
+| M1-06 | Tests: xunit, shouldly, nsubstitute, aspire-fixture, red-first | Integration tests run against the real Aspire stack in CI |
+| M1-07 | Frontend: react, spa, pnpm-workspaces, redux-toolkit, rtk-query-codegen, react-router, react-hook-form, zod, tailwind, shadcn, design-system none, tanstack-table, echarts, realtime none, oidc-client-ts, pwa no, accessibility | App builds, logs in through Keycloak, lists a module's data |
+| M1-08 | Fabric half: agent briefs, `/next-issue` skill, board protocol workflows (janitor, return-to-Todo), cross-model review workflow, `docs/owners.yml` | Workflows tested; a dry run claims and releases an issue |
+| M1-09 | Profile CI builds and tests the generated `saas-standard-react` project, backend and frontend | Green in this repo's CI |
+| M1-10 | Pilot: one agent delivers one issue in a generated project | Merged PR in the pilot repo, delivered through the board protocol |
+
+**Gates:** after M1-01 (the slot set, before any real pack is written)
+and after M1-10 (the M1 gate above).
