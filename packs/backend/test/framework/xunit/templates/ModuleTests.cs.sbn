@@ -16,7 +16,8 @@ public class {{ module.namespace }}ModuleTests
             .Build();
 
         new {{ module.namespace }}Module().AddServices(services, configuration);
+        var buildContainer = () => services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true }).Dispose();
 
-        using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+{{ slots["tests.assert-does-not-throw"] }}
     }
 }

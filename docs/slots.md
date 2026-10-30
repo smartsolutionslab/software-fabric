@@ -75,6 +75,10 @@ no test framework; the chosen test-framework pack contributes the one
 test that runs every rule. A pack's gate therefore works with xUnit,
 NUnit and TUnit alike.
 
+Tests a test-framework pack generates assert through slots the
+assertion pack fills (added in M1-04), so they read like every other
+test in the project without the two packs knowing each other.
+
 ## Module paths use the namespace (added in M1-02)
 
 Per-module targets use `{{ module.namespace }}`: module `order-handling`
@@ -118,6 +122,8 @@ Cardinality `0+` unless stated. "Separator" is what joins contributions
 | `tests.build-properties` *(added in M1-02)* | `tests/Directory.Build.props` | xunit (`OutputType Exe` for xUnit v3) |
 | `tests.packages` | `tests/Directory.Build.props` | xunit, shouldly, nsubstitute, aspire-fixture |
 | `tests.usings` | `tests/Directory.Build.props` | xunit, shouldly, nsubstitute |
+| `tests.assert-no-violations` *(added in M1-04, declared by the test-framework pack, exactly-one)* | `tests/Architecture.Tests/ArchitectureRulesTests.cs` | shouldly (`violations.ShouldBeEmpty(description);`) |
+| `tests.assert-does-not-throw` *(added in M1-04, declared by the test-framework pack, exactly-one)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs` | shouldly (`Should.NotThrow(buildContainer);`) |
 
 **One package, one owner.** A `PackageVersion` is declared by exactly
 one pack; others only reference it. Two packs declaring the same version

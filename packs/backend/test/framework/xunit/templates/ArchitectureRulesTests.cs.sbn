@@ -12,9 +12,8 @@ public class ArchitectureRulesTests
     {
         var architectureRule = ArchitectureModel.Rules.Single(candidate => candidate.GetType().Name == rule);
         var violations = architectureRule.Violations(Model).ToList();
-        if (violations.Count > 0)
-        {
-            throw new ArchitectureViolationException($"{architectureRule.Description}{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
-        }
+        var description = architectureRule.Description;
+
+{{ slots["tests.assert-no-violations"] }}
     }
 }

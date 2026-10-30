@@ -2,6 +2,8 @@ option: backend.test.assertions.shouldly
 files:
   - { template: templates/BannedSymbols.txt.sbn, target: tests/BannedSymbols.txt }
 slots:
+  - { slot: tests.assert-no-violations, template: templates/assert-no-violations.sbn }
+  - { slot: tests.assert-does-not-throw, template: templates/assert-does-not-throw.sbn }
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
   - { slot: tests.packages, template: templates/packages.sbn }
   - { slot: tests.usings, template: templates/usings.sbn }

@@ -94,4 +94,22 @@ public sealed class SaasStandardReactTests
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("InvoicesController is a controller");
     }
+
+    [Fact]
+    public void A_rule_violation_is_reported_through_the_chosen_assertion_library()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Api/InvoicesController.cs", """
+            namespace Shop.Modules.Billing.Api;
+
+            public sealed class InvoicesController : Microsoft.AspNetCore.Mvc.ControllerBase;
+            """);
+        project.Build();
+
+        var (_, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        output.ShouldContain("Shouldly.ShouldAssertException");
+        output.ShouldContain("No module contains an MVC controller.");
+    }
 }
