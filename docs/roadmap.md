@@ -28,7 +28,7 @@ Each is one issue, one PR. Tests first.
 | M0-09 | Scriban rendering with the restricted model | Same input twice → byte-identical output |
 | M0-10 | `fabric new --profile <p> [--set dim=opt]` and `fabric validate` | Writes `fabric.yaml` + base project for a profile using stub packs |
 | M0-11 | `fabric add-module <name> --set module.style=…` | Adds a module to an existing generated project |
-| M0-12 | Profile CI: generate every profile and build it | Job exists and runs against stub packs |
+| M0-12 | Profile CI: generate every profile and build it | Job exists and runs against stub packs. *As built:* every fixture profile is generated twice and compared, a module is added, every real profile is validated. Building generated projects needs real packs and moves to M1. |
 
 **Gate after M0:** review of the slot list and the rule evaluator before
 any real pack is written.
