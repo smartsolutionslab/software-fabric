@@ -12,12 +12,12 @@ internal sealed class GeneratedProject : IDisposable
     private readonly StandIns standIns = new();
     private readonly IReadOnlyDictionary<string, Core.Packs.PackManifest> packs;
 
-    public GeneratedProject(string profile)
+    public GeneratedProject(string profile, params string[] overrides)
     {
-        packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, profile);
+        packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, profile, overrides);
         ProjectDirectory = Path.Combine(root, "shop");
 
-        var generated = Generator.New(Repository.Catalog, packs, "shop", profile, []);
+        var generated = Generator.New(Repository.Catalog, packs, "shop", profile, overrides);
         generated.Errors.ShouldBeEmpty();
         ProjectWriter.Write(ProjectDirectory, generated.Files).ShouldBeNull();
     }
@@ -41,9 +41,12 @@ internal sealed class GeneratedProject : IDisposable
 
     public void Build()
     {
-        var (exitCode, output) = DotNet.Run(ProjectDirectory, new Dictionary<string, string>(), "build", "build.proj", "-c", "Release");
+        var (exitCode, output) = TryBuild();
         exitCode.ShouldBe(0, output);
     }
+
+    public (int ExitCode, string Output) TryBuild() =>
+        DotNet.Run(ProjectDirectory, new Dictionary<string, string>(), "build", "build.proj", "-c", "Release");
 
     /// <summary>Runs one test project of the generated solution, already built in Release.</summary>
     public (int ExitCode, string Output) Test(string project, IReadOnlyDictionary<string, string>? environment = null) =>

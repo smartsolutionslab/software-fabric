@@ -6,7 +6,7 @@ public sealed class NoControllers : IArchitectureRule
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
-        ArgumentNullException.ThrowIfNull(model);
+        {{ not_null "model" }}
 
         return model.ModuleAssemblies
             .SelectMany(assembly => assembly.GetTypes())

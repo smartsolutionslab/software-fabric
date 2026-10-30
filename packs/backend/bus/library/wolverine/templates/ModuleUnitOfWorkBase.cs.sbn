@@ -18,7 +18,7 @@ public abstract class ModuleUnitOfWork<TContext>(IServiceProvider services) : IU
 
     public async Task PublishAsync(IIntegrationEvent integrationEvent)
     {
-        ArgumentNullException.ThrowIfNull(integrationEvent);
+        {{ not_null "integrationEvent" }}
         await Outbox.PublishAsync(integrationEvent);
     }
 

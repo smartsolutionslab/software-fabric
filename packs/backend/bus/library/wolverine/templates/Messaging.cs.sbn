@@ -17,8 +17,8 @@ public static class Messaging
     /// <summary>Wolverine with a durable outbox and inbox in the project's database, the broker as transport, and every module's consumers.</summary>
     public static IServiceCollection AddMessaging(this IServiceCollection services, IConfiguration configuration, IReadOnlyList<IModule> modules)
     {
-        ArgumentNullException.ThrowIfNull(configuration);
-        ArgumentNullException.ThrowIfNull(modules);
+        {{ not_null "configuration" }}
+        {{ not_null "modules" }}
 
         var database = configuration.GetConnectionString("database")
             ?? throw new InvalidOperationException("Connection string 'database' is missing; Aspire provides it.");

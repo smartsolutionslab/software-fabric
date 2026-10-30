@@ -24,7 +24,7 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        ArgumentNullException.ThrowIfNull(modelBuilder);
+        {{ not_null "modelBuilder" }}
 
         modelBuilder.HasDefaultSchema(schema);
         modelBuilder.ApplyConfigurationsFromAssembly(GetType().Assembly);

@@ -1,0 +1,6 @@
+func not_null(name)
+  ret "Ensure.That(" + name + ").IsNotNull();"
+end
+func not_blank(name)
+  ret "Ensure.That(" + name + ").IsNotNullOrWhiteSpace();"
+end

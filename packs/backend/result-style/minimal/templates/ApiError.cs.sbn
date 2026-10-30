@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace {{ namespace }}.BuildingBlocks.Results;
+namespace {{ namespace }}.Kernel;
 
 /// <summary>An expected failure: a stable machine-readable code, a message for people, and the HTTP status it maps to.</summary>
 public record ApiError(string Code, string Message, HttpStatusCode Status)

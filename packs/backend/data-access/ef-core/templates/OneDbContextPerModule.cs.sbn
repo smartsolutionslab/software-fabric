@@ -6,7 +6,7 @@ public sealed class OneDbContextPerModule : IArchitectureRule
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
-        ArgumentNullException.ThrowIfNull(model);
+        {{ not_null "model" }}
 
         foreach (var assembly in model.ModuleAssemblies)
         {

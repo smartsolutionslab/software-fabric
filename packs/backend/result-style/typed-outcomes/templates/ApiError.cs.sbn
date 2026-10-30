@@ -1,0 +1,9 @@
+using System.Net;
+
+namespace {{ namespace }}.Kernel;
+
+/// <summary>
+/// The base of every expected failure: a stable machine-readable code, a message for people, and the HTTP status it
+/// maps to, so endpoints emit problem details without per-case mapping.
+/// </summary>
+public abstract record ApiError(string Code, string Message, HttpStatusCode Status);

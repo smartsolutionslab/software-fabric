@@ -10,7 +10,7 @@ public static class TenantColumn
     /// <summary>A TenantId shadow column on every entity and a filter to the context's current tenant.</summary>
     public static ModelBuilder ApplyTenantColumn(this ModelBuilder modelBuilder, ModuleDbContext context)
     {
-        ArgumentNullException.ThrowIfNull(modelBuilder);
+        {{ not_null "modelBuilder" }}
 
         var currentTenant = Expression.Property(Expression.Constant(context), nameof(ModuleDbContext.CurrentTenantId));
         foreach (var entity in modelBuilder.Model.GetEntityTypes().Where(entity => !entity.IsOwned() && entity.BaseType is null))
@@ -29,7 +29,7 @@ public static class TenantColumn
     /// <summary>Stamps new rows with the current tenant; saving one without a tenant fails.</summary>
     public static void StampTenant(this ModuleDbContext context)
     {
-        ArgumentNullException.ThrowIfNull(context);
+        {{ not_null "context" }}
 
         foreach (var entry in context.ChangeTracker.Entries().Where(entry => entry.State == EntityState.Added && entry.Metadata.FindProperty(Column) is not null))
         {

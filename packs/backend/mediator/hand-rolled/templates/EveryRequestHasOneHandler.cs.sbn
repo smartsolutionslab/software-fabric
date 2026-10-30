@@ -9,7 +9,7 @@ public sealed class EveryRequestHasOneHandler : IArchitectureRule
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
-        ArgumentNullException.ThrowIfNull(model);
+        {{ not_null "model" }}
 
         foreach (var assembly in model.ModuleAssemblies.Where(assembly => assembly.GetName().Name!.EndsWith(".Application", StringComparison.Ordinal)))
         {

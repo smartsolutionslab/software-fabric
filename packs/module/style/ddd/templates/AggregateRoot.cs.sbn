@@ -12,7 +12,7 @@ public abstract class AggregateRoot<TId>(TId id) : Entity<TId>(id)
 
     protected void Raise(IDomainEvent domainEvent)
     {
-        ArgumentNullException.ThrowIfNull(domainEvent);
+        {{ not_null "domainEvent" }}
         domainEvents.Add(domainEvent);
     }
 }

@@ -9,8 +9,8 @@ public static class ModuleInfrastructure
     public static IServiceCollection AddModuleInfrastructure<TModule>(this IServiceCollection services, IConfiguration configuration)
         where TModule : IModule
     {
-        ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(configuration);
+        {{ not_null "services" }}
+        {{ not_null "configuration" }}
 {{ slots["modules.infrastructure"] }}
         return services;
     }

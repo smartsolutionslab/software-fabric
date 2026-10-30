@@ -4,7 +4,7 @@
 
 ## Decision
 
-Expected failures — not found, validation, conflict, forbidden — are values: handlers return `Result<TValue, TError>` where `TError` derives from `ApiError(Code, Message, Status)`. Exceptions are for the unexpected only.
+Expected failures — not found, validation, conflict, forbidden — are values: handlers return `Result<TValue, TError>` where `TError` derives from `ApiError(Code, Message, Status)`, both in `src/Kernel` (their exact shape is the result style's ADR). Exceptions are for the unexpected only.
 
 At the HTTP edge, `ToHttpResult()` turns a success into `200` with the value and a failure into RFC 9457 problem details with the error's status and code.
 

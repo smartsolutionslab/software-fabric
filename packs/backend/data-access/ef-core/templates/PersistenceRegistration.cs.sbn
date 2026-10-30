@@ -14,7 +14,7 @@ public static class PersistenceRegistration
     public static IServiceCollection AddModuleDbContext<TModule>(this IServiceCollection services, IConfiguration configuration)
         where TModule : IModule
     {
-        ArgumentNullException.ThrowIfNull(configuration);
+        {{ not_null "configuration" }}
 
         var context = ModuleAssemblies.Of<TModule>("Infrastructure").GetTypes()
             .SingleOrDefault(type => type is { IsClass: true, IsAbstract: false } && typeof(ModuleDbContext).IsAssignableFrom(type));

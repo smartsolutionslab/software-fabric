@@ -9,7 +9,7 @@ public static class ModuleEndpoints
     public static RouteGroupBuilder MapModuleEndpoints<TModule>(this RouteGroupBuilder group)
         where TModule : IModule
     {
-        ArgumentNullException.ThrowIfNull(group);
+        {{ not_null "group" }}
 {{ slots["modules.endpoints"] }}
         return group;
     }

@@ -1,0 +1,9 @@
+option: backend.absence.option
+files:
+  - { template: templates/Option.cs.sbn, target: src/Kernel/Option.cs }
+  - { template: templates/NoNullableReturns.cs.sbn, target: tests/Architecture.Tests/Rules/NoNullableReturns.cs }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No public method in a module's Domain or Application project returns a nullable reference; absence is an Option<T>.", file: templates/NoNullableReturns.cs.sbn }

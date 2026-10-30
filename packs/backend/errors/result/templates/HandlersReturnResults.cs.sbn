@@ -8,7 +8,7 @@ public sealed class HandlersReturnResults : IArchitectureRule
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
-        ArgumentNullException.ThrowIfNull(model);
+        {{ not_null "model" }}
 
         var handlers = model.ModuleAssemblies
             .Where(assembly => assembly.GetName().Name!.EndsWith(".Application", StringComparison.Ordinal))
@@ -35,6 +35,6 @@ public sealed class HandlersReturnResults : IArchitectureRule
             type = type.GetGenericArguments()[0];
         }
 
-        return type.IsGenericType && type.GetGenericTypeDefinition().FullName == "{{ namespace }}.BuildingBlocks.Results.Result`2";
+        return type.IsGenericType && type.GetGenericTypeDefinition().FullName == "{{ namespace }}.Kernel.Result`2";
     }
 }

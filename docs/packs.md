@@ -68,6 +68,20 @@ the slot's `separator` (a newline unless declared — JSON lists declare
 `",\n"`). A slot declared twice, a contribution to a slot no selected
 pack declares, and a cardinality breach are errors.
 
+## Template functions
+
+A pattern that runs through every pack is a function, not a branch. Packs contribute Scriban code to the reserved slot
+`templates.functions`; the generator prefixes it to every template and slot contribution instead of rendering it.
+Write `{{ not_null "services" }}`, never a guard of your own: the chosen guards pack decides whether that renders
+`Ensure.That(services).IsNotNull();` or `ArgumentNullException.ThrowIfNull(services);`.
+
+| Function | Defined by | Renders |
+|---|---|---|
+| `not_null name` | `backend.guards.*` | a null guard for the argument `name` |
+| `not_blank name` | `backend.guards.*` | a null-or-whitespace guard for the string argument `name` |
+
+A contribution is plain Scriban code (`func ... end`), no `{{ }}`.
+
 ## What the generator writes from every pack
 
 - **ADR:** each selected pack's `adr` is rendered to

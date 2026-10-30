@@ -1,8 +1,6 @@
 option: backend.errors.result
 files:
-  - { template: templates/Result.cs.sbn, target: src/BuildingBlocks/Results/Result.cs }
-  - { template: templates/ApiError.cs.sbn, target: src/BuildingBlocks/Results/ApiError.cs }
-  - { template: templates/ResultHttpExtensions.cs.sbn, target: src/BuildingBlocks/Results/ResultHttpExtensions.cs }
+  - { template: templates/ResultHttpExtensions.cs.sbn, target: src/BuildingBlocks/Http/ResultHttpExtensions.cs }
   - { template: templates/HandlersReturnResults.cs.sbn, target: tests/Architecture.Tests/Rules/HandlersReturnResults.cs }
 slots:
   - { slot: host.services, template: templates/host-services.sbn }

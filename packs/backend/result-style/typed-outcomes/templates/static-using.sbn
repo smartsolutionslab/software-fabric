@@ -1,0 +1,3 @@
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Kernel' And '$(MSBuildProjectName)' != 'AppHost'">
+    <Using Include="{{ namespace }}.Kernel.Result" Static="true" />
+  </ItemGroup>

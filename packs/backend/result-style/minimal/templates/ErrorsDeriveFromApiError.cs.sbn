@@ -1,0 +1,17 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class ErrorsDeriveFromApiError : IArchitectureRule
+{
+    public string Description => "Every type named *Error in a module's Application project derives from ApiError.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        return model.ModuleAssemblies
+            .Where(assembly => assembly.GetName().Name!.EndsWith(".Application", StringComparison.Ordinal))
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type.IsClass && type.Name.EndsWith("Error", StringComparison.Ordinal) && !typeof(ApiError).IsAssignableFrom(type))
+            .Select(type => $"{type.FullName} is named an error but does not derive from ApiError.");
+    }
+}

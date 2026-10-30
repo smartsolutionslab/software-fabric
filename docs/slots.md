@@ -20,11 +20,13 @@ docs/adr/NNNN-<dimension>-<option>.md
                                 generator; one per pack, numbered in selection order
 global.json  .editorconfig  Directory.Build.props  Directory.Packages.props  build.proj
 Solution.slnx                   base
+build/guards/BannedSymbols.txt  backend.guards.ensure-that
 src/
   AppHost/                      base (Aspire composition root)
   ServiceDefaults/              base
   BuildingBlocks/               base; packs add their own files under it
   Contracts/                    base
+  Kernel/                       base (project); guards, result and absence packs add Ensure, Result, ApiError, Option
   Host/                         backend.topology.modular-monolith
   Modules/
     Directory.Build.props       base; per-layer package references by slot
@@ -111,6 +113,8 @@ Cardinality `0+` unless stated. "Separator" is what joins contributions
 
 | Slot | File | Filled by |
 |---|---|---|
+| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`) |
+| `dotnet.build-items` *(added with the kernel options)* | `Directory.Build.props` | ensure-that (ban list), typed-outcomes (`using static Result`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
 | `dotnet.build-properties` | `Directory.Build.props` | packs adding analyzers or properties (result, red-first) |
 | `solution.projects` *(added in M1-02)* | `Solution.slnx` | packs owning a project: modular-monolith (Host), aspire-fixture (Integration.Tests) |

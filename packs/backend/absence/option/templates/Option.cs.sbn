@@ -1,0 +1,57 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>
+/// An explicit absence (docs/adr): says what absent means and makes the caller handle it, where a nullable reference
+/// only says a value may be null.
+/// </summary>
+#pragma warning disable CA1716 // Option is a keyword in Visual Basic only; the name is the point here.
+public readonly struct Option<T> : IEquatable<Option<T>>
+    where T : notnull
+{
+    private readonly T value;
+    private readonly bool hasValue;
+
+    private Option(T value, bool hasValue)
+    {
+        this.value = value;
+        this.hasValue = hasValue;
+    }
+
+    public bool HasValue => hasValue;
+
+    public T Value =>
+        hasValue ? value : throw new InvalidOperationException("Option has no value.");
+
+#pragma warning disable CA1000 // Option<Invoice>.Some(invoice) / Option<Invoice>.None are the type's whole API.
+    public static Option<T> Some(T value) =>
+        value is null
+            ? throw new ArgumentNullException(nameof(value))
+            : new Option<T>(value, hasValue: true);
+
+    public static Option<T> None => default;
+#pragma warning restore CA1000
+
+    public TOut Match<TOut>(Func<T, TOut> some, Func<TOut> none) =>
+        hasValue ? some(value) : none();
+
+    public Option<TOut> Map<TOut>(Func<T, TOut> mapper)
+        where TOut : notnull =>
+        hasValue ? Option<TOut>.Some(mapper(value)) : Option<TOut>.None;
+
+    public T GetOrDefault(T fallback) => hasValue ? value : fallback;
+
+    public bool Equals(Option<T> other) =>
+        hasValue == other.hasValue && (!hasValue || EqualityComparer<T>.Default.Equals(value, other.value));
+
+    public override bool Equals(object? obj) => obj is Option<T> other && Equals(other);
+
+    public override int GetHashCode() =>
+        hasValue ? HashCode.Combine(true, value) : HashCode.Combine(false);
+
+    public static bool operator ==(Option<T> left, Option<T> right) => left.Equals(right);
+
+    public static bool operator !=(Option<T> left, Option<T> right) => !left.Equals(right);
+
+    public override string ToString() => hasValue ? $"Some({value})" : "None";
+}
+#pragma warning restore CA1716

@@ -8,7 +8,7 @@ public sealed class ConsumersHandleIntegrationEvents : IArchitectureRule
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
-        ArgumentNullException.ThrowIfNull(model);
+        {{ not_null "model" }}
 
         var consumers = model.ModuleAssemblies
             .SelectMany(assembly => assembly.GetTypes())

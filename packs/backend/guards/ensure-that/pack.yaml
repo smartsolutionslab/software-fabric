@@ -1,0 +1,12 @@
+option: backend.guards.ensure-that
+files:
+  - { template: templates/Ensure.cs.sbn, target: src/Kernel/Ensure.cs }
+  - { template: templates/BannedSymbols.txt.sbn, target: build/guards/BannedSymbols.txt }
+slots:
+  - { slot: templates.functions, template: templates/functions.sbn }
+  - { slot: dotnet.build-items, template: templates/build-items.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: analyzer, describes: "The BCL ThrowIf* guards are banned (RS0030) in every project but the AppHost; preconditions use Ensure.That.", file: templates/BannedSymbols.txt.sbn }

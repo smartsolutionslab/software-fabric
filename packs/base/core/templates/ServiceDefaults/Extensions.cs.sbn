@@ -71,7 +71,7 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        ArgumentNullException.ThrowIfNull(app);
+        {{ not_null "app" }}
 
         // Health endpoints outside Development need a deliberate decision: https://aka.ms/aspire/healthchecks
         if (app.Environment.IsDevelopment())

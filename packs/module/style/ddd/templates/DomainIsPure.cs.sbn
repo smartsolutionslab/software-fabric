@@ -2,11 +2,11 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 
 public sealed class DomainIsPure : IArchitectureRule
 {
-    public string Description => "A module's Domain project references nothing but the BCL and BuildingBlocks.Domain.";
+    public string Description => "A module's Domain project references nothing but the BCL, Kernel and BuildingBlocks.Domain.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
-        ArgumentNullException.ThrowIfNull(model);
+        {{ not_null "model" }}
 
         foreach (var assembly in model.ModuleAssemblies.Where(assembly => assembly.GetName().Name!.EndsWith(".Domain", StringComparison.Ordinal)))
         {
@@ -18,6 +18,6 @@ public sealed class DomainIsPure : IArchitectureRule
     }
 
     private static bool IsAllowed(string name) =>
-        name is "netstandard" or "mscorlib" or "System" or "{{ namespace }}.BuildingBlocks.Domain"
+        name is "netstandard" or "mscorlib" or "System" or "{{ namespace }}.Kernel" or "{{ namespace }}.BuildingBlocks.Domain"
         || name.StartsWith("System.", StringComparison.Ordinal);
 }

@@ -114,6 +114,28 @@ dimensions:
       result:     { tier: supported }
       exceptions: { tier: supported }
 
+  backend.result-style:
+    scope: project
+    active-when: "backend.errors == result"
+    default: typed-outcomes
+    options:
+      typed-outcomes: { tier: supported, note: "readonly struct; handlers return Success(value) / Failure(error) without repeating type arguments" }
+      minimal:        { tier: supported, note: "a sealed class with Success, Failure and Match" }
+
+  backend.guards:
+    scope: project
+    default: ensure-that
+    options:
+      ensure-that: { tier: supported, note: "fluent Ensure.That(x) chains; the BCL ThrowIf* helpers are banned" }
+      bcl:         { tier: supported, note: "ArgumentNullException.ThrowIfNull and friends" }
+
+  backend.absence:
+    scope: project
+    default: option
+    options:
+      option:   { tier: supported, note: "Option<T> for domain absences and repository lookups" }
+      nullable: { tier: supported, note: "nullable references only" }
+
   backend.auth:
     scope: project
     default: keycloak

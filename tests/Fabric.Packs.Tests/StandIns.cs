@@ -20,9 +20,9 @@ internal sealed class StandIns : IDisposable
 
     public IReadOnlyList<string> StoodIn { get; private set; } = [];
 
-    public IReadOnlyDictionary<string, PackManifest> Complete(CatalogModel catalog, IReadOnlyDictionary<string, PackManifest> packs, string profile)
+    public IReadOnlyDictionary<string, PackManifest> Complete(CatalogModel catalog, IReadOnlyDictionary<string, PackManifest> packs, string profile, IReadOnlyList<string> overrides)
     {
-        var resolved = ChoiceResolver.Resolve(catalog, profile, []).Choices
+        var resolved = ChoiceResolver.Resolve(catalog, profile, overrides).Choices
             ?? throw new InvalidOperationException($"profile {profile} does not resolve.");
 
         var chosen = resolved.Project.Concat(resolved.ModuleDefaults)

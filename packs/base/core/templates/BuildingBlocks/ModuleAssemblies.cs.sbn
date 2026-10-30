@@ -11,7 +11,7 @@ public static class ModuleAssemblies
 
     public static Assembly Of(IModule module, string layer)
     {
-        ArgumentNullException.ThrowIfNull(module);
+        {{ not_null "module" }}
         return Of(module.GetType(), layer);
     }
 

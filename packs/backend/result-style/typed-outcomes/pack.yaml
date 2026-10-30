@@ -1,0 +1,12 @@
+option: backend.result-style.typed-outcomes
+files:
+  - { template: templates/Result.cs.sbn, target: src/Kernel/Result.cs }
+  - { template: templates/ApiError.cs.sbn, target: src/Kernel/ApiError.cs }
+  - { template: templates/ErrorsAreSealedRecords.cs.sbn, target: tests/Architecture.Tests/Rules/ErrorsAreSealedRecords.cs }
+slots:
+  - { slot: dotnet.build-items, template: templates/static-using.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Every error in a module derives from ApiError and is a sealed record.", file: templates/ErrorsAreSealedRecords.cs.sbn }

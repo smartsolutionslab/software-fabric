@@ -9,7 +9,7 @@ public static class TenantScope
 
     public static IDisposable Begin(string tenantId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        {{ not_blank "tenantId" }}
 
         var previous = Current.Value;
         Current.Value = tenantId;

@@ -1,8 +1,9 @@
-namespace {{ namespace }}.BuildingBlocks.Results;
+namespace {{ namespace }}.Kernel;
 
 /// <summary>Either a value or an expected failure. Read <see cref="Value"/> or <see cref="Error"/> only after checking <see cref="IsSuccess"/>, or use <see cref="Match{TResult}"/>.</summary>
 public sealed class Result<TValue, TError>
-    where TError : ApiError
+    where TValue : notnull
+    where TError : notnull
 {
     private readonly TValue? value;
     private readonly TError? error;
@@ -24,20 +25,20 @@ public sealed class Result<TValue, TError>
 
     public TError Error => IsSuccess ? throw new InvalidOperationException("A successful result has no error.") : error!;
 
-#pragma warning disable CA1000 // Static factories on the generic type are the point: Result<Invoice, BillingError>.Success(invoice).
+#pragma warning disable CA1000 // Static factories on the generic type are the point: Result<Invoice, ApiError>.Success(invoice).
     public static Result<TValue, TError> Success(TValue value) => new(value);
 
     public static Result<TValue, TError> Failure(TError error)
     {
-        ArgumentNullException.ThrowIfNull(error);
+        {{ not_null "error" }}
         return new(error);
     }
 #pragma warning restore CA1000
 
     public TResult Match<TResult>(Func<TValue, TResult> success, Func<TError, TResult> failure)
     {
-        ArgumentNullException.ThrowIfNull(success);
-        ArgumentNullException.ThrowIfNull(failure);
+        {{ not_null "success" }}
+        {{ not_null "failure" }}
 
         return IsSuccess ? success(value!) : failure(error!);
     }

@@ -12,4 +12,4 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: architecture-test, describes: "A module's Domain project references nothing but the BCL and BuildingBlocks.Domain.", file: templates/DomainIsPure.cs.sbn }
+  - { kind: architecture-test, describes: "A module's Domain project references nothing but the BCL, Kernel and BuildingBlocks.Domain.", file: templates/DomainIsPure.cs.sbn }

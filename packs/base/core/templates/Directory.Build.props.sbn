@@ -10,4 +10,16 @@
     <Deterministic>true</Deterministic>
 {{ slots["dotnet.build-properties"] }}
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'AppHost'">
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- src/Kernel is available everywhere but the AppHost, which composes processes and needs none of it. -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Kernel' And '$(MSBuildProjectName)' != 'AppHost'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)src/Kernel/Kernel.csproj" />
+    <Using Include="{{ namespace }}.Kernel" />
+  </ItemGroup>
+
+{{ slots["dotnet.build-items"] }}
 </Project>

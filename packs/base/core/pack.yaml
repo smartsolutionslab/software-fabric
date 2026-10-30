@@ -34,6 +34,7 @@ files:
   - { template: templates/BuildingBlocks/ModuleEndpoints.cs.sbn, target: src/BuildingBlocks/Modules/ModuleEndpoints.cs }
   - { template: templates/BuildingBlocks/ModuleAssemblies.cs.sbn, target: src/BuildingBlocks/Modules/ModuleAssemblies.cs }
   - { template: templates/Contracts/Contracts.csproj.sbn, target: src/Contracts/Contracts.csproj }
+  - { template: templates/Kernel/Kernel.csproj.sbn, target: src/Kernel/Kernel.csproj }
   - { template: templates/Modules/Directory.Build.props.sbn, target: src/Modules/Directory.Build.props }
   - { template: templates/tests/Directory.Build.props.sbn, target: tests/Directory.Build.props }
   - { template: templates/tests/Architecture.Tests.csproj.sbn, target: tests/Architecture.Tests/Architecture.Tests.csproj }
@@ -60,6 +61,8 @@ declares-slots:
   - { slot: readme.sections, description: "How to build, run and work on the project, one section per pack that changes it.", separator: "\n\n" }
   - { slot: solution.projects, description: "<Project Path='...' /> lines for projects other packs own." }
   - { slot: dotnet.package-versions, description: "<PackageVersion> lines; one owner per package." }
+  - { slot: templates.functions, description: "Scriban function definitions every template can call (not_null, not_blank, ...); filled by packs, never rendered as text." }
+  - { slot: dotnet.build-items, description: "Item lines (references, usings, analyzer files) in an ItemGroup of Directory.Build.props, conditioned by the contributor." }
   - { slot: dotnet.build-properties, description: "Properties for every .NET project." }
   - { slot: apphost.packages, description: "<PackageReference> lines for the AppHost." }
   - { slot: apphost.project-references, description: "<ProjectReference> lines for the projects the AppHost runs." }

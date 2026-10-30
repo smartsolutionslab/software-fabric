@@ -6,7 +6,7 @@ public sealed class RequestsLiveInCommandsOrQueries : IArchitectureRule
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
-        ArgumentNullException.ThrowIfNull(model);
+        {{ not_null "model" }}
 
         foreach (var type in model.ModuleAssemblies.SelectMany(assembly => assembly.GetTypes()).Where(type => !type.IsInterface))
         {
