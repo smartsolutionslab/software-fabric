@@ -83,7 +83,7 @@ public static class CatalogReader
             id,
             source.Enum<DimensionScope>(fields.Required("scope"), "scope", owner),
             fields.Optional("multi") is { } multi && source.Boolean(multi, "multi", owner),
-            fields.Optional("active-when") is { } activeWhen ? source.Scalar(activeWhen, owner) : null,
+            fields.Optional("active-when") is { } activeWhen ? source.Condition(activeWhen, owner) : null,
             fields.Optional("default") is { } defaultNode ? source.ScalarOrList(defaultNode, owner) : null,
             fields.Optional("note") is { } note ? source.Scalar(note, owner) : null,
             options);
@@ -97,8 +97,8 @@ public static class CatalogReader
         return new CatalogOption(
             id,
             source.Enum<SupportTier>(fields.Required("tier"), "tier", owner),
-            fields.Optional("requires") is { } requires ? source.List(requires, owner) : [],
-            fields.Optional("conflicts") is { } conflicts ? source.List(conflicts, owner) : [],
+            fields.Optional("requires") is { } requires ? source.Conditions(requires, owner) : [],
+            fields.Optional("conflicts") is { } conflicts ? source.Conditions(conflicts, owner) : [],
             fields.Optional("note") is { } note ? source.Scalar(note, owner) : null);
     }
 

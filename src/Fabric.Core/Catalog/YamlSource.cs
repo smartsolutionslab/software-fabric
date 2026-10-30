@@ -23,6 +23,24 @@ internal sealed class YamlSource(string name)
     public IReadOnlyList<string> ScalarOrList(YamlNode node, string owner) =>
         node is YamlSequenceNode ? List(node, owner) : [Scalar(node, owner)];
 
+    public Condition Condition(YamlNode node, string owner)
+    {
+        var text = Scalar(node, owner);
+        try
+        {
+            return ConditionParser.Parse(text);
+        }
+        catch (ConditionSyntaxException exception)
+        {
+            throw Error(node, $"invalid condition on {owner}: {exception.Message}");
+        }
+    }
+
+    public IReadOnlyList<Condition> Conditions(YamlNode node, string owner) =>
+        node is YamlSequenceNode sequence
+            ? [.. sequence.Children.Select(child => Condition(child, owner))]
+            : throw Error(node, $"{owner} must be a list.");
+
     public int Integer(YamlNode node, string field, string owner)
     {
         var value = Scalar(node, owner);

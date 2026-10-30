@@ -40,7 +40,7 @@ public class CatalogReaderTests
         var busLibrary = catalog.Dimensions["backend.bus.library"];
         busLibrary.Scope.ShouldBe(DimensionScope.Project);
         busLibrary.Multi.ShouldBeFalse();
-        busLibrary.ActiveWhen.ShouldBe("backend.bus.transport != none");
+        busLibrary.ActiveWhen?.ToString().ShouldBe("backend.bus.transport != none");
         busLibrary.Default.ShouldBe(["wolverine"]);
 
         var protocols = catalog.Dimensions["backend.api-protocols"];
@@ -58,8 +58,8 @@ public class CatalogReaderTests
         var uiLibraries = catalog.Dimensions["frontend.ui-library"].Options;
 
         uiLibraries["shadcn"].Tier.ShouldBe(SupportTier.Supported);
-        uiLibraries["shadcn"].Requires.ShouldBe(["frontend.framework == react", "frontend.styling == tailwind"]);
-        uiLibraries["mui"].Conflicts.ShouldBe(["frontend.styling == tailwind"]);
+        uiLibraries["shadcn"].Requires.Select(condition => condition.ToString()).ShouldBe(["frontend.framework == react", "frontend.styling == tailwind"]);
+        uiLibraries["mui"].Conflicts.Select(condition => condition.ToString()).ShouldBe(["frontend.styling == tailwind"]);
         catalog.Dimensions["module.event-store"].Options["kurrentdb"].Tier.ShouldBe(SupportTier.Experimental);
     }
 
@@ -109,7 +109,7 @@ public class CatalogReaderTests
               a.b:
                 scope: project
                 options:
-                  x: { tier: supported, needs: [c.d == e] }
+                  x: { tier: supported, needs: ["c.d == e"] }
             """));
 
         exception.Message.ShouldContain("'needs'");

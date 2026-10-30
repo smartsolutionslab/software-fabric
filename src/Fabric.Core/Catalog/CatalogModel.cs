@@ -22,7 +22,7 @@ public sealed record Dimension(
     string Id,
     DimensionScope Scope,
     bool Multi,
-    string? ActiveWhen,
+    Condition? ActiveWhen,
     IReadOnlyList<string>? Default,
     string? Note,
     IReadOnlyDictionary<string, CatalogOption> Options);
@@ -30,8 +30,8 @@ public sealed record Dimension(
 public sealed record CatalogOption(
     string Id,
     SupportTier Tier,
-    IReadOnlyList<string> Requires,
-    IReadOnlyList<string> Conflicts,
+    IReadOnlyList<Condition> Requires,
+    IReadOnlyList<Condition> Conflicts,
     string? Note);
 
 /// <param name="Settings">Dimension id to selection, in file order. Single-valued dimensions hold one entry.</param>
