@@ -1,0 +1,7 @@
+## Frontend
+
+```bash
+cd web && pnpm install && pnpm build
+```
+
+The AppHost starts the web app with everything else (`dotnet run --project src/AppHost`).

@@ -3,5 +3,8 @@ var builder = DistributedApplication.CreateBuilder(args);
 {{ slots["apphost.resources"] }}
 
 {{ slots["apphost.host"] }}{{ slots["apphost.host-wiring"] }};
+{{ if slots["apphost.web"] != "" }}
+{{ slots["apphost.web"] }}{{ slots["apphost.web-wiring"] }};
+{{ end }}
 
 builder.Build().Run();

@@ -1,0 +1,10 @@
+option: frontend.forms.react-hook-form
+files: []
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 30 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing another form library (Formik, React Final Form) fails lint.", file: templates/restricted.sbn }

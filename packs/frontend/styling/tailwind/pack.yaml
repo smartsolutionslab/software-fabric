@@ -1,0 +1,12 @@
+option: frontend.styling.tailwind
+files: []
+slots:
+  - { slot: web.dev-dependencies, template: templates/dev-dependencies.sbn }
+  - { slot: web.vite-imports, template: templates/vite-import.sbn, order: 10 }
+  - { slot: web.vite-plugins, template: templates/vite-plugin.sbn, order: 10 }
+  - { slot: web.styles, template: templates/styles.sbn, order: 10 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "The stylesheet compiles with Tailwind during the build; an unknown utility in @apply fails it." }

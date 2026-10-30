@@ -20,11 +20,11 @@ Two halves, one repo:
 ## Status
 
 M0 (generator core) is done. M1 (profile `saas-standard-react` end to end)
-is in progress: the base pack and the backend packs through messaging and
-tenancy are real (M1-01 to M1-05); the frontend, the Aspire integration
-tests and the agent setup follow (M1-06 to M1-10). `tests/Fabric.Packs.Tests`
+is in progress: the base pack, the backend packs, the Aspire integration
+tests and the frontend app shell are real (M1-01 to M1-07a); login and
+data in the frontend, and the agent setup follow (M1-07b to M1-10). `tests/Fabric.Packs.Tests`
 generates the profile from the real packs — empty stand-ins for the rest —
-builds it, runs its tests and starts it against real PostgreSQL and RabbitMQ
+builds it, runs its tests, installs, builds, lints and tests its web app, and starts it against real PostgreSQL and RabbitMQ
 containers.
 
 | Artifact | Purpose |

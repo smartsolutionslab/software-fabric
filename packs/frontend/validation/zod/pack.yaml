@@ -1,0 +1,10 @@
+option: frontend.validation.zod
+files: []
+slots:
+  - { slot: web.dependencies, template: templates/dependency.sbn }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 40 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing another schema library (Yup, Joi, Valibot) fails lint.", file: templates/restricted.sbn }
