@@ -16,3 +16,4 @@ jobs:
       - run: dotnet restore Fabric.slnx
       - run: dotnet build Fabric.slnx -c Release --no-restore
       - run: dotnet test --solution Fabric.slnx -c Release --no-build
+      - run: build/profiles.sh

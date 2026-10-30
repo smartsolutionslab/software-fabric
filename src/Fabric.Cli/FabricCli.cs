@@ -22,6 +22,7 @@ public static class FabricCli
             ValidateCommand(output, error),
             NewCommand(output, error),
             AddModuleCommand(output, error),
+            ProfilesCommand(output, error),
         };
 
         return root.Parse(args).Invoke(new InvocationConfiguration { Output = output, Error = error });
@@ -155,6 +156,24 @@ public static class FabricCli
             }
 
             output.WriteLine($"added module {moduleName} with {Files(addition.Created.Count)}.");
+            return 0;
+        }));
+
+        return command;
+    }
+
+    private static Command ProfilesCommand(TextWriter output, TextWriter error)
+    {
+        var catalog = CatalogOption();
+        var command = new Command("profiles", "List the catalog's profiles, one per line.") { catalog };
+
+        command.SetAction(result => Guarded(error, () =>
+        {
+            foreach (var profile in CatalogReader.ReadFile(result.GetValue(catalog)!).Profiles.Keys)
+            {
+                output.WriteLine(profile);
+            }
+
             return 0;
         }));
 
