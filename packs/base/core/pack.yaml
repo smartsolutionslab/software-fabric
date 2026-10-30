@@ -20,6 +20,7 @@ files:
   - { template: templates/build.proj.sbn, target: build.proj }
   - { template: templates/Solution.slnx.sbn, target: Solution.slnx }
   - { template: templates/ci.yml.sbn, target: ".github/workflows/ci.yml" }
+  - { template: templates/pull_request_template.md.sbn, target: ".github/pull_request_template.md" }
   - { template: templates/AppHost/AppHost.csproj.sbn, target: src/AppHost/AppHost.csproj }
   - { template: templates/AppHost/AppHost.cs.sbn, target: src/AppHost/AppHost.cs }
   - { template: templates/AppHost/appsettings.json.sbn, target: src/AppHost/appsettings.json }
@@ -75,6 +76,7 @@ declares-slots:
   - { slot: tests.build-properties, description: "Properties for every test project." }
   - { slot: tests.packages, description: "<PackageReference> lines for every test project." }
   - { slot: tests.usings, description: "<Using> lines for every test project." }
+  - { slot: pr-template.sections, description: "Sections every pull request description has, each starting with a ## heading.", separator: "\n\n" }
   - { slot: ci.backend-steps, description: "Steps of the backend CI job, indented six spaces." }
   - { slot: ci.frontend-steps, description: "Steps of the frontend CI job, indented six spaces." }
 agents:

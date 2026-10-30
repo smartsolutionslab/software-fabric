@@ -11,6 +11,7 @@ slots:
   - { slot: host.services, template: templates/host-services.sbn }
   - { slot: host.middleware, template: templates/host-middleware.sbn, order: -10 }
   - { slot: modules.endpoints, template: templates/module-endpoints.sbn, order: -10 }
+  - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 10 }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

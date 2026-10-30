@@ -282,4 +282,35 @@ public sealed class SaasStandardReactTests
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
     }
+
+    [Fact]
+    public void The_generated_integration_tests_pass_against_the_running_aspire_stack()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+        output.ShouldContain("succeeded: 6");
+    }
+
+    [Theory]
+    [InlineData("src/Modules/Billing/Billing.Domain/Invoice.cs", "## What changed\nPaid invoices.", 1)]
+    [InlineData("src/Modules/Billing/Billing.Domain/Invoice.cs", "## Tests observed failing\n\n```\nfailed Billing.Tests.An_invoice_can_be_paid\n```", 0)]
+    [InlineData("docs/adr/0001-base-core.md", "## What changed\nTypo.", 0)]
+    [InlineData("tests/Modules/Billing.Tests/InvoiceTests.cs", "## What changed\nMore tests.", 0)]
+    public void The_red_first_check_wants_failing_output_when_source_changes(string changedFile, string body, int expectedExitCode)
+    {
+        using var project = new GeneratedProject(Profile);
+        var bodyFile = Path.Combine(project.ProjectDirectory, "pr-body.md");
+        var changedFiles = Path.Combine(project.ProjectDirectory, "changed-files.txt");
+        File.WriteAllText(bodyFile, body);
+        File.WriteAllText(changedFiles, changedFile + "\n");
+
+        var (exitCode, output) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/check-red-first.sh", bodyFile, changedFiles);
+
+        exitCode.ShouldBe(expectedExitCode, output);
+    }
 }

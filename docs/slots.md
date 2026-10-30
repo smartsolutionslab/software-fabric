@@ -141,6 +141,7 @@ is a defect in the second pack.
 | `host.packages` | `src/Host/Host.csproj` | 0+ | keycloak, wolverine, ef-core |
 | `host.services` | `src/Host/Program.cs` | 0+ | keycloak, wolverine (with `modules` in scope), result (problem details), tenancy |
 | `host.middleware` | `src/Host/Program.cs` | 0+ | keycloak, tenancy |
+| `host.endpoints` *(added in M1-06)* | `src/Host/Program.cs` | 0+ | keycloak (`/me`), tenancy (`/me/tenant`) |
 | `modules.infrastructure` | `src/BuildingBlocks/Modules/ModuleInfrastructure.cs` | 0+ | ef-core, wolverine, tenancy |
 | `modules.endpoints` *(added in M1-02)* | `src/BuildingBlocks/Modules/ModuleEndpoints.cs` | 0+ | minimal-apis (maps `IEndpoint`s), keycloak (`group.RequireAuthorization()`) |
 | `persistence.options` *(added in M1-03)* | `src/BuildingBlocks/Persistence/PersistenceRegistration.cs` (owned and declared by ef-core) | **exactly-one** | postgres (`options.UseNpgsql(connectionString)`) |
@@ -164,7 +165,8 @@ is a defect in the second pack.
 
 | Slot | File | Filled by |
 |---|---|---|
-| `ci.backend-steps` | `.github/workflows/ci.yml` | aspire-fixture (Docker), red-first (none) |
+| `ci.backend-steps` | `.github/workflows/ci.yml` | xunit (runs every test project; the integration tests need Docker, which GitHub's runners have) |
+| `pr-template.sections` *(added in M1-06)* | `.github/pull_request_template.md` | red-first (`## Tests observed failing`) |
 | `ci.frontend-steps` | 〃 | pnpm, rtk-query-codegen (generated client is current), accessibility |
 
 ## Generator changes this needs

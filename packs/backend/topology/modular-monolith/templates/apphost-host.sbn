@@ -1,1 +1,2 @@
 builder.AddProject<Projects.Host>("host")
+    .WithHttpHealthCheck("/health")

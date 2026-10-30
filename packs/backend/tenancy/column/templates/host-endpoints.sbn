@@ -1,0 +1,2 @@
+app.MapGet("/me/tenant", ({{ namespace }}.BuildingBlocks.Tenancy.ITenantContext tenant) => TypedResults.Ok(new { TenantId = tenant.TenantId }))
+    .RequireAuthorization();

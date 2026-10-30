@@ -10,6 +10,7 @@ slots:
   - { slot: persistence.context-members, template: templates/context-members.sbn }
   - { slot: persistence.model-conventions, template: templates/model-conventions.sbn }
   - { slot: persistence.save-changes, template: templates/save-changes.sbn }
+  - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 20 }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
