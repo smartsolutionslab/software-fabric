@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/smartsolutionslab/software-fabric/schema/pack.schema.json",
+  "title": "Option pack manifest (pack.yaml)",
+  "description": "One pack implements one catalog option. See docs/adr/0002-option-packs-and-slots.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["option", "files", "agents", "adr", "gates"],
+  "properties": {
+    "option": {
+      "description": "The catalog option this pack implements, as <dimension>.<option>.",
+      "type": "string",
+      "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$"
+    },
+    "files": {
+      "description": "Files this pack owns outright. No other pack may write to these paths.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/file" }
+    },
+    "slots": {
+      "description": "Contributions to extension points other packs or the base declare.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/slotContribution" }
+    },
+    "declares-slots": {
+      "description": "Extension points this pack opens for others.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/slotDeclaration" }
+    },
+    "agents": {
+      "description": "Rules for agents working in a generated project that chose this option.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agents-md"],
+      "properties": {
+        "agents-md": { "description": "Section appended to the generated AGENTS.md.", "type": "string" },
+        "briefs": {
+          "description": "Additions to individual agent briefs, keyed by role.",
+          "type": "object",
+          "propertyNames": {
+            "enum": ["architect", "test-writer", "backend-engineer", "frontend-engineer", "infra-engineer", "backend-reviewer", "frontend-reviewer", "security-reviewer", "triage"]
+          },
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "adr": {
+      "description": "Template of the ADR recording this choice in the generated project.",
+      "type": "string"
+    },
+    "gates": {
+      "description": "Checks that fail a generated project's build when this option's rules are broken. At least one.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/gate" }
+    }
+  },
+  "$defs": {
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["template", "target"],
+      "properties": {
+        "template": { "description": "Path inside the pack, rendered with Scriban.", "type": "string" },
+        "target": { "description": "Path in the generated project; may use {{ module.name }} for per-module files.", "type": "string" },
+        "per-module": { "description": "Render once per module that chose this option.", "type": "boolean", "default": false }
+      }
+    },
+    "slotContribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slot", "template"],
+      "properties": {
+        "slot": { "type": "string", "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$" },
+        "template": { "type": "string" },
+        "order": { "description": "Tie-breaker inside the slot; lower renders first. Ties sort by option id.", "type": "integer", "default": 0 }
+      }
+    },
+    "slotDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slot", "description"],
+      "properties": {
+        "slot": { "type": "string", "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$" },
+        "description": { "type": "string" },
+        "cardinality": { "enum": ["zero-or-more", "exactly-one", "at-most-one"], "default": "zero-or-more" }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "describes"],
+      "properties": {
+        "kind": { "enum": ["architecture-test", "analyzer", "lint-rule", "ci-step", "unit-test"] },
+        "describes": { "description": "The rule this gate enforces, in one sentence.", "type": "string" },
+        "file": { "description": "Template providing the gate, if it is a file.", "type": "string" }
+      }
+    }
+  }
+}

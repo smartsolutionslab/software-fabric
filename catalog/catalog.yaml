@@ -1,0 +1,446 @@
+# Software Fabric — option catalog
+# Grammar: docs/catalog-rules.md
+
+version: 1
+
+profiles:
+  saas-standard-react:
+    frontend.framework: react
+    frontend.state: redux-toolkit
+    frontend.api-client: rtk-query-codegen
+    frontend.ui-library: shadcn
+    frontend.styling: tailwind
+    backend.bus.transport: rabbitmq
+    backend.tenancy: column
+    module.style: ddd
+
+  saas-standard-vue:
+    extends: saas-standard-react
+    frontend.framework: vue
+    frontend.state: pinia-tanstack-query
+    frontend.api-client: orval
+    frontend.routing: vue-router
+    frontend.forms: vee-validate
+    frontend.ui-library: primevue
+    frontend.styling: library-theme
+
+  industrial-event-driven-mfe:
+    frontend.framework: react
+    frontend.architecture: micro-frontends
+    frontend.mfe-technique: module-federation
+    frontend.design-system: tokens-and-components
+    frontend.realtime: signalr
+    backend.bus.transport: kafka
+    module.style: event-sourced
+    module.cqrs: physical
+
+  lean-crud:
+    frontend.framework: react
+    frontend.state: tanstack-query
+    backend.bus.transport: none
+    module.style: crud
+    module.cqrs: none
+
+dimensions:
+
+  # ─────────────────────────── Backend · project ───────────────────────────
+
+  backend.database:
+    scope: project
+    default: postgres
+    options:
+      postgres:  { tier: supported }
+      sqlserver: { tier: supported }
+
+  backend.data-access:
+    scope: project
+    default: ef-core
+    options:
+      ef-core:             { tier: supported }
+      ef-core-dapper-read: { tier: supported, note: "EF Core for writes, Dapper in query handlers" }
+
+  backend.topology:
+    scope: project
+    default: modular-monolith
+    options:
+      modular-monolith: { tier: supported }
+      services:
+        tier: supported
+        requires: ["backend.bus.transport != none"]
+
+  backend.bus.transport:
+    scope: project
+    default: none
+    options:
+      none:              { tier: supported, note: "in-process integration events through an outbox table" }
+      rabbitmq:          { tier: supported }
+      azure-service-bus: { tier: supported }
+      kafka:             { tier: supported }
+
+  backend.bus.library:
+    scope: project
+    active-when: "backend.bus.transport != none"
+    default: wolverine
+    options:
+      wolverine:   { tier: supported }
+      masstransit: { tier: supported, note: "check the licence of the pinned major version before each release" }
+
+  backend.mediator:
+    scope: project
+    default: hand-rolled
+    options:
+      hand-rolled: { tier: supported }
+      wolverine:   { tier: supported }
+
+  backend.api-style:
+    scope: project
+    default: minimal-apis
+    options:
+      minimal-apis: { tier: supported }
+      controllers:  { tier: supported }
+
+  backend.api-protocols:
+    scope: project
+    multi: true
+    default: [rest]
+    options:
+      rest: { tier: supported }
+      grpc: { tier: supported, requires: ["backend.api-protocols has rest"] }
+
+  backend.errors:
+    scope: project
+    default: result
+    options:
+      result:     { tier: supported }
+      exceptions: { tier: supported }
+
+  backend.auth:
+    scope: project
+    default: keycloak
+    options:
+      keycloak:     { tier: supported }
+      entra-id:     { tier: supported }
+      generic-oidc: { tier: supported }
+
+  backend.tenancy:
+    scope: project
+    default: none
+    options:
+      none:                { tier: supported }
+      column:              { tier: supported }
+      schema-per-tenant:   { tier: supported }
+      database-per-tenant: { tier: supported }
+
+  # ─────────────────────────── Backend · per module ──────────────────────────
+
+  module.style:
+    scope: module
+    default: ddd
+    options:
+      crud: { tier: supported }
+      ddd:  { tier: supported }
+      event-sourced:
+        tier: supported
+        requires: ["module.cqrs != none"]
+
+  module.event-store:
+    scope: module
+    active-when: "module.style == event-sourced"
+    default: marten
+    options:
+      marten:
+        tier: supported
+        requires: ["backend.database == postgres"]
+      kurrentdb: { tier: experimental }
+
+  module.ddd-depth:
+    scope: module
+    active-when: "module.style in (ddd, event-sourced)"
+    default: light
+    options:
+      light:  { tier: supported, note: "aggregates and value objects for core concepts" }
+      strict: { tier: supported, note: "no primitives on the domain model; architecture test enforced" }
+
+  module.cqrs:
+    scope: module
+    default: logical
+    options:
+      none:     { tier: supported }
+      logical:  { tier: supported, note: "separate command and query handlers, one store" }
+      physical: { tier: supported, note: "separate read models fed by projections" }
+
+  module.communication:
+    scope: module
+    multi: true
+    default: [integration-events]
+    options:
+      contract-interface:
+        tier: supported
+        conflicts: ["backend.topology == services"]
+      integration-events: { tier: supported }
+
+  # ─────────────────────────── Backend · tests ───────────────────────────────
+
+  backend.test.framework:
+    scope: project
+    default: xunit
+    options:
+      xunit: { tier: supported }
+      nunit: { tier: supported }
+      tunit: { tier: supported }
+
+  backend.test.assertions:
+    scope: project
+    default: shouldly
+    options:
+      shouldly:           { tier: supported }
+      awesome-assertions: { tier: supported }
+
+  backend.test.mocks:
+    scope: project
+    default: nsubstitute
+    options:
+      moq:         { tier: supported }
+      nsubstitute: { tier: supported }
+
+  backend.test.integration:
+    scope: project
+    default: aspire-fixture
+    options:
+      aspire-fixture: { tier: supported }
+      testcontainers: { tier: supported }
+
+  backend.test.extras:
+    scope: project
+    multi: true
+    default: []
+    options:
+      mutation-testing: { tier: supported, note: "Stryker.NET" }
+      contract-tests:   { tier: supported }
+
+  test.discipline:
+    scope: project
+    default: red-first
+    options:
+      red-first:  { tier: supported, note: "new-behaviour tests observed failing; output quoted in the PR" }
+      test-after: { tier: supported, note: "coverage gate only" }
+
+  # ─────────────────────────── Frontend ──────────────────────────────────────
+
+  frontend.framework:
+    scope: project
+    default: react
+    options:
+      react: { tier: supported }
+      vue:   { tier: supported }
+
+  frontend.architecture:
+    scope: project
+    default: spa
+    options:
+      spa:       { tier: supported }
+      multi-app: { tier: supported, note: "several apps and shared libraries in one workspace" }
+      micro-frontends:
+        tier: supported
+        requires: ["frontend.design-system != none"]
+
+  frontend.mfe-technique:
+    scope: project
+    active-when: "frontend.architecture == micro-frontends"
+    default: module-federation
+    options:
+      module-federation: { tier: supported }
+      native-federation: { tier: supported }
+      web-components:    { tier: supported }
+
+  frontend.mfe-mixed-frameworks:
+    scope: project
+    active-when: "frontend.architecture == micro-frontends"
+    default: "no"
+    options:
+      "no":  { tier: supported }
+      "yes":
+        tier: experimental
+        requires: ["frontend.design-system in (tokens, web-components)"]
+
+  frontend.workspace:
+    scope: project
+    default: pnpm-workspaces
+    options:
+      pnpm-workspaces: { tier: supported }
+      nx:              { tier: supported }
+      turborepo:       { tier: supported }
+
+  frontend.state:
+    scope: project
+    default: tanstack-query
+    options:
+      redux-toolkit:
+        tier: supported
+        requires: ["frontend.framework == react"]
+      zustand-tanstack-query:
+        tier: supported
+        requires: ["frontend.framework == react"]
+      tanstack-query: { tier: supported }
+      pinia-tanstack-query:
+        tier: supported
+        requires: ["frontend.framework == vue"]
+      pinia:
+        tier: supported
+        requires: ["frontend.framework == vue"]
+
+  frontend.api-client:
+    scope: project
+    default: orval
+    note: "Always generated from the backend's OpenAPI document; CI fails when it is stale."
+    options:
+      rtk-query-codegen:
+        tier: supported
+        requires: ["frontend.state == redux-toolkit"]
+      orval:         { tier: supported }
+      openapi-fetch: { tier: supported }
+
+  frontend.routing:
+    scope: project
+    default: react-router
+    options:
+      react-router:
+        tier: supported
+        requires: ["frontend.framework == react"]
+      tanstack-router:
+        tier: supported
+        requires: ["frontend.framework == react"]
+      vue-router:
+        tier: supported
+        requires: ["frontend.framework == vue"]
+
+  frontend.forms:
+    scope: project
+    default: react-hook-form
+    options:
+      react-hook-form:
+        tier: supported
+        requires: ["frontend.framework == react"]
+      tanstack-form: { tier: supported }
+      vee-validate:
+        tier: supported
+        requires: ["frontend.framework == vue"]
+      formkit:
+        tier: supported
+        requires: ["frontend.framework == vue"]
+
+  frontend.validation:
+    scope: project
+    default: zod
+    options:
+      zod:     { tier: supported }
+      valibot: { tier: supported }
+
+  frontend.styling:
+    scope: project
+    default: tailwind
+    options:
+      tailwind:      { tier: supported }
+      css-modules:   { tier: supported }
+      library-theme: { tier: supported, note: "the UI library's own theming system" }
+
+  frontend.ui-library:
+    scope: project
+    default: shadcn
+    options:
+      shadcn:
+        tier: supported
+        requires: ["frontend.framework == react", "frontend.styling == tailwind"]
+      radix-headless:
+        tier: supported
+        requires: ["frontend.framework == react"]
+      mui:
+        tier: supported
+        requires: ["frontend.framework == react"]
+        conflicts: ["frontend.styling == tailwind"]
+      mantine:
+        tier: supported
+        requires: ["frontend.framework == react"]
+      ant-design:
+        tier: supported
+        requires: ["frontend.framework == react"]
+      fluent-ui:
+        tier: supported
+        requires: ["frontend.framework == react"]
+      primevue:
+        tier: supported
+        requires: ["frontend.framework == vue"]
+      vuetify:
+        tier: supported
+        requires: ["frontend.framework == vue"]
+      quasar:
+        tier: supported
+        requires: ["frontend.framework == vue"]
+      element-plus:
+        tier: supported
+        requires: ["frontend.framework == vue"]
+      shadcn-vue:
+        tier: supported
+        requires: ["frontend.framework == vue", "frontend.styling == tailwind"]
+
+  frontend.design-system:
+    scope: project
+    default: none
+    options:
+      none:   { tier: supported, note: "the UI library as shipped" }
+      tokens: { tier: supported, note: "Style Dictionary tokens, framework-neutral" }
+      tokens-and-components: { tier: supported, note: "tokens plus an own component package with Storybook" }
+      web-components:        { tier: experimental }
+
+  frontend.data-grid:
+    scope: project
+    default: tanstack-table
+    options:
+      tanstack-table: { tier: supported }
+      ag-grid:        { tier: supported, note: "community vs enterprise licence is the project's call" }
+
+  frontend.charts:
+    scope: project
+    default: echarts
+    options:
+      echarts: { tier: supported }
+      recharts:
+        tier: supported
+        requires: ["frontend.framework == react"]
+      chartjs: { tier: supported }
+
+  frontend.realtime:
+    scope: project
+    default: none
+    options:
+      none:    { tier: supported }
+      signalr: { tier: supported }
+      sse:     { tier: supported }
+
+  frontend.auth-client:
+    scope: project
+    default: oidc-client-ts
+    options:
+      oidc-client-ts: { tier: supported }
+      msal:
+        tier: supported
+        requires: ["backend.auth == entra-id"]
+
+  frontend.pwa:
+    scope: project
+    default: "no"
+    options:
+      "no":  { tier: supported }
+      "yes": { tier: supported }
+
+  frontend.test.extras:
+    scope: project
+    multi: true
+    default: [accessibility]
+    note: "Vitest, Testing Library and Playwright are always present."
+    options:
+      storybook-tests:
+        tier: supported
+        requires: ["frontend.design-system == tokens-and-components"]
+      screenshot-tests: { tier: supported }
+      accessibility:    { tier: supported, note: "axe in component and e2e tests" }
