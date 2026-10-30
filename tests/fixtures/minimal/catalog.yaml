@@ -1,0 +1,33 @@
+# Fixture catalog: small enough to read, rich enough to exercise every generator path.
+version: 1
+
+profiles:
+  minimal:
+    backend.database: postgres
+  everything:
+    backend.database: sqlserver
+    backend.api-protocols: [rest, grpc]
+    module.style: crud
+
+dimensions:
+  backend.database:
+    scope: project
+    default: postgres
+    options:
+      postgres:  { tier: supported }
+      sqlserver: { tier: supported }
+
+  backend.api-protocols:
+    scope: project
+    multi: true
+    default: [rest]
+    options:
+      rest: { tier: supported }
+      grpc: { tier: supported, requires: ["backend.api-protocols has rest"] }
+
+  module.style:
+    scope: module
+    default: ddd
+    options:
+      crud: { tier: supported }
+      ddd:  { tier: supported }

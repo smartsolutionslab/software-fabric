@@ -1,0 +1,1 @@
+# ADR: module.style.crud

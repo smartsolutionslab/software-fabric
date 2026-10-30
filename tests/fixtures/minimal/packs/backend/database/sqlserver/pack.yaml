@@ -1,0 +1,11 @@
+option: backend.database.sqlserver
+files:
+  - { template: templates/connection.sbn, target: config/database.txt }
+slots:
+  - { slot: readme.database, template: templates/line.sbn }
+  - { slot: readme.sections, template: templates/section.sbn, order: 10 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "Fixture gate.", file: templates/gate.sbn }

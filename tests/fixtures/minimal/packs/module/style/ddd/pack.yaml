@@ -1,0 +1,10 @@
+option: module.style.ddd
+files:
+  - { template: templates/module.sbn, target: "src/{{ module.name }}/README.md", per-module: true }
+slots:
+  - { slot: readme.sections, template: templates/section.sbn, order: 30 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "Fixture gate.", file: templates/gate.sbn }

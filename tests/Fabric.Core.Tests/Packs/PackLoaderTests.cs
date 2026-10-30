@@ -189,4 +189,16 @@ public sealed class PackLoaderTests : IDisposable
 
         Load().Errors.Count.ShouldBe(2);
     }
+
+    [Fact]
+    public void A_relative_packs_directory_loads_like_an_absolute_one()
+    {
+        packs.AddDefault("backend.database.postgres");
+        var relative = Path.GetRelativePath(Environment.CurrentDirectory, packs.Root);
+
+        var result = PackLoader.Load(relative, Catalog);
+
+        result.Errors.ShouldBeEmpty();
+        result.Packs["backend.database.postgres"].Directory.ShouldBe(Path.Combine(packs.Root, "backend", "database", "postgres"));
+    }
 }

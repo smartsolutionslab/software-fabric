@@ -30,6 +30,7 @@ public static class PackLoader
         ArgumentNullException.ThrowIfNull(packsRoot);
         ArgumentNullException.ThrowIfNull(catalog);
 
+        packsRoot = Path.GetFullPath(packsRoot);
         List<string> errors = [];
         List<PackManifest> packs = [];
         IEnumerable<string> manifests = Directory.Exists(packsRoot)

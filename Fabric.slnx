@@ -4,6 +4,7 @@
     <Project Path="src/Fabric.Core/Fabric.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Fabric.Cli.Tests/Fabric.Cli.Tests.csproj" />
     <Project Path="tests/Fabric.Core.Tests/Fabric.Core.Tests.csproj" />
   </Folder>
 </Solution>

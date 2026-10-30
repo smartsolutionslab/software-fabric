@@ -4,10 +4,13 @@ using YamlDotNet.RepresentationModel;
 namespace Fabric.Core.Catalog;
 
 /// <summary>Reads YAML nodes strictly and reports every problem with file and line.</summary>
-internal sealed class YamlSource(string name)
+internal sealed class YamlSource(string name, Func<string, Exception>? createException = null)
 {
-    public CatalogException Error(YamlNode node, string message) =>
-        new($"{name}:{node.Start.Line}: {message}");
+    public Exception Error(YamlNode node, string message)
+    {
+        var located = $"{name}:{node.Start.Line}: {message}";
+        return createException?.Invoke(located) ?? new CatalogException(located);
+    }
 
     public YamlMappingNode Mapping(YamlNode node, string owner) =>
         node as YamlMappingNode ?? throw Error(node, $"{owner} must be a mapping.");
