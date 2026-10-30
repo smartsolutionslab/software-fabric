@@ -19,7 +19,7 @@ Two halves, one repo:
 
 ## Status
 
-Milestone **M0 — core**, not yet started in code. What exists:
+Milestone **M0 — core**: M0-01 to M0-06 done (solution, catalog loading, condition parsing, choice resolution, rule evaluation, catalog self-check). What exists:
 
 | Artifact | Purpose |
 |---|---|
