@@ -1,2 +1,2 @@
-app.MapGet("/me", (System.Security.Claims.ClaimsPrincipal user) => TypedResults.Ok(new { Name = user.FindFirst("preferred_username")?.Value }))
+app.MapGet("/me", (System.Security.Claims.ClaimsPrincipal user) => TypedResults.Ok(new {{ namespace }}.Host.CurrentUser(user.FindFirst("preferred_username")?.Value)))
     .RequireAuthorization();

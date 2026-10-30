@@ -4,6 +4,7 @@ files:
   - { template: templates/TenantScope.cs.sbn, target: src/BuildingBlocks/Tenancy/TenantScope.cs }
   - { template: templates/HttpTenantContext.cs.sbn, target: src/BuildingBlocks/Tenancy/HttpTenantContext.cs }
   - { template: templates/TenancyRegistration.cs.sbn, target: src/BuildingBlocks/Tenancy/TenancyRegistration.cs }
+  - { template: templates/CurrentTenant.cs.sbn, target: src/Host/CurrentTenant.cs }
   - { template: templates/TenantColumn.cs.sbn, target: src/BuildingBlocks/Tenancy/TenantColumn.cs }
 slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 10 }

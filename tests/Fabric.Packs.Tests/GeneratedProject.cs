@@ -79,7 +79,20 @@ internal sealed class GeneratedProject : IDisposable
     public void Dispose()
     {
         standIns.Dispose();
-        Directory.Delete(root, recursive: true);
+
+        // Processes a stopped AppHost started (the Vite server, its installer) can still be writing for a moment.
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                Directory.Delete(root, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < 10)
+            {
+                Thread.Sleep(TimeSpan.FromSeconds(1));
+            }
+        }
     }
 
     private static int FreePort()

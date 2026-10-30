@@ -3,11 +3,15 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 {{ slots["web.vite-imports"] }}
 
+// Under Aspire the host's address arrives as services__host__http__0; /api is forwarded there without the prefix.
+const host = process.env.services__host__http__0;
+
 export default defineConfig({
   plugins: [
     react(){{ if slots["web.vite-plugins"] != "" }},
 {{ slots["web.vite-plugins"] }}{{ end }}
   ],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-  test: { environment: 'jsdom', setupFiles: ['./src/test-setup.ts'] },
+  server: host ? { proxy: { '/api': { target: host, changeOrigin: true, rewrite: (path) => path.replace(/^\/api/, '') } } } : {},
+  test: { environment: 'jsdom', include: ['src/**/*.test.{ts,tsx}'], setupFiles: ['./src/test-setup.ts'] },
 });

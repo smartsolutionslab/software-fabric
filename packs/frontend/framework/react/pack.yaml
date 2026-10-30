@@ -9,7 +9,15 @@ files:
   - { template: templates/index.css.sbn, target: web/app/src/index.css }
   - { template: templates/test-setup.ts.sbn, target: web/app/src/test-setup.ts }
   - { template: templates/Home.tsx.sbn, target: web/app/src/pages/Home.tsx }
+  - { template: templates/vite-env.d.ts.sbn, target: web/app/src/vite-env.d.ts }
+  - { template: templates/playwright.config.ts.sbn, target: web/app/playwright.config.ts }
+  - { template: templates/gitignore.sbn, target: web/app/.gitignore }
 declares-slots:
+  - { slot: web.scripts, description: "Entries of web/app's scripts ('\"codegen\": \"...\"').", separator: ",\n" }
+  - { slot: web.prepare, description: "Commands run before dev, build and test (code generators), joined with ' && '.", separator: " && " }
+  - { slot: web.env, description: "Members of ImportMetaEnv: the VITE_ variables the app reads." }
+  - { slot: web.test-setup, description: "Statements of src/test-setup.ts, run before every Vitest file." }
+  - { slot: web.lint-ignores, description: "Entries of eslint's ignores (generated files).", separator: ",\n" }
   - { slot: web.dependencies, description: "Entries of web/app's dependencies ('\"zod\": \"4.6.7\"').", separator: ",\n" }
   - { slot: web.dev-dependencies, description: "Entries of web/app's devDependencies.", separator: ",\n" }
   - { slot: web.vite-imports, description: "Import lines of vite.config.ts." }
@@ -22,6 +30,8 @@ slots:
   - { slot: dotnet.package-versions, template: templates/package-version.sbn }
   - { slot: apphost.packages, template: templates/apphost-package.sbn }
   - { slot: apphost.web, template: templates/apphost-web.sbn }
+  - { slot: apphost.web-wiring, template: templates/apphost-web-wiring.sbn }
+  - { slot: ci.backend-steps, template: templates/ci-backend-steps.sbn, order: 5 }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

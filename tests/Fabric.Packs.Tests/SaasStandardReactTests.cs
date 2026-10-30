@@ -3,6 +3,7 @@ using System.Net;
 namespace Fabric.Packs.Tests;
 
 /// <summary>Generates saas-standard-react from the real packs (stand-ins for the rest) and checks the result.</summary>
+[Collection(FixedPorts.Name)]
 public sealed class SaasStandardReactTests
 {
     private const string Profile = "saas-standard-react";
@@ -292,7 +293,7 @@ public sealed class SaasStandardReactTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 6");
+        output.ShouldContain("succeeded: 7");
     }
 
     [Theory]

@@ -1,0 +1,3 @@
+
+    .WaitFor(keycloak)
+    .WithEnvironment("VITE_OIDC_AUTHORITY", ReferenceExpression.Create($"{keycloak.GetEndpoint("http")}/realms/{{ name }}"))

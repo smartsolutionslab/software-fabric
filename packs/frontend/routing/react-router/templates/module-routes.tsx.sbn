@@ -1,0 +1,4 @@
+import type { ModuleRoute } from '@/modules';
+import { {{ module.namespace }}Page } from './{{ module.namespace }}Page';
+
+export const route: ModuleRoute = { path: '{{ module.name }}', title: '{{ module.namespace }}', element: <{{ module.namespace }}Page /> };

@@ -1,0 +1,12 @@
+option: frontend.test.extras.accessibility
+files:
+  - { template: templates/accessibility.test.tsx.sbn, target: web/app/src/accessibility.test.tsx }
+  - { template: templates/vitest-axe.d.ts.sbn, target: web/app/src/vitest-axe.d.ts }
+slots:
+  - { slot: web.dev-dependencies, template: templates/dev-dependencies.sbn }
+  - { slot: web.test-setup, template: templates/test-setup.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "axe finds no violations on the start page; any new screen gets the same check.", file: templates/accessibility.test.tsx.sbn }

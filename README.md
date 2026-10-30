@@ -21,8 +21,9 @@ Two halves, one repo:
 
 M0 (generator core) is done. M1 (profile `saas-standard-react` end to end)
 is in progress: the base pack, the backend packs, the Aspire integration
-tests and the frontend app shell are real (M1-01 to M1-07a); login and
-data in the frontend, and the agent setup follow (M1-07b to M1-10). `tests/Fabric.Packs.Tests`
+tests and the frontend are real (M1-01 to M1-07): a generated app signs a
+user in through Keycloak and lists a module's data, checked end to end with
+Playwright. The agent setup, profile CI and the pilot follow (M1-08 to M1-10). `tests/Fabric.Packs.Tests`
 generates the profile from the real packs — empty stand-ins for the rest —
 builds it, runs its tests, installs, builds, lints and tests its web app, and starts it against real PostgreSQL and RabbitMQ
 containers.

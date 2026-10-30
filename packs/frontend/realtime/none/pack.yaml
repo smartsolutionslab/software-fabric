@@ -1,0 +1,7 @@
+option: frontend.realtime.none
+files: []
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "Nothing to check: the frontend has no push channel; it fetches." }
