@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Fabric.Cli</RootNamespace>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>fabric</ToolCommandName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Fabric.Core/Fabric.Core.csproj" />
+  </ItemGroup>
+
+</Project>
