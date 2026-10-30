@@ -139,12 +139,14 @@ is a defect in the second pack.
 | `apphost.host` | `src/AppHost/Program.cs` | **exactly-one** | backend.topology (adds the host project) |
 | `apphost.host-wiring` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak (`.WithReference(...).WaitFor(...)`) |
 | `host.packages` | `src/Host/Host.csproj` | 0+ | keycloak, wolverine, ef-core |
-| `host.services` | `src/Host/Program.cs` | 0+ | keycloak, wolverine, result (problem details), tenancy |
+| `host.services` | `src/Host/Program.cs` | 0+ | keycloak, wolverine (with `modules` in scope), result (problem details), tenancy |
 | `host.middleware` | `src/Host/Program.cs` | 0+ | keycloak, tenancy |
 | `modules.infrastructure` | `src/BuildingBlocks/Modules/ModuleInfrastructure.cs` | 0+ | ef-core, wolverine, tenancy |
 | `modules.endpoints` *(added in M1-02)* | `src/BuildingBlocks/Modules/ModuleEndpoints.cs` | 0+ | minimal-apis (maps `IEndpoint`s), keycloak (`group.RequireAuthorization()`) |
 | `persistence.options` *(added in M1-03)* | `src/BuildingBlocks/Persistence/PersistenceRegistration.cs` (owned and declared by ef-core) | **exactly-one** | postgres (`options.UseNpgsql(connectionString)`) |
 | `persistence.model-conventions` | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` (owned and declared by ef-core) | 0+ | tenancy column |
+| `persistence.context-members` *(added in M1-05)* | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` | 0+ | tenancy column (`CurrentTenantId`) |
+| `persistence.save-changes` *(added in M1-05)* | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` | 0+ | tenancy column (stamps new rows) |
 
 ### Frontend
 

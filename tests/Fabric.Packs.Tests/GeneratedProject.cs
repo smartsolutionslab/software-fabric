@@ -41,13 +41,13 @@ internal sealed class GeneratedProject : IDisposable
 
     public void Build()
     {
-        var (exitCode, output) = DotNet.Run(ProjectDirectory, "build", "build.proj", "-c", "Release");
+        var (exitCode, output) = DotNet.Run(ProjectDirectory, new Dictionary<string, string>(), "build", "build.proj", "-c", "Release");
         exitCode.ShouldBe(0, output);
     }
 
     /// <summary>Runs one test project of the generated solution, already built in Release.</summary>
-    public (int ExitCode, string Output) Test(string project) =>
-        DotNet.Run(ProjectDirectory, "test", "--project", project, "-c", "Release", "--no-build");
+    public (int ExitCode, string Output) Test(string project, IReadOnlyDictionary<string, string>? environment = null) =>
+        DotNet.Run(ProjectDirectory, environment ?? new Dictionary<string, string>(), "test", "--project", project, "-c", "Release", "--no-build");
 
     /// <summary>Starts the built host on a free port, outside Aspire, with the given configuration.</summary>
     public RunningHost StartHost(IReadOnlyDictionary<string, string> environment)
@@ -87,6 +87,12 @@ internal sealed class GeneratedProject : IDisposable
 internal sealed class RunningHost(Process process, Uri address) : IDisposable
 {
     private readonly HttpClient client = new() { BaseAddress = address };
+
+    public async Task<HttpResponseMessage> PostAsync(string path)
+    {
+        await GetAsync("/alive");
+        return await client.PostAsync(new Uri(path, UriKind.Relative), null);
+    }
 
     /// <summary>Waits until /alive answers, or fails with the host's output.</summary>
     public async Task<HttpResponseMessage> GetAsync(string path)

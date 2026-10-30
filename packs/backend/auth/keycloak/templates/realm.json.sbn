@@ -2,6 +2,11 @@
   "realm": "{{ name }}",
   "enabled": true,
   "registrationAllowed": false,
+{{~ if project["backend.tenancy"] != "none" ~}}
+  "groups": [
+    { "name": "tenants", "subGroups": [ { "name": "tenant-a" }, { "name": "tenant-b" } ] }
+  ],
+{{~ end ~}}
   "clients": [
     {
       "clientId": "{{ name }}-api",
@@ -27,6 +32,20 @@
             "access.token.claim": "true",
             "id.token.claim": "false"
           }
+{{~ if project["backend.tenancy"] != "none" ~}}
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "claim.name": "groups",
+            "full.path": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+{{~ end ~}}
         }
       ]
     }
@@ -39,7 +58,18 @@
       "emailVerified": true,
       "firstName": "Local",
       "lastName": "Developer",
-      "credentials": [{ "type": "password", "value": "developer", "temporary": false }]
+      "credentials": [{ "type": "password", "value": "developer", "temporary": false }]{{ if project["backend.tenancy"] != "none" }},
+      "groups": ["/tenants/tenant-a"]
+    },
+    {
+      "username": "developer-b",
+      "enabled": true,
+      "email": "developer-b@example.com",
+      "emailVerified": true,
+      "firstName": "Local",
+      "lastName": "Developer B",
+      "credentials": [{ "type": "password", "value": "developer-b", "temporary": false }],
+      "groups": ["/tenants/tenant-b"]{{ end }}
     }
   ]
 }

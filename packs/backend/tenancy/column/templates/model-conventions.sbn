@@ -1,0 +1,1 @@
+        modelBuilder.ApplyTenantColumn(this);

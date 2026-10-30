@@ -1,0 +1,8 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application;
+using {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.Persistence;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure;
+
+public sealed class {{ module.namespace }}UnitOfWork(IServiceProvider services)
+    : ModuleUnitOfWork<{{ module.namespace }}DbContext>(services), I{{ module.namespace }}UnitOfWork;

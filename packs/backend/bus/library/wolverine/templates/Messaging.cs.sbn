@@ -1,0 +1,54 @@
+using {{ namespace }}.BuildingBlocks.Modules;
+using Wolverine;
+using Wolverine.EntityFrameworkCore;
+{{~ if project["backend.database"] == "postgres" ~}}
+using Wolverine.Postgresql;
+{{~ else ~}}
+using Wolverine.SqlServer;
+{{~ end ~}}
+{{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
+using Wolverine.RabbitMQ;
+{{~ end ~}}
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class Messaging
+{
+    /// <summary>Wolverine with a durable outbox and inbox in the project's database, the broker as transport, and every module's consumers.</summary>
+    public static IServiceCollection AddMessaging(this IServiceCollection services, IConfiguration configuration, IReadOnlyList<IModule> modules)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(modules);
+
+        var database = configuration.GetConnectionString("database")
+            ?? throw new InvalidOperationException("Connection string 'database' is missing; Aspire provides it.");
+        var broker = configuration.GetConnectionString("messaging")
+            ?? throw new InvalidOperationException("Connection string 'messaging' is missing; Aspire provides it.");
+
+        services.AddWolverine(options =>
+        {
+            // Handler code is generated at startup. For production, pre-generate it (see docs/adr).
+            options.UseRuntimeCompilation();
+{{~ if project["backend.database"] == "postgres" ~}}
+            options.PersistMessagesWithPostgresql(database, "wolverine");
+{{~ else ~}}
+            options.PersistMessagesWithSqlServer(database, "wolverine");
+{{~ end ~}}
+            options.UseEntityFrameworkCoreTransactions();
+            options.Policies.UseDurableOutboxOnAllSendingEndpoints();
+            options.Policies.UseDurableInboxOnAllListeners();
+{{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
+            options.UseRabbitMq(new Uri(broker)).AutoProvision().UseConventionalRouting();
+{{~ end ~}}
+
+            options.Discovery.DisableConventionalDiscovery();
+            options.Discovery.CustomizeHandlerDiscovery(query => query.Includes.WithNameSuffix("Consumer"));
+            foreach (var module in modules)
+            {
+                options.Discovery.IncludeAssembly(ModuleAssemblies.Of(module, "Application"));
+            }
+        });
+
+        return services;
+    }
+}

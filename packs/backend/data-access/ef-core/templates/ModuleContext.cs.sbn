@@ -3,5 +3,5 @@ using Microsoft.EntityFrameworkCore;
 
 namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.Persistence;
 
-public sealed class {{ module.namespace }}DbContext(DbContextOptions<{{ module.namespace }}DbContext> options)
-    : ModuleDbContext(options, "{{ module.name | string.replace "-" "_" }}");
+public sealed class {{ module.namespace }}DbContext(DbContextOptions<{{ module.namespace }}DbContext> options, IServiceProvider services)
+    : ModuleDbContext(options, services, "{{ module.name | string.replace "-" "_" }}");

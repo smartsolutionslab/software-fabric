@@ -1,0 +1,30 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class ConsumersHandleIntegrationEvents : IArchitectureRule
+{
+    public string Description => "Every consumer handles integration events and nothing else.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        var consumers = model.ModuleAssemblies
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type is { IsClass: true, IsAbstract: false } && type.Name.EndsWith("Consumer", StringComparison.Ordinal));
+
+        foreach (var consumer in consumers)
+        {
+            foreach (var method in consumer.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Where(method => method.Name.StartsWith("Handle", StringComparison.Ordinal) || method.Name.StartsWith("Consume", StringComparison.Ordinal)))
+            {
+                var message = method.GetParameters().FirstOrDefault()?.ParameterType;
+                if (message is null || !message.GetInterfaces().Any(contract => contract.FullName == "{{ namespace }}.Contracts.IIntegrationEvent"))
+                {
+                    yield return $"{consumer.FullName}.{method.Name} does not handle an integration event.";
+                }
+            }
+        }
+    }
+}

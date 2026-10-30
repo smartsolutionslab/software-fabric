@@ -19,10 +19,13 @@ Two halves, one repo:
 
 ## Status
 
-Milestone **M0 — core**: all twelve tasks done, waiting at the M0 gate
-(review of the slot set and the rule evaluator). The generator works end
-to end against the stub packs in `tests/fixtures/minimal`; the real
-catalog has no packs yet — those start in M1.
+M0 (generator core) is done. M1 (profile `saas-standard-react` end to end)
+is in progress: the base pack and the backend packs through messaging and
+tenancy are real (M1-01 to M1-05); the frontend, the Aspire integration
+tests and the agent setup follow (M1-06 to M1-10). `tests/Fabric.Packs.Tests`
+generates the profile from the real packs — empty stand-ins for the rest —
+builds it, runs its tests and starts it against real PostgreSQL and RabbitMQ
+containers.
 
 | Artifact | Purpose |
 |---|---|
@@ -30,7 +33,7 @@ catalog has no packs yet — those start in M1.
 | [`docs/catalog-rules.md`](docs/catalog-rules.md) | The rule grammar the catalog uses |
 | [`docs/packs.md`](docs/packs.md) | How to write a pack: layout, targets, template model, slots |
 | [`schema/pack.schema.json`](schema/pack.schema.json) | What an option pack must declare |
-| [`docs/adr/`](docs/adr/) | Decisions 0001–0004 |
+| [`docs/adr/`](docs/adr/) | Decisions 0001–0006 |
 | [`docs/roadmap.md`](docs/roadmap.md) | M0–M4 and the M0 task list |
 
 ## Using it

@@ -7,7 +7,7 @@ files:
   - { template: templates/ModulesDoNotReferenceEachOther.cs.sbn, target: tests/Architecture.Tests/Rules/ModulesDoNotReferenceEachOther.cs }
 declares-slots:
   - { slot: host.packages, description: "<PackageReference> lines for the host." }
-  - { slot: host.services, description: "Statements registering services on the host's builder." }
+  - { slot: host.services, description: "Statements registering services on the host's builder; IReadOnlyList<IModule> modules is in scope." }
   - { slot: host.middleware, description: "Statements adding middleware to the built app, before endpoints are mapped." }
 slots:
   - { slot: apphost.host, template: templates/apphost-host.sbn }

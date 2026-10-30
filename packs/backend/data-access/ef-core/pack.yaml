@@ -6,7 +6,9 @@ files:
   - { template: templates/OneDbContextPerModule.cs.sbn, target: tests/Architecture.Tests/Rules/OneDbContextPerModule.cs }
 declares-slots:
   - { slot: persistence.options, description: "Statements configuring DbContextOptionsBuilder options for the database provider, given string connectionString.", cardinality: exactly-one }
-  - { slot: persistence.model-conventions, description: "Statements on ModelBuilder modelBuilder applied to every module's model." }
+  - { slot: persistence.model-conventions, description: "Statements on ModelBuilder modelBuilder applied to every module's model; this is the ModuleDbContext." }
+  - { slot: persistence.context-members, description: "Members added to ModuleDbContext; IServiceProvider Services is available." }
+  - { slot: persistence.save-changes, description: "Statements run before every SaveChanges of a module's DbContext; this is the ModuleDbContext." }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
   - { slot: buildingblocks.packages, template: templates/buildingblocks-packages.sbn }

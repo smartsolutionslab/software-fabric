@@ -1,0 +1,6 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application;
+
+/// <summary>The {{ module.namespace }} module's unit of work; implemented in its Infrastructure project.</summary>
+public interface I{{ module.namespace }}UnitOfWork : IUnitOfWork;

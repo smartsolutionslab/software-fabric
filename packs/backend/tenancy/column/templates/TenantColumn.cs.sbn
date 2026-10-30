@@ -1,0 +1,40 @@
+using System.Linq.Expressions;
+using {{ namespace }}.BuildingBlocks.Persistence;
+
+namespace Microsoft.EntityFrameworkCore;
+
+public static class TenantColumn
+{
+    private const string Column = "TenantId";
+
+    /// <summary>A TenantId shadow column on every entity and a filter to the context's current tenant.</summary>
+    public static ModelBuilder ApplyTenantColumn(this ModelBuilder modelBuilder, ModuleDbContext context)
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+
+        var currentTenant = Expression.Property(Expression.Constant(context), nameof(ModuleDbContext.CurrentTenantId));
+        foreach (var entity in modelBuilder.Model.GetEntityTypes().Where(entity => !entity.IsOwned() && entity.BaseType is null))
+        {
+            modelBuilder.Entity(entity.ClrType).Property<string>(Column).HasMaxLength(64).IsRequired();
+            modelBuilder.Entity(entity.ClrType).HasIndex(Column);
+
+            var row = Expression.Parameter(entity.ClrType, "row");
+            var rowTenant = Expression.Call(typeof(EF), nameof(EF.Property), [typeof(string)], row, Expression.Constant(Column));
+            modelBuilder.Entity(entity.ClrType).HasQueryFilter(Expression.Lambda(Expression.Equal(rowTenant, currentTenant), row));
+        }
+
+        return modelBuilder;
+    }
+
+    /// <summary>Stamps new rows with the current tenant; saving one without a tenant fails.</summary>
+    public static void StampTenant(this ModuleDbContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        foreach (var entry in context.ChangeTracker.Entries().Where(entry => entry.State == EntityState.Added && entry.Metadata.FindProperty(Column) is not null))
+        {
+            entry.Property(Column).CurrentValue = context.CurrentTenantId
+                ?? throw new InvalidOperationException($"Cannot save a new {entry.Metadata.ClrType.Name} without a tenant.");
+        }
+    }
+}

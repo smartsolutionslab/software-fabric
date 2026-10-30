@@ -54,6 +54,8 @@ Templates are [Scriban](https://github.com/scriban/scriban).
 | `module` | `{ name, namespace, values }` — per-module files only |
 | `slots["<slot>"]` | The slot's contributions in order, joined by its separator — files only, not slot contributions |
 
+A template may branch on another dimension (`{{ if project["backend.database"] == "postgres" }}`) when its own output differs by that choice; see ADR-0006 for when that is right and when a slot is.
+
 Unknown variables are errors. `date`, `timespan` and `math` are not
 available: the same choices must always render the same bytes. Output
 line endings are LF; whitespace-only lines become empty and runs of blank
