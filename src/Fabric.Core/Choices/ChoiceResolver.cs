@@ -37,14 +37,15 @@ public static class ChoiceResolver
             return Failure(errors);
         }
 
-        var defaults = SettleDefaults(catalog, explicitValues, errors);
+        var dimensions = catalog.Dimensions.Values.ToList();
+        var defaults = SettleDefaults(dimensions, explicitValues, dimension => dimension.Default, errors);
         if (errors.Count > 0)
         {
             return Failure(errors);
         }
 
         var values = Merge(explicitValues, defaults);
-        CheckActivity(catalog, explicitValues, values, errors);
+        CheckActivity(dimensions, explicitValues, values, errors);
         if (errors.Count > 0)
         {
             return Failure(errors);
@@ -61,6 +62,63 @@ public static class ChoiceResolver
         }
 
         return new ChoiceResolution(new ResolvedChoices(project, moduleDefaults), []);
+    }
+
+    /// <summary>
+    /// Resolves one new module: overrides first, then the project's module defaults, then catalog defaults for module
+    /// dimensions the overrides switch on. Project values are fixed and only read.
+    /// </summary>
+    public static ModuleResolution ResolveModule(CatalogModel catalog, ProjectChoices project, IReadOnlyList<string> overrides)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(overrides);
+
+        List<string> errors = [];
+        OrderedDictionary<string, IReadOnlyList<string>> explicitValues = [];
+        foreach (var setting in overrides)
+        {
+            ApplyOverride(setting, explicitValues, errors);
+        }
+
+        if (errors.Count == 0)
+        {
+            Validate(catalog, explicitValues, errors);
+        }
+
+        errors.AddRange(explicitValues.Keys
+            .Where(dimension => catalog.Dimensions.TryGetValue(dimension, out var definition) && definition.Scope == DimensionScope.Project)
+            .Select(dimension => $"{dimension} is project-scoped; it was fixed when the project was generated."));
+        if (errors.Count > 0)
+        {
+            return new ModuleResolution(null, errors);
+        }
+
+        var moduleDimensions = catalog.Dimensions.Values.Where(dimension => dimension.Scope == DimensionScope.Module).ToList();
+        var fixedValues = Merge(project.Project, explicitValues);
+        var defaults = SettleDefaults(
+            moduleDimensions,
+            fixedValues,
+            dimension => project.ModuleDefaults.TryGetValue(dimension.Id, out var value) ? value : dimension.Default,
+            errors);
+        var view = Merge(fixedValues, defaults);
+        if (errors.Count == 0)
+        {
+            CheckActivity(moduleDimensions, explicitValues, view, errors);
+        }
+
+        if (errors.Count > 0)
+        {
+            return new ModuleResolution(null, errors);
+        }
+
+        OrderedDictionary<string, IReadOnlyList<string>> values = [];
+        foreach (var dimension in moduleDimensions.Where(dimension => view.ContainsKey(dimension.Id)))
+        {
+            values.Add(dimension.Id, view[dimension.Id]);
+        }
+
+        return new ModuleResolution(values, []);
     }
 
     private static ChoiceResolution Failure(List<string> errors) => new(null, errors);
@@ -145,18 +203,19 @@ public static class ChoiceResolver
     /// Defaults can switch other dimensions on or off, so they are recomputed until the set stops changing.
     /// </summary>
     private static Dictionary<string, IReadOnlyList<string>> SettleDefaults(
-        CatalogModel catalog,
-        OrderedDictionary<string, IReadOnlyList<string>> explicitValues,
+        List<Dimension> dimensions,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> fixedValues,
+        Func<Dimension, IReadOnlyList<string>?> defaultOf,
         List<string> errors)
     {
         Dictionary<string, IReadOnlyList<string>> defaults = [];
-        for (var round = 0; round <= catalog.Dimensions.Count; round++)
+        for (var round = 0; round <= dimensions.Count; round++)
         {
-            var view = Merge(explicitValues, defaults);
+            var view = Merge(fixedValues, defaults);
             Dictionary<string, IReadOnlyList<string>> next = [];
-            foreach (var dimension in catalog.Dimensions.Values)
+            foreach (var dimension in dimensions)
             {
-                if (!explicitValues.ContainsKey(dimension.Id) && dimension.Default is { } value && IsActive(dimension, view))
+                if (!fixedValues.ContainsKey(dimension.Id) && defaultOf(dimension) is { } value && IsActive(dimension, view))
                 {
                     next.Add(dimension.Id, value);
                 }
@@ -175,12 +234,12 @@ public static class ChoiceResolver
     }
 
     private static void CheckActivity(
-        CatalogModel catalog,
+        IReadOnlyList<Dimension> dimensions,
         OrderedDictionary<string, IReadOnlyList<string>> explicitValues,
         Dictionary<string, IReadOnlyList<string>> values,
         List<string> errors)
     {
-        foreach (var dimension in catalog.Dimensions.Values)
+        foreach (var dimension in dimensions)
         {
             var active = IsActive(dimension, values);
             if (!active && explicitValues.TryGetValue(dimension.Id, out var chosen))

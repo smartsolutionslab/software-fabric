@@ -40,4 +40,40 @@ public static class ProjectWriter
 
         return null;
     }
+
+    /// <summary>Adds new files to an existing project and replaces its <c>fabric.yaml</c>. Never overwrites anything else.</summary>
+    /// <returns>An error, or <c>null</c> when everything was written.</returns>
+    public static string? Add(string directory, IReadOnlyList<RenderedFile> files, string fabricYaml)
+    {
+        ArgumentNullException.ThrowIfNull(directory);
+        ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(fabricYaml);
+
+        var root = Path.GetFullPath(directory);
+        List<(string FullPath, string Content)> targets = [];
+        foreach (var file in files)
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(root, file.Path));
+            if (!fullPath.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            {
+                return $"{file.Path} points outside the project directory.";
+            }
+
+            if (File.Exists(fullPath) || Directory.Exists(fullPath))
+            {
+                return $"{file.Path} already exists; add-module does not overwrite files.";
+            }
+
+            targets.Add((fullPath, file.Content));
+        }
+
+        targets.Add((Path.Combine(root, FabricFile.FileName), fabricYaml));
+        foreach (var (fullPath, content) in targets)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            File.WriteAllText(fullPath, content, Utf8WithoutBom);
+        }
+
+        return null;
+    }
 }

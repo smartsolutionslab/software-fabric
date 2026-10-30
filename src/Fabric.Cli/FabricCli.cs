@@ -21,6 +21,7 @@ public static class FabricCli
         {
             ValidateCommand(output, error),
             NewCommand(output, error),
+            AddModuleCommand(output, error),
         };
 
         return root.Parse(args).Invoke(new InvocationConfiguration { Output = output, Error = error });
@@ -94,12 +95,73 @@ public static class FabricCli
                 return Fail(error, [writeError]);
             }
 
-            output.WriteLine($"created {target} with {generated.Files.Count} files.");
+            output.WriteLine($"created {target} with {Files(generated.Files.Count)}.");
             return 0;
         }));
 
         return command;
     }
+
+    private static Command AddModuleCommand(TextWriter output, TextWriter error)
+    {
+        var (set, catalog, packs) = (SetOption(), CatalogOption(), PacksOption());
+        var name = new Argument<string>("name") { Description = "The module's name, in lower kebab-case." };
+        var project = new Option<string>("--project")
+        {
+            Description = "The generated project to add the module to. Defaults to the current directory.",
+            DefaultValueFactory = _ => ".",
+        };
+        var command = new Command("add-module", "Add a module (bounded context) to a generated project. Only creates files.")
+        {
+            name,
+            set,
+            project,
+            catalog,
+            packs,
+        };
+
+        command.SetAction(result => Guarded(error, () =>
+        {
+            var projectDirectory = result.GetValue(project)!;
+            var fabricYamlPath = Path.Combine(projectDirectory, FabricFile.FileName);
+            if (!File.Exists(fabricYamlPath))
+            {
+                return Fail(error, [$"no {FabricFile.FileName} in {projectDirectory}; run add-module in a generated project or pass --project."]);
+            }
+
+            FabricRecord record;
+            using (var reader = File.OpenText(fabricYamlPath))
+            {
+                record = FabricFile.Read(reader, fabricYamlPath);
+            }
+
+            var catalogModel = CatalogReader.ReadFile(result.GetValue(catalog)!);
+            var loaded = PackLoader.Load(result.GetValue(packs)!, catalogModel);
+            if (loaded.Errors.Count > 0)
+            {
+                return Fail(error, loaded.Errors);
+            }
+
+            var moduleName = result.GetValue(name)!;
+            var addition = Generator.AddModule(catalogModel, loaded.Packs, record, moduleName, result.GetValue(set) ?? []);
+            if (addition.FabricYaml is not { } fabricYaml)
+            {
+                return Fail(error, addition.Errors);
+            }
+
+            if (ProjectWriter.Add(projectDirectory, addition.Created, fabricYaml) is { } writeError)
+            {
+                return Fail(error, [writeError]);
+            }
+
+            output.WriteLine($"added module {moduleName} with {Files(addition.Created.Count)}.");
+            return 0;
+        }));
+
+        return command;
+    }
+
+    private static string Files(int count) => count == 1 ? "1 file" : $"{count} files";
 
     private static Option<string?> ProfileOption() => new("--profile") { Description = "A profile from the catalog to start from." };
 
@@ -128,7 +190,7 @@ public static class FabricCli
         {
             return action();
         }
-        catch (Exception exception) when (exception is CatalogException or IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is CatalogException or FabricFileException or IOException or UnauthorizedAccessException)
         {
             return Fail(error, [exception.Message]);
         }

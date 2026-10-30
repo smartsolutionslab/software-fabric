@@ -11,3 +11,6 @@ public sealed record ResolvedChoices(
 
 /// <summary>Either <see cref="Choices"/> or at least one entry in <see cref="Errors"/>.</summary>
 public sealed record ChoiceResolution(ResolvedChoices? Choices, IReadOnlyList<string> Errors);
+
+/// <summary>Either <see cref="Values"/> for one module or at least one entry in <see cref="Errors"/>.</summary>
+public sealed record ModuleResolution(IReadOnlyDictionary<string, IReadOnlyList<string>>? Values, IReadOnlyList<string> Errors);

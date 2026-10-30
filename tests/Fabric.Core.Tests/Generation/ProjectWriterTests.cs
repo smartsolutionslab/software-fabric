@@ -49,4 +49,29 @@ public sealed class ProjectWriterTests : IDisposable
         Directory.Exists(target).ShouldBeFalse();
         File.Exists(Path.Combine(root, "escape.txt")).ShouldBeFalse();
     }
+
+    [Fact]
+    public void Adding_writes_new_files_and_replaces_fabric_yaml()
+    {
+        File.WriteAllText(Path.Combine(root, "fabric.yaml"), "old");
+
+        ProjectWriter.Add(root, [new RenderedFile("src/billing/README.md", "# billing\n")], "new").ShouldBeNull();
+
+        File.ReadAllText(Path.Combine(root, "src", "billing", "README.md")).ShouldBe("# billing\n");
+        File.ReadAllText(Path.Combine(root, "fabric.yaml")).ShouldBe("new");
+    }
+
+    [Fact]
+    public void Adding_refuses_to_overwrite_an_existing_file_and_writes_nothing()
+    {
+        File.WriteAllText(Path.Combine(root, "fabric.yaml"), "old");
+        Directory.CreateDirectory(Path.Combine(root, "src"));
+        File.WriteAllText(Path.Combine(root, "src", "b.txt"), "mine");
+
+        ProjectWriter.Add(root, [new RenderedFile("src/a.txt", "a"), new RenderedFile("src/b.txt", "b")], "new")
+            .ShouldBe("src/b.txt already exists; add-module does not overwrite files.");
+
+        File.Exists(Path.Combine(root, "src", "a.txt")).ShouldBeFalse();
+        File.ReadAllText(Path.Combine(root, "fabric.yaml")).ShouldBe("old");
+    }
 }
