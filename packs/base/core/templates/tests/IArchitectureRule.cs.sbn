@@ -1,0 +1,12 @@
+namespace {{ namespace }}.Architecture.Tests;
+
+/// <summary>
+/// One architectural rule a choice made for this project. Rules do not depend on a test framework: the chosen
+/// framework runs every implementation in this assembly and fails on any violation.
+/// </summary>
+public interface IArchitectureRule
+{
+    string Description { get; }
+
+    IEnumerable<string> Violations(ArchitectureModel model);
+}

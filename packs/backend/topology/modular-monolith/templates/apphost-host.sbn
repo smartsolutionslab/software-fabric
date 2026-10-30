@@ -1,0 +1,1 @@
+builder.AddProject<Projects.Host>("host")

@@ -56,7 +56,8 @@ Templates are [Scriban](https://github.com/scriban/scriban).
 
 Unknown variables are errors. `date`, `timespan` and `math` are not
 available: the same choices must always render the same bytes. Output
-line endings are LF.
+line endings are LF; whitespace-only lines become empty and runs of blank
+lines collapse to one, so an empty slot leaves no gap.
 
 ## Slots
 

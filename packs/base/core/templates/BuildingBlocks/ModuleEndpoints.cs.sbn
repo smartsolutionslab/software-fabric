@@ -1,0 +1,15 @@
+using Microsoft.AspNetCore.Routing;
+
+namespace {{ namespace }}.BuildingBlocks.Modules;
+
+public static class ModuleEndpoints
+{
+    /// <summary>Maps one module's endpoints into the route group the module was given.</summary>
+    public static IEndpointRouteBuilder MapModuleEndpoints<TModule>(this IEndpointRouteBuilder endpoints)
+        where TModule : IModule
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+{{ slots["modules.endpoints"] }}
+        return endpoints;
+    }
+}

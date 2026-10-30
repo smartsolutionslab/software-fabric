@@ -1,0 +1,19 @@
+option: backend.topology.modular-monolith
+files:
+  - { template: templates/Host.csproj.sbn, target: src/Host/Host.csproj }
+  - { template: templates/Program.cs.sbn, target: src/Host/Program.cs }
+  - { template: templates/appsettings.json.sbn, target: src/Host/appsettings.json }
+  - { template: templates/ModulesDoNotReferenceEachOther.cs.sbn, target: tests/Architecture.Tests/Rules/ModulesDoNotReferenceEachOther.cs }
+declares-slots:
+  - { slot: host.packages, description: "<PackageReference> lines for the host." }
+  - { slot: host.services, description: "Statements registering services on the host's builder." }
+  - { slot: host.middleware, description: "Statements adding middleware to the built app, before endpoints are mapped." }
+slots:
+  - { slot: apphost.host, template: templates/apphost-host.sbn }
+  - { slot: apphost.project-references, template: templates/apphost-project-reference.sbn }
+  - { slot: solution.projects, template: templates/solution-project.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No module references another module's assemblies.", file: templates/ModulesDoNotReferenceEachOther.cs.sbn }

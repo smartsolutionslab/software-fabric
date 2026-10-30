@@ -1,0 +1,17 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.BuildingBlocks.Modules;
+
+public static class ModuleInfrastructure
+{
+    /// <summary>Everything a module needs from infrastructure; each choice that needs something per module adds it here.</summary>
+    public static IServiceCollection AddModuleInfrastructure<TModule>(this IServiceCollection services, IConfiguration configuration)
+        where TModule : IModule
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+{{ slots["modules.infrastructure"] }}
+        return services;
+    }
+}

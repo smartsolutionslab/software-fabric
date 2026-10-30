@@ -6,7 +6,8 @@ the 37 packs of `saas-standard-react` plus the base; later profiles add
 slots in their own change (ADR-0002).
 
 **Status: accepted at the M0 gate (2026-10-30).** Generator changes 1–3
-below are built (M1-01).
+below are built (M1-01). Building the base (M1-02) added four slots and
+two conventions, marked *added in M1-02* below.
 
 ## Layout of a generated project
 
@@ -18,7 +19,7 @@ AGENTS.md                       base; every pack's agents-md via agents.sections
 docs/adr/NNNN-<dimension>-<option>.md
                                 generator; one per pack, numbered in selection order
 global.json  .editorconfig  Directory.Build.props  Directory.Packages.props  build.proj
-                                base
+Solution.slnx                   base
 src/
   AppHost/                      base (Aspire composition root)
   ServiceDefaults/              base
@@ -28,8 +29,8 @@ src/
   Modules/
     Directory.Build.props       base; per-layer package references by slot
     <Module>/<Module>.Domain|Application|Infrastructure|Api/
-                                base owns the csproj files (per module);
-                                module.style / module.cqrs / ... own the code
+                                base owns the csproj files and <Module>Module.cs
+                                (per module); module.style / module.cqrs / ... own the code
 tests/
   Directory.Build.props         base; test packages and usings by slot
   Architecture.Tests/           base; packs add gate tests as their own files
@@ -61,9 +62,25 @@ line per module in a shared file. Proposed in ADR-0005:
   implementation in BuildingBlocks and lets the per-module file inherit
   from it. **No per-module slots** — the generator does not need them.
 - **Frontend modules** are found with `import.meta.glob('./modules/*/routes.tsx')`.
-- **Solution file:** `<Name>.slnx` lists the projects at generation time;
+- **Solution file:** `Solution.slnx` lists the projects at generation time;
   `add-module` prints the `dotnet sln add` line instead of editing it.
   `build.proj` is what CI builds, so a stale `.slnx` never breaks a build.
+
+## Architecture rules are framework-free (added in M1-02)
+
+A gate of kind `architecture-test` is a class implementing
+`IArchitectureRule` (base, `tests/Architecture.Tests`), placed in
+`tests/Architecture.Tests/Rules/` as the pack's own file. Rules depend on
+no test framework; the chosen test-framework pack contributes the one
+test that runs every rule. A pack's gate therefore works with xUnit,
+NUnit and TUnit alike.
+
+## Module paths use the namespace (added in M1-02)
+
+Per-module targets use `{{ module.namespace }}`: module `order-handling`
+lives in `src/Modules/OrderHandling/OrderHandling.Domain/`, its
+assemblies are `<Namespace>.Modules.OrderHandling.<Layer>`, and the host
+loads `<Namespace>.Modules.*.Api.dll`.
 
 ## Slots
 
@@ -84,11 +101,13 @@ Cardinality `0+` unless stated. "Separator" is what joins contributions
 |---|---|---|
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
 | `dotnet.build-properties` | `Directory.Build.props` | packs adding analyzers or properties (result, red-first) |
+| `solution.projects` *(added in M1-02)* | `Solution.slnx` | packs owning a project: modular-monolith (Host), aspire-fixture (Integration.Tests) |
 | `modules.packages.domain` | `src/Modules/Directory.Build.props` | — (Domain stays dependency-free) |
 | `modules.packages.application` | 〃 | wolverine, mediator |
 | `modules.packages.infrastructure` | 〃 | ef-core, postgres, wolverine |
 | `modules.packages.api` | 〃 | minimal-apis |
 | `buildingblocks.packages` | `src/BuildingBlocks/BuildingBlocks.csproj` | ef-core, wolverine, result |
+| `tests.build-properties` *(added in M1-02)* | `tests/Directory.Build.props` | xunit (`OutputType Exe` for xUnit v3) |
 | `tests.packages` | `tests/Directory.Build.props` | xunit, shouldly, nsubstitute, aspire-fixture |
 | `tests.usings` | `tests/Directory.Build.props` | xunit, shouldly, nsubstitute |
 
@@ -101,6 +120,7 @@ is a defect in the second pack.
 | Slot | File | Cardinality | Filled by |
 |---|---|---|---|
 | `apphost.packages` | `src/AppHost/AppHost.csproj` | 0+ | postgres, rabbitmq, keycloak, react |
+| `apphost.project-references` *(added in M1-02)* | `src/AppHost/AppHost.csproj` | 0+ | backend.topology (the host project) |
 | `apphost.resources` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak, react (Vite app) |
 | `apphost.host` | `src/AppHost/Program.cs` | **exactly-one** | backend.topology (adds the host project) |
 | `apphost.host-wiring` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak (`.WithReference(...).WaitFor(...)`) |
@@ -108,6 +128,7 @@ is a defect in the second pack.
 | `host.services` | `src/Host/Program.cs` | 0+ | keycloak, wolverine, result (problem details), tenancy |
 | `host.middleware` | `src/Host/Program.cs` | 0+ | keycloak, tenancy |
 | `modules.infrastructure` | `src/BuildingBlocks/Modules/ModuleInfrastructure.cs` | 0+ | ef-core, wolverine, tenancy |
+| `modules.endpoints` *(added in M1-02)* | `src/BuildingBlocks/Modules/ModuleEndpoints.cs` | 0+ | minimal-apis |
 | `persistence.model-conventions` | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` (owned and declared by ef-core) | 0+ | tenancy column |
 
 ### Frontend

@@ -219,4 +219,14 @@ public sealed class RendererTests : IDisposable
         Renderer.Render(Catalog, Compose([Composed(pack, "d.sbn", "src/billing/Domain.cs", module: "billing")]), Choices, "shop")
             .Files.ShouldHaveSingleItem().Content.ShouldBe("namespace Shop.Modules.Billing;");
     }
+
+    [Fact]
+    public void Runs_of_blank_lines_left_by_empty_slots_collapse_to_one()
+    {
+        var owner = Pack("base.core", ("t.sbn", "a\n\n{{ slots[\"empty\"] }}\n    \n\n{{ slots[\"empty\"] }}\nb\n"));
+
+        var rendered = Renderer.Render(Catalog, Compose([Composed(owner, "t.sbn", "out.txt")], new() { ["empty"] = [] }), Choices, "shop");
+
+        rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("a\n\nb\n");
+    }
 }

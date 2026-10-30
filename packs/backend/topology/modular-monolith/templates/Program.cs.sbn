@@ -1,0 +1,24 @@
+using {{ namespace }}.BuildingBlocks.Modules;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
+
+var modules = ModuleDiscovery.Discover(AppContext.BaseDirectory);
+foreach (var module in modules)
+{
+    module.AddServices(builder.Services, builder.Configuration);
+}
+
+{{ slots["host.services"] }}
+
+var app = builder.Build();
+
+{{ slots["host.middleware"] }}
+
+app.MapDefaultEndpoints();
+foreach (var module in modules)
+{
+    module.MapEndpoints(app);
+}
+
+app.Run();

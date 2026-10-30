@@ -1,0 +1,17 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.4">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>{{ namespace }}.AppHost</RootNamespace>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
+  </PropertyGroup>
+
+  <ItemGroup>
+{{ slots["apphost.packages"] }}
+  </ItemGroup>
+
+  <ItemGroup>
+{{ slots["apphost.project-references"] }}
+  </ItemGroup>
+
+</Project>

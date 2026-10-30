@@ -1,0 +1,84 @@
+option: base.core
+files:
+  - { template: templates/README.md.sbn, target: README.md }
+  - { template: templates/AGENTS.md.sbn, target: AGENTS.md }
+  - { template: templates/CLAUDE.md.sbn, target: CLAUDE.md }
+  - { template: templates/agents/architect.md.sbn, target: ".claude/agents/architect.md" }
+  - { template: templates/agents/test-writer.md.sbn, target: ".claude/agents/test-writer.md" }
+  - { template: templates/agents/backend-engineer.md.sbn, target: ".claude/agents/backend-engineer.md" }
+  - { template: templates/agents/frontend-engineer.md.sbn, target: ".claude/agents/frontend-engineer.md" }
+  - { template: templates/agents/infra-engineer.md.sbn, target: ".claude/agents/infra-engineer.md" }
+  - { template: templates/agents/backend-reviewer.md.sbn, target: ".claude/agents/backend-reviewer.md" }
+  - { template: templates/agents/frontend-reviewer.md.sbn, target: ".claude/agents/frontend-reviewer.md" }
+  - { template: templates/agents/security-reviewer.md.sbn, target: ".claude/agents/security-reviewer.md" }
+  - { template: templates/agents/triage.md.sbn, target: ".claude/agents/triage.md" }
+  - { template: templates/global.json.sbn, target: global.json }
+  - { template: templates/editorconfig.sbn, target: ".editorconfig" }
+  - { template: templates/gitignore.sbn, target: ".gitignore" }
+  - { template: templates/Directory.Build.props.sbn, target: Directory.Build.props }
+  - { template: templates/Directory.Packages.props.sbn, target: Directory.Packages.props }
+  - { template: templates/build.proj.sbn, target: build.proj }
+  - { template: templates/Solution.slnx.sbn, target: Solution.slnx }
+  - { template: templates/ci.yml.sbn, target: ".github/workflows/ci.yml" }
+  - { template: templates/AppHost/AppHost.csproj.sbn, target: src/AppHost/AppHost.csproj }
+  - { template: templates/AppHost/AppHost.cs.sbn, target: src/AppHost/AppHost.cs }
+  - { template: templates/AppHost/appsettings.json.sbn, target: src/AppHost/appsettings.json }
+  - { template: templates/AppHost/launchSettings.json.sbn, target: src/AppHost/Properties/launchSettings.json }
+  - { template: templates/ServiceDefaults/ServiceDefaults.csproj.sbn, target: src/ServiceDefaults/ServiceDefaults.csproj }
+  - { template: templates/ServiceDefaults/Extensions.cs.sbn, target: src/ServiceDefaults/Extensions.cs }
+  - { template: templates/BuildingBlocks/BuildingBlocks.csproj.sbn, target: src/BuildingBlocks/BuildingBlocks.csproj }
+  - { template: templates/BuildingBlocks/IModule.cs.sbn, target: src/BuildingBlocks/Modules/IModule.cs }
+  - { template: templates/BuildingBlocks/ModuleDiscovery.cs.sbn, target: src/BuildingBlocks/Modules/ModuleDiscovery.cs }
+  - { template: templates/BuildingBlocks/ModuleInfrastructure.cs.sbn, target: src/BuildingBlocks/Modules/ModuleInfrastructure.cs }
+  - { template: templates/BuildingBlocks/ModuleEndpoints.cs.sbn, target: src/BuildingBlocks/Modules/ModuleEndpoints.cs }
+  - { template: templates/Contracts/Contracts.csproj.sbn, target: src/Contracts/Contracts.csproj }
+  - { template: templates/Modules/Directory.Build.props.sbn, target: src/Modules/Directory.Build.props }
+  - { template: templates/tests/Directory.Build.props.sbn, target: tests/Directory.Build.props }
+  - { template: templates/tests/Architecture.Tests.csproj.sbn, target: tests/Architecture.Tests/Architecture.Tests.csproj }
+  - { template: templates/tests/IArchitectureRule.cs.sbn, target: tests/Architecture.Tests/IArchitectureRule.cs }
+  - { template: templates/tests/ArchitectureModel.cs.sbn, target: tests/Architecture.Tests/ArchitectureModel.cs }
+  - { template: templates/tests/EveryModuleHasOneIModule.cs.sbn, target: tests/Architecture.Tests/Rules/EveryModuleHasOneIModule.cs }
+  - { template: templates/Modules/Domain.csproj.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/{{ module.namespace }}.Domain.csproj", per-module: true }
+  - { template: templates/Modules/Application.csproj.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/{{ module.namespace }}.Application.csproj", per-module: true }
+  - { template: templates/Modules/Infrastructure.csproj.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/{{ module.namespace }}.Infrastructure.csproj", per-module: true }
+  - { template: templates/Modules/Api.csproj.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}.Api.csproj", per-module: true }
+  - { template: templates/Modules/Module.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}Module.cs", per-module: true }
+  - { template: templates/Modules/Tests.csproj.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/{{ module.namespace }}.Tests.csproj", per-module: true }
+declares-slots:
+  - { slot: agents.sections, description: "Every pack's agents-md; filled by the generator." }
+  - { slot: agents.brief.architect, description: "Every pack's brief for the architect; filled by the generator." }
+  - { slot: agents.brief.test-writer, description: "Every pack's brief for the test-writer; filled by the generator." }
+  - { slot: agents.brief.backend-engineer, description: "Every pack's brief for the backend-engineer; filled by the generator." }
+  - { slot: agents.brief.frontend-engineer, description: "Every pack's brief for the frontend-engineer; filled by the generator." }
+  - { slot: agents.brief.infra-engineer, description: "Every pack's brief for the infra-engineer; filled by the generator." }
+  - { slot: agents.brief.backend-reviewer, description: "Every pack's brief for the backend-reviewer; filled by the generator." }
+  - { slot: agents.brief.frontend-reviewer, description: "Every pack's brief for the frontend-reviewer; filled by the generator." }
+  - { slot: agents.brief.security-reviewer, description: "Every pack's brief for the security-reviewer; filled by the generator." }
+  - { slot: agents.brief.triage, description: "Every pack's brief for the triage; filled by the generator." }
+  - { slot: readme.sections, description: "How to build, run and work on the project, one section per pack that changes it.", separator: "\n\n" }
+  - { slot: solution.projects, description: "<Project Path='...' /> lines for projects other packs own." }
+  - { slot: dotnet.package-versions, description: "<PackageVersion> lines; one owner per package." }
+  - { slot: dotnet.build-properties, description: "Properties for every .NET project." }
+  - { slot: apphost.packages, description: "<PackageReference> lines for the AppHost." }
+  - { slot: apphost.project-references, description: "<ProjectReference> lines for the projects the AppHost runs." }
+  - { slot: apphost.resources, description: "Statements adding Aspire resources (databases, brokers, identity, frontends)." }
+  - { slot: apphost.host, description: "The expression adding the host project, without a semicolon.", cardinality: exactly-one }
+  - { slot: apphost.host-wiring, description: "Chained calls on the host (.WithReference(...), .WaitFor(...))." }
+  - { slot: buildingblocks.packages, description: "<PackageReference> lines for BuildingBlocks." }
+  - { slot: modules.infrastructure, description: "Statements registering infrastructure for one module, generic over TModule." }
+  - { slot: modules.endpoints, description: "Statements mapping one module's endpoints, generic over TModule." }
+  - { slot: modules.packages.domain, description: "<PackageReference> lines for every module's Domain project." }
+  - { slot: modules.packages.application, description: "<PackageReference> lines for every module's Application project." }
+  - { slot: modules.packages.infrastructure, description: "<PackageReference> lines for every module's Infrastructure project." }
+  - { slot: modules.packages.api, description: "<PackageReference> lines for every module's Api project." }
+  - { slot: tests.build-properties, description: "Properties for every test project." }
+  - { slot: tests.packages, description: "<PackageReference> lines for every test project." }
+  - { slot: tests.usings, description: "<Using> lines for every test project." }
+  - { slot: ci.backend-steps, description: "Steps of the backend CI job, indented six spaces." }
+  - { slot: ci.frontend-steps, description: "Steps of the frontend CI job, indented six spaces." }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Every module's Api assembly has exactly one IModule (ADR-0005).", file: templates/tests/EveryModuleHasOneIModule.cs.sbn }
+  - { kind: ci-step, describes: "build.proj builds every project with warnings as errors.", file: templates/ci.yml.sbn }

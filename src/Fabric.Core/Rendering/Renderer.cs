@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Fabric.Core.Catalog;
 using Fabric.Core.Choices;
 using Fabric.Core.Generation;
@@ -14,7 +15,7 @@ namespace Fabric.Core.Rendering;
 /// <c>module_defaults</c>, <c>modules</c>, <c>module</c> (per-module files only) and <c>slots</c> (files only). Nothing from the clock or the machine is
 /// available, unknown variables are errors, and output uses LF, so the same input always renders the same bytes.
 /// </summary>
-public static class Renderer
+public static partial class Renderer
 {
     public static RenderedProject Render(CatalogModel catalog, Composition composition, ProjectChoices choices, string name)
     {
@@ -72,7 +73,7 @@ public static class Renderer
 
         try
         {
-            return template.Render(context).Replace("\r\n", "\n", StringComparison.Ordinal);
+            return Tidy(template.Render(context).Replace("\r\n", "\n", StringComparison.Ordinal));
         }
         catch (ScriptRuntimeException exception)
         {
@@ -80,6 +81,16 @@ public static class Renderer
             return null;
         }
     }
+
+    /// <summary>An empty slot leaves its line behind; whitespace-only lines become empty and blank-line runs collapse to one.</summary>
+    private static string Tidy(string content) =>
+        BlankLineRun().Replace(WhitespaceOnlyLine().Replace(content, string.Empty), "\n\n");
+
+    [GeneratedRegex(@"(?m)^[ \t]+$")]
+    private static partial Regex WhitespaceOnlyLine();
+
+    [GeneratedRegex(@"\n{3,}")]
+    private static partial Regex BlankLineRun();
 
     /// <summary>Scriban's built-ins minus <c>date</c>, <c>timespan</c> and <c>math</c>, which can read the clock or a random source.</summary>
     private static ScriptObject Builtins()

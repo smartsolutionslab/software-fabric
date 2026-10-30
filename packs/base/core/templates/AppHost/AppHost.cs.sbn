@@ -1,0 +1,7 @@
+var builder = DistributedApplication.CreateBuilder(args);
+
+{{ slots["apphost.resources"] }}
+
+{{ slots["apphost.host"] }}{{ slots["apphost.host-wiring"] }};
+
+builder.Build().Run();

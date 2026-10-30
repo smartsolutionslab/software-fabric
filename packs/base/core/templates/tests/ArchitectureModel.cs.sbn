@@ -1,0 +1,22 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests;
+
+/// <summary>The assemblies architecture rules look at.</summary>
+public sealed class ArchitectureModel
+{
+    private ArchitectureModel(IReadOnlyList<Assembly> moduleAssemblies) => ModuleAssemblies = moduleAssemblies;
+
+    public IReadOnlyList<Assembly> ModuleAssemblies { get; }
+
+    public static IReadOnlyList<IArchitectureRule> Rules { get; } =
+        [.. typeof(ArchitectureModel).Assembly.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(IArchitectureRule).IsAssignableFrom(type))
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .Select(type => (IArchitectureRule)Activator.CreateInstance(type)!)];
+
+    public static ArchitectureModel Load() =>
+        new([.. Directory.EnumerateFiles(AppContext.BaseDirectory, "{{ namespace }}.Modules.*.dll")
+            .Order(StringComparer.Ordinal)
+            .Select(Assembly.LoadFrom)]);
+}
