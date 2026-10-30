@@ -4,8 +4,12 @@ files:
   - { template: templates/PersistenceRegistration.cs.sbn, target: src/BuildingBlocks/Persistence/PersistenceRegistration.cs }
   - { template: templates/ModuleContext.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/{{ module.namespace }}DbContext.cs", per-module: true }
   - { template: templates/OneDbContextPerModule.cs.sbn, target: tests/Architecture.Tests/Rules/OneDbContextPerModule.cs }
+  - { template: templates/NoServices.cs.sbn, target: src/BuildingBlocks/Persistence/NoServices.cs }
+  - { template: templates/MigrationRunner.csproj.sbn, target: src/MigrationRunner/MigrationRunner.csproj }
+  - { template: templates/MigrationRunner.cs.sbn, target: src/MigrationRunner/Program.cs }
+  - { template: templates/DesignTimeFactory.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/{{ module.namespace }}DbContextFactory.cs", per-module: true }
 declares-slots:
-  - { slot: persistence.options, description: "Statements configuring DbContextOptionsBuilder options for the database provider, given string connectionString.", cardinality: exactly-one }
+  - { slot: persistence.options, description: "Statements configuring the DbContextOptionsBuilder options for the database provider, given string connectionString and string schema (the module's; for its migrations history).", cardinality: exactly-one }
   - { slot: persistence.model-conventions, description: "Statements on ModelBuilder modelBuilder applied to every module's model; this is the ModuleDbContext." }
   - { slot: persistence.context-members, description: "Members added to ModuleDbContext; IServiceProvider Services is available." }
   - { slot: persistence.save-changes, description: "Statements run before every SaveChanges of a module's DbContext; this is the ModuleDbContext." }
@@ -13,6 +17,11 @@ slots:
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
   - { slot: buildingblocks.packages, template: templates/buildingblocks-packages.sbn }
   - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn }
+  - { slot: dotnet.tools, template: templates/dotnet-tool.sbn }
+  - { slot: solution.projects, template: templates/solution-project.sbn }
+  - { slot: apphost.project-references, template: templates/apphost-project-reference.sbn }
+  - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 15 }
+  - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 5 }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

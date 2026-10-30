@@ -1,5 +1,6 @@
 ## Project structure (base)
 
+- Run `dotnet tool restore` once after cloning; local tools are pinned in `.config/dotnet-tools.json`.
 - Build everything with `dotnet build build.proj`. Run locally with `dotnet run --project src/AppHost`.
 - `src/AppHost` is the only composition root. A new database, broker or service is an Aspire resource there, never a hand-written connection string.
 - Each bounded context is a module under `src/Modules/<Module>/` with Domain, Application, Infrastructure and Api projects. Add one with `fabric add-module <name>`; never copy another module.

@@ -14,26 +14,31 @@ public static class PersistenceRegistration
     public static IServiceCollection AddModuleDbContext<TModule>(this IServiceCollection services, IConfiguration configuration)
         where TModule : IModule
     {
-        {{ not_null "configuration" }}
-
         var context = ModuleAssemblies.Of<TModule>("Infrastructure").GetTypes()
             .SingleOrDefault(type => type is { IsClass: true, IsAbstract: false } && typeof(ModuleDbContext).IsAssignableFrom(type));
-        if (context is null)
-        {
-            return services;
-        }
+
+        return context is null ? services : services.AddModuleDbContext(context, configuration);
+    }
+
+    /// <summary>Registers one module DbContext type, with a health check.</summary>
+    public static IServiceCollection AddModuleDbContext(this IServiceCollection services, Type context, IConfiguration configuration)
+    {
+        {{ not_null "context" }}
+        {{ not_null "configuration" }}
 
         var connectionString = configuration.GetConnectionString(ConnectionStringName)
             ?? throw new InvalidOperationException($"Connection string '{ConnectionStringName}' is missing; Aspire provides it.");
+        var schema = (string)(context.GetField("Schema")?.GetValue(null)
+            ?? throw new InvalidOperationException($"{context.Name} declares no Schema constant."));
 
         typeof(PersistenceRegistration)
             .GetMethod(nameof(Register), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(context)
-            .Invoke(null, [services, connectionString]);
+            .Invoke(null, [services, connectionString, schema]);
         return services;
     }
 
-    private static void Register<TContext>(IServiceCollection services, string connectionString)
+    private static void Register<TContext>(IServiceCollection services, string connectionString, string schema)
         where TContext : ModuleDbContext
     {
         services.AddDbContext<TContext>(options =>

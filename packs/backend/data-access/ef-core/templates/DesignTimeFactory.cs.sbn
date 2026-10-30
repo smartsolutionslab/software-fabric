@@ -1,0 +1,18 @@
+using {{ namespace }}.BuildingBlocks.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.Persistence;
+
+/// <summary>Used by <c>dotnet ef</c> only: builds the context without the application or a database.</summary>
+public sealed class {{ module.namespace }}DbContextFactory : IDesignTimeDbContextFactory<{{ module.namespace }}DbContext>
+{
+    public {{ module.namespace }}DbContext CreateDbContext(string[] args)
+    {
+        const string connectionString = "Server=localhost";
+        const string schema = {{ module.namespace }}DbContext.Schema;
+        var options = new DbContextOptionsBuilder<{{ module.namespace }}DbContext>();
+{{ slots["persistence.options"] }}
+        return new {{ module.namespace }}DbContext(options.Options, NoServices.Instance);
+    }
+}

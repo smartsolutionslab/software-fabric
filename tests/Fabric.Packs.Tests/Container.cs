@@ -30,6 +30,10 @@ internal sealed class Container : IDisposable
         return container;
     }
 
+    /// <summary>Runs one SQL statement as the postgres user and returns its unaligned, tuples-only output.</summary>
+    public string Psql(string password, string sql) =>
+        Docker("exec", "--env", $"PGPASSWORD={password}", id, "psql", "-U", "postgres", "-d", "postgres", "-tAc", sql).Trim();
+
     public void Dispose() => Docker("rm", "--force", id);
 
     private static Container Start(string image, int containerPort, params string[] environment)

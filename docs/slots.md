@@ -20,6 +20,7 @@ docs/adr/NNNN-<dimension>-<option>.md
                                 generator; one per pack, numbered in selection order
 global.json  .editorconfig  Directory.Build.props  Directory.Packages.props  build.proj
 Solution.slnx                   base
+.config/dotnet-tools.json       base; tools by slot (dotnet-ef from ef-core)
 build/guards/BannedSymbols.txt  backend.guards.ensure-that
 src/
   AppHost/                      base (Aspire composition root)
@@ -28,6 +29,7 @@ src/
   Contracts/                    base
   Kernel/                       base (project); guards, result and absence packs add Ensure, Result, ApiError, Option
   Host/                         backend.topology.modular-monolith
+  MigrationRunner/              backend.data-access.ef-core (applies every module's migrations, then exits)
   Modules/
     Directory.Build.props       base; per-layer package references by slot
     <Module>/<Module>.Domain|Application|Infrastructure|Api/
@@ -115,6 +117,7 @@ Cardinality `0+` unless stated. "Separator" is what joins contributions
 |---|---|---|
 | `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`) |
 | `dotnet.build-items` *(added with the kernel options)* | `Directory.Build.props` | ensure-that (ban list), typed-outcomes (`using static Result`) |
+| `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
 | `dotnet.build-properties` | `Directory.Build.props` | packs adding analyzers or properties (result, red-first) |
 | `solution.projects` *(added in M1-02)* | `Solution.slnx` | packs owning a project: modular-monolith (Host), aspire-fixture (Integration.Tests) |
@@ -148,7 +151,7 @@ is a defect in the second pack.
 | `host.endpoints` *(added in M1-06)* | `src/Host/Program.cs` | 0+ | keycloak (`/me`), tenancy (`/me/tenant`) |
 | `modules.infrastructure` | `src/BuildingBlocks/Modules/ModuleInfrastructure.cs` | 0+ | ef-core, wolverine, tenancy |
 | `modules.endpoints` *(added in M1-02)* | `src/BuildingBlocks/Modules/ModuleEndpoints.cs` | 0+ | minimal-apis (maps `IEndpoint`s), keycloak (`group.RequireAuthorization()`) |
-| `persistence.options` *(added in M1-03)* | `src/BuildingBlocks/Persistence/PersistenceRegistration.cs` (owned and declared by ef-core) | **exactly-one** | postgres (`options.UseNpgsql(connectionString)`) |
+| `persistence.options` *(added in M1-03)* | `PersistenceRegistration.cs` and each module's design-time factory (owned and declared by ef-core); `options`, `connectionString` and `schema` in scope | **exactly-one** | postgres (`options.UseNpgsql(connectionString, ...)` with the history table in `schema`) |
 | `persistence.model-conventions` | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` (owned and declared by ef-core) | 0+ | tenancy column |
 | `persistence.context-members` *(added in M1-05)* | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` | 0+ | tenancy column (`CurrentTenantId`) |
 | `persistence.save-changes` *(added in M1-05)* | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` | 0+ | tenancy column (stamps new rows) |

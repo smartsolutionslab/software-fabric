@@ -45,6 +45,9 @@ internal sealed class GeneratedProject : IDisposable
         exitCode.ShouldBe(0, output);
     }
 
+    public (int ExitCode, string Output) DotNetCommand(IReadOnlyDictionary<string, string> environment, params string[] arguments) =>
+        DotNet.Run(ProjectDirectory, environment, arguments);
+
     public (int ExitCode, string Output) TryBuild() =>
         DotNet.Run(ProjectDirectory, new Dictionary<string, string>(), "build", "build.proj", "-c", "Release");
 

@@ -1,0 +1,3 @@
+var migrations = builder.AddProject<Projects.MigrationRunner>("migrations")
+    .WithReference(database)
+    .WaitFor(database);

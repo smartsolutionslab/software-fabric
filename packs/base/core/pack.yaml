@@ -13,6 +13,7 @@ files:
   - { template: templates/agents/security-reviewer.md.sbn, target: ".claude/agents/security-reviewer.md" }
   - { template: templates/agents/triage.md.sbn, target: ".claude/agents/triage.md" }
   - { template: templates/global.json.sbn, target: global.json }
+  - { template: templates/dotnet-tools.json.sbn, target: ".config/dotnet-tools.json" }
   - { template: templates/editorconfig.sbn, target: ".editorconfig" }
   - { template: templates/gitignore.sbn, target: ".gitignore" }
   - { template: templates/Directory.Build.props.sbn, target: Directory.Build.props }
@@ -60,6 +61,7 @@ declares-slots:
   - { slot: agents.brief.triage, description: "Every pack's brief for the triage; filled by the generator." }
   - { slot: readme.sections, description: "How to build, run and work on the project, one section per pack that changes it.", separator: "\n\n" }
   - { slot: solution.projects, description: "<Project Path='...' /> lines for projects other packs own." }
+  - { slot: dotnet.tools, description: "Entries of the local tool manifest (.config/dotnet-tools.json), restored with dotnet tool restore.", separator: ",\n" }
   - { slot: dotnet.package-versions, description: "<PackageVersion> lines; one owner per package." }
   - { slot: templates.functions, description: "Scriban function definitions every template can call (not_null, not_blank, ...); filled by packs, never rendered as text." }
   - { slot: dotnet.build-items, description: "Item lines (references, usings, analyzer files) in an ItemGroup of Directory.Build.props, conditioned by the contributor." }

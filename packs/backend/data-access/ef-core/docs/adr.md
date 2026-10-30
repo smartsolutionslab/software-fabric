@@ -9,4 +9,4 @@ Each module owns one `DbContext`, deriving from `ModuleDbContext`, in its Infras
 ## Consequences
 
 - Modules never join across schemas; another module's data is reached through its contract, not its tables.
-- Migrations are per module and per context.
+- Migrations are per module, in the module's Infrastructure project, with the history table in the module's schema. `src/MigrationRunner` applies them all and exits; Aspire starts the host only after it completes. Each module has a design-time factory so `dotnet ef` needs neither the application nor a database.
