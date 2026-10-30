@@ -65,15 +65,16 @@ internal sealed class Container : IDisposable
         throw new InvalidOperationException($"Container {id} did not become ready: {string.Join(' ', command)}");
     }
 
+    /// <returns>Standard output only: docker writes pull progress to standard error, which must not end up in an id.</returns>
     private static string Docker(params string[] arguments)
     {
-        var (exitCode, output) = Run(arguments);
-        return exitCode == 0 ? output : throw new InvalidOperationException($"docker {string.Join(' ', arguments)} failed: {output}");
+        var (exitCode, output, error) = Run(arguments);
+        return exitCode == 0 ? output : throw new InvalidOperationException($"docker {string.Join(' ', arguments)} failed: {output}{error}");
     }
 
     private static bool TryDocker(string[] arguments) => Run(arguments).ExitCode == 0;
 
-    private static (int ExitCode, string Output) Run(string[] arguments)
+    private static (int ExitCode, string Output, string Error) Run(string[] arguments)
     {
         var start = new ProcessStartInfo("docker") { RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var argument in arguments)
@@ -85,6 +86,6 @@ internal sealed class Container : IDisposable
         var error = process.StandardError.ReadToEndAsync();
         var output = process.StandardOutput.ReadToEnd();
         process.WaitForExit();
-        return (process.ExitCode, output + error.Result);
+        return (process.ExitCode, output, error.Result);
     }
 }
