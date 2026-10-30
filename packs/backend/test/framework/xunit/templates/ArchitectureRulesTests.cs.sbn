@@ -1,0 +1,20 @@
+namespace {{ namespace }}.Architecture.Tests;
+
+public class ArchitectureRulesTests
+{
+    private static readonly ArchitectureModel Model = ArchitectureModel.Load();
+
+    public static TheoryData<string> Rules { get; } = new(ArchitectureModel.Rules.Select(rule => rule.GetType().Name));
+
+    [Theory]
+    [MemberData(nameof(Rules))]
+    public void Rule_holds(string rule)
+    {
+        var architectureRule = ArchitectureModel.Rules.Single(candidate => candidate.GetType().Name == rule);
+        var violations = architectureRule.Violations(Model).ToList();
+        if (violations.Count > 0)
+        {
+            throw new ArchitectureViolationException($"{architectureRule.Description}{Environment.NewLine}{string.Join(Environment.NewLine, violations)}");
+        }
+    }
+}

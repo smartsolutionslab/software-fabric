@@ -1,0 +1,8 @@
+{{~ if project["backend.test.framework"] == "xunit" ~}}
+T:Xunit.Assert;Use Shouldly (docs/adr)
+{{~ else if project["backend.test.framework"] == "nunit" ~}}
+T:NUnit.Framework.Assert;Use Shouldly (docs/adr)
+T:NUnit.Framework.Legacy.ClassicAssert;Use Shouldly (docs/adr)
+{{~ else ~}}
+T:TUnit.Assertions.Assert;Use Shouldly (docs/adr)
+{{~ end ~}}

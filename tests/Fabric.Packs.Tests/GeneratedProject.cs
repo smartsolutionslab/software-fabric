@@ -45,6 +45,10 @@ internal sealed class GeneratedProject : IDisposable
         exitCode.ShouldBe(0, output);
     }
 
+    /// <summary>Runs one test project of the generated solution, already built in Release.</summary>
+    public (int ExitCode, string Output) Test(string project) =>
+        DotNet.Run(ProjectDirectory, "test", "--project", project, "-c", "Release", "--no-build");
+
     /// <summary>Starts the built host on a free port, outside Aspire, with the given configuration.</summary>
     public RunningHost StartHost(IReadOnlyDictionary<string, string> environment)
     {

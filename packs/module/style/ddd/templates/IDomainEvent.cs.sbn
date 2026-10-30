@@ -1,0 +1,6 @@
+namespace {{ namespace }}.BuildingBlocks.Domain;
+
+#pragma warning disable CA1040 // A marker: what happened is the event's own record type and properties.
+/// <summary>Something that happened inside an aggregate, named in the past tense (InvoicePaid).</summary>
+public interface IDomainEvent;
+#pragma warning restore CA1040

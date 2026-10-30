@@ -1,0 +1,8 @@
+option: module.ddd-depth.light
+files:
+  - { template: templates/AggregatesHaveNoPublicSetters.cs.sbn, target: tests/Architecture.Tests/Rules/AggregatesHaveNoPublicSetters.cs }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No aggregate root exposes a public setter.", file: templates/AggregatesHaveNoPublicSetters.cs.sbn }

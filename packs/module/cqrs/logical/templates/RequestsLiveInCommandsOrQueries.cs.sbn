@@ -1,0 +1,26 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class RequestsLiveInCommandsOrQueries : IArchitectureRule
+{
+    public string Description => "Commands live in a Commands namespace and queries in a Queries namespace.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        foreach (var type in model.ModuleAssemblies.SelectMany(assembly => assembly.GetTypes()).Where(type => !type.IsInterface))
+        {
+            var contracts = type.GetInterfaces().Where(contract => contract.IsGenericType).Select(contract => contract.GetGenericTypeDefinition().Name).ToList();
+            var space = type.Namespace ?? string.Empty;
+            if (contracts.Contains("ICommand`1") && !space.Contains(".Commands", StringComparison.Ordinal))
+            {
+                yield return $"{type.FullName} is a command outside a Commands namespace.";
+            }
+
+            if (contracts.Contains("IQuery`1") && !space.Contains(".Queries", StringComparison.Ordinal))
+            {
+                yield return $"{type.FullName} is a query outside a Queries namespace.";
+            }
+        }
+    }
+}

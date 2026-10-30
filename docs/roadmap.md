@@ -44,9 +44,9 @@ Aspire integration tests here and in CI.
 | M1-01 | Slot set (`docs/slots.md`), ADR-0005, and the generator changes it needs: slot separators, generator-written ADRs / AGENTS.md sections / agent briefs, project name | Slot set approved at the gate; generator changes tested against the fixtures |
 | M1-02 | Base pack: repo skeleton, Aspire AppHost and ServiceDefaults, BuildingBlocks, Contracts, per-module csproj skeletons, `build.proj`, AGENTS.md, CLAUDE.md, CI. A test helper generates a real profile with empty stand-ins for packs not written yet | `saas-standard-react` generates with stand-ins and `dotnet build build.proj` passes |
 | M1-03 | Backend core: modular-monolith, minimal-apis, rest, result, hand-rolled mediator, postgres, ef-core, keycloak | Host starts under Aspire; an endpoint answers |
-| M1-04 | Modules: ddd (light), cqrs logical, integration-events | `fabric add-module billing` in a generated project builds and its tests pass |
-| M1-05 | Messaging and tenancy: rabbitmq, wolverine (with outbox), tenancy column | An integration event crosses two modules; a tenant cannot read another's rows |
-| M1-06 | Tests: xunit, shouldly, nsubstitute, aspire-fixture, red-first | Integration tests run against the real Aspire stack in CI |
+| M1-04 | Modules: ddd (light), cqrs logical. *As built:* also xunit, shouldly, nsubstitute (moved from M1-06 — a module's tests need a framework); integration-events moved to M1-05, where the bus that carries them is built | `fabric add-module billing` in a generated project builds and its tests pass |
+| M1-05 | Messaging and tenancy: integration-events, rabbitmq, wolverine (with outbox), tenancy column | An integration event crosses two modules; a tenant cannot read another's rows |
+| M1-06 | Tests: aspire-fixture, red-first | Integration tests run against the real Aspire stack in CI |
 | M1-07 | Frontend: react, spa, pnpm-workspaces, redux-toolkit, rtk-query-codegen, react-router, react-hook-form, zod, tailwind, shadcn, design-system none, tanstack-table, echarts, realtime none, oidc-client-ts, pwa no, accessibility | App builds, logs in through Keycloak, lists a module's data |
 | M1-08 | Fabric half: agent briefs, `/next-issue` skill, board protocol workflows (janitor, return-to-Todo), cross-model review workflow, `docs/owners.yml` | Workflows tested; a dry run claims and releases an issue |
 | M1-09 | Profile CI builds and tests the generated `saas-standard-react` project, backend and frontend | Green in this repo's CI |

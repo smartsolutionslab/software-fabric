@@ -1,0 +1,12 @@
+option: backend.test.assertions.shouldly
+files:
+  - { template: templates/BannedSymbols.txt.sbn, target: tests/BannedSymbols.txt }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: tests.packages, template: templates/packages.sbn }
+  - { slot: tests.usings, template: templates/usings.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: analyzer, describes: "The test framework's own Assert class is banned in tests (RS0030), so assertions read the same everywhere.", file: templates/BannedSymbols.txt.sbn }

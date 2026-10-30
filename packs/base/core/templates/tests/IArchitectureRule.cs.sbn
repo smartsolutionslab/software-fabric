@@ -10,3 +10,21 @@ public interface IArchitectureRule
 
     IEnumerable<string> Violations(ArchitectureModel model);
 }
+
+/// <summary>Thrown by the test that runs a rule when the rule has violations; works the same under any test framework.</summary>
+public sealed class ArchitectureViolationException : Exception
+{
+    public ArchitectureViolationException()
+    {
+    }
+
+    public ArchitectureViolationException(string message)
+        : base(message)
+    {
+    }
+
+    public ArchitectureViolationException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}

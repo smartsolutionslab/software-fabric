@@ -1,0 +1,11 @@
+# Assertions: Shouldly
+
+**Status:** Accepted (generated)
+
+## Decision
+
+Assertions use Shouldly (`total.ShouldBe(42)`), whose failure messages quote the expression that failed. The test framework's own `Assert` is banned in test projects by the Banned API analyzer, so there is one way to assert.
+
+## Consequences
+
+- A test using `Assert` does not build.

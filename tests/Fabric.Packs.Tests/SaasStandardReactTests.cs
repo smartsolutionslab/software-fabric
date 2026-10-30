@@ -60,4 +60,38 @@ public sealed class SaasStandardReactTests
         (await host.GetAsync("/openapi/v1.json")).StatusCode.ShouldBe(HttpStatusCode.OK);
         (await host.GetAsync("/billing/probe")).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
+
+    [Fact]
+    public void A_new_module_builds_and_its_tests_and_the_architecture_rules_pass()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Build();
+
+        var (moduleExitCode, moduleOutput) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj");
+        moduleExitCode.ShouldBe(0, moduleOutput);
+        moduleOutput.ShouldContain("failed: 0");
+
+        var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        architectureExitCode.ShouldBe(0, architectureOutput);
+        architectureOutput.ShouldContain("failed: 0");
+    }
+
+    [Fact]
+    public void Breaking_an_architecture_rule_fails_the_generated_tests()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Api/InvoicesController.cs", """
+            namespace Shop.Modules.Billing.Api;
+
+            public sealed class InvoicesController : Microsoft.AspNetCore.Mvc.ControllerBase;
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("InvoicesController is a controller");
+    }
 }

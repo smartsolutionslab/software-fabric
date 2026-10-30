@@ -1,0 +1,23 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class DomainIsPure : IArchitectureRule
+{
+    public string Description => "A module's Domain project references nothing but the BCL and BuildingBlocks.Domain.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        foreach (var assembly in model.ModuleAssemblies.Where(assembly => assembly.GetName().Name!.EndsWith(".Domain", StringComparison.Ordinal)))
+        {
+            foreach (var reference in assembly.GetReferencedAssemblies().Select(reference => reference.Name!).Where(name => !IsAllowed(name)))
+            {
+                yield return $"{assembly.GetName().Name} references {reference}.";
+            }
+        }
+    }
+
+    private static bool IsAllowed(string name) =>
+        name is "netstandard" or "mscorlib" or "System" or "{{ namespace }}.BuildingBlocks.Domain"
+        || name.StartsWith("System.", StringComparison.Ordinal);
+}

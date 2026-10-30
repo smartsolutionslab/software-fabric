@@ -1,0 +1,1 @@
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../BuildingBlocks.Domain/BuildingBlocks.Domain.csproj" />
