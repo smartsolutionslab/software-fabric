@@ -31,6 +31,7 @@ files:
   - { template: templates/BuildingBlocks/ModuleDiscovery.cs.sbn, target: src/BuildingBlocks/Modules/ModuleDiscovery.cs }
   - { template: templates/BuildingBlocks/ModuleInfrastructure.cs.sbn, target: src/BuildingBlocks/Modules/ModuleInfrastructure.cs }
   - { template: templates/BuildingBlocks/ModuleEndpoints.cs.sbn, target: src/BuildingBlocks/Modules/ModuleEndpoints.cs }
+  - { template: templates/BuildingBlocks/ModuleAssemblies.cs.sbn, target: src/BuildingBlocks/Modules/ModuleAssemblies.cs }
   - { template: templates/Contracts/Contracts.csproj.sbn, target: src/Contracts/Contracts.csproj }
   - { template: templates/Modules/Directory.Build.props.sbn, target: src/Modules/Directory.Build.props }
   - { template: templates/tests/Directory.Build.props.sbn, target: tests/Directory.Build.props }
@@ -63,10 +64,10 @@ declares-slots:
   - { slot: apphost.project-references, description: "<ProjectReference> lines for the projects the AppHost runs." }
   - { slot: apphost.resources, description: "Statements adding Aspire resources (databases, brokers, identity, frontends)." }
   - { slot: apphost.host, description: "The expression adding the host project, without a semicolon.", cardinality: exactly-one }
-  - { slot: apphost.host-wiring, description: "Chained calls on the host (.WithReference(...), .WaitFor(...))." }
+  - { slot: apphost.host-wiring, description: "Chained calls on the host, each starting on a new line (.WithReference(...), .WaitFor(...)).", separator: "" }
   - { slot: buildingblocks.packages, description: "<PackageReference> lines for BuildingBlocks." }
   - { slot: modules.infrastructure, description: "Statements registering infrastructure for one module, generic over TModule." }
-  - { slot: modules.endpoints, description: "Statements mapping one module's endpoints, generic over TModule." }
+  - { slot: modules.endpoints, description: "Statements on one module's route group (RouteGroupBuilder group), generic over TModule." }
   - { slot: modules.packages.domain, description: "<PackageReference> lines for every module's Domain project." }
   - { slot: modules.packages.application, description: "<PackageReference> lines for every module's Application project." }
   - { slot: modules.packages.infrastructure, description: "<PackageReference> lines for every module's Infrastructure project." }

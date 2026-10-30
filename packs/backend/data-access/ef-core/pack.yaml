@@ -1,0 +1,18 @@
+option: backend.data-access.ef-core
+files:
+  - { template: templates/ModuleDbContext.cs.sbn, target: src/BuildingBlocks/Persistence/ModuleDbContext.cs }
+  - { template: templates/PersistenceRegistration.cs.sbn, target: src/BuildingBlocks/Persistence/PersistenceRegistration.cs }
+  - { template: templates/ModuleContext.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/{{ module.namespace }}DbContext.cs", per-module: true }
+  - { template: templates/OneDbContextPerModule.cs.sbn, target: tests/Architecture.Tests/Rules/OneDbContextPerModule.cs }
+declares-slots:
+  - { slot: persistence.options, description: "Statements configuring DbContextOptionsBuilder options for the database provider, given string connectionString.", cardinality: exactly-one }
+  - { slot: persistence.model-conventions, description: "Statements on ModelBuilder modelBuilder applied to every module's model." }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: buildingblocks.packages, template: templates/buildingblocks-packages.sbn }
+  - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Each module has at most one DbContext, in its Infrastructure project, deriving from ModuleDbContext.", file: templates/OneDbContextPerModule.cs.sbn }

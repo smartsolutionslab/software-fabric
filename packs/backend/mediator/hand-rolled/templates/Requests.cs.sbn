@@ -1,0 +1,21 @@
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+#pragma warning disable CA1040 // Marker interfaces: the result type is the only thing a request declares.
+/// <summary>A request that changes state.</summary>
+public interface ICommand<TResult>;
+
+/// <summary>A request that only reads.</summary>
+public interface IQuery<TResult>;
+#pragma warning restore CA1040
+
+public interface ICommandHandler<in TCommand, TResult>
+    where TCommand : ICommand<TResult>
+{
+    Task<TResult> HandleAsync(TCommand command, CancellationToken cancellationToken);
+}
+
+public interface IQueryHandler<in TQuery, TResult>
+    where TQuery : IQuery<TResult>
+{
+    Task<TResult> HandleAsync(TQuery query, CancellationToken cancellationToken);
+}

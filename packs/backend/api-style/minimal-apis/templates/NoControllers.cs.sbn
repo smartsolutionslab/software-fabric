@@ -1,0 +1,29 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class NoControllers : IArchitectureRule
+{
+    public string Description => "No module contains an MVC controller.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        return model.ModuleAssemblies
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(IsController)
+            .Select(type => $"{type.FullName} is a controller; use an IEndpoint.");
+    }
+
+    private static bool IsController(Type type)
+    {
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        {
+            if (current.FullName == "Microsoft.AspNetCore.Mvc.ControllerBase")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

@@ -82,6 +82,14 @@ lives in `src/Modules/OrderHandling/OrderHandling.Domain/`, its
 assemblies are `<Namespace>.Modules.OrderHandling.<Layer>`, and the host
 loads `<Namespace>.Modules.*.Api.dll`.
 
+## Wiring code lives in extension methods (added in M1-03)
+
+A contribution to `host.services`, `host.middleware` or
+`modules.infrastructure` is a call to an extension method the pack owns,
+declared in `Microsoft.Extensions.DependencyInjection` (services) or
+`Microsoft.AspNetCore.Builder` (app). Shared files then need no `using`
+per choice, and the code behind the call is in a file the pack owns.
+
 ## Slots
 
 Cardinality `0+` unless stated. "Separator" is what joins contributions
@@ -128,7 +136,8 @@ is a defect in the second pack.
 | `host.services` | `src/Host/Program.cs` | 0+ | keycloak, wolverine, result (problem details), tenancy |
 | `host.middleware` | `src/Host/Program.cs` | 0+ | keycloak, tenancy |
 | `modules.infrastructure` | `src/BuildingBlocks/Modules/ModuleInfrastructure.cs` | 0+ | ef-core, wolverine, tenancy |
-| `modules.endpoints` *(added in M1-02)* | `src/BuildingBlocks/Modules/ModuleEndpoints.cs` | 0+ | minimal-apis |
+| `modules.endpoints` *(added in M1-02)* | `src/BuildingBlocks/Modules/ModuleEndpoints.cs` | 0+ | minimal-apis (maps `IEndpoint`s), keycloak (`group.RequireAuthorization()`) |
+| `persistence.options` *(added in M1-03)* | `src/BuildingBlocks/Persistence/PersistenceRegistration.cs` (owned and declared by ef-core) | **exactly-one** | postgres (`options.UseNpgsql(connectionString)`) |
 | `persistence.model-conventions` | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` (owned and declared by ef-core) | 0+ | tenancy column |
 
 ### Frontend

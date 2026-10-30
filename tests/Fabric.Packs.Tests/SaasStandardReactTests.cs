@@ -1,20 +1,28 @@
-using Fabric.Core.Generation;
+using System.Net;
 
 namespace Fabric.Packs.Tests;
 
-/// <summary>Generates saas-standard-react from the real packs (stand-ins for the rest) and builds the result.</summary>
-public sealed class SaasStandardReactTests : IDisposable
+/// <summary>Generates saas-standard-react from the real packs (stand-ins for the rest) and checks the result.</summary>
+public sealed class SaasStandardReactTests
 {
     private const string Profile = "saas-standard-react";
 
-    private readonly string root = Directory.CreateTempSubdirectory("fabric-saas-").FullName;
-    private readonly StandIns standIns = new();
+    /// <summary>What a module's endpoint looks like with minimal-apis and result; the module packs (M1-04) will add real ones.</summary>
+    private const string ProbeEndpoint = """
+        using Microsoft.AspNetCore.Builder;
+        using Microsoft.AspNetCore.Http;
+        using Microsoft.AspNetCore.Routing;
+        using Shop.BuildingBlocks.Api;
+        using Shop.BuildingBlocks.Results;
 
-    public void Dispose()
-    {
-        standIns.Dispose();
-        Directory.Delete(root, recursive: true);
-    }
+        namespace Shop.Modules.Billing.Api;
+
+        public sealed class Probe : IEndpoint
+        {
+            public void Map(IEndpointRouteBuilder endpoints) =>
+                endpoints.MapGet("/probe", () => Result<string, ApiError>.Success("pong").ToHttpResult());
+        }
+        """;
 
     [Fact]
     public void The_repository_packs_load_without_errors()
@@ -25,27 +33,31 @@ public sealed class SaasStandardReactTests : IDisposable
     [Fact]
     public void Generates_builds_and_still_builds_after_adding_a_module()
     {
-        var packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, Profile);
-        var project = Path.Combine(root, "shop");
+        using var project = new GeneratedProject(Profile);
+        project.Build();
 
-        var generated = Generator.New(Repository.Catalog, packs, "shop", Profile, []);
-        generated.Errors.ShouldBeEmpty();
-        ProjectWriter.Write(project, generated.Files).ShouldBeNull();
+        project.AddModule("billing");
+        project.Build();
 
-        Build(project);
-
-        var record = FabricFile.Read(new StringReader(File.ReadAllText(Path.Combine(project, FabricFile.FileName))), FabricFile.FileName);
-        var addition = Generator.AddModule(Repository.Catalog, packs, record, "billing", []);
-        addition.Errors.ShouldBeEmpty();
-        ProjectWriter.Add(project, addition.Created, addition.FabricYaml!).ShouldBeNull();
-
-        Build(project);
-        File.Exists(Path.Combine(project, "src", "Modules", "Billing", "Billing.Api", "bin", "Release", "net10.0", "Shop.Modules.Billing.Api.dll")).ShouldBeTrue();
+        File.Exists(Path.Combine(project.ProjectDirectory, "src", "Modules", "Billing", "Billing.Api", "bin", "Release", "net10.0", "Shop.Modules.Billing.Api.dll")).ShouldBeTrue();
     }
 
-    private static void Build(string project)
+    [Fact]
+    public async Task The_host_finds_module_endpoints_serves_openapi_and_requires_a_token()
     {
-        var (exitCode, output) = DotNet.Run(project, "build", "build.proj", "-c", "Release");
-        exitCode.ShouldBe(0, output);
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Api/Probe.cs", ProbeEndpoint);
+        project.Build();
+
+        using var host = project.StartHost(new Dictionary<string, string>
+        {
+            ["ConnectionStrings__database"] = "Host=127.0.0.1;Port=1;Database=shop;Username=none;Password=none",
+            ["Authentication__Authority"] = "http://127.0.0.1:1/realms/shop",
+        });
+
+        (await host.GetAsync("/alive")).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await host.GetAsync("/openapi/v1.json")).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await host.GetAsync("/billing/probe")).StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 }

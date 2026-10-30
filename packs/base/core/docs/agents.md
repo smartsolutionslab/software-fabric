@@ -7,3 +7,4 @@
 - Nothing may need a line per module in a shared file (no module list in Program.cs, no per-module ProjectReference). Registration is by convention: implement `IModule` once per module.
 - A new package version goes in `Directory.Packages.props`; projects reference it without a version.
 - An architecture rule is a class implementing `IArchitectureRule` in `tests/Architecture.Tests/Rules/`; it runs with the other tests.
+- Code that wires a choice into the host or into every module is an extension method in the `Microsoft.Extensions.DependencyInjection` (services) or `Microsoft.AspNetCore.Builder` (app) namespace, so no shared file needs a `using` per choice.

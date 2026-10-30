@@ -1,0 +1,25 @@
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Api;
+using Microsoft.AspNetCore.Routing;
+
+namespace Microsoft.AspNetCore.Builder;
+
+public static class EndpointDiscovery
+{
+    /// <summary>Maps every <see cref="IEndpoint"/> in the assembly into the given route group.</summary>
+    public static IEndpointRouteBuilder MapEndpointsIn(this IEndpointRouteBuilder endpoints, Assembly assembly)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ArgumentNullException.ThrowIfNull(assembly);
+
+        foreach (var endpoint in assembly.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(IEndpoint).IsAssignableFrom(type))
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .Select(type => (IEndpoint)Activator.CreateInstance(type)!))
+        {
+            endpoint.Map(endpoints);
+        }
+
+        return endpoints;
+    }
+}

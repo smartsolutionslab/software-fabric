@@ -1,0 +1,6 @@
+#pragma warning disable ASPIREHOSTINGKEYCLOAK001, ASPIRECERTIFICATES001 // Preview APIs, development only (see docs/adr).
+var keycloak = builder.AddKeycloak("keycloak", 8080)
+    .WithoutHttpsCertificate()
+    .WithDataVolume()
+    .WithRealmImport("./realms");
+#pragma warning restore ASPIREHOSTINGKEYCLOAK001, ASPIRECERTIFICATES001

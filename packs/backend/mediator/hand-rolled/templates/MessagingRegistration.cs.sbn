@@ -1,0 +1,29 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.BuildingBlocks.Modules;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class MessagingRegistration
+{
+    public static IServiceCollection AddDispatcher(this IServiceCollection services) =>
+        services.AddScoped<IDispatcher, Dispatcher>();
+
+    /// <summary>Registers every command and query handler in the module's Application assembly.</summary>
+    public static IServiceCollection AddModuleHandlers<TModule>(this IServiceCollection services)
+        where TModule : IModule
+    {
+        Type[] handlerDefinitions = [typeof(ICommandHandler<,>), typeof(IQueryHandler<,>)];
+        var handlers = ModuleAssemblies.Of<TModule>("Application").GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false })
+            .SelectMany(type => type.GetInterfaces()
+                .Where(contract => contract.IsGenericType && handlerDefinitions.Contains(contract.GetGenericTypeDefinition()))
+                .Select(contract => (contract, type)));
+
+        foreach (var (contract, implementation) in handlers)
+        {
+            services.AddScoped(contract, implementation);
+        }
+
+        return services;
+    }
+}

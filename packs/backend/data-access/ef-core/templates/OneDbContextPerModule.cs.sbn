@@ -1,0 +1,39 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class OneDbContextPerModule : IArchitectureRule
+{
+    public string Description => "Each module has at most one DbContext, in its Infrastructure project, deriving from ModuleDbContext.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        foreach (var assembly in model.ModuleAssemblies)
+        {
+            var contexts = assembly.GetTypes().Where(IsDbContext).ToList();
+            var isInfrastructure = assembly.GetName().Name!.EndsWith(".Infrastructure", StringComparison.Ordinal);
+            if (contexts.Count > (isInfrastructure ? 1 : 0))
+            {
+                yield return $"{assembly.GetName().Name} has {contexts.Count} DbContexts: {string.Join(", ", contexts.Select(type => type.Name))}.";
+            }
+
+            foreach (var context in contexts.Where(type => type.BaseType?.FullName != "{{ namespace }}.BuildingBlocks.Persistence.ModuleDbContext"))
+            {
+                yield return $"{context.FullName} does not derive from ModuleDbContext.";
+            }
+        }
+    }
+
+    private static bool IsDbContext(Type type)
+    {
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        {
+            if (current.FullName == "Microsoft.EntityFrameworkCore.DbContext")
+            {
+                return !type.IsAbstract;
+            }
+        }
+
+        return false;
+    }
+}

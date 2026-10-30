@@ -1,0 +1,17 @@
+using Microsoft.EntityFrameworkCore;
+
+namespace {{ namespace }}.BuildingBlocks.Persistence;
+
+/// <summary>The base of every module's DbContext: the module's own schema and its entity configurations.</summary>
+public abstract class ModuleDbContext(DbContextOptions options, string schema) : DbContext(options)
+{
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+
+        modelBuilder.HasDefaultSchema(schema);
+        modelBuilder.ApplyConfigurationsFromAssembly(GetType().Assembly);
+{{ slots["persistence.model-conventions"] }}
+        base.OnModelCreating(modelBuilder);
+    }
+}

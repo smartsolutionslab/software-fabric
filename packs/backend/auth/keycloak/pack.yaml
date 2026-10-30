@@ -1,0 +1,18 @@
+option: backend.auth.keycloak
+files:
+  - { template: templates/realm.json.sbn, target: src/AppHost/realms/realm.json }
+  - { template: templates/Authentication.cs.sbn, target: src/Host/Authentication.cs }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: apphost.packages, template: templates/apphost-package.sbn }
+  - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 20 }
+  - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 20 }
+  - { slot: host.packages, template: templates/host-package.sbn }
+  - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: host.middleware, template: templates/host-middleware.sbn, order: -10 }
+  - { slot: modules.endpoints, template: templates/module-endpoints.sbn, order: -10 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "A module endpoint answers 401 without a token; checked by the integration tests of the aspire-fixture pack against the running stack." }

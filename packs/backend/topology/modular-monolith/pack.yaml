@@ -3,6 +3,7 @@ files:
   - { template: templates/Host.csproj.sbn, target: src/Host/Host.csproj }
   - { template: templates/Program.cs.sbn, target: src/Host/Program.cs }
   - { template: templates/appsettings.json.sbn, target: src/Host/appsettings.json }
+  - { template: templates/launchSettings.json.sbn, target: src/Host/Properties/launchSettings.json }
   - { template: templates/ModulesDoNotReferenceEachOther.cs.sbn, target: tests/Architecture.Tests/Rules/ModulesDoNotReferenceEachOther.cs }
 declares-slots:
   - { slot: host.packages, description: "<PackageReference> lines for the host." }

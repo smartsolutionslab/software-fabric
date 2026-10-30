@@ -1,0 +1,15 @@
+using System.Net;
+
+namespace {{ namespace }}.BuildingBlocks.Results;
+
+/// <summary>An expected failure: a stable machine-readable code, a message for people, and the HTTP status it maps to.</summary>
+public record ApiError(string Code, string Message, HttpStatusCode Status)
+{
+    public static ApiError NotFound(string code, string message) => new(code, message, HttpStatusCode.NotFound);
+
+    public static ApiError Validation(string code, string message) => new(code, message, HttpStatusCode.BadRequest);
+
+    public static ApiError Conflict(string code, string message) => new(code, message, HttpStatusCode.Conflict);
+
+    public static ApiError Forbidden(string code, string message) => new(code, message, HttpStatusCode.Forbidden);
+}

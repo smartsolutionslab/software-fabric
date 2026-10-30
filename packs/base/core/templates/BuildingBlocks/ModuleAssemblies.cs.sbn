@@ -1,0 +1,14 @@
+using System.Reflection;
+
+namespace {{ namespace }}.BuildingBlocks.Modules;
+
+public static class ModuleAssemblies
+{
+    /// <summary>The assembly of one layer (Domain, Application, Infrastructure, Api) of the module <typeparamref name="TModule"/> belongs to.</summary>
+    public static Assembly Of<TModule>(string layer)
+        where TModule : IModule
+    {
+        var api = typeof(TModule).Assembly.GetName().Name!;
+        return Assembly.Load(api[..api.LastIndexOf('.')] + "." + layer);
+    }
+}

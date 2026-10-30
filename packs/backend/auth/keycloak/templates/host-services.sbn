@@ -1,0 +1,1 @@
+builder.Services.AddKeycloakAuthentication(builder.Configuration, builder.Environment);

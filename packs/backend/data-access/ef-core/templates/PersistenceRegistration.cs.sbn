@@ -1,0 +1,45 @@
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Modules;
+using {{ namespace }}.BuildingBlocks.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class PersistenceRegistration
+{
+    private const string ConnectionStringName = "database";
+
+    /// <summary>Registers the module's DbContext, if its Infrastructure project has one, with a health check.</summary>
+    public static IServiceCollection AddModuleDbContext<TModule>(this IServiceCollection services, IConfiguration configuration)
+        where TModule : IModule
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var context = ModuleAssemblies.Of<TModule>("Infrastructure").GetTypes()
+            .SingleOrDefault(type => type is { IsClass: true, IsAbstract: false } && typeof(ModuleDbContext).IsAssignableFrom(type));
+        if (context is null)
+        {
+            return services;
+        }
+
+        var connectionString = configuration.GetConnectionString(ConnectionStringName)
+            ?? throw new InvalidOperationException($"Connection string '{ConnectionStringName}' is missing; Aspire provides it.");
+
+        typeof(PersistenceRegistration)
+            .GetMethod(nameof(Register), BindingFlags.NonPublic | BindingFlags.Static)!
+            .MakeGenericMethod(context)
+            .Invoke(null, [services, connectionString]);
+        return services;
+    }
+
+    private static void Register<TContext>(IServiceCollection services, string connectionString)
+        where TContext : ModuleDbContext
+    {
+        services.AddDbContext<TContext>(options =>
+        {
+{{ slots["persistence.options"] }}
+        });
+        services.AddHealthChecks().AddDbContextCheck<TContext>(typeof(TContext).Name);
+    }
+}
