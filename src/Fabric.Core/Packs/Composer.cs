@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Fabric.Core.Catalog;
 using Fabric.Core.Choices;
+using Fabric.Core.Generation;
 
 namespace Fabric.Core.Packs;
 
@@ -76,23 +77,23 @@ public static partial class Composer
         {
             foreach (var file in pack.Files)
             {
-                var usesModuleName = ModuleNamePattern().IsMatch(file.Target);
-                if (file.PerModule && !usesModuleName)
+                var usesModule = ModulePlaceholder().IsMatch(file.Target);
+                if (file.PerModule && !usesModule)
                 {
-                    errors.Add($"{pack.Option}: per-module target '{file.Target}' must contain {{{{ module.name }}}}.");
+                    errors.Add($"{pack.Option}: per-module target '{file.Target}' must contain {{{{ module.name }}}} or {{{{ module.namespace }}}}.");
                     continue;
                 }
 
-                if (!file.PerModule && usesModuleName)
+                if (!file.PerModule && usesModule)
                 {
-                    errors.Add($"{pack.Option}: target '{file.Target}' uses {{{{ module.name }}}}, but the file is not per-module.");
+                    errors.Add($"{pack.Option}: target '{file.Target}' uses the module, but the file is not per-module.");
                     continue;
                 }
 
                 IEnumerable<string?> modules = file.PerModule ? ModulesUsing(catalog, pack, choices) : ProjectOnly;
                 foreach (var module in modules)
                 {
-                    var target = module is null ? file.Target : ModuleNamePattern().Replace(file.Target, module);
+                    var target = module is null ? file.Target : ModulePlaceholder().Replace(file.Target, match => match.Groups[1].Value == "name" ? module : Names.ToPascalCase(module));
                     Claim(claims, files, new ComposedFile(pack, file, target, module), errors);
                 }
             }
@@ -219,6 +220,6 @@ public static partial class Composer
     private static IReadOnlyList<string> Chosen(IReadOnlyDictionary<string, IReadOnlyList<string>> values, string dimension) =>
         values.TryGetValue(dimension, out var chosen) ? chosen : [];
 
-    [GeneratedRegex(@"\{\{\s*module\.name\s*\}\}")]
-    private static partial Regex ModuleNamePattern();
+    [GeneratedRegex(@"\{\{\s*module\.(name|namespace)\s*\}\}")]
+    private static partial Regex ModulePlaceholder();
 }

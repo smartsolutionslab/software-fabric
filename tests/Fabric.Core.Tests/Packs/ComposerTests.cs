@@ -112,14 +112,14 @@ public class ComposerTests
     public void A_per_module_target_without_the_module_name_is_an_error()
     {
         Composer.Compose(Catalog, Packs(Base, Pack("backend.database.postgres", files: [new("db.sbn", "src/Database.cs", true)]), Ddd), Choices())
-            .Errors.ShouldBe(["backend.database.postgres: per-module target 'src/Database.cs' must contain {{ module.name }}."]);
+            .Errors.ShouldBe(["backend.database.postgres: per-module target 'src/Database.cs' must contain {{ module.name }} or {{ module.namespace }}."]);
     }
 
     [Fact]
     public void A_project_file_using_the_module_name_is_an_error()
     {
         Composer.Compose(Catalog, Packs(Base, Pack("backend.database.postgres", files: [new("db.sbn", "src/{{ module.name }}.cs", false)]), Ddd), Choices())
-            .Errors.ShouldBe(["backend.database.postgres: target 'src/{{ module.name }}.cs' uses {{ module.name }}, but the file is not per-module."]);
+            .Errors.ShouldBe(["backend.database.postgres: target 'src/{{ module.name }}.cs' uses the module, but the file is not per-module."]);
     }
 
     [Fact]
@@ -250,5 +250,25 @@ public class ComposerTests
             Choices());
 
         composition.SlotSeparators.ShouldNotBeNull()["web.dependencies"].ShouldBe(",\n");
+    }
+
+    [Fact]
+    public void A_per_module_target_may_use_the_module_namespace()
+    {
+        var composition = Composer.Compose(
+            Catalog,
+            Packs(Base, Postgres, Pack("module.style.ddd", files: [new("domain.sbn", "src/Modules/{{ module.namespace }}/{{module.namespace}}.Domain/{{ module.namespace }}.Domain.csproj", true)]), Crud),
+            Choices(("order-handling", "ddd")));
+
+        composition.Errors.ShouldBeEmpty();
+        composition.Files.Where(file => file.Module is not null).ShouldHaveSingleItem().Target
+            .ShouldBe("src/Modules/OrderHandling/OrderHandling.Domain/OrderHandling.Domain.csproj");
+    }
+
+    [Fact]
+    public void A_project_file_using_the_module_namespace_is_an_error()
+    {
+        Composer.Compose(Catalog, Packs(Base, Pack("backend.database.postgres", files: [new("db.sbn", "src/{{ module.namespace }}.cs", false)]), Ddd), Choices())
+            .Errors.ShouldBe(["backend.database.postgres: target 'src/{{ module.namespace }}.cs' uses the module, but the file is not per-module."]);
     }
 }

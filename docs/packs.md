@@ -33,9 +33,10 @@ Every path is relative to the pack directory and must stay inside it.
 A file's `target` is its path in the generated project, with `/`.
 
 - `per-module: true` renders the file once per module, and its target
-  **must** contain `{{ module.name }}`. A module option's per-module file
+  **must** contain `{{ module.name }}` (`order-handling`) or
+  `{{ module.namespace }}` (`OrderHandling`). A module option's per-module file
   renders for the modules that chose it; any other pack's for every module.
-- A project file's target must **not** contain `{{ module.name }}`.
+- A project file's target must **not** contain either.
 - Two packs claiming the same target is an error. So is a pack claiming
   `fabric.yaml`, which the generator writes.
 
