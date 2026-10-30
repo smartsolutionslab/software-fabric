@@ -7,7 +7,7 @@ using YamlDotNet.RepresentationModel;
 
 namespace Fabric.Core.Generation;
 
-public sealed record FabricRecord(string? Profile, ProjectChoices Choices);
+public sealed record FabricRecord(string Name, string? Profile, ProjectChoices Choices);
 
 /// <summary>
 /// <c>fabric.yaml</c>: the record of what a generated project chose. Written once by <c>fabric new</c>, extended by
@@ -19,14 +19,16 @@ public static partial class FabricFile
 
     private const int Version = 1;
 
-    public static string Write(CatalogModel catalog, string? profile, ProjectChoices choices)
+    public static string Write(CatalogModel catalog, string name, string? profile, ProjectChoices choices)
     {
         ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(choices);
 
         var text = new StringBuilder()
             .Append("# Written by fabric. These choices are fixed for this project (ADR-0001 of the generator).\n")
-            .Append("fabric: ").Append(Version).Append('\n');
+            .Append("fabric: ").Append(Version).Append('\n')
+            .Append("name: ").Append(Scalar(name)).Append('\n');
         if (profile is not null)
         {
             text.Append("profile: ").Append(Scalar(profile)).Append('\n');
@@ -42,9 +44,9 @@ public static partial class FabricFile
         else
         {
             text.Append("modules:\n");
-            foreach (var (name, values) in choices.Modules)
+            foreach (var (moduleName, values) in choices.Modules)
             {
-                AppendValues(text, catalog, name, values, indent: "  ");
+                AppendValues(text, catalog, moduleName, values, indent: "  ");
             }
         }
 
@@ -73,7 +75,7 @@ public static partial class FabricFile
 
         var source = new YamlSource(sourceName, message => new FabricFileException(message));
         var root = source.Mapping(stream.Documents[0].RootNode, FileName);
-        var fields = source.Fields(root, FileName, "fabric", "profile", "project", "module-defaults", "modules");
+        var fields = source.Fields(root, FileName, "fabric", "name", "profile", "project", "module-defaults", "modules");
 
         var versionNode = fields.Required("fabric");
         var version = source.Integer(versionNode, "fabric", FileName);
@@ -85,11 +87,12 @@ public static partial class FabricFile
         Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> modules = [];
         foreach (var (key, value) in source.Mapping(fields.Required("modules"), "'modules'").Children)
         {
-            var name = source.Scalar(key, "a module name");
-            modules.Add(name, ReadValues(source, value, $"module '{name}'"));
+            var moduleName = source.Scalar(key, "a module name");
+            modules.Add(moduleName, ReadValues(source, value, $"module '{moduleName}'"));
         }
 
         return new FabricRecord(
+            source.Scalar(fields.Required("name"), FileName),
             fields.Optional("profile") is { } profile ? source.Scalar(profile, FileName) : null,
             new ProjectChoices(
                 ReadValues(source, fields.Required("project"), "'project'"),

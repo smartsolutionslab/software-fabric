@@ -45,11 +45,13 @@ Templates are [Scriban](https://github.com/scriban/scriban).
 
 | Name | Content |
 |---|---|
+| `name` | The project's name, lower kebab-case (`smart-shop`) |
+| `namespace` | The same in PascalCase (`SmartShop`), for C# namespaces |
 | `project["<dimension>"]` | The project's choice: a string, or a list for multi-valued dimensions |
 | `module_defaults["<dimension>"]` | What new modules start from |
-| `modules` | List of `{ name, values }` |
-| `module` | `{ name, values }` — per-module files only |
-| `slots["<slot>"]` | The slot's contributions in order, joined by newlines — files only, not slot contributions |
+| `modules` | List of `{ name, namespace, values }` |
+| `module` | `{ name, namespace, values }` — per-module files only |
+| `slots["<slot>"]` | The slot's contributions in order, joined by its separator — files only, not slot contributions |
 
 Unknown variables are errors. `date`, `timespan` and `math` are not
 available: the same choices must always render the same bytes. Output
@@ -57,9 +59,26 @@ line endings are LF.
 
 ## Slots
 
-Contributions are ordered by `order`, then by option id. A slot declared
-twice, a contribution to a slot no selected pack declares, and a
-cardinality breach are errors.
+Contributions are ordered by `order`, then by option id, and joined by
+the slot's `separator` (a newline unless declared — JSON lists declare
+`",\n"`). A slot declared twice, a contribution to a slot no selected
+pack declares, and a cardinality breach are errors.
+
+## What the generator writes from every pack
+
+- **ADR:** each selected pack's `adr` is rendered to
+  `docs/adr/NNNN-<dimension>-<option>.md`, numbered in selection order
+  (base first).
+- **AGENTS.md:** each selected pack's `agents-md` is a contribution to
+  `agents.sections`, in selection order.
+- **Briefs:** each brief a pack gives for a role is a contribution to
+  `agents.brief.<role>`.
+
+Those slots are reserved: the base declares them, the generator fills
+them, and a pack contributing to them directly is an error. All three are
+templates and see the same model as any other.
+
+The full slot set for a generated project is in `docs/slots.md`.
 
 ## Adding a module later
 

@@ -83,7 +83,8 @@
       "properties": {
         "slot": { "type": "string", "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$" },
         "description": { "type": "string" },
-        "cardinality": { "enum": ["zero-or-more", "exactly-one", "at-most-one"], "default": "zero-or-more" }
+        "cardinality": { "enum": ["zero-or-more", "exactly-one", "at-most-one"], "default": "zero-or-more" },
+        "separator": { "description": "Joins the contributions; a newline when absent. JSON lists need \",\\n\".", "type": "string" }
       }
     },
     "gate": {

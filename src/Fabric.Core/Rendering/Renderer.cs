@@ -1,5 +1,6 @@
 using Fabric.Core.Catalog;
 using Fabric.Core.Choices;
+using Fabric.Core.Generation;
 using Fabric.Core.Packs;
 using Scriban;
 using Scriban.Functions;
@@ -9,26 +10,28 @@ using Scriban.Syntax;
 namespace Fabric.Core.Rendering;
 
 /// <summary>
-/// Renders a composition with Scriban. Templates see <c>project</c>, <c>module_defaults</c>, <c>modules</c>,
-/// <c>module</c> (per-module files only) and <c>slots</c> (files only). Nothing from the clock or the machine is
+/// Renders a composition with Scriban. Templates see <c>name</c>, <c>namespace</c>, <c>project</c>,
+/// <c>module_defaults</c>, <c>modules</c>, <c>module</c> (per-module files only) and <c>slots</c> (files only). Nothing from the clock or the machine is
 /// available, unknown variables are errors, and output uses LF, so the same input always renders the same bytes.
 /// </summary>
 public static class Renderer
 {
-    public static RenderedProject Render(CatalogModel catalog, Composition composition, ProjectChoices choices)
+    public static RenderedProject Render(CatalogModel catalog, Composition composition, ProjectChoices choices, string name)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(composition);
         ArgumentNullException.ThrowIfNull(choices);
+        ArgumentNullException.ThrowIfNull(name);
 
         List<string> errors = [];
-        var model = Model(catalog, choices);
+        var model = Model(catalog, choices, name);
 
         var slots = new ScriptObject();
         foreach (var (slot, entries) in composition.Slots)
         {
             var parts = entries.Select(entry => RenderTemplate(entry.Pack, entry.Contribution.Template, errors, model));
-            slots.SetValue(slot, string.Join('\n', parts.OfType<string>()), readOnly: true);
+            var separator = composition.SlotSeparators?.GetValueOrDefault(slot) ?? "\n";
+            slots.SetValue(slot, string.Join(separator, parts.OfType<string>()), readOnly: true);
         }
 
         List<RenderedFile> files = [];
@@ -90,16 +93,18 @@ public static class Renderer
         return builtins;
     }
 
-    private static ScriptObject Model(CatalogModel catalog, ProjectChoices choices)
+    private static ScriptObject Model(CatalogModel catalog, ProjectChoices choices, string name)
     {
         var modules = new ScriptArray();
-        foreach (var (name, values) in choices.Modules)
+        foreach (var (moduleName, values) in choices.Modules)
         {
-            modules.Add(Module(catalog, name, values));
+            modules.Add(Module(catalog, moduleName, values));
         }
 
         return new ScriptObject
         {
+            ["name"] = name,
+            ["namespace"] = Names.ToPascalCase(name),
             ["project"] = Values(catalog, choices.Project),
             ["module_defaults"] = Values(catalog, choices.ModuleDefaults),
             ["modules"] = modules,
@@ -107,7 +112,7 @@ public static class Renderer
     }
 
     private static ScriptObject Module(CatalogModel catalog, string name, IReadOnlyDictionary<string, IReadOnlyList<string>> values) =>
-        new() { ["name"] = name, ["values"] = Values(catalog, values) };
+        new() { ["name"] = name, ["namespace"] = Names.ToPascalCase(name), ["values"] = Values(catalog, values) };
 
     /// <summary>Single-valued dimensions become strings, multi-valued ones lists.</summary>
     private static ScriptObject Values(CatalogModel catalog, IReadOnlyDictionary<string, IReadOnlyList<string>> values)

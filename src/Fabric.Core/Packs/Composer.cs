@@ -10,6 +10,12 @@ namespace Fabric.Core.Packs;
 /// </summary>
 public static partial class Composer
 {
+    /// <summary>Filled by the generator with every selected pack's <c>agents.agents-md</c>.</summary>
+    public const string AgentSectionsSlot = "agents.sections";
+
+    /// <summary>Followed by a role; filled by the generator with every selected pack's brief for that role.</summary>
+    public const string AgentBriefSlotPrefix = "agents.brief.";
+
     private static readonly string?[] ProjectOnly = [null];
 
     public static Composition Compose(CatalogModel catalog, IReadOnlyDictionary<string, PackManifest> packs, ProjectChoices choices)
@@ -21,9 +27,9 @@ public static partial class Composer
         List<string> errors = [];
         var selected = Select(catalog, packs, choices, errors);
         var files = ComposeFiles(catalog, selected, choices, errors);
-        var slots = ComposeSlots(selected, errors);
+        var (slots, separators) = ComposeSlots(selected, errors);
 
-        return new Composition(selected, files, slots, errors);
+        return new Composition(selected, files, slots, errors, separators);
     }
 
     /// <summary>Base packs first, then one pack per chosen option in catalog order.</summary>
@@ -87,19 +93,30 @@ public static partial class Composer
                 foreach (var module in modules)
                 {
                     var target = module is null ? file.Target : ModuleNamePattern().Replace(file.Target, module);
-                    if (claims.TryGetValue(target, out var owner))
-                    {
-                        errors.Add($"{target} is claimed by both {owner.Option} and {pack.Option}.");
-                        continue;
-                    }
-
-                    claims.Add(target, pack);
-                    files.Add(new ComposedFile(pack, file, target, module));
+                    Claim(claims, files, new ComposedFile(pack, file, target, module), errors);
                 }
             }
         }
 
+        foreach (var (pack, index) in selected.Select((pack, index) => (pack, index)))
+        {
+            var target = $"docs/adr/{index + 1:0000}-{pack.Option.Replace('.', '-')}.md";
+            Claim(claims, files, new ComposedFile(pack, new PackFile(pack.Adr, target, PerModule: false), target, null), errors);
+        }
+
         return files;
+    }
+
+    private static void Claim(Dictionary<string, PackManifest> claims, List<ComposedFile> files, ComposedFile file, List<string> errors)
+    {
+        if (claims.TryGetValue(file.Target, out var owner))
+        {
+            errors.Add($"{file.Target} is claimed by both {owner.Option} and {file.Pack.Option}.");
+            return;
+        }
+
+        claims.Add(file.Target, file.Pack);
+        files.Add(file);
     }
 
     /// <summary>A module option's per-module files render for the modules that chose it; any other pack's for every module.</summary>
@@ -108,7 +125,9 @@ public static partial class Composer
             ? choices.Modules.Where(module => Chosen(module.Value, pack.Dimension).Contains(pack.OptionName)).Select(module => module.Key)
             : choices.Modules.Keys;
 
-    private static OrderedDictionary<string, IReadOnlyList<SlotEntry>> ComposeSlots(List<PackManifest> selected, List<string> errors)
+    private static (OrderedDictionary<string, IReadOnlyList<SlotEntry>> Slots, Dictionary<string, string> Separators) ComposeSlots(
+        List<PackManifest> selected,
+        List<string> errors)
     {
         OrderedDictionary<string, (PackManifest Owner, SlotDeclaration Declaration, List<SlotEntry> Entries)> slots = [];
         foreach (var pack in selected)
@@ -129,7 +148,11 @@ public static partial class Composer
         {
             foreach (var contribution in pack.Slots)
             {
-                if (slots.TryGetValue(contribution.Slot, out var slot))
+                if (IsGeneratorFilled(contribution.Slot))
+                {
+                    errors.Add($"{pack.Option} contributes to slot '{contribution.Slot}', which the generator fills from each pack's agents section.");
+                }
+                else if (slots.TryGetValue(contribution.Slot, out var slot))
                 {
                     slot.Entries.Add(new SlotEntry(pack, contribution));
                 }
@@ -140,7 +163,24 @@ public static partial class Composer
             }
         }
 
+        foreach (var (pack, index) in selected.Select((pack, index) => (pack, index)))
+        {
+            if (slots.TryGetValue(AgentSectionsSlot, out var sections))
+            {
+                sections.Entries.Add(new SlotEntry(pack, new SlotContribution(AgentSectionsSlot, pack.Agents.AgentsMd, index)));
+            }
+
+            foreach (var (role, brief) in pack.Agents.Briefs)
+            {
+                if (slots.TryGetValue(AgentBriefSlotPrefix + role, out var briefs))
+                {
+                    briefs.Entries.Add(new SlotEntry(pack, new SlotContribution(AgentBriefSlotPrefix + role, brief, index)));
+                }
+            }
+        }
+
         OrderedDictionary<string, IReadOnlyList<SlotEntry>> result = [];
+        Dictionary<string, string> separators = [];
         foreach (var (name, (_, declaration, entries)) in slots)
         {
             List<SlotEntry> ordered = [.. entries
@@ -148,10 +188,17 @@ public static partial class Composer
                 .ThenBy(entry => entry.Pack.Option, StringComparer.Ordinal)];
             CheckCardinality(declaration, ordered, errors);
             result.Add(name, ordered);
+            if (declaration.Separator is { } separator)
+            {
+                separators.Add(name, separator);
+            }
         }
 
-        return result;
+        return (result, separators);
     }
+
+    private static bool IsGeneratorFilled(string slot) =>
+        slot == AgentSectionsSlot || slot.StartsWith(AgentBriefSlotPrefix, StringComparison.Ordinal);
 
     private static void CheckCardinality(SlotDeclaration declaration, List<SlotEntry> entries, List<string> errors)
     {

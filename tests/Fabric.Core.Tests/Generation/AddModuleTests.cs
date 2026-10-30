@@ -6,7 +6,7 @@ public class AddModuleTests
 {
     private static FabricRecord Generated(string profile)
     {
-        var generated = Generator.New(Fixtures.MinimalCatalog, Fixtures.MinimalPacks, profile, []);
+        var generated = Generator.New(Fixtures.MinimalCatalog, Fixtures.MinimalPacks, "shop", profile, []);
         generated.Errors.ShouldBeEmpty();
         var fabricYaml = generated.Files.Single(file => file.Path == FabricFile.FileName).Content;
         return FabricFile.Read(new StringReader(fabricYaml), FabricFile.FileName);

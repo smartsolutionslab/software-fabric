@@ -92,7 +92,7 @@ public class ComposerTests
             Choices(("billing", "ddd"), ("audit", "crud")));
 
         composition.Errors.ShouldBeEmpty();
-        var file = composition.Files.ShouldHaveSingleItem();
+        var file = composition.Files.Where(file => file.Module is not null).ShouldHaveSingleItem();
         file.Target.ShouldBe("src/billing/Domain.cs");
         file.Module.ShouldBe("billing");
     }
@@ -105,7 +105,7 @@ public class ComposerTests
             Packs(Base, Pack("backend.database.postgres", files: [new("db.sbn", "src/{{module.name}}/Database.cs", true)]), Ddd, Crud),
             Choices(("billing", "ddd"), ("audit", "crud")));
 
-        composition.Files.Select(file => file.Target).ShouldBe(["src/billing/Database.cs", "src/audit/Database.cs"]);
+        composition.Files.Where(file => file.Module is not null).Select(file => file.Target).ShouldBe(["src/billing/Database.cs", "src/audit/Database.cs"]);
     }
 
     [Fact]
@@ -189,5 +189,66 @@ public class ComposerTests
                 Pack("module.style.ddd", slots: [new("apphost.database", "ddd.sbn", 0)])),
             Choices())
             .Errors.ShouldBe([$"slot 'apphost.database' takes {wording} contribution, got 2: backend.database.postgres, module.style.ddd."]);
+    }
+
+    [Fact]
+    public void Every_selected_pack_contributes_its_adr_as_a_numbered_file()
+    {
+        var composition = Composer.Compose(Catalog, Packs(Base, Postgres, Ddd), Choices());
+
+        var adrs = composition.Files.Where(file => file.Target.StartsWith("docs/adr/", StringComparison.Ordinal)).ToList();
+        adrs.Select(file => file.Target).ShouldBe(["docs/adr/0001-base-core.md", "docs/adr/0002-backend-database-postgres.md", "docs/adr/0003-module-style-ddd.md"]);
+        adrs.ShouldAllBe(file => file.File.Template == "docs/adr.md");
+    }
+
+    [Fact]
+    public void The_generator_fills_agents_sections_with_every_pack_in_selection_order()
+    {
+        var composition = Composer.Compose(
+            Catalog,
+            Packs(Pack("base.core", declares: [new("agents.sections", "AGENTS.md sections", SlotCardinality.ZeroOrMore)]), Postgres, Ddd),
+            Choices());
+
+        composition.Errors.ShouldBeEmpty();
+        composition.Slots["agents.sections"].Select(entry => (entry.Pack.Option, entry.Contribution.Template))
+            .ShouldBe([("base.core", "docs/agents.md"), ("backend.database.postgres", "docs/agents.md"), ("module.style.ddd", "docs/agents.md")]);
+    }
+
+    [Fact]
+    public void The_generator_fills_a_role_brief_slot_with_the_packs_that_brief_that_role()
+    {
+        var briefing = Pack("backend.database.postgres") with
+        {
+            Agents = new PackAgents("docs/agents.md", new Dictionary<string, string> { ["backend-engineer"] = "docs/engineer.md" }),
+        };
+        var composition = Composer.Compose(
+            Catalog,
+            Packs(Pack("base.core", declares: [new("agents.brief.backend-engineer", "brief", SlotCardinality.ZeroOrMore)]), briefing, Ddd),
+            Choices());
+
+        composition.Slots["agents.brief.backend-engineer"].ShouldHaveSingleItem().Contribution.Template.ShouldBe("docs/engineer.md");
+    }
+
+    [Theory]
+    [InlineData("agents.sections")]
+    [InlineData("agents.brief.architect")]
+    public void A_pack_may_not_contribute_to_a_slot_the_generator_fills(string slot)
+    {
+        Composer.Compose(
+            Catalog,
+            Packs(Pack("base.core", declares: [new(slot, "reserved", SlotCardinality.ZeroOrMore)]), Pack("backend.database.postgres", slots: [new(slot, "x.sbn", 0)]), Ddd),
+            Choices())
+            .Errors.ShouldBe([$"backend.database.postgres contributes to slot '{slot}', which the generator fills from each pack's agents section."]);
+    }
+
+    [Fact]
+    public void A_slot_separator_is_passed_on_to_rendering()
+    {
+        var composition = Composer.Compose(
+            Catalog,
+            Packs(Pack("base.core", declares: [new("web.dependencies", "deps", SlotCardinality.ZeroOrMore, ",\n")]), Postgres, Ddd),
+            Choices());
+
+        composition.SlotSeparators.ShouldNotBeNull()["web.dependencies"].ShouldBe(",\n");
     }
 }

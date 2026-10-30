@@ -5,8 +5,8 @@ slots through which packs reach into files they do not own. Written for
 the 37 packs of `saas-standard-react` plus the base; later profiles add
 slots in their own change (ADR-0002).
 
-**Status: proposed — the M0 gate reviews this before any real pack is
-written.**
+**Status: accepted at the M0 gate (2026-10-30).** Generator changes 1–3
+below are built (M1-01).
 
 ## Layout of a generated project
 
