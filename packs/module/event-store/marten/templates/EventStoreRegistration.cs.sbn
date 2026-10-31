@@ -1,3 +1,7 @@
+{{~ if project["backend.tenancy"] != "none" ~}}
+{{~ # Marten's streams are not separated by tenant yet; rendering them would leak (ADR-0006: fail loudly). ~}}
+{{ marten_event_store_needs_backend_tenancy_none }}
+{{~ end ~}}
 using System.Text.RegularExpressions;
 using {{ namespace }}.BuildingBlocks.EventSourcing;
 using {{ namespace }}.BuildingBlocks.Modules;

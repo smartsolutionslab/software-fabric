@@ -12,6 +12,8 @@ Only a module's Infrastructure project references Marten; an architecture rule f
 
 The store creates and updates its tables on first use (`AutoCreate.CreateOrUpdate`). The EF Core migration runner does not apply Marten's schema yet; until it does, the database user the host runs as needs the right to create tables in the module's schema.
 
+Built without tenancy only: generating it with a tenancy option fails, because the streams are not separated by tenant yet.
+
 ## Consequences
 
 - A stream is append-only; an event's type name is part of the stored data, so renaming an event type needs a Marten event type alias.
