@@ -1,0 +1,6 @@
+using {{ namespace }}.BuildingBlocks.ReadModels;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application;
+
+/// <summary>The {{ module.namespace }} module's read models, the only thing its queries read; implemented in its Infrastructure project.</summary>
+public interface I{{ module.namespace }}ReadModels : IReadModels;

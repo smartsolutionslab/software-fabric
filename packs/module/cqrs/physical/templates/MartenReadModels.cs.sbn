@@ -1,0 +1,45 @@
+{{~ func uses_marten
+  if module_defaults["module.event-store"] == "marten"
+    ret true
+  end
+  for chosen in modules
+    if chosen.values["module.event-store"] == "marten"
+      ret true
+    end
+  end
+  ret false
+end ~}}
+{{~ if !uses_marten ~}}
+{{~ # Physical CQRS is built for event-sourced modules on Marten only (ADR-0006: fail loudly, never render nothing). ~}}
+{{ physical_cqrs_needs_an_event_sourced_module_on_marten }}
+{{~ end ~}}
+using Marten;
+
+namespace {{ namespace }}.BuildingBlocks.ReadModels;
+
+/// <summary>A module's read models: Marten documents its projections write, read with query sessions only.</summary>
+public abstract class MartenReadModels(IDocumentStore store) : IReadModels
+{
+{{~ if project["backend.absence"] == "option" ~}}
+    public async Task<Option<TReadModel>> FindAsync<TReadModel>(Guid id, CancellationToken cancellationToken)
+{{~ else ~}}
+    public async Task<TReadModel?> FindAsync<TReadModel>(Guid id, CancellationToken cancellationToken)
+{{~ end ~}}
+        where TReadModel : class
+    {
+        await using var session = store.QuerySession();
+        var readModel = await session.LoadAsync<TReadModel>(id, cancellationToken);
+{{~ if project["backend.absence"] == "option" ~}}
+        return readModel is null ? Option<TReadModel>.None : Option<TReadModel>.Some(readModel);
+{{~ else ~}}
+        return readModel;
+{{~ end ~}}
+    }
+
+    public async Task<IReadOnlyList<TReadModel>> ListAsync<TReadModel>(CancellationToken cancellationToken)
+        where TReadModel : class
+    {
+        await using var session = store.QuerySession();
+        return await session.Query<TReadModel>().ToListAsync(cancellationToken);
+    }
+}

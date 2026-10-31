@@ -1,0 +1,51 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class QueriesReadOnlyReadModels : IArchitectureRule
+{
+    // By name: the rule needs no reference to what it keeps queries away from.
+    private static readonly string[] WriteSide =
+    [
+        "{{ namespace }}.BuildingBlocks.EventSourcing.IAggregateStore",
+        "{{ namespace }}.BuildingBlocks.EventSourcing.IEventSourced",
+        "Microsoft.EntityFrameworkCore.DbContext",
+    ];
+
+    public string Description => "Nothing in a Queries namespace depends on the write side (aggregate stores, aggregates, DbContexts); queries read read models.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var queries = model.ModuleAssemblies
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type.Namespace?.Contains(".Queries", StringComparison.Ordinal) == true);
+
+        foreach (var type in queries)
+        {
+            var dependencies = type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                .SelectMany(constructor => constructor.GetParameters().Select(parameter => parameter.ParameterType))
+                .Concat(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Select(field => field.FieldType))
+                .Distinct();
+
+            foreach (var dependency in dependencies.Where(IsWriteSide))
+            {
+                yield return $"{type.FullName} reads the write side ({dependency.Name}); a query reads read models through I<Module>ReadModels.";
+            }
+        }
+    }
+
+    private static bool IsWriteSide(Type type)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            if (WriteSide.Contains(current.FullName) || current.GetInterfaces().Any(contract => WriteSide.Contains(contract.FullName)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
