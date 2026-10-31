@@ -475,6 +475,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     [InlineData("claude", "codex", "Agent-Executor: claude-cloud/lane-backend", "Agent-Executor: claude-local/laptop")]
     [InlineData("codex", "claude", "Agent-Executor: codex-cloud/lane-backend")]
     [InlineData("a developer", "claude")]
+    [InlineData("a developer with Claude Code", "codex", "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>")]
     public void The_reviewer_is_from_the_other_model_family(string author, string reviewer, params string[] trailers)
     {
         var repository = Repository([.. trailers.Select(trailer => $"Change\n\n{trailer}"), "Plain change"]);
@@ -483,6 +484,41 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
 
         exitCode.ShouldBe(0, $"{author}: {output}");
         output.Trim().ShouldBe(reviewer);
+        Directory.Delete(repository, recursive: true);
+    }
+
+    [Fact]
+    public void The_review_workflow_fails_when_no_family_can_review()
+    {
+        var workflow = File.ReadAllLines(Path.Combine(ProjectDirectory, ".github", "workflows", "cross-model-review.yml"));
+        var start = Array.FindIndex(workflow, line => line.Contains("id: choose", StringComparison.Ordinal));
+        var run = workflow[start + 1].Trim();
+        var script = run == "run: |"
+            ? string.Join('\n', workflow
+                .Skip(start + 2)
+                .TakeWhile(line => !line.TrimStart().StartsWith("env:", StringComparison.Ordinal))
+                .Select(line => line.Trim()))
+            : run["run: ".Length..];
+        script.ShouldContain("reviewer.sh");
+        var repository = Repository("One\n\nAgent-Executor: claude-cloud/a", "Two\n\nAgent-Executor: codex-cloud/b");
+        var output = Path.Combine(state, "github-output");
+
+        var (exitCode, log) = Shell.Run(
+            repository,
+            new Dictionary<string, string>
+            {
+                ["GITHUB_OUTPUT"] = output,
+                ["GITHUB_REPOSITORY"] = "acme/shop",
+                ["BASE"] = "base",
+                ["HEAD"] = "HEAD",
+                ["PATH"] = Path.Combine(AppContext.BaseDirectory, "Board") + ":" + Environment.GetEnvironmentVariable("PATH"),
+            },
+            "bash",
+            "-e",
+            "-c",
+            script.Replace(".github/scripts/board/", Path.Combine(ProjectDirectory, ".github/scripts/board/") , StringComparison.Ordinal));
+
+        exitCode.ShouldNotBe(0, $"{script}\n{log}");
         Directory.Delete(repository, recursive: true);
     }
 

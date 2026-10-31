@@ -21,6 +21,10 @@ public sealed class OwnBoardTests
         var scripts = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, ".github", "scripts", "board"))
             .Select(path => Path.GetRelativePath(project.ProjectDirectory, path).Replace('\\', '/'));
 
+        var copiedScripts = Directory.EnumerateFiles(Path.Combine(Repository.Root, ".github", "scripts", "board"))
+            .Select(path => ".github/scripts/board/" + Path.GetFileName(path));
+        copiedScripts.Order().ShouldBe(scripts.Order(), "the board scripts here are not the ones the packs generate; remove or regenerate them.");
+
         foreach (var file in Copies.Concat(scripts))
         {
             var copy = Path.Combine(Repository.Root, file);

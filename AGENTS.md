@@ -56,6 +56,12 @@ This repo runs the protocol its packs generate (ADR-0004), copied into
   this repo's ADRs do not settle is always a `needs:decision`: agents
   implement decisions, they do not make them.
 - An issue with a human assignee belongs to that human.
+- **Phases**, each with a brief in `.claude/agents/`: architect (spec and
+  plan) → test-writer (tests first, failing output verbatim) → engineer (may
+  not edit those tests) → the reviewer for what the diff touches
+  (`backend-reviewer` for `src/` and backend packs, `frontend-reviewer`,
+  `security-reviewer`). Without subagents, work the same phases yourself, in
+  that order.
 
 ## Layout (target)
 

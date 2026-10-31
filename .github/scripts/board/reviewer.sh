@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # Picks the model family that reviews a pull request: never the family that wrote it (board protocol, docs/adr).
 # Usage: reviewer.sh <base sha> <head sha>
-# Reads the Agent-Executor trailers of the commits in base..head; prints claude or codex.
+# Reads the Agent-Executor trailers of the commits in base..head, and Co-Authored-By trailers naming Claude or Codex
+# (a developer working with an assistant); prints claude or codex.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-families="$(git log --format='%(trailers:key=Agent-Executor,valueonly)' "$1..$2" | sed -E '/^$/d; s#[-/].*##' | sort -u)"
+families="$(
+  {
+    git log --format='%(trailers:key=Agent-Executor,valueonly)' "$1..$2" | sed -E '/^$/d; s#[-/].*##'
+    git log --format='%(trailers:key=Co-Authored-By,valueonly)' "$1..$2" | sed -nE 's/^.*\b(claude|codex)\b.*$/\1/Ip' | tr '[:upper:]' '[:lower:]'
+  } | sort -u
+)"
 
 case "$families" in
   "") echo "${BOARD_DEFAULT_REVIEWER}" ;;

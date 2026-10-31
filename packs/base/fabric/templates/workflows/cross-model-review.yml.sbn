@@ -21,7 +21,10 @@ jobs:
         with:
           fetch-depth: 0
       - id: choose
-        run: echo "reviewer=$(bash .github/scripts/board/reviewer.sh "$BASE" "$HEAD")" >> "$GITHUB_OUTPUT"
+        # Assigned first: inside echo's arguments a failing reviewer.sh would not fail the step, and no review would run.
+        run: |
+          reviewer="$(bash .github/scripts/board/reviewer.sh "$BASE" "$HEAD")"
+          echo "reviewer=$reviewer" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
           BASE: ${{ github.event.pull_request.base.sha }}

@@ -5,7 +5,7 @@ description: Claim the next eligible issue of a lane from the board and deliver 
 
 # Deliver the next issue
 
-Arguments: the lane (`backend`, `frontend`, `infra`, …) and this run's executor, `<family>-<runtime>/<detail>`, e.g. `claude-cloud/lane-backend` or `claude-local/<host>`.
+Arguments: the lane (one of the lanes in `docs/owners.yml`) and this run's executor, `<family>-<runtime>/<detail>`, e.g. `claude-cloud/lane-backend` or `claude-local/<host>`.
 
 1. **Claim.** Run `bash .github/scripts/board/next.sh <lane> <executor>`.
    - Exit 3: nothing is eligible in the lane. Stop and say so.
