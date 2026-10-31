@@ -46,6 +46,15 @@ public readonly struct Result<TValue, TError>
 
         return isSuccess ? onSuccess(value) : onFailure(error);
     }
+
+    /// <summary>The same outcome with the error translated, e.g. a domain error to an <c>ApiError</c> in Application.</summary>
+    public Result<TValue, TOut> MapError<TOut>(Func<TError, TOut> map)
+        where TOut : notnull
+    {
+        {{ not_null "map" }}
+
+        return isSuccess ? Result<TValue, TOut>.Success(value) : Result<TValue, TOut>.Failure(map(error));
+    }
 }
 
 /// <summary>Half-built success, waiting for a return type to say which <see cref="Result{TValue,TError}"/> it is.</summary>

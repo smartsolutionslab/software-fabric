@@ -2,6 +2,8 @@ option: backend.result-style.typed-outcomes
 files:
   - { template: templates/Result.cs.sbn, target: src/Kernel/Result.cs }
   - { template: templates/ApiError.cs.sbn, target: src/Kernel/ApiError.cs }
+  - { template: templates/DomainError.cs.sbn, target: src/Kernel/DomainError.cs }
+  - { template: templates/Unit.cs.sbn, target: src/Kernel/Unit.cs }
   - { template: templates/ErrorsAreSealedRecords.cs.sbn, target: tests/Architecture.Tests/Rules/ErrorsAreSealedRecords.cs }
 slots:
   - { slot: dotnet.build-items, template: templates/static-using.sbn }

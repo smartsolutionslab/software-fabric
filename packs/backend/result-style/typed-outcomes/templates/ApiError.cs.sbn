@@ -6,4 +6,21 @@ namespace {{ namespace }}.Kernel;
 /// The base of every expected failure: a stable machine-readable code, a message for people, and the HTTP status it
 /// maps to, so endpoints emit problem details without per-case mapping.
 /// </summary>
-public abstract record ApiError(string Code, string Message, HttpStatusCode Status);
+public abstract record ApiError(string Code, string Message, HttpStatusCode Status)
+{
+    /// <summary>A domain rule's failure with the status Application gives it; the domain itself knows no HTTP.</summary>
+    public static ApiError From(DomainError error, HttpStatusCode status)
+    {
+        {{ not_null "error" }}
+        return new DomainFailure(error, status);
+    }
+}
+
+/// <summary>An <see cref="ApiError"/> made from a <see cref="DomainError"/> by <see cref="ApiError.From"/>.</summary>
+public sealed record DomainFailure : ApiError
+{
+    internal DomainFailure(DomainError error, HttpStatusCode status)
+        : base(error.Code, error.Message, status) => Error = error;
+
+    public DomainError Error { get; }
+}

@@ -1,0 +1,51 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class DomainErrorsCarryNoHttp : IArchitectureRule
+{
+    // By name: a project whose errors are exceptions has no ApiError, and the rule then holds trivially.
+    private const string ApiError = "{{ namespace }}.Kernel.ApiError";
+
+    public string Description => "A module's Domain project knows no HTTP: no type there is or returns an ApiError.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var types = model.ModuleAssemblies
+            .Where(assembly => assembly.GetName().Name!.EndsWith(".Domain", StringComparison.Ordinal))
+            .SelectMany(assembly => assembly.GetTypes());
+
+        foreach (var type in types)
+        {
+            if (IsApiError(type))
+            {
+                yield return $"{type.FullName} is an ApiError; a domain rule fails with a DomainError, and Application maps it with ApiError.From.";
+                continue;
+            }
+
+            var methods = type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
+            foreach (var method in methods.Where(method => Mentions(method.ReturnType)))
+            {
+                yield return $"{type.FullName}.{method.Name} returns an ApiError; return a DomainError and let Application map it.";
+            }
+        }
+    }
+
+    private static bool IsApiError(Type type)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            if (current.FullName == ApiError)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool Mentions(Type type) =>
+        IsApiError(type) || (type.IsGenericType && type.GetGenericArguments().Any(Mentions));
+}

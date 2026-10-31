@@ -107,6 +107,98 @@ public sealed class SaasStandardReactTests
     }
 
     [Fact]
+    public void An_aggregate_fails_with_a_domain_error_that_the_application_maps_to_an_api_error()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Invoice.cs", """
+            using Shop.BuildingBlocks.Domain;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record InvoiceId(Guid Value);
+
+            public sealed record InvoiceAlreadyPaid(InvoiceId Invoice) : DomainError("billing.invoice-already-paid", "The invoice is already paid.");
+
+            public static class InvoiceErrors
+            {
+                public static DomainError AlreadyPaid(InvoiceId invoice) => new InvoiceAlreadyPaid(invoice);
+            }
+
+            public sealed class Invoice(InvoiceId id) : AggregateRoot<InvoiceId>(id)
+            {
+                public bool IsPaid { get; private set; }
+
+                public Result<Unit, DomainError> Pay()
+                {
+                    if (IsPaid)
+                    {
+                        return Failure(InvoiceErrors.AlreadyPaid(Id));
+                    }
+
+                    IsPaid = true;
+                    return Success(Unit.Value);
+                }
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Application/Commands/PayInvoice/PayInvoice.cs", """
+            using System.Net;
+            using Shop.BuildingBlocks.Messaging;
+            using Shop.Modules.Billing.Domain.Invoices;
+
+            namespace Shop.Modules.Billing.Application.Commands.PayInvoice;
+
+            public sealed record PayInvoice(Guid Invoice) : ICommand<Result<Unit, ApiError>>;
+
+            public static class InvoiceFailures
+            {
+                public static ApiError From(DomainError error) => error switch
+                {
+                    InvoiceAlreadyPaid => ApiError.From(error, HttpStatusCode.Conflict),
+                    _ => ApiError.From(error, HttpStatusCode.UnprocessableEntity),
+                };
+            }
+
+            public sealed class PayInvoiceHandler : ICommandHandler<PayInvoice, Result<Unit, ApiError>>
+            {
+                public Task<Result<Unit, ApiError>> HandleAsync(PayInvoice command, CancellationToken cancellationToken)
+                {
+                    Ensure.That(command).IsNotNull();
+
+                    var invoice = new Invoice(new InvoiceId(command.Invoice));
+                    return Task.FromResult(invoice.Pay().MapError(InvoiceFailures.From));
+                }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+    }
+
+    [Fact]
+    public void A_domain_error_that_speaks_http_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Domain/Invoices/InvoiceNotFound.cs", """
+            using System.Net;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record InvoiceNotFound(Guid Invoice) : ApiError("billing.invoice-not-found", "No such invoice.", HttpStatusCode.NotFound);
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceNotFound is an ApiError");
+    }
+
+    [Fact]
     public void Breaking_an_architecture_rule_fails_the_generated_tests()
     {
         using var project = new GeneratedProject(Profile);

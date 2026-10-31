@@ -1,0 +1,7 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>
+/// A failure a domain rule reports: a stable machine-readable code and a message for people, and nothing about HTTP.
+/// Application maps it to an <see cref="ApiError"/> with <see cref="ApiError.From"/>.
+/// </summary>
+public abstract record DomainError(string Code, string Message);
