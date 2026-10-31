@@ -14,7 +14,8 @@ candidates="$(board_issues "labels=$(board_uri "agent:ready,lane:$lane")" \
   | jq -r 'map(select((.assignees | length) == 0 and ([.labels[].name] | (index("agent:blocked") or index("agent:claimed")) | not)))
            | sort_by(.number) | .[] | "\(.number)\t\(.title)"')"
 
-# Returns 0 when claimed, 2 when another agent holds or just took the issue, 1 on any other failure.
+# Returns 0 when claimed, 2 when another agent holds or just took the issue, 1 when nothing was claimed for another
+# reason, 4 when the branch is held but recording the claim on the issue failed.
 claim() {
   local issue="$1" title="$2" branch base outcome
   branch="$(board_branch_for "$issue")"
@@ -31,11 +32,15 @@ claim() {
 Agent-Executor: $executor" || outcome=$?
   [ "$outcome" -eq 0 ] || return "$outcome"
 
-  board_add_label "$issue" agent:claimed
-  board_status "$issue" Claimed
-  board_executor "$issue" "$executor"
-  board_comment "$issue" "<!-- board:claim -->
-Claimed by \`$executor\` on branch \`$branch\`. The claim lapses after ${BOARD_LEASE_HOURS} h without a push."
+  # Called as `claim || outcome=$?`, so errexit is off in here: every step's failure is checked explicitly.
+  if ! { board_add_label "$issue" agent:claimed &&
+    board_status "$issue" Claimed &&
+    board_executor "$issue" "$executor" &&
+    board_comment "$issue" "<!-- board:claim -->
+Claimed by \`$executor\` on branch \`$branch\`. The claim lapses after ${BOARD_LEASE_HOURS} h without a push."; }; then
+    echo "The branch $branch is held, but recording the claim on #$issue failed (above). Work the issue or give it back with release.sh." >&2
+    return 4
+  fi
   echo "$issue $branch"
 }
 
@@ -46,6 +51,7 @@ while IFS=$'\t' read -r issue title; do
   case "$outcome" in
     0) exit 0 ;;
     2) continue ;;
+    4) exit 1 ;;
     *)
       echo "Claiming #$issue failed; nothing was claimed." >&2
       exit 1

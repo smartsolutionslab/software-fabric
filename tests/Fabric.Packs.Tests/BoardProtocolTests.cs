@@ -211,6 +211,20 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     }
 
     [Fact]
+    public void A_claim_whose_bookkeeping_fails_is_an_error_that_names_the_held_branch()
+    {
+        Issues(Issue(7, "Pay an invoice", ReadyBackend));
+        File.WriteAllText(Path.Combine(state, "reject-labels"), "");
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain("agent/7-pay-an-invoice");
+        output.ShouldNotStartWith("7 agent/");
+        HasBranch("agent/7-pay-an-invoice").ShouldBeTrue();
+    }
+
+    [Fact]
     public void A_lane_with_nothing_eligible_exits_3()
     {
         Issues(Issue(4, "Frontend", ["agent:ready", "lane:frontend"]));
@@ -491,14 +505,14 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     public void The_review_workflow_fails_when_no_family_can_review()
     {
         var workflow = File.ReadAllLines(Path.Combine(ProjectDirectory, ".github", "workflows", "cross-model-review.yml"));
-        var start = Array.FindIndex(workflow, line => line.Contains("id: choose", StringComparison.Ordinal));
-        var run = workflow[start + 1].Trim();
-        var script = run == "run: |"
+        var choose = Array.FindIndex(workflow, line => line.Contains("id: choose", StringComparison.Ordinal));
+        var run = Array.FindIndex(workflow, choose, line => line.Trim().StartsWith("run:", StringComparison.Ordinal));
+        var script = workflow[run].Trim() == "run: |"
             ? string.Join('\n', workflow
-                .Skip(start + 2)
+                .Skip(run + 1)
                 .TakeWhile(line => !line.TrimStart().StartsWith("env:", StringComparison.Ordinal))
                 .Select(line => line.Trim()))
-            : run["run: ".Length..];
+            : workflow[run].Trim()["run: ".Length..];
         script.ShouldContain("reviewer.sh");
         var repository = Repository("One\n\nAgent-Executor: claude-cloud/a", "Two\n\nAgent-Executor: codex-cloud/b");
         var output = Path.Combine(state, "github-output");
@@ -519,6 +533,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
             script.Replace(".github/scripts/board/", Path.Combine(ProjectDirectory, ".github/scripts/board/") , StringComparison.Ordinal));
 
         exitCode.ShouldNotBe(0, $"{script}\n{log}");
+        log.ShouldContain("more than one model family");
         Directory.Delete(repository, recursive: true);
     }
 

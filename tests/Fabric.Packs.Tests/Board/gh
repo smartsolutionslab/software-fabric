@@ -71,7 +71,9 @@ case "${positional[0]} ${positional[1]:-}" in
         jq --arg body "${flag[f:body]}" --arg at "$now_iso" '. + [{body: $body, created_at: $at}]' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
         echo "{}"
         ;;
-      "POST issues/"*"/labels") n="${path#issues/}"; key='f:labels[]'; update_issue "${n%/labels}" ".labels += [{name: \"${flag[$key]}\"}]"; echo "[]" ;;
+      "POST issues/"*"/labels")
+        if [ -e "$state/reject-labels" ]; then echo '{"message":"Server Error"}' >&2; exit 1; fi
+        n="${path#issues/}"; key='f:labels[]'; update_issue "${n%/labels}" ".labels += [{name: \"${flag[$key]}\"}]"; echo "[]" ;;
       "DELETE issues/"*"/labels/"*)
         n="${path#issues/}"; name="$(sed 's/%3A/:/g' <<< "${n#*/labels/}")"
         if ! jq -e --argjson number "${n%%/*}" --arg name "$name" '.[] | select(.number == $number) | .labels | any(.name == $name)' "$issues" > /dev/null; then
