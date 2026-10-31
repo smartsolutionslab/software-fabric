@@ -41,6 +41,9 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The workflow's own token: without one the action fetches an app token through OIDC (id-token: write),
+          # which this job does not need, since report-review.sh posts the findings.
+          github_token: ${{ github.token }}
           claude_args: --json-schema '${{ steps.schema.outputs.json }}'
           prompt: |
             Review pull request #${{ github.event.pull_request.number }} as the reviewers in .claude/agents/ describe
