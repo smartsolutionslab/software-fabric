@@ -144,7 +144,7 @@ public sealed class LeanCrudBackendTests
 
             public sealed class TextConsumer
             {
-                public void Handle(string text) => _ = text;
+                public static void Handle(string text) => _ = text;
             }
             """);
         project.Build();
