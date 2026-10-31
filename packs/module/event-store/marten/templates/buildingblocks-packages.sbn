@@ -1,0 +1,2 @@
+    <PackageReference Include="Marten" />
+    <ProjectReference Include="../BuildingBlocks.EventSourcing/BuildingBlocks.EventSourcing.csproj" />
