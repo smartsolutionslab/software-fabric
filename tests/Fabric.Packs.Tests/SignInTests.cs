@@ -71,7 +71,9 @@ public sealed class SignInTests
 
         // The new endpoint makes the frontend's OpenAPI copy stale: the integration tests say so and rewrite it.
         var (_, integration) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
-        integration.ShouldContain("failed Shop.Integration.Tests.OpenApiDocumentTests.The_frontends_copy_of_the_openapi_document_is_current");
+        integration.ShouldContain(
+            "failed Shop.Integration.Tests.OpenApiDocumentTests.The_frontends_copy_of_the_openapi_document_is_current",
+            customMessage: integration);
         var web = Path.Combine(project.ProjectDirectory, "web");
         File.ReadAllText(Path.Combine(web, "app", "openapi.json")).ShouldContain("/billing/notes");
 

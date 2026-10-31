@@ -53,7 +53,7 @@ internal sealed class GeneratedProject : IDisposable
 
     /// <summary>Runs one test project of the generated solution, already built in Release.</summary>
     public (int ExitCode, string Output) Test(string project, IReadOnlyDictionary<string, string>? environment = null) =>
-        DotNet.Run(ProjectDirectory, environment ?? new Dictionary<string, string>(), "test", "--project", project, "-c", "Release", "--no-build");
+        DotNet.Run(ProjectDirectory, environment ?? new Dictionary<string, string>(), "test", "--project", project, "-c", "Release", "--no-build", "--no-ansi");
 
     /// <summary>Starts the built host on a free port, outside Aspire, with the given configuration.</summary>
     public RunningHost StartHost(IReadOnlyDictionary<string, string> environment)
