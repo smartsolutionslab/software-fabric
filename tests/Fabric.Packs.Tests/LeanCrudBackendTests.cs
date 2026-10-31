@@ -93,11 +93,13 @@ public sealed class LeanCrudBackendTests
 
             public sealed class InvoicePaidConsumer
             {
+                private readonly ConcurrentBag<Guid> received = Received;
+
                 public static ConcurrentBag<Guid> Received { get; } = [];
 
                 public Task Handle(InvoicePaidV1 message, CancellationToken cancellationToken)
                 {
-                    Received.Add(message.InvoiceId);
+                    received.Add(message.InvoiceId);
                     return Task.CompletedTask;
                 }
             }
