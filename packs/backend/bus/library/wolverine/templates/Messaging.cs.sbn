@@ -8,6 +8,11 @@ using Wolverine.SqlServer;
 {{~ end ~}}
 {{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
 using Wolverine.RabbitMQ;
+{{~ else if project["backend.bus.transport"] == "kafka" ~}}
+using System.Reflection;
+using {{ namespace }}.Contracts;
+using Confluent.Kafka;
+using Wolverine.Kafka;
 {{~ end ~}}
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -39,6 +44,23 @@ public static class Messaging
             options.Policies.UseDurableInboxOnAllListeners();
 {{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
             options.UseRabbitMq(new Uri(broker)).AutoProvision().UseConventionalRouting();
+{{~ else if project["backend.bus.transport"] == "kafka" ~}}
+            // Kafka has no conventional routing: every integration event has a topic named after its type, and the
+            // host listens to the topics of the events its modules consume.
+            options.UseKafka(broker).AutoProvision().ConfigureConsumers(consumer =>
+            {
+                consumer.GroupId = "{{ name }}";
+                consumer.AutoOffsetReset = AutoOffsetReset.Earliest;
+            });
+            foreach (var integrationEvent in typeof(IIntegrationEvent).Assembly.GetTypes().Where(IsIntegrationEvent))
+            {
+                options.PublishMessage(integrationEvent).ToKafkaTopic(integrationEvent.FullName!);
+            }
+
+            foreach (var consumed in modules.SelectMany(module => ConsumedEvents(ModuleAssemblies.Of(module, "Application"))).Distinct())
+            {
+                options.ListenToKafkaTopic(consumed.FullName!);
+            }
 {{~ end ~}}
 
             options.Discovery.DisableConventionalDiscovery();
@@ -51,4 +73,19 @@ public static class Messaging
 
         return services;
     }
+{{~ if project["backend.bus.transport"] == "kafka" ~}}
+
+    private static bool IsIntegrationEvent(Type type) =>
+        type is { IsClass: true, IsAbstract: false } && typeof(IIntegrationEvent).IsAssignableFrom(type);
+
+    /// <summary>The integration events the consumers (<c>*Consumer</c>) of one Application assembly handle.</summary>
+    private static IEnumerable<Type> ConsumedEvents(Assembly application) =>
+        application.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && type.Name.EndsWith("Consumer", StringComparison.Ordinal))
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            .Where(method => method.Name.StartsWith("Handle", StringComparison.Ordinal) || method.Name.StartsWith("Consume", StringComparison.Ordinal))
+            .Select(method => method.GetParameters().FirstOrDefault()?.ParameterType)
+            .OfType<Type>()
+            .Where(IsIntegrationEvent);
+{{~ end ~}}
 }
