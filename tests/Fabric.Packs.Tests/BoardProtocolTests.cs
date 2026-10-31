@@ -279,6 +279,32 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         output.ShouldContain("No eligible issue in lane backend.");
     }
 
+    [Theory]
+    [InlineData("needs:decision")]
+    [InlineData("needs:human")]
+    public void An_issue_escalated_to_nobody_is_not_claimed_again(string escalation)
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, escalation]));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(3, output);
+    }
+
+    [Fact]
+    public void An_eligible_issue_behind_a_full_page_of_claimed_ones_is_still_found()
+    {
+        Issues([
+            Issue(1, "Pay an invoice", ReadyBackend),
+            .. Enumerable.Range(2, 100).Select(number => Issue(number, $"Taken {number}", [.. ReadyBackend, "agent:claimed"])),
+        ]);
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldStartWith("1 agent/1-pay-an-invoice");
+    }
+
     [Fact]
     public void A_claim_the_remote_refuses_is_an_error_not_an_empty_lane()
     {

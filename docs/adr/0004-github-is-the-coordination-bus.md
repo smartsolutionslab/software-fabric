@@ -20,8 +20,10 @@ In Progress, In Review, Blocked, Done), `Lane`, `Executor`, `Priority`,
 `Size`.
 
 **Eligibility.** An agent takes an issue only if it carries
-`agent:ready`, has **no human assignee**, is neither `agent:blocked` nor
-`agent:claimed`, and its lane is one the agent serves. `agent:claimed` is
+`agent:ready`, has **no human assignee**, carries none of `agent:blocked`,
+`agent:claimed` or `needs:*`, and its lane is one the agent serves. An
+escalation no owner had capacity for has no assignee, so its `needs:*`
+label is what holds it for a developer. `agent:claimed` is
 set on a claim and removed when it ends, so a claimed issue looks taken
 even without a board; the branch, not the label, is the lock. The lane is a `lane:<name>` label, so
 eligibility needs no board access. A human assignee means the issue

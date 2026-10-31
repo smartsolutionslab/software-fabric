@@ -62,7 +62,12 @@ case "${positional[0]} ${positional[1]:-}" in
           ($labels | split(",") | map(select(. != ""))) as $wanted
           | map(select(.state == $state)
                 | select([.labels[].name] as $have | all($wanted[]; . as $w | $have | index($w)))
-                | select($assignee == "" or ([.assignees[].login] | index($assignee))))' "$issues"
+                | select($assignee == "" or ([.assignees[].login] | index($assignee))))
+          | sort_by(-.number)' "$issues" > "$state/page.json"
+        # Pages like GitHub: newest first, per_page at a time; --paginate prints every page as its own array.
+        size="$(param per_page)"; size="${size:-30}"
+        pages="$(jq --argjson size "$size" '[range(0; length; $size) as $at | .[$at:$at + $size]] | if length == 0 then [[]] else . end' "$state/page.json")"
+        if [ -n "${flag[paginate]:-}" ]; then jq -c '.[]' <<< "$pages"; else jq -c '.[0]' <<< "$pages"; fi
         ;;
       "GET issues/"*) jq --argjson number "${path#issues/}" '.[] | select(.number == $number)' "$issues" ;;
       "POST issues/"*"/comments")

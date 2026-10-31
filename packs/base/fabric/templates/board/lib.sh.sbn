@@ -112,9 +112,9 @@ board_uri() {
   jq -rn --arg value "$1" '$value | @uri'
 }
 
-# Open issues matching a query string (labels=..., assignee=...), pull requests left out.
+# Open issues matching a query string (labels=..., assignee=...), every page, pull requests left out.
 board_issues() {
-  gh api "repos/$repo/issues?state=open&per_page=100&$1" | jq 'map(select(has("pull_request") | not))'
+  gh api "repos/$repo/issues?state=open&per_page=100&$1" --paginate | jq -s 'add // [] | map(select(has("pull_request") | not))'
 }
 
 board_issue() {

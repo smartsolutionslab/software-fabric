@@ -2,7 +2,8 @@
 # Claims the next eligible issue of a lane (board protocol, docs/adr).
 # Usage: next.sh <lane> <executor>
 # Prints "<issue> <branch>" and exits 0, or exits 3 when the lane has nothing eligible.
-# Eligible: open, labelled agent:ready and lane:<lane>, no assignee, neither agent:blocked nor agent:claimed.
+# Eligible: open, labelled agent:ready and lane:<lane>, no assignee, not claimed, blocked or escalated (needs:*): an
+# escalation no owner had capacity for keeps agent:ready and has no assignee, but still waits for a developer.
 # The branch is the lock: a claim commit pushed onto a new branch, or onto a parked one, succeeds for one agent only.
 # Exit 1 means a claim failed for another reason (printed); it is not an empty lane.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -11,7 +12,7 @@ lane="$1"
 executor="$2"
 
 candidates="$(board_issues "labels=$(board_uri "agent:ready,lane:$lane")" \
-  | jq -r 'map(select((.assignees | length) == 0 and ([.labels[].name] | (index("agent:blocked") or index("agent:claimed")) | not)))
+  | jq -r 'map(select((.assignees | length) == 0 and ([.labels[].name] | any(. == "agent:blocked" or . == "agent:claimed" or startswith("needs:")) | not)))
            | sort_by(.number) | .[] | "\(.number)\t\(.title)"')"
 
 # Returns 0 when claimed, 2 when another agent holds or just took the issue, 1 when nothing was claimed for another
