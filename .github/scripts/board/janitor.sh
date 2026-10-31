@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Returns lapsed claims to Todo (board protocol, docs/adr). Run on a schedule.
+# A claim lapses when its agent/ branch has no open pull request and no commit (the claim is one) within the lease.
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+now="$(board_now)"
+lease=$((BOARD_LEASE_HOURS * 3600))
+
+board_git ls-remote --heads origin | awk 'index($2, "refs/heads/agent/") == 1 { sub("refs/heads/", "", $2); print $2 }' | while read -r branch; do
+  issue="${branch#agent/}"
+  issue="${issue%%-*}"
+  # A stray agent/ branch without an issue is not a claim.
+  gh api "repos/$repo/issues/$issue" > /dev/null 2>&1 || continue
+
+  if [ "$(gh api "repos/$repo/pulls?state=open&head=$(board_uri "${repo%%/*}:$branch")" | jq length)" -gt 0 ]; then
+    continue
+  fi
+
+  head="$(board_fetch "$branch")" || continue
+  board_parked "$head" && continue
+
+  # The claim is a commit too, so the branch's last commit is the last sign of life.
+  if [ $((now - $(board_git log -1 --format=%ct "$head"))) -gt "$lease" ]; then
+    board_park "$issue" "The claim lapsed: no push for ${BOARD_LEASE_HOURS} h and no open pull request." || continue
+    board_unclaim "$issue"
+    board_status "$issue" Todo
+    board_executor "$issue" ""
+    board_comment "$issue" "The claim on \`$branch\` lapsed: no push for ${BOARD_LEASE_HOURS} h and no open pull request. Back to Todo; the work so far stays on the branch."
+    echo "Returned #$issue to Todo."
+  fi
+done
+

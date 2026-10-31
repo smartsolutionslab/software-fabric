@@ -36,6 +36,27 @@ on, through the board protocol in ADR-0004.
 - Conventional Commits.
 - Tests first for new behaviour; quote the failing output in the PR.
 
+## Board protocol (from M2)
+
+This repo runs the protocol its packs generate (ADR-0004), copied into
+`.github/scripts/board/`; a test fails when the copy drifts from the packs.
+
+- **Take work** with `GITHUB_REPOSITORY=smartsolutionslab/software-fabric
+  bash .github/scripts/board/next.sh <lane> <executor>`. Lanes: `generator`
+  (src/, catalog, schema), `packs-backend`, `packs-frontend`, `ci` (workflows,
+  build/). Exit 3: nothing eligible. Exit 1: the claim failed; stop and report
+  it. Claude Code: `/next-issue`.
+- **Work only on the `agent/<issue>-<slug>` branch you claimed**, push at
+  least every two hours, and end every commit with
+  `Agent-Executor: <family>-<runtime>/<detail>`.
+- **Open the pull request against `main`** with `## Spec and plan` and
+  `## Tests observed failing`; a reviewer of the other model family runs on it.
+- **Escalate instead of guessing** with `escalate.sh <issue> needs:decision
+  "<question>"` (or `agent:blocked` with the verbatim failure). A decision
+  this repo's ADRs do not settle is always a `needs:decision`: agents
+  implement decisions, they do not make them.
+- An issue with a human assignee belongs to that human.
+
 ## Layout (target)
 
 ```

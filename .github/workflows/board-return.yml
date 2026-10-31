@@ -1,0 +1,21 @@
+name: board-return
+
+# An escalated issue goes back to the agents once its developer unassigns themselves (board protocol, docs/adr).
+on:
+  issues:
+    types: [unassigned]
+
+permissions:
+  issues: write
+
+jobs:
+  return-to-todo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/board/return-to-todo.sh "${{ github.event.issue.number }}"
+        env:
+          GH_TOKEN: ${{ secrets.BOARD_TOKEN || github.token }}
+          BOARD_PROJECT_OWNER: ${{ vars.BOARD_PROJECT_OWNER }}
+          BOARD_PROJECT_NUMBER: ${{ vars.BOARD_PROJECT_NUMBER }}
+

@@ -1,0 +1,88 @@
+name: cross-model-review
+
+# The reviewer is from a different model family than the author (board protocol, docs/adr). Its findings land on the
+# pull request, and a blocking one fails the check.
+# Needs the secret of the reviewing family: ANTHROPIC_API_KEY for claude, OPENAI_API_KEY for codex.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  choose:
+    runs-on: ubuntu-latest
+    outputs:
+      reviewer: ${{ steps.choose.outputs.reviewer }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: choose
+        run: echo "reviewer=$(bash .github/scripts/board/reviewer.sh "$BASE" "$HEAD")" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+
+  claude:
+    needs: choose
+    if: needs.choose.outputs.reviewer == 'claude'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: schema
+        run: echo "json=$(jq -c . .github/review-findings.schema.json)" >> "$GITHUB_OUTPUT"
+      - id: review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The workflow's own token: without one the action fetches an app token through OIDC (id-token: write),
+          # which this job does not need, since report-review.sh posts the findings.
+          github_token: ${{ github.token }}
+          claude_args: --json-schema '${{ steps.schema.outputs.json }}'
+          prompt: |
+            Review pull request #${{ github.event.pull_request.number }} as the reviewers in .claude/agents/ describe
+            (backend-reviewer, frontend-reviewer, security-reviewer: whichever the diff touches). Read AGENTS.md first.
+            Do not comment on the pull request yourself. Answer with every finding: its file, its line (null when it has
+            none), whether it is blocking or optional, and what is wrong.
+      - name: Post the findings; a blocking one fails this check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINDINGS: ${{ steps.review.outputs.structured_output }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          printf '%s' "$FINDINGS" > "$RUNNER_TEMP/findings.json"
+          bash .github/scripts/board/report-review.sh "$PR" "$RUNNER_TEMP/findings.json" claude
+
+  codex:
+    needs: choose
+    if: needs.choose.outputs.reviewer == 'codex'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: review
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          output-schema-file: .github/review-findings.schema.json
+          prompt: |
+            Review pull request #${{ github.event.pull_request.number }} as the reviewers in .claude/agents/ describe
+            (backend-reviewer, frontend-reviewer, security-reviewer: whichever the diff touches). Read AGENTS.md first.
+            Answer with every finding: its file, its line (null when it has none), whether it is blocking or optional,
+            and what is wrong.
+      - name: Post the findings; a blocking one fails this check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINDINGS: ${{ steps.review.outputs.final-message }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          printf '%s' "$FINDINGS" > "$RUNNER_TEMP/findings.json"
+          bash .github/scripts/board/report-review.sh "$PR" "$RUNNER_TEMP/findings.json" codex
+

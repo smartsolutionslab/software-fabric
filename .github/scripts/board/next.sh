@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Claims the next eligible issue of a lane (board protocol, docs/adr).
+# Usage: next.sh <lane> <executor>
+# Prints "<issue> <branch>" and exits 0, or exits 3 when the lane has nothing eligible.
+# Eligible: open, labelled agent:ready and lane:<lane>, no assignee, neither agent:blocked nor agent:claimed.
+# The branch is the lock: a claim commit pushed onto a new branch, or onto a parked one, succeeds for one agent only.
+# Exit 1 means a claim failed for another reason (printed); it is not an empty lane.
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+lane="$1"
+executor="$2"
+
+candidates="$(board_issues "labels=$(board_uri "agent:ready,lane:$lane")" \
+  | jq -r 'map(select((.assignees | length) == 0 and ([.labels[].name] | (index("agent:blocked") or index("agent:claimed")) | not)))
+           | sort_by(.number) | .[] | "\(.number)\t\(.title)"')"
+
+# Returns 0 when claimed, 2 when another agent holds or just took the issue, 1 on any other failure.
+claim() {
+  local issue="$1" title="$2" branch base outcome
+  branch="$(board_branch_for "$issue")"
+  if [ -n "$branch" ]; then
+    base="$(board_fetch "$branch")" || return 1
+    board_parked "$base" || return 2
+  else
+    branch="agent/$issue-$(board_slug "$title")"
+    base="$(board_fetch "$(board_default_branch)")" || return 1
+  fi
+  outcome=0
+  board_mark "$branch" "$base" "chore(board): claim #$issue
+
+Agent-Executor: $executor" || outcome=$?
+  [ "$outcome" -eq 0 ] || return "$outcome"
+
+  board_add_label "$issue" agent:claimed
+  board_status "$issue" Claimed
+  board_executor "$issue" "$executor"
+  board_comment "$issue" "<!-- board:claim -->
+Claimed by \`$executor\` on branch \`$branch\`. The claim lapses after ${BOARD_LEASE_HOURS} h without a push."
+  echo "$issue $branch"
+}
+
+while IFS=$'\t' read -r issue title; do
+  [ -n "$issue" ] || continue
+  outcome=0
+  claim "$issue" "$title" || outcome=$?
+  case "$outcome" in
+    0) exit 0 ;;
+    2) continue ;;
+    *)
+      echo "Claiming #$issue failed; nothing was claimed." >&2
+      exit 1
+      ;;
+  esac
+done <<< "$candidates"
+
+echo "No eligible issue in lane $lane." >&2
+exit 3
+
