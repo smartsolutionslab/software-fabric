@@ -1,0 +1,26 @@
+{%{#!/usr/bin/env bash
+# Creates the labels and board fields the protocol uses (docs/adr). Safe to run again.
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+label() {
+  gh label create "$1" --repo "$repo" --color "$2" --description "$3" --force > /dev/null
+}
+
+label agent:ready 0e8a16 "Agents may take this issue."
+label agent:blocked b60205 "A phase failed twice; a developer has the verbatim failure."
+label needs:human d93f0b "Triage found this unfit for agents."
+label needs:decision fbca04 "An agent needs a developer's decision."
+for lane in $(yq -r '.lanes | keys | .[]' "$board_root/docs/owners.yml"); do
+  label "lane:$lane" 1d76db "Work for the $lane lane."
+done
+
+if board_project_configured; then
+  fields="$(gh project field-list "$BOARD_PROJECT_NUMBER" --owner "$BOARD_PROJECT_OWNER" --format json)"
+  if ! jq -e '.fields[] | select(.name == "Executor")' <<< "$fields" > /dev/null; then
+    gh project field-create "$BOARD_PROJECT_NUMBER" --owner "$BOARD_PROJECT_OWNER" --name Executor --data-type TEXT > /dev/null
+  fi
+  echo "Give the board's Status field the options Todo, Claimed, In Progress, In Review, Blocked and Done (GitHub creates only some of them)."
+else
+  echo "No board in .github/board.env; labels only."
+fi
+}%}

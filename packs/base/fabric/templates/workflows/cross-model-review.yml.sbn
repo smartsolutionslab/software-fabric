@@ -1,0 +1,60 @@
+{%{name: cross-model-review
+
+# The reviewer is from a different model family than the author (board protocol, docs/adr).
+# Needs the secret of the reviewing family: ANTHROPIC_API_KEY for claude, OPENAI_API_KEY for codex.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  choose:
+    runs-on: ubuntu-latest
+    outputs:
+      reviewer: ${{ steps.choose.outputs.reviewer }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: choose
+        run: echo "reviewer=$(bash .github/scripts/board/reviewer.sh "$BASE" "$HEAD")" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+
+  claude:
+    needs: choose
+    if: needs.choose.outputs.reviewer == 'claude'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review pull request #${{ github.event.pull_request.number }} as the reviewers in .claude/agents/ describe
+            (backend-reviewer, frontend-reviewer, security-reviewer: whichever the diff touches). Read AGENTS.md first.
+            Post each finding as a review comment on its line, ranked: blocking findings first, then the rest marked optional.
+
+  codex:
+    needs: choose
+    if: needs.choose.outputs.reviewer == 'codex'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: |
+            Review pull request #${{ github.event.pull_request.number }} as the reviewers in .claude/agents/ describe
+            (backend-reviewer, frontend-reviewer, security-reviewer: whichever the diff touches). Read AGENTS.md first.
+            Report each finding with its file and line, ranked: blocking findings first, then the rest marked optional.
+}%}

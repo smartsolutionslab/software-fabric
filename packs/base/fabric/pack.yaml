@@ -1,0 +1,33 @@
+option: base.fabric
+files:
+  - { template: templates/board/lib.sh.sbn, target: ".github/scripts/board/lib.sh" }
+  - { template: templates/board/next.sh.sbn, target: ".github/scripts/board/next.sh" }
+  - { template: templates/board/release.sh.sbn, target: ".github/scripts/board/release.sh" }
+  - { template: templates/board/escalate.sh.sbn, target: ".github/scripts/board/escalate.sh" }
+  - { template: templates/board/janitor.sh.sbn, target: ".github/scripts/board/janitor.sh" }
+  - { template: templates/board/return-to-todo.sh.sbn, target: ".github/scripts/board/return-to-todo.sh" }
+  - { template: templates/board/reviewer.sh.sbn, target: ".github/scripts/board/reviewer.sh" }
+  - { template: templates/board/check-trailers.sh.sbn, target: ".github/scripts/board/check-trailers.sh" }
+  - { template: templates/board/setup.sh.sbn, target: ".github/scripts/board/setup.sh" }
+  - { template: templates/board.env.sbn, target: ".github/board.env" }
+  - { template: templates/owners.yml.sbn, target: docs/owners.yml }
+  - { template: templates/workflows/board-janitor.yml.sbn, target: ".github/workflows/board-janitor.yml" }
+  - { template: templates/workflows/board-return.yml.sbn, target: ".github/workflows/board-return.yml" }
+  - { template: templates/workflows/agent-executor.yml.sbn, target: ".github/workflows/agent-executor.yml" }
+  - { template: templates/workflows/cross-model-review.yml.sbn, target: ".github/workflows/cross-model-review.yml" }
+  - { template: templates/skills/next-issue.md.sbn, target: ".claude/skills/next-issue/SKILL.md" }
+agents:
+  agents-md: docs/agents.md
+  briefs:
+    architect: docs/architect.md
+    triage: docs/triage.md
+    backend-engineer: docs/engineer.md
+    frontend-engineer: docs/engineer.md
+    infra-engineer: docs/engineer.md
+    backend-reviewer: docs/reviewer.md
+    frontend-reviewer: docs/reviewer.md
+    security-reviewer: docs/reviewer.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "Every commit on an agent/ branch carries an Agent-Executor trailer.", file: templates/workflows/agent-executor.yml.sbn }
+  - { kind: ci-step, describes: "A pull request is reviewed by a model family that wrote none of its commits.", file: templates/workflows/cross-model-review.yml.sbn }
