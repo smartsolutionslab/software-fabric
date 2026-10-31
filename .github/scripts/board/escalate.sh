@@ -35,9 +35,14 @@ if [ -n "$lane" ]; then
   done < <(yq -r "(.lanes[\"$lane\"].owners // [])[]" "$owners_file")
 fi
 
-board_park "$issue" "Escalated ($label)." || { echo "Parking #$issue's branch failed; not escalated." >&2; exit 1; }
-# The escalation label holds the issue before agent:claimed stops holding it; the other order lets next.sh take it.
+# The escalation label holds the issue before the branch is parked and before agent:claimed stops holding it: a
+# next.sh already past its list rechecks the issue, not agent:claimed, so either other order lets it take the issue.
 board_add_label "$issue" "$label"
+if ! board_park "$issue" "Escalated ($label)."; then
+  board_remove_label "$issue" "$label"
+  echo "Parking #$issue's branch failed; not escalated." >&2
+  exit 1
+fi
 board_unclaim "$issue"
 board_status "$issue" Blocked
 if [ -n "$owner" ]; then

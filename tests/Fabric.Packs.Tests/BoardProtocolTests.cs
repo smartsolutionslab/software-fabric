@@ -349,6 +349,20 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     }
 
     [Fact]
+    public void An_issue_that_cannot_be_read_again_after_the_claim_is_an_error_not_an_empty_lane()
+    {
+        Issues(Issue(7, "Pay an invoice", ReadyBackend));
+        File.WriteAllText(Path.Combine(state, "fail-issue-read"), "2");
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain("Service Unavailable");
+        output.ShouldNotContain("No eligible issue");
+        Head("agent/7-pay-an-invoice").ShouldBe("chore(board): claim #7");
+    }
+
+    [Fact]
     public void A_claim_the_remote_refuses_is_an_error_not_an_empty_lane()
     {
         Issues(Issue(7, "Pay an invoice", ReadyBackend));
@@ -480,6 +494,49 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         var released = Array.FindIndex(log, line => line.Contains("issues/7/labels/agent%3Aclaimed", StringComparison.Ordinal));
         held.ShouldBeGreaterThanOrEqualTo(0, string.Join('\n', log));
         released.ShouldBeGreaterThan(held, string.Join('\n', log));
+    }
+
+    [Fact]
+    public void An_escalation_holds_the_issue_before_it_parks_the_branch()
+    {
+        Owners("wip-limit: 1\nlanes:\n  backend: { owners: [alice] }\n");
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+        var hook = Path.Combine(origin, "hooks", "pre-receive");
+        File.WriteAllText(hook, $"#!/bin/sh\necho push >> '{state}/log'\n");
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var (exitCode, output) = Run("escalate.sh", "7", "needs:decision", "Refund to the card or as credit?");
+
+        exitCode.ShouldBe(0, output);
+        var log = File.ReadAllLines(Path.Combine(state, "log"));
+        var held = Array.FindIndex(log, line => line.Contains("issues/7/labels -f labels[]=needs:decision", StringComparison.Ordinal));
+        var parked = Array.IndexOf(log, "push");
+        held.ShouldBeGreaterThanOrEqualTo(0, string.Join('\n', log));
+        parked.ShouldBeGreaterThan(held, string.Join('\n', log));
+    }
+
+    [Fact]
+    public void An_escalation_whose_branch_cannot_be_parked_takes_its_label_back()
+    {
+        Owners("wip-limit: 1\nlanes:\n  backend: { owners: [alice] }\n");
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+        var hook = Path.Combine(origin, "hooks", "pre-receive");
+        File.WriteAllText(hook, "#!/bin/sh\necho 'Write access is not permitted through this proxy.' >&2\nexit 1\n");
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var (exitCode, output) = Run("escalate.sh", "7", "needs:decision", "Refund to the card or as credit?");
+
+        exitCode.ShouldBe(1, output);
+        Labels(IssueState(7)).ShouldNotContain("needs:decision");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
     }
 
     [Fact]

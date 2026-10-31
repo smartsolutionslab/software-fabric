@@ -71,7 +71,11 @@ case "${positional[0]} ${positional[1]:-}" in
         # A change someone makes right after the list was answered, once.
         if [ -e "$state/after-list" ]; then bash "$state/after-list"; rm "$state/after-list"; fi
         ;;
-      "GET issues/"*) jq --argjson number "${path#issues/}" '.[] | select(.number == $number)' "$issues" ;;
+      "GET issues/"*)
+        # fail-issue-read holds the number of the single-issue read that fails, as a server error would.
+        reads=$(( $(cat "$state/issue-reads" 2>/dev/null || echo 0) + 1 )); echo "$reads" > "$state/issue-reads"
+        if [ "$(cat "$state/fail-issue-read" 2>/dev/null)" = "$reads" ]; then echo '{"message":"Service Unavailable"}' >&2; exit 1; fi
+        jq --argjson number "${path#issues/}" '.[] | select(.number == $number)' "$issues" ;;
       "POST issues/"*"/comments")
         n="${path#issues/}"; n="${n%/comments}"; file="$state/comments/$n.json"; mkdir -p "$state/comments"
         [ -e "$file" ] || echo '[]' > "$file"

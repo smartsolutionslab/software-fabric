@@ -39,6 +39,10 @@ Agent-Executor: $executor" || outcome=$?
   [ "$outcome" -eq 0 ] || return "$outcome"
 
   board_eligible "$issue" "$lane" || outcome=$?
+  if [ "$outcome" -eq 1 ]; then
+    echo "The branch $branch is held, but #$issue could not be read again to confirm the claim (above)." >&2
+    return 4
+  fi
   if [ "$outcome" -ne 0 ]; then
     if ! board_park "$issue" "No longer eligible once claimed: assigned, closed or escalated meanwhile."; then
       echo "The branch $branch is held, but #$issue stopped being eligible and giving it back failed (above)." >&2
