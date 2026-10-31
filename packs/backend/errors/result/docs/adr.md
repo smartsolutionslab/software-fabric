@@ -12,3 +12,4 @@ At the HTTP edge, `ToHttpResult()` turns a success into `200` with the value and
 
 - A caller cannot ignore a failure without saying so; the compiler shows every place a failure is handled.
 - No exception filter decides status codes; the error that knows the failure carries its status.
+- A domain rule's failure is a `DomainError` without HTTP; the Application decides its status when it maps it with `ApiError.From`. HTTP stays out of the Domain.

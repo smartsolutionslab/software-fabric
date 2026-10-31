@@ -8,5 +8,5 @@ Modules model their business with aggregates, entities and domain events. Aggreg
 
 ## Consequences
 
-- Persistence, HTTP and messaging never leak into the Domain project; an architecture rule fails the build if they do.
+- Persistence, HTTP and messaging never leak into the Domain project; an architecture rule fails the build if they do. With result values, that includes errors: a Domain error is a `DomainError` (code and message), and only the Application gives it an HTTP status.
 - Each aggregate is loaded and saved as a whole; cross-aggregate consistency is eventual, through domain events.

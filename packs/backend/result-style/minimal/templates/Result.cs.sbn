@@ -42,4 +42,13 @@ public sealed class Result<TValue, TError>
 
         return IsSuccess ? success(value!) : failure(error!);
     }
+
+    /// <summary>The same outcome with the error translated, e.g. a domain error to an <c>ApiError</c> in Application.</summary>
+    public Result<TValue, TOut> MapError<TOut>(Func<TError, TOut> map)
+        where TOut : notnull
+    {
+        {{ not_null "map" }}
+
+        return IsSuccess ? Result<TValue, TOut>.Success(value!) : Result<TValue, TOut>.Failure(map(error!));
+    }
 }
