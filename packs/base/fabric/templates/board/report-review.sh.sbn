@@ -8,7 +8,13 @@ pr="$1"
 findings_file="$2"
 reviewer="$3"
 
-if ! findings="$(jq -ce '.findings | arrays' "$findings_file" 2> /dev/null)"; then
+# The schema, checked here too: a severity the summary does not know would be counted as optional.
+if ! findings="$(jq -ce '.findings | arrays | select(all(.[];
+    type == "object"
+    and (.severity == "blocking" or .severity == "optional")
+    and (.file | type) == "string"
+    and ((.line | type) == "number" or .line == null)
+    and (.message | type) == "string"))' "$findings_file" 2> /dev/null)" || [ -z "$findings" ]; then
   echo "The $reviewer review did not report its findings in the shape .github/review-findings.schema.json asks for. It answered:" >&2
   head -c 4000 "$findings_file" >&2
   echo >&2

@@ -235,6 +235,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     [InlineData("board_branch_for() { return 1; }", "board_park 7 Released")]
     [InlineData("board_executor_of() { return 1; }", "board_park 7 Released")]
     [InlineData("board_item() { return 1; }", "board_field 7 Status Todo")]
+    [InlineData("board_issue() { return 1; }", "board_unclaim 7")]
     public void A_board_step_tested_in_a_condition_still_fails_when_a_lookup_inside_it_fails(string failingLookup, string step)
     {
         Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
@@ -676,6 +677,20 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     public void A_reviewer_that_reports_no_findings_list_fails_the_review()
     {
         var (exitCode, output) = Run("report-review.sh", "5", Findings("I could not run the build."), "codex");
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain("did not report its findings");
+        Reviews().ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("""{"findings": [{"severity": "blocker", "file": "a.cs", "line": 1, "message": "Wrong."}]}""")]
+    [InlineData("""{"findings": [{"severity": "blocking", "file": "a.cs", "line": 1}]}""")]
+    [InlineData("""{"findings": [{"severity": "optional", "file": "a.cs", "line": "1", "message": "Wrong."}]}""")]
+    [InlineData("""{"findings": ["Wrong."]}""")]
+    public void A_finding_outside_the_schema_fails_the_review(string answer)
+    {
+        var (exitCode, output) = Run("report-review.sh", "5", Findings(answer), "codex");
 
         exitCode.ShouldBe(1, output);
         output.ShouldContain("did not report its findings");

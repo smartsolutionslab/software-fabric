@@ -144,13 +144,13 @@ board_remove_label() {
   gh api -X DELETE "repos/$repo/issues/$1/labels/$(board_uri "$2")" > /dev/null
 }
 
-board_has_label() {
-  board_issue "$1" | jq -e --arg name "$2" 'any(.labels[]; .name == $name)' > /dev/null
-}
-
 # agent:claimed shows people (and agents reading labels) that an issue is taken; the branch stays the lock.
+# An issue that cannot be read is a failure, not an issue without the label: a parked branch whose issue keeps
+# agent:claimed is skipped by next.sh and the janitor alike, for good.
 board_unclaim() {
-  if board_has_label "$1" agent:claimed; then
+  local state
+  state="$(board_issue "$1")" || return 1
+  if jq -e 'any(.labels[]; .name == "agent:claimed")' <<< "$state" > /dev/null; then
     board_remove_label "$1" agent:claimed
   fi
 }
