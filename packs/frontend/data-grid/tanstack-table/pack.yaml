@@ -1,0 +1,13 @@
+option: frontend.data-grid.tanstack-table
+files:
+  - { template: templates/data-table.tsx.sbn, target: web/app/src/components/ui/data-table.tsx }
+  - { template: templates/data-table-columns.ts.sbn, target: web/app/src/components/ui/data-table-columns.ts }
+  - { template: templates/data-table.test.tsx.sbn, target: web/app/src/components/ui/data-table.test.tsx }
+slots:
+  - { slot: web.dependencies, template: templates/dependency.sbn }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 50 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing AG Grid fails lint.", file: templates/restricted.sbn }

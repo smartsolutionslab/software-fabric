@@ -1,0 +1,19 @@
+option: frontend.auth-client.oidc-client-ts
+files:
+  - { template: templates/oidcConfig.ts.sbn, target: web/app/src/auth/oidcConfig.ts }
+  - { template: templates/accessToken.ts.sbn, target: web/app/src/auth/accessToken.ts }
+  - { template: templates/SignedIn.tsx.sbn, target: web/app/src/auth/SignedIn.tsx }
+  - { template: templates/auth-provider.tsx.sbn, target: web/app/src/providers/auth.tsx }
+  - { template: templates/sign-in.spec.ts.sbn, target: web/app/e2e/sign-in.spec.ts }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.imports, template: templates/import.sbn, order: 0 }
+  - { slot: web.providers, template: templates/provider.sbn, order: 0 }
+  - { slot: web.env, template: templates/env.sbn }
+  - { slot: web.api-imports, template: templates/api-import.sbn }
+  - { slot: web.api-headers, template: templates/api-headers.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: end-to-end-test, describes: "A realm user signs in through the identity provider and sees the application (e2e/sign-in.spec.ts, run against the running AppHost).", file: templates/sign-in.spec.ts.sbn }

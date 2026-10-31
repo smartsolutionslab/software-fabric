@@ -1,0 +1,15 @@
+{{~ if project["backend.auth"] != "keycloak" ~}}
+throw new Error('This sign-in test knows Keycloak\'s login page only so far (docs/adr/0006 of the generator).');
+{{~ end ~}}
+import { expect, test } from '@playwright/test';
+
+test('a realm user signs in and sees the application', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByLabel('Username or email').fill('developer');
+  await page.getByLabel('Password', { exact: true }).fill('developer');
+  await page.getByRole('button', { name: 'Sign In' }).click();
+
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '{{ name }}' })).toBeVisible();
+});

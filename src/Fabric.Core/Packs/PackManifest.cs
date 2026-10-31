@@ -44,6 +44,7 @@ public enum GateKind
     LintRule,
     CiStep,
     UnitTest,
+    EndToEndTest,
 }
 
 public sealed record PackGate(GateKind Kind, string Describes, string? File);

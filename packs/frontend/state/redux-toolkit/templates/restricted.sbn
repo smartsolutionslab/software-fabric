@@ -1,0 +1,1 @@
+          { group: ['zustand', 'mobx', 'mobx-react*', 'jotai', 'recoil'], message: 'Use the Redux store (docs/adr).' }

@@ -20,6 +20,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # The sign-in test drives a generated app in Chromium; the version matches the generated @playwright/test.
+      - run: npx --yes playwright@1.63.0 install --with-deps chromium
       # Generated AppHosts use the Aspire CLI bundle; set it up once instead of letting parallel builds race to do it.
       - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
       - run: dotnet restore Fabric.slnx

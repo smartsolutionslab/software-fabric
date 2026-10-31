@@ -1,0 +1,1 @@
+import { withStore } from './providers/store';

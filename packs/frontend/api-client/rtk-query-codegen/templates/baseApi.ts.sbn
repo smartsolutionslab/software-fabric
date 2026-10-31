@@ -1,0 +1,14 @@
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+{{ slots["web.api-imports"] }}
+
+/** The API the generated endpoints (src/api/generated.ts) are injected into; /api reaches the host. */
+export const baseApi = createApi({
+  baseQuery: fetchBaseQuery({
+    baseUrl: '/api',
+    prepareHeaders: (headers) => {
+{{ slots["web.api-headers"] }}
+      return headers;
+    },
+  }),
+  endpoints: () => ({}),
+});

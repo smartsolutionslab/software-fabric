@@ -1,0 +1,7 @@
+option: frontend.pwa.no
+files: []
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "Nothing to check: no service worker and no manifest are generated." }

@@ -3,10 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "{{ if slots["web.prepare"] != "" }}{{ slots["web.prepare"] }} && {{ end }}vite",
+    "build": "{{ if slots["web.prepare"] != "" }}{{ slots["web.prepare"] }} && {{ end }}tsc -b && vite build",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "{{ if slots["web.prepare"] != "" }}{{ slots["web.prepare"] }} && {{ end }}vitest run",
+    "e2e": "playwright test"{{ if slots["web.scripts"] != "" }},
+{{ slots["web.scripts"] }}{{ end }}
   },
   "dependencies": {
     "react": "19.3.1",
@@ -15,6 +17,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.8",

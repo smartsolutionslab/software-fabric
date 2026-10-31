@@ -1,0 +1,19 @@
+option: frontend.state.redux-toolkit
+files:
+  - { template: templates/store.ts.sbn, target: web/app/src/store.ts }
+  - { template: templates/store-provider.tsx.sbn, target: web/app/src/providers/store.tsx }
+  - { template: templates/hooks.ts.sbn, target: web/app/src/hooks.ts }
+declares-slots:
+  - { slot: web.store-imports, description: "Import lines of src/store.ts." }
+  - { slot: web.store-reducers, description: "Entries of the root reducer map.", separator: ",\n" }
+  - { slot: web.store-middleware, description: "Calls chained onto getDefaultMiddleware() ('.concat(api.middleware)').", separator: "" }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.imports, template: templates/import.sbn, order: 5 }
+  - { slot: web.providers, template: templates/provider.sbn, order: 10 }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 15 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing another state library (Zustand, MobX, Jotai, Recoil) fails lint.", file: templates/restricted.sbn }

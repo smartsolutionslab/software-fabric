@@ -1,0 +1,11 @@
+option: frontend.charts.echarts
+files:
+  - { template: templates/chart.tsx.sbn, target: web/app/src/components/chart.tsx }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 60 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing Recharts or Chart.js fails lint.", file: templates/restricted.sbn }

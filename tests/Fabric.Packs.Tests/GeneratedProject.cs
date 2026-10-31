@@ -53,7 +53,7 @@ internal sealed class GeneratedProject : IDisposable
 
     /// <summary>Runs one test project of the generated solution, already built in Release.</summary>
     public (int ExitCode, string Output) Test(string project, IReadOnlyDictionary<string, string>? environment = null) =>
-        DotNet.Run(ProjectDirectory, environment ?? new Dictionary<string, string>(), "test", "--project", project, "-c", "Release", "--no-build");
+        DotNet.Run(ProjectDirectory, environment ?? new Dictionary<string, string>(), "test", "--project", project, "-c", "Release", "--no-build", "--no-ansi");
 
     /// <summary>Starts the built host on a free port, outside Aspire, with the given configuration.</summary>
     public RunningHost StartHost(IReadOnlyDictionary<string, string> environment)
@@ -79,7 +79,20 @@ internal sealed class GeneratedProject : IDisposable
     public void Dispose()
     {
         standIns.Dispose();
-        Directory.Delete(root, recursive: true);
+
+        // Processes a stopped AppHost started (the Vite server, its installer) can still be writing for a moment.
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                Directory.Delete(root, recursive: true);
+                return;
+            }
+            catch (IOException) when (attempt < 10)
+            {
+                Thread.Sleep(TimeSpan.FromSeconds(1));
+            }
+        }
     }
 
     private static int FreePort()

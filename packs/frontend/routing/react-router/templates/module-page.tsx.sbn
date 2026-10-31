@@ -1,0 +1,7 @@
+export function {{ module.namespace }}Page() {
+  return (
+    <main>
+      <h1>{{ module.namespace }}</h1>
+    </main>
+  );
+}

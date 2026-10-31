@@ -1,0 +1,1 @@
+          { group: ['recharts', 'chart.js', 'react-chartjs-2'], message: 'Use Chart from src/components/chart (docs/adr).' }

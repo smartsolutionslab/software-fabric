@@ -1,0 +1,7 @@
+      # The integration tests start the whole application, the web app included.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22

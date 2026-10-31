@@ -1,5 +1,5 @@
 ## Routing: React Router
 
-- Add a route in `src/App.tsx`; a module's routes point at components under `src/modules/<module>/`.
+- A module's screens live in `src/modules/<module>/`; its `routes.tsx` exports `route` and the app picks it up by itself. Do not list modules in `App.tsx`.
 - Import from `react-router`, never `react-router-dom`.
 - Tests render routes inside `MemoryRouter`.

@@ -92,7 +92,7 @@
       "additionalProperties": false,
       "required": ["kind", "describes"],
       "properties": {
-        "kind": { "enum": ["architecture-test", "analyzer", "lint-rule", "ci-step", "unit-test"] },
+        "kind": { "enum": ["architecture-test", "analyzer", "lint-rule", "ci-step", "unit-test", "end-to-end-test"] },
         "describes": { "description": "The rule this gate enforces, in one sentence.", "type": "string" },
         "file": { "description": "Template providing the gate, if it is a file.", "type": "string" }
       }
