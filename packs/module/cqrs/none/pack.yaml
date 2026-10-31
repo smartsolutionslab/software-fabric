@@ -1,0 +1,9 @@
+option: module.cqrs.none
+files:
+  # Per module: the rule checks only the modules that chose no CQRS, so another module may choose logical or physical.
+  - { template: templates/ModuleHasOneModel.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}HasOneModel.cs", per-module: true }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "A module without CQRS has no separate read models or projections: it reads the entities it writes.", file: templates/ModuleHasOneModel.cs.sbn }

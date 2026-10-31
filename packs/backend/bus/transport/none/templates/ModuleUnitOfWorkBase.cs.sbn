@@ -1,0 +1,50 @@
+using {{ namespace }}.Contracts;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+/// <summary>
+/// A module's unit of work over its DbContext and its outbox table: the changes and the queued events are saved in one
+/// transaction, and the host's dispatcher delivers the events in-process once it is committed.
+/// </summary>
+public abstract class ModuleUnitOfWork<TContext>(TContext context, IServiceProvider services) : IUnitOfWork
+    where TContext : DbContext
+{
+    private readonly List<IIntegrationEvent> queued = [];
+
+    public Task PublishAsync(IIntegrationEvent integrationEvent)
+    {
+        {{ not_null "integrationEvent" }}
+        queued.Add(integrationEvent);
+        return Task.CompletedTask;
+    }
+
+    public async Task CommitAsync(CancellationToken cancellationToken)
+    {
+        if (queued.Count == 0)
+        {
+            await context.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        await Outbox.EnsureCreatedAsync(context, cancellationToken);
+
+        // A transaction the caller opened is theirs to commit; the events join it.
+        var transaction = context.Database.CurrentTransaction is null
+            ? await context.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        await using (transaction)
+        {
+            await context.SaveChangesAsync(cancellationToken);
+            await Outbox.AddAsync(context, queued, cancellationToken);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        }
+
+        queued.Clear();
+        services.GetService<OutboxSignal>()?.Notify();
+    }
+}

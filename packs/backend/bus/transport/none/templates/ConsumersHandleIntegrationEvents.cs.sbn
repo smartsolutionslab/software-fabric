@@ -1,0 +1,48 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class ConsumersHandleIntegrationEvents : IArchitectureRule
+{
+    private const string IntegrationEvent = "{{ namespace }}.Contracts.IIntegrationEvent";
+
+    public string Description => "Every consumer is a public class whose Handle methods take an integration event first and return void or Task.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var consumers = model.ModuleAssemblies
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type is { IsClass: true, IsAbstract: false } && type.Name.EndsWith("Consumer", StringComparison.Ordinal));
+
+        foreach (var consumer in consumers)
+        {
+            if (!consumer.IsPublic)
+            {
+                yield return $"{consumer.FullName} is not public; the dispatcher delivers only to public consumers.";
+            }
+
+            var methods = consumer.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Where(method => method.Name.StartsWith("Handle", StringComparison.Ordinal) || method.Name.StartsWith("Consume", StringComparison.Ordinal))
+                .ToList();
+            if (methods.Count == 0)
+            {
+                yield return $"{consumer.FullName} has no public Handle method.";
+            }
+
+            foreach (var method in methods)
+            {
+                var message = method.GetParameters().FirstOrDefault()?.ParameterType;
+                if (method.Name != "Handle" || message is null || !message.GetInterfaces().Any(contract => contract.FullName == IntegrationEvent))
+                {
+                    yield return $"{consumer.FullName}.{method.Name} does not handle an integration event.";
+                }
+                else if (method.ReturnType != typeof(void) && method.ReturnType != typeof(Task))
+                {
+                    yield return $"{consumer.FullName}.{method.Name} returns {method.ReturnType.Name}; a consumer returns void or Task.";
+                }
+            }
+        }
+    }
+}

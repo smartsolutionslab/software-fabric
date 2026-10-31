@@ -1,0 +1,63 @@
+using System.Reflection;
+using {{ namespace }}.Contracts;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+/// <summary>
+/// Every module's consumers: public classes named *Consumer in an Application assembly, with a public Handle method whose
+/// first parameter is an integration event. Further parameters are a CancellationToken or services; the consumer itself
+/// is created per message with its constructor's dependencies.
+/// </summary>
+public sealed class IntegrationEventConsumers
+{
+    private readonly Dictionary<Type, List<MethodInfo>> handlers = [];
+
+    public IntegrationEventConsumers(IEnumerable<Assembly> applicationAssemblies)
+    {
+        {{ not_null "applicationAssemblies" }}
+
+        var methods = applicationAssemblies
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type is { IsClass: true, IsAbstract: false, IsPublic: true } && type.Name.EndsWith("Consumer", StringComparison.Ordinal))
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            .Where(method => method.Name == "Handle" && method.GetParameters() is [{ ParameterType: var message }, ..] && typeof(IIntegrationEvent).IsAssignableFrom(message));
+
+        foreach (var method in methods)
+        {
+            var message = method.GetParameters()[0].ParameterType;
+            if (!handlers.TryGetValue(message, out var forMessage))
+            {
+                handlers[message] = forMessage = [];
+            }
+
+            forMessage.Add(method);
+        }
+    }
+
+    /// <summary>Hands the event to every consumer of its type, each in its own scope.</summary>
+    public async Task DeliverAsync(IIntegrationEvent integrationEvent, IServiceScopeFactory scopes, CancellationToken cancellationToken)
+    {
+        {{ not_null "integrationEvent" }}
+        {{ not_null "scopes" }}
+
+        if (!handlers.TryGetValue(integrationEvent.GetType(), out var methods))
+        {
+            return;
+        }
+
+        foreach (var method in methods)
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var consumer = method.IsStatic ? null : ActivatorUtilities.CreateInstance(scope.ServiceProvider, method.DeclaringType!);
+            object?[] arguments = [.. method.GetParameters().Select((parameter, index) => index == 0
+                ? integrationEvent
+                : parameter.ParameterType == typeof(CancellationToken) ? cancellationToken : scope.ServiceProvider.GetRequiredService(parameter.ParameterType))];
+
+            if (method.Invoke(consumer, BindingFlags.DoNotWrapExceptions, null, arguments, null) is Task task)
+            {
+                await task;
+            }
+        }
+    }
+}

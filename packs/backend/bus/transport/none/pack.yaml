@@ -1,0 +1,23 @@
+option: backend.bus.transport.none
+# No broker and no messaging library (backend.bus.library is inactive): integration events go through an outbox table
+# in each module's schema and are delivered in-process by the host. Owns the same unit-of-work files a messaging
+# library's pack owns; the two are never chosen together.
+files:
+  - { template: templates/Messaging.cs.sbn, target: src/Host/Messaging.cs }
+  - { template: templates/ModuleUnitOfWorkBase.cs.sbn, target: src/BuildingBlocks/Messaging/ModuleUnitOfWork.cs }
+  - { template: templates/UnitOfWorkRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/UnitOfWorkRegistration.cs }
+  - { template: templates/Outbox.cs.sbn, target: src/BuildingBlocks/Messaging/Outbox.cs }
+  - { template: templates/OutboxSignal.cs.sbn, target: src/BuildingBlocks/Messaging/OutboxSignal.cs }
+  - { template: templates/OutboxDispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/OutboxDispatcher.cs }
+  - { template: templates/IntegrationEventConsumers.cs.sbn, target: src/BuildingBlocks/Messaging/IntegrationEventConsumers.cs }
+  - { template: templates/ModuleUnitOfWork.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/{{ module.namespace }}UnitOfWork.cs", per-module: true }
+  - { template: templates/ConsumersHandleIntegrationEvents.cs.sbn, target: tests/Architecture.Tests/Rules/ConsumersHandleIntegrationEvents.cs }
+slots:
+  - { slot: host.services, template: templates/host-services.sbn, order: 20 }
+  - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 20 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Every consumer is a public class whose Handle methods take an integration event first and return void or Task.", file: templates/ConsumersHandleIntegrationEvents.cs.sbn }
+  - { kind: ci-step, describes: "An integration event committed by one module reaches a consumer in another through the outbox, without a broker; checked against the running host." }
