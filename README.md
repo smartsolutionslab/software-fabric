@@ -20,7 +20,7 @@ Two halves, one repo:
 ## Status
 
 M0 (generator core) is done. M1 (profile `saas-standard-react` end to end)
-is done, waiting for its gate review: the base pack, the backend packs, the Aspire integration
+is done; its gate passed on 2026-10-31: the base pack, the backend packs, the Aspire integration
 tests and the frontend are real (M1-01 to M1-07): a generated app signs a
 user in through Keycloak and lists a module's data, checked end to end with
 Playwright. Every generated project carries the board protocol (M1-08):
