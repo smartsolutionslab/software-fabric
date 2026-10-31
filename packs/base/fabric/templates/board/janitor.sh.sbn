@@ -17,7 +17,20 @@ board_git ls-remote --heads origin | awk 'index($2, "refs/heads/agent/") == 1 { 
   [ "$pulls" -eq 0 ] || continue
 
   head="$(board_fetch "$branch")" || continue
-  board_parked "$head" && continue
+  if board_parked "$head"; then
+    # Parked, but still labelled agent:claimed: a release, escalation or lapse stopped half-way. Neither next.sh nor
+    # this loop would ever take the issue again, so finish it. A claim pushed meanwhile has moved the branch: its label
+    # goes back on.
+    if board_issue "$issue" | jq -e 'any(.labels[]; .name == "agent:claimed")' > /dev/null; then
+      board_unclaim "$issue" || continue
+      head="$(board_fetch "$branch")" || continue
+      if ! board_parked "$head"; then
+        board_add_label "$issue" agent:claimed
+      fi
+      echo "Finished giving back #$issue."
+    fi
+    continue
+  fi
 
   # The claim is a commit too, so the branch's last commit is the last sign of life.
   if [ $((now - $(board_git log -1 --format=%ct "$head"))) -gt "$lease" ]; then

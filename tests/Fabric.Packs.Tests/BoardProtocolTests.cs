@@ -474,6 +474,22 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     }
 
     [Fact]
+    public void The_janitor_finishes_a_release_that_parked_the_branch_but_left_the_claim_label()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddHours(-3));
+        Branch("agent/7-pay-an-invoice", "chore(board): release #7", Now.AddHours(-2));
+
+        var (exitCode, output) = Run("janitor.sh");
+
+        exitCode.ShouldBe(0, output);
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+        var (claimed, claim) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+        claimed.ShouldBe(0, claim);
+        claim.ShouldStartWith("7 agent/7-pay-an-invoice");
+    }
+
+    [Fact]
     public void The_janitor_leaves_the_branch_of_a_closed_issue_alone()
     {
         Issues(Issue(7, "Paid", [.. ReadyBackend, "agent:claimed"], state: "closed"));
