@@ -123,7 +123,14 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     private (int ExitCode, string Output) Run(string script, params string[] arguments) =>
         RunIn(ProjectDirectory, script, arguments);
 
-    private (int ExitCode, string Output) RunIn(string directory, string script, params string[] arguments)
+    private (int ExitCode, string Output) RunIn(string directory, string script, params string[] arguments) =>
+        Bash(directory, [Path.Combine(ProjectDirectory, ".github/scripts/board", script), .. arguments]);
+
+    /// <summary>Runs bash with lib.sh sourced, as the scripts do, in the project's checkout.</summary>
+    private (int ExitCode, string Output) RunLib(string commands) =>
+        Bash(ProjectDirectory, ["-c", $"source {Path.Combine(ProjectDirectory, ".github/scripts/board/lib.sh")}; set +e; {commands}"]);
+
+    private (int ExitCode, string Output) Bash(string directory, string[] arguments)
     {
         var fake = Path.Combine(AppContext.BaseDirectory, "Board");
         if (!OperatingSystem.IsWindows())
@@ -145,7 +152,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
             ["BOARD_PROJECT_NUMBER"] = "1",
             ["BOARD_NOW"] = Now.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture),
         };
-        return Shell.Run(directory, environment, "bash", [Path.Combine(ProjectDirectory, ".github/scripts/board", script), .. arguments]);
+        return Shell.Run(directory, environment, "bash", arguments);
     }
 
     [Fact]
@@ -222,6 +229,43 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         output.ShouldContain("agent/7-pay-an-invoice");
         output.ShouldNotStartWith("7 agent/");
         HasBranch("agent/7-pay-an-invoice").ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Of_two_identical_claims_at_once_only_one_holds_the_branch()
+    {
+        var (_, output) = RunLib("""
+            base="$(board_fetch main)"
+            board_mark agent/7-pay "$base" "chore(board): claim #7"; echo "first=$?"
+            board_mark agent/7-pay "$base" "chore(board): claim #7"; echo "second=$?"
+            """);
+
+        output.ShouldContain("first=0", Case.Sensitive, output);
+        output.ShouldContain("second=2", Case.Sensitive, output);
+    }
+
+    [Fact]
+    public void Parking_against_a_head_that_has_moved_on_leaves_the_branch_alone()
+    {
+        Branch("agent/7-lapsed", "chore(board): claim #7", Now.AddHours(-6));
+        var stale = Origin("rev-parse", "refs/heads/agent/7-lapsed");
+        Branch("agent/7-lapsed", "Renewed just now", Now);
+
+        var (_, output) = RunLib($"""
+            board_git fetch --quiet origin refs/heads/agent/7-lapsed
+            board_park 7 "lapsed" {stale}; echo "park=$?"
+            """);
+
+        output.ShouldContain("park=2", Case.Sensitive, output);
+        Head("agent/7-lapsed").ShouldBe("Renewed just now");
+    }
+
+    [Fact]
+    public void The_return_workflow_may_check_out_a_private_repository()
+    {
+        var workflow = File.ReadAllText(Path.Combine(ProjectDirectory, ".github", "workflows", "board-return.yml"));
+
+        workflow.ShouldContain("contents: read");
     }
 
     [Fact]

@@ -59,9 +59,13 @@ board_executor_of() {
 # The branch is the lock, and it moves only by `git push` (cloud sessions refuse branch writes through the API).
 # Every board step is an empty commit on top of what the step saw, so a push that finds the branch moved is not a
 # fast-forward and is rejected: of two agents taking the same step, one wins.
+# Each commit carries a nonce: two agents with the same identity, parent and second would otherwise build the same
+# commit, and the second push would report the branch "up to date" and succeed. An up-to-date push still counts as lost.
 # Returns 0 when pushed, 2 when another agent moved the branch first, 1 on any other failure (printed).
 board_mark() {
-  local branch="$1" base="$2" message="$3" commit output
+  local branch="$1" base="$2" message="$3" commit output nonce
+  nonce="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+  message="$(git interpret-trailers --trailer "Board-Nonce: $nonce" <<< "$message")"
   commit="$(
     export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-$(board_git config user.name || echo board)}"
     export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-$(board_git config user.email || echo board@users.noreply.github.com)}"
@@ -72,6 +76,7 @@ board_mark() {
     board_git commit-tree "$base^{tree}" -p "$base" -m "$message"
   )" || return 1
   if output="$(board_git push --porcelain origin "$commit:refs/heads/$branch" 2>&1)"; then
+    grep -q $'^=\t' <<< "$output" && return 2
     return 0
   fi
   if grep -q $'\t\[rejected\]' <<< "$output"; then
@@ -82,11 +87,14 @@ board_mark() {
 }
 
 # Parks the issue's branch for the next agent: a release commit on top, signed with the claimer's executor.
+# Given the head a decision was made on, parks that head only: if the branch has moved since, nothing changes (2).
 board_park() {
-  local issue="$1" reason="$2" branch head executor
+  local issue="$1" reason="$2" head="${3:-}" branch executor
   branch="$(board_branch_for "$issue")"
   [ -n "$branch" ] || return 0
-  head="$(board_fetch "$branch")" || return 1
+  if [ -z "$head" ]; then
+    head="$(board_fetch "$branch")" || return 1
+  fi
   board_parked "$head" && return 0
   executor="$(board_executor_of "$head")"
   board_mark "$branch" "$head" "chore(board): release #$issue

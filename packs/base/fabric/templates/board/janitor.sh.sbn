@@ -21,7 +21,8 @@ board_git ls-remote --heads origin | awk 'index($2, "refs/heads/agent/") == 1 { 
 
   # The claim is a commit too, so the branch's last commit is the last sign of life.
   if [ $((now - $(board_git log -1 --format=%ct "$head"))) -gt "$lease" ]; then
-    board_park "$issue" "The claim lapsed: no push for ${BOARD_LEASE_HOURS} h and no open pull request." || continue
+    # Parks the head whose age was checked; a push since then means the claim is alive after all.
+    board_park "$issue" "The claim lapsed: no push for ${BOARD_LEASE_HOURS} h and no open pull request." "$head" || continue
     board_unclaim "$issue"
     board_status "$issue" Todo
     board_executor "$issue" ""
