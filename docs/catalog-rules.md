@@ -41,6 +41,9 @@ A condition is a single string:
 <dimension> has <option>        # for multi dimensions
 ```
 
+- `has` is only for multi-valued dimensions; `==`, `!=` and `in` only for
+  single-valued ones. The catalog self-check rejects any other pairing.
+- A condition may not refer to its own dimension in `active-when`.
 - A dimension that is **inactive** never satisfies `==`, `in` or `has`, and
   always satisfies `!=`.
 - Module-scoped conditions are evaluated **per module**. A project-scoped

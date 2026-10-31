@@ -19,15 +19,36 @@ Two halves, one repo:
 
 ## Status
 
-Milestone **M0 — core**, not yet started in code. What exists:
+Milestone **M0 — core**: all twelve tasks done, waiting at the M0 gate
+(review of the slot set and the rule evaluator). The generator works end
+to end against the stub packs in `tests/fixtures/minimal`; the real
+catalog has no packs yet — those start in M1.
 
 | Artifact | Purpose |
 |---|---|
 | [`catalog/catalog.yaml`](catalog/catalog.yaml) | Every option, its scope and its rules |
 | [`docs/catalog-rules.md`](docs/catalog-rules.md) | The rule grammar the catalog uses |
+| [`docs/packs.md`](docs/packs.md) | How to write a pack: layout, targets, template model, slots |
 | [`schema/pack.schema.json`](schema/pack.schema.json) | What an option pack must declare |
 | [`docs/adr/`](docs/adr/) | Decisions 0001–0004 |
 | [`docs/roadmap.md`](docs/roadmap.md) | M0–M4 and the M0 task list |
+
+## Using it
+
+```bash
+dotnet build Fabric.slnx -c Release
+```
+
+```bash
+fabric() { dotnet src/Fabric.Cli/bin/Release/net10.0/fabric.dll "$@"; }
+fabric profiles
+fabric validate --profile saas-standard-vue --set backend.database=sqlserver
+fabric new ../shop --profile everything --catalog tests/fixtures/minimal/catalog.yaml --packs tests/fixtures/minimal/packs
+fabric add-module billing --project ../shop --catalog tests/fixtures/minimal/catalog.yaml --packs tests/fixtures/minimal/packs
+```
+
+`build/profiles.sh` is what CI runs after the tests: every fixture profile
+generated twice and compared, a module added, every real profile validated.
 
 ## Stack of the generator itself
 

@@ -1,0 +1,11 @@
+option: base.core
+files:
+  - { template: templates/readme.md.sbn, target: README.md }
+declares-slots:
+  - { slot: readme.sections, description: "One section per option.", cardinality: zero-or-more }
+  - { slot: readme.database, description: "The database line.", cardinality: exactly-one }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "Fixture gate.", file: templates/gate.sbn }

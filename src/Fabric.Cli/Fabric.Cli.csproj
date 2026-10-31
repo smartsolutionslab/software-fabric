@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Fabric.Cli</RootNamespace>
+    <AssemblyName>fabric</AssemblyName>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>fabric</ToolCommandName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Fabric.Core/Fabric.Core.csproj" />
+  </ItemGroup>
+
+  <!-- The tool ships the catalog and the packs it generates from, next to its own binaries. -->
+  <ItemGroup>
+    <Content Include="../../catalog/catalog.yaml" Link="catalog/catalog.yaml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../packs/**" LinkBase="packs" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

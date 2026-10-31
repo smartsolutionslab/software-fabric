@@ -1,0 +1,9 @@
+option: backend.api-protocols.grpc
+files: []
+slots:
+  - { slot: readme.sections, template: templates/section.sbn, order: 20 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "Fixture gate.", file: templates/gate.sbn }
