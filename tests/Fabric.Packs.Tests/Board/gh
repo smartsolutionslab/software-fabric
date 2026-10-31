@@ -74,6 +74,10 @@ case "${positional[0]} ${positional[1]:-}" in
       "POST issues/"*"/labels") n="${path#issues/}"; key='f:labels[]'; update_issue "${n%/labels}" ".labels += [{name: \"${flag[$key]}\"}]"; echo "[]" ;;
       "DELETE issues/"*"/labels/"*)
         n="${path#issues/}"; name="$(sed 's/%3A/:/g' <<< "${n#*/labels/}")"
+        if ! jq -e --argjson number "${n%%/*}" --arg name "$name" '.[] | select(.number == $number) | .labels | any(.name == $name)' "$issues" > /dev/null; then
+          echo '{"message":"Label does not exist"}' >&2
+          exit 1
+        fi
         update_issue "${n%%/*}" ".labels |= map(select(.name != \"$name\"))"; echo "[]"
         ;;
       "POST issues/"*"/assignees") n="${path#issues/}"; key='f:assignees[]'; update_issue "${n%/assignees}" ".assignees += [{login: \"${flag[$key]}\"}]"; echo "{}" ;;
