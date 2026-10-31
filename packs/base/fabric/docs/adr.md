@@ -12,6 +12,7 @@ Agents coordinate through GitHub, never with each other, so any runtime that can
 - **Escalation** labels the issue (`needs:human`, `needs:decision`, `agent:blocked`), assigns the owner of its lane with the fewest open assignments below the WIP limit (`docs/owners.yml`), and says why in a comment.
 - **Board fields.** When `.github/board.env` names a GitHub Project, the scripts keep its `Status` (Todo, Claimed, In Progress, In Review, Blocked, Done) and `Executor` fields current; without one, labels and comments carry the protocol alone.
 - **Review across model families.** Every agent commit carries `Agent-Executor: <family>-<runtime>/<detail>`; the review workflow has the other family review the pull request. A pull request with commits from both families has no independent reviewer and fails that check.
+- **Findings are a gate.** The reviewer answers in the shape of `.github/review-findings.schema.json` (severity blocking or optional, file, line, message). `report-review.sh` posts them as a pull request review, on their lines where GitHub accepts that, and fails the check when one blocks or when the reviewer reported no findings list at all.
 
 ## Consequences
 

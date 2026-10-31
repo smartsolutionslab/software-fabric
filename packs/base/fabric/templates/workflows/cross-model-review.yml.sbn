@@ -1,6 +1,7 @@
 {%{name: cross-model-review
 
-# The reviewer is from a different model family than the author (board protocol, docs/adr).
+# The reviewer is from a different model family than the author (board protocol, docs/adr). Its findings land on the
+# pull request, and a blocking one fails the check.
 # Needs the secret of the reviewing family: ANTHROPIC_API_KEY for claude, OPENAI_API_KEY for codex.
 on:
   pull_request:
@@ -34,13 +35,26 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: anthropics/claude-code-action@v1
+      - id: schema
+        run: echo "json=$(jq -c . .github/review-findings.schema.json)" >> "$GITHUB_OUTPUT"
+      - id: review
+        uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: --json-schema '${{ steps.schema.outputs.json }}'
           prompt: |
             Review pull request #${{ github.event.pull_request.number }} as the reviewers in .claude/agents/ describe
             (backend-reviewer, frontend-reviewer, security-reviewer: whichever the diff touches). Read AGENTS.md first.
-            Post each finding as a review comment on its line, ranked: blocking findings first, then the rest marked optional.
+            Do not comment on the pull request yourself. Answer with every finding: its file, its line (null when it has
+            none), whether it is blocking or optional, and what is wrong.
+      - name: Post the findings; a blocking one fails this check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINDINGS: ${{ steps.review.outputs.structured_output }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          printf '%s' "$FINDINGS" > "$RUNNER_TEMP/findings.json"
+          bash .github/scripts/board/report-review.sh "$PR" "$RUNNER_TEMP/findings.json" claude
 
   codex:
     needs: choose
@@ -50,11 +64,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: openai/codex-action@v1
+      - id: review
+        uses: openai/codex-action@v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          output-schema-file: .github/review-findings.schema.json
           prompt: |
             Review pull request #${{ github.event.pull_request.number }} as the reviewers in .claude/agents/ describe
             (backend-reviewer, frontend-reviewer, security-reviewer: whichever the diff touches). Read AGENTS.md first.
-            Report each finding with its file and line, ranked: blocking findings first, then the rest marked optional.
+            Answer with every finding: its file, its line (null when it has none), whether it is blocking or optional,
+            and what is wrong.
+      - name: Post the findings; a blocking one fails this check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FINDINGS: ${{ steps.review.outputs.final-message }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          printf '%s' "$FINDINGS" > "$RUNNER_TEMP/findings.json"
+          bash .github/scripts/board/report-review.sh "$PR" "$RUNNER_TEMP/findings.json" codex
 }%}

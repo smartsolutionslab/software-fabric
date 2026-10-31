@@ -337,6 +337,90 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Field(7, "STATUS").ShouldBeNull();
     }
 
+    private const string MixedFindings = """
+        {"findings": [
+          {"severity": "blocking", "file": "src/Invoice.cs", "line": 12, "message": "Paying twice charges twice."},
+          {"severity": "optional", "file": "src/InvoiceId.cs", "line": null, "message": "Name the property Value."}
+        ]}
+        """;
+
+    private string Findings(string output)
+    {
+        var path = Path.Combine(state, "findings.json");
+        File.WriteAllText(path, output);
+        return path;
+    }
+
+    private JsonArray Reviews()
+    {
+        var path = Path.Combine(state, "reviews.json");
+        return File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))!.AsArray() : [];
+    }
+
+    [Fact]
+    public void A_blocking_finding_is_posted_on_its_line_and_fails_the_review()
+    {
+        var (exitCode, output) = Run("report-review.sh", "5", Findings(MixedFindings), "codex");
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain("1 blocking");
+        var review = Reviews().ShouldHaveSingleItem()!;
+        var body = (string)review["body"]!;
+        body.ShouldContain("codex");
+        body.ShouldContain("1 blocking, 1 optional");
+        body.ShouldContain("Name the property Value.");
+        var comment = review["comments"]!.AsArray().ShouldHaveSingleItem()!;
+        ((string)comment["path"]!).ShouldBe("src/Invoice.cs");
+        ((int)comment["line"]!).ShouldBe(12);
+        ((string)comment["body"]!).ShouldContain("Paying twice charges twice.");
+    }
+
+    [Fact]
+    public void Optional_findings_are_posted_and_the_review_passes()
+    {
+        var (exitCode, output) = Run(
+            "report-review.sh",
+            "5",
+            Findings("""{"findings": [{"severity": "optional", "file": "src/Invoice.cs", "line": 3, "message": "Shorter name?"}]}"""),
+            "claude");
+
+        exitCode.ShouldBe(0, output);
+        ((string)Reviews().ShouldHaveSingleItem()!["body"]!).ShouldContain("0 blocking, 1 optional");
+    }
+
+    [Fact]
+    public void A_review_without_findings_passes_and_says_so()
+    {
+        var (exitCode, output) = Run("report-review.sh", "5", Findings("""{"findings": []}"""), "codex");
+
+        exitCode.ShouldBe(0, output);
+        ((string)Reviews().ShouldHaveSingleItem()!["body"]!).ShouldContain("No findings");
+    }
+
+    [Fact]
+    public void A_reviewer_that_reports_no_findings_list_fails_the_review()
+    {
+        var (exitCode, output) = Run("report-review.sh", "5", Findings("I could not run the build."), "codex");
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain("did not report its findings");
+        Reviews().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void When_github_refuses_a_line_comment_every_finding_goes_into_the_review_body()
+    {
+        File.WriteAllText(Path.Combine(state, "reject-inline"), "");
+
+        var (exitCode, output) = Run("report-review.sh", "5", Findings(MixedFindings), "codex");
+
+        exitCode.ShouldBe(1, output);
+        var review = Reviews().ShouldHaveSingleItem()!;
+        (review["comments"]?.AsArray() ?? []).ShouldBeEmpty();
+        ((string)review["body"]!).ShouldContain("`src/Invoice.cs:12`");
+        ((string)review["body"]!).ShouldContain("Paying twice charges twice.");
+    }
+
     private static string Repository(params string[] commitMessages)
     {
         var directory = Directory.CreateTempSubdirectory("fabric-git-").FullName;

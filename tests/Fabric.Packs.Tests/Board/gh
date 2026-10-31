@@ -77,6 +77,17 @@ case "${positional[0]} ${positional[1]:-}" in
         update_issue "${n%%/*}" ".labels |= map(select(.name != \"$name\"))"; echo "[]"
         ;;
       "POST issues/"*"/assignees") n="${path#issues/}"; key='f:assignees[]'; update_issue "${n%/assignees}" ".assignees += [{login: \"${flag[$key]}\"}]"; echo "{}" ;;
+      "POST pulls/"*"/reviews")
+        payload="$(cat "${flag[input]}")"
+        if [ -e "$state/reject-inline" ] && [ "$(jq '.comments // [] | length' <<< "$payload")" -gt 0 ]; then
+          echo '{"message":"Unprocessable Entity","errors":["Line could not be resolved"]}' >&2
+          exit 1
+        fi
+        file="$state/reviews.json"
+        [ -e "$file" ] || echo '[]' > "$file"
+        jq --argjson review "$payload" '. + [$review]' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+        echo '{"id":1}'
+        ;;
       "GET pulls?"*)
         head="$(tr '&' '\n' <<< "${path#pulls?}" | sed -n 's/^head=//p' | sed 's/%3A/:/g; s/%2F/\//g; s/^[^:]*://')"
         jq --arg head "$head" 'map(select(.head.ref == $head))' "$state/prs.json" 2>/dev/null || echo '[]'
