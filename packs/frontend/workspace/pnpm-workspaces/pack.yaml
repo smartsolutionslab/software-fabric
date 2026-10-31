@@ -1,0 +1,14 @@
+option: frontend.workspace.pnpm-workspaces
+files:
+  - { template: templates/package.json.sbn, target: web/package.json }
+  - { template: templates/pnpm-workspace.yaml.sbn, target: web/pnpm-workspace.yaml }
+declares-slots:
+  - { slot: web.workspace-packages, description: "Lines of pnpm-workspace.yaml's packages list ('  - app')." }
+slots:
+  - { slot: ci.frontend-steps, template: templates/ci-steps.sbn, order: 10 }
+  - { slot: readme.sections, template: templates/readme.sbn, order: 20 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "The frontend job installs the workspace and runs build, lint and test in every package; any failure fails CI.", file: templates/ci-steps.sbn }

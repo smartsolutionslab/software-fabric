@@ -145,6 +145,8 @@ is a defect in the second pack.
 | `apphost.resources` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak, react (Vite app) |
 | `apphost.host` | `src/AppHost/Program.cs` | **exactly-one** | backend.topology (adds the host project) |
 | `apphost.host-wiring` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak (`.WithReference(...).WaitFor(...)`) |
+| `apphost.web` *(added in M1-07)* | `src/AppHost/Program.cs` | at-most-one | react (`AddViteApp("web", "../../web/app").WithPnpm()`) |
+| `apphost.web-wiring` *(added in M1-07)* | `src/AppHost/Program.cs` | 0+ | keycloak, the host (`.WithReference(...)`) |
 | `host.packages` | `src/Host/Host.csproj` | 0+ | keycloak, wolverine, ef-core |
 | `host.services` | `src/Host/Program.cs` | 0+ | keycloak, wolverine (with `modules` in scope), result (problem details), tenancy |
 | `host.middleware` | `src/Host/Program.cs` | 0+ | keycloak, tenancy |
@@ -160,13 +162,16 @@ is a defect in the second pack.
 
 | Slot | File | Separator | Filled by |
 |---|---|---|---|
+| `web.workspace-packages` *(added in M1-07)* | `web/pnpm-workspace.yaml` | newline | spa (`  - app`) |
 | `web.dependencies` | `web/app/package.json` | `,` + newline | react, redux, rtk, router, rhf, zod, tailwind, shadcn, tanstack-table, echarts, oidc |
 | `web.dev-dependencies` | 〃 | `,` + newline | vitest, testing-library, playwright, axe, rtk codegen |
-| `web.scripts` | 〃 | `,` + newline | rtk-query-codegen (`codegen`), accessibility |
+| `web.scripts` *(declared in M1-07b)* | 〃 | `,` + newline | rtk-query-codegen (`codegen`), accessibility |
+| `web.vite-imports` *(added in M1-07)* | `web/app/vite.config.ts` | newline | tailwind |
 | `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind |
 | `web.imports` | `web/app/src/main.tsx` | newline | redux, router, oidc |
 | `web.providers` | `web/app/src/main.tsx` | `,` + newline | redux, oidc, router — wrappers composed in order |
 | `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn |
+| `web.restricted-imports` *(added in M1-07)* | `web/app/eslint.config.js` | `,` + newline | router, shadcn, react-hook-form, zod — each bans its alternatives |
 
 ### CI
 

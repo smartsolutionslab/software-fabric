@@ -1,0 +1,13 @@
+option: frontend.ui-library.shadcn
+files:
+  - { template: templates/components.json.sbn, target: web/app/components.json }
+  - { template: templates/utils.ts.sbn, target: web/app/src/lib/utils.ts }
+  - { template: templates/button.tsx.sbn, target: web/app/src/components/ui/button.tsx }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 20 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing another component library (MUI, Ant Design, Mantine, Chakra) fails lint.", file: templates/restricted.sbn }

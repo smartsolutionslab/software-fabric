@@ -70,6 +70,8 @@ declares-slots:
   - { slot: apphost.project-references, description: "<ProjectReference> lines for the projects the AppHost runs." }
   - { slot: apphost.resources, description: "Statements adding Aspire resources (databases, brokers, identity, frontends)." }
   - { slot: apphost.host, description: "The expression adding the host project, without a semicolon.", cardinality: exactly-one }
+  - { slot: apphost.web, description: "The expression adding the web app, without a semicolon.", cardinality: at-most-one }
+  - { slot: apphost.web-wiring, description: "Chained calls on the web app, each starting on a new line.", separator: "" }
   - { slot: apphost.host-wiring, description: "Chained calls on the host, each starting on a new line (.WithReference(...), .WaitFor(...)).", separator: "" }
   - { slot: buildingblocks.packages, description: "<PackageReference> lines for BuildingBlocks." }
   - { slot: modules.infrastructure, description: "Statements registering infrastructure for one module, generic over TModule." }

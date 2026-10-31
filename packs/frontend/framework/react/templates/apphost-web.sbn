@@ -1,0 +1,2 @@
+builder.AddViteApp("web", "../../web/app")
+    .WithPnpm()

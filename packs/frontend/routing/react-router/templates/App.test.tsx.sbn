@@ -1,0 +1,14 @@
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
+import { expect, test } from 'vitest';
+import { App } from './App';
+
+test('the start page names the application', () => {
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+
+  expect(screen.getByRole('heading', { name: '{{ name }}' })).toBeInTheDocument();
+});

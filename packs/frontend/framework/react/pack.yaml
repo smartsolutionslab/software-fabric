@@ -1,0 +1,29 @@
+option: frontend.framework.react
+files:
+  - { template: templates/package.json.sbn, target: web/app/package.json }
+  - { template: templates/index.html.sbn, target: web/app/index.html }
+  - { template: templates/vite.config.ts.sbn, target: web/app/vite.config.ts }
+  - { template: templates/tsconfig.json.sbn, target: web/app/tsconfig.json }
+  - { template: templates/eslint.config.js.sbn, target: web/app/eslint.config.js }
+  - { template: templates/main.tsx.sbn, target: web/app/src/main.tsx }
+  - { template: templates/index.css.sbn, target: web/app/src/index.css }
+  - { template: templates/test-setup.ts.sbn, target: web/app/src/test-setup.ts }
+  - { template: templates/Home.tsx.sbn, target: web/app/src/pages/Home.tsx }
+declares-slots:
+  - { slot: web.dependencies, description: "Entries of web/app's dependencies ('\"zod\": \"4.6.7\"').", separator: ",\n" }
+  - { slot: web.dev-dependencies, description: "Entries of web/app's devDependencies.", separator: ",\n" }
+  - { slot: web.vite-imports, description: "Import lines of vite.config.ts." }
+  - { slot: web.vite-plugins, description: "Entries of vite.config.ts's plugins array.", separator: ",\n" }
+  - { slot: web.imports, description: "Import lines of src/main.tsx." }
+  - { slot: web.providers, description: "Wrappers around the app, outermost first: (children: ReactNode) => ReactNode.", separator: ",\n" }
+  - { slot: web.styles, description: "Lines of src/index.css." }
+  - { slot: web.restricted-imports, description: "Entries of the no-restricted-imports patterns ({ group: [...], message: '...' }).", separator: ",\n" }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-version.sbn }
+  - { slot: apphost.packages, template: templates/apphost-package.sbn }
+  - { slot: apphost.web, template: templates/apphost-web.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "TypeScript strict (tsc -b in the build) and the strict typescript-eslint rules fail the frontend job.", file: templates/eslint.config.js.sbn }

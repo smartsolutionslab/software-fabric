@@ -1,0 +1,7 @@
+option: frontend.design-system.none
+files: []
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "Nothing beyond the UI library: there is no token layer or own component package to keep in step." }

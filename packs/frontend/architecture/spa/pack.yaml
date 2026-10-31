@@ -1,0 +1,9 @@
+option: frontend.architecture.spa
+files: []
+slots:
+  - { slot: web.workspace-packages, template: templates/workspace-package.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "One application package, web/app; the workspace lists nothing else to build and deploy." }
