@@ -5,7 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 issue="$1"
 
-state="$(gh issue view "$issue" --repo "$repo" --json assignees,labels)"
+state="$(board_issue "$issue")"
 if [ "$(jq '.assignees | length' <<< "$state")" -gt 0 ]; then
   echo "#$issue still has an assignee; it stays with them."
   exit 0
@@ -17,7 +17,10 @@ if [ -z "$escalations" ]; then
   exit 0
 fi
 
-gh issue edit "$issue" --repo "$repo" --remove-label "$escalations" --add-label agent:ready > /dev/null
+for label in ${escalations//,/ }; do
+  board_remove_label "$issue" "$label"
+done
+board_add_label "$issue" agent:ready
 board_status "$issue" Todo
 board_comment "$issue" "Answered and unassigned: back to Todo for the agents (was $escalations)."
 }%}

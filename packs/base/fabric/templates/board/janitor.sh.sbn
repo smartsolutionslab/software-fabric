@@ -15,7 +15,7 @@ gh api "repos/$repo/git/matching-refs/heads/agent/" | jq -r '.[] | "\(.ref) \(.o
   issue="${branch#agent/}"
   issue="${issue%%-*}"
 
-  if [ "$(gh pr list --repo "$repo" --head "$branch" --state open --json number | jq length)" -gt 0 ]; then
+  if [ "$(gh api "repos/$repo/pulls?state=open&head=$(board_uri "${repo%%/*}:$branch")" | jq length)" -gt 0 ]; then
     continue
   fi
 

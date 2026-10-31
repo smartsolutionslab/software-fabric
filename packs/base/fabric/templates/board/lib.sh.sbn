@@ -1,5 +1,6 @@
 {%{# Shared by the board scripts (board protocol, docs/adr). Source it; do not run it.
-# Talks to GitHub only through `gh`, so any runtime with gh and jq can follow the protocol.
+# Talks to GitHub only through `gh api` and REST: Claude Code's cloud sessions refuse GraphQL, which most other gh
+# subcommands use. Board fields are the exception (GitHub Projects have no REST API) and stay optional.
 
 set -euo pipefail
 
@@ -15,7 +16,7 @@ done < "$board_root/.github/board.env"
 
 repo="${GITHUB_REPOSITORY:-}"
 if [ -z "$repo" ]; then
-  repo="$(gh repo view --json nameWithOwner | jq -r .nameWithOwner)"
+  repo="$(git -C "$board_root" remote get-url origin | sed -E 's#\.git$##; s#^.*github\.com[:/]##')"
 fi
 
 board_now() {
@@ -53,7 +54,32 @@ board_park() {
 }
 
 board_comment() {
-  gh issue comment "$1" --repo "$repo" --body "$2" > /dev/null
+  gh api -X POST "repos/$repo/issues/$1/comments" -f "body=$2" > /dev/null
+}
+
+board_uri() {
+  jq -rn --arg value "$1" '$value | @uri'
+}
+
+# Open issues matching a query string (labels=..., assignee=...), pull requests left out.
+board_issues() {
+  gh api "repos/$repo/issues?state=open&per_page=100&$1" | jq 'map(select(has("pull_request") | not))'
+}
+
+board_issue() {
+  gh api "repos/$repo/issues/$1"
+}
+
+board_add_label() {
+  gh api -X POST "repos/$repo/issues/$1/labels" -f "labels[]=$2" > /dev/null
+}
+
+board_remove_label() {
+  gh api -X DELETE "repos/$repo/issues/$1/labels/$(board_uri "$2")" > /dev/null
+}
+
+board_assign() {
+  gh api -X POST "repos/$repo/issues/$1/assignees" -f "assignees[]=$2" > /dev/null
 }
 
 # Board fields (Status, Executor) live on the GitHub Project named in .github/board.env.

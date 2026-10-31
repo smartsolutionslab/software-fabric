@@ -9,7 +9,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 lane="$1"
 executor="$2"
 
-candidates="$(gh issue list --repo "$repo" --state open --label agent:ready --label "lane:$lane" --limit 200 --json number,title,assignees,labels \
+candidates="$(board_issues "labels=$(board_uri "agent:ready,lane:$lane")" \
   | jq -r 'map(select((.assignees | length) == 0 and ([.labels[].name] | index("agent:blocked") | not)))
            | sort_by(.number) | .[] | "\(.number)\t\(.title)"')"
 

@@ -13,7 +13,7 @@ case "$label" in
   *) echo "Unknown escalation label '$label'." >&2; exit 2 ;;
 esac
 
-lane="$(gh issue view "$issue" --repo "$repo" --json labels | jq -r '[.labels[].name | select(startswith("lane:"))][0] // "" | ltrimstr("lane:")')"
+lane="$(board_issue "$issue" | jq -r '[.labels[].name | select(startswith("lane:"))][0] // "" | ltrimstr("lane:")')"
 owners_file="$board_root/docs/owners.yml"
 limit="$(yq -r '.["wip-limit"] // 3' "$owners_file")"
 
@@ -27,7 +27,7 @@ fewest=""
 if [ -n "$lane" ]; then
   while read -r login; do
     [ -n "$login" ] || continue
-    open="$(gh issue list --repo "$repo" --state open --assignee "$login" --limit 200 --json number | jq length)"
+    open="$(board_issues "assignee=$(board_uri "$login")" | jq length)"
     if [ "$open" -lt "$limit" ] && { [ -z "$fewest" ] || [ "$open" -lt "$fewest" ]; }; then
       owner="$login"
       fewest="$open"
@@ -38,14 +38,15 @@ fi
 board_park "$issue"
 board_status "$issue" Blocked
 if [ -n "$owner" ]; then
-  gh issue edit "$issue" --repo "$repo" --add-label "$label" --add-assignee "$owner" > /dev/null
+  board_add_label "$issue" "$label"
+  board_assign "$issue" "$owner"
   board_comment "$issue" "@$owner, this needs you ($label):
 
 $message
 
 Unassign yourself once answered; the issue then returns to Todo and the next agent resumes on its branch."
 else
-  gh issue edit "$issue" --repo "$repo" --add-label "$label" > /dev/null
+  board_add_label "$issue" "$label"
   board_comment "$issue" "This needs a developer ($label), but no owner of lane '${lane:-none}' in docs/owners.yml has capacity:
 
 $message"

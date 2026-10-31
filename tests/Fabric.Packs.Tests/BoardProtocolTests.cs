@@ -58,7 +58,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     }
 
     private void OpenPullRequest(string head) =>
-        File.WriteAllText(Path.Combine(state, "prs.json"), new JsonArray(new JsonObject { ["number"] = 1, ["headRefName"] = head }).ToJsonString());
+        File.WriteAllText(Path.Combine(state, "prs.json"), new JsonArray(new JsonObject { ["number"] = 1, ["head"] = new JsonObject { ["ref"] = head } }).ToJsonString());
 
     private void Owners(string yaml) => board.Project.Write("docs/owners.yml", yaml);
 

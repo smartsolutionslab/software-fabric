@@ -16,5 +16,6 @@ Agents coordinate through GitHub, never with each other, so any runtime that can
 ## Consequences
 
 - No dispatcher to keep alive: the state is on GitHub. A crashed agent costs one lease, not a stuck issue.
+- The scripts call GitHub's REST API only (`gh api`): Claude Code's cloud sessions refuse GraphQL, which `gh issue`, `gh pr` and `gh repo` use. The board fields are the exception, since GitHub Projects have no REST API: in such a session the scripts run on labels and comments alone.
 - Workflows changing the board need a token with the `project` scope (`BOARD_TOKEN`); the default token can change labels, branches and comments only.
 - The review workflow needs the reviewing family's API key as a secret (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
