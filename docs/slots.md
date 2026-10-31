@@ -186,6 +186,7 @@ is a defect in the second pack.
 | `ci.backend-steps` | `.github/workflows/ci.yml` | xunit (runs every test project; the integration tests need Docker, which GitHub's runners have) |
 | `pr-template.sections` *(added in M1-06)* | `.github/pull_request_template.md` | red-first (`## Tests observed failing`) |
 | `ci.frontend-steps` | 〃 | pnpm, rtk-query-codegen (generated client is current), accessibility |
+| `ci.e2e-steps` *(added in M1-09)* | `.github/workflows/ci.yml` | react (builds, then `.github/scripts/e2e.sh` starts the AppHost and runs Playwright); without a contribution there is no e2e job |
 
 ## Generator changes this needs
 

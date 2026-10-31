@@ -86,6 +86,7 @@ declares-slots:
   - { slot: pr-template.sections, description: "Sections every pull request description has, each starting with a ## heading.", separator: "\n\n" }
   - { slot: ci.backend-steps, description: "Steps of the backend CI job, indented six spaces." }
   - { slot: ci.frontend-steps, description: "Steps of the frontend CI job, indented six spaces." }
+  - { slot: ci.e2e-steps, description: "Steps of the e2e CI job after .NET and Aspire are set up: build, start the application, run the end-to-end tests. No contribution, no job." }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

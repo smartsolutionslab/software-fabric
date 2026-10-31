@@ -12,6 +12,7 @@ files:
   - { template: templates/vite-env.d.ts.sbn, target: web/app/src/vite-env.d.ts }
   - { template: templates/playwright.config.ts.sbn, target: web/app/playwright.config.ts }
   - { template: templates/gitignore.sbn, target: web/app/.gitignore }
+  - { template: templates/e2e.sh.sbn, target: ".github/scripts/e2e.sh" }
 declares-slots:
   - { slot: web.scripts, description: "Entries of web/app's scripts ('\"codegen\": \"...\"').", separator: ",\n" }
   - { slot: web.prepare, description: "Commands run before dev, build and test (code generators), joined with ' && '.", separator: " && " }
@@ -32,6 +33,7 @@ slots:
   - { slot: apphost.web, template: templates/apphost-web.sbn }
   - { slot: apphost.web-wiring, template: templates/apphost-web-wiring.sbn }
   - { slot: ci.backend-steps, template: templates/ci-backend-steps.sbn, order: 5 }
+  - { slot: ci.e2e-steps, template: templates/ci-e2e-steps.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

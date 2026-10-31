@@ -25,8 +25,9 @@ tests and the frontend are real (M1-01 to M1-07): a generated app signs a
 user in through Keycloak and lists a module's data, checked end to end with
 Playwright. Every generated project carries the board protocol (M1-08):
 agents claim issues, escalate to developers and get reviewed by another
-model family through GitHub alone. Profile CI and the pilot follow (M1-09,
-M1-10). `tests/Fabric.Packs.Tests`
+model family through GitHub alone. CI generates the profile with the CLI
+and puts it through its own CI, end-to-end tests included (M1-09). The
+pilot follows (M1-10). `tests/Fabric.Packs.Tests`
 generates the profile from the real packs — empty stand-ins for the rest —
 builds it, runs its tests, installs, builds, lints and tests its web app, and starts it against real PostgreSQL and RabbitMQ
 containers.
@@ -56,6 +57,9 @@ fabric add-module billing --project ../shop --catalog tests/fixtures/minimal/cat
 
 `build/profiles.sh` is what CI runs after the tests: every fixture profile
 generated twice and compared, a module added, every real profile validated.
+`build/profile-ci.sh saas-standard-react` generates that profile from the
+real packs and runs the generated project's CI steps against it (Docker,
+Node 22 with pnpm and the Aspire CLI bundle needed).
 
 ## Stack of the generator itself
 

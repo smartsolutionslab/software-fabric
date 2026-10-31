@@ -23,3 +23,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 {{ slots["ci.frontend-steps"] }}
+{{ if slots["ci.e2e-steps"] != "" }}
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
+{{ slots["ci.e2e-steps"] }}
+{{ end }}
