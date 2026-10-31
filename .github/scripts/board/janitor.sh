@@ -22,11 +22,18 @@ board_git ls-remote --heads origin | awk 'index($2, "refs/heads/agent/") == 1 { 
     # Parked, but still labelled agent:claimed: a release, escalation or lapse stopped half-way. Neither next.sh nor
     # this loop would ever take the issue again, so finish it. A claim pushed meanwhile has moved the branch: its label
     # goes back on.
-    if board_issue "$issue" | jq -e 'any(.labels[]; .name == "agent:claimed")' > /dev/null; then
+    issue_state="$(board_issue "$issue")" || continue
+    if jq -e 'any(.labels[]; .name == "agent:claimed")' <<< "$issue_state" > /dev/null; then
       board_unclaim "$issue" || continue
       head="$(board_fetch "$branch")" || continue
       if ! board_parked "$head"; then
         board_add_label "$issue" agent:claimed
+        continue
+      fi
+      # An escalation keeps its Blocked status and its executor for the developer; anything else is back in Todo.
+      if ! jq -e 'any(.labels[]; .name == "agent:blocked" or (.name | startswith("needs:")))' <<< "$issue_state" > /dev/null; then
+        board_status "$issue" Todo
+        board_executor "$issue" ""
       fi
       echo "Finished giving back #$issue."
     fi

@@ -503,6 +503,29 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         claim.ShouldStartWith("7 agent/7");
     }
 
+    [Theory]
+    [InlineData(null, "Claimed", "Todo", "")]
+    [InlineData("needs:decision", "Blocked", "Blocked", "codex-cloud/other")]
+    public void A_give_back_the_janitor_finishes_also_resets_the_board_unless_the_issue_is_escalated(
+        string? escalation,
+        string status,
+        string expectedStatus,
+        string expectedExecutor)
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed", .. escalation is null ? Array.Empty<string>() : [escalation]]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddHours(-3));
+        Branch("agent/7", "chore(board): release #7", Now.AddHours(-2));
+        Directory.CreateDirectory(Path.Combine(state, "board"));
+        File.WriteAllText(Path.Combine(state, "board", "7.STATUS"), status);
+        File.WriteAllText(Path.Combine(state, "board", "7.EXECUTOR"), "codex-cloud/other");
+
+        var (exitCode, output) = Run("janitor.sh");
+
+        exitCode.ShouldBe(0, output);
+        Field(7, "STATUS").ShouldBe(expectedStatus);
+        Field(7, "EXECUTOR").ShouldBe(expectedExecutor);
+    }
+
     [Fact]
     public void The_janitor_takes_only_agent_slash_issue_for_a_lock()
     {
