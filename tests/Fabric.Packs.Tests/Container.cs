@@ -47,6 +47,11 @@ internal sealed class Container : IDisposable
         return container;
     }
 
+    /// <summary>The first message of a Kafka topic, read with the broker's own console consumer; empty when none arrives in time.</summary>
+    public string FirstKafkaMessage(string topic) =>
+        Run(["exec", "--user", "appuser", id, "kafka-console-consumer", "--bootstrap-server", "localhost:29092", "--topic", topic,
+            "--from-beginning", "--max-messages", "1", "--timeout-ms", "30000"]).Output;
+
     /// <summary>Runs one SQL statement as the postgres user and returns its unaligned, tuples-only output.</summary>
     public string Psql(string password, string sql) =>
         Docker("exec", "--env", $"PGPASSWORD={password}", id, "psql", "-U", "postgres", "-d", "postgres", "-tAc", sql).Trim();

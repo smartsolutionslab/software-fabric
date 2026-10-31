@@ -361,7 +361,8 @@ public sealed class EventDrivenBackendTests
             ["Authentication__Authority"] = "http://127.0.0.1:1/realms/shop",
         });
 
-        (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        var invoice = Guid.NewGuid();
+        (await host.PostAsync($"/billing/invoices/{invoice}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
 
         var received = "0";
         for (var attempt = 0; attempt < 120 && received == "0"; attempt++)
@@ -371,6 +372,9 @@ public sealed class EventDrivenBackendTests
         }
 
         received.ShouldBe("1");
+
+        // Without a transport Wolverine would deliver the event in process; it must have crossed on the broker.
+        kafka.FirstKafkaMessage("Shop.Contracts.Billing.InvoicePaidV1").ShouldContain(invoice.ToString());
     }
 
     [Fact]
