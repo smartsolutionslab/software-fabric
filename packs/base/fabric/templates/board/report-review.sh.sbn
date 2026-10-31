@@ -38,7 +38,7 @@ payload="$work/review.json"
 # The summary, then the findings the selector picks as a list, if any.
 body() {
   local list
-  list="$(listed "$1")"
+  list="$(listed "$1")" || return 1
   if [ -n "$list" ]; then
     printf '%s\n\n%s' "$summary" "$list"
   else
@@ -46,7 +46,8 @@ body() {
   fi
 }
 
-jq -n --arg body "$(body '.[] | select(.line == null)')" --argjson findings "$findings" '{
+general="$(body '.[] | select(.line == null)')"
+jq -n --arg body "$general" --argjson findings "$findings" '{
   event: "COMMENT",
   body: $body,
   comments: [$findings[] | select(.line != null) | {path: .file, line: .line, side: "RIGHT", body: "**\(.severity)**: \(.message)"}]
@@ -54,7 +55,8 @@ jq -n --arg body "$(body '.[] | select(.line == null)')" --argjson findings "$fi
 
 if ! review "$payload" 2> "$work/refused"; then
   echo "GitHub refused the line comments ($(head -c 300 "$work/refused")); posting every finding in the review body." >&2
-  jq -n --arg body "$(body '.[]')" '{event: "COMMENT", body: $body}' > "$payload"
+  everything="$(body '.[]')"
+  jq -n --arg body "$everything" '{event: "COMMENT", body: $body}' > "$payload"
   review "$payload"
 fi
 

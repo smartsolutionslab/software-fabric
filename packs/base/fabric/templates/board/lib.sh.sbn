@@ -1,4 +1,6 @@
 {%{# Shared by the board scripts (board protocol, docs/adr). Source it; do not run it.
+# Bash ignores errexit inside a function called as a condition (`if f`, `f || ...`), and callers do call these that
+# way, so every step that can fail inside a function is checked explicitly.
 # Talks to GitHub through `git` (branches) and `gh api` with REST (issues, labels, comments, pull requests): Claude
 # Code's cloud sessions refuse GraphQL, which most other gh subcommands use, and branch writes through the API.
 # Board fields are the exception (GitHub Projects have no REST API) and stay optional.
@@ -64,8 +66,8 @@ board_executor_of() {
 # Returns 0 when pushed, 2 when another agent moved the branch first, 1 on any other failure (printed).
 board_mark() {
   local branch="$1" base="$2" message="$3" commit output nonce
-  nonce="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
-  message="$(git interpret-trailers --trailer "Board-Nonce: $nonce" <<< "$message")"
+  nonce="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')" || return 1
+  message="$(git interpret-trailers --trailer "Board-Nonce: $nonce" <<< "$message")" || return 1
   commit="$(
     export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-$(board_git config user.name || echo board)}"
     export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-$(board_git config user.email || echo board@users.noreply.github.com)}"
@@ -90,13 +92,13 @@ board_mark() {
 # Given the head a decision was made on, parks that head only: if the branch has moved since, nothing changes (2).
 board_park() {
   local issue="$1" reason="$2" head="${3:-}" branch executor
-  branch="$(board_branch_for "$issue")"
+  branch="$(board_branch_for "$issue")" || return 1
   [ -n "$branch" ] || return 0
   if [ -z "$head" ]; then
     head="$(board_fetch "$branch")" || return 1
   fi
   board_parked "$head" && return 0
-  executor="$(board_executor_of "$head")"
+  executor="$(board_executor_of "$head")" || return 1
   board_mark "$branch" "$head" "chore(board): release #$issue
 
 $reason
@@ -167,9 +169,9 @@ board_item() {
   local issue="$1" url item
   url="https://github.com/$repo/issues/$issue"
   item="$(gh project item-list "$BOARD_PROJECT_NUMBER" --owner "$BOARD_PROJECT_OWNER" --format json --limit 1000 \
-    | jq -r --arg url "$url" '.items[] | select(.content.url == $url) | .id' | head -n1)"
+    | jq -r --arg url "$url" '.items[] | select(.content.url == $url) | .id' | head -n1)" || return 1
   if [ -z "$item" ]; then
-    item="$(gh project item-add "$BOARD_PROJECT_NUMBER" --owner "$BOARD_PROJECT_OWNER" --url "$url" --format json | jq -r .id)"
+    item="$(gh project item-add "$BOARD_PROJECT_NUMBER" --owner "$BOARD_PROJECT_OWNER" --url "$url" --format json | jq -r .id)" || return 1
   fi
   echo "$item"
 }
@@ -177,17 +179,17 @@ board_item() {
 board_field() {
   local issue="$1" field="$2" value="$3" project fields field_id item
   board_project_configured || return 0
-  project="$(gh project view "$BOARD_PROJECT_NUMBER" --owner "$BOARD_PROJECT_OWNER" --format json | jq -r .id)"
-  fields="$(gh project field-list "$BOARD_PROJECT_NUMBER" --owner "$BOARD_PROJECT_OWNER" --format json)"
-  field_id="$(jq -r --arg name "$field" '.fields[] | select(.name == $name) | .id' <<< "$fields")"
+  project="$(gh project view "$BOARD_PROJECT_NUMBER" --owner "$BOARD_PROJECT_OWNER" --format json | jq -r .id)" || return 1
+  fields="$(gh project field-list "$BOARD_PROJECT_NUMBER" --owner "$BOARD_PROJECT_OWNER" --format json)" || return 1
+  field_id="$(jq -r --arg name "$field" '.fields[] | select(.name == $name) | .id' <<< "$fields")" || return 1
   if [ -z "$field_id" ]; then
     echo "The board has no field '$field'; run .github/scripts/board/setup.sh." >&2
     return 1
   fi
-  item="$(board_item "$issue")"
+  item="$(board_item "$issue")" || return 1
   if jq -e --arg name "$field" '.fields[] | select(.name == $name) | has("options")' <<< "$fields" > /dev/null; then
     local option
-    option="$(jq -r --arg name "$field" --arg value "$value" '.fields[] | select(.name == $name) | .options[] | select(.name == $value) | .id' <<< "$fields")"
+    option="$(jq -r --arg name "$field" --arg value "$value" '.fields[] | select(.name == $name) | .options[] | select(.name == $value) | .id' <<< "$fields")" || return 1
     if [ -z "$option" ]; then
       echo "The board's '$field' field has no option '$value'; run .github/scripts/board/setup.sh." >&2
       return 1

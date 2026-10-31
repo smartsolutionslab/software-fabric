@@ -106,6 +106,7 @@ case "${positional[0]} ${positional[1]:-}" in
         echo '{"id":1}'
         ;;
       "GET pulls?"*)
+        if [ -e "$state/fail-pulls" ]; then echo '{"message":"Service Unavailable"}' >&2; exit 1; fi
         head="$(tr '&' '\n' <<< "${path#pulls?}" | sed -n 's/^head=//p' | sed 's/%3A/:/g; s/%2F/\//g; s/^[^:]*://')"
         jq --arg head "$head" 'map(select(.head.ref == $head))' "$state/prs.json" 2>/dev/null || echo '[]'
         ;;

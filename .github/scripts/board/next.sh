@@ -24,7 +24,7 @@ claim() {
   outcome=0
   board_eligible "$issue" "$lane" || outcome=$?
   [ "$outcome" -eq 0 ] || return "$outcome"
-  branch="$(board_branch_for "$issue")"
+  branch="$(board_branch_for "$issue")" || return 1
   if [ -n "$branch" ]; then
     base="$(board_fetch "$branch")" || return 1
     board_parked "$base" || return 2

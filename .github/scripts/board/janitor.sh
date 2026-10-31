@@ -12,9 +12,9 @@ board_git ls-remote --heads origin | awk 'index($2, "refs/heads/agent/") == 1 { 
   # A stray agent/ branch without an open issue is not a claim: a merged pull request leaves its branch behind.
   [ "$(board_issue "$issue" 2>/dev/null | jq -r .state)" = open ] || continue
 
-  if [ "$(gh api "repos/$repo/pulls?state=open&head=$(board_uri "${repo%%/*}:$branch")" | jq length)" -gt 0 ]; then
-    continue
-  fi
+  # Unknown is not "none": a failed lookup leaves the branch alone, as an open pull request would.
+  pulls="$(gh api "repos/$repo/pulls?state=open&head=$(board_uri "${repo%%/*}:$branch")" | jq length)" || continue
+  [ "$pulls" -eq 0 ] || continue
 
   head="$(board_fetch "$branch")" || continue
   board_parked "$head" && continue

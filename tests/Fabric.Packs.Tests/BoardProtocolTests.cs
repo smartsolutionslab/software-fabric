@@ -231,6 +231,24 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         HasBranch("agent/7-pay-an-invoice").ShouldBeTrue();
     }
 
+    [Theory]
+    [InlineData("board_branch_for() { return 1; }", "board_park 7 Released")]
+    [InlineData("board_executor_of() { return 1; }", "board_park 7 Released")]
+    [InlineData("board_item() { return 1; }", "board_field 7 Status Todo")]
+    public void A_board_step_tested_in_a_condition_still_fails_when_a_lookup_inside_it_fails(string failingLookup, string step)
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+
+        var (_, output) = RunLib($"""
+            {failingLookup}
+            if {step}; then echo outcome=success; else echo outcome=failure; fi
+            """);
+
+        output.ShouldContain("outcome=failure", Case.Sensitive, output);
+        Head("agent/7-pay-an-invoice").ShouldBe("chore(board): claim #7");
+    }
+
     [Fact]
     public void Of_two_identical_claims_at_once_only_one_holds_the_branch()
     {
@@ -438,6 +456,20 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Head("agent/4-claimed-recently").ShouldBe("chore(board): claim #4");
         Head("agent/5-parked").ShouldBe("chore(board): release #5");
         Head("agent/9-pushed-recently").ShouldBe("Refund an invoice");
+    }
+
+    [Fact]
+    public void The_janitor_leaves_a_branch_alone_when_it_cannot_ask_for_its_pull_requests()
+    {
+        Issues(Issue(7, "Lapsed", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7-lapsed", "chore(board): claim #7", Now.AddHours(-6));
+        File.WriteAllText(Path.Combine(state, "fail-pulls"), "");
+
+        var (_, output) = Run("janitor.sh");
+
+        output.ShouldNotContain("Returned #7");
+        Head("agent/7-lapsed").ShouldBe("chore(board): claim #7");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
     }
 
     [Fact]
