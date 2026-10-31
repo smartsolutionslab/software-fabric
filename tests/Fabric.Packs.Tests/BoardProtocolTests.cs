@@ -384,6 +384,19 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     }
 
     [Fact]
+    public void The_janitor_leaves_the_branch_of_a_closed_issue_alone()
+    {
+        Issues(Issue(7, "Paid", [.. ReadyBackend, "agent:claimed"], state: "closed"));
+        Branch("agent/7-paid", "Pay an invoice", Now.AddHours(-30));
+
+        var (exitCode, output) = Run("janitor.sh");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldNotContain("Returned #7");
+        Head("agent/7-paid").ShouldBe("Pay an invoice");
+    }
+
+    [Fact]
     public void Escalation_goes_to_the_lane_owner_with_the_fewest_open_assignments_below_the_limit()
     {
         Owners("wip-limit: 2\nlanes:\n  backend: { owners: [alice, bob, carol] }\n  frontend: { owners: [dave] }\n");
@@ -407,6 +420,23 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Labels(issue).ShouldNotContain("agent:claimed");
         Comments(7).ShouldContain("@bob, this needs you (needs:decision)");
         Comments(7).ShouldContain("Refund to the card or as credit?");
+    }
+
+    [Fact]
+    public void An_escalation_holds_the_issue_before_it_lets_go_of_the_claim()
+    {
+        Owners("wip-limit: 1\nlanes:\n  backend: { owners: [alice] }\n");
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+
+        var (exitCode, output) = Run("escalate.sh", "7", "needs:decision", "Refund to the card or as credit?");
+
+        exitCode.ShouldBe(0, output);
+        var log = File.ReadAllLines(Path.Combine(state, "log"));
+        var held = Array.FindIndex(log, line => line.Contains("issues/7/labels -f labels[]=needs:decision", StringComparison.Ordinal));
+        var released = Array.FindIndex(log, line => line.Contains("issues/7/labels/agent%3Aclaimed", StringComparison.Ordinal));
+        held.ShouldBeGreaterThanOrEqualTo(0, string.Join('\n', log));
+        released.ShouldBeGreaterThan(held, string.Join('\n', log));
     }
 
     [Fact]

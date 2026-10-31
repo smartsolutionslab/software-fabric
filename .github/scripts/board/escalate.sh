@@ -36,10 +36,11 @@ if [ -n "$lane" ]; then
 fi
 
 board_park "$issue" "Escalated ($label)." || { echo "Parking #$issue's branch failed; not escalated." >&2; exit 1; }
+# The escalation label holds the issue before agent:claimed stops holding it; the other order lets next.sh take it.
+board_add_label "$issue" "$label"
 board_unclaim "$issue"
 board_status "$issue" Blocked
 if [ -n "$owner" ]; then
-  board_add_label "$issue" "$label"
   board_assign "$issue" "$owner"
   board_comment "$issue" "@$owner, this needs you ($label):
 
@@ -47,7 +48,6 @@ $message
 
 Unassign yourself once answered; the issue then returns to Todo and the next agent resumes on its branch."
 else
-  board_add_label "$issue" "$label"
   board_comment "$issue" "This needs a developer ($label), but no owner of lane '${lane:-none}' in docs/owners.yml has capacity:
 
 $message"
