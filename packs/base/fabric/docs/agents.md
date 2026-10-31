@@ -3,7 +3,7 @@
 Agents coordinate through GitHub only: issues, labels, branches and the board. The scripts in `.github/scripts/board/` are the protocol; use them, never their steps by hand. They need `gh` (authenticated) and `jq`; `escalate.sh` also needs `yq`.
 
 - **Take work** with `next.sh <lane> <executor>`. It picks the lowest-numbered open issue labelled `agent:ready` and `lane:<lane>` with no assignee and none of `agent:blocked`, `agent:claimed` or `needs:*`, claims it (labelling it `agent:claimed`), and prints `<issue> <branch>`. Exit 3 means nothing is eligible. Claude Code: the `/next-issue` skill does all of this.
-- **The branch is the lock.** Work only on the `agent/<issue>-<slug>` branch you claimed. If it already has commits, resume them.
+- **The branch is the lock.** Work only on the `agent/<issue>` branch you claimed. If it already has commits, resume them.
 - **Push at least every two hours.** A claim lapses after `BOARD_LEASE_HOURS` without a push and without an open pull request; the janitor then parks the branch and returns the issue to Todo.
 - **Every commit names its executor** with the trailer `Agent-Executor: <family>-<runtime>/<detail>`, e.g. `Agent-Executor: claude-cloud/lane-backend` or `Agent-Executor: codex-cloud/lane-frontend`. CI rejects an agent branch with a commit that lacks it, and the trailer decides who reviews: always a model family that did not write the change.
 - **Escalate instead of guessing**, with `escalate.sh <issue> <label> "<message>"`:

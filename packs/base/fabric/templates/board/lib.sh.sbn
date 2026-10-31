@@ -26,11 +26,6 @@ board_now() {
   echo "${BOARD_NOW:-$(date -u +%s)}"
 }
 
-# A branch name for an issue: agent/<number>-<slug of the title>.
-board_slug() {
-  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-40 | sed -E 's/-+$//'
-}
-
 board_git() {
   git -C "$board_root" "$@"
 }
@@ -39,9 +34,10 @@ board_default_branch() {
   board_git ls-remote --symref origin HEAD | sed -nE 's#^ref: refs/heads/([^[:space:]]+)[[:space:]]+HEAD$#\1#p'
 }
 
-# The issue's branch on the remote (agent/<issue>-<slug>), or nothing.
+# The issue's branch on the remote, or nothing. It is agent/<issue> and nothing more: a name taken from anything
+# that can change, such as the title, would let two agents that each saw no branch push two different locks.
 board_branch_for() {
-  board_git ls-remote --heads origin | awk -v prefix="refs/heads/agent/$1-" 'index($2, prefix) == 1 { sub("refs/heads/", "", $2); print $2; exit }'
+  board_git ls-remote --heads origin "refs/heads/agent/$1" | awk -v ref="refs/heads/agent/$1" '$2 == ref { print "agent/" substr(ref, 18); exit }'
 }
 
 # Fetches a remote branch and prints its last commit.

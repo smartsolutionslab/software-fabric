@@ -8,7 +8,8 @@ lease=$((BOARD_LEASE_HOURS * 3600))
 
 board_git ls-remote --heads origin | awk 'index($2, "refs/heads/agent/") == 1 { sub("refs/heads/", "", $2); print $2 }' | while read -r branch; do
   issue="${branch#agent/}"
-  issue="${issue%%-*}"
+  # Only agent/<issue> is a lock; anything else under agent/ is someone's branch, not a claim.
+  [[ "$issue" =~ ^[0-9]+$ ]] || continue
   # A stray agent/ branch without an open issue is not a claim: a merged pull request leaves its branch behind.
   [ "$(board_issue "$issue" 2>/dev/null | jq -r .state)" = open ] || continue
 

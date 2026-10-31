@@ -15,12 +15,12 @@ executor="$2"
 
 candidates="$(board_issues "labels=$(board_uri "agent:ready,lane:$lane")" \
   | jq -r --arg lane "$lane" "map(select(($board_eligible_jq) and ([.labels[].name] | index(\"agent:claimed\") | not)))
-           | sort_by(.number) | .[] | \"\\(.number)\\t\\(.title)\"")"
+           | sort_by(.number) | .[].number")"
 
 # Returns 0 when claimed, 2 when another agent holds or just took the issue, 1 when nothing was claimed for another
 # reason, 4 when the branch is held but recording the claim on the issue failed.
 claim() {
-  local issue="$1" title="$2" branch base outcome
+  local issue="$1" branch base outcome
   outcome=0
   board_eligible "$issue" "$lane" || outcome=$?
   [ "$outcome" -eq 0 ] || return "$outcome"
@@ -29,7 +29,7 @@ claim() {
     base="$(board_fetch "$branch")" || return 1
     board_parked "$base" || return 2
   else
-    branch="agent/$issue-$(board_slug "$title")"
+    branch="agent/$issue"
     base="$(board_fetch "$(board_default_branch)")" || return 1
   fi
   outcome=0
@@ -63,10 +63,10 @@ Claimed by \`$executor\` on branch \`$branch\`. The claim lapses after ${BOARD_L
   echo "$issue $branch"
 }
 
-while IFS=$'\t' read -r issue title; do
+while read -r issue; do
   [ -n "$issue" ] || continue
   outcome=0
-  claim "$issue" "$title" || outcome=$?
+  claim "$issue" || outcome=$?
   case "$outcome" in
     0) exit 0 ;;
     2) continue ;;

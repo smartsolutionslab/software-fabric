@@ -46,7 +46,7 @@ This repo runs the protocol its packs generate (ADR-0004), copied into
   (src/, catalog, schema), `packs-backend`, `packs-frontend`, `ci` (workflows,
   build/). Exit 3: nothing eligible. Exit 1: the claim failed; stop and report
   it. Claude Code: `/next-issue`.
-- **Work only on the `agent/<issue>-<slug>` branch you claimed**, push at
+- **Work only on the `agent/<issue>` branch you claimed**, push at
   least every two hours, and end every commit with
   `Agent-Executor: <family>-<runtime>/<detail>`.
 - **Open the pull request against `main`** with `## Spec and plan` and

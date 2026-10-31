@@ -30,9 +30,10 @@ eligibility needs no board access. A human assignee means the issue
 belongs to that human, without exception.
 
 **Claim.** The branch is the lock. The agent pushes an empty claim
-commit to `agent/<issue>-<slug>`; a second agent's claim, built on a
+commit to `agent/<issue>`; a second agent's claim, built on a
 different commit, is not a fast-forward and is rejected, so it moves to the
-next issue. The winner then sets `Status` and `Executor` and posts a claim
+next issue. The name holds nothing that can change: with the title in it, two
+agents that each saw no branch could push two locks for one issue. The winner then sets `Status` and `Executor` and posts a claim
 comment.
 
 **Lease.** Every push renews the claim. A scheduled janitor workflow

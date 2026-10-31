@@ -182,13 +182,13 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
 
         exitCode.ShouldBe(0, output);
-        output.Trim().ShouldBe("7 agent/7-pay-an-invoice");
-        Head("agent/7-pay-an-invoice").ShouldBe("chore(board): claim #7");
-        Executor("agent/7-pay-an-invoice").ShouldBe("claude-cloud/lane-backend");
-        Origin("rev-parse", "refs/heads/agent/7-pay-an-invoice~1").ShouldBe(Origin("rev-parse", "refs/heads/main"));
+        output.Trim().ShouldBe("7 agent/7");
+        Head("agent/7").ShouldBe("chore(board): claim #7");
+        Executor("agent/7").ShouldBe("claude-cloud/lane-backend");
+        Origin("rev-parse", "refs/heads/agent/7~1").ShouldBe(Origin("rev-parse", "refs/heads/main"));
         Field(7, "STATUS").ShouldBe("Claimed");
         Field(7, "EXECUTOR").ShouldBe("claude-cloud/lane-backend");
-        Comments(7).ShouldContain("Claimed by `claude-cloud/lane-backend` on branch `agent/7-pay-an-invoice`");
+        Comments(7).ShouldContain("Claimed by `claude-cloud/lane-backend` on branch `agent/7`");
         Labels(IssueState(7)).ShouldContain("agent:claimed");
     }
 
@@ -196,12 +196,12 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     public void An_issue_whose_branch_another_agent_created_is_skipped()
     {
         Issues(Issue(7, "Pay an invoice", ReadyBackend), Issue(9, "Refund an invoice", ReadyBackend));
-        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10));
 
         var (exitCode, output) = Run("next.sh", "backend", "codex-cloud/lane-backend");
 
         exitCode.ShouldBe(0, output);
-        output.Trim().ShouldBe("9 agent/9-refund-an-invoice");
+        output.Trim().ShouldBe("9 agent/9");
         Field(7, "STATUS").ShouldBeNull();
     }
 
@@ -213,8 +213,8 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
 
         exitCode.ShouldBe(0, output);
-        output.Trim().ShouldBe("9 agent/9-refund-an-invoice");
-        HasBranch("agent/7-pay-an-invoice").ShouldBeFalse();
+        output.Trim().ShouldBe("9 agent/9");
+        HasBranch("agent/7").ShouldBeFalse();
     }
 
     [Fact]
@@ -226,9 +226,9 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
 
         exitCode.ShouldBe(1, output);
-        output.ShouldContain("agent/7-pay-an-invoice");
+        output.ShouldContain("agent/7");
         output.ShouldNotStartWith("7 agent/");
-        HasBranch("agent/7-pay-an-invoice").ShouldBeTrue();
+        HasBranch("agent/7").ShouldBeTrue();
     }
 
     [Theory]
@@ -239,7 +239,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     public void A_board_step_tested_in_a_condition_still_fails_when_a_lookup_inside_it_fails(string failingLookup, string step)
     {
         Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
-        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10));
 
         var (_, output) = RunLib($"""
             {failingLookup}
@@ -247,7 +247,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
             """);
 
         output.ShouldContain("outcome=failure", Case.Sensitive, output);
-        Head("agent/7-pay-an-invoice").ShouldBe("chore(board): claim #7");
+        Head("agent/7").ShouldBe("chore(board): claim #7");
     }
 
     [Fact]
@@ -255,8 +255,8 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     {
         var (_, output) = RunLib("""
             base="$(board_fetch main)"
-            board_mark agent/7-pay "$base" "chore(board): claim #7"; echo "first=$?"
-            board_mark agent/7-pay "$base" "chore(board): claim #7"; echo "second=$?"
+            board_mark agent/7 "$base" "chore(board): claim #7"; echo "first=$?"
+            board_mark agent/7 "$base" "chore(board): claim #7"; echo "second=$?"
             """);
 
         output.ShouldContain("first=0", Case.Sensitive, output);
@@ -266,17 +266,17 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     [Fact]
     public void Parking_against_a_head_that_has_moved_on_leaves_the_branch_alone()
     {
-        Branch("agent/7-lapsed", "chore(board): claim #7", Now.AddHours(-6));
-        var stale = Origin("rev-parse", "refs/heads/agent/7-lapsed");
-        Branch("agent/7-lapsed", "Renewed just now", Now);
+        Branch("agent/7", "chore(board): claim #7", Now.AddHours(-6));
+        var stale = Origin("rev-parse", "refs/heads/agent/7");
+        Branch("agent/7", "Renewed just now", Now);
 
         var (_, output) = RunLib($"""
-            board_git fetch --quiet origin refs/heads/agent/7-lapsed
+            board_git fetch --quiet origin refs/heads/agent/7
             board_park 7 "lapsed" {stale}; echo "park=$?"
             """);
 
         output.ShouldContain("park=2", Case.Sensitive, output);
-        Head("agent/7-lapsed").ShouldBe("Renewed just now");
+        Head("agent/7").ShouldBe("Renewed just now");
     }
 
     [Fact]
@@ -285,6 +285,20 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         var workflow = File.ReadAllText(Path.Combine(ProjectDirectory, ".github", "workflows", "board-return.yml"));
 
         workflow.ShouldContain("contents: read");
+    }
+
+    [Theory]
+    [InlineData("Pay an invoice")]
+    [InlineData("Pay an invoice (renamed while it was being claimed)")]
+    public void The_lock_is_named_by_the_issue_alone_so_a_title_edit_cannot_make_a_second_one(string title)
+    {
+        Issues(Issue(7, title, ReadyBackend));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(0, output);
+        output.Trim().ShouldBe("7 agent/7");
+        Origin("for-each-ref", "--format=%(refname)", "refs/heads/agent/").Trim().ShouldBe("refs/heads/agent/7");
     }
 
     [Fact]
@@ -321,7 +335,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
 
         exitCode.ShouldBe(0, output);
-        output.ShouldStartWith("1 agent/1-pay-an-invoice");
+        output.ShouldStartWith("1 agent/1");
     }
 
     public static TheoryData<string> ChangesThatEndEligibility => new()
@@ -363,7 +377,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
 
         exitCode.ShouldBe(3, output);
-        Head("agent/7-pay-an-invoice").ShouldBe("chore(board): release #7");
+        Head("agent/7").ShouldBe("chore(board): release #7");
         Labels(IssueState(7)).ShouldNotContain("agent:claimed");
     }
 
@@ -378,7 +392,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         exitCode.ShouldBe(1, output);
         output.ShouldContain("Service Unavailable");
         output.ShouldNotContain("No eligible issue");
-        Head("agent/7-pay-an-invoice").ShouldBe("chore(board): claim #7");
+        Head("agent/7").ShouldBe("chore(board): claim #7");
     }
 
     [Fact]
@@ -406,22 +420,22 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     {
         Issues(Issue(7, "Pay an invoice", ReadyBackend));
 
-        Run("next.sh", "backend", "claude-cloud/one").Output.Trim().ShouldBe("7 agent/7-pay-an-invoice");
+        Run("next.sh", "backend", "claude-cloud/one").Output.Trim().ShouldBe("7 agent/7");
         Field(7, "STATUS").ShouldBe("Claimed");
 
         var (releaseExitCode, releaseOutput) = Run("release.sh", "7", "It belongs to the frontend lane.");
         releaseExitCode.ShouldBe(0, releaseOutput);
-        Head("agent/7-pay-an-invoice").ShouldBe("chore(board): release #7");
-        Executor("agent/7-pay-an-invoice").ShouldBe("claude-cloud/one");
+        Head("agent/7").ShouldBe("chore(board): release #7");
+        Executor("agent/7").ShouldBe("claude-cloud/one");
         Field(7, "STATUS").ShouldBe("Todo");
         Field(7, "EXECUTOR").ShouldBe("");
         Comments(7).ShouldContain("Released: It belongs to the frontend lane.");
         Labels(IssueState(7)).ShouldNotContain("agent:claimed");
 
-        Run("next.sh", "backend", "claude-cloud/two").Output.Trim().ShouldBe("7 agent/7-pay-an-invoice");
-        Head("agent/7-pay-an-invoice").ShouldBe("chore(board): claim #7");
-        Executor("agent/7-pay-an-invoice").ShouldBe("claude-cloud/two");
-        Origin("rev-list", "--count", "main..refs/heads/agent/7-pay-an-invoice").ShouldBe("3");
+        Run("next.sh", "backend", "claude-cloud/two").Output.Trim().ShouldBe("7 agent/7");
+        Head("agent/7").ShouldBe("chore(board): claim #7");
+        Executor("agent/7").ShouldBe("claude-cloud/two");
+        Origin("rev-list", "--count", "main..refs/heads/agent/7").ShouldBe("3");
         Field(7, "EXECUTOR").ShouldBe("claude-cloud/two");
         Labels(IssueState(7)).ShouldContain("agent:claimed");
     }
@@ -435,41 +449,41 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
             Issue(5, "Parked", ReadyBackend),
             Issue(7, "Lapsed", [.. ReadyBackend, "agent:claimed"]),
             Issue(9, "Pushed recently", ReadyBackend));
-        Branch("agent/3-has-a-pull-request", "chore(board): claim #3", Now.AddHours(-5));
-        OpenPullRequest("agent/3-has-a-pull-request");
-        Branch("agent/4-claimed-recently", "chore(board): claim #4", Now.AddHours(-1));
-        Branch("agent/5-parked", "chore(board): claim #5", Now.AddHours(-9));
-        Branch("agent/5-parked", "chore(board): release #5", Now.AddHours(-8));
-        Branch("agent/7-lapsed", "chore(board): claim #7", Now.AddHours(-6));
-        Branch("agent/7-lapsed", "Pay an invoice", Now.AddHours(-5));
-        Branch("agent/9-pushed-recently", "Refund an invoice", Now.AddMinutes(-30));
+        Branch("agent/3", "chore(board): claim #3", Now.AddHours(-5));
+        OpenPullRequest("agent/3");
+        Branch("agent/4", "chore(board): claim #4", Now.AddHours(-1));
+        Branch("agent/5", "chore(board): claim #5", Now.AddHours(-9));
+        Branch("agent/5", "chore(board): release #5", Now.AddHours(-8));
+        Branch("agent/7", "chore(board): claim #7", Now.AddHours(-6));
+        Branch("agent/7", "Pay an invoice", Now.AddHours(-5));
+        Branch("agent/9", "Refund an invoice", Now.AddMinutes(-30));
 
         var (exitCode, output) = Run("janitor.sh");
 
         exitCode.ShouldBe(0, output);
         output.Trim().ShouldBe("Returned #7 to Todo.");
-        Head("agent/7-lapsed").ShouldBe("chore(board): release #7");
-        Executor("agent/7-lapsed").ShouldBe("codex-cloud/other");
+        Head("agent/7").ShouldBe("chore(board): release #7");
+        Executor("agent/7").ShouldBe("codex-cloud/other");
         Field(7, "STATUS").ShouldBe("Todo");
         Comments(7).ShouldContain("lapsed");
         Labels(IssueState(7)).ShouldNotContain("agent:claimed");
-        Head("agent/3-has-a-pull-request").ShouldBe("chore(board): claim #3");
-        Head("agent/4-claimed-recently").ShouldBe("chore(board): claim #4");
-        Head("agent/5-parked").ShouldBe("chore(board): release #5");
-        Head("agent/9-pushed-recently").ShouldBe("Refund an invoice");
+        Head("agent/3").ShouldBe("chore(board): claim #3");
+        Head("agent/4").ShouldBe("chore(board): claim #4");
+        Head("agent/5").ShouldBe("chore(board): release #5");
+        Head("agent/9").ShouldBe("Refund an invoice");
     }
 
     [Fact]
     public void The_janitor_leaves_a_branch_alone_when_it_cannot_ask_for_its_pull_requests()
     {
         Issues(Issue(7, "Lapsed", [.. ReadyBackend, "agent:claimed"]));
-        Branch("agent/7-lapsed", "chore(board): claim #7", Now.AddHours(-6));
+        Branch("agent/7", "chore(board): claim #7", Now.AddHours(-6));
         File.WriteAllText(Path.Combine(state, "fail-pulls"), "");
 
         var (_, output) = Run("janitor.sh");
 
         output.ShouldNotContain("Returned #7");
-        Head("agent/7-lapsed").ShouldBe("chore(board): claim #7");
+        Head("agent/7").ShouldBe("chore(board): claim #7");
         Labels(IssueState(7)).ShouldContain("agent:claimed");
     }
 
@@ -477,8 +491,8 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     public void The_janitor_finishes_a_release_that_parked_the_branch_but_left_the_claim_label()
     {
         Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
-        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddHours(-3));
-        Branch("agent/7-pay-an-invoice", "chore(board): release #7", Now.AddHours(-2));
+        Branch("agent/7", "chore(board): claim #7", Now.AddHours(-3));
+        Branch("agent/7", "chore(board): release #7", Now.AddHours(-2));
 
         var (exitCode, output) = Run("janitor.sh");
 
@@ -486,20 +500,34 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Labels(IssueState(7)).ShouldNotContain("agent:claimed");
         var (claimed, claim) = Run("next.sh", "backend", "claude-cloud/lane-backend");
         claimed.ShouldBe(0, claim);
-        claim.ShouldStartWith("7 agent/7-pay-an-invoice");
+        claim.ShouldStartWith("7 agent/7");
+    }
+
+    [Fact]
+    public void The_janitor_takes_only_agent_slash_issue_for_a_lock()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7" + "-pay-an-invoice", "Work in progress", Now.AddHours(-30));
+
+        var (exitCode, output) = Run("janitor.sh");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldNotContain("#7");
+        Head("agent/7" + "-pay-an-invoice").ShouldBe("Work in progress");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
     }
 
     [Fact]
     public void The_janitor_leaves_the_branch_of_a_closed_issue_alone()
     {
         Issues(Issue(7, "Paid", [.. ReadyBackend, "agent:claimed"], state: "closed"));
-        Branch("agent/7-paid", "Pay an invoice", Now.AddHours(-30));
+        Branch("agent/7", "Pay an invoice", Now.AddHours(-30));
 
         var (exitCode, output) = Run("janitor.sh");
 
         exitCode.ShouldBe(0, output);
         output.ShouldNotContain("Returned #7");
-        Head("agent/7-paid").ShouldBe("Pay an invoice");
+        Head("agent/7").ShouldBe("Pay an invoice");
     }
 
     [Fact]
@@ -513,7 +541,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
             Issue(4, "Carol's", ["lane:backend"], ["carol"]),
             Issue(5, "Carol's other", ["lane:frontend"], ["carol"]),
             Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
-        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10));
 
         var (exitCode, output) = Run("escalate.sh", "7", "needs:decision", "Refund to the card or as credit?");
 
@@ -522,7 +550,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Assignees(issue).ShouldBe(["bob"]);
         Labels(issue).ShouldContain("needs:decision");
         Field(7, "STATUS").ShouldBe("Blocked");
-        Head("agent/7-pay-an-invoice").ShouldBe("chore(board): release #7");
+        Head("agent/7").ShouldBe("chore(board): release #7");
         Labels(issue).ShouldNotContain("agent:claimed");
         Comments(7).ShouldContain("@bob, this needs you (needs:decision)");
         Comments(7).ShouldContain("Refund to the card or as credit?");
@@ -533,7 +561,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     {
         Owners("wip-limit: 1\nlanes:\n  backend: { owners: [alice] }\n");
         Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
-        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10));
 
         var (exitCode, output) = Run("escalate.sh", "7", "needs:decision", "Refund to the card or as credit?");
 
@@ -550,7 +578,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     {
         Owners("wip-limit: 1\nlanes:\n  backend: { owners: [alice] }\n");
         Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
-        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10));
         var hook = Path.Combine(origin, "hooks", "pre-receive");
         File.WriteAllText(hook, $"#!/bin/sh\necho push >> '{state}/log'\n");
         if (!OperatingSystem.IsWindows())
@@ -573,7 +601,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     {
         Owners("wip-limit: 1\nlanes:\n  backend: { owners: [alice] }\n");
         Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
-        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10));
         var hook = Path.Combine(origin, "hooks", "pre-receive");
         File.WriteAllText(hook, "#!/bin/sh\necho 'Write access is not permitted through this proxy.' >&2\nexit 1\n");
         if (!OperatingSystem.IsWindows())
@@ -593,14 +621,14 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     {
         Owners("wip-limit: 2\nlanes: [backend]\n");
         Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
-        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10));
 
         var (exitCode, output) = Run("escalate.sh", "7", "needs:decision", "Refund to the card or as credit?");
 
         exitCode.ShouldNotBe(0, output);
         Comments(7).ShouldNotContain("has capacity");
         Labels(IssueState(7)).ShouldNotContain("needs:decision");
-        Head("agent/7-pay-an-invoice").ShouldBe("chore(board): claim #7");
+        Head("agent/7").ShouldBe("chore(board): claim #7");
     }
 
     [Fact]
@@ -828,7 +856,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     }
 
     [Theory]
-    [InlineData("agent/7-pay", 1)]
+    [InlineData("agent/7", 1)]
     [InlineData("feature/pay", 0)]
     public void Every_commit_on_an_agent_branch_names_its_executor(string branch, int expectedExitCode)
     {
@@ -851,7 +879,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     {
         var repository = Repository("One\n\nAgent-Executor: claude-cloud/a", "Two\n\nAgent-Executor: claude-cloud/a");
 
-        var (exitCode, output) = RunIn(repository, "check-trailers.sh", "agent/7-pay", "base", "HEAD");
+        var (exitCode, output) = RunIn(repository, "check-trailers.sh", "agent/7", "base", "HEAD");
 
         exitCode.ShouldBe(0, output);
         Directory.Delete(repository, recursive: true);
