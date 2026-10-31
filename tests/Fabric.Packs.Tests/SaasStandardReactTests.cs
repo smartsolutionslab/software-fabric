@@ -85,6 +85,28 @@ public sealed class SaasStandardReactTests
     }
 
     [Fact]
+    public void A_domain_aggregate_built_on_the_building_blocks_keeps_the_architecture_rules_green()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Invoice.cs", """
+            using Shop.BuildingBlocks.Domain;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record InvoiceId(Guid Value);
+
+            public sealed class Invoice(InvoiceId id) : AggregateRoot<InvoiceId>(id);
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+    }
+
+    [Fact]
     public void Breaking_an_architecture_rule_fails_the_generated_tests()
     {
         using var project = new GeneratedProject(Profile);

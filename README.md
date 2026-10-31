@@ -20,14 +20,15 @@ Two halves, one repo:
 ## Status
 
 M0 (generator core) is done. M1 (profile `saas-standard-react` end to end)
-is in progress: the base pack, the backend packs, the Aspire integration
+is done, waiting for its gate review: the base pack, the backend packs, the Aspire integration
 tests and the frontend are real (M1-01 to M1-07): a generated app signs a
 user in through Keycloak and lists a module's data, checked end to end with
 Playwright. Every generated project carries the board protocol (M1-08):
 agents claim issues, escalate to developers and get reviewed by another
 model family through GitHub alone. CI generates the profile with the CLI
-and puts it through its own CI, end-to-end tests included (M1-09). The
-pilot follows (M1-10). `tests/Fabric.Packs.Tests`
+and puts it through its own CI, end-to-end tests included (M1-09). In the
+pilot (M1-10) an agent delivered an issue in a generated project through
+the board protocol, reviewed by another model family and merged on green CI. `tests/Fabric.Packs.Tests`
 generates the profile from the real packs — empty stand-ins for the rest —
 builds it, runs its tests, installs, builds, lints and tests its web app, and starts it against real PostgreSQL and RabbitMQ
 containers.

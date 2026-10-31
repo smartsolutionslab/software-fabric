@@ -48,47 +48,47 @@ case "${positional[0]} ${positional[1]:-}" in
           [[ "$branch" == "$prefix"* ]] && jq -n --arg ref "refs/heads/$branch" --arg sha "$(cat "$state/refs/$branch")" '{ref: $ref, object: {sha: $sha}}'
         done | jq -s .
         ;;
-      "POST git/refs")
-        branch="${flag[f:ref]#refs/heads/}"
-        if [ -e "$state/refs/$branch" ]; then echo '{"message":"Reference already exists"}' >&2; exit 1; fi
-        mkdir -p "$(dirname "$state/refs/$branch")"
-        echo "${flag[f:sha]}" > "$state/refs/$branch"
-        echo "{}"
-        ;;
-      "POST branches/"*"/rename")
-        from="${path#branches/}"; from="${from%/rename}"; to="${flag[f:new_name]}"
-        if [ ! -e "$state/refs/$from" ] || [ -e "$state/refs/$to" ]; then echo '{"message":"Not Found"}' >&2; exit 1; fi
-        mkdir -p "$(dirname "$state/refs/$to")"
-        mv "$state/refs/$from" "$state/refs/$to"
-        echo "{}"
+      # Like Claude Code's cloud sessions: branch writes through the API are refused; agents push with git.
+      "POST git/refs" | "POST branches/"* | "PATCH git/refs/"* | "DELETE git/refs/"*)
+        echo '{"message":"Write access to this GitHub API path is not permitted through this proxy."}' >&2
+        exit 1
         ;;
       "GET commits/"*) jq -n --arg date "$(cat "$state/commits/${path#commits/}" 2>/dev/null || echo 2000-01-01T00:00:00Z)" '{commit: {committer: {date: $date}}}' ;;
       "GET issues/"*"/comments") n="${path#issues/}"; cat "$state/comments/${n%/comments}.json" 2>/dev/null || echo '[]' ;;
+      "GET issues?"*)
+        query="${path#issues?}"
+        param() { tr '&' '\n' <<< "$query" | sed -n "s/^$1=//p" | sed 's/%3A/:/g; s/%2C/,/g'; }
+        jq --arg state "$(param state)" --arg labels "$(param labels)" --arg assignee "$(param assignee)" '
+          ($labels | split(",") | map(select(. != ""))) as $wanted
+          | map(select(.state == $state)
+                | select([.labels[].name] as $have | all($wanted[]; . as $w | $have | index($w)))
+                | select($assignee == "" or ([.assignees[].login] | index($assignee))))' "$issues"
+        ;;
+      "GET issues/"*) jq --argjson number "${path#issues/}" '.[] | select(.number == $number)' "$issues" ;;
+      "POST issues/"*"/comments")
+        n="${path#issues/}"; n="${n%/comments}"; file="$state/comments/$n.json"; mkdir -p "$state/comments"
+        [ -e "$file" ] || echo '[]' > "$file"
+        jq --arg body "${flag[f:body]}" --arg at "$now_iso" '. + [{body: $body, created_at: $at}]' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+        echo "{}"
+        ;;
+      "POST issues/"*"/labels") n="${path#issues/}"; key='f:labels[]'; update_issue "${n%/labels}" ".labels += [{name: \"${flag[$key]}\"}]"; echo "[]" ;;
+      "DELETE issues/"*"/labels/"*)
+        n="${path#issues/}"; name="$(sed 's/%3A/:/g' <<< "${n#*/labels/}")"
+        update_issue "${n%%/*}" ".labels |= map(select(.name != \"$name\"))"; echo "[]"
+        ;;
+      "POST issues/"*"/assignees") n="${path#issues/}"; key='f:assignees[]'; update_issue "${n%/assignees}" ".assignees += [{login: \"${flag[$key]}\"}]"; echo "{}" ;;
+      "GET pulls?"*)
+        head="$(tr '&' '\n' <<< "${path#pulls?}" | sed -n 's/^head=//p' | sed 's/%3A/:/g; s/%2F/\//g; s/^[^:]*://')"
+        jq --arg head "$head" 'map(select(.head.ref == $head))' "$state/prs.json" 2>/dev/null || echo '[]'
+        ;;
       *) echo "fake gh: no answer for api $method $path" >&2; exit 64 ;;
     esac
     ;;
-  "issue list")
-    jq --arg labels "${flag[label]:-}" --arg assignee "${flag[assignee]:-}" '
-      ($labels | split("\n") | map(select(. != ""))) as $wanted
-      | map(select(.state == "open")
-            | select([.labels[].name] as $have | all($wanted[]; . as $w | $have | index($w)))
-            | select($assignee == "" or ([.assignees[].login] | index($assignee))))' "$issues"
+  # Like Claude Code's cloud sessions: these subcommands need GraphQL, which is refused there.
+  "issue "* | "pr "* | "repo "*)
+    echo "HTTP 403: GitHub GraphQL is not available from Claude Code sessions; use the REST API (gh api repos/{owner}/{repo}/...)." >&2
+    exit 1
     ;;
-  "issue view") jq --argjson number "${positional[2]}" '.[] | select(.number == $number)' "$issues" ;;
-  "issue comment")
-    n="${positional[2]}"; file="$state/comments/$n.json"; mkdir -p "$state/comments"
-    [ -e "$file" ] || echo '[]' > "$file"
-    jq --arg body "${flag[body]}" --arg at "$now_iso" '. + [{body: $body, created_at: $at}]' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
-    ;;
-  "issue edit")
-    n="${positional[2]}"
-    [ -z "${flag[add-label]:-}" ] || update_issue "$n" ".labels += [{name: \"${flag[add-label]}\"}]"
-    [ -z "${flag[add-assignee]:-}" ] || update_issue "$n" ".assignees += [{login: \"${flag[add-assignee]}\"}]"
-    if [ -n "${flag[remove-label]:-}" ]; then
-      update_issue "$n" ".labels |= map(select(.name as \$name | \"${flag[remove-label]}\" | split(\",\") | index(\$name) | not))"
-    fi
-    ;;
-  "pr list") jq --arg head "${flag[head]}" 'map(select(.headRefName == $head))' "$state/prs.json" 2>/dev/null || echo '[]' ;;
   "project view") echo '{"id":"PROJECT"}' ;;
   "project field-list")
     echo '{"fields":[{"id":"STATUS","name":"Status","options":[{"id":"Todo","name":"Todo"},{"id":"Claimed","name":"Claimed"},{"id":"In Progress","name":"In Progress"},{"id":"In Review","name":"In Review"},{"id":"Blocked","name":"Blocked"},{"id":"Done","name":"Done"}]},{"id":"EXECUTOR","name":"Executor"}]}'
