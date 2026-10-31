@@ -9,4 +9,4 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: ci-step, describes: "The host connects to the broker and an integration event crosses from one module to another over Kafka; checked by the integration tests of the aspire-fixture pack against the running stack." }
+  - { kind: ci-step, describes: "The broker becomes healthy and the host, which needs it to start, reports itself healthy; checked by the integration tests of the aspire-fixture pack against the running stack." }
