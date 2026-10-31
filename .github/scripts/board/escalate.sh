@@ -25,6 +25,8 @@ fi
 owner=""
 fewest=""
 if [ -n "$lane" ]; then
+  # Read first: a failure inside `< <(...)` would go unnoticed and look like a lane without owners.
+  owners="$(yq -r "(.lanes[\"$lane\"].owners // [])[]" "$owners_file")"
   while read -r login; do
     [ -n "$login" ] || continue
     open="$(board_issues "assignee=$(board_uri "$login")" | jq length)"
@@ -32,7 +34,7 @@ if [ -n "$lane" ]; then
       owner="$login"
       fewest="$open"
     fi
-  done < <(yq -r "(.lanes[\"$lane\"].owners // [])[]" "$owners_file")
+  done <<< "$owners"
 fi
 
 # The escalation label holds the issue before the branch is parked and before agent:claimed stops holding it: a

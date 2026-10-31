@@ -573,6 +573,21 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     }
 
     [Fact]
+    public void An_owners_file_that_cannot_be_read_fails_the_escalation_instead_of_finding_no_capacity()
+    {
+        Owners("wip-limit: 2\nlanes: [backend]\n");
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+
+        var (exitCode, output) = Run("escalate.sh", "7", "needs:decision", "Refund to the card or as credit?");
+
+        exitCode.ShouldNotBe(0, output);
+        Comments(7).ShouldNotContain("has capacity");
+        Labels(IssueState(7)).ShouldNotContain("needs:decision");
+        Head("agent/7-pay-an-invoice").ShouldBe("chore(board): claim #7");
+    }
+
+    [Fact]
     public void Escalation_without_an_owner_with_capacity_leaves_the_issue_unassigned_and_says_so()
     {
         Owners("wip-limit: 1\nlanes:\n  backend: { owners: [alice] }\n");
