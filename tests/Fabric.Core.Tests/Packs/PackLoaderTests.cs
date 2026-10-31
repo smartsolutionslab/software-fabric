@@ -17,6 +17,12 @@ public sealed class PackLoaderTests : IDisposable
                 scope: project
                 default: shadcn
                 options: { shadcn: { tier: supported } }
+              frontend.framework:
+                scope: project
+                role-slots:
+                  web.dependencies: { description: "Entries of the app's dependencies.", separator: ",\n" }
+                  web.imports: { description: "Import lines of the entry point." }
+                options: { react: { tier: supported }, vue: { tier: supported } }
             """),
         "test.yaml");
 
@@ -50,6 +56,62 @@ public sealed class PackLoaderTests : IDisposable
         pack.Agents.Briefs["backend-engineer"].ShouldBe("docs/engineer.md");
         pack.Adr.ShouldBe("docs/adr.md");
         pack.Gates.ShouldHaveSingleItem().Kind.ShouldBe(GateKind.UnitTest);
+    }
+
+    private static string FrameworkManifest(string option, string declarations) => $$"""
+        option: {{option}}
+        files:
+          - { template: templates/readme.md.sbn, target: docs/readme.md, per-module: false }
+        declares-slots:
+        {{declarations}}
+        agents:
+          agents-md: docs/agents.md
+        adr: docs/adr.md
+        gates:
+          - { kind: unit-test, describes: "The pack renders.", file: templates/gate.cs.sbn }
+        """;
+
+    private static readonly string[] FrameworkFiles = ["templates/readme.md.sbn", "docs/agents.md", "docs/adr.md", "templates/gate.cs.sbn"];
+
+    [Fact]
+    public void An_option_pack_that_declares_every_role_slot_of_its_dimension_loads()
+    {
+        packs.Add(
+            "frontend.framework.react",
+            FrameworkManifest("frontend.framework.react", """
+                  - { slot: web.dependencies, description: "React's dependencies.", separator: ",\n" }
+                  - { slot: web.imports, description: "Import lines of main.tsx." }
+                """),
+            FrameworkFiles);
+
+        Load().Errors.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void An_option_pack_missing_a_role_slot_of_its_dimension_is_rejected()
+    {
+        packs.Add(
+            "frontend.framework.vue",
+            FrameworkManifest("frontend.framework.vue", """
+                  - { slot: web.dependencies, description: "Vue's dependencies.", separator: ",\n" }
+                """),
+            FrameworkFiles);
+
+        SingleError().ShouldEndWith("does not declare the role slot 'web.imports' that every frontend.framework option declares (catalog).");
+    }
+
+    [Fact]
+    public void A_role_slot_declared_with_another_separator_is_rejected()
+    {
+        packs.Add(
+            "frontend.framework.vue",
+            FrameworkManifest("frontend.framework.vue", """
+                  - { slot: web.dependencies, description: "Vue's dependencies." }
+                  - { slot: web.imports, description: "Import lines of main.ts." }
+                """),
+            FrameworkFiles);
+
+        SingleError().ShouldEndWith("declares the role slot 'web.dependencies' joined by a newline; the catalog joins it by ',\\n'.");
     }
 
     [Fact]

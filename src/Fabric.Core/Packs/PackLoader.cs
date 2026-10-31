@@ -124,6 +124,26 @@ public static class PackLoader
 
     private static string Location(string pointer) => pointer.Length == 0 ? "/" : pointer;
 
+    // ADR-0008: other packs contribute to a role slot whichever option of the dimension is chosen, so every option declares it, joined alike.
+    private static IEnumerable<string> RoleSlotProblems(PackManifest pack, Dimension dimension)
+    {
+        foreach (var role in dimension.RoleSlots.Values)
+        {
+            var declaration = pack.DeclaredSlots.FirstOrDefault(slot => slot.Slot == role.Slot);
+            if (declaration is null)
+            {
+                yield return $"does not declare the role slot '{role.Slot}' that every {dimension.Id} option declares (catalog).";
+            }
+            else if (declaration.Separator != role.Separator)
+            {
+                yield return $"declares the role slot '{role.Slot}' joined by {Joiner(declaration.Separator)}; the catalog joins it by {Joiner(role.Separator)}.";
+            }
+        }
+    }
+
+    private static string Joiner(string? separator) =>
+        separator is null ? "a newline" : $"'{separator.Replace("\n", "\\n", StringComparison.Ordinal)}'";
+
     private static IEnumerable<string> SemanticProblems(PackManifest pack, string directoryOption, CatalogModel catalog)
     {
         if (pack.Option != directoryOption)
@@ -141,6 +161,13 @@ public static class PackLoader
             else if (!dimension.Options.ContainsKey(pack.OptionName))
             {
                 yield return $"'{pack.OptionName}' is not an option of {pack.Dimension} in the catalog.";
+            }
+            else
+            {
+                foreach (var problem in RoleSlotProblems(pack, dimension))
+                {
+                    yield return problem;
+                }
             }
         }
 
