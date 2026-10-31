@@ -1,0 +1,7 @@
+# Who an escalated issue goes to (board protocol, docs/adr). Owners are GitHub logins;
+# the one with the fewest open assignments below the WIP limit gets it.
+wip-limit: 3
+lanes:
+  backend: { owners: [] }
+  frontend: { owners: [] }
+  infra: { owners: [] }

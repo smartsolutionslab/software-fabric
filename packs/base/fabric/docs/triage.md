@@ -1,0 +1,2 @@
+- An issue agents may take gets `agent:ready` and exactly one `lane:<lane>` label (the lanes are in `docs/owners.yml`).
+- An issue unfit for agents: `.github/scripts/board/escalate.sh <issue> needs:human "<what is missing>"`; it assigns a developer of the lane.

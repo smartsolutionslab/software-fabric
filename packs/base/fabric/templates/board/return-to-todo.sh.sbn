@@ -1,0 +1,23 @@
+{%{#!/usr/bin/env bash
+# Returns an escalated issue to the agents once its developer has unassigned themselves (board protocol, docs/adr).
+# Usage: return-to-todo.sh <issue>
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+issue="$1"
+
+state="$(gh issue view "$issue" --repo "$repo" --json assignees,labels)"
+if [ "$(jq '.assignees | length' <<< "$state")" -gt 0 ]; then
+  echo "#$issue still has an assignee; it stays with them."
+  exit 0
+fi
+
+escalations="$(jq -r '[.labels[].name | select(. == "needs:human" or . == "needs:decision" or . == "agent:blocked")] | join(",")' <<< "$state")"
+if [ -z "$escalations" ]; then
+  echo "#$issue was not escalated; nothing to do."
+  exit 0
+fi
+
+gh issue edit "$issue" --repo "$repo" --remove-label "$escalations" --add-label agent:ready > /dev/null
+board_status "$issue" Todo
+board_comment "$issue" "Answered and unassigned: back to Todo for the agents (was $escalations)."
+}%}

@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# A stand-in for the GitHub CLI holding a repository's issues, branches, pull requests and board in $GH_FAKE_STATE.
+# It answers exactly the calls the board scripts make; anything else fails loudly.
+set -euo pipefail
+
+state="$GH_FAKE_STATE"
+echo "gh $*" >> "$state/log"
+
+# Flags as an associative array; repeated flags (--label) joined by newlines; the rest positional.
+declare -A flag=()
+positional=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --*)
+      name="${1#--}"
+      if [ $# -gt 1 ] && [[ "$2" != --* ]] && [ "$name" != clear ]; then
+        flag[$name]="${flag[$name]:+${flag[$name]}$'\n'}$2"
+        shift 2
+      else
+        flag[$name]=1
+        shift
+      fi
+      ;;
+    -X) flag[method]="$2"; shift 2 ;;
+    -f) flag["f:${2%%=*}"]="${2#*=}"; shift 2 ;;
+    *) positional+=("$1"); shift ;;
+  esac
+done
+
+issues="$state/issues.json"
+now_iso="$(date -u -d "@${BOARD_NOW:-$(date -u +%s)}" +%Y-%m-%dT%H:%M:%SZ)"
+
+update_issue() {
+  jq --argjson number "$1" "map(if .number == \$number then $2 else . end)" "$issues" > "$issues.tmp"
+  mv "$issues.tmp" "$issues"
+}
+
+case "${positional[0]} ${positional[1]:-}" in
+  "api repos/"*)
+    path="${positional[1]#repos/*/*/}"
+    method="${flag[method]:-GET}"
+    case "$method $path" in
+      "GET repos/"*) echo '{"default_branch":"main"}' ;;
+      "GET git/ref/heads/main") echo '{"object":{"sha":"main-sha"}}' ;;
+      "GET git/matching-refs/heads/"*)
+        prefix="${path#git/matching-refs/heads/}"
+        (cd "$state/refs" && find . -type f | sed 's#^\./##' | sort) | while read -r branch; do
+          [[ "$branch" == "$prefix"* ]] && jq -n --arg ref "refs/heads/$branch" --arg sha "$(cat "$state/refs/$branch")" '{ref: $ref, object: {sha: $sha}}'
+        done | jq -s .
+        ;;
+      "POST git/refs")
+        branch="${flag[f:ref]#refs/heads/}"
+        if [ -e "$state/refs/$branch" ]; then echo '{"message":"Reference already exists"}' >&2; exit 1; fi
+        mkdir -p "$(dirname "$state/refs/$branch")"
+        echo "${flag[f:sha]}" > "$state/refs/$branch"
+        echo "{}"
+        ;;
+      "POST branches/"*"/rename")
+        from="${path#branches/}"; from="${from%/rename}"; to="${flag[f:new_name]}"
+        if [ ! -e "$state/refs/$from" ] || [ -e "$state/refs/$to" ]; then echo '{"message":"Not Found"}' >&2; exit 1; fi
+        mkdir -p "$(dirname "$state/refs/$to")"
+        mv "$state/refs/$from" "$state/refs/$to"
+        echo "{}"
+        ;;
+      "GET commits/"*) jq -n --arg date "$(cat "$state/commits/${path#commits/}" 2>/dev/null || echo 2000-01-01T00:00:00Z)" '{commit: {committer: {date: $date}}}' ;;
+      "GET issues/"*"/comments") n="${path#issues/}"; cat "$state/comments/${n%/comments}.json" 2>/dev/null || echo '[]' ;;
+      *) echo "fake gh: no answer for api $method $path" >&2; exit 64 ;;
+    esac
+    ;;
+  "issue list")
+    jq --arg labels "${flag[label]:-}" --arg assignee "${flag[assignee]:-}" '
+      ($labels | split("\n") | map(select(. != ""))) as $wanted
+      | map(select(.state == "open")
+            | select([.labels[].name] as $have | all($wanted[]; . as $w | $have | index($w)))
+            | select($assignee == "" or ([.assignees[].login] | index($assignee))))' "$issues"
+    ;;
+  "issue view") jq --argjson number "${positional[2]}" '.[] | select(.number == $number)' "$issues" ;;
+  "issue comment")
+    n="${positional[2]}"; file="$state/comments/$n.json"; mkdir -p "$state/comments"
+    [ -e "$file" ] || echo '[]' > "$file"
+    jq --arg body "${flag[body]}" --arg at "$now_iso" '. + [{body: $body, created_at: $at}]' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+    ;;
+  "issue edit")
+    n="${positional[2]}"
+    [ -z "${flag[add-label]:-}" ] || update_issue "$n" ".labels += [{name: \"${flag[add-label]}\"}]"
+    [ -z "${flag[add-assignee]:-}" ] || update_issue "$n" ".assignees += [{login: \"${flag[add-assignee]}\"}]"
+    if [ -n "${flag[remove-label]:-}" ]; then
+      update_issue "$n" ".labels |= map(select(.name as \$name | \"${flag[remove-label]}\" | split(\",\") | index(\$name) | not))"
+    fi
+    ;;
+  "pr list") jq --arg head "${flag[head]}" 'map(select(.headRefName == $head))' "$state/prs.json" 2>/dev/null || echo '[]' ;;
+  "project view") echo '{"id":"PROJECT"}' ;;
+  "project field-list")
+    echo '{"fields":[{"id":"STATUS","name":"Status","options":[{"id":"Todo","name":"Todo"},{"id":"Claimed","name":"Claimed"},{"id":"In Progress","name":"In Progress"},{"id":"In Review","name":"In Review"},{"id":"Blocked","name":"Blocked"},{"id":"Done","name":"Done"}]},{"id":"EXECUTOR","name":"Executor"}]}'
+    ;;
+  "project item-list") jq --arg repo "$GITHUB_REPOSITORY" '{items: map({id: "ITEM-\(.number)", content: {url: "https://github.com/\($repo)/issues/\(.number)"}})}' "$issues" ;;
+  "project item-edit")
+    item="${flag[id]#ITEM-}"; field="${flag[field-id]}"
+    value="${flag[single-select-option-id]:-${flag[text]:-}}"
+    mkdir -p "$state/board"
+    printf '%s' "$value" > "$state/board/$item.$field"
+    ;;
+  "label create") ;;
+  *) echo "fake gh: no answer for $*" >&2; exit 64 ;;
+esac

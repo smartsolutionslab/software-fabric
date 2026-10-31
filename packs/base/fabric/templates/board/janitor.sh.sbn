@@ -1,0 +1,37 @@
+{%{#!/usr/bin/env bash
+# Returns lapsed claims to Todo (board protocol, docs/adr). Run on a schedule.
+# A claim lapses when its agent/ branch has no open pull request and neither a push nor the claim happened within the lease.
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+now="$(board_now)"
+lease=$((BOARD_LEASE_HOURS * 3600))
+
+to_epoch() {
+  date -u -d "$1" +%s
+}
+
+gh api "repos/$repo/git/matching-refs/heads/agent/" | jq -r '.[] | "\(.ref) \(.object.sha)"' | while read -r ref sha; do
+  branch="${ref#refs/heads/}"
+  issue="${branch#agent/}"
+  issue="${issue%%-*}"
+
+  if [ "$(gh pr list --repo "$repo" --head "$branch" --state open --json number | jq length)" -gt 0 ]; then
+    continue
+  fi
+
+  pushed="$(to_epoch "$(gh api "repos/$repo/commits/$sha" | jq -r .commit.committer.date)")"
+  claimed="$(gh api "repos/$repo/issues/$issue/comments" | jq -r '[.[] | select(.body | contains("<!-- board:claim -->")) | .created_at] | max // empty')"
+  last="$pushed"
+  if [ -n "$claimed" ] && [ "$(to_epoch "$claimed")" -gt "$last" ]; then
+    last="$(to_epoch "$claimed")"
+  fi
+
+  if [ $((now - last)) -gt "$lease" ]; then
+    board_rename "$branch" "parked/${branch#agent/}" || continue
+    board_status "$issue" Todo
+    board_executor "$issue" ""
+    board_comment "$issue" "The claim on \`$branch\` lapsed: no push for ${BOARD_LEASE_HOURS} h and no open pull request. Back to Todo; the work so far is on \`parked/${branch#agent/}\`."
+    echo "Returned #$issue to Todo."
+  fi
+done
+}%}

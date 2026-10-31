@@ -1,0 +1,1 @@
+- A decision the issue does not settle and the ADRs do not answer is not yours to make: `.github/scripts/board/escalate.sh <issue> needs:decision "<the concrete question>"`.
