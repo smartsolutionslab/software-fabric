@@ -1,0 +1,18 @@
+option: backend.test.framework.xunit
+files:
+  - { template: templates/ArchitectureRulesTests.cs.sbn, target: tests/Architecture.Tests/ArchitectureRulesTests.cs }
+  - { template: templates/ModuleTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/{{ module.namespace }}ModuleTests.cs", per-module: true }
+declares-slots:
+  - { slot: tests.assert-no-violations, description: "One statement asserting that IReadOnlyList<string> violations is empty, with string description as the message.", cardinality: exactly-one }
+  - { slot: tests.assert-does-not-throw, description: "One statement asserting that Action buildContainer does not throw.", cardinality: exactly-one }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: tests.build-properties, template: templates/build-properties.sbn }
+  - { slot: tests.packages, template: templates/packages.sbn }
+  - { slot: tests.usings, template: templates/usings.sbn }
+  - { slot: ci.backend-steps, template: templates/ci-step.sbn, order: 10 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "Every architecture rule runs as a test and fails it on any violation.", file: templates/ArchitectureRulesTests.cs.sbn }

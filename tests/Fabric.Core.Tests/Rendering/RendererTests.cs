@@ -62,7 +62,7 @@ public sealed class RendererTests : IDisposable
     private RenderedFile RenderSingle(string template)
     {
         var pack = Pack("base.core", ("t.sbn", template));
-        var rendered = Renderer.Render(Catalog, Compose([Composed(pack, "t.sbn", "out.txt")]), Choices);
+        var rendered = Renderer.Render(Catalog, Compose([Composed(pack, "t.sbn", "out.txt")]), Choices, "shop");
         rendered.Errors.ShouldBeEmpty();
         return rendered.Files.ShouldHaveSingleItem();
     }
@@ -70,7 +70,7 @@ public sealed class RendererTests : IDisposable
     private string SingleError(string template)
     {
         var pack = Pack("base.core", ("t.sbn", template));
-        var rendered = Renderer.Render(Catalog, Compose([Composed(pack, "t.sbn", "out.txt")]), Choices);
+        var rendered = Renderer.Render(Catalog, Compose([Composed(pack, "t.sbn", "out.txt")]), Choices, "shop");
         rendered.Files.ShouldBeEmpty();
         return rendered.Errors.ShouldHaveSingleItem();
     }
@@ -99,7 +99,7 @@ public sealed class RendererTests : IDisposable
     {
         var pack = Pack("module.style.ddd", ("d.sbn", "namespace {{ module.name }}; // {{ module.values[\"module.style\"] }}"));
 
-        var rendered = Renderer.Render(Catalog, Compose([Composed(pack, "d.sbn", "src/billing/Domain.cs", module: "billing")]), Choices);
+        var rendered = Renderer.Render(Catalog, Compose([Composed(pack, "d.sbn", "src/billing/Domain.cs", module: "billing")]), Choices, "shop");
 
         rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("namespace billing; // ddd");
     }
@@ -111,11 +111,13 @@ public sealed class RendererTests : IDisposable
         var first = Pack("backend.database.postgres", ("pg.sbn", "## {{ project[\"backend.database\"] }}"));
         var second = Pack("module.style.ddd", ("ddd.sbn", "## DDD"));
 
-        var rendered = Renderer.Render(Catalog, 
+        var rendered = Renderer.Render(
+            Catalog,
             Compose(
                 [Composed(owner, "readme.sbn", "README.md")],
                 new() { ["readme.sections"] = [new(first, new("readme.sections", "pg.sbn", 0)), new(second, new("readme.sections", "ddd.sbn", 1))] }),
-            Choices);
+            Choices,
+            "shop");
 
         rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("# Readme\n## postgres\n## DDD\n");
     }
@@ -125,7 +127,7 @@ public sealed class RendererTests : IDisposable
     {
         var owner = Pack("base.core", ("readme.sbn", "[{{ slots[\"readme.sections\"] }}]"));
 
-        var rendered = Renderer.Render(Catalog, Compose([Composed(owner, "readme.sbn", "README.md")], new() { ["readme.sections"] = [] }), Choices);
+        var rendered = Renderer.Render(Catalog, Compose([Composed(owner, "readme.sbn", "README.md")], new() { ["readme.sections"] = [] }), Choices, "shop");
 
         rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("[]");
     }
@@ -161,7 +163,7 @@ public sealed class RendererTests : IDisposable
     {
         var pack = Pack("base.core", ("t.sbn", "x"));
 
-        var rendered = Renderer.Render(Catalog, Compose([Composed(pack, "t.sbn", "src/b.txt"), Composed(pack, "t.sbn", "README.md"), Composed(pack, "t.sbn", "src/a.txt")]), Choices);
+        var rendered = Renderer.Render(Catalog, Compose([Composed(pack, "t.sbn", "src/b.txt"), Composed(pack, "t.sbn", "README.md"), Composed(pack, "t.sbn", "src/a.txt")]), Choices, "shop");
 
         rendered.Files.Select(file => file.Path).ShouldBe(["README.md", "src/a.txt", "src/b.txt"]);
     }
@@ -172,10 +174,102 @@ public sealed class RendererTests : IDisposable
         var pack = Pack("base.core", ("t.sbn", "{{ for p in project }}{{ p.key }}={{ p.value }}\n{{ end }}"));
         var composition = Compose([Composed(pack, "t.sbn", "out.txt")]);
 
-        var first = Renderer.Render(Catalog, composition, Choices).Files.ShouldHaveSingleItem().Content;
-        var second = Renderer.Render(Catalog, composition, Choices).Files.ShouldHaveSingleItem().Content;
+        var first = Renderer.Render(Catalog, composition, Choices, "shop").Files.ShouldHaveSingleItem().Content;
+        var second = Renderer.Render(Catalog, composition, Choices, "shop").Files.ShouldHaveSingleItem().Content;
 
         second.ShouldBe(first);
         first.ShouldContain("backend.database=postgres");
+    }
+
+    [Fact]
+    public void Slot_contributions_are_joined_with_the_declared_separator()
+    {
+        var owner = Pack("base.core", ("pkg.sbn", "{\n{{ slots[\"deps\"] }}\n}"));
+        var react = Pack("frontend.framework.react", ("react.sbn", "  \"react\": \"19\""));
+        var zod = Pack("frontend.validation.zod", ("zod.sbn", "  \"zod\": \"4\""));
+
+        var rendered = Renderer.Render(
+            Catalog,
+            new Composition(
+                [],
+                [Composed(owner, "pkg.sbn", "package.json")],
+                new Dictionary<string, IReadOnlyList<SlotEntry>> { ["deps"] = [new(react, new("deps", "react.sbn", 0)), new(zod, new("deps", "zod.sbn", 1))] },
+                [],
+                new Dictionary<string, string> { ["deps"] = ",\n" }),
+            Choices,
+            "shop");
+
+        rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("{\n  \"react\": \"19\",\n  \"zod\": \"4\"\n}");
+    }
+
+    [Fact]
+    public void The_project_name_and_its_namespace_are_available()
+    {
+        var pack = Pack("base.core", ("t.sbn", "{{ name }} {{ namespace }}"));
+
+        Renderer.Render(Catalog, Compose([Composed(pack, "t.sbn", "out.txt")]), Choices, "smart-shop-2")
+            .Files.ShouldHaveSingleItem().Content.ShouldBe("smart-shop-2 SmartShop2");
+    }
+
+    [Fact]
+    public void A_module_has_a_namespace_too()
+    {
+        var pack = Pack("module.style.ddd", ("d.sbn", "namespace {{ namespace }}.Modules.{{ module.namespace }};"));
+
+        Renderer.Render(Catalog, Compose([Composed(pack, "d.sbn", "src/billing/Domain.cs", module: "billing")]), Choices, "shop")
+            .Files.ShouldHaveSingleItem().Content.ShouldBe("namespace Shop.Modules.Billing;");
+    }
+
+    [Fact]
+    public void Runs_of_blank_lines_left_by_empty_slots_collapse_to_one()
+    {
+        var owner = Pack("base.core", ("t.sbn", "a\n\n{{ slots[\"empty\"] }}\n    \n\n{{ slots[\"empty\"] }}\nb\n"));
+
+        var rendered = Renderer.Render(Catalog, Compose([Composed(owner, "t.sbn", "out.txt")], new() { ["empty"] = [] }), Choices, "shop");
+
+        rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("a\n\nb\n");
+    }
+
+    [Fact]
+    public void Functions_contributed_to_templates_functions_are_available_in_every_template()
+    {
+        var guards = Pack("backend.guards.ensure-that", ("functions.sbn", "func not_null(name)\n  ret \"Ensure.That(\" + name + \").IsNotNull();\"\nend"));
+        var owner = Pack("base.core", ("t.sbn", "{{ not_null \"services\" }}\n"), ("section.sbn", "{{ not_null \"model\" }}"));
+
+        var rendered = Renderer.Render(
+            Catalog,
+            Compose(
+                [Composed(owner, "t.sbn", "a.cs")],
+                new()
+                {
+                    [Composer.TemplateFunctionsSlot] = [new(guards, new(Composer.TemplateFunctionsSlot, "functions.sbn", 0))],
+                    ["sections"] = [new(owner, new("sections", "section.sbn", 0))],
+                }),
+            Choices,
+            "shop");
+
+        rendered.Errors.ShouldBeEmpty();
+        rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("Ensure.That(services).IsNotNull();\n");
+    }
+
+    [Fact]
+    public void A_slot_contribution_can_use_the_contributed_functions_too()
+    {
+        var guards = Pack("backend.guards.ensure-that", ("functions.sbn", "func shout(text)\n  ret text + \"!\"\nend"));
+        var owner = Pack("base.core", ("t.sbn", "{{ slots[\"sections\"] }}"), ("section.sbn", "{{ shout \"hi\" }}"));
+
+        var rendered = Renderer.Render(
+            Catalog,
+            Compose(
+                [Composed(owner, "t.sbn", "a.txt")],
+                new()
+                {
+                    [Composer.TemplateFunctionsSlot] = [new(guards, new(Composer.TemplateFunctionsSlot, "functions.sbn", 0))],
+                    ["sections"] = [new(owner, new("sections", "section.sbn", 0))],
+                }),
+            Choices,
+            "shop");
+
+        rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("hi!");
     }
 }

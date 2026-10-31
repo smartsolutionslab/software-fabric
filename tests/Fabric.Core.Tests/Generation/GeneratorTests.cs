@@ -6,7 +6,7 @@ namespace Fabric.Core.Tests.Generation;
 public class GeneratorTests
 {
     private static GenerationResult New(string? profile, params string[] overrides) =>
-        Generator.New(Fixtures.MinimalCatalog, Fixtures.MinimalPacks, profile, overrides);
+        Generator.New(Fixtures.MinimalCatalog, Fixtures.MinimalPacks, "shop", profile, overrides);
 
     private static string Content(GenerationResult result, string path) =>
         result.Files.Single(file => file.Path == path).Content;
@@ -17,9 +17,19 @@ public class GeneratorTests
         var result = New("minimal");
 
         result.Errors.ShouldBeEmpty();
-        result.Files.Select(file => file.Path).ShouldBe(["README.md", "config/database.txt", "fabric.yaml"]);
+        result.Files.Select(file => file.Path).ShouldBe([
+            ".claude/agents/backend-engineer.md",
+            "AGENTS.md",
+            "README.md",
+            "config/database.txt",
+            "docs/adr/0001-base-core.md",
+            "docs/adr/0002-backend-database-postgres.md",
+            "docs/adr/0003-backend-api-protocols-rest.md",
+            "docs/adr/0004-module-style-ddd.md",
+            "fabric.yaml",
+        ]);
         Content(result, "config/database.txt").ShouldBe("provider=postgres\n");
-        Content(result, "fabric.yaml").ShouldContain("profile: minimal\n");
+        Content(result, "fabric.yaml").ShouldContain("name: shop\nprofile: minimal\n");
     }
 
     [Fact]
@@ -64,7 +74,7 @@ public class GeneratorTests
     {
         var packs = Fixtures.MinimalPacks.Where(pack => pack.Key != "backend.database.postgres").ToDictionary();
 
-        var result = Generator.New(Fixtures.MinimalCatalog, packs, "minimal", []);
+        var result = Generator.New(Fixtures.MinimalCatalog, packs, "shop", "minimal", []);
 
         result.Files.ShouldBeEmpty();
         result.Errors[0].ShouldBe("no pack for backend.database=postgres.");
@@ -77,7 +87,7 @@ public class GeneratorTests
         var postgres = packs["backend.database.postgres"];
         packs["backend.database.postgres"] = postgres with { Files = [new PackFile("templates/connection.sbn", "fabric.yaml", PerModule: false)] };
 
-        Generator.New(Fixtures.MinimalCatalog, packs, "minimal", [])
+        Generator.New(Fixtures.MinimalCatalog, packs, "shop", "minimal", [])
             .Errors.ShouldBe(["backend.database.postgres claims fabric.yaml, which the generator writes."]);
     }
 
@@ -85,5 +95,44 @@ public class GeneratorTests
     public void Generating_twice_gives_identical_output()
     {
         New("everything").Files.ShouldBe(New("everything").Files);
+    }
+
+    [Fact]
+    public void Every_selected_pack_contributes_its_agents_md_to_agents_md_in_selection_order()
+    {
+        Content(New("minimal"), "AGENTS.md").ShouldBe("""
+            # Agent guide for shop
+
+            Agent rules for base.core.
+
+            Agent rules for backend.database.postgres.
+
+            Agent rules for backend.api-protocols.rest.
+
+            Agent rules for module.style.ddd.
+
+            """);
+    }
+
+    [Fact]
+    public void A_role_brief_collects_the_briefs_packs_give_for_that_role_rendered_as_templates()
+    {
+        Content(New("minimal"), ".claude/agents/backend-engineer.md").ShouldBe("# Backend engineer (Shop)\n\nWrite EF Core migrations for postgres.\n");
+    }
+
+    [Fact]
+    public void Every_selected_pack_gets_its_adr_numbered_in_selection_order()
+    {
+        Content(New("minimal"), "docs/adr/0002-backend-database-postgres.md").ShouldBe("# ADR: backend.database.postgres\n");
+    }
+
+    [Theory]
+    [InlineData("Shop")]
+    [InlineData("my_shop")]
+    [InlineData("")]
+    public void Rejects_a_project_name_that_is_not_lower_kebab_case(string name)
+    {
+        Generator.New(Fixtures.MinimalCatalog, Fixtures.MinimalPacks, name, "minimal", [])
+            .Errors.ShouldBe([$"project name '{name}' must be lower-case letters, digits and hyphens, starting with a letter."]);
     }
 }

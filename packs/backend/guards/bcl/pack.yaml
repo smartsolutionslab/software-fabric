@@ -1,0 +1,9 @@
+option: backend.guards.bcl
+files: []
+slots:
+  - { slot: templates.functions, template: templates/functions.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "None beyond the platform: the BCL guards need no helper and nothing bans them; review checks preconditions exist at trust boundaries." }

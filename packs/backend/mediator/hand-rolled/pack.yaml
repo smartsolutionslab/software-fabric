@@ -1,0 +1,14 @@
+option: backend.mediator.hand-rolled
+files:
+  - { template: templates/Requests.cs.sbn, target: src/BuildingBlocks/Messaging/Requests.cs }
+  - { template: templates/Dispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/Dispatcher.cs }
+  - { template: templates/MessagingRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/MessagingRegistration.cs }
+  - { template: templates/EveryRequestHasOneHandler.cs.sbn, target: tests/Architecture.Tests/Rules/EveryRequestHasOneHandler.cs }
+slots:
+  - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Every command and query in an Application assembly has exactly one handler there.", file: templates/EveryRequestHasOneHandler.cs.sbn }

@@ -17,7 +17,7 @@ fabric() { dotnet "$cli" "$@"; }
 
 for profile in $(fabric profiles --catalog "$fixture/catalog.yaml"); do
   for run in first second; do
-    fabric new "$work/$profile-$run" --profile "$profile" --catalog "$fixture/catalog.yaml" --packs "$fixture/packs" >/dev/null
+    fabric new "$work/$profile-$run" --name "$profile" --profile "$profile" --catalog "$fixture/catalog.yaml" --packs "$fixture/packs" >/dev/null
   done
   diff -r "$work/$profile-first" "$work/$profile-second"
   fabric add-module billing --project "$work/$profile-first" --catalog "$fixture/catalog.yaml" --packs "$fixture/packs" >/dev/null

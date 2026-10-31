@@ -13,6 +13,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      # Generated AppHosts use the Aspire CLI bundle; set it up once instead of letting parallel builds race to do it.
+      - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
       - run: dotnet restore Fabric.slnx
       - run: dotnet build Fabric.slnx -c Release --no-restore
       - run: dotnet test --solution Fabric.slnx -c Release --no-build

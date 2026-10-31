@@ -1,0 +1,33 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class AggregatesHaveNoPublicSetters : IArchitectureRule
+{
+    public string Description => "No aggregate root exposes a public setter.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        return model.ModuleAssemblies
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(IsAggregateRoot)
+            .SelectMany(type => type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(property => property.SetMethod is { IsPublic: true })
+                .Select(property => $"{type.FullName}.{property.Name} has a public setter."));
+    }
+
+    private static bool IsAggregateRoot(Type type)
+    {
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        {
+            if (current.IsGenericType && current.GetGenericTypeDefinition().FullName == "{{ namespace }}.BuildingBlocks.Domain.AggregateRoot`1")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

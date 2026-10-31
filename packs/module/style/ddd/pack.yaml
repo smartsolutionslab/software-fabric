@@ -1,0 +1,15 @@
+option: module.style.ddd
+files:
+  - { template: templates/BuildingBlocks.Domain.csproj.sbn, target: src/BuildingBlocks.Domain/BuildingBlocks.Domain.csproj }
+  - { template: templates/Entity.cs.sbn, target: src/BuildingBlocks.Domain/Entity.cs }
+  - { template: templates/AggregateRoot.cs.sbn, target: src/BuildingBlocks.Domain/AggregateRoot.cs }
+  - { template: templates/IDomainEvent.cs.sbn, target: src/BuildingBlocks.Domain/IDomainEvent.cs }
+  - { template: templates/DomainIsPure.cs.sbn, target: tests/Architecture.Tests/Rules/DomainIsPure.cs }
+slots:
+  - { slot: solution.projects, template: templates/solution-project.sbn }
+  - { slot: modules.packages.domain, template: templates/domain-reference.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "A module's Domain project references nothing but the BCL, Kernel and BuildingBlocks.Domain.", file: templates/DomainIsPure.cs.sbn }

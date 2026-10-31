@@ -1,0 +1,12 @@
+option: backend.api-protocols.rest
+files: []
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-version.sbn }
+  - { slot: host.packages, template: templates/host-package.sbn }
+  - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: host.middleware, template: templates/host-middleware.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "GET /openapi/v1.json answers with the API description; checked by the integration tests of the aspire-fixture pack against the running stack." }

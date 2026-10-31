@@ -1,0 +1,16 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+{{ slots["tests.build-properties"] }}
+  </PropertyGroup>
+
+  <ItemGroup>
+{{ slots["tests.packages"] }}
+  </ItemGroup>
+
+  <ItemGroup>
+{{ slots["tests.usings"] }}
+  </ItemGroup>
+</Project>

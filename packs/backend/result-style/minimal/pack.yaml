@@ -1,0 +1,10 @@
+option: backend.result-style.minimal
+files:
+  - { template: templates/Result.cs.sbn, target: src/Kernel/Result.cs }
+  - { template: templates/ApiError.cs.sbn, target: src/Kernel/ApiError.cs }
+  - { template: templates/ErrorsDeriveFromApiError.cs.sbn, target: tests/Architecture.Tests/Rules/ErrorsDeriveFromApiError.cs }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Every type named *Error in a module's Application project derives from ApiError.", file: templates/ErrorsDeriveFromApiError.cs.sbn }

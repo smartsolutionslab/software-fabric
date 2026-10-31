@@ -1,0 +1,2 @@
+      - name: Test
+        run: for project in $(find tests -name '*.Tests.csproj' | sort); do dotnet test --project "$project" -c Release --no-build || exit 1; done

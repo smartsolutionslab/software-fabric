@@ -1,0 +1,34 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!-- A module project is called <Module>.<Layer>; everything below is keyed on that, so modules need no list. -->
+  <PropertyGroup>
+    <ModuleName>$([System.IO.Path]::GetFileNameWithoutExtension('$(MSBuildProjectName)'))</ModuleName>
+    <ModuleLayer>$([System.IO.Path]::GetExtension('$(MSBuildProjectName)').TrimStart('.'))</ModuleLayer>
+    <ModuleDirectory>$(MSBuildProjectDirectory)/..</ModuleDirectory>
+    <AssemblyName>{{ namespace }}.Modules.$(MSBuildProjectName)</AssemblyName>
+    <RootNamespace>{{ namespace }}.Modules.$(MSBuildProjectName)</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(ModuleLayer)' == 'Domain'">
+{{ slots["modules.packages.domain"] }}
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ModuleLayer)' == 'Application'">
+    <ProjectReference Include="$(ModuleDirectory)/$(ModuleName).Domain/$(ModuleName).Domain.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../BuildingBlocks/BuildingBlocks.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../Contracts/Contracts.csproj" />
+{{ slots["modules.packages.application"] }}
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ModuleLayer)' == 'Infrastructure'">
+    <ProjectReference Include="$(ModuleDirectory)/$(ModuleName).Application/$(ModuleName).Application.csproj" />
+{{ slots["modules.packages.infrastructure"] }}
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ModuleLayer)' == 'Api'">
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="$(ModuleDirectory)/$(ModuleName).Infrastructure/$(ModuleName).Infrastructure.csproj" />
+{{ slots["modules.packages.api"] }}
+  </ItemGroup>
+</Project>

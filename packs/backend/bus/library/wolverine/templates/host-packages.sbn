@@ -1,0 +1,14 @@
+    <PackageReference Include="WolverineFx" />
+    <PackageReference Include="WolverineFx.RuntimeCompilation" />
+{{~ if project["backend.database"] == "postgres" ~}}
+    <PackageReference Include="WolverineFx.Postgresql" />
+{{~ else ~}}
+    <PackageReference Include="WolverineFx.SqlServer" />
+{{~ end ~}}
+{{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
+    <PackageReference Include="WolverineFx.RabbitMQ" />
+{{~ else if project["backend.bus.transport"] == "azure-service-bus" ~}}
+    <PackageReference Include="WolverineFx.AzureServiceBus" />
+{{~ else ~}}
+    <PackageReference Include="WolverineFx.Kafka" />
+{{~ end ~}}

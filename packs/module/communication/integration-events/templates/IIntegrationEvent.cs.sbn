@@ -1,0 +1,6 @@
+namespace {{ namespace }}.Contracts;
+
+#pragma warning disable CA1040 // A marker: an event is its record type and properties.
+/// <summary>Something a module tells other modules has happened. A versioned record: InvoicePaidV1.</summary>
+public interface IIntegrationEvent;
+#pragma warning restore CA1040

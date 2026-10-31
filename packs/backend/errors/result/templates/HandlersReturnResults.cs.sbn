@@ -1,0 +1,40 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class HandlersReturnResults : IArchitectureRule
+{
+    public string Description => "Every handler in an Application assembly returns a Result.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var handlers = model.ModuleAssemblies
+            .Where(assembly => assembly.GetName().Name!.EndsWith(".Application", StringComparison.Ordinal))
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type is { IsClass: true, IsAbstract: false } && type.Name.EndsWith("Handler", StringComparison.Ordinal));
+
+        foreach (var handler in handlers)
+        {
+            foreach (var method in handler.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                .Where(method => method.Name.StartsWith("Handle", StringComparison.Ordinal)))
+            {
+                if (!IsResult(method.ReturnType))
+                {
+                    yield return $"{handler.FullName}.{method.Name} returns {method.ReturnType.Name}, not a Result.";
+                }
+            }
+        }
+    }
+
+    private static bool IsResult(Type type)
+    {
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Task<>))
+        {
+            type = type.GetGenericArguments()[0];
+        }
+
+        return type.IsGenericType && type.GetGenericTypeDefinition().FullName == "{{ namespace }}.Kernel.Result`2";
+    }
+}

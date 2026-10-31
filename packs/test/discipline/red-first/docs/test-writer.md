@@ -1,0 +1,1 @@
+Red first: write only tests, run them, and return the full failing output verbatim — it goes into the PR. If a new-behaviour test passes before any code changes, stop and report it: either the behaviour exists or the test does not test it.

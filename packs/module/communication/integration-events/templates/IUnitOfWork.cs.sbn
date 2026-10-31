@@ -1,0 +1,13 @@
+using {{ namespace }}.Contracts;
+
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+/// <summary>A module's changes and the integration events announcing them, saved together.</summary>
+public interface IUnitOfWork
+{
+    /// <summary>Queues the event; it is sent only if <see cref="CommitAsync"/> succeeds.</summary>
+    Task PublishAsync(IIntegrationEvent integrationEvent);
+
+    /// <summary>Saves the module's changes and its queued events in one transaction.</summary>
+    Task CommitAsync(CancellationToken cancellationToken);
+}

@@ -1,0 +1,19 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.4">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>{{ namespace }}.AppHost</RootNamespace>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
+    <!-- Aspire keeps generated passwords here; without it a data volume outlives the password it was created with. -->
+    <UserSecretsId>fabric-{{ name }}-apphost</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+{{ slots["apphost.packages"] }}
+  </ItemGroup>
+
+  <ItemGroup>
+{{ slots["apphost.project-references"] }}
+  </ItemGroup>
+
+</Project>

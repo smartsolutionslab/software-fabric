@@ -1,0 +1,80 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>Either a value or an expected failure. Business failures carry a typed error; bugs and broken infrastructure throw.</summary>
+public readonly struct Result<TValue, TError>
+    where TValue : notnull
+    where TError : notnull
+{
+    private readonly TValue value;
+    private readonly TError error;
+    private readonly bool isSuccess;
+
+    private Result(TValue value, TError error, bool isSuccess)
+    {
+        this.value = value;
+        this.error = error;
+        this.isSuccess = isSuccess;
+    }
+
+    public bool IsSuccess => isSuccess;
+
+    public bool IsFailure => !isSuccess;
+
+    public TValue Value =>
+        isSuccess ? value : throw new InvalidOperationException("Result is a failure; no value.");
+
+    public TError Error =>
+        isSuccess ? throw new InvalidOperationException("Result is a success; no error.") : error;
+
+#pragma warning disable CA1000 // Static factories on the generic type: Result<InvoiceDto, ApiError>.Success(dto) where no return type infers it.
+    public static Result<TValue, TError> Success(TValue value) => new(value, default!, isSuccess: true);
+
+    public static Result<TValue, TError> Failure(TError error) => new(default!, error, isSuccess: false);
+#pragma warning restore CA1000
+
+#pragma warning disable CA2225 // The named alternatives are Success and Failure above.
+    /// <summary>Lets a handler write <c>Success(dto)</c>; the return type supplies the error type.</summary>
+    public static implicit operator Result<TValue, TError>(SuccessOutcome<TValue> outcome) => Success(outcome.Value);
+
+    public static implicit operator Result<TValue, TError>(FailureOutcome<TError> outcome) => Failure(outcome.Error);
+#pragma warning restore CA2225
+
+    public TOut Match<TOut>(Func<TValue, TOut> onSuccess, Func<TError, TOut> onFailure)
+    {
+        {{ not_null "onSuccess" }}
+        {{ not_null "onFailure" }}
+
+        return isSuccess ? onSuccess(value) : onFailure(error);
+    }
+}
+
+/// <summary>Half-built success, waiting for a return type to say which <see cref="Result{TValue,TError}"/> it is.</summary>
+public readonly struct SuccessOutcome<TValue>
+    where TValue : notnull
+{
+    internal SuccessOutcome(TValue value) => Value = value;
+
+    internal TValue Value { get; }
+}
+
+/// <summary>
+/// Half-built failure. The type argument is the error base the result declares, not the concrete error: generics are
+/// invariant, so each module's <c>&lt;Name&gt;Failures</c> factories return the base.
+/// </summary>
+public readonly struct FailureOutcome<TError>
+    where TError : notnull
+{
+    internal FailureOutcome(TError error) => Error = error;
+
+    internal TError Error { get; }
+}
+
+/// <summary>Imported with <c>using static</c> everywhere: <c>Success(dto)</c>, <c>Failure(InvoiceFailures.NotFound(id))</c>.</summary>
+public static class Result
+{
+    public static SuccessOutcome<TValue> Success<TValue>(TValue value)
+        where TValue : notnull => new(value);
+
+    public static FailureOutcome<TError> Failure<TError>(TError error)
+        where TError : notnull => new(error);
+}

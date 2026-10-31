@@ -1,0 +1,5 @@
+# Agent guide — {{ name }}
+
+This file is read by every agent working here, whichever model or tool it is. Each section below comes from one choice in `fabric.yaml`; the reasoning is in `docs/adr/`. Follow all of them.
+
+{{ slots["agents.sections"] }}

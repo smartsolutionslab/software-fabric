@@ -1,0 +1,26 @@
+using {{ namespace }}.Contracts;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Wolverine.EntityFrameworkCore;
+
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+/// <summary>
+/// A module's unit of work over Wolverine's EF Core outbox. The outbox is the host's (messaging is host-wide), so it
+/// is resolved on first use; a module's own registrations stay valid without a running host.
+/// </summary>
+public abstract class ModuleUnitOfWork<TContext>(IServiceProvider services) : IUnitOfWork
+    where TContext : DbContext
+{
+    private IDbContextOutbox<TContext>? outbox;
+
+    private IDbContextOutbox<TContext> Outbox => outbox ??= services.GetRequiredService<IDbContextOutbox<TContext>>();
+
+    public async Task PublishAsync(IIntegrationEvent integrationEvent)
+    {
+        {{ not_null "integrationEvent" }}
+        await Outbox.PublishAsync(integrationEvent);
+    }
+
+    public Task CommitAsync(CancellationToken cancellationToken) => Outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
+}

@@ -1,0 +1,18 @@
+using System.Reflection;
+
+namespace {{ namespace }}.BuildingBlocks.Modules;
+
+public static class ModuleDiscovery
+{
+    /// <summary>Module Api assemblies follow this pattern; nothing else in the output directory does.</summary>
+    public const string ApiAssemblyPattern = "{{ namespace }}.Modules.*.Api.dll";
+
+    /// <summary>One instance of every <see cref="IModule"/> in the module Api assemblies next to the host.</summary>
+    public static IReadOnlyList<IModule> Discover(string directory) =>
+        [.. Directory.EnumerateFiles(directory, ApiAssemblyPattern)
+            .Order(StringComparer.Ordinal)
+            .Select(Assembly.LoadFrom)
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(IModule).IsAssignableFrom(type))
+            .Select(type => (IModule)Activator.CreateInstance(type)!)];
+}

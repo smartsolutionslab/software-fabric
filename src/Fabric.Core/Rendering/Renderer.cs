@@ -1,5 +1,7 @@
+using System.Text.RegularExpressions;
 using Fabric.Core.Catalog;
 using Fabric.Core.Choices;
+using Fabric.Core.Generation;
 using Fabric.Core.Packs;
 using Scriban;
 using Scriban.Functions;
@@ -9,26 +11,29 @@ using Scriban.Syntax;
 namespace Fabric.Core.Rendering;
 
 /// <summary>
-/// Renders a composition with Scriban. Templates see <c>project</c>, <c>module_defaults</c>, <c>modules</c>,
-/// <c>module</c> (per-module files only) and <c>slots</c> (files only). Nothing from the clock or the machine is
+/// Renders a composition with Scriban. Templates see <c>name</c>, <c>namespace</c>, <c>project</c>,
+/// <c>module_defaults</c>, <c>modules</c>, <c>module</c> (per-module files only) and <c>slots</c> (files only). Nothing from the clock or the machine is
 /// available, unknown variables are errors, and output uses LF, so the same input always renders the same bytes.
 /// </summary>
-public static class Renderer
+public static partial class Renderer
 {
-    public static RenderedProject Render(CatalogModel catalog, Composition composition, ProjectChoices choices)
+    public static RenderedProject Render(CatalogModel catalog, Composition composition, ProjectChoices choices, string name)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(composition);
         ArgumentNullException.ThrowIfNull(choices);
+        ArgumentNullException.ThrowIfNull(name);
 
         List<string> errors = [];
-        var model = Model(catalog, choices);
+        var model = Model(catalog, choices, name);
+        var functions = Functions(composition);
 
         var slots = new ScriptObject();
-        foreach (var (slot, entries) in composition.Slots)
+        foreach (var (slot, entries) in composition.Slots.Where(slot => slot.Key != Composer.TemplateFunctionsSlot))
         {
-            var parts = entries.Select(entry => RenderTemplate(entry.Pack, entry.Contribution.Template, errors, model));
-            slots.SetValue(slot, string.Join('\n', parts.OfType<string>()), readOnly: true);
+            var parts = entries.Select(entry => RenderTemplate(entry.Pack, entry.Contribution.Template, functions, errors, model));
+            var separator = composition.SlotSeparators?.GetValueOrDefault(slot) ?? "\n";
+            slots.SetValue(slot, string.Join(separator, parts.OfType<string>()), readOnly: true);
         }
 
         List<RenderedFile> files = [];
@@ -40,7 +45,7 @@ public static class Renderer
                 scope["module"] = Module(catalog, module, choices.Modules[module]);
             }
 
-            if (RenderTemplate(file.Pack, file.File.Template, errors, model, scope) is { } content)
+            if (RenderTemplate(file.Pack, file.File.Template, functions, errors, model, scope) is { } content)
             {
                 files.Add(new RenderedFile(file.Target, content));
             }
@@ -51,10 +56,16 @@ public static class Renderer
             : new RenderedProject([.. files.OrderBy(file => file.Path, StringComparer.Ordinal)], []);
     }
 
-    private static string? RenderTemplate(PackManifest pack, string templatePath, List<string> errors, params ScriptObject[] globals)
+    /// <summary>The Scriban code packs contribute to <see cref="Composer.TemplateFunctionsSlot"/>, as a prefix that outputs nothing.</summary>
+    private static string Functions(Composition composition) =>
+        composition.Slots.TryGetValue(Composer.TemplateFunctionsSlot, out var entries) && entries.Count > 0
+            ? "{{~ " + string.Join('\n', entries.Select(entry => File.ReadAllText(Path.Combine(entry.Pack.Directory, entry.Contribution.Template)))) + " }}"
+            : string.Empty;
+
+    private static string? RenderTemplate(PackManifest pack, string templatePath, string functions, List<string> errors, params ScriptObject[] globals)
     {
         var label = $"{pack.Option}: {templatePath}";
-        var template = Template.Parse(File.ReadAllText(Path.Combine(pack.Directory, templatePath)), templatePath);
+        var template = Template.Parse(functions + File.ReadAllText(Path.Combine(pack.Directory, templatePath)), templatePath);
         if (template.HasErrors)
         {
             errors.Add($"{label}: {string.Join("; ", template.Messages)}");
@@ -69,7 +80,7 @@ public static class Renderer
 
         try
         {
-            return template.Render(context).Replace("\r\n", "\n", StringComparison.Ordinal);
+            return Tidy(template.Render(context).Replace("\r\n", "\n", StringComparison.Ordinal));
         }
         catch (ScriptRuntimeException exception)
         {
@@ -77,6 +88,16 @@ public static class Renderer
             return null;
         }
     }
+
+    /// <summary>An empty slot leaves its line behind; whitespace-only lines become empty and blank-line runs collapse to one.</summary>
+    private static string Tidy(string content) =>
+        BlankLineRun().Replace(WhitespaceOnlyLine().Replace(content, string.Empty), "\n\n");
+
+    [GeneratedRegex(@"(?m)^[ \t]+$")]
+    private static partial Regex WhitespaceOnlyLine();
+
+    [GeneratedRegex(@"\n{3,}")]
+    private static partial Regex BlankLineRun();
 
     /// <summary>Scriban's built-ins minus <c>date</c>, <c>timespan</c> and <c>math</c>, which can read the clock or a random source.</summary>
     private static ScriptObject Builtins()
@@ -90,16 +111,18 @@ public static class Renderer
         return builtins;
     }
 
-    private static ScriptObject Model(CatalogModel catalog, ProjectChoices choices)
+    private static ScriptObject Model(CatalogModel catalog, ProjectChoices choices, string name)
     {
         var modules = new ScriptArray();
-        foreach (var (name, values) in choices.Modules)
+        foreach (var (moduleName, values) in choices.Modules)
         {
-            modules.Add(Module(catalog, name, values));
+            modules.Add(Module(catalog, moduleName, values));
         }
 
         return new ScriptObject
         {
+            ["name"] = name,
+            ["namespace"] = Names.ToPascalCase(name),
             ["project"] = Values(catalog, choices.Project),
             ["module_defaults"] = Values(catalog, choices.ModuleDefaults),
             ["modules"] = modules,
@@ -107,7 +130,7 @@ public static class Renderer
     }
 
     private static ScriptObject Module(CatalogModel catalog, string name, IReadOnlyDictionary<string, IReadOnlyList<string>> values) =>
-        new() { ["name"] = name, ["values"] = Values(catalog, values) };
+        new() { ["name"] = name, ["namespace"] = Names.ToPascalCase(name), ["values"] = Values(catalog, values) };
 
     /// <summary>Single-valued dimensions become strings, multi-valued ones lists.</summary>
     private static ScriptObject Values(CatalogModel catalog, IReadOnlyDictionary<string, IReadOnlyList<string>> values)

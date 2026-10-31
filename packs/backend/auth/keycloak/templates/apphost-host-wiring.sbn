@@ -1,0 +1,4 @@
+
+    .WithReference(keycloak)
+    .WaitFor(keycloak)
+    .WithEnvironment("Authentication__Authority", ReferenceExpression.Create($"{keycloak.GetEndpoint("http")}/realms/{{ name }}"))

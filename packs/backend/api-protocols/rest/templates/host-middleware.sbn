@@ -1,0 +1,4 @@
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}

@@ -1,0 +1,1 @@
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />

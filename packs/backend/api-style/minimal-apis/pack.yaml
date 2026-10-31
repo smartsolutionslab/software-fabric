@@ -1,0 +1,12 @@
+option: backend.api-style.minimal-apis
+files:
+  - { template: templates/IEndpoint.cs.sbn, target: src/BuildingBlocks/Api/IEndpoint.cs }
+  - { template: templates/EndpointDiscovery.cs.sbn, target: src/BuildingBlocks/Api/EndpointDiscovery.cs }
+  - { template: templates/NoControllers.cs.sbn, target: tests/Architecture.Tests/Rules/NoControllers.cs }
+slots:
+  - { slot: modules.endpoints, template: templates/module-endpoints.sbn, order: 10 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No module contains an MVC controller.", file: templates/NoControllers.cs.sbn }

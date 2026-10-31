@@ -22,16 +22,17 @@ public sealed class NewCommandTests : IDisposable
         var run = New("shop", "--profile", "everything");
 
         run.ExitCode.ShouldBe(0);
-        run.Output.ShouldBe($"created {Path.Combine(root, "shop")} with 3 files.{Environment.NewLine}");
-        Tree("shop").Keys.Order(StringComparer.Ordinal).ShouldBe(["README.md", "config/database.txt", "fabric.yaml"]);
+        run.Output.ShouldBe($"created {Path.Combine(root, "shop")} with 10 files.{Environment.NewLine}");
+        Tree("shop").Keys.ShouldContain("docs/adr/0005-module-style-crud.md");
+        Tree("shop")["fabric.yaml"].ShouldContain("name: shop\n");
         Tree("shop")["fabric.yaml"].ShouldContain("backend.api-protocols: [rest, grpc]\n");
     }
 
     [Fact]
     public void Two_runs_with_the_same_choices_write_identical_trees()
     {
-        New("first", "--profile", "everything").ExitCode.ShouldBe(0);
-        New("second", "--profile", "everything").ExitCode.ShouldBe(0);
+        New("first", "--profile", "everything", "--name", "shop").ExitCode.ShouldBe(0);
+        New("second", "--profile", "everything", "--name", "shop").ExitCode.ShouldBe(0);
 
         Tree("second").ShouldBe(Tree("first"));
     }
@@ -66,5 +67,23 @@ public sealed class NewCommandTests : IDisposable
 
         run.ExitCode.ShouldBe(1);
         run.Error.ShouldContain("error: no pack for backend.database=postgres.");
+    }
+
+    [Fact]
+    public void The_name_option_wins_over_the_directory_name()
+    {
+        var run = New("Some_Directory", "--profile", "minimal", "--name", "shop");
+
+        run.ExitCode.ShouldBe(0);
+        Tree("Some_Directory")["AGENTS.md"].ShouldStartWith("# Agent guide for shop\n");
+    }
+
+    [Fact]
+    public void A_directory_name_that_is_not_a_valid_project_name_needs_the_name_option()
+    {
+        var run = New("Some_Directory", "--profile", "minimal");
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: project name 'Some_Directory' must be lower-case letters, digits and hyphens, starting with a letter. Pass --name.");
     }
 }

@@ -1,0 +1,22 @@
+{%{name: red-first
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  failing-tests-quoted:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Source changes quote the tests they made fail first
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          printf '%s' "$BODY" > "$RUNNER_TEMP/body.md"
+          git diff --name-only "$BASE"...HEAD > "$RUNNER_TEMP/changed.txt"
+          bash .github/scripts/check-red-first.sh "$RUNNER_TEMP/body.md" "$RUNNER_TEMP/changed.txt"
+}%}

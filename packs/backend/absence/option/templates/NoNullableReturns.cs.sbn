@@ -1,0 +1,42 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class NoNullableReturns : IArchitectureRule
+{
+    private static readonly NullabilityInfoContext Nullability = new();
+
+    public string Description => "No public method in a module's Domain or Application project returns a nullable reference; absence is an Option<T>.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var methods = model.ModuleAssemblies
+            .Where(assembly => assembly.GetName().Name!.EndsWith(".Domain", StringComparison.Ordinal) || assembly.GetName().Name!.EndsWith(".Application", StringComparison.Ordinal))
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type.IsPublic && !type.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute)))
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                .Where(method => !method.IsSpecialName && !method.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute)))
+                .Select(method => (type, method)));
+
+        foreach (var (type, method) in methods)
+        {
+            if (ReturnsNullableReference(method))
+            {
+                yield return $"{type.FullName}.{method.Name} returns a nullable reference; return Option<T>.";
+            }
+        }
+    }
+
+    private static bool ReturnsNullableReference(MethodInfo method)
+    {
+        var returned = Nullability.Create(method.ReturnParameter);
+        if (returned.Type.IsGenericType && returned.Type.GetGenericTypeDefinition() is var definition && (definition == typeof(Task<>) || definition == typeof(ValueTask<>)))
+        {
+            returned = returned.GenericTypeArguments[0];
+        }
+
+        return !returned.Type.IsValueType && returned.ReadState == NullabilityState.Nullable;
+    }
+}

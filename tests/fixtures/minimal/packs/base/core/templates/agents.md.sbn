@@ -1,0 +1,3 @@
+# Agent guide for {{ name }}
+
+{{ slots["agents.sections"] }}

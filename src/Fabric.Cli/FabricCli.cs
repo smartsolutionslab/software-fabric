@@ -66,9 +66,11 @@ public static class FabricCli
     {
         var (profile, set, catalog, packs) = (ProfileOption(), SetOption(), CatalogOption(), PacksOption());
         var directory = new Argument<string>("directory") { Description = "Where to create the project; must be new or empty." };
+        var name = new Option<string?>("--name") { Description = "The project's name in lower kebab-case. Defaults to the directory's name." };
         var command = new Command("new", "Generate a project from a profile plus overrides.")
         {
             directory,
+            name,
             profile,
             set,
             catalog,
@@ -77,6 +79,13 @@ public static class FabricCli
 
         command.SetAction(result => Guarded(error, () =>
         {
+            var target = result.GetValue(directory)!;
+            var projectName = result.GetValue(name) ?? Path.GetFileName(Path.TrimEndingDirectorySeparator(Path.GetFullPath(target)));
+            if (result.GetValue(name) is null && !Names.IsValid(projectName))
+            {
+                return Fail(error, [$"project name '{projectName}' must be lower-case letters, digits and hyphens, starting with a letter. Pass --name."]);
+            }
+
             var catalogModel = CatalogReader.ReadFile(result.GetValue(catalog)!);
             var loaded = PackLoader.Load(result.GetValue(packs)!, catalogModel);
             if (loaded.Errors.Count > 0)
@@ -84,13 +93,12 @@ public static class FabricCli
                 return Fail(error, loaded.Errors);
             }
 
-            var generated = Generator.New(catalogModel, loaded.Packs, result.GetValue(profile), result.GetValue(set) ?? []);
+            var generated = Generator.New(catalogModel, loaded.Packs, projectName, result.GetValue(profile), result.GetValue(set) ?? []);
             if (generated.Errors.Count > 0)
             {
                 return Fail(error, generated.Errors);
             }
 
-            var target = result.GetValue(directory)!;
             if (ProjectWriter.Write(target, generated.Files) is { } writeError)
             {
                 return Fail(error, [writeError]);

@@ -1,0 +1,3 @@
+
+    /// <summary>The tenant whose rows this context sees (tenancy: column).</summary>
+    public string? CurrentTenantId => Services.GetService<{{ namespace }}.BuildingBlocks.Tenancy.ITenantContext>()?.TenantId;

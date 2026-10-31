@@ -1,0 +1,11 @@
+option: backend.errors.result
+files:
+  - { template: templates/ResultHttpExtensions.cs.sbn, target: src/BuildingBlocks/Http/ResultHttpExtensions.cs }
+  - { template: templates/HandlersReturnResults.cs.sbn, target: tests/Architecture.Tests/Rules/HandlersReturnResults.cs }
+slots:
+  - { slot: host.services, template: templates/host-services.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Every handler in an Application assembly returns a Result.", file: templates/HandlersReturnResults.cs.sbn }

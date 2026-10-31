@@ -1,0 +1,19 @@
+option: backend.bus.library.wolverine
+files:
+  - { template: templates/Messaging.cs.sbn, target: src/Host/Messaging.cs }
+  - { template: templates/ModuleUnitOfWorkBase.cs.sbn, target: src/BuildingBlocks/Messaging/ModuleUnitOfWork.cs }
+  - { template: templates/UnitOfWorkRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/UnitOfWorkRegistration.cs }
+  - { template: templates/ModuleUnitOfWork.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/{{ module.namespace }}UnitOfWork.cs", per-module: true }
+  - { template: templates/ConsumersHandleIntegrationEvents.cs.sbn, target: tests/Architecture.Tests/Rules/ConsumersHandleIntegrationEvents.cs }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: buildingblocks.packages, template: templates/buildingblocks-packages.sbn }
+  - { slot: host.packages, template: templates/host-packages.sbn }
+  - { slot: host.services, template: templates/host-services.sbn, order: 20 }
+  - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 20 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Every consumer handles integration events and nothing else.", file: templates/ConsumersHandleIntegrationEvents.cs.sbn }
+  - { kind: ci-step, describes: "An integration event published by one module reaches a consumer in another; checked by the integration tests of the aspire-fixture pack against the running stack." }

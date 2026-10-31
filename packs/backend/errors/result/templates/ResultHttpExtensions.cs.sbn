@@ -1,0 +1,15 @@
+namespace Microsoft.AspNetCore.Http;
+
+public static class ResultHttpExtensions
+{
+    /// <summary>200 with the value, or problem details carrying the error's status and code.</summary>
+    public static IResult ToHttpResult<TValue, TError>(this Result<TValue, TError> result)
+        where TValue : notnull
+        where TError : ApiError =>
+        result.Match<IResult>(
+            value => TypedResults.Ok(value),
+            error => TypedResults.Problem(
+                title: error.Message,
+                statusCode: (int)error.Status,
+                extensions: new Dictionary<string, object?> { ["code"] = error.Code }));
+}

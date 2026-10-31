@@ -1,0 +1,15 @@
+    <PackageVersion Include="WolverineFx" Version="6.59.1" />
+    <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="6.59.1" />
+    <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.59.1" />
+{{~ if project["backend.database"] == "postgres" ~}}
+    <PackageVersion Include="WolverineFx.Postgresql" Version="6.59.1" />
+{{~ else ~}}
+    <PackageVersion Include="WolverineFx.SqlServer" Version="6.59.1" />
+{{~ end ~}}
+{{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
+    <PackageVersion Include="WolverineFx.RabbitMQ" Version="6.59.1" />
+{{~ else if project["backend.bus.transport"] == "azure-service-bus" ~}}
+    <PackageVersion Include="WolverineFx.AzureServiceBus" Version="6.59.1" />
+{{~ else ~}}
+    <PackageVersion Include="WolverineFx.Kafka" Version="6.59.1" />
+{{~ end ~}}

@@ -1,0 +1,15 @@
+option: test.discipline.red-first
+files:
+  - { template: templates/check-red-first.sh.sbn, target: ".github/scripts/check-red-first.sh" }
+  - { template: templates/red-first.yml.sbn, target: ".github/workflows/red-first.yml" }
+slots:
+  - { slot: pr-template.sections, template: templates/pr-section.sbn }
+agents:
+  agents-md: docs/agents.md
+  briefs:
+    test-writer: docs/test-writer.md
+    backend-engineer: docs/engineer.md
+    frontend-engineer: docs/engineer.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "A pull request that changes src/ or web/ quotes the output of its tests failing before the change.", file: templates/red-first.yml.sbn }

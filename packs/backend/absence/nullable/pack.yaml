@@ -1,0 +1,7 @@
+option: backend.absence.nullable
+files: []
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: analyzer, describes: "Nullable reference types are enabled in every project and warnings are errors, so a possibly-null value used as non-null fails the build." }

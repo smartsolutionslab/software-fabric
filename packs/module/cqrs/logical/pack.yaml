@@ -1,0 +1,8 @@
+option: module.cqrs.logical
+files:
+  - { template: templates/RequestsLiveInCommandsOrQueries.cs.sbn, target: tests/Architecture.Tests/Rules/RequestsLiveInCommandsOrQueries.cs }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Commands live in a Commands namespace and queries in a Queries namespace.", file: templates/RequestsLiveInCommandsOrQueries.cs.sbn }

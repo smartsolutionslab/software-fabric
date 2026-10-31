@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Dependency-free building blocks every project, the Domain included, may use: guards, results, absence. -->
+  <PropertyGroup>
+    <AssemblyName>{{ namespace }}.Kernel</AssemblyName>
+    <RootNamespace>{{ namespace }}.Kernel</RootNamespace>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,13 @@
+option: backend.test.integration.aspire-fixture
+files:
+  - { template: templates/Integration.Tests.csproj.sbn, target: tests/Integration.Tests/Integration.Tests.csproj }
+  - { template: templates/AspireFixture.cs.sbn, target: tests/Integration.Tests/AspireFixture.cs }
+  - { template: templates/HostTests.cs.sbn, target: tests/Integration.Tests/HostTests.cs }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-version.sbn }
+  - { slot: solution.projects, template: templates/solution-project.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "The running application: every resource healthy, the host healthy, and the gates of the chosen API, identity and tenancy options.", file: templates/HostTests.cs.sbn }

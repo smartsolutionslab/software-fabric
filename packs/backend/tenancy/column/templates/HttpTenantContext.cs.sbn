@@ -1,0 +1,22 @@
+using Microsoft.AspNetCore.Http;
+
+namespace {{ namespace }}.BuildingBlocks.Tenancy;
+
+/// <summary>An explicit <see cref="TenantScope"/> first; otherwise the user's one group under /tenants/.</summary>
+public sealed class HttpTenantContext(IHttpContextAccessor accessor) : ITenantContext
+{
+    private const string TenantGroupPrefix = "/tenants/";
+
+    public string? TenantId => TenantScope.TenantId ?? FromToken();
+
+    private string? FromToken()
+    {
+        var tenants = accessor.HttpContext?.User.FindAll("groups")
+            .Select(claim => claim.Value)
+            .Where(group => group.StartsWith(TenantGroupPrefix, StringComparison.Ordinal))
+            .Select(group => group[TenantGroupPrefix.Length..])
+            .ToList();
+
+        return tenants is [var tenant] ? tenant : null;
+    }
+}

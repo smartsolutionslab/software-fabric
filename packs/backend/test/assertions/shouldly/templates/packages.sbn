@@ -1,0 +1,2 @@
+    <PackageReference Include="Shouldly" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />

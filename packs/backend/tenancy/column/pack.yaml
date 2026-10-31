@@ -1,0 +1,18 @@
+option: backend.tenancy.column
+files:
+  - { template: templates/ITenantContext.cs.sbn, target: src/BuildingBlocks/Tenancy/ITenantContext.cs }
+  - { template: templates/TenantScope.cs.sbn, target: src/BuildingBlocks/Tenancy/TenantScope.cs }
+  - { template: templates/HttpTenantContext.cs.sbn, target: src/BuildingBlocks/Tenancy/HttpTenantContext.cs }
+  - { template: templates/TenancyRegistration.cs.sbn, target: src/BuildingBlocks/Tenancy/TenancyRegistration.cs }
+  - { template: templates/TenantColumn.cs.sbn, target: src/BuildingBlocks/Tenancy/TenantColumn.cs }
+slots:
+  - { slot: host.services, template: templates/host-services.sbn, order: 10 }
+  - { slot: persistence.context-members, template: templates/context-members.sbn }
+  - { slot: persistence.model-conventions, template: templates/model-conventions.sbn }
+  - { slot: persistence.save-changes, template: templates/save-changes.sbn }
+  - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 20 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "A tenant cannot read another tenant's rows; checked by the integration tests of the aspire-fixture pack against the running stack and by each module's tenancy tests." }

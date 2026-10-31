@@ -30,7 +30,7 @@ public static class Generator
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(overrides);
 
-        if (!ModuleNames.IsValid(name))
+        if (!Names.IsValid(name))
         {
             return AdditionFailure([$"module name '{name}' must be lower-case letters, digits and hyphens, starting with a letter."]);
         }
@@ -80,10 +80,10 @@ public static class Generator
         }
 
         var moduleOnly = after with { Files = [.. after.Files.Where(file => file.Module == name)] };
-        var rendered = Renderer.Render(catalog, moduleOnly, choices);
+        var rendered = Renderer.Render(catalog, moduleOnly, choices, project.Name);
         return rendered.Errors.Count > 0
             ? AdditionFailure(rendered.Errors)
-            : new ModuleAddition(rendered.Files, FabricFile.Write(catalog, project.Profile, choices), []);
+            : new ModuleAddition(rendered.Files, FabricFile.Write(catalog, project.Name, project.Profile, choices), []);
     }
 
     private static string? ProjectWideRefusal(PackManifest pack)
@@ -104,12 +104,19 @@ public static class Generator
     public static GenerationResult New(
         CatalogModel catalog,
         IReadOnlyDictionary<string, PackManifest> packs,
+        string name,
         string? profile,
         IReadOnlyList<string> overrides)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(packs);
+        ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(overrides);
+
+        if (!Names.IsValid(name))
+        {
+            return Failure([$"project name '{name}' must be lower-case letters, digits and hyphens, starting with a letter."]);
+        }
 
         var resolution = ChoiceResolver.Resolve(catalog, profile, overrides);
         if (resolution.Choices is not { } resolved)
@@ -140,13 +147,13 @@ public static class Generator
             return Failure(compositionErrors);
         }
 
-        var rendered = Renderer.Render(catalog, composition, choices);
+        var rendered = Renderer.Render(catalog, composition, choices, name);
         if (rendered.Errors.Count > 0)
         {
             return Failure(rendered.Errors);
         }
 
-        var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, profile, choices));
+        var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, name, profile, choices));
         return new GenerationResult([.. rendered.Files.Append(fabricFile).OrderBy(file => file.Path, StringComparer.Ordinal)], []);
     }
 

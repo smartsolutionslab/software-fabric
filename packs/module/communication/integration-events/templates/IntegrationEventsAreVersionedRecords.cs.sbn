@@ -1,0 +1,40 @@
+using System.Reflection;
+using System.Text.RegularExpressions;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed partial class IntegrationEventsAreVersionedRecords : IArchitectureRule
+{
+    public string Description => "Every integration event is a record in Contracts whose name ends in V<number>.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var events = model.ModuleAssemblies
+            .Append(Assembly.Load("Contracts"))
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type is { IsClass: true, IsAbstract: false } && type.GetInterfaces().Any(contract => contract.FullName == "{{ namespace }}.Contracts.IIntegrationEvent"));
+
+        foreach (var type in events)
+        {
+            if (type.Assembly.GetName().Name != "Contracts")
+            {
+                yield return $"{type.FullName} is an integration event outside Contracts.";
+            }
+
+            if (!Versioned().IsMatch(type.Name))
+            {
+                yield return $"{type.FullName} has no version suffix (V1, V2, ...).";
+            }
+
+            if (type.GetMethod("<Clone>$") is null)
+            {
+                yield return $"{type.FullName} is not a record.";
+            }
+        }
+    }
+
+    [GeneratedRegex("V[0-9]+$")]
+    private static partial Regex Versioned();
+}
