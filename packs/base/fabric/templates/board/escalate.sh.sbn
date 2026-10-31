@@ -35,7 +35,7 @@ if [ -n "$lane" ]; then
   done < <(yq -r "(.lanes[\"$lane\"].owners // [])[]" "$owners_file")
 fi
 
-board_park "$issue"
+board_park "$issue" "Escalated ($label)." || { echo "Parking #$issue's branch failed; not escalated." >&2; exit 1; }
 board_status "$issue" Blocked
 if [ -n "$owner" ]; then
   board_add_label "$issue" "$label"

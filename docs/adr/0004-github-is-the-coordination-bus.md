@@ -25,19 +25,18 @@ lane is one the agent serves. The lane is a `lane:<name>` label, so
 eligibility needs no board access. A human assignee means the issue
 belongs to that human, without exception.
 
-**Claim.** The branch is the lock: the agent creates
-`agent/<issue>-<slug>` through the API, which fails if the branch exists;
-it then moves to the next issue. The winner then sets `Status` and
-`Executor` and posts a claim comment. An issue with a parked branch
-(below) is claimed by renaming `parked/<issue>-…` back to `agent/…`, which
-also succeeds for one agent only.
+**Claim.** The branch is the lock. The agent pushes an empty claim
+commit to `agent/<issue>-<slug>`; a second agent's claim, built on a
+different commit, is not a fast-forward and is rejected, so it moves to the
+next issue. The winner then sets `Status` and `Executor` and posts a claim
+comment.
 
 **Lease.** Every push renews the claim. A scheduled janitor workflow
-returns an issue to Todo when its branch has had neither a push nor the
-claim comment for the lease period (default 2 h) and has no open PR.
-Released, escalated and lapsed claims **park** the branch (rename it to
-`parked/<issue>-…`) instead of deleting it, so the next agent resumes the
-work rather than repeating it.
+returns an issue to Todo when its branch's last commit is older than the
+lease period (default 2 h) and it has no open PR. Released, escalated and
+lapsed claims **park** the branch: a release commit goes on top, the work
+stays, and the next agent resumes it with a new claim commit. Branches are
+never renamed, deleted or force-pushed.
 
 **Escalation to a developer.** Three routes, each with a label and a
 concrete question or the verbatim failure in a comment:
@@ -76,6 +75,9 @@ before the first `-`, decides who reviews.
   janitor and return-to-Todo workflows get their own tests.
 - *As built (M1-08):* the generated project carries the protocol as
   scripts in `.github/scripts/board/` (pack `base.fabric`), each step one
-  script, called by the workflows and by agents of any runtime. The merge
+  script, called by the workflows and by agents of any runtime. The pilot
+  (M1-10) found that Claude Code's cloud sessions refuse GraphQL and
+  branch writes through the API, so the scripts use REST for issues and
+  `git push` for branches; a branch rename or delete is never needed. The merge
   queue and the two-review-round limit are rules in AGENTS.md, not yet
   automation.

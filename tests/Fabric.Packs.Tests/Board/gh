@@ -48,19 +48,10 @@ case "${positional[0]} ${positional[1]:-}" in
           [[ "$branch" == "$prefix"* ]] && jq -n --arg ref "refs/heads/$branch" --arg sha "$(cat "$state/refs/$branch")" '{ref: $ref, object: {sha: $sha}}'
         done | jq -s .
         ;;
-      "POST git/refs")
-        branch="${flag[f:ref]#refs/heads/}"
-        if [ -e "$state/refs/$branch" ]; then echo '{"message":"Reference already exists"}' >&2; exit 1; fi
-        mkdir -p "$(dirname "$state/refs/$branch")"
-        echo "${flag[f:sha]}" > "$state/refs/$branch"
-        echo "{}"
-        ;;
-      "POST branches/"*"/rename")
-        from="${path#branches/}"; from="${from%/rename}"; to="${flag[f:new_name]}"
-        if [ ! -e "$state/refs/$from" ] || [ -e "$state/refs/$to" ]; then echo '{"message":"Not Found"}' >&2; exit 1; fi
-        mkdir -p "$(dirname "$state/refs/$to")"
-        mv "$state/refs/$from" "$state/refs/$to"
-        echo "{}"
+      # Like Claude Code's cloud sessions: branch writes through the API are refused; agents push with git.
+      "POST git/refs" | "POST branches/"* | "PATCH git/refs/"* | "DELETE git/refs/"*)
+        echo '{"message":"Write access to this GitHub API path is not permitted through this proxy."}' >&2
+        exit 1
         ;;
       "GET commits/"*) jq -n --arg date "$(cat "$state/commits/${path#commits/}" 2>/dev/null || echo 2000-01-01T00:00:00Z)" '{commit: {committer: {date: $date}}}' ;;
       "GET issues/"*"/comments") n="${path#issues/}"; cat "$state/comments/${n%/comments}.json" 2>/dev/null || echo '[]' ;;

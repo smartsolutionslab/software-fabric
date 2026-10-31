@@ -1,6 +1,7 @@
 {%{# Shared by the board scripts (board protocol, docs/adr). Source it; do not run it.
-# Talks to GitHub only through `gh api` and REST: Claude Code's cloud sessions refuse GraphQL, which most other gh
-# subcommands use. Board fields are the exception (GitHub Projects have no REST API) and stay optional.
+# Talks to GitHub through `git` (branches) and `gh api` with REST (issues, labels, comments, pull requests): Claude
+# Code's cloud sessions refuse GraphQL, which most other gh subcommands use, and branch writes through the API.
+# Board fields are the exception (GitHub Projects have no REST API) and stay optional.
 
 set -euo pipefail
 
@@ -28,29 +29,71 @@ board_slug() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' | cut -c1-40 | sed -E 's/-+$//'
 }
 
-board_default_sha() {
-  local branch
-  branch="$(gh api "repos/$repo" | jq -r .default_branch)"
-  gh api "repos/$repo/git/ref/heads/$branch" | jq -r .object.sha
+board_git() {
+  git -C "$board_root" "$@"
 }
 
-# The first branch under refs/heads/<prefix><issue>-, or nothing.
+board_default_branch() {
+  board_git ls-remote --symref origin HEAD | sed -nE 's#^ref: refs/heads/([^[:space:]]+)[[:space:]]+HEAD$#\1#p'
+}
+
+# The issue's branch on the remote (agent/<issue>-<slug>), or nothing.
 board_branch_for() {
-  local prefix="$1" issue="$2"
-  gh api "repos/$repo/git/matching-refs/heads/$prefix$issue-" | jq -r '.[0].ref // empty' | sed 's#^refs/heads/##'
+  board_git ls-remote --heads origin | awk -v prefix="refs/heads/agent/$1-" 'index($2, prefix) == 1 { sub("refs/heads/", "", $2); print $2; exit }'
 }
 
-# Renaming is atomic on GitHub: of two agents renaming the same branch, one fails.
-board_rename() {
-  gh api -X POST "repos/$repo/branches/$1/rename" -f "new_name=$2" > /dev/null 2>&1
+# Fetches a remote branch and prints its last commit.
+board_fetch() {
+  board_git fetch --quiet origin "refs/heads/$1" && board_git rev-parse FETCH_HEAD
 }
 
-board_park() {
-  local issue="$1" branch
-  branch="$(board_branch_for agent/ "$issue")"
-  if [ -n "$branch" ]; then
-    board_rename "$branch" "parked/${branch#agent/}"
+# A branch is parked when its last commit gives the issue back.
+board_parked() {
+  [[ "$(board_git log -1 --format=%s "$1")" == "chore(board): release #"* ]]
+}
+
+board_executor_of() {
+  board_git log -1 --format='%(trailers:key=Agent-Executor,valueonly)' "$1" | sed '/^$/d' | head -n1
+}
+
+# The branch is the lock, and it moves only by `git push` (cloud sessions refuse branch writes through the API).
+# Every board step is an empty commit on top of what the step saw, so a push that finds the branch moved is not a
+# fast-forward and is rejected: of two agents taking the same step, one wins.
+# Returns 0 when pushed, 2 when another agent moved the branch first, 1 on any other failure (printed).
+board_mark() {
+  local branch="$1" base="$2" message="$3" commit output
+  commit="$(
+    export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-$(board_git config user.name || echo board)}"
+    export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-$(board_git config user.email || echo board@users.noreply.github.com)}"
+    export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-$GIT_AUTHOR_NAME}" GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-$GIT_AUTHOR_EMAIL}"
+    if [ -n "${BOARD_NOW:-}" ]; then
+      export GIT_AUTHOR_DATE="@$BOARD_NOW +0000" GIT_COMMITTER_DATE="@$BOARD_NOW +0000"
+    fi
+    board_git commit-tree "$base^{tree}" -p "$base" -m "$message"
+  )" || return 1
+  if output="$(board_git push --porcelain origin "$commit:refs/heads/$branch" 2>&1)"; then
+    return 0
   fi
+  if grep -q $'\t\[rejected\]' <<< "$output"; then
+    return 2
+  fi
+  echo "$output" >&2
+  return 1
+}
+
+# Parks the issue's branch for the next agent: a release commit on top, signed with the claimer's executor.
+board_park() {
+  local issue="$1" reason="$2" branch head executor
+  branch="$(board_branch_for "$issue")"
+  [ -n "$branch" ] || return 0
+  head="$(board_fetch "$branch")" || return 1
+  board_parked "$head" && return 0
+  executor="$(board_executor_of "$head")"
+  board_mark "$branch" "$head" "chore(board): release #$issue
+
+$reason
+
+Agent-Executor: ${executor:-board}"
 }
 
 board_comment() {
