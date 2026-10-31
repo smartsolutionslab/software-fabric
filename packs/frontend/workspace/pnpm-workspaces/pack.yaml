@@ -7,6 +7,7 @@ declares-slots:
 slots:
   - { slot: ci.frontend-steps, template: templates/ci-steps.sbn, order: 10 }
   - { slot: readme.sections, template: templates/readme.sbn, order: 20 }
+  - { slot: readme.first-steps, template: templates/first-steps.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

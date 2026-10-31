@@ -38,4 +38,18 @@ public sealed class FrontendTests
         e2e.ShouldContain("run: bash .github/scripts/e2e.sh");
         File.Exists(Path.Combine(project.ProjectDirectory, ".github", "scripts", "e2e.sh")).ShouldBeTrue();
     }
+
+    [Fact]
+    public void The_lockfile_is_the_first_step_and_ci_installs_only_from_it()
+    {
+        using var project = new GeneratedProject(Profile);
+        var readme = File.ReadAllText(Path.Combine(project.ProjectDirectory, "README.md"));
+        var ci = File.ReadAllText(Path.Combine(project.ProjectDirectory, ".github", "workflows", "ci.yml"));
+
+        readme.ShouldContain("## First steps");
+        readme[readme.IndexOf("## First steps", StringComparison.Ordinal)..].ShouldContain("pnpm install");
+        ci.ShouldContain("web/pnpm-lock.yaml is missing");
+        ci.ShouldNotContain("run: pnpm install\n");
+        ci.ShouldContain("run: pnpm install --frozen-lockfile");
+    }
 }

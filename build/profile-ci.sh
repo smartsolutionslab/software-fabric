@@ -31,9 +31,14 @@ for tests in $(find tests -name '*.Tests.csproj' | sort); do
   echo "::endgroup::"
 done
 
-for command in install build lint test; do
+step "first step: the lockfile"
+(cd web && pnpm install)
+echo "::endgroup::"
+
+for command in "install --frozen-lockfile" build lint test; do
   step "pnpm $command"
-  (cd web && pnpm "$command")
+  # shellcheck disable=SC2086 # the command and its flags are separate words
+  (cd web && pnpm $command)
   echo "::endgroup::"
 done
 

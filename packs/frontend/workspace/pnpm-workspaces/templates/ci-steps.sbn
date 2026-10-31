@@ -4,7 +4,9 @@
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: pnpm install
+      - name: The lockfile is committed
+        run: test -f web/pnpm-lock.yaml || { echo "::error::web/pnpm-lock.yaml is missing. Run pnpm install in web/ and commit it (README, First steps)."; exit 1; }
+      - run: pnpm install --frozen-lockfile
         working-directory: web
       - run: pnpm build
         working-directory: web

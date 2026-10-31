@@ -59,6 +59,7 @@ declares-slots:
   - { slot: agents.brief.frontend-reviewer, description: "Every pack's brief for the frontend-reviewer; filled by the generator." }
   - { slot: agents.brief.security-reviewer, description: "Every pack's brief for the security-reviewer; filled by the generator." }
   - { slot: agents.brief.triage, description: "Every pack's brief for the triage; filled by the generator." }
+  - { slot: readme.first-steps, description: "Markdown list items: what to do once, right after generating. README.md lists them under First steps, and fabric new prints them." }
   - { slot: readme.sections, description: "How to build, run and work on the project, one section per pack that changes it.", separator: "\n\n" }
   - { slot: solution.projects, description: "<Project Path='...' /> lines for projects other packs own." }
   - { slot: dotnet.tools, description: "Entries of the local tool manifest (.config/dotnet-tools.json), restored with dotnet tool restore.", separator: ",\n" }
