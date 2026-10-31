@@ -29,6 +29,33 @@ public sealed class NewCommandTests : IDisposable
     }
 
     [Fact]
+    public void Prints_the_readmes_first_steps_after_writing_the_project()
+    {
+        var packs = Path.Combine(root, "packs");
+        CopyDirectory(Paths.FixturePacks, packs);
+        File.AppendAllText(
+            Path.Combine(packs, "base", "core", "templates", "readme.md.sbn"),
+            "\n## First steps\n\n- Install the tools and commit the lockfile.\n\n## Afterwards\n\nNot a first step.\n");
+
+        var run = CliRun.Of(["new", Path.Combine(root, "shop"), "--profile", "everything", "--catalog", Paths.FixtureCatalog, "--packs", packs]);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldContain("First steps (README.md):");
+        run.Output.ShouldContain("- Install the tools and commit the lockfile.");
+        run.Output.ShouldNotContain("Not a first step.");
+    }
+
+    private static void CopyDirectory(string source, string target)
+    {
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var destination = Path.Combine(target, Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(file, destination);
+        }
+    }
+
+    [Fact]
     public void Two_runs_with_the_same_choices_write_identical_trees()
     {
         New("first", "--profile", "everything", "--name", "shop").ExitCode.ShouldBe(0);

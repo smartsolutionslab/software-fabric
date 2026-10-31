@@ -1,0 +1,1 @@
+- Create the frontend's lockfile and commit it: `cd web && pnpm install`, then commit `web/pnpm-lock.yaml`. CI installs with `--frozen-lockfile` and fails until it is there.

@@ -105,6 +105,13 @@ public static class FabricCli
             }
 
             output.WriteLine($"created {target} with {Files(generated.Files.Count)}.");
+            if (FirstSteps(generated.Files) is { } firstSteps)
+            {
+                output.WriteLine();
+                output.WriteLine("First steps (README.md):");
+                output.WriteLine(firstSteps);
+            }
+
             return 0;
         }));
 
@@ -189,6 +196,22 @@ public static class FabricCli
     }
 
     private static string Files(int count) => count == 1 ? "1 file" : $"{count} files";
+
+    /// <summary>The generated README's "## First steps" section, which packs fill through readme.first-steps.</summary>
+    private static string? FirstSteps(IReadOnlyList<Core.Rendering.RenderedFile> files)
+    {
+        var readme = files.FirstOrDefault(file => file.Path == "README.md")?.Content;
+        const string heading = "## First steps\n";
+        var start = readme?.IndexOf(heading, StringComparison.Ordinal) ?? -1;
+        if (start < 0)
+        {
+            return null;
+        }
+
+        var section = readme![(start + heading.Length)..];
+        var end = section.IndexOf("\n## ", StringComparison.Ordinal);
+        return (end < 0 ? section : section[..end]).Trim();
+    }
 
     private static Option<string?> ProfileOption() => new("--profile") { Description = "A profile from the catalog to start from." };
 
