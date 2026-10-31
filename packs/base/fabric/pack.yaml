@@ -18,6 +18,8 @@ files:
   - { template: templates/workflows/agent-executor.yml.sbn, target: ".github/workflows/agent-executor.yml" }
   - { template: templates/workflows/cross-model-review.yml.sbn, target: ".github/workflows/cross-model-review.yml" }
   - { template: templates/skills/next-issue.md.sbn, target: ".claude/skills/next-issue/SKILL.md" }
+slots:
+  - { slot: pr-template.sections, template: templates/pr-spec-and-plan.sbn, order: 0 }
 agents:
   agents-md: docs/agents.md
   briefs:

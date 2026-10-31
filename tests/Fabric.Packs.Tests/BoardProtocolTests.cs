@@ -149,6 +149,18 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     }
 
     [Fact]
+    public void The_next_issue_skill_covers_a_run_without_subagents_and_a_failed_claim()
+    {
+        var skill = File.ReadAllText(Path.Combine(ProjectDirectory, ".claude", "skills", "next-issue", "SKILL.md"));
+        var template = File.ReadAllText(Path.Combine(ProjectDirectory, ".github", "pull_request_template.md"));
+
+        skill.ShouldContain("Exit 1");
+        skill.ShouldContain("Without subagents");
+        skill.ShouldContain("## Spec and plan");
+        template.ShouldContain("## Spec and plan");
+    }
+
+    [Fact]
     public void An_agent_claims_the_lowest_numbered_eligible_issue_of_its_lane()
     {
         Issues(
