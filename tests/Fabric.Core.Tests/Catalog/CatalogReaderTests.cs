@@ -24,6 +24,27 @@ public class CatalogReaderTests
     }
 
     [Fact]
+    public void Reads_the_role_slots_a_dimension_requires_of_its_options()
+    {
+        var catalog = Read("""
+            version: 1
+            dimensions:
+              frontend.framework:
+                scope: project
+                role-slots:
+                  web.dependencies: { description: "Entries of the app's dependencies.", separator: ",\n" }
+                  web.imports: { description: "Import lines of the entry point." }
+                options: { react: { tier: supported } }
+            """);
+
+        var roles = catalog.Dimensions["frontend.framework"].RoleSlots;
+        roles.Keys.ShouldBe(["web.dependencies", "web.imports"], ignoreOrder: false);
+        roles["web.dependencies"].ShouldBe(new RoleSlot("web.dependencies", "Entries of the app's dependencies.", ",\n"));
+        roles["web.imports"].Separator.ShouldBeNull();
+        Read("version: 1\ndimensions:\n  a.b: { scope: project, options: { c: { tier: supported } } }\n").Dimensions["a.b"].RoleSlots.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Keeps_dimensions_in_file_order()
     {
         var catalog = ReadRepositoryCatalog();

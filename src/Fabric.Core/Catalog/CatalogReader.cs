@@ -70,7 +70,23 @@ public static class CatalogReader
             "active-when",
             "default",
             "note",
+            "role-slots",
             "options");
+
+        OrderedDictionary<string, RoleSlot> roleSlots = [];
+        if (fields.Optional("role-slots") is { } roleSlotsNode)
+        {
+            foreach (var (key, value) in source.Mapping(roleSlotsNode, $"'role-slots' of {owner}").Children)
+            {
+                var slot = source.Scalar(key, $"a role slot of {owner}");
+                var roleOwner = $"role slot '{slot}' of {owner}";
+                var roleFields = source.Fields(source.Mapping(value, roleOwner), roleOwner, "description", "separator");
+                roleSlots.Add(slot, new RoleSlot(
+                    slot,
+                    source.Scalar(roleFields.Required("description"), roleOwner),
+                    roleFields.Optional("separator") is { } separator ? source.Scalar(separator, roleOwner) : null));
+            }
+        }
 
         OrderedDictionary<string, CatalogOption> options = [];
         foreach (var (key, value) in source.Mapping(fields.Required("options"), $"'options' of {owner}").Children)
@@ -86,7 +102,8 @@ public static class CatalogReader
             fields.Optional("active-when") is { } activeWhen ? source.Condition(activeWhen, owner) : null,
             fields.Optional("default") is { } defaultNode ? source.ScalarOrList(defaultNode, owner) : null,
             fields.Optional("note") is { } note ? source.Scalar(note, owner) : null,
-            options);
+            options,
+            roleSlots);
     }
 
     private static CatalogOption ReadOption(YamlSource source, string qualifiedId, string id, YamlNode node)

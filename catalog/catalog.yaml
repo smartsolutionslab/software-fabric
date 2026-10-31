@@ -252,6 +252,21 @@ dimensions:
   frontend.framework:
     scope: project
     default: react
+    # Role slots (ADR-0008): every framework's pack declares them, so packs shared across frameworks can contribute.
+    role-slots:
+      web.dependencies: { description: "Entries of the web app's dependencies ('\"zod\": \"4.6.7\"').", separator: ",\n" }
+      web.dev-dependencies: { description: "Entries of the web app's devDependencies.", separator: ",\n" }
+      web.scripts: { description: "Entries of the web app's scripts ('\"codegen\": \"...\"').", separator: ",\n" }
+      web.prepare: { description: "Commands run before dev, build and test (code generators).", separator: " && " }
+      web.env: { description: "Members of the typed environment: the VITE_ variables the app reads." }
+      web.test-setup: { description: "Statements of the test setup file, run before every test file." }
+      web.lint-ignores: { description: "Entries of eslint's ignores (generated files).", separator: ",\n" }
+      web.restricted-imports: { description: "Entries of eslint's no-restricted-imports patterns.", separator: ",\n" }
+      web.vite-imports: { description: "Import lines of vite.config.ts." }
+      web.vite-plugins: { description: "Entries of vite.config.ts's plugins array.", separator: ",\n" }
+      web.imports: { description: "Import lines of the app's entry point." }
+      web.providers: { description: "Wrappers around the app, outermost first, in the framework's own form.", separator: ",\n" }
+      web.styles: { description: "Lines of the global stylesheet." }
     options:
       react: { tier: supported }
       vue:   { tier: supported }
@@ -314,6 +329,10 @@ dimensions:
   frontend.api-client:
     scope: project
     default: orval
+    # Role slots (ADR-0008): every client's pack declares them; the auth client puts its token on every request.
+    role-slots:
+      web.api-imports: { description: "Import lines of the API client's base module." }
+      web.api-headers: { description: "Statements that set request headers (headers, a Headers object) before every call." }
     note: "Always generated from the backend's OpenAPI document; CI fails when it is stale."
     options:
       rtk-query-codegen:
