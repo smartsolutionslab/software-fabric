@@ -305,6 +305,49 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         output.ShouldStartWith("1 agent/1-pay-an-invoice");
     }
 
+    public static TheoryData<string> ChangesThatEndEligibility => new()
+    {
+        { ".assignees = [{login: \"alice\"}]" },
+        { ".state = \"closed\"" },
+        { ".labels += [{name: \"needs:decision\"}]" },
+    };
+
+    /// <summary>A jq update applied to issue 7 in the fake GitHub, as a shell command.</summary>
+    private string ChangeIssue7(string update) =>
+        $"jq 'map(if .number == 7 then {update} else . end)' '{state}/issues.json' > '{state}/issues.tmp' && mv '{state}/issues.tmp' '{state}/issues.json'";
+
+    [Theory]
+    [MemberData(nameof(ChangesThatEndEligibility))]
+    public void An_issue_that_stops_being_eligible_after_the_list_is_not_claimed(string change)
+    {
+        Issues(Issue(7, "Pay an invoice", ReadyBackend));
+        File.WriteAllText(Path.Combine(state, "after-list"), ChangeIssue7(change));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(3, output);
+        Origin("for-each-ref", "refs/heads/agent/").ShouldBeEmpty();
+    }
+
+    [Theory]
+    [MemberData(nameof(ChangesThatEndEligibility))]
+    public void An_issue_that_stops_being_eligible_during_the_claim_is_given_back(string change)
+    {
+        Issues(Issue(7, "Pay an invoice", ReadyBackend));
+        var hook = Path.Combine(origin, "hooks", "pre-receive");
+        File.WriteAllText(hook, $"#!/bin/sh\n{ChangeIssue7(change)}\nrm \"$0\"\n");
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(3, output);
+        Head("agent/7-pay-an-invoice").ShouldBe("chore(board): release #7");
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+    }
+
     [Fact]
     public void A_claim_the_remote_refuses_is_an_error_not_an_empty_lane()
     {

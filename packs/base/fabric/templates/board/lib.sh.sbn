@@ -121,6 +121,19 @@ board_issue() {
   gh api "repos/$repo/issues/$1"
 }
 
+# Work an agent may take in lane $lane: open, agent:ready, no assignee, neither blocked nor escalated (needs:*), as jq
+# over one issue. agent:claimed is the callers' to judge: the branch is the lock, and the label follows it.
+board_eligible_jq='.state == "open" and (.assignees | length) == 0
+  and ([.labels[].name] | index("agent:ready") != null and index("lane:" + $lane) != null
+       and (any(. == "agent:blocked" or startswith("needs:")) | not))'
+
+# Returns 0 when the issue is eligible in the lane now, 2 when it is not, 1 when it could not be read.
+board_eligible() {
+  local state
+  state="$(board_issue "$1")" || return 1
+  jq -e --arg lane "$2" "$board_eligible_jq" <<< "$state" > /dev/null || return 2
+}
+
 board_add_label() {
   gh api -X POST "repos/$repo/issues/$1/labels" -f "labels[]=$2" > /dev/null
 }

@@ -4,6 +4,8 @@
 # Prints "<issue> <branch>" and exits 0, or exits 3 when the lane has nothing eligible.
 # Eligible: open, labelled agent:ready and lane:<lane>, no assignee, not claimed, blocked or escalated (needs:*): an
 # escalation no owner had capacity for keeps agent:ready and has no assignee, but still waits for a developer.
+# The list is a snapshot, so each candidate is read again before its claim and once more after it: an issue assigned,
+# closed or escalated meanwhile is not claimed, or is given straight back.
 # The branch is the lock: a claim commit pushed onto a new branch, or onto a parked one, succeeds for one agent only.
 # Exit 1 means a claim failed for another reason (printed); it is not an empty lane.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -12,13 +14,16 @@ lane="$1"
 executor="$2"
 
 candidates="$(board_issues "labels=$(board_uri "agent:ready,lane:$lane")" \
-  | jq -r 'map(select((.assignees | length) == 0 and ([.labels[].name] | any(. == "agent:blocked" or . == "agent:claimed" or startswith("needs:")) | not)))
-           | sort_by(.number) | .[] | "\(.number)\t\(.title)"')"
+  | jq -r --arg lane "$lane" "map(select(($board_eligible_jq) and ([.labels[].name] | index(\"agent:claimed\") | not)))
+           | sort_by(.number) | .[] | \"\\(.number)\\t\\(.title)\"")"
 
 # Returns 0 when claimed, 2 when another agent holds or just took the issue, 1 when nothing was claimed for another
 # reason, 4 when the branch is held but recording the claim on the issue failed.
 claim() {
   local issue="$1" title="$2" branch base outcome
+  outcome=0
+  board_eligible "$issue" "$lane" || outcome=$?
+  [ "$outcome" -eq 0 ] || return "$outcome"
   branch="$(board_branch_for "$issue")"
   if [ -n "$branch" ]; then
     base="$(board_fetch "$branch")" || return 1
@@ -32,6 +37,15 @@ claim() {
 
 Agent-Executor: $executor" || outcome=$?
   [ "$outcome" -eq 0 ] || return "$outcome"
+
+  board_eligible "$issue" "$lane" || outcome=$?
+  if [ "$outcome" -ne 0 ]; then
+    if ! board_park "$issue" "No longer eligible once claimed: assigned, closed or escalated meanwhile."; then
+      echo "The branch $branch is held, but #$issue stopped being eligible and giving it back failed (above)." >&2
+      return 4
+    fi
+    return 2
+  fi
 
   # Called as `claim || outcome=$?`, so errexit is off in here: every step's failure is checked explicitly.
   if ! { board_add_label "$issue" agent:claimed &&

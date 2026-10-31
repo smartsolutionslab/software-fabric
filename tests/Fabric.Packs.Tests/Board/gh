@@ -68,6 +68,8 @@ case "${positional[0]} ${positional[1]:-}" in
         size="$(param per_page)"; size="${size:-30}"
         pages="$(jq --argjson size "$size" '[range(0; length; $size) as $at | .[$at:$at + $size]] | if length == 0 then [[]] else . end' "$state/page.json")"
         if [ -n "${flag[paginate]:-}" ]; then jq -c '.[]' <<< "$pages"; else jq -c '.[0]' <<< "$pages"; fi
+        # A change someone makes right after the list was answered, once.
+        if [ -e "$state/after-list" ]; then bash "$state/after-list"; rm "$state/after-list"; fi
         ;;
       "GET issues/"*) jq --argjson number "${path#issues/}" '.[] | select(.number == $number)' "$issues" ;;
       "POST issues/"*"/comments")
