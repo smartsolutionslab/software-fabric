@@ -394,7 +394,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         var (exitCode, output) = Run("report-review.sh", "5", Findings("""{"findings": []}"""), "codex");
 
         exitCode.ShouldBe(0, output);
-        ((string)Reviews().ShouldHaveSingleItem()!["body"]!).ShouldContain("No findings");
+        ((string)Reviews().ShouldHaveSingleItem()!["body"]!).ShouldEndWith("No findings.");
     }
 
     [Fact]
