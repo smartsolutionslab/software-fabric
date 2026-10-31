@@ -170,6 +170,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Field(7, "STATUS").ShouldBe("Claimed");
         Field(7, "EXECUTOR").ShouldBe("claude-cloud/lane-backend");
         Comments(7).ShouldContain("Claimed by `claude-cloud/lane-backend` on branch `agent/7-pay-an-invoice`");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
     }
 
     [Fact]
@@ -183,6 +184,18 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         exitCode.ShouldBe(0, output);
         output.Trim().ShouldBe("9 agent/9-refund-an-invoice");
         Field(7, "STATUS").ShouldBeNull();
+    }
+
+    [Fact]
+    public void An_issue_labelled_claimed_is_skipped_without_touching_its_branch()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]), Issue(9, "Refund an invoice", ReadyBackend));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(0, output);
+        output.Trim().ShouldBe("9 agent/9-refund-an-invoice");
+        HasBranch("agent/7-pay-an-invoice").ShouldBeFalse();
     }
 
     [Fact]
@@ -231,12 +244,14 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Field(7, "STATUS").ShouldBe("Todo");
         Field(7, "EXECUTOR").ShouldBe("");
         Comments(7).ShouldContain("Released: It belongs to the frontend lane.");
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
 
         Run("next.sh", "backend", "claude-cloud/two").Output.Trim().ShouldBe("7 agent/7-pay-an-invoice");
         Head("agent/7-pay-an-invoice").ShouldBe("chore(board): claim #7");
         Executor("agent/7-pay-an-invoice").ShouldBe("claude-cloud/two");
         Origin("rev-list", "--count", "main..refs/heads/agent/7-pay-an-invoice").ShouldBe("3");
         Field(7, "EXECUTOR").ShouldBe("claude-cloud/two");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
     }
 
     [Fact]
@@ -246,7 +261,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
             Issue(3, "Has a pull request", ReadyBackend),
             Issue(4, "Claimed recently", ReadyBackend),
             Issue(5, "Parked", ReadyBackend),
-            Issue(7, "Lapsed", ReadyBackend),
+            Issue(7, "Lapsed", [.. ReadyBackend, "agent:claimed"]),
             Issue(9, "Pushed recently", ReadyBackend));
         Branch("agent/3-has-a-pull-request", "chore(board): claim #3", Now.AddHours(-5));
         OpenPullRequest("agent/3-has-a-pull-request");
@@ -265,6 +280,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Executor("agent/7-lapsed").ShouldBe("codex-cloud/other");
         Field(7, "STATUS").ShouldBe("Todo");
         Comments(7).ShouldContain("lapsed");
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
         Head("agent/3-has-a-pull-request").ShouldBe("chore(board): claim #3");
         Head("agent/4-claimed-recently").ShouldBe("chore(board): claim #4");
         Head("agent/5-parked").ShouldBe("chore(board): release #5");
@@ -281,7 +297,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
             Issue(3, "Bob's", ["lane:backend"], ["bob"]),
             Issue(4, "Carol's", ["lane:backend"], ["carol"]),
             Issue(5, "Carol's other", ["lane:frontend"], ["carol"]),
-            Issue(7, "Pay an invoice", ReadyBackend));
+            Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
         Branch("agent/7-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
 
         var (exitCode, output) = Run("escalate.sh", "7", "needs:decision", "Refund to the card or as credit?");
@@ -292,6 +308,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Labels(issue).ShouldContain("needs:decision");
         Field(7, "STATUS").ShouldBe("Blocked");
         Head("agent/7-pay-an-invoice").ShouldBe("chore(board): release #7");
+        Labels(issue).ShouldNotContain("agent:claimed");
         Comments(7).ShouldContain("@bob, this needs you (needs:decision)");
         Comments(7).ShouldContain("Refund to the card or as credit?");
     }

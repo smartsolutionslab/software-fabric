@@ -7,6 +7,7 @@ label() {
 }
 
 label agent:ready 0e8a16 "Agents may take this issue."
+label agent:claimed 5319e7 "An agent holds this issue; its agent/ branch is the lock."
 label agent:blocked b60205 "A phase failed twice; a developer has the verbatim failure."
 label needs:human d93f0b "Triage found this unfit for agents."
 label needs:decision fbca04 "An agent needs a developer's decision."

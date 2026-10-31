@@ -36,6 +36,7 @@ if [ -n "$lane" ]; then
 fi
 
 board_park "$issue" "Escalated ($label)." || { echo "Parking #$issue's branch failed; not escalated." >&2; exit 1; }
+board_unclaim "$issue"
 board_status "$issue" Blocked
 if [ -n "$owner" ]; then
   board_add_label "$issue" "$label"

@@ -7,6 +7,7 @@ issue="$1"
 reason="$2"
 
 board_park "$issue" "Released: $reason" || { echo "Parking #$issue's branch failed; it is still claimed." >&2; exit 1; }
+board_unclaim "$issue"
 board_status "$issue" Todo
 board_executor "$issue" ""
 board_comment "$issue" "Released: $reason
