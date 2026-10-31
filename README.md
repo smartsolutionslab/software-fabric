@@ -23,7 +23,10 @@ M0 (generator core) is done. M1 (profile `saas-standard-react` end to end)
 is in progress: the base pack, the backend packs, the Aspire integration
 tests and the frontend are real (M1-01 to M1-07): a generated app signs a
 user in through Keycloak and lists a module's data, checked end to end with
-Playwright. The agent setup, profile CI and the pilot follow (M1-08 to M1-10). `tests/Fabric.Packs.Tests`
+Playwright. Every generated project carries the board protocol (M1-08):
+agents claim issues, escalate to developers and get reviewed by another
+model family through GitHub alone. Profile CI and the pilot follow (M1-09,
+M1-10). `tests/Fabric.Packs.Tests`
 generates the profile from the real packs — empty stand-ins for the rest —
 builds it, runs its tests, installs, builds, lints and tests its web app, and starts it against real PostgreSQL and RabbitMQ
 containers.
