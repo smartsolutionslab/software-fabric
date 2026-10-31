@@ -9,6 +9,8 @@ files:
   - { template: templates/board/reviewer.sh.sbn, target: ".github/scripts/board/reviewer.sh" }
   - { template: templates/board/check-trailers.sh.sbn, target: ".github/scripts/board/check-trailers.sh" }
   - { template: templates/board/setup.sh.sbn, target: ".github/scripts/board/setup.sh" }
+  - { template: templates/board/report-review.sh.sbn, target: ".github/scripts/board/report-review.sh" }
+  - { template: templates/review-findings.schema.json.sbn, target: ".github/review-findings.schema.json" }
   - { template: templates/board.env.sbn, target: ".github/board.env" }
   - { template: templates/owners.yml.sbn, target: docs/owners.yml }
   - { template: templates/workflows/board-janitor.yml.sbn, target: ".github/workflows/board-janitor.yml" }
@@ -30,4 +32,4 @@ agents:
 adr: docs/adr.md
 gates:
   - { kind: ci-step, describes: "Every commit on an agent/ branch carries an Agent-Executor trailer.", file: templates/workflows/agent-executor.yml.sbn }
-  - { kind: ci-step, describes: "A pull request is reviewed by a model family that wrote none of its commits.", file: templates/workflows/cross-model-review.yml.sbn }
+  - { kind: ci-step, describes: "A pull request is reviewed by a model family that wrote none of its commits; a blocking finding fails the check.", file: templates/workflows/cross-model-review.yml.sbn }

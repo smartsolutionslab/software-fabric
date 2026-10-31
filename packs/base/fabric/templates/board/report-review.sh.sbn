@@ -1,0 +1,66 @@
+{%{#!/usr/bin/env bash
+# Posts a reviewer's findings on the pull request and fails when one of them blocks (board protocol, docs/adr).
+# Usage: report-review.sh <pull request> <findings file> <reviewer>
+# The findings file is the reviewer's final answer, shaped by .github/review-findings.schema.json.
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+pr="$1"
+findings_file="$2"
+reviewer="$3"
+
+if ! findings="$(jq -ce '.findings | arrays' "$findings_file" 2> /dev/null)"; then
+  echo "The $reviewer review did not report its findings in the shape .github/review-findings.schema.json asks for. It answered:" >&2
+  head -c 4000 "$findings_file" >&2
+  echo >&2
+  exit 1
+fi
+
+blocking="$(jq '[.[] | select(.severity == "blocking")] | length' <<< "$findings")"
+optional="$(jq '[.[] | select(.severity != "blocking")] | length' <<< "$findings")"
+summary="**Cross-model review by $reviewer:** $blocking blocking, $optional optional."
+if [ $((blocking + optional)) -eq 0 ]; then
+  summary="$summary
+
+No findings."
+fi
+
+# Findings with a line go on that line; the rest, or all of them when GitHub refuses a line, go in the body.
+listed() {
+  jq -r "$1"' | "- **\(.severity)** `\(.file)\(if .line then ":\(.line)" else "" end)`: \(.message)"' <<< "$findings"
+}
+review() {
+  gh api -X POST "repos/$repo/pulls/$pr/reviews" --input "$1" > /dev/null
+}
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+payload="$work/review.json"
+
+# The summary, then the findings the selector picks as a list, if any.
+body() {
+  local list
+  list="$(listed "$1")"
+  if [ -n "$list" ]; then
+    printf '%s\n\n%s' "$summary" "$list"
+  else
+    printf '%s' "$summary"
+  fi
+}
+
+jq -n --arg body "$(body '.[] | select(.line == null)')" --argjson findings "$findings" '{
+  event: "COMMENT",
+  body: $body,
+  comments: [$findings[] | select(.line != null) | {path: .file, line: .line, side: "RIGHT", body: "**\(.severity)**: \(.message)"}]
+}' > "$payload"
+
+if ! review "$payload" 2> "$work/refused"; then
+  echo "GitHub refused the line comments ($(head -c 300 "$work/refused")); posting every finding in the review body." >&2
+  jq -n --arg body "$(body '.[]')" '{event: "COMMENT", body: $body}' > "$payload"
+  review "$payload"
+fi
+
+echo "$summary"
+if [ "$blocking" -gt 0 ]; then
+  echo "$blocking blocking finding(s): the review fails until they are resolved." >&2
+  exit 1
+fi
+}%}
