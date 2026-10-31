@@ -1,0 +1,6 @@
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application;
+
+/// <summary>The {{ module.namespace }} module's aggregate store; implemented in its Infrastructure project by the event store.</summary>
+public interface I{{ module.namespace }}AggregateStore : IAggregateStore;

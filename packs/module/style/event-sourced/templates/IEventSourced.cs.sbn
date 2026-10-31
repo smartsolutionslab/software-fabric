@@ -1,0 +1,18 @@
+namespace {{ namespace }}.BuildingBlocks.EventSourcing;
+
+/// <summary>What an aggregate store needs from an event-sourced aggregate; implemented by <see cref="EventSourcedAggregate{TId}"/>.</summary>
+public interface IEventSourced
+{
+    IAggregateId Id { get; }
+
+    long Version { get; }
+
+    /// <summary>Events raised since the aggregate was loaded or saved, oldest first.</summary>
+    IReadOnlyList<IDomainEvent> PendingEvents { get; }
+
+    /// <summary>Rebuilds the aggregate's state from its stored events, oldest first.</summary>
+    void Replay(IEnumerable<IDomainEvent> history);
+
+    /// <summary>Called by the store once the pending events are stored.</summary>
+    void MarkStored();
+}

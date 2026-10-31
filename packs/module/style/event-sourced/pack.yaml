@@ -1,0 +1,20 @@
+option: module.style.event-sourced
+files:
+  - { template: templates/BuildingBlocks.EventSourcing.csproj.sbn, target: src/BuildingBlocks.EventSourcing/BuildingBlocks.EventSourcing.csproj }
+  - { template: templates/EventSourcedAggregate.cs.sbn, target: src/BuildingBlocks.EventSourcing/EventSourcedAggregate.cs }
+  - { template: templates/IEventSourced.cs.sbn, target: src/BuildingBlocks.EventSourcing/IEventSourced.cs }
+  - { template: templates/IAggregateId.cs.sbn, target: src/BuildingBlocks.EventSourcing/IAggregateId.cs }
+  - { template: templates/IDomainEvent.cs.sbn, target: src/BuildingBlocks.EventSourcing/IDomainEvent.cs }
+  - { template: templates/IAggregateStore.cs.sbn, target: src/BuildingBlocks.EventSourcing/IAggregateStore.cs }
+  - { template: templates/ModuleAggregateStore.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/I{{ module.namespace }}AggregateStore.cs", per-module: true }
+  - { template: templates/EventsAreAppliedByAnAggregate.cs.sbn, target: tests/Architecture.Tests/Rules/EventsAreAppliedByAnAggregate.cs }
+  - { template: templates/EventSourcedDomainIsPure.cs.sbn, target: tests/Architecture.Tests/Rules/EventSourcedDomainIsPure.cs }
+slots:
+  - { slot: solution.projects, template: templates/solution-project.sbn }
+  - { slot: modules.packages.domain, template: templates/domain-reference.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Every domain event is applied by an aggregate, and no event-sourced aggregate has a public setter.", file: templates/EventsAreAppliedByAnAggregate.cs.sbn }
+  - { kind: architecture-test, describes: "A module's Domain project references nothing but the BCL, Kernel and BuildingBlocks.EventSourcing.", file: templates/EventSourcedDomainIsPure.cs.sbn }

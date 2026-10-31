@@ -1,0 +1,61 @@
+using System.Collections.Concurrent;
+using System.Reflection;
+
+namespace {{ namespace }}.BuildingBlocks.EventSourcing;
+
+/// <summary>
+/// An aggregate whose state is the sum of its events. A change is raised as an event and applied by the aggregate's
+/// own <c>Apply(TheEvent)</c> method; loading the aggregate replays its stored events through the same methods.
+/// </summary>
+public abstract class EventSourcedAggregate<TId> : IEventSourced
+    where TId : IAggregateId
+{
+    private static readonly ConcurrentDictionary<(Type Aggregate, Type Event), MethodInfo?> ApplyMethods = new();
+
+    private readonly List<IDomainEvent> pendingEvents = [];
+
+    /// <summary>Set by the Apply method of the aggregate's first event.</summary>
+    public TId Id { get; protected set; } = default!;
+
+    /// <summary>How many of the aggregate's events are stored; 0 for an aggregate that was never saved.</summary>
+    public long Version { get; private set; }
+
+    IAggregateId IEventSourced.Id => Id;
+
+    IReadOnlyList<IDomainEvent> IEventSourced.PendingEvents => pendingEvents;
+
+    void IEventSourced.Replay(IEnumerable<IDomainEvent> history)
+    {
+        {{ not_null "history" }}
+
+        foreach (var domainEvent in history)
+        {
+            Apply(domainEvent);
+            Version++;
+        }
+    }
+
+    void IEventSourced.MarkStored()
+    {
+        Version += pendingEvents.Count;
+        pendingEvents.Clear();
+    }
+
+    /// <summary>Applies the event to the aggregate's state and keeps it until the aggregate is saved.</summary>
+    protected void Raise(IDomainEvent domainEvent)
+    {
+        {{ not_null "domainEvent" }}
+
+        Apply(domainEvent);
+        pendingEvents.Add(domainEvent);
+    }
+
+    private void Apply(IDomainEvent domainEvent)
+    {
+        var method = ApplyMethods.GetOrAdd(
+            (GetType(), domainEvent.GetType()),
+            static key => key.Aggregate.GetMethod("Apply", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, [key.Event]))
+            ?? throw new InvalidOperationException($"{GetType().Name} has no Apply({domainEvent.GetType().Name}).");
+        method.Invoke(this, [domainEvent]);
+    }
+}

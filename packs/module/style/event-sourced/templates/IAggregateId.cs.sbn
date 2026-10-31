@@ -1,0 +1,7 @@
+namespace {{ namespace }}.BuildingBlocks.EventSourcing;
+
+/// <summary>An event-sourced aggregate's identity, a strongly typed record over the id of its event stream: <c>InvoiceId(Guid Value)</c>.</summary>
+public interface IAggregateId
+{
+    Guid Value { get; }
+}
