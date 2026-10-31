@@ -68,6 +68,24 @@ the slot's `separator` (a newline unless declared — JSON lists declare
 `",\n"`). A slot declared twice, a contribution to a slot no selected
 pack declares, and a cardinality breach are errors.
 
+### Role slots
+
+A pack shared across the options of another dimension (zod, an auth client)
+contributes to slots that dimension's chosen option declares. So that it finds
+them whichever option is chosen, the catalog names them as **role slots** of
+that dimension (ADR-0008):
+
+```yaml
+frontend.framework:
+  role-slots:
+    web.dependencies: { description: "Entries of the web app's dependencies.", separator: ",\n" }
+```
+
+Every pack of an option of `frontend.framework` must declare each role slot,
+joined by the catalog's separator; the pack loader rejects one that does not,
+naming the slot. A pack may describe the slot more concretely in its own
+declaration.
+
 ## Template functions
 
 A pattern that runs through every pack is a function, not a branch. Packs contribute Scriban code to the reserved slot

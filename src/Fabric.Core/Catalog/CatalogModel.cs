@@ -18,6 +18,7 @@ public enum SupportTier
 }
 
 /// <param name="Default">The default selection; <c>null</c> when the dimension has none. Single-valued dimensions hold one entry.</param>
+/// <param name="RoleSlots">Slots every option's pack must declare, in file order (ADR-0008); other packs contribute to them whichever option is chosen.</param>
 public sealed record Dimension(
     string Id,
     DimensionScope Scope,
@@ -25,7 +26,11 @@ public sealed record Dimension(
     Condition? ActiveWhen,
     IReadOnlyList<string>? Default,
     string? Note,
-    IReadOnlyDictionary<string, CatalogOption> Options);
+    IReadOnlyDictionary<string, CatalogOption> Options,
+    IReadOnlyDictionary<string, RoleSlot> RoleSlots);
+
+/// <param name="Separator">Joins the slot's contributions; <c>null</c> means a newline. Every option's declaration must use it.</param>
+public sealed record RoleSlot(string Slot, string Description, string? Separator);
 
 public sealed record CatalogOption(
     string Id,

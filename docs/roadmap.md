@@ -54,3 +54,39 @@ Aspire integration tests here and in CI.
 
 **Gates:** after M1-01 (the slot set, before any real pack is written)
 and after M1-10 (the M1 gate above).
+
+*M1 gate passed on 2026-10-31.* The user's review accepted: the board lock as
+claim and release commits (ADR-0004), lanes and `agent:claimed` as labels with
+the board optional, domain errors without HTTP (ADR-0007), the lockfile as the
+first step after `fabric new`, and packs branching on other choices at
+generation time (ADR-0006). Known limits carried into M2: `release.sh`,
+`escalate.sh` and the janitor ran against the `gh` stand-in, not yet against
+GitHub; `escalate.sh`'s `yq` expressions are tested against Python's `yq` only.
+
+## M2 tasks
+
+The three remaining profiles, generated from real packs and green in profile
+CI. `fabric new` lists what each one lacks today: 7 packs for
+`saas-standard-vue`, 12 for `industrial-event-driven-mfe`, 6 for `lean-crud`.
+
+It also shows the first design question. The frontend's shared vocabulary
+(`web.dependencies`, `web.imports`, `web.providers`, `web.env`,
+`web.test-setup`, `web.restricted-imports`, `web.dev-dependencies`) is declared
+by the React pack, and the request-header slots (`web.api-imports`,
+`web.api-headers`) by `rtk-query-codegen`. Packs shared across frameworks
+(zod, tanstack-table, echarts, oidc-client-ts, accessibility) contribute to
+them, so choosing Vue or Orval leaves them nowhere to go.
+
+| # | Task | Done when |
+|---|---|---|
+| M2-00 | The board protocol in this repo: labels, lanes (`generator`, `packs-backend`, `packs-frontend`, `ci`), `docs/owners.yml`, the janitor and return-to-Todo workflows, one issue per M2 task | An agent claims an M2 issue here with `next.sh` |
+| M2-01 | Role slots: a slot that several options of one dimension must all declare, with one shared description (frontend framework, API client). Decision and ADR first (human), then the generator check | Composing a profile fails, naming the option, when a role slot is missing from it |
+| M2-02 | `lean-crud`: transport none, tenancy none, module style crud, CQRS none, state tanstack-query, API client orval | `build/profile-ci.sh lean-crud` green |
+| M2-03 | `saas-standard-vue`: vue, vue-router, pinia-tanstack-query, orval, vee-validate, primevue, library-theme; the shared frontend packs branch on the framework where their code differs (ADR-0006) | `build/profile-ci.sh saas-standard-vue` green |
+| M2-04 | Event-driven backend: kafka, event-sourced modules on marten, physical CQRS | The backend of `industrial-event-driven-mfe` builds and its tests pass |
+| M2-05 | Micro-frontends: module-federation, single framework, tokens-and-components, signalr | `build/profile-ci.sh industrial-event-driven-mfe` green |
+| M2-06 | Profile CI runs every profile | One CI job per profile, all green |
+
+**Gate after M2:** every profile green, and no pack had to edit another's
+output (a slot was added instead). M2-00 and M2-01 are supervised; from M2-02
+on, agents take the tasks through the board.
