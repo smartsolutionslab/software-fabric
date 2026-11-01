@@ -3,6 +3,7 @@
 - Components are function components in `.tsx`; one component per file, named like the file.
 - Import from `@/…` (= `web/app/src`), never with long relative paths.
 - Tests sit next to the code (`Thing.test.tsx`), use Testing Library queries by role and label, and import `test`/`expect` from `vitest`.
+- A test waits for a condition, never a count: `await screen.findBy…(...)` or `await waitFor(() => expect(...))`. No loop of `await new Promise(...)`, no sleep or empty `act` right before `expect`; lint fails on both. Driving fake timers (`vi.advanceTimersByTimeAsync`) is fine.
 - Call the backend through `/api/...`; the dev server forwards it to the host. Never hard-code the host's port.
 - End-to-end tests go in `e2e/` (Playwright); run them with the AppHost up: `pnpm e2e`.
 - No `any`, no non-null assertions (`!`); lint fails on both.

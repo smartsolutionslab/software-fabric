@@ -33,4 +33,34 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // A test waits for a condition, not a count: a fixed number of yields passes on a fast machine and fails on a
+    // loaded CI runner. Necessary, not sufficient; docs/adr says what these selectors cannot see.
+    files: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "ForStatement[test] AwaitExpression > NewExpression[callee.name='Promise'], " +
+            "ForOfStatement AwaitExpression > NewExpression[callee.name='Promise'], " +
+            "ForInStatement AwaitExpression > NewExpression[callee.name='Promise']",
+          message:
+            'A fixed count of timer yields is not a bound on work that advances in another phase of the event loop. ' +
+            'Wait for the condition: findBy* or waitFor. To drive fake timers, use vi.advanceTimersByTimeAsync.',
+        },
+        {
+          selector:
+            ':matches(' +
+            "ExpressionStatement[expression.type='AwaitExpression'][expression.argument.callee.name='Promise'], " +
+            "ExpressionStatement[expression.type='AwaitExpression'][expression.argument.callee.name=/^(settle|sleep|delay|wait|pause|tick|nextTick|flushPromises|setTimeout)$/], " +
+            "ExpressionStatement[expression.type='AwaitExpression'][expression.argument.callee.name='act'][expression.argument.arguments.0.body.body.length=0]" +
+            ") + ExpressionStatement:has(CallExpression[callee.name='expect'])",
+          message:
+            'A settle may not immediately precede an assertion: it assumes the work finished in time. ' +
+            'Wait for the condition: findBy* or waitFor.',
+        },
+      ],
+    },
+  },
 );
