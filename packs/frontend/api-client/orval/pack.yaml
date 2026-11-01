@@ -1,0 +1,20 @@
+option: frontend.api-client.orval
+files:
+  - { template: templates/orval.config.ts.sbn, target: web/app/orval.config.ts }
+  - { template: templates/openapi.json.sbn, target: web/app/openapi.json }
+  - { template: templates/baseApi.ts.sbn, target: web/app/src/api/baseApi.ts }
+  - { template: templates/gitignore.sbn, target: web/app/src/api/.gitignore }
+  - { template: templates/OpenApiDocumentTests.cs.sbn, target: tests/Integration.Tests/OpenApiDocumentTests.cs }
+declares-slots:
+  - { slot: web.api-imports, description: "Import lines of src/api/baseApi.ts. Every api-client pack declares it." }
+  - { slot: web.api-headers, description: "Statements in apiFetch, before every call, with the request's Headers headers in scope. Every api-client pack declares it." }
+slots:
+  - { slot: web.dev-dependencies, template: templates/dev-dependency.sbn }
+  - { slot: web.scripts, template: templates/scripts.sbn }
+  - { slot: web.prepare, template: templates/prepare.sbn }
+  - { slot: web.lint-ignores, template: templates/lint-ignore.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "An integration test compares web/app/openapi.json with the document the running host serves; a stale copy fails it (and is rewritten for the commit).", file: templates/OpenApiDocumentTests.cs.sbn }
