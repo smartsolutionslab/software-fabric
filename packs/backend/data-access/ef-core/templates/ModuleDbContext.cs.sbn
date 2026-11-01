@@ -9,6 +9,7 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
     /// <summary>The application's services, for conventions that depend on the current request.</summary>
     public IServiceProvider Services { get; } = services;
 {{ slots["persistence.context-members"] }}
+{{~ if slots["persistence.save-changes"] != "" ~}}
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -21,6 +22,7 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
         BeforeSaving();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
+{{~ end ~}}
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,9 +33,11 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
 {{ slots["persistence.model-conventions"] }}
         base.OnModelCreating(modelBuilder);
     }
+{{~ if slots["persistence.save-changes"] != "" ~}}
 
     private void BeforeSaving()
     {
 {{ slots["persistence.save-changes"] }}
     }
+{{~ end ~}}
 }

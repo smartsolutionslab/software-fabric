@@ -1,0 +1,143 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using {{ namespace }}.Contracts;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+/// <summary>
+/// Every module's consumers. What a valid consumer is lives in one place, <see cref="Problem"/>: discovery accepts a
+/// Handle method only when it has none, and the architecture rule ConsumersHandleIntegrationEvents fails every Handle
+/// method that has one, so the rule cannot accept a handler this dispatcher would skip. Further Handle parameters are a
+/// CancellationToken or services; the consumer itself is created per message with its constructor's dependencies.
+/// </summary>
+public sealed class IntegrationEventConsumers
+{
+    private const BindingFlags HandleMethods = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+    private readonly Dictionary<Type, List<MethodInfo>> handlers = [];
+
+    public IntegrationEventConsumers(IEnumerable<Assembly> assemblies)
+    {
+        {{ not_null "assemblies" }}
+
+        var methods = assemblies
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type.Name.EndsWith("Consumer", StringComparison.Ordinal))
+            .SelectMany(type => type.GetMethods(HandleMethods))
+            .Where(method => method.Name == "Handle" && Problem(method) is null);
+
+        foreach (var method in methods)
+        {
+            var message = method.GetParameters()[0].ParameterType;
+            if (!handlers.TryGetValue(message, out var forMessage))
+            {
+                handlers[message] = forMessage = [];
+            }
+
+            forMessage.Add(method);
+        }
+    }
+
+    /// <summary>Every Handle method an event can be delivered to.</summary>
+    public IReadOnlyCollection<MethodInfo> Handlers => [.. handlers.Values.SelectMany(methods => methods)];
+
+    /// <summary>
+    /// Why the dispatcher cannot deliver to this Handle method, or null when it can: a public, non-abstract class in an
+    /// Application project; not generic; its first parameter exactly the type delivered (a sealed integration event,
+    /// because delivery looks up the event's own type); returning void or Task, never async void.
+    /// </summary>
+    public static string? Problem(MethodInfo method)
+    {
+        {{ not_null "method" }}
+
+        var consumer = method.DeclaringType!;
+        var handler = $"{consumer.FullName}.{method.Name}";
+        if (!consumer.IsVisible)
+        {
+            return $"{consumer.FullName} is not public; the dispatcher delivers only to public consumers.";
+        }
+
+        if (!consumer.IsClass || consumer.IsAbstract)
+        {
+            return $"{consumer.FullName} is not a class the dispatcher can create; a consumer is a public, non-abstract class.";
+        }
+
+        if (!consumer.Assembly.GetName().Name!.EndsWith(".Application", StringComparison.Ordinal))
+        {
+            return $"{consumer.FullName} is outside an Application project; the dispatcher delivers only to consumers there.";
+        }
+
+        if (method.IsGenericMethodDefinition || consumer.ContainsGenericParameters)
+        {
+            return $"{handler} is generic; the dispatcher calls handlers of one concrete event type.";
+        }
+
+        var message = method.GetParameters().FirstOrDefault()?.ParameterType;
+        if (message is null || !typeof(IIntegrationEvent).IsAssignableFrom(message))
+        {
+            return $"{handler} does not handle an integration event.";
+        }
+
+        if (!message.IsSealed)
+        {
+            return $"{handler} takes {message.Name}, which is not a sealed integration event; the dispatcher delivers each event only to handlers of exactly its type.";
+        }
+
+        if (method.ReturnType == typeof(void) && method.GetCustomAttribute<AsyncStateMachineAttribute>() is not null)
+        {
+            return $"{handler} is async void; a consumer that awaits returns Task.";
+        }
+
+        return method.ReturnType == typeof(void) || method.ReturnType == typeof(Task)
+            ? null
+            : $"{handler} returns {method.ReturnType.Name}; a consumer returns void or Task.";
+    }
+
+    /// <summary>Hands the event to every consumer of its type, each in its own scope.</summary>
+    public async Task DeliverAsync(IIntegrationEvent integrationEvent, IServiceScopeFactory scopes, CancellationToken cancellationToken)
+    {
+        {{ not_null "integrationEvent" }}
+        {{ not_null "scopes" }}
+
+        if (!handlers.TryGetValue(integrationEvent.GetType(), out var methods))
+        {
+            return;
+        }
+
+        foreach (var method in methods)
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var consumer = method.IsStatic ? null : ActivatorUtilities.CreateInstance(scope.ServiceProvider, method.DeclaringType!);
+            try
+            {
+                // Inside the try: a parameter that cannot be resolved must not skip the consumer's disposal.
+                object?[] arguments = [.. method.GetParameters().Select((parameter, index) => index == 0
+                    ? integrationEvent
+                    : parameter.ParameterType == typeof(CancellationToken) ? cancellationToken : scope.ServiceProvider.GetRequiredService(parameter.ParameterType))];
+
+                if (method.Invoke(consumer, BindingFlags.DoNotWrapExceptions, null, arguments, null) is Task task)
+                {
+                    await task;
+                }
+            }
+            finally
+            {
+                // The scope does not track an instance it did not create; whoever creates the consumer disposes it.
+                await DisposeAsync(consumer);
+            }
+        }
+    }
+
+    private static async ValueTask DisposeAsync(object? consumer)
+    {
+        if (consumer is IAsyncDisposable asynchronous)
+        {
+            await asynchronous.DisposeAsync();
+        }
+        else if (consumer is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+    }
+}

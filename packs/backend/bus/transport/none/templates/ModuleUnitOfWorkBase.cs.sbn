@@ -1,0 +1,50 @@
+using {{ namespace }}.Contracts;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+/// <summary>
+/// A module's unit of work over its DbContext and its outbox table: the changes and the queued events are saved in one
+/// transaction, and the host's dispatcher delivers the events in-process once it is committed.
+/// </summary>
+public abstract class ModuleUnitOfWork<TContext>(TContext context, IServiceProvider services) : IUnitOfWork
+    where TContext : DbContext
+{
+    private readonly List<IIntegrationEvent> queued = [];
+
+    public Task PublishAsync(IIntegrationEvent integrationEvent)
+    {
+        {{ not_null "integrationEvent" }}
+        queued.Add(integrationEvent);
+        return Task.CompletedTask;
+    }
+
+    public async Task CommitAsync(CancellationToken cancellationToken)
+    {
+        // It cannot know when, or whether, a caller's transaction commits, so it would forget changes a rollback undid.
+        if (context.Database.CurrentTransaction is not null)
+        {
+            throw new InvalidOperationException(
+                $"{GetType().Name} opens its own transaction; commit it outside the transaction the caller began on {typeof(TContext).Name}.");
+        }
+
+        if (queued.Count == 0)
+        {
+            await context.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        await using (var transaction = await context.Database.BeginTransactionAsync(cancellationToken))
+        {
+            // The tracked changes stay pending until the commit succeeds, so a retry after a failure saves them again.
+            await context.SaveChangesAsync(acceptAllChangesOnSuccess: false, cancellationToken);
+            await Outbox.AddAsync(context, queued, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        context.ChangeTracker.AcceptAllChanges();
+        queued.Clear();
+        services.GetService<OutboxSignal>()?.Notify();
+    }
+}

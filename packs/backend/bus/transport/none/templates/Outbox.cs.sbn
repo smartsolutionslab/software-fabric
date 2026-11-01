@@ -1,0 +1,120 @@
+{{~ if project["backend.database"] != "postgres" ~}}
+#error The in-process outbox of backend.bus.transport.none is written for PostgreSQL only; choose backend.database=postgres or add this database to the pack.
+{{~ end ~}}
+using System.Text.Json;
+using {{ namespace }}.Contracts;
+using Microsoft.EntityFrameworkCore;
+
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+/// <summary>A pending row of a module's outbox table.</summary>
+public sealed record OutboxMessage(Guid Id, string Type, string Payload);
+
+/// <summary>
+/// The outbox table in a module's schema: integration events saved in the same transaction as the module's changes,
+/// delivered in-process afterwards. The MigrationRunner creates it; it stays out of the module's EF Core model.
+/// </summary>
+public static class Outbox
+{
+    /// <summary>A message that failed this often is left for a developer; its last error is in the row.</summary>
+    public const int MaximumAttempts = 10;
+
+    /// <summary>How long a message waits after its first failure; each further failure doubles it.</summary>
+    public static readonly TimeSpan FirstRetryDelay = TimeSpan.FromSeconds(1);
+
+    /// <summary>The longest a failed message waits before its next attempt.</summary>
+    public static readonly TimeSpan MaximumRetryDelay = TimeSpan.FromMinutes(5);
+
+    /// <summary>Creates the outbox table in the context's schema. The MigrationRunner runs it for every module; the host never does.</summary>
+    public static Task CreateTableAsync(DbContext context, CancellationToken cancellationToken)
+    {
+        {{ not_null "context" }}
+
+        return context.Database.ExecuteSqlRawAsync(
+            Sql(SchemaOf(context), """
+                create schema if not exists "$schema$";
+                create table if not exists "$schema$".outbox_messages (
+                    id uuid primary key,
+                    type text not null,
+                    payload text not null,
+                    created_at timestamptz not null default now(),
+                    delivered_at timestamptz null,
+                    attempts integer not null default 0,
+                    next_attempt_at timestamptz null,
+                    last_error text null);
+                """),
+            cancellationToken);
+    }
+
+    /// <summary>Adds the events to the outbox in the context's current transaction.</summary>
+    public static async Task AddAsync(DbContext context, IEnumerable<IIntegrationEvent> integrationEvents, CancellationToken cancellationToken)
+    {
+        {{ not_null "context" }}
+        {{ not_null "integrationEvents" }}
+
+        var insert = Sql(SchemaOf(context), """insert into "$schema$".outbox_messages (id, type, payload) values ({0}, {1}, {2})""");
+        foreach (var integrationEvent in integrationEvents)
+        {
+            var type = integrationEvent.GetType();
+            await context.Database.ExecuteSqlRawAsync(
+                insert,
+                [Guid.CreateVersion7(), $"{type.FullName}, {type.Assembly.GetName().Name}", JsonSerializer.Serialize(integrationEvent, type)],
+                cancellationToken);
+        }
+    }
+
+    /// <summary>The oldest undelivered messages, locked for this transaction; another instance skips them.</summary>
+    public static Task<List<OutboxMessage>> LockPendingAsync(DbContext context, int count, CancellationToken cancellationToken)
+    {
+        {{ not_null "context" }}
+
+        return context.Database
+            .SqlQueryRaw<OutboxMessage>(
+                Sql(SchemaOf(context), """
+                    select id as "Id", type as "Type", payload as "Payload" from "$schema$".outbox_messages
+                    where delivered_at is null and attempts < {0} and (next_attempt_at is null or next_attempt_at <= now())
+                    order by id
+                    limit {1}
+                    for update skip locked
+                    """),
+                MaximumAttempts,
+                count)
+            .ToListAsync(cancellationToken);
+    }
+
+    public static Task MarkDeliveredAsync(DbContext context, Guid id, CancellationToken cancellationToken)
+    {
+        {{ not_null "context" }}
+
+        return context.Database.ExecuteSqlRawAsync(
+            Sql(SchemaOf(context), """update "$schema$".outbox_messages set delivered_at = now(), attempts = attempts + 1, last_error = null where id = {0}"""),
+            [id],
+            cancellationToken);
+    }
+
+    /// <summary>Records the failure and holds the message back: 1 s after the first failure, doubling, at most 5 minutes.</summary>
+    public static Task MarkFailedAsync(DbContext context, Guid id, string error, CancellationToken cancellationToken)
+    {
+        {{ not_null "context" }}
+
+        // attempts on the right is the value before this update: 1 s * 2^0 after the first failure. clock_timestamp(), not
+        // now(): now() is when the batch's transaction began, before its consumers ran.
+        return context.Database.ExecuteSqlRawAsync(
+            Sql(SchemaOf(context), """
+                update "$schema$".outbox_messages
+                set attempts = attempts + 1,
+                    next_attempt_at = clock_timestamp() + least(make_interval(secs => {2} * power(2, attempts)), make_interval(secs => {3})),
+                    last_error = {1}
+                where id = {0}
+                """),
+            [id, error, FirstRetryDelay.TotalSeconds, MaximumRetryDelay.TotalSeconds],
+            cancellationToken);
+    }
+
+    // The schema is the module's own constant, never input; only values go in as parameters.
+    private static string Sql(string schema, string statement) => statement.Replace("$schema$", schema, StringComparison.Ordinal);
+
+    private static string SchemaOf(DbContext context) =>
+        context.Model.GetDefaultSchema()
+        ?? throw new InvalidOperationException($"{context.GetType().Name} has no default schema; module contexts derive from ModuleDbContext.");
+}

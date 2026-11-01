@@ -1,0 +1,9 @@
+option: module.style.crud
+files:
+  # Per module: the rule checks only the modules that chose CRUD, so another module may choose another style.
+  - { template: templates/EntitiesKnowNoPersistence.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}EntitiesKnowNoPersistence.cs", per-module: true }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "A CRUD module's Domain project references neither EF Core nor ASP.NET Core: entities are plain classes, mapped in Infrastructure.", file: templates/EntitiesKnowNoPersistence.cs.sbn }
