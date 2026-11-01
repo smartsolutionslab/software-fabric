@@ -109,6 +109,31 @@ public sealed class NewCommandTests : IDisposable
         Directory.Exists(Path.Combine(root, "unbuilt")).ShouldBeFalse();
     }
 
+    [Theory]
+    [InlineData("backend.llm=anthropic", "no pack for backend.llm=anthropic.")]
+    [InlineData("backend.llm=openai", "no pack for backend.llm=openai.")]
+    [InlineData("backend.llm=azure-openai", "no pack for backend.llm=azure-openai.")]
+    [InlineData("backend.llm=ollama", "no pack for backend.llm=ollama.")]
+    [InlineData("backend.mcp=server,client", "no pack for backend.mcp=server.")]
+    [InlineData("backend.mcp=server,client", "no pack for backend.mcp=client.")]
+    public void An_llm_or_mcp_option_without_a_pack_yet_writes_nothing(string setting, string error)
+    {
+        var run = CliRun.Of("new", Path.Combine(root, "unbuilt"), "--profile", "lean-crud", "--set", setting, "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain($"error: {error}");
+        Directory.Exists(Path.Combine(root, "unbuilt")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_project_without_an_llm_generates_and_tells_its_agents_so()
+    {
+        var run = CliRun.Of("new", Path.Combine(root, "plain"), "--profile", "lean-crud", "--set", "backend.llm=none", "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        File.ReadAllText(Path.Combine(root, "plain", "AGENTS.md")).ShouldContain("## LLM: none");
+    }
+
     [Fact]
     public void The_name_option_wins_over_the_directory_name()
     {

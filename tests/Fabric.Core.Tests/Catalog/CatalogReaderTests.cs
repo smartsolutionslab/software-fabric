@@ -16,8 +16,8 @@ public class CatalogReaderTests
         var catalog = ReadRepositoryCatalog();
 
         catalog.Version.ShouldBe(1);
-        catalog.Dimensions.Count.ShouldBe(45);
-        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(124);
+        catalog.Dimensions.Count.ShouldBe(47);
+        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(131);
         catalog.Profiles.Keys.ShouldBe(
             ["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud"],
             ignoreOrder: false);
@@ -91,6 +91,24 @@ public class CatalogReaderTests
     public void An_authentication_or_authorization_option_without_a_pack_is_experimental(string dimension, string option)
     {
         ReadRepositoryCatalog().Dimensions[dimension].Options[option].Tier.ShouldBe(SupportTier.Experimental);
+    }
+
+    [Theory]
+    [InlineData("backend.llm", "anthropic")]
+    [InlineData("backend.llm", "openai")]
+    [InlineData("backend.llm", "azure-openai")]
+    [InlineData("backend.llm", "ollama")]
+    [InlineData("backend.mcp", "server")]
+    [InlineData("backend.mcp", "client")]
+    public void An_llm_or_mcp_option_without_a_pack_is_experimental(string dimension, string option)
+    {
+        ReadRepositoryCatalog().Dimensions[dimension].Options[option].Tier.ShouldBe(SupportTier.Experimental);
+    }
+
+    [Fact]
+    public void No_llm_is_supported_because_every_profile_generates_it()
+    {
+        ReadRepositoryCatalog().Dimensions["backend.llm"].Options["none"].Tier.ShouldBe(SupportTier.Supported);
     }
 
     [Fact]
