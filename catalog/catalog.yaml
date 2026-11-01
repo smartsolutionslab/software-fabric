@@ -50,14 +50,14 @@ dimensions:
     default: postgres
     options:
       postgres:  { tier: supported }
-      sqlserver: { tier: supported }
+      sqlserver: { tier: experimental }
 
   backend.data-access:
     scope: project
     default: ef-core
     options:
       ef-core:             { tier: supported }
-      ef-core-dapper-read: { tier: supported, note: "EF Core for writes, Dapper in query handlers" }
+      ef-core-dapper-read: { tier: experimental, note: "EF Core for writes, Dapper in query handlers" }
 
   backend.topology:
     scope: project
@@ -65,7 +65,7 @@ dimensions:
     options:
       modular-monolith: { tier: supported }
       services:
-        tier: supported
+        tier: experimental
         requires: ["backend.bus.transport != none"]
 
   backend.bus.transport:
@@ -74,7 +74,7 @@ dimensions:
     options:
       none:              { tier: supported, note: "in-process integration events through an outbox table" }
       rabbitmq:          { tier: supported }
-      azure-service-bus: { tier: supported }
+      azure-service-bus: { tier: experimental }
       kafka:             { tier: supported }
 
   backend.bus.library:
@@ -83,21 +83,21 @@ dimensions:
     default: wolverine
     options:
       wolverine:   { tier: supported }
-      masstransit: { tier: supported, note: "check the licence of the pinned major version before each release" }
+      masstransit: { tier: experimental, note: "check the licence of the pinned major version before each release" }
 
   backend.mediator:
     scope: project
     default: hand-rolled
     options:
       hand-rolled: { tier: supported }
-      wolverine:   { tier: supported }
+      wolverine:   { tier: experimental }
 
   backend.api-style:
     scope: project
     default: minimal-apis
     options:
       minimal-apis: { tier: supported }
-      controllers:  { tier: supported }
+      controllers:  { tier: experimental }
 
   backend.api-protocols:
     scope: project
@@ -105,14 +105,14 @@ dimensions:
     default: [rest]
     options:
       rest: { tier: supported }
-      grpc: { tier: supported, requires: ["backend.api-protocols has rest"] }
+      grpc: { tier: experimental, requires: ["backend.api-protocols has rest"] }
 
   backend.errors:
     scope: project
     default: result
     options:
       result:     { tier: supported }
-      exceptions: { tier: supported }
+      exceptions: { tier: experimental }
 
   backend.result-style:
     scope: project
@@ -141,8 +141,8 @@ dimensions:
     default: keycloak
     options:
       keycloak:     { tier: supported }
-      entra-id:     { tier: supported }
-      generic-oidc: { tier: supported }
+      entra-id:     { tier: experimental }
+      generic-oidc: { tier: experimental }
       none:         { tier: experimental, note: "no authentication: every endpoint is anonymous and there is no sign-in" }
 
   backend.authorization:
@@ -161,8 +161,8 @@ dimensions:
     options:
       none:                { tier: supported }
       column:              { tier: supported }
-      schema-per-tenant:   { tier: supported }
-      database-per-tenant: { tier: supported }
+      schema-per-tenant:   { tier: experimental }
+      database-per-tenant: { tier: experimental }
 
   # ─────────────────────────── Backend · per module ──────────────────────────
 
@@ -192,7 +192,7 @@ dimensions:
     default: light
     options:
       light:  { tier: supported, note: "aggregates and value objects for core concepts" }
-      strict: { tier: supported, note: "no primitives on the domain model; architecture test enforced" }
+      strict: { tier: experimental, note: "no primitives on the domain model; architecture test enforced" }
 
   module.cqrs:
     scope: module
@@ -208,7 +208,7 @@ dimensions:
     default: [integration-events]
     options:
       contract-interface:
-        tier: supported
+        tier: experimental
         conflicts: ["backend.topology == services"]
       integration-events: { tier: supported }
 
@@ -219,21 +219,21 @@ dimensions:
     default: xunit
     options:
       xunit: { tier: supported }
-      nunit: { tier: supported }
-      tunit: { tier: supported }
+      nunit: { tier: experimental }
+      tunit: { tier: experimental }
 
   backend.test.assertions:
     scope: project
     default: shouldly
     options:
       shouldly:           { tier: supported }
-      awesome-assertions: { tier: supported }
+      awesome-assertions: { tier: experimental }
 
   backend.test.mocks:
     scope: project
     default: nsubstitute
     options:
-      moq:         { tier: supported }
+      moq:         { tier: experimental }
       nsubstitute: { tier: supported }
 
   backend.test.integration:
@@ -241,22 +241,22 @@ dimensions:
     default: aspire-fixture
     options:
       aspire-fixture: { tier: supported }
-      testcontainers: { tier: supported }
+      testcontainers: { tier: experimental }
 
   backend.test.extras:
     scope: project
     multi: true
     default: []
     options:
-      mutation-testing: { tier: supported, note: "Stryker.NET" }
-      contract-tests:   { tier: supported }
+      mutation-testing: { tier: experimental, note: "Stryker.NET" }
+      contract-tests:   { tier: experimental }
 
   test.discipline:
     scope: project
     default: red-first
     options:
       red-first:  { tier: supported, note: "new-behaviour tests observed failing; output quoted in the PR" }
-      test-after: { tier: supported, note: "coverage gate only" }
+      test-after: { tier: experimental, note: "coverage gate only" }
 
   # ─────────────────────────── Frontend ──────────────────────────────────────
 
@@ -281,16 +281,16 @@ dimensions:
       web.styles: { description: "Lines of the global stylesheet." }
     options:
       react: { tier: supported }
-      vue:   { tier: supported }
+      vue:   { tier: experimental }
 
   frontend.architecture:
     scope: project
     default: spa
     options:
       spa:       { tier: supported }
-      multi-app: { tier: supported, note: "several apps and shared libraries in one workspace" }
+      multi-app: { tier: experimental, note: "several apps and shared libraries in one workspace" }
       micro-frontends:
-        tier: supported
+        tier: experimental
         requires: ["frontend.design-system != none"]
 
   frontend.mfe-technique:
@@ -298,16 +298,16 @@ dimensions:
     active-when: "frontend.architecture == micro-frontends"
     default: module-federation
     options:
-      module-federation: { tier: supported }
-      native-federation: { tier: supported }
-      web-components:    { tier: supported }
+      module-federation: { tier: experimental }
+      native-federation: { tier: experimental }
+      web-components:    { tier: experimental }
 
   frontend.mfe-mixed-frameworks:
     scope: project
     active-when: "frontend.architecture == micro-frontends"
     default: "no"
     options:
-      "no":  { tier: supported }
+      "no":  { tier: experimental }
       "yes":
         tier: experimental
         requires: ["frontend.design-system in (tokens, web-components)"]
@@ -317,8 +317,8 @@ dimensions:
     default: pnpm-workspaces
     options:
       pnpm-workspaces: { tier: supported }
-      nx:              { tier: supported }
-      turborepo:       { tier: supported }
+      nx:              { tier: experimental }
+      turborepo:       { tier: experimental }
 
   frontend.state:
     scope: project
@@ -328,14 +328,14 @@ dimensions:
         tier: supported
         requires: ["frontend.framework == react"]
       zustand-tanstack-query:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == react"]
       tanstack-query: { tier: supported }
       pinia-tanstack-query:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == vue"]
       pinia:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == vue"]
 
   frontend.api-client:
@@ -351,7 +351,7 @@ dimensions:
         tier: supported
         requires: ["frontend.state == redux-toolkit"]
       orval:         { tier: supported }
-      openapi-fetch: { tier: supported }
+      openapi-fetch: { tier: experimental }
 
   frontend.routing:
     scope: project
@@ -361,10 +361,10 @@ dimensions:
         tier: supported
         requires: ["frontend.framework == react"]
       tanstack-router:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == react"]
       vue-router:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == vue"]
 
   frontend.forms:
@@ -374,12 +374,12 @@ dimensions:
       react-hook-form:
         tier: supported
         requires: ["frontend.framework == react"]
-      tanstack-form: { tier: supported }
+      tanstack-form: { tier: experimental }
       vee-validate:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == vue"]
       formkit:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == vue"]
 
   frontend.validation:
@@ -387,15 +387,15 @@ dimensions:
     default: zod
     options:
       zod:     { tier: supported }
-      valibot: { tier: supported }
+      valibot: { tier: experimental }
 
   frontend.styling:
     scope: project
     default: tailwind
     options:
       tailwind:      { tier: supported }
-      css-modules:   { tier: supported }
-      library-theme: { tier: supported, note: "the UI library's own theming system" }
+      css-modules:   { tier: experimental }
+      library-theme: { tier: experimental, note: "the UI library's own theming system" }
 
   frontend.ui-library:
     scope: project
@@ -405,35 +405,35 @@ dimensions:
         tier: supported
         requires: ["frontend.framework == react", "frontend.styling == tailwind"]
       radix-headless:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == react"]
       mui:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == react"]
         conflicts: ["frontend.styling == tailwind"]
       mantine:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == react"]
       ant-design:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == react"]
       fluent-ui:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == react"]
       primevue:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == vue"]
       vuetify:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == vue"]
       quasar:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == vue"]
       element-plus:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == vue"]
       shadcn-vue:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == vue", "frontend.styling == tailwind"]
 
   frontend.design-system:
@@ -441,8 +441,8 @@ dimensions:
     default: none
     options:
       none:   { tier: supported, note: "the UI library as shipped" }
-      tokens: { tier: supported, note: "Style Dictionary tokens, framework-neutral" }
-      tokens-and-components: { tier: supported, note: "tokens plus an own component package with Storybook" }
+      tokens: { tier: experimental, note: "Style Dictionary tokens, framework-neutral" }
+      tokens-and-components: { tier: experimental, note: "tokens plus an own component package with Storybook" }
       web-components:        { tier: experimental }
 
   frontend.data-grid:
@@ -450,7 +450,7 @@ dimensions:
     default: tanstack-table
     options:
       tanstack-table: { tier: supported }
-      ag-grid:        { tier: supported, note: "community vs enterprise licence is the project's call" }
+      ag-grid:        { tier: experimental, note: "community vs enterprise licence is the project's call" }
 
   frontend.charts:
     scope: project
@@ -458,17 +458,17 @@ dimensions:
     options:
       echarts: { tier: supported }
       recharts:
-        tier: supported
+        tier: experimental
         requires: ["frontend.framework == react"]
-      chartjs: { tier: supported }
+      chartjs: { tier: experimental }
 
   frontend.realtime:
     scope: project
     default: none
     options:
       none:    { tier: supported }
-      signalr: { tier: supported }
-      sse:     { tier: supported }
+      signalr: { tier: experimental }
+      sse:     { tier: experimental }
 
   frontend.auth-client:
     scope: project
@@ -477,7 +477,7 @@ dimensions:
     options:
       oidc-client-ts: { tier: supported }
       msal:
-        tier: supported
+        tier: experimental
         requires: ["backend.auth == entra-id"]
 
   frontend.pwa:
@@ -485,7 +485,7 @@ dimensions:
     default: "no"
     options:
       "no":  { tier: supported }
-      "yes": { tier: supported }
+      "yes": { tier: experimental }
 
   frontend.test.extras:
     scope: project
@@ -494,7 +494,7 @@ dimensions:
     note: "Vitest, Testing Library and Playwright are always present."
     options:
       storybook-tests:
-        tier: supported
+        tier: experimental
         requires: ["frontend.design-system == tokens-and-components"]
-      screenshot-tests: { tier: supported }
+      screenshot-tests: { tier: experimental }
       accessibility:    { tier: supported, note: "axe in component and e2e tests" }
