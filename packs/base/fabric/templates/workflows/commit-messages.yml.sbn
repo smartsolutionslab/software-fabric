@@ -1,0 +1,19 @@
+{%{name: commit-messages
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  conventional-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Every commit in the pull request is a Conventional Commit
+        run: bash .github/scripts/board/check-commits.sh "$BASE" "$HEAD"
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+}%}
