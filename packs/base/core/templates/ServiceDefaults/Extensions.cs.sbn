@@ -23,7 +23,7 @@ public static class Extensions
         builder.Services.AddServiceDiscovery();
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
-            http.AddStandardResilienceHandler();
+            http.AddStandardResilienceHandler(IdempotentRetry.RetryIdempotentMethodsOnly);
             http.AddServiceDiscovery();
         });
 

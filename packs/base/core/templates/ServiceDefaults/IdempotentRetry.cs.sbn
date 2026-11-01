@@ -1,0 +1,82 @@
+using Microsoft.Extensions.Http.Resilience;
+using Polly;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+/// <summary>
+/// Confines the standard resilience handler's retry to methods a retry cannot damage.
+/// <para>
+/// The handler's own predicate looks only at the outcome (5xx, 408, 429, a transport exception), never at the
+/// method, so it retries a POST exactly like a GET. A request that reached the server, was applied and lost its
+/// response is indistinguishable from one that never arrived, so that retry can apply it twice. Timeouts and the
+/// circuit breaker are untouched: a POST still gets its attempt timeout and total budget, and simply one attempt.
+/// </para>
+/// </summary>
+public static class IdempotentRetry
+{
+    private static readonly HttpRequestOptionsKey<bool> RetryEveryMethodRequested = new("ServiceDefaults.RetryEveryMethod");
+
+    /// <summary>Applied to every HttpClient by <c>AddServiceDefaults()</c>.</summary>
+    public static void RetryIdempotentMethodsOnly(HttpStandardResilienceOptions options)
+    {
+        {{ not_null "options" }}
+
+        options.Retry.ShouldHandle = arguments =>
+        {
+            // A response carries its request; a transport exception has none, and the context holds it either way.
+            var request = arguments.Outcome.Result?.RequestMessage ?? arguments.Context.GetRequestMessage();
+
+            // Without a request the method is unknown, and an unknown method is not retried.
+            if (request is null || !(IsIdempotent(request.Method) || IsMarked(request)))
+            {
+                return ValueTask.FromResult(false);
+            }
+
+            return ValueTask.FromResult(HttpClientResiliencePredicates.IsTransient(arguments.Outcome));
+        };
+    }
+
+    /// <summary>
+    /// Opts one client's POSTs and PATCHes back into retrying on transient failures. Only for a client whose
+    /// non-idempotent calls are idempotent in fact (a token mint, where a second token supersedes the first); say why
+    /// at the call site.
+    /// <para>
+    /// The opt-in is a request option the shared predicate reads, not a named options instance: the defaults pipeline
+    /// reads one options name for every client, so a per-client name would never be consulted.
+    /// </para>
+    /// </summary>
+    public static IHttpClientBuilder RetryEveryMethod(this IHttpClientBuilder builder)
+    {
+        {{ not_null "builder" }}
+
+        return builder.AddHttpMessageHandler(() => new RetryEveryMethodMarker());
+    }
+
+    /// <summary>RFC 9110, section 9.2.2. POST and PATCH are the methods it leaves out.</summary>
+    private static bool IsIdempotent(HttpMethod method) =>
+        method == HttpMethod.Get
+        || method == HttpMethod.Head
+        || method == HttpMethod.Put
+        || method == HttpMethod.Delete
+        || method == HttpMethod.Options
+        || method == HttpMethod.Trace;
+
+    private static bool IsMarked(HttpRequestMessage request) =>
+        request.Options.TryGetValue(RetryEveryMethodRequested, out var requested) && requested;
+
+    /// <summary>Marks each request of its client; the retry re-sends the same request instance, so the mark holds.</summary>
+    private sealed class RetryEveryMethodMarker : DelegatingHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            request.Options.Set(RetryEveryMethodRequested, true);
+            return base.SendAsync(request, cancellationToken);
+        }
+
+        protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            request.Options.Set(RetryEveryMethodRequested, true);
+            return base.Send(request, cancellationToken);
+        }
+    }
+}

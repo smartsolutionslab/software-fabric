@@ -10,3 +10,4 @@
 - A new package version goes in `Directory.Packages.props`; projects reference it without a version.
 - An architecture rule is a class implementing `IArchitectureRule` in `tests/Architecture.Tests/Rules/`; it runs with the other tests.
 - Code that wires a choice into the host or into every module is an extension method in the `Microsoft.Extensions.DependencyInjection` (services) or `Microsoft.AspNetCore.Builder` (app) namespace, so no shared file needs a `using` per choice.
+- HttpClients retry only GET, HEAD, PUT, DELETE, OPTIONS and TRACE; a POST or PATCH gets one attempt. Only a client whose POSTs or PATCHes are idempotent in fact (a token mint) may opt back in with `.RetryEveryMethod()` on its `IHttpClientBuilder`, with a comment at that call site saying why a second attempt cannot apply twice. Never replace the retry predicate in `src/ServiceDefaults`.
