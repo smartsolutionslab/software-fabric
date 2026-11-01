@@ -554,6 +554,154 @@ public sealed class LeanCrudBackendTests
         output.ShouldContain("Shop.Modules.Shipping.Infrastructure.InvoicePaidConsumer is outside an Application project; the dispatcher delivers only to consumers there.");
     }
 
+    private const string InvoiceEvents = """
+        namespace Shop.Contracts.Billing;
+
+        public abstract record InvoiceEventV1(Guid InvoiceId) : IIntegrationEvent;
+
+        public sealed record InvoicePaidV1(Guid InvoiceId) : InvoiceEventV1(InvoiceId);
+        """;
+
+    private const string BaseEventConsumer = """
+        using Shop.Contracts.Billing;
+
+        namespace Shop.Modules.Shipping.Application;
+
+        public sealed class InvoiceEventConsumer
+        {
+            public static void Handle(InvoiceEventV1 message) => _ = message;
+        }
+        """;
+
+    private const string GenericConsumer = """
+        using Shop.Contracts;
+
+        namespace Shop.Modules.Shipping.Application;
+
+        public sealed class AnyEventConsumer
+        {
+            public static void Handle<TEvent>(TEvent message)
+                where TEvent : IIntegrationEvent => _ = message;
+        }
+        """;
+
+    [Fact]
+    public void A_handler_for_a_base_event_type_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoiceEvents.cs", InvoiceEvents);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoiceEventConsumer.cs", BaseEventConsumer);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Shipping.Application.InvoiceEventConsumer.Handle takes InvoiceEventV1, which is not a sealed integration event; the dispatcher delivers each event only to handlers of exactly its type.");
+    }
+
+    [Fact]
+    public void A_generic_handler_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("shipping");
+        project.Write("src/Modules/Shipping/Shipping.Application/AnyEventConsumer.cs", GenericConsumer);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Shipping.Application.AnyEventConsumer.Handle is generic; the dispatcher calls handlers of one concrete event type.");
+    }
+
+    [Fact]
+    public void Discovery_accepts_exactly_the_consumers_the_gate_accepts()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoiceEvents.cs", InvoiceEvents);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoiceEventConsumer.cs", BaseEventConsumer);
+        project.Write("src/Modules/Shipping/Shipping.Application/AnyEventConsumer.cs", GenericConsumer);
+        project.Write("src/Modules/Shipping/Shipping.Application/Consumers.cs", """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoicePaidConsumer
+            {
+                public static void Handle(InvoicePaidV1 message) => _ = message;
+            }
+
+            public sealed class LateInvoicePaidConsumer
+            {
+                public static async void Handle(InvoicePaidV1 message)
+                {
+                    await Task.Yield();
+                    _ = message;
+                }
+            }
+
+            public sealed class TextConsumer
+            {
+                public static void Handle(string text) => _ = text;
+            }
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Infrastructure/OutsideConsumer.cs", """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Infrastructure;
+
+            public sealed class OutsideConsumer
+            {
+                public static void Handle(InvoicePaidV1 message) => _ = message;
+            }
+            """);
+        project.Write("tests/Architecture.Tests/ConsumerDefinitionTests.cs", """
+            using System.Reflection;
+            using Shop.Architecture.Tests.Rules;
+            using Shop.BuildingBlocks.Messaging;
+
+            namespace Shop.Architecture.Tests;
+
+            public class ConsumerDefinitionTests
+            {
+                [Fact]
+                public void The_dispatcher_discovers_exactly_the_handlers_the_gate_accepts()
+                {
+                    var model = ArchitectureModel.Load();
+                    var violations = new ConsumersHandleIntegrationEvents().Violations(model).ToList();
+                    var discovered = new IntegrationEventConsumers(model.ModuleAssemblies).Handlers;
+
+                    var handlers = model.ModuleAssemblies
+                        .SelectMany(assembly => assembly.GetTypes())
+                        .Where(type => type.Name.EndsWith("Consumer", StringComparison.Ordinal))
+                        .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+                        .Where(method => method.Name == "Handle")
+                        .ToList();
+                    handlers.Count.ShouldBe(6);
+
+                    foreach (var handler in handlers)
+                    {
+                        var type = handler.DeclaringType!.FullName!;
+                        var gateAccepts = !violations.Any(violation => violation.StartsWith($"{type}.Handle ", StringComparison.Ordinal) || violation.StartsWith($"{type} ", StringComparison.Ordinal));
+                        discovered.Contains(handler).ShouldBe(gateAccepts, $"{type}.Handle: the gate says {(gateAccepts ? "valid" : "invalid")}");
+                    }
+
+                    discovered.Select(handler => handler.DeclaringType!.Name).ShouldBe(["InvoicePaidConsumer"]);
+                }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.DotNetCommand(
+            new Dictionary<string, string>(),
+            "test", "--project", "tests/Architecture.Tests/Architecture.Tests.csproj", "-c", "Release", "--no-build", "--no-ansi",
+            "--filter-class", "Shop.Architecture.Tests.ConsumerDefinitionTests");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("succeeded: 1");
+    }
+
     /// <summary>billing publishes InvoicePaidV1 on POST /billing/invoices/{id}/pay; shipping's consumer reports on GET /shipping/consumer.</summary>
     private static GeneratedProject ConsumerProject(string consumer, string consumerSource, string report)
     {
