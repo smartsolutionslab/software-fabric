@@ -10,6 +10,17 @@ public sealed class CodeStyleTests
     private const string Domain = "src/Modules/Billing/Billing.Domain";
     private const string DomainProject = Domain + "/Billing.Domain.csproj";
     private const string TestProject = "tests/Modules/Billing.Tests/Billing.Tests.csproj";
+    private const string BuildingBlocksProject = "src/BuildingBlocks/BuildingBlocks.csproj";
+
+    /// <summary>A wiring extension method, in the namespace the wiring convention gives it.</summary>
+    private const string ProbeRegistration = """
+        namespace Microsoft.Extensions.DependencyInjection;
+
+        public static class ProbeRegistration
+        {
+            public static IServiceCollection AddProbe(this IServiceCollection services) => services;
+        }
+        """;
 
     public static TheoryData<string, string, string> Violations => new()
     {
@@ -133,6 +144,32 @@ public sealed class CodeStyleTests
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain($"{file}(", Case.Sensitive, output);
         output.ShouldContain($"error {diagnostic}:", Case.Sensitive, output);
+    }
+
+    [Fact]
+    public void A_microsoft_namespace_outside_a_wiring_folder_fails_the_release_build()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/BuildingBlocks/Probe/ProbeRegistration.cs", ProbeRegistration);
+
+        var (exitCode, output) = BuildRelease(project, BuildingBlocksProject);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("ProbeRegistration.cs(", Case.Sensitive, output);
+        output.ShouldContain("error IDE0130:", Case.Sensitive, output);
+    }
+
+    [Fact]
+    public void A_microsoft_namespace_in_a_wiring_folder_builds()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/BuildingBlocks/Probe/Wiring/ProbeRegistration.cs", ProbeRegistration);
+
+        var (exitCode, output) = BuildRelease(project, BuildingBlocksProject);
+
+        exitCode.ShouldBe(0, output);
     }
 
     /// <summary>
