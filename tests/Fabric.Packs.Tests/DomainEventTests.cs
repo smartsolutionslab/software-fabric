@@ -79,6 +79,8 @@ public sealed class DomainEventTests
             public static ConcurrentBag<(InvoicePaid Event, IServiceProvider Services)> Paid { get; } = [];
 
             public static ConcurrentBag<(InvoiceId Settled, InvoiceId Receipt)> Settled { get; } = [];
+
+            public static ConcurrentBag<InvoiceVoided> Voided { get; } = [];
         }
 
         public sealed class InvoicePaidReaction(IServiceProvider services) : IDomainEventReaction<InvoicePaid>
@@ -94,6 +96,15 @@ public sealed class DomainEventTests
         {
             public Task ReactAsync(InvoiceVoided domainEvent, CancellationToken cancellationToken) =>
                 throw new InvalidOperationException("The voided reaction failed.");
+        }
+
+        public sealed class InvoiceVoidedAuditReaction : IDomainEventReaction<InvoiceVoided>
+        {
+            public Task ReactAsync(InvoiceVoided domainEvent, CancellationToken cancellationToken)
+            {
+                Recorded.Voided.Add(domainEvent);
+                return Task.CompletedTask;
+            }
         }
 
         /// <summary>Saves another aggregate through the module's context, which the Application cannot name; a real reaction goes through a port.</summary>
@@ -114,12 +125,46 @@ public sealed class DomainEventTests
         }
         """;
 
+    private const string RecordingLogger = """
+        using System.Collections.Concurrent;
+        using Microsoft.Extensions.Logging;
+
+        namespace Shop.Modules.Billing.Tests;
+
+        public sealed class RecordingLoggerProvider : ILoggerProvider
+        {
+            public static RecordingLoggerProvider Instance { get; } = new();
+
+            public ConcurrentBag<(LogLevel Level, string Message, Exception? Exception)> Entries { get; } = [];
+
+            public ILogger CreateLogger(string categoryName) => new Logger(this);
+
+            public void Dispose()
+            {
+            }
+
+            private sealed class Logger(RecordingLoggerProvider provider) : ILogger
+            {
+                public IDisposable? BeginScope<TState>(TState state)
+                    where TState : notnull => null;
+
+                public bool IsEnabled(LogLevel logLevel) => true;
+
+                public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+                {
+                    Ensure.That(formatter).IsNotNull();
+                    provider.Entries.Add((logLevel, formatter(state, exception), exception));
+                }
+            }
+        }
+        """;
+
     private const string DispatchTests = """
         using System.Transactions;
         using Microsoft.EntityFrameworkCore;
         using Microsoft.Extensions.Configuration;
         using Microsoft.Extensions.DependencyInjection;
-        using Shop.BuildingBlocks.DomainEvents;
+        using Microsoft.Extensions.Logging;
         using Shop.BuildingBlocks.Tenancy;
         using Shop.Modules.Billing.Api;
         using Shop.Modules.Billing.Application.Invoices;
@@ -277,7 +322,7 @@ public sealed class DomainEventTests
             }
 
             [Fact]
-            public async Task A_handler_that_throws_fails_the_caller_after_the_changes_are_committed()
+            public async Task A_reaction_that_throws_is_logged_and_fails_neither_the_caller_nor_the_other_reactions()
             {
                 var cancellationToken = TestContext.Current.CancellationToken;
                 using var tenant = TenantScope.Begin("tenant-a");
@@ -287,9 +332,12 @@ public sealed class DomainEventTests
                 var invoice = Add(context);
                 invoice.Void();
 
-                var failure = await Should.ThrowAsync<DomainEventDispatchException>(() => context.SaveChangesAsync(cancellationToken));
+                await context.SaveChangesAsync(cancellationToken);
 
-                failure.InnerException.ShouldNotBeNull().Message.ShouldBe("The voided reaction failed.");
+                Recorded.Voided.Count(voided => voided.Invoice == invoice.Id).ShouldBe(1);
+                RecordingLoggerProvider.Instance.Entries.ShouldContain(entry => entry.Level == LogLevel.Error
+                    && entry.Message.Contains("InvoiceVoidedReaction", StringComparison.Ordinal)
+                    && entry.Exception != null && entry.Exception.Message == "The voided reaction failed.");
                 await using var check = provider.CreateAsyncScope();
                 (await check.ServiceProvider.GetRequiredService<BillingDbContext>().Set<Invoice>().SingleAsync(row => row.Id == invoice.Id, cancellationToken))
                     .IsVoided.ShouldBeTrue();
@@ -319,7 +367,7 @@ public sealed class DomainEventTests
 
             private static async Task<ServiceProvider> StartAsync(CancellationToken cancellationToken)
             {
-                var services = new ServiceCollection().AddLogging().AddTenancy();
+                var services = new ServiceCollection().AddLogging(logging => logging.AddProvider(RecordingLoggerProvider.Instance)).AddTenancy();
                 var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
                 new BillingModule().AddServices(services, configuration);
                 var provider = services.BuildServiceProvider();
@@ -357,6 +405,7 @@ public sealed class DomainEventTests
         project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/Configurations/InvoiceConfiguration.cs", InvoiceConfiguration);
         project.Write("src/Modules/Billing/Billing.Application/Invoices/InvoiceReactions.cs", Reactions);
         project.Write("tests/Modules/Billing.Tests/DomainEventTests.cs", DispatchTests);
+        project.Write("tests/Modules/Billing.Tests/RecordingLoggerProvider.cs", RecordingLogger);
         project.Build();
 
         using var postgres = Container.Postgres(DatabasePassword);
@@ -367,6 +416,81 @@ public sealed class DomainEventTests
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
         output.ShouldContain("succeeded: 9");
+    }
+
+    /// <summary>
+    /// The brokerless unit of work accepts its changes and clears its queue only after the commit returns; a reaction
+    /// that throws out of the commit would leave both, and the next commit would publish the integration event again.
+    /// </summary>
+    [Fact]
+    public void A_reaction_that_throws_leaves_the_brokerless_unit_of_work_committed_and_its_integration_event_published_once()
+    {
+        using var project = new GeneratedProject("lean-crud", "module.style=ddd", "module.cqrs=logical");
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Invoice.cs", Invoice);
+        project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/Configurations/InvoiceConfiguration.cs", InvoiceConfiguration);
+        project.Write("src/Modules/Billing/Billing.Application/Invoices/InvoiceReactions.cs", Reactions);
+        project.Write("src/Contracts/Billing/InvoiceVoidedV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoiceVoidedV1(Guid InvoiceId) : IIntegrationEvent;
+            """);
+        project.Write("tests/Modules/Billing.Tests/RecordingLoggerProvider.cs", RecordingLogger);
+        project.Write("tests/Modules/Billing.Tests/UnitOfWorkTests.cs", """
+            using Microsoft.EntityFrameworkCore;
+            using Microsoft.Extensions.Configuration;
+            using Microsoft.Extensions.DependencyInjection;
+            using Microsoft.Extensions.Logging;
+            using Shop.BuildingBlocks.Messaging;
+            using Shop.Contracts.Billing;
+            using Shop.Modules.Billing.Api;
+            using Shop.Modules.Billing.Application;
+            using Shop.Modules.Billing.Application.Invoices;
+            using Shop.Modules.Billing.Domain.Invoices;
+            using Shop.Modules.Billing.Infrastructure.Persistence;
+
+            namespace Shop.Modules.Billing.Tests;
+
+            public class UnitOfWorkTests
+            {
+                [Fact]
+                public async Task A_reaction_that_throws_neither_fails_the_commit_nor_leaves_the_event_queued()
+                {
+                    var cancellationToken = TestContext.Current.CancellationToken;
+                    var services = new ServiceCollection().AddLogging(logging => logging.AddProvider(RecordingLoggerProvider.Instance));
+                    var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+                    new BillingModule().AddServices(services, configuration);
+                    await using var provider = services.BuildServiceProvider();
+                    await using var scope = provider.CreateAsyncScope();
+                    var context = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+                    await context.Database.EnsureCreatedAsync(cancellationToken);
+                    await Outbox.CreateTableAsync(context, cancellationToken);
+                    var invoice = new Invoice(new InvoiceId(Guid.CreateVersion7()));
+                    context.Add(invoice);
+                    await context.SaveChangesAsync(cancellationToken);
+                    var unitOfWork = scope.ServiceProvider.GetRequiredService<IBillingUnitOfWork>();
+
+                    invoice.Void();
+                    await unitOfWork.PublishAsync(new InvoiceVoidedV1(invoice.Id.Value));
+                    await unitOfWork.CommitAsync(cancellationToken);
+                    await unitOfWork.CommitAsync(cancellationToken);
+
+                    context.Entry(invoice).State.ShouldBe(EntityState.Unchanged);
+                    Recorded.Voided.Count(voided => voided.Invoice == invoice.Id).ShouldBe(1);
+                    (await context.Database.SqlQueryRaw<int>("select count(*)::int as \"Value\" from billing.outbox_messages").SingleAsync(cancellationToken))
+                        .ShouldBe(1);
+                }
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = project.Test(
+            "tests/Modules/Billing.Tests/Billing.Tests.csproj",
+            new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" });
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
     }
 
     [Fact]
