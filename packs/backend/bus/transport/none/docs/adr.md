@@ -10,7 +10,7 @@ There is no broker and no messaging library. Modules still talk through integrat
 - After the commit, a dispatcher in the host reads each module's outbox, hands every message to the consumers of its type (classes named `*Consumer` in the modules' Application projects, with `Handle(<event>)`), and marks it delivered. Rows are locked with `for update skip locked`, so several host instances do not deliver the same message at once.
 - A consumer that throws leaves its message undelivered, and the message backs off before it is tried again: 1 second after the first failure, doubling with every further one (1, 2, 4, … 256 seconds), never more than 5 minutes. The wait is kept in the row (`next_attempt_at`), so it holds however busy the dispatcher is, and other messages are delivered meanwhile. After ten attempts, about eight and a half minutes after the first, the message is left for a developer with its last error in `last_error`.
 - The dispatcher reads up to 20 messages at a time in one transaction, and that transaction, with the messages' row locks, stays open while the batch's consumers run. A slow consumer therefore keeps a database connection and its batch's rows locked until it returns; other host instances skip those rows rather than wait for them.
-- The outbox table is messaging storage, like a messaging library's envelope tables: the host creates it on startup, it is not part of the module's EF Core model, and no migration mentions it.
+- The outbox table is not part of the module's EF Core model, so no EF Core migration mentions it. The MigrationRunner creates it in every module's schema, as a step after the modules' migrations; the host never creates tables, so hosts starting together do not race over it.
 
 ## Consequences
 

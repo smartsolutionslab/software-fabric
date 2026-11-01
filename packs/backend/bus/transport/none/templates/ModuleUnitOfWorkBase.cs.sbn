@@ -28,8 +28,6 @@ public abstract class ModuleUnitOfWork<TContext>(TContext context, IServiceProvi
             return;
         }
 
-        await Outbox.EnsureCreatedAsync(context, cancellationToken);
-
         // A transaction the caller opened is theirs to commit; the events join it.
         var transaction = context.Database.CurrentTransaction is null
             ? await context.Database.BeginTransactionAsync(cancellationToken)

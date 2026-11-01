@@ -1,7 +1,6 @@
 {{~ if project["backend.database"] != "postgres" ~}}
 #error The in-process outbox of backend.bus.transport.none is written for PostgreSQL only; choose backend.database=postgres or add this database to the pack.
 {{~ end ~}}
-using System.Collections.Concurrent;
 using System.Text.Json;
 using {{ namespace }}.Contracts;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +12,7 @@ public sealed record OutboxMessage(Guid Id, string Type, string Payload);
 
 /// <summary>
 /// The outbox table in a module's schema: integration events saved in the same transaction as the module's changes,
-/// delivered in-process afterwards. It is messaging storage, created on first use, and stays out of the module's model and migrations.
+/// delivered in-process afterwards. The MigrationRunner creates it; it stays out of the module's EF Core model.
 /// </summary>
 public static class Outbox
 {
@@ -26,20 +25,13 @@ public static class Outbox
     /// <summary>The longest a failed message waits before its next attempt.</summary>
     public static readonly TimeSpan MaximumRetryDelay = TimeSpan.FromMinutes(5);
 
-    private static readonly ConcurrentDictionary<string, bool> Created = new(StringComparer.Ordinal);
-
-    public static async Task EnsureCreatedAsync(DbContext context, CancellationToken cancellationToken)
+    /// <summary>Creates the outbox table in the context's schema. The MigrationRunner runs it for every module; the host never does.</summary>
+    public static Task CreateTableAsync(DbContext context, CancellationToken cancellationToken)
     {
         {{ not_null "context" }}
 
-        var schema = SchemaOf(context);
-        if (Created.ContainsKey(schema))
-        {
-            return;
-        }
-
-        await context.Database.ExecuteSqlRawAsync(
-            Sql(schema, """
+        return context.Database.ExecuteSqlRawAsync(
+            Sql(SchemaOf(context), """
                 create schema if not exists "$schema$";
                 create table if not exists "$schema$".outbox_messages (
                     id uuid primary key,
@@ -52,7 +44,6 @@ public static class Outbox
                     last_error text null);
                 """),
             cancellationToken);
-        Created[schema] = true;
     }
 
     /// <summary>Adds the events to the outbox in the context's current transaction.</summary>

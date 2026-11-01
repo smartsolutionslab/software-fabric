@@ -7,6 +7,7 @@ files:
   - { template: templates/ModuleUnitOfWorkBase.cs.sbn, target: src/BuildingBlocks/Messaging/ModuleUnitOfWork.cs }
   - { template: templates/UnitOfWorkRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/UnitOfWorkRegistration.cs }
   - { template: templates/Outbox.cs.sbn, target: src/BuildingBlocks/Messaging/Outbox.cs }
+  - { template: templates/OutboxTables.cs.sbn, target: src/BuildingBlocks/Messaging/OutboxTables.cs }
   - { template: templates/OutboxSignal.cs.sbn, target: src/BuildingBlocks/Messaging/OutboxSignal.cs }
   - { template: templates/OutboxDispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/OutboxDispatcher.cs }
   - { template: templates/IntegrationEventConsumers.cs.sbn, target: src/BuildingBlocks/Messaging/IntegrationEventConsumers.cs }
@@ -15,6 +16,7 @@ files:
 slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 20 }
   - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 20 }
+  - { slot: migration-runner.steps, template: templates/migration-runner-steps.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
