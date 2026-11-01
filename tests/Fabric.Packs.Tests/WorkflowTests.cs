@@ -153,16 +153,16 @@ public sealed partial class WorkflowTests
     private static IEnumerable<string> Workflows(string root) =>
         Directory.EnumerateFiles(Path.Combine(root, ".github", "workflows"), "*.yml").Order();
 
-    /// <summary>Every <c>uses:</c> that is not a local action, a 40-hex commit and a version comment.</summary>
+    /// <summary>
+    /// Every line with a <c>uses</c> key that is not a local action or <c>uses: action@&lt;40 hex&gt; # v…</c>. It
+    /// reads lines, not YAML (templates are not YAML yet), so any other spelling fails closed, as the generated check does.
+    /// </summary>
     private static List<string> Unpinned(string root, IEnumerable<string> files) =>
     [
         .. files.SelectMany(path => File.ReadLines(path)
             .Select((line, index) => (Line: line, Number: index + 1))
-            .Select(entry => (entry.Number, Match: Uses().Match(entry.Line)))
-            .Where(entry => entry.Match.Success
-                && !entry.Match.Groups["action"].Value.StartsWith("./", StringComparison.Ordinal)
-                && !Pinned().IsMatch(entry.Match.Groups["action"].Value + entry.Match.Groups["rest"].Value))
-            .Select(entry => $"{Path.GetRelativePath(root, path).Replace('\\', '/')}:{entry.Number}: {entry.Match.Value.Trim()}")),
+            .Where(entry => UsesKey().IsMatch(entry.Line) && !Pinned().IsMatch(entry.Line) && !LocalAction().IsMatch(entry.Line))
+            .Select(entry => $"{Path.GetRelativePath(root, path).Replace('\\', '/')}:{entry.Number}: {entry.Line.Trim()}")),
     ];
 
     /// <summary>Every workflow whose top-level <c>concurrency</c> differs from what its triggers call for.</summary>
@@ -218,6 +218,13 @@ public sealed partial class WorkflowTests
     [GeneratedRegex(@"^\s*(?:-\s+)?uses:\s*(?<action>\S+)(?<rest>.*)$")]
     private static partial Regex Uses();
 
-    [GeneratedRegex(@"^[^@\s]+@[0-9a-f]{40}\s+#\s*v\d\S*$")]
+    /// <summary>A <c>uses</c> key anywhere YAML allows one: a block or flow mapping, quoted or not.</summary>
+    [GeneratedRegex(@"(^|[\s{,])[""']?uses[""']?\s*:(\s|$)")]
+    private static partial Regex UsesKey();
+
+    [GeneratedRegex(@"^\s*(-\s+)?uses:\s*[^@\s]+@[0-9a-f]{40}\s+#\s*v\d\S*\s*$")]
     private static partial Regex Pinned();
+
+    [GeneratedRegex(@"^\s*(-\s+)?uses:\s*\./")]
+    private static partial Regex LocalAction();
 }
