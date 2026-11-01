@@ -1,6 +1,7 @@
 option: backend.guards.ensure-that
 files:
   - { template: templates/Ensure.cs.sbn, target: src/Kernel/Ensure.cs }
+  - { template: templates/GuardException.cs.sbn, target: src/Kernel/GuardException.cs }
   - { template: templates/BannedSymbols.txt.sbn, target: build/guards/BannedSymbols.txt }
 slots:
   - { slot: templates.functions, template: templates/functions.sbn }

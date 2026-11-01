@@ -1,0 +1,28 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>
+/// What every failed <see cref="Ensure"/> guard throws, a null check included. It is an <see cref="ArgumentException"/>,
+/// so code that catches one still catches it, but its own type tells a failed precondition apart from an
+/// <see cref="ArgumentException"/> a bug throws.
+/// </summary>
+public sealed class GuardException : ArgumentException
+{
+    public GuardException()
+    {
+    }
+
+    public GuardException(string message)
+        : base(message)
+    {
+    }
+
+    public GuardException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    public GuardException(string message, string parameterName)
+        : base(message, parameterName)
+    {
+    }
+}

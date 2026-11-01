@@ -8,6 +8,8 @@ Every argument precondition is a fluent chain on `Ensure.That(value)` from `src/
 
 Value objects validate their invariants with the same chains in their factories.
 
+Every failed guard, a null check included, throws `GuardException` (`src/Kernel`), an `ArgumentException` that carries the parameter name. Its own type tells a failed precondition apart from an `ArgumentException` a bug throws.
+
 This is the convention of Smart Sentinel Eye.
 
 ## Consequences

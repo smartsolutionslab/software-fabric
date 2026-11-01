@@ -5,7 +5,7 @@ namespace {{ namespace }}.Kernel;
 
 /// <summary>
 /// Fluent argument guards (docs/adr). The string overload also validates value-object invariants: the first failed
-/// predicate throws <see cref="ArgumentException"/>, which a value object's factory may translate into a failure.
+/// predicate throws <see cref="GuardException"/>, which a value object's factory may translate into a failure.
 /// </summary>
 public static class Ensure
 {
@@ -76,7 +76,7 @@ public readonly struct EnsuredString
     {
         if (value is null)
         {
-            throw new ArgumentNullException(parameter);
+            throw new GuardException($"{parameter} must not be null.", parameter);
         }
         return this;
     }
@@ -85,7 +85,7 @@ public readonly struct EnsuredString
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new ArgumentException($"{parameter} must not be null or whitespace.", parameter);
+            throw new GuardException($"{parameter} must not be null or whitespace.", parameter);
         }
         return this;
     }
@@ -94,7 +94,7 @@ public readonly struct EnsuredString
     {
         if (value.Length < minimumLength)
         {
-            throw new ArgumentException(
+            throw new GuardException(
                 $"{parameter} must be at least {minimumLength} character(s).", parameter);
         }
         return this;
@@ -104,7 +104,7 @@ public readonly struct EnsuredString
     {
         if (value.Length > maximumLength)
         {
-            throw new ArgumentException(
+            throw new GuardException(
                 $"{parameter} must be no more than {maximumLength} character(s).", parameter);
         }
         return this;
@@ -114,7 +114,7 @@ public readonly struct EnsuredString
     {
         if (!value.StartsWith(prefix, comparison))
         {
-            throw new ArgumentException(
+            throw new GuardException(
                 $"{parameter} must start with '{prefix}'.", parameter);
         }
         return this;
@@ -124,7 +124,7 @@ public readonly struct EnsuredString
     {
         if (!pattern.IsMatch(value))
         {
-            throw new ArgumentException($"{parameter}: {message}", parameter);
+            throw new GuardException($"{parameter}: {message}", parameter);
         }
         return this;
     }
@@ -133,7 +133,7 @@ public readonly struct EnsuredString
     {
         if (!predicate(value))
         {
-            throw new ArgumentException($"{parameter}: {message}", parameter);
+            throw new GuardException($"{parameter}: {message}", parameter);
         }
         return this;
     }
@@ -141,9 +141,8 @@ public readonly struct EnsuredString
 
 /// <summary>
 /// Guard chain for a reference-type argument. <see cref="IsNotNull"/>
-/// throws <see cref="ArgumentNullException"/> — matching the exception
-/// <c>ArgumentNullException.ThrowIfNull</c> raised — while value/predicate
-/// failures use <see cref="ArgumentException"/>, consistent with the string chain.
+/// throws <see cref="GuardException"/>, like every other guard, so a null the
+/// caller sent is the same failed precondition as any other bad value.
 /// </summary>
 public readonly struct EnsuredObject<T>
     where T : class
@@ -161,7 +160,7 @@ public readonly struct EnsuredObject<T>
     {
         if (value is null)
         {
-            throw new ArgumentNullException(parameter);
+            throw new GuardException($"{parameter} must not be null.", parameter);
         }
         return this;
     }
@@ -169,7 +168,7 @@ public readonly struct EnsuredObject<T>
 
 /// <summary>
 /// Guard chain for a <see cref="Guid"/> argument.
-/// <see cref="IsNotEmpty"/> throws <see cref="ArgumentException"/> on
+/// <see cref="IsNotEmpty"/> throws <see cref="GuardException"/> on
 /// <see cref="Guid.Empty"/> — the value-type analogue of
 /// <see cref="EnsuredObject{T}.IsNotNull"/>.
 /// </summary>
@@ -188,7 +187,7 @@ public readonly struct EnsuredGuid
     {
         if (value == Guid.Empty)
         {
-            throw new ArgumentException(
+            throw new GuardException(
                 message is null ? $"{parameter} must not be empty." : $"{parameter}: {message}",
                 parameter);
         }
@@ -198,7 +197,7 @@ public readonly struct EnsuredGuid
 
 /// <summary>
 /// Guard chain for a comparable value-type argument. Failures
-/// throw <see cref="ArgumentException"/>, consistent with the string and
+/// throw <see cref="GuardException"/>, consistent with the string and
 /// object chains.
 /// </summary>
 public readonly struct EnsuredValue<T>
@@ -217,7 +216,7 @@ public readonly struct EnsuredValue<T>
     {
         if (value.CompareTo(minimum) < 0)
         {
-            throw new ArgumentException($"{parameter} must be >= {minimum}; got {value}.", parameter);
+            throw new GuardException($"{parameter} must be >= {minimum}; got {value}.", parameter);
         }
         return this;
     }
@@ -226,7 +225,7 @@ public readonly struct EnsuredValue<T>
     {
         if (value.CompareTo(minimum) < 0 || value.CompareTo(maximum) > 0)
         {
-            throw new ArgumentException(
+            throw new GuardException(
                 $"{parameter} must be in [{minimum}, {maximum}]; got {value}.", parameter);
         }
         return this;
@@ -237,7 +236,7 @@ public readonly struct EnsuredValue<T>
         Ensure.That(predicate).IsNotNull();
         if (!predicate(value))
         {
-            throw new ArgumentException($"{parameter}: {message}", parameter);
+            throw new GuardException($"{parameter}: {message}", parameter);
         }
         return this;
     }
