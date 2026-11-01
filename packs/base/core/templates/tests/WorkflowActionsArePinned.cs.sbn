@@ -1,0 +1,81 @@
+using System.Text.RegularExpressions;
+using YamlDotNet.Core;
+using YamlDotNet.RepresentationModel;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A tag can be moved to code nobody reviewed, so a workflow step names the commit it runs. The workflows are read as
+/// YAML, so a step is found however it is spelled, and a comment or a run script that mentions <c>uses:</c> is not one.
+/// </summary>
+public sealed partial class WorkflowActionsArePinned : IArchitectureRule
+{
+    public string Description => "Every step in .github/workflows uses an action pinned to a full commit SHA, a local action or a docker image by digest.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var root = RepositoryRoot();
+        var workflows = Path.Combine(root, ".github", "workflows");
+        if (!Directory.Exists(workflows))
+        {
+            return [];
+        }
+
+        List<string> violations = [];
+        foreach (var path in Directory.EnumerateFiles(workflows)
+            .Where(path => path.EndsWith(".yml", StringComparison.Ordinal) || path.EndsWith(".yaml", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal))
+        {
+            var file = Path.GetRelativePath(root, path).Replace('\\', '/');
+            var stream = new YamlStream();
+            try
+            {
+                using var reader = new StreamReader(path);
+                stream.Load(reader);
+            }
+            catch (YamlException exception)
+            {
+                violations.Add($"{file}:{exception.Start.Line}: is not valid YAML: {exception.Message}");
+                continue;
+            }
+
+            foreach (var (line, uses) in stream.Documents.SelectMany(document => StepActions(document.RootNode)))
+            {
+                if (!Allowed().IsMatch(uses))
+                {
+                    violations.Add($"{file}:{line}: {uses} is not pinned to a full commit SHA (<owner>/<repo>@<40 hex>).");
+                }
+            }
+        }
+
+        return violations;
+    }
+
+    /// <summary>The value of every <c>jobs.&lt;job&gt;.steps[*].uses</c>, with the line of its key.</summary>
+    private static IEnumerable<(long Line, string Uses)> StepActions(YamlNode workflow) =>
+        from job in Value(workflow, "jobs") is YamlMappingNode jobs ? jobs.Children.Values : Enumerable.Empty<YamlNode>()
+        from step in Value(job, "steps") is YamlSequenceNode steps ? steps.Children : Enumerable.Empty<YamlNode>()
+        from entry in step is YamlMappingNode mapping ? mapping.Children : Enumerable.Empty<KeyValuePair<YamlNode, YamlNode>>()
+        where entry.Key is YamlScalarNode { Value: "uses" }
+        select ((long)entry.Key.Start.Line, entry.Value is YamlScalarNode { Value: { } value } ? value : entry.Value.ToString());
+
+    private static YamlNode? Value(YamlNode? node, string key) =>
+        node is YamlMappingNode mapping && mapping.Children.TryGetValue(new YamlScalarNode(key), out var value) ? value : null;
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+
+    [GeneratedRegex(@"^(\./.*|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[^@\s]+)?@[0-9a-f]{40}|docker://[^@\s]+@sha256:[0-9a-f]{64})$")]
+    private static partial Regex Allowed();
+}

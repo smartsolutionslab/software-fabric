@@ -34,7 +34,7 @@ public sealed partial class WorkflowTests
                 uses: >-
                   pnpm/action-setup@v4
               - {"uses":"actions/cache@v4"}
-              - run: echo "uses: actions/checkout@v4 is a workflow key"
+              - run: 'echo "uses: actions/checkout@v4 is a workflow key"'
               - uses: docker://alpine:3.20
               - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
               - uses: actions/cache/save@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
@@ -68,7 +68,7 @@ public sealed partial class WorkflowTests
     {
         var packs = Path.Combine(Repository.Root, "packs");
 
-        Unpinned(packs, Directory.EnumerateFiles(packs, "*", SearchOption.AllDirectories).Order()).ShouldBeEmpty();
+        UnpinnedTemplateLines(packs, Directory.EnumerateFiles(packs, "*", SearchOption.AllDirectories).Order()).ShouldBeEmpty();
     }
 
     /// <summary>
@@ -141,14 +141,49 @@ public sealed partial class WorkflowTests
             .Order(StringComparer.Ordinal);
 
     /// <summary>
-    /// Every line with a <c>uses</c> key that is not a local action or <c>uses: action@&lt;40 hex&gt; # v…</c>. It
-    /// reads lines, not YAML (templates are not YAML yet), so any other spelling fails closed, as the generated check does.
+    /// Every step <c>uses</c> in these workflows, read as YAML as the generated rule reads them, that is not a local
+    /// action, a docker image by digest, or an action pinned to a commit with its version in a comment on that line.
     /// </summary>
-    private static List<string> Unpinned(string root, IEnumerable<string> files) =>
+    private static List<string> Unpinned(string root, IEnumerable<string> workflows)
+    {
+        List<string> problems = [];
+        foreach (var path in workflows)
+        {
+            var lines = File.ReadAllLines(path);
+            var stream = new YamlStream();
+            stream.Load(new StringReader(string.Join('\n', lines)));
+            foreach (var (keyLine, valueLine, uses) in stream.Documents.SelectMany(document => StepActions(document.RootNode)))
+            {
+                var pinned = PinnedAction().IsMatch(uses) && VersionComment().IsMatch(lines[valueLine - 1]);
+                if (!pinned && !LocalOrDigest().IsMatch(uses))
+                {
+                    problems.Add($"{Path.GetRelativePath(root, path).Replace('\\', '/')}:{keyLine}: {uses}");
+                }
+            }
+        }
+
+        return problems;
+    }
+
+    private static IEnumerable<(long KeyLine, long ValueLine, string Uses)> StepActions(YamlNode workflow) =>
+        from job in Value(workflow, "jobs") is YamlMappingNode jobs ? jobs.Children.Values : Enumerable.Empty<YamlNode>()
+        from step in Value(job, "steps") is YamlSequenceNode steps ? steps.Children : Enumerable.Empty<YamlNode>()
+        from entry in step is YamlMappingNode mapping ? mapping.Children : Enumerable.Empty<KeyValuePair<YamlNode, YamlNode>>()
+        where entry.Key is YamlScalarNode { Value: "uses" }
+        select ((long)entry.Key.Start.Line, (long)entry.Value.Start.Line, entry.Value is YamlScalarNode { Value: { } value } ? value : entry.Value.ToString());
+
+    private static YamlNode? Value(YamlNode? node, string key) =>
+        node is YamlMappingNode mapping && mapping.Children.TryGetValue(new YamlScalarNode(key), out var value) ? value : null;
+
+    /// <summary>
+    /// Pack templates are not YAML until rendered, so they are read by line: every block-style <c>uses:</c> line names a
+    /// commit with its version in a comment. Other spellings are caught in the generated workflows above.
+    /// </summary>
+    private static List<string> UnpinnedTemplateLines(string root, IEnumerable<string> files) =>
     [
         .. files.SelectMany(path => File.ReadLines(path)
             .Select((line, index) => (Line: line, Number: index + 1))
-            .Where(entry => UsesKey().IsMatch(entry.Line) && !Pinned().IsMatch(entry.Line) && !LocalAction().IsMatch(entry.Line))
+            .Where(entry => TemplateUses().IsMatch(entry.Line) && !TemplatePinned().IsMatch(entry.Line) && !TemplateLocal().IsMatch(entry.Line))
             .Select(entry => $"{Path.GetRelativePath(root, path).Replace('\\', '/')}:{entry.Number}: {entry.Line.Trim()}")),
     ];
 
@@ -203,12 +238,21 @@ public sealed partial class WorkflowTests
         node.Children.TryGetValue(new YamlScalarNode(key), out var value) ? ((YamlScalarNode)value).Value : null;
 
     /// <summary>A <c>uses</c> key anywhere YAML allows one: a block or flow mapping, quoted or not.</summary>
-    [GeneratedRegex(@"(^|[\s{,])[""']?uses[""']?\s*:")]
-    private static partial Regex UsesKey();
+    [GeneratedRegex(@"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[^@\s]+)?@[0-9a-f]{40}$")]
+    private static partial Regex PinnedAction();
+
+    [GeneratedRegex(@"@[0-9a-f]{40}[""']?\s*\}?\s*#\s*v\d")]
+    private static partial Regex VersionComment();
+
+    [GeneratedRegex(@"^(\./.*|docker://[^@\s]+@sha256:[0-9a-f]{64})$")]
+    private static partial Regex LocalOrDigest();
+
+    [GeneratedRegex(@"^\s*(-\s+)?uses:")]
+    private static partial Regex TemplateUses();
 
     [GeneratedRegex(@"^\s*(-\s+)?uses:\s*[^@\s]+@[0-9a-f]{40}\s+#\s*v\d\S*\s*$")]
-    private static partial Regex Pinned();
+    private static partial Regex TemplatePinned();
 
     [GeneratedRegex(@"^\s*(-\s+)?uses:\s*\./")]
-    private static partial Regex LocalAction();
+    private static partial Regex TemplateLocal();
 }

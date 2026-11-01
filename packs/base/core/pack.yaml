@@ -22,7 +22,6 @@ files:
   - { template: templates/Solution.slnx.sbn, target: Solution.slnx }
   - { template: templates/ci.yml.sbn, target: ".github/workflows/ci.yml" }
   - { template: templates/format.sh.sbn, target: ".github/scripts/format.sh" }
-  - { template: templates/check-actions-pinned.sh.sbn, target: ".github/scripts/check-actions-pinned.sh" }
   - { template: templates/pull_request_template.md.sbn, target: ".github/pull_request_template.md" }
   - { template: templates/AppHost/AppHost.csproj.sbn, target: src/AppHost/AppHost.csproj }
   - { template: templates/AppHost/AppHost.cs.sbn, target: src/AppHost/AppHost.cs }
@@ -48,6 +47,7 @@ files:
   - { template: templates/tests/RetryProbe.cs.sbn, target: tests/Architecture.Tests/Rules/RetryProbe.cs }
   - { template: templates/tests/HttpClientsRetryOnlyIdempotentMethods.cs.sbn, target: tests/Architecture.Tests/Rules/HttpClientsRetryOnlyIdempotentMethods.cs }
   - { template: templates/tests/RetryEveryMethodOptsAClientBackIn.cs.sbn, target: tests/Architecture.Tests/Rules/RetryEveryMethodOptsAClientBackIn.cs }
+  - { template: templates/tests/WorkflowActionsArePinned.cs.sbn, target: tests/Architecture.Tests/Rules/WorkflowActionsArePinned.cs }
   - { template: templates/Modules/Domain.csproj.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/{{ module.namespace }}.Domain.csproj", per-module: true }
   - { template: templates/Modules/Application.csproj.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/{{ module.namespace }}.Application.csproj", per-module: true }
   - { template: templates/Modules/Infrastructure.csproj.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/{{ module.namespace }}.Infrastructure.csproj", per-module: true }
@@ -101,6 +101,6 @@ gates:
   - { kind: architecture-test, describes: "Every module's Api assembly has exactly one IModule (ADR-0005).", file: templates/tests/EveryModuleHasOneIModule.cs.sbn }
   - { kind: architecture-test, describes: "HttpClients from AddServiceDefaults() retry only idempotent methods; a POST or PATCH gets one attempt.", file: templates/tests/HttpClientsRetryOnlyIdempotentMethods.cs.sbn }
   - { kind: architecture-test, describes: "RetryEveryMethod() opts one HttpClient back into retrying POST and PATCH on transient failures.", file: templates/tests/RetryEveryMethodOptsAClientBackIn.cs.sbn }
+  - { kind: architecture-test, describes: "Every workflow step uses an action pinned to a full commit SHA, a local action or a docker image by digest.", file: templates/tests/WorkflowActionsArePinned.cs.sbn }
   - { kind: ci-step, describes: "build.proj builds every project with warnings as errors.", file: templates/ci.yml.sbn }
   - { kind: ci-step, describes: "Every project under src/ and tests/ is formatted as dotnet format would format it (whitespace and code style).", file: templates/format.sh.sbn }
-  - { kind: ci-step, describes: "Every action a workflow uses is pinned to a full commit SHA with its version tag in a comment.", file: templates/check-actions-pinned.sh.sbn }

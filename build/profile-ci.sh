@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Profile CI (ADR-0003, roadmap M1-09): generates a profile with the CLI from the real packs, no stand-ins, adds a
-# module, and runs what the generated project's own CI (.github/workflows/ci.yml) runs: the pinned-actions check,
-# backend format check, build and tests, the web app's install, build, lint, tests and format check, and the
-# end-to-end tests against the running application.
+# module, and runs what the generated project's own CI (.github/workflows/ci.yml) runs: backend format check, build and
+# tests, the web app's install, build, lint, tests and format check, and the end-to-end tests against the running
+# application.
 # Needs a Release build of the solution, Docker, Node 22 with pnpm, the Aspire CLI bundle and Playwright's Chromium.
 # Usage: build/profile-ci.sh <profile>
 set -euo pipefail
@@ -21,10 +21,6 @@ fabric add-module billing --project "$project"
 cd "$project"
 
 step() { echo "::group::$profile: $1"; }
-
-step "actions pinned"
-bash .github/scripts/check-actions-pinned.sh
-echo "::endgroup::"
 
 step "backend format check"
 bash .github/scripts/format.sh --verify-no-changes
