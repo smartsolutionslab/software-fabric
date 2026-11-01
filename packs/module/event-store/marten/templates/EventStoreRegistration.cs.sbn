@@ -14,7 +14,7 @@ public static class EventStoreRegistration
 {
     /// <summary>
     /// Gives the module its own Marten store when its Infrastructure project has adapters over one: classes whose
-    /// constructor takes an <see cref="IDocumentStore"/>. Each adapter is registered as the module's Application
+    /// constructor takes an <see cref="IDocumentStore"/> (among other services). Each adapter is registered as the module's Application
     /// interfaces it implements (I&lt;Module&gt;AggregateStore, ...). The store never changes the database's schema; the
     /// MigrationRunner applies it (<see cref="ApplyEventStoreSchemasAsync"/>).
     /// </summary>

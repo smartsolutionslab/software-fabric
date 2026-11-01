@@ -41,13 +41,7 @@ public sealed class QueriesReadOnlyReadModels : IArchitectureRule
 
         foreach (var type in queries)
         {
-            // Whatever reaches the type: constructor and method parameters (a handler's Handle may be static) and fields.
-            var dependencies = type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                .SelectMany(constructor => constructor.GetParameters().Select(parameter => parameter.ParameterType))
-                .Concat(type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
-                    .SelectMany(method => method.GetParameters().Select(parameter => parameter.ParameterType)))
-                .Concat(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Select(field => field.FieldType))
-                .Distinct();
+            var dependencies = DeclaredDependencies(type);
 
             foreach (var dependency in dependencies)
             {
@@ -61,6 +55,25 @@ public sealed class QueriesReadOnlyReadModels : IArchitectureRule
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// What the type and each of its base classes (up to object) declare: constructor and method parameters (a
+    /// handler's Handle may be static) and fields, private ones included.
+    /// </summary>
+    private static List<Type> DeclaredDependencies(Type type)
+    {
+        const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+        List<Type> dependencies = [];
+        for (var current = type; current is not null && current != typeof(object); current = current.BaseType)
+        {
+            dependencies.AddRange(current.GetConstructors(Declared).SelectMany(constructor => constructor.GetParameters().Select(parameter => parameter.ParameterType)));
+            dependencies.AddRange(current.GetMethods(Declared).SelectMany(method => method.GetParameters().Select(parameter => parameter.ParameterType)));
+            dependencies.AddRange(current.GetFields(Declared).Select(field => field.FieldType));
+        }
+
+        return [.. dependencies.Distinct()];
     }
 
     /// <summary><c>{{ namespace }}.Modules.Billing.Application</c> belongs to module <c>{{ namespace }}.Modules.Billing</c>.</summary>

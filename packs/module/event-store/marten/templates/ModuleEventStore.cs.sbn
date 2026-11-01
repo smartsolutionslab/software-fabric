@@ -31,7 +31,10 @@ public sealed class ModuleEventStore
         this.projections = projections;
     }
 
-    /// <summary>The module's classes over its store: those whose constructor takes an <see cref="IDocumentStore"/>.</summary>
+    /// <summary>
+    /// The module's classes over its store: those with a constructor taking an <see cref="IDocumentStore"/>, whatever
+    /// else it takes (the container supplies the rest).
+    /// </summary>
     public IReadOnlyList<Type> Adapters { get; }
 
     /// <summary>The module's event store, or null when its Infrastructure project has no adapter over one.</summary>
@@ -42,7 +45,7 @@ public sealed class ModuleEventStore
         var types = infrastructure.GetTypes();
         var adapters = types
             .Where(type => type is { IsClass: true, IsAbstract: false }
-                && type.GetConstructors().Any(constructor => constructor.GetParameters() is [{ ParameterType: var parameter }] && parameter == typeof(IDocumentStore)))
+                && type.GetConstructors().Any(constructor => constructor.GetParameters().Any(parameter => parameter.ParameterType == typeof(IDocumentStore))))
             .ToList();
         if (adapters.Count == 0)
         {
