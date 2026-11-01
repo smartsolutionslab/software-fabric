@@ -1,9 +1,13 @@
 option: backend.errors.result
 files:
   - { template: templates/ResultHttpExtensions.cs.sbn, target: src/BuildingBlocks/Http/ResultHttpExtensions.cs }
+  - { template: templates/ArgumentExceptionHandler.cs.sbn, target: src/BuildingBlocks/Http/ArgumentExceptionHandler.cs }
+  - { template: templates/ErrorResponses.cs.sbn, target: src/BuildingBlocks/Http/ErrorResponses.cs }
   - { template: templates/HandlersReturnResults.cs.sbn, target: tests/Architecture.Tests/Rules/HandlersReturnResults.cs }
 slots:
   - { slot: host.services, template: templates/host-services.sbn }
+  # First in the pipeline, so an exception from any later middleware or endpoint becomes problem details.
+  - { slot: host.middleware, template: templates/host-middleware.sbn, order: -100 }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

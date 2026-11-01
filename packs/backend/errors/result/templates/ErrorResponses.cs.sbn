@@ -1,0 +1,13 @@
+using {{ namespace }}.BuildingBlocks.Http;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class ErrorResponses
+{
+    /// <summary>
+    /// Problem details for every error the host answers: a failed guard is a 400 with the code
+    /// <see cref="ArgumentExceptionHandler.Code"/>, any other exception a 500 that says nothing about itself.
+    /// </summary>
+    public static IServiceCollection AddErrorResponses(this IServiceCollection services) =>
+        services.AddProblemDetails().AddExceptionHandler<ArgumentExceptionHandler>();
+}
