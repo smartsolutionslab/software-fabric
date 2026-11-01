@@ -58,6 +58,18 @@ public sealed class LeanCrudFrontendTests
     }
 
     [Fact]
+    public void The_lean_crud_web_app_passes_its_format_check_after_building()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        RunWeb(project, "install", "build");
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "format:check");
+
+        exitCode.ShouldBe(0, $"pnpm format:check:\n{output}");
+    }
+
+    [Fact]
     public void A_generated_call_carries_the_signed_in_users_token()
     {
         using var project = new GeneratedProject(Profile);

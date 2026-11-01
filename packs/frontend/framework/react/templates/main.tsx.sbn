@@ -4,11 +4,13 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './index.css';
 
-/** Wraps the app in one provider; listed outermost first. */
+/** Wraps the app in one provider. */
 type Provider = (children: ReactNode) => ReactNode;
 
 const providers: Provider[] = [
-{{ slots["web.providers"] }}
+  // Outermost first: each one wraps all that follow it.
+{{- if slots["web.providers"] != "" }}
+{{ slots["web.providers"] }},{{ end }}
 ];
 
 const root = document.getElementById('root');

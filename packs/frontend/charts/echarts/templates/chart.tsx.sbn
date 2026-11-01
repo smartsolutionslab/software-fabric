@@ -11,7 +11,7 @@ interface ChartProps {
 export function Chart({ option, label, height = 320 }: ChartProps) {
   return (
     <div role="img" aria-label={label}>
-      <ReactECharts option={option} style={ { height } } />
+      <ReactECharts option={option} style={{ "{{" }} height {{ "}}" }} />
     </div>
   );
 }

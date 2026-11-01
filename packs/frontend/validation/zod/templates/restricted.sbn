@@ -1,1 +1,1 @@
-          { group: ['yup', 'joi', 'valibot'], message: 'Use zod (docs/adr).' }
+            { group: ['yup', 'joi', 'valibot'], message: 'Use zod (docs/adr).' }

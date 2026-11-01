@@ -1,1 +1,4 @@
-          { group: ['@mui/*', 'antd', '@mantine/*', '@chakra-ui/*'], message: 'Use the shadcn/ui components in src/components/ui (docs/adr).' }
+            {
+              group: ['@mui/*', 'antd', '@mantine/*', '@chakra-ui/*'],
+              message: 'Use the shadcn/ui components in src/components/ui (docs/adr).',
+            }

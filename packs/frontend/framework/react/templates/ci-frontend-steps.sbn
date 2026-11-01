@@ -1,0 +1,3 @@
+      # Formatting is Prettier's (.prettierrc.json); run pnpm format in web/app to fix what this reports.
+      - run: pnpm format:check
+        working-directory: web/app

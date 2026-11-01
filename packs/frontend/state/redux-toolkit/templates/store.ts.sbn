@@ -3,7 +3,8 @@ import { configureStore } from '@reduxjs/toolkit';
 
 export const store = configureStore({
   reducer: {
-{{ slots["web.store-reducers"] }}
+{{- if slots["web.store-reducers"] != "" }}
+{{ slots["web.store-reducers"] }},{{ end }}
   },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware(){{ slots["web.store-middleware"] }},
 });

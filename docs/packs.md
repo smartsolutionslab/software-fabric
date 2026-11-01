@@ -68,6 +68,11 @@ the slot's `separator` (a newline unless declared — JSON lists declare
 `",\n"`). A slot declared twice, a contribution to a slot no selected
 pack declares, and a cardinality breach are errors.
 
+A generated web app must pass its own `pnpm format:check` (Prettier), so a
+contribution to a file under `web/` is written as Prettier prints it at
+the depth where it lands; the template adds the trailing comma after the
+last entry of a list.
+
 ### Role slots
 
 A pack shared across the options of another dimension (zod, an auth client)

@@ -7,4 +7,6 @@ import type { ReactNode } from 'react';
 /** The one cache of server data; the generated hooks (src/api/generated.ts) read and invalidate it. */
 const queryClient = new QueryClient();
 
-export const withQueryClient = (children: ReactNode) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+export const withQueryClient = (children: ReactNode) => (
+  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+);

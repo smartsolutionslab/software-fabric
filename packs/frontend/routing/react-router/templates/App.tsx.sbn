@@ -2,7 +2,9 @@ import { NavLink, Route, Routes } from 'react-router';
 import type { ModuleRoute } from '@/modules';
 import { Home } from '@/pages/Home';
 
-const moduleRoutes = Object.values(import.meta.glob<ModuleRoute>('./modules/*/routes.tsx', { eager: true, import: 'route' }));
+const moduleRoutes = Object.values(
+  import.meta.glob<ModuleRoute>('./modules/*/routes.tsx', { eager: true, import: 'route' }),
+);
 
 export function App() {
   return (
