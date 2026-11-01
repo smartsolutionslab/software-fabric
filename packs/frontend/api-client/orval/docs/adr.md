@@ -6,7 +6,7 @@
 
 The frontend's API client is generated from the backend's OpenAPI document by orval (`orval.config.ts`): TanStack Query hooks and plain request functions, one per endpoint, with the document's types. The document is checked in as `web/app/openapi.json`; `pnpm codegen` turns it into `src/api/generated.ts` and runs before every `dev`, `build` and `test`; the generated file is not checked in.
 
-Every generated call goes through `apiFetch` in `src/api/baseApi.ts`, orval's mutator. It owns the base URL (`/api`), the request headers (the signed-in user's token is added there) and the answer: the parsed body for a 2xx, an `ApiError` with the status for anything else, which the hooks report as their `error`.
+Every generated call goes through `apiFetch` in `src/api/baseApi.ts`, orval's mutator. It owns the base URL (`/api`), the request headers (the signed-in user's token is added there) and the answer: the body parsed as JSON for a 2xx (nothing for an empty one), an `ApiError` with the status for anything else, which the hooks report as their `error`. Endpoints therefore answer JSON, as typed results do; a `text/plain` answer would not parse.
 
 The document is checked in rather than produced while building: the host only starts with its database, broker and identity provider, so it cannot describe itself during a plain build. Instead the integration tests, which run the whole application, compare the checked-in copy with what the host serves. A stale copy fails the test, which also rewrites the file so the fix is one commit away.
 
