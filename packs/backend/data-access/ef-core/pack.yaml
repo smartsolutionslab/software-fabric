@@ -9,7 +9,7 @@ files:
   - { template: templates/MigrationRunner.cs.sbn, target: src/MigrationRunner/Program.cs }
   - { template: templates/DesignTimeFactory.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/{{ module.namespace }}DbContextFactory.cs", per-module: true }
 declares-slots:
-  - { slot: persistence.options, description: "Statements configuring the DbContextOptionsBuilder options for the database provider, given string connectionString and string schema (the module's; for its migrations history).", cardinality: exactly-one }
+  - { slot: persistence.options, description: "Statements configuring the DbContextOptionsBuilder options for the database provider, given string connectionString and string schema (the module's; for its migrations history), each indented twelve spaces.", cardinality: exactly-one }
   - { slot: persistence.model-conventions, description: "Statements on ModelBuilder modelBuilder applied to every module's model; this is the ModuleDbContext." }
   - { slot: persistence.context-members, description: "Members added to ModuleDbContext; IServiceProvider Services is available." }
   - { slot: persistence.interceptors, description: "Expressions creating an EF Core interceptor (IInterceptor) for one ModuleDbContext instance, each indented twelve spaces; this is the ModuleDbContext, so Services is available. Added in OnConfiguring, so every instance gets its own.", separator: ",\n" }
