@@ -7,9 +7,10 @@ namespace {{ namespace }}.BuildingBlocks.Messaging;
 
 /// <summary>
 /// Every module's consumers. What a valid consumer is lives in one place, <see cref="Problem"/>: discovery accepts a
-/// Handle method only when it has none, and the architecture rule ConsumersHandleIntegrationEvents fails every Handle
-/// method that has one, so the rule cannot accept a handler this dispatcher would skip. Further Handle parameters are a
-/// CancellationToken or services; the consumer itself is created per message with its constructor's dependencies.
+/// handler (<see cref="IsHandler"/>: Handle, or HandleAsync for one that awaits) only when it has none, and the
+/// architecture rule ConsumersHandleIntegrationEvents fails every handler that has one, so the rule cannot accept a
+/// handler this dispatcher would skip. Further handler parameters are a CancellationToken or services; the consumer
+/// itself is created per message with its constructor's dependencies.
 /// </summary>
 public sealed class IntegrationEventConsumers
 {
@@ -25,7 +26,7 @@ public sealed class IntegrationEventConsumers
             .SelectMany(assembly => assembly.GetTypes())
             .Where(type => type.Name.EndsWith("Consumer", StringComparison.Ordinal))
             .SelectMany(type => type.GetMethods(HandleMethods))
-            .Where(method => method.Name == "Handle" && Problem(method) is null);
+            .Where(method => IsHandler(method) && Problem(method) is null);
 
         foreach (var method in methods)
         {
@@ -39,11 +40,19 @@ public sealed class IntegrationEventConsumers
         }
     }
 
-    /// <summary>Every Handle method an event can be delivered to.</summary>
+    /// <summary>Every handler an event can be delivered to.</summary>
     public IReadOnlyCollection<MethodInfo> Handlers => [.. handlers.Values.SelectMany(methods => methods)];
 
+    /// <summary>Whether a consumer's method is named as a handler: Handle, or HandleAsync (async methods end in Async).</summary>
+    public static bool IsHandler(MethodInfo method)
+    {
+        {{ not_null "method" }}
+
+        return method.Name is "Handle" or "HandleAsync";
+    }
+
     /// <summary>
-    /// Why the dispatcher cannot deliver to this Handle method, or null when it can: a public, non-abstract class in an
+    /// Why the dispatcher cannot deliver to this handler, or null when it can: a public, non-abstract class in an
     /// Application project; not generic; its first parameter exactly the type delivered (a sealed integration event,
     /// because delivery looks up the event's own type); returning void or Task, never async void.
     /// </summary>

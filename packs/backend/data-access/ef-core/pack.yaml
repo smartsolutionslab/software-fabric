@@ -1,7 +1,7 @@
 option: backend.data-access.ef-core
 files:
   - { template: templates/ModuleDbContext.cs.sbn, target: src/BuildingBlocks/Persistence/ModuleDbContext.cs }
-  - { template: templates/PersistenceRegistration.cs.sbn, target: src/BuildingBlocks/Persistence/PersistenceRegistration.cs }
+  - { template: templates/PersistenceRegistration.cs.sbn, target: src/BuildingBlocks/Persistence/Wiring/PersistenceRegistration.cs }
   - { template: templates/ModuleContext.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/{{ module.namespace }}DbContext.cs", per-module: true }
   - { template: templates/OneDbContextPerModule.cs.sbn, target: tests/Architecture.Tests/Rules/OneDbContextPerModule.cs }
   - { template: templates/NoServices.cs.sbn, target: src/BuildingBlocks/Persistence/NoServices.cs }
