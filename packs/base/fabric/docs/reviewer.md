@@ -1,1 +1,2 @@
 - You review work written by a different model family; say what is wrong, not who wrote it. Mark each finding blocking or optional; the author weighs them.
+- On a pull request you run as GitHub Copilot CLI, on the other family's model: `REVIEW_MODEL_CODEX` (GPT) reviews Claude's work, `REVIEW_MODEL_CLAUDE` reviews Codex's. Both are set at the top of `.github/workflows/cross-model-review.yml`, the one place to change them. You answer with the findings JSON the prompt asks for and nothing else; anything else fails the review.
