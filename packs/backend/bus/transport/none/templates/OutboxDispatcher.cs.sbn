@@ -37,7 +37,8 @@ public sealed partial class OutboxDispatcher(
                     delivered += await DeliverPendingAsync(type, stoppingToken);
                 }
 #pragma warning disable CA1031 // The database may be away for a moment; the messages wait in their table until it is back.
-                catch (Exception exception) when (exception is not OperationCanceledException)
+                // Only the host stopping ends the loop; any other cancellation (a timed-out call) is a failure like the rest.
+                catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
 #pragma warning restore CA1031
                 {
                     LogReadFailed(logger, exception, type.Name);
@@ -70,7 +71,8 @@ public sealed partial class OutboxDispatcher(
                 delivered++;
             }
 #pragma warning disable CA1031 // A failing consumer must not stop delivery of other messages; the error is kept with the message.
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            // A consumer's own cancellation (an HTTP timeout) is a failed delivery; only the host stopping is not.
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
 #pragma warning restore CA1031
             {
                 LogDeliveryFailed(logger, exception, message.Id, message.Type);

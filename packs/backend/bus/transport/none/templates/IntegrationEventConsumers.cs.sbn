@@ -54,10 +54,30 @@ public sealed class IntegrationEventConsumers
                 ? integrationEvent
                 : parameter.ParameterType == typeof(CancellationToken) ? cancellationToken : scope.ServiceProvider.GetRequiredService(parameter.ParameterType))];
 
-            if (method.Invoke(consumer, BindingFlags.DoNotWrapExceptions, null, arguments, null) is Task task)
+            try
             {
-                await task;
+                if (method.Invoke(consumer, BindingFlags.DoNotWrapExceptions, null, arguments, null) is Task task)
+                {
+                    await task;
+                }
             }
+            finally
+            {
+                // The scope does not track an instance it did not create; whoever creates the consumer disposes it.
+                await DisposeAsync(consumer);
+            }
+        }
+    }
+
+    private static async ValueTask DisposeAsync(object? consumer)
+    {
+        if (consumer is IAsyncDisposable asynchronous)
+        {
+            await asynchronous.DisposeAsync();
+        }
+        else if (consumer is IDisposable disposable)
+        {
+            disposable.Dispose();
         }
     }
 }
