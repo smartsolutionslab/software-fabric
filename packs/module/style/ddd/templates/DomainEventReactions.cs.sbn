@@ -1,0 +1,82 @@
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Domain;
+
+namespace {{ namespace }}.BuildingBlocks.DomainEvents;
+
+/// <summary>One reaction of one event type, as discovered in a module's Application assembly.</summary>
+public sealed record DomainEventReactionRegistration(Type Event, Type Reaction);
+
+/// <summary>
+/// What a domain-event reaction the dispatcher delivers to is, in one place: discovery (<see cref="In"/>) registers
+/// only reactions without a <see cref="Problem"/>, and the architecture rule EveryDomainEventHasAReaction fails every
+/// reaction with one and counts an event as handled only through <see cref="In"/>, so the two cannot disagree.
+/// </summary>
+public static class DomainEventReactions
+{
+    /// <summary>A type meant as a reaction: a non-abstract class implementing IDomainEventReaction&lt;&gt;. Abstract bases are not.</summary>
+    public static bool IsReaction(Type type)
+    {
+        {{ not_null "type" }}
+        return type is { IsClass: true, IsAbstract: false } && Contracts(type).Any();
+    }
+
+    /// <summary>
+    /// Why the dispatcher would not deliver to this reaction, or null when it does: it is in an Application project (only
+    /// those are discovered), not generic, has a public constructor (the service container creates it), and every event
+    /// it handles is deliverable (<see cref="EventProblem"/>).
+    /// </summary>
+    public static string? Problem(Type reaction)
+    {
+        {{ not_null "reaction" }}
+
+        if (!reaction.Assembly.GetName().Name!.EndsWith(".Application", StringComparison.Ordinal))
+        {
+            return $"{reaction.FullName} is outside an Application project; only reactions there are discovered.";
+        }
+
+        if (reaction.ContainsGenericParameters)
+        {
+            return $"{reaction.FullName} is generic; the dispatcher creates reactions of one concrete event type.";
+        }
+
+        if (reaction.GetConstructors().Length == 0)
+        {
+            return $"{reaction.FullName} has no public constructor; the service container creates reactions.";
+        }
+
+        var undeliverable = Contracts(reaction)
+            .Select(contract => contract.GetGenericArguments()[0])
+            .FirstOrDefault(domainEvent => EventProblem(domainEvent) is not null);
+        return undeliverable is null
+            ? null
+            : $"{reaction.FullName} handles {undeliverable.Name}, which is not a sealed domain event; the dispatcher delivers each event only to reactions of exactly its own type.";
+    }
+
+    /// <summary>Why an event of this type cannot reach a reaction, or null: it is sealed and not generic, because delivery looks up the event's own type.</summary>
+    public static string? EventProblem(Type domainEvent)
+    {
+        {{ not_null "domainEvent" }}
+
+        if (domainEvent.ContainsGenericParameters)
+        {
+            return $"{domainEvent.FullName} is generic; give each domain event its own sealed type.";
+        }
+
+        return domainEvent.IsSealed
+            ? null
+            : $"{domainEvent.FullName} is not sealed; the dispatcher delivers each event only to reactions of exactly its own type, so a derived event would miss them.";
+    }
+
+    /// <summary>Every reaction the dispatcher delivers to in this Application assembly, once per event type it handles.</summary>
+    public static IEnumerable<DomainEventReactionRegistration> In(Assembly application)
+    {
+        {{ not_null "application" }}
+
+        return application.GetTypes()
+            .Where(type => IsReaction(type) && Problem(type) is null)
+            .SelectMany(reaction => Contracts(reaction).Select(contract => new DomainEventReactionRegistration(contract.GetGenericArguments()[0], reaction)));
+    }
+
+    private static IEnumerable<Type> Contracts(Type type) =>
+        type.GetInterfaces().Where(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IDomainEventReaction<>));
+}

@@ -4,14 +4,27 @@ files:
   - { template: templates/Entity.cs.sbn, target: src/BuildingBlocks.Domain/Entity.cs }
   - { template: templates/AggregateRoot.cs.sbn, target: src/BuildingBlocks.Domain/AggregateRoot.cs }
   - { template: templates/IDomainEvent.cs.sbn, target: src/BuildingBlocks.Domain/IDomainEvent.cs }
+  - { template: templates/IHasDomainEvents.cs.sbn, target: src/BuildingBlocks.Domain/IHasDomainEvents.cs }
+  - { template: templates/DeliberatelyUnhandledAttribute.cs.sbn, target: src/BuildingBlocks.Domain/DeliberatelyUnhandledAttribute.cs }
+  - { template: templates/IDomainEventReaction.cs.sbn, target: src/BuildingBlocks/DomainEvents/IDomainEventReaction.cs }
+  - { template: templates/DomainEventReactions.cs.sbn, target: src/BuildingBlocks/DomainEvents/DomainEventReactions.cs }
+  - { template: templates/DomainEventDispatch.cs.sbn, target: src/BuildingBlocks/DomainEvents/DomainEventDispatch.cs }
+  - { template: templates/DomainEventDispatchException.cs.sbn, target: src/BuildingBlocks/DomainEvents/DomainEventDispatchException.cs }
+  - { template: templates/DomainEventRegistration.cs.sbn, target: src/BuildingBlocks/DomainEvents/DomainEventRegistration.cs }
   - { template: templates/DomainIsPure.cs.sbn, target: tests/Architecture.Tests/Rules/DomainIsPure.cs }
   - { template: templates/DomainErrorsCarryNoHttp.cs.sbn, target: tests/Architecture.Tests/Rules/DomainErrorsCarryNoHttp.cs }
+  - { template: templates/EveryDomainEventHasAReaction.cs.sbn, target: tests/Architecture.Tests/Rules/EveryDomainEventHasAReaction.cs }
 slots:
   - { slot: solution.projects, template: templates/solution-project.sbn }
   - { slot: modules.packages.domain, template: templates/domain-reference.sbn }
+  # The dispatcher lives in BuildingBlocks (it needs EF Core and DI); reactions in Application reach it through that.
+  - { slot: buildingblocks.packages, template: templates/buildingblocks-reference.sbn }
+  - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 40 }
+  - { slot: persistence.interceptors, template: templates/persistence-interceptor.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
   - { kind: architecture-test, describes: "A module's Domain project references nothing but the BCL, Kernel and BuildingBlocks.Domain.", file: templates/DomainIsPure.cs.sbn }
   - { kind: architecture-test, describes: "No type in a module's Domain project is or returns an ApiError.", file: templates/DomainErrorsCarryNoHttp.cs.sbn }
+  - { kind: architecture-test, describes: "Every domain event is sealed and has a reaction the dispatcher delivers to, by the dispatcher's own definition (DomainEventReactions), unless marked [DeliberatelyUnhandled]; every reaction is one it delivers to.", file: templates/EveryDomainEventHasAReaction.cs.sbn }

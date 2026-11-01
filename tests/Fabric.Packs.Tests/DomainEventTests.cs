@@ -1,6 +1,6 @@
 namespace Fabric.Packs.Tests;
 
-/// <summary>module.style.ddd: domain events reach in-process handlers after the save, and every event has one.</summary>
+/// <summary>module.style.ddd: domain events reach in-process reactions after the save, and every event has one.</summary>
 public sealed class DomainEventTests
 {
     private const string Profile = "saas-standard-react";
@@ -65,7 +65,7 @@ public sealed class DomainEventTests
         }
         """;
 
-    private const string Handlers = """
+    private const string Reactions = """
         using System.Collections.Concurrent;
         using Microsoft.EntityFrameworkCore;
         using Microsoft.Extensions.DependencyInjection;
@@ -81,25 +81,25 @@ public sealed class DomainEventTests
             public static ConcurrentBag<(InvoiceId Settled, InvoiceId Receipt)> Settled { get; } = [];
         }
 
-        public sealed class InvoicePaidHandler(IServiceProvider services) : IDomainEventHandler<InvoicePaid>
+        public sealed class InvoicePaidReaction(IServiceProvider services) : IDomainEventReaction<InvoicePaid>
         {
-            public Task HandleAsync(InvoicePaid domainEvent, CancellationToken cancellationToken)
+            public Task ReactAsync(InvoicePaid domainEvent, CancellationToken cancellationToken)
             {
                 Recorded.Paid.Add((domainEvent, services));
                 return Task.CompletedTask;
             }
         }
 
-        public sealed class InvoiceVoidedHandler : IDomainEventHandler<InvoiceVoided>
+        public sealed class InvoiceVoidedReaction : IDomainEventReaction<InvoiceVoided>
         {
-            public Task HandleAsync(InvoiceVoided domainEvent, CancellationToken cancellationToken) =>
-                throw new InvalidOperationException("The voided handler failed.");
+            public Task ReactAsync(InvoiceVoided domainEvent, CancellationToken cancellationToken) =>
+                throw new InvalidOperationException("The voided reaction failed.");
         }
 
-        /// <summary>Saves another aggregate through the module's context, which the Application cannot name; a real handler goes through a port.</summary>
-        public sealed class InvoiceSettledHandler(IServiceProvider services) : IDomainEventHandler<InvoiceSettled>
+        /// <summary>Saves another aggregate through the module's context, which the Application cannot name; a real reaction goes through a port.</summary>
+        public sealed class InvoiceSettledReaction(IServiceProvider services) : IDomainEventReaction<InvoiceSettled>
         {
-            public async Task HandleAsync(InvoiceSettled domainEvent, CancellationToken cancellationToken)
+            public async Task ReactAsync(InvoiceSettled domainEvent, CancellationToken cancellationToken)
             {
                 Ensure.That(domainEvent).IsNotNull();
 
@@ -289,7 +289,7 @@ public sealed class DomainEventTests
 
                 var failure = await Should.ThrowAsync<DomainEventDispatchException>(() => context.SaveChangesAsync(cancellationToken));
 
-                failure.InnerException.ShouldNotBeNull().Message.ShouldBe("The voided handler failed.");
+                failure.InnerException.ShouldNotBeNull().Message.ShouldBe("The voided reaction failed.");
                 await using var check = provider.CreateAsyncScope();
                 (await check.ServiceProvider.GetRequiredService<BillingDbContext>().Set<Invoice>().SingleAsync(row => row.Id == invoice.Id, cancellationToken))
                     .IsVoided.ShouldBeTrue();
@@ -355,7 +355,7 @@ public sealed class DomainEventTests
         project.AddModule("billing");
         project.Write("src/Modules/Billing/Billing.Domain/Invoices/Invoice.cs", Invoice);
         project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/Configurations/InvoiceConfiguration.cs", InvoiceConfiguration);
-        project.Write("src/Modules/Billing/Billing.Application/Invoices/InvoiceHandlers.cs", Handlers);
+        project.Write("src/Modules/Billing/Billing.Application/Invoices/InvoiceReactions.cs", Reactions);
         project.Write("tests/Modules/Billing.Tests/DomainEventTests.cs", DispatchTests);
         project.Build();
 
@@ -395,42 +395,42 @@ public sealed class DomainEventTests
 
             public abstract record InvoiceEvent(Guid Invoice) : IDomainEvent;
             """);
-        project.Write("src/Modules/Billing/Billing.Application/Invoices/InvoiceHandlers.cs", """
+        project.Write("src/Modules/Billing/Billing.Application/Invoices/InvoiceReactions.cs", """
             using Shop.BuildingBlocks.Domain;
             using Shop.BuildingBlocks.DomainEvents;
             using Shop.Modules.Billing.Domain.Invoices;
 
             namespace Shop.Modules.Billing.Application.Invoices;
 
-            public sealed class InvoicePaidHandler : IDomainEventHandler<InvoicePaid>
+            public sealed class InvoicePaidReaction : IDomainEventReaction<InvoicePaid>
             {
-                public Task HandleAsync(InvoicePaid domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
+                public Task ReactAsync(InvoicePaid domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
             }
 
-            public sealed class InvoiceDisputedHandler : IDomainEventHandler<InvoiceDisputed>
+            public sealed class InvoiceDisputedReaction : IDomainEventReaction<InvoiceDisputed>
             {
-                public Task HandleAsync(InvoiceDisputed domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
+                public Task ReactAsync(InvoiceDisputed domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
             }
 
-            public sealed class InvoiceCorrectedHandler : IDomainEventHandler<InvoiceCorrected>
+            public sealed class InvoiceCorrectedReaction : IDomainEventReaction<InvoiceCorrected>
             {
-                public Task HandleAsync(InvoiceCorrected domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
+                public Task ReactAsync(InvoiceCorrected domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
             }
 
-            public sealed class EveryEventHandler : IDomainEventHandler<IDomainEvent>
+            public sealed class EveryEventReaction : IDomainEventReaction<IDomainEvent>
             {
-                public Task HandleAsync(IDomainEvent domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
+                public Task ReactAsync(IDomainEvent domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
             }
             """);
-        project.Write("src/Modules/Billing/Billing.Infrastructure/InvoiceRemindedHandler.cs", """
+        project.Write("src/Modules/Billing/Billing.Infrastructure/InvoiceRemindedReaction.cs", """
             using Shop.BuildingBlocks.DomainEvents;
             using Shop.Modules.Billing.Domain.Invoices;
 
             namespace Shop.Modules.Billing.Infrastructure;
 
-            public sealed class InvoiceRemindedHandler : IDomainEventHandler<InvoiceReminded>
+            public sealed class InvoiceRemindedReaction : IDomainEventReaction<InvoiceReminded>
             {
-                public Task HandleAsync(InvoiceReminded domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
+                public Task ReactAsync(InvoiceReminded domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
             }
             """);
         project.Build();
@@ -438,12 +438,12 @@ public sealed class DomainEventTests
         var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
 
         exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceSent has no handler");
-        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceReminded has no handler");
-        output.ShouldContain("Shop.Modules.Billing.Infrastructure.InvoiceRemindedHandler is outside an Application project");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceSent has no reaction");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceReminded has no reaction");
+        output.ShouldContain("Shop.Modules.Billing.Infrastructure.InvoiceRemindedReaction is outside an Application project");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceCorrected is not sealed");
-        output.ShouldContain("Shop.Modules.Billing.Application.Invoices.EveryEventHandler handles IDomainEvent, which is not a sealed domain event");
-        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceDisputed is marked deliberately unhandled, but Shop.Modules.Billing.Application.Invoices.InvoiceDisputedHandler handles it");
+        output.ShouldContain("Shop.Modules.Billing.Application.Invoices.EveryEventReaction handles IDomainEvent, which is not a sealed domain event");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceDisputed is marked deliberately unhandled, but Shop.Modules.Billing.Application.Invoices.InvoiceDisputedReaction handles it");
         output.ShouldNotContain("InvoicePaid ");
         output.ShouldNotContain("InvoiceArchived");
         output.ShouldNotContain("InvoiceEvent ");
@@ -466,15 +466,15 @@ public sealed class DomainEventTests
 
             public abstract record InvoiceEvent(Guid Invoice) : IDomainEvent;
             """);
-        project.Write("src/Modules/Billing/Billing.Application/Invoices/InvoicePaidHandler.cs", """
+        project.Write("src/Modules/Billing/Billing.Application/Invoices/InvoicePaidReaction.cs", """
             using Shop.BuildingBlocks.DomainEvents;
             using Shop.Modules.Billing.Domain.Invoices;
 
             namespace Shop.Modules.Billing.Application.Invoices;
 
-            public sealed class InvoicePaidHandler : IDomainEventHandler<InvoicePaid>
+            public sealed class InvoicePaidReaction : IDomainEventReaction<InvoicePaid>
             {
-                public Task HandleAsync(InvoicePaid domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
+                public Task ReactAsync(InvoicePaid domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
             }
             """);
         project.Build();
