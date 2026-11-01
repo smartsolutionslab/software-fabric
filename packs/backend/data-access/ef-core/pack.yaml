@@ -12,6 +12,7 @@ declares-slots:
   - { slot: persistence.options, description: "Statements configuring the DbContextOptionsBuilder options for the database provider, given string connectionString and string schema (the module's; for its migrations history).", cardinality: exactly-one }
   - { slot: persistence.model-conventions, description: "Statements on ModelBuilder modelBuilder applied to every module's model; this is the ModuleDbContext." }
   - { slot: persistence.context-members, description: "Members added to ModuleDbContext; IServiceProvider Services is available." }
+  - { slot: persistence.interceptors, description: "Expressions creating an EF Core interceptor (IInterceptor) for one ModuleDbContext instance, each indented twelve spaces; this is the ModuleDbContext, so Services is available. Added in OnConfiguring, so every instance gets its own.", separator: ",\n" }
   - { slot: persistence.save-changes, description: "Statements run before every SaveChanges of a module's DbContext; this is the ModuleDbContext." }
   - { slot: migration-runner.steps, description: "Top-level statements of src/MigrationRunner/Program.cs, run after every module's EF Core migrations and before the runner exits; IHost host (its Services and configuration, with the connection string 'database') is in scope, and await is allowed. For schema that is not an EF Core migration (an event store's tables), so the host never migrates." }
 slots:
