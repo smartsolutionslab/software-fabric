@@ -15,6 +15,27 @@ public sealed partial class WorkflowTests
 
     private const string Group = "${{ github.workflow }}-${{ github.ref }}";
 
+    /// <summary>A workflow naming actions in every way YAML allows; only line 14 is pinned as the checks require.</summary>
+    private const string Spellings = """
+        name: spellings
+        on: push
+        jobs:
+          flow:
+            runs-on: ubuntu-latest
+            steps:
+              - { uses: actions/checkout@v4 }
+              - uses: "actions/setup-node@v4"
+              - "uses": actions/setup-dotnet@v4
+              - name: folded
+                uses: >-
+                  pnpm/action-setup@v4
+              - { name: pinned-in-flow, uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 }
+              - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+              - run: echo "a step that only mentions uses in its text"
+        """;
+
+    private static readonly int[] SpellingsUnpinnedLines = [7, 8, 9, 11, 13];
+
     /// <summary>The profiles the real packs generate alone, which profile CI builds (ADR-0003).</summary>
     public static TheoryData<string> Profiles => new(
         Repository.Catalog.Profiles.Keys.Where(profile => Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, []).Errors.Count == 0));
@@ -74,6 +95,42 @@ public sealed partial class WorkflowTests
         output.ShouldContain("actions/checkout@v4", Case.Sensitive, output);
         output.ShouldContain("file=.github/workflows/extra.yml,line=7::", Case.Sensitive, output);
         output.ShouldNotContain("./.github/actions/local", Case.Sensitive, output);
+    }
+
+    [Fact]
+    public void An_action_spelled_as_a_flow_mapping_quoted_or_on_its_own_line_fails_the_generated_check()
+    {
+        using var project = new GeneratedProject("lean-crud");
+        project.Write(".github/workflows/spellings.yml", Spellings);
+
+        var (exitCode, output) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/check-actions-pinned.sh");
+
+        exitCode.ShouldBe(1, output);
+        foreach (var line in SpellingsUnpinnedLines)
+        {
+            output.ShouldContain($"file=.github/workflows/spellings.yml,line={line}::", Case.Sensitive, output);
+        }
+
+        output.Split('\n').Count(text => text.Contains("file=.github/workflows/spellings.yml,", StringComparison.Ordinal))
+            .ShouldBe(SpellingsUnpinnedLines.Length, output);
+    }
+
+    [Fact]
+    public void The_generator_s_own_check_finds_an_action_however_the_workflow_spells_it()
+    {
+        var root = Directory.CreateTempSubdirectory("fabric-spellings-").FullName;
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, ".github", "workflows"));
+            File.WriteAllText(Path.Combine(root, ".github", "workflows", "spellings.yml"), Spellings);
+
+            Unpinned(root, Workflows(root)).Select(entry => entry[..entry.IndexOf(": ", StringComparison.Ordinal)])
+                .ShouldBe(SpellingsUnpinnedLines.Select(line => $".github/workflows/spellings.yml:{line}"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]
