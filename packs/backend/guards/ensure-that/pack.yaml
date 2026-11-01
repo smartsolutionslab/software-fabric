@@ -3,9 +3,12 @@ files:
   - { template: templates/Ensure.cs.sbn, target: src/Kernel/Ensure.cs }
   - { template: templates/GuardException.cs.sbn, target: src/Kernel/GuardException.cs }
   - { template: templates/BannedSymbols.txt.sbn, target: build/guards/BannedSymbols.txt }
+  - { template: templates/Guards.Tests.csproj.sbn, target: tests/Kernel/Guards.Tests/Guards.Tests.csproj }
+  - { template: templates/EnsureTests.cs.sbn, target: tests/Kernel/Guards.Tests/EnsureTests.cs }
 slots:
   - { slot: templates.functions, template: templates/functions.sbn }
   - { slot: dotnet.build-items, template: templates/build-items.sbn }
+  - { slot: solution.projects, template: templates/solution-project.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

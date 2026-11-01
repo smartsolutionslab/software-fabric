@@ -5,6 +5,10 @@ files:
   - { template: templates/DomainError.cs.sbn, target: src/Kernel/DomainError.cs }
   - { template: templates/Unit.cs.sbn, target: src/Kernel/Unit.cs }
   - { template: templates/ErrorsDeriveFromApiError.cs.sbn, target: tests/Architecture.Tests/Rules/ErrorsDeriveFromApiError.cs }
+  - { template: templates/Results.Tests.csproj.sbn, target: tests/Kernel/Results.Tests/Results.Tests.csproj }
+  - { template: templates/ResultTests.cs.sbn, target: tests/Kernel/Results.Tests/ResultTests.cs }
+slots:
+  - { slot: solution.projects, template: templates/solution-project.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

@@ -1,0 +1,114 @@
+<Project>
+  <!--
+    The coverage gate (docs/adr), run by .github/scripts/test.sh after the tests:
+    dotnet msbuild .github/scripts/coverage-gate.proj -p:CoverageDirectory=<directory of *.cobertura.xml reports>
+    Lines are merged across the reports, so a line any test project runs is covered. Each module's Domain and
+    Application assembly ({{ namespace }}.Modules.<Module>.<Layer>, named after the project's ModuleLayer) and the
+    Kernel are checked against tests/coverage.props; an assembly with no executable lines has nothing to check. Code
+    source generators write (under obj/) is not counted.
+  -->
+  <Import Project="$(MSBuildThisFileDirectory)../../tests/coverage.props" />
+
+  <UsingTask TaskName="CheckCoverage" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Reports ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <Domain Required="true" />
+      <Application Required="true" />
+      <Kernel Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.Globalization" />
+      <Using Namespace="System.Xml.Linq" />
+      <Code Type="Method" Language="cs"><![CDATA[
+      public override bool Execute()
+      {
+        var thresholds = new Dictionary<string, double>
+        {
+            ["Domain"] = double.Parse(Domain, CultureInfo.InvariantCulture),
+            ["Application"] = double.Parse(Application, CultureInfo.InvariantCulture),
+            ["Kernel"] = double.Parse(Kernel, CultureInfo.InvariantCulture),
+        };
+
+        string LayerOf(string assembly)
+        {
+            if (assembly == "{{ namespace }}.Kernel")
+            {
+                return "Kernel";
+            }
+
+            var layer = assembly.Substring(assembly.LastIndexOf('.') + 1);
+            return assembly.StartsWith("{{ namespace }}.Modules.", StringComparison.Ordinal) && thresholds.ContainsKey(layer) ? layer : null;
+        }
+
+        // Assembly -> "file:line" -> covered by any report.
+        var assemblies = new SortedDictionary<string, Dictionary<string, bool>>(StringComparer.Ordinal);
+        foreach (var report in Reports)
+        {
+            foreach (var package in XDocument.Load(report.ItemSpec).Descendants("package"))
+            {
+                var assembly = (string)package.Attribute("name");
+                if (LayerOf(assembly) == null)
+                {
+                    continue;
+                }
+
+                if (!assemblies.TryGetValue(assembly, out var lines))
+                {
+                    lines = new Dictionary<string, bool>(StringComparer.Ordinal);
+                    assemblies.Add(assembly, lines);
+                }
+
+                foreach (var type in package.Descendants("class"))
+                {
+                    // What a source generator writes lands under obj/: it is not this project's code to test.
+                    var file = ((string)type.Attribute("filename")).Replace('\\', '/');
+                    if (file.Contains("/obj/"))
+                    {
+                        continue;
+                    }
+
+                    foreach (var line in type.Elements("lines").Elements("line"))
+                    {
+                        var key = file + ":" + (string)line.Attribute("number");
+                        var covered = int.Parse((string)line.Attribute("hits"), CultureInfo.InvariantCulture) > 0;
+                        lines[key] = (lines.TryGetValue(key, out var before) && before) || covered;
+                    }
+                }
+            }
+        }
+
+        foreach (var entry in assemblies)
+        {
+            if (entry.Value.Count == 0)
+            {
+                continue;
+            }
+
+            var layer = LayerOf(entry.Key);
+            var percent = 100.0 * entry.Value.Values.Count(covered => covered) / entry.Value.Count;
+            var shown = (Math.Floor(percent * 10) / 10).ToString("0.0", CultureInfo.InvariantCulture);
+            var threshold = thresholds[layer].ToString(CultureInfo.InvariantCulture);
+            if (percent < thresholds[layer])
+            {
+                Log.LogError($"{entry.Key}: {shown} % line coverage, below the {layer} threshold of {threshold} % (tests/coverage.props).");
+            }
+            else
+            {
+                Log.LogMessage(MessageImportance.High, $"{entry.Key}: {shown} % line coverage, {layer} threshold {threshold} %.");
+            }
+        }
+
+        return !Log.HasLoggedErrors;
+      }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="Check">
+    <ItemGroup>
+      <CoverageReport Include="$(CoverageDirectory)/*.cobertura.xml" />
+    </ItemGroup>
+    <Error Condition="'@(CoverageReport)' == ''" Text="No coverage reports in '$(CoverageDirectory)'." />
+    <CheckCoverage Reports="@(CoverageReport)" Domain="$(CoverageThresholdDomain)" Application="$(CoverageThresholdApplication)" Kernel="$(CoverageThresholdKernel)" />
+  </Target>
+</Project>
