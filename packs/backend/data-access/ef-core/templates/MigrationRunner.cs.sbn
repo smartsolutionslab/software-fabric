@@ -23,4 +23,6 @@ foreach (var context in contexts)
 {
     await using var scope = host.Services.CreateAsyncScope();
     await ((DbContext)scope.ServiceProvider.GetRequiredService(context)).Database.MigrateAsync();
-}
+}{{ if slots["migration-runner.steps"] != "" }}
+
+{{ slots["migration-runner.steps"] }}{{ end }}
