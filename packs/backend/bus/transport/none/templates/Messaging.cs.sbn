@@ -1,0 +1,25 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.BuildingBlocks.Modules;
+using {{ namespace }}.BuildingBlocks.Persistence;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class Messaging
+{
+    /// <summary>In-process integration events: every module's consumers, and the dispatcher that delivers from the modules' outbox tables.</summary>
+    public static IServiceCollection AddMessaging(this IServiceCollection services, IReadOnlyList<IModule> modules)
+    {
+        {{ not_null "modules" }}
+
+        var contexts = modules
+            .SelectMany(module => ModuleAssemblies.Of(module, "Infrastructure").GetTypes())
+            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(ModuleDbContext).IsAssignableFrom(type))
+            .ToList();
+
+        return services
+            .AddSingleton(new IntegrationEventConsumers(modules.Select(module => ModuleAssemblies.Of(module, "Application"))))
+            .AddSingleton(new OutboxContexts(contexts))
+            .AddSingleton<OutboxSignal>()
+            .AddHostedService<OutboxDispatcher>();
+    }
+}

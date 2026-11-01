@@ -1,0 +1,8 @@
+option: backend.tenancy.none
+files:
+  - { template: templates/NoTenantIds.cs.sbn, target: tests/Architecture.Tests/Rules/NoTenantIds.cs }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No type in a module has a TenantId: the project has one tenant.", file: templates/NoTenantIds.cs.sbn }

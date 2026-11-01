@@ -1,0 +1,30 @@
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.BuildingBlocks.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class OutboxTables
+{
+    /// <summary>
+    /// Creates every module's outbox table. A step of the MigrationRunner, after the modules' migrations: the runner has
+    /// each module's DbContext registered, and it runs once before any host starts, so hosts never create tables.
+    /// </summary>
+    public static async Task CreateOutboxTablesAsync(this IServiceProvider services, CancellationToken cancellationToken = default)
+    {
+        {{ not_null "services" }}
+
+        var contexts = Directory.EnumerateFiles(AppContext.BaseDirectory, "{{ namespace }}.Modules.*.Infrastructure.dll")
+            .Order(StringComparer.Ordinal)
+            .Select(Assembly.LoadFrom)
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(ModuleDbContext).IsAssignableFrom(type));
+
+        foreach (var context in contexts)
+        {
+            await using var scope = services.CreateAsyncScope();
+            await Outbox.CreateTableAsync((DbContext)scope.ServiceProvider.GetRequiredService(context), cancellationToken);
+        }
+    }
+}

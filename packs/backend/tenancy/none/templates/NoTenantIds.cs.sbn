@@ -1,0 +1,25 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class NoTenantIds : IArchitectureRule
+{
+    private const string TenantId = "TenantId";
+
+    private const BindingFlags Members = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+    public string Description => "No type in a module has a TenantId: this project has no tenancy.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var type in model.ModuleAssemblies.SelectMany(assembly => assembly.GetTypes()))
+        {
+            if (type.GetProperties(Members).Any(property => property.Name == TenantId) || type.GetFields(Members).Any(field => field.Name == TenantId))
+            {
+                yield return $"{type.FullName} has a TenantId, but this project has no tenancy.";
+            }
+        }
+    }
+}

@@ -1,0 +1,25 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.BuildingBlocks.Modules;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class UnitOfWorkRegistration
+{
+    /// <summary>Registers the module's unit of work: the class in its Infrastructure project implementing I&lt;Module&gt;UnitOfWork.</summary>
+    public static IServiceCollection AddModuleUnitOfWork<TModule>(this IServiceCollection services)
+        where TModule : IModule
+    {
+        var registrations = ModuleAssemblies.Of<TModule>("Infrastructure").GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false })
+            .SelectMany(type => type.GetInterfaces()
+                .Where(contract => contract != typeof(IUnitOfWork) && typeof(IUnitOfWork).IsAssignableFrom(contract))
+                .Select(contract => (contract, type)));
+
+        foreach (var (contract, implementation) in registrations)
+        {
+            services.AddScoped(contract, implementation);
+        }
+
+        return services;
+    }
+}
