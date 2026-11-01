@@ -98,6 +98,13 @@ public sealed class DomainEventTests
                 throw new InvalidOperationException("The voided reaction failed.");
         }
 
+        public sealed class InvoiceVoidedCleanupReaction : IDomainEventReaction<InvoiceVoided>, IAsyncDisposable
+        {
+            public Task ReactAsync(InvoiceVoided domainEvent, CancellationToken cancellationToken) => Task.CompletedTask;
+
+            public ValueTask DisposeAsync() => ValueTask.FromException(new InvalidOperationException("The cleanup reaction's disposal failed."));
+        }
+
         public sealed class InvoiceVoidedAuditReaction : IDomainEventReaction<InvoiceVoided>
         {
             public Task ReactAsync(InvoiceVoided domainEvent, CancellationToken cancellationToken)
@@ -338,6 +345,9 @@ public sealed class DomainEventTests
                 RecordingLoggerProvider.Instance.Entries.ShouldContain(entry => entry.Level == LogLevel.Error
                     && entry.Message.Contains("InvoiceVoidedReaction", StringComparison.Ordinal)
                     && entry.Exception != null && entry.Exception.Message == "The voided reaction failed.");
+                RecordingLoggerProvider.Instance.Entries.ShouldContain(entry => entry.Level == LogLevel.Error
+                    && entry.Message.Contains("InvoiceVoidedCleanupReaction", StringComparison.Ordinal)
+                    && entry.Exception != null && entry.Exception.Message == "The cleanup reaction's disposal failed.");
                 await using var check = provider.CreateAsyncScope();
                 (await check.ServiceProvider.GetRequiredService<BillingDbContext>().Set<Invoice>().SingleAsync(row => row.Id == invoice.Id, cancellationToken))
                     .IsVoided.ShouldBeTrue();
