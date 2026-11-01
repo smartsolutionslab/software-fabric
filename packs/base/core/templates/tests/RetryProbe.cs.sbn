@@ -1,0 +1,88 @@
+using System.Net;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Http.Resilience;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// Counts the attempts the HttpClient pipeline of <c>AddServiceDefaults()</c> makes for one request against a server
+/// that always fails. It goes through the real defaults, not a copy of them, so a change to
+/// <c>src/ServiceDefaults</c> is what the retry rules see.
+/// </summary>
+internal static class RetryProbe
+{
+    /// <summary>One attempt plus the standard resilience handler's three retries.</summary>
+    public const int EveryAttempt = 4;
+
+    private const string ClientName = "retry-probe";
+
+    internal enum Failure
+    {
+        /// <summary>The server answers 503 Service Unavailable.</summary>
+        ServiceUnavailable,
+
+        /// <summary>The transport throws before any response, so the method cannot be read off a response.</summary>
+        TransportThrows,
+
+        /// <summary>The server answers 400 Bad Request, which no retry can fix.</summary>
+        BadRequest,
+    }
+
+    /// <param name="client">Configures the probed client beyond the defaults (an opt-in), or returns it unchanged.</param>
+    public static int Attempts(HttpMethod method, Failure failure, Func<IHttpClientBuilder, IHttpClientBuilder> client)
+    {
+        var builder = Host.CreateEmptyApplicationBuilder(settings: null);
+        builder.AddServiceDefaults();
+
+        var server = new FailingServer(failure);
+        client(builder.Services.AddHttpClient(ClientName).ConfigurePrimaryHttpMessageHandler(() => server));
+
+        // The attempt count is what the rules are about, and the backoff does not change it; without this, every
+        // probe would wait out the standard handler's exponential delays.
+        builder.Services.PostConfigureAll<HttpStandardResilienceOptions>(options =>
+        {
+            options.Retry.Delay = TimeSpan.Zero;
+            options.Retry.UseJitter = false;
+        });
+
+        using var provider = builder.Services.BuildServiceProvider();
+        using var httpClient = provider.GetRequiredService<IHttpClientFactory>().CreateClient(ClientName);
+        using var request = new HttpRequestMessage(method, new Uri("https://retry-probe.test/thing"));
+        if (method != HttpMethod.Get)
+        {
+            request.Content = new StringContent("{}");
+        }
+
+        try
+        {
+            using var response = httpClient.Send(request);
+        }
+        catch (HttpRequestException)
+        {
+            // The transport failure the probe asked for; the attempts it caused are what is counted.
+        }
+
+        return server.Attempts;
+    }
+
+    private sealed class FailingServer(Failure failure) : HttpMessageHandler
+    {
+        public int Attempts { get; private set; }
+
+        protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Attempts++;
+            if (failure == Failure.TransportThrows)
+            {
+                throw new HttpRequestException("The retry probe's transport failed.");
+            }
+
+            var status = failure == Failure.BadRequest ? HttpStatusCode.BadRequest : HttpStatusCode.ServiceUnavailable;
+            return new HttpResponseMessage(status) { RequestMessage = request };
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(Send(request, cancellationToken));
+    }
+}

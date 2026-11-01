@@ -1,0 +1,35 @@
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A client whose POSTs and PATCHes are idempotent in fact (a token mint, where a second token supersedes the first)
+/// opts back into retrying them with <c>RetryEveryMethod()</c>. The opt-in restores the retry of transient failures,
+/// not "retry anything".
+/// </summary>
+public sealed class RetryEveryMethodOptsAClientBackIn : IArchitectureRule
+{
+    private static readonly (HttpMethod Method, RetryProbe.Failure Failure, int Attempts)[] Cases =
+    [
+        (HttpMethod.Post, RetryProbe.Failure.ServiceUnavailable, RetryProbe.EveryAttempt),
+        (HttpMethod.Patch, RetryProbe.Failure.ServiceUnavailable, RetryProbe.EveryAttempt),
+        (HttpMethod.Post, RetryProbe.Failure.TransportThrows, RetryProbe.EveryAttempt),
+        (HttpMethod.Post, RetryProbe.Failure.BadRequest, 1),
+    ];
+
+    public string Description => "An HttpClient with RetryEveryMethod() retries its POSTs and PATCHes on transient failures, and only on those.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var (method, failure, expected) in Cases)
+        {
+            var attempts = RetryProbe.Attempts(method, failure, client => client.RetryEveryMethod());
+            if (attempts != expected)
+            {
+                yield return $"A {method} that failed with {failure} was attempted {attempts} times by a client with RetryEveryMethod(); expected {expected}.";
+            }
+        }
+    }
+}
