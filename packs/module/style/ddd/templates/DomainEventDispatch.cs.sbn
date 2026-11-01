@@ -243,6 +243,11 @@ public sealed partial class DomainEventDispatch(IServiceProvider services) : ISa
         return deliverNow;
     }
 
+    /// <summary>
+    /// Runs after the caller's changes are committed, while the caller's own work after the commit (accepting changes,
+    /// flushing an outbox) has yet to run. So nothing here throws into the caller: every failure is logged. The logger
+    /// is resolvable, because a save without one was refused.
+    /// </summary>
     private async Task DeliverAsync(List<IDomainEvent> events, CancellationToken cancellationToken)
     {
         if (events.Count == 0)
@@ -250,14 +255,23 @@ public sealed partial class DomainEventDispatch(IServiceProvider services) : ISa
             return;
         }
 
-        var registrations = services.GetServices<DomainEventReactionRegistration>().ToList();
-        var scopes = services.GetRequiredService<IServiceScopeFactory>();
         var logger = services.GetRequiredService<ILogger<DomainEventDispatch>>();
+        List<DomainEventReactionRegistration> registrations;
+        IServiceScopeFactory scopes;
+        try
+        {
+            registrations = [.. services.GetServices<DomainEventReactionRegistration>()];
+            scopes = services.GetRequiredService<IServiceScopeFactory>();
+        }
+        catch (Exception exception)
+        {
+            DispatchFailed(logger, exception, events.Count);
+            return;
+        }
+
         for (var index = 0; index < events.Count; index++)
         {
             var domainEvent = events[index];
-            var contract = typeof(IDomainEventReaction<>).MakeGenericType(domainEvent.GetType());
-            var react = contract.GetMethod(nameof(IDomainEventReaction<IDomainEvent>.ReactAsync))!;
             foreach (var registration in registrations.Where(registration => registration.Event == domainEvent.GetType()))
             {
                 if (cancellationToken.IsCancellationRequested)
@@ -266,21 +280,29 @@ public sealed partial class DomainEventDispatch(IServiceProvider services) : ISa
                     return;
                 }
 
-                // The caller's changes are committed and its own work after the commit (accepting changes, flushing an
-                // outbox) still has to run, so a failing reaction is reported here and never thrown into the caller.
-                await using var scope = scopes.CreateAsyncScope();
-                try
-                {
-                    var reaction = scope.ServiceProvider.GetRequiredService(registration.Reaction);
-                    await (Task)react.Invoke(reaction, BindingFlags.DoNotWrapExceptions, null, [domainEvent, cancellationToken], null)!;
-                }
-                catch (Exception exception)
-                {
-                    ReactionFailed(logger, exception, registration.Reaction.FullName, domainEvent.GetType().Name);
-                }
+                await ReactAsync(scopes, registration, domainEvent, logger, cancellationToken);
             }
         }
     }
+
+    /// <summary>One reaction, from creating its scope to disposing it, with every failure on the way logged.</summary>
+    private static async Task ReactAsync(IServiceScopeFactory scopes, DomainEventReactionRegistration registration, IDomainEvent domainEvent, ILogger logger, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var reaction = scope.ServiceProvider.GetRequiredService(registration.Reaction);
+            var react = typeof(IDomainEventReaction<>).MakeGenericType(registration.Event).GetMethod(nameof(IDomainEventReaction<IDomainEvent>.ReactAsync))!;
+            await (Task)react.Invoke(reaction, BindingFlags.DoNotWrapExceptions, null, [domainEvent, cancellationToken], null)!;
+        }
+        catch (Exception exception)
+        {
+            ReactionFailed(logger, exception, registration.Reaction.FullName, domainEvent.GetType().Name);
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Dispatching domain events failed before any reaction ran; {Count} committed events were not delivered.")]
+    private static partial void DispatchFailed(ILogger logger, Exception exception, int count);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "The domain-event reaction {Reaction} failed on {DomainEvent}; the changes that raised the event are committed, and nothing retries the reaction.")]
     private static partial void ReactionFailed(ILogger logger, Exception exception, string? reaction, string domainEvent);
