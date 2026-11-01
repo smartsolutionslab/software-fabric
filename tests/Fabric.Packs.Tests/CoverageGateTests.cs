@@ -19,11 +19,15 @@ public sealed class CoverageGateTests
         { "Application", "src/Modules/Billing/Billing.Application", 80 },
     };
 
-    /// <summary>The Kernel's packs: the defaults, and the other option of each dimension that has one with a pack.</summary>
-    public static TheoryData<string> KernelChoices => new()
+    /// <summary>
+    /// The Kernel's packs: the defaults, and the other option of each dimension that has one with a pack; and
+    /// saas-standard-react, whose Wolverine source generator writes code into each module's Application.
+    /// </summary>
+    public static TheoryData<string, string> FreshProjects => new()
     {
-        string.Empty,
-        "backend.guards=bcl backend.absence=nullable backend.result-style=minimal",
+        { Profile, string.Empty },
+        { Profile, "backend.guards=bcl backend.absence=nullable backend.result-style=minimal" },
+        { "saas-standard-react", string.Empty },
     };
 
     [Theory]
@@ -68,10 +72,10 @@ public sealed class CoverageGateTests
     }
 
     [Theory]
-    [MemberData(nameof(KernelChoices))]
-    public void A_fresh_project_with_a_module_passes_the_gate_its_kernel_included(string overrides)
+    [MemberData(nameof(FreshProjects))]
+    public void A_fresh_project_with_a_module_passes_the_gate_its_kernel_included(string profile, string overrides)
     {
-        using var project = new GeneratedProject(Profile, overrides.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        using var project = new GeneratedProject(profile, overrides.Split(' ', StringSplitOptions.RemoveEmptyEntries));
         project.AddModule("billing");
         project.Build();
 
