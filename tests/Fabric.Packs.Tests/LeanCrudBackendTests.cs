@@ -23,6 +23,36 @@ public sealed class LeanCrudBackendTests
         ["Authentication__Authority"] = "http://127.0.0.1:1/realms/shop",
     };
 
+    /// <summary>What Aspire does before it starts the host: every module's migrations, then the runner's further steps.</summary>
+    private static void RunMigrationRunner(GeneratedProject project, Container postgres)
+    {
+        var (exitCode, output) = project.DotNetCommand(
+            new Dictionary<string, string> { ["ConnectionStrings__database"] = Dependencies(postgres)["ConnectionStrings__database"] },
+            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+        exitCode.ShouldBe(0, output);
+    }
+
+    [Fact]
+    public async Task The_migration_runner_creates_every_modules_outbox_table_and_the_host_creates_none()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        using (var host = project.StartHost(Dependencies(postgres)))
+        {
+            (await host.GetAsync("/alive")).StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+
+        postgres.Psql(DatabasePassword, "select count(*) from information_schema.tables where table_name = 'outbox_messages'").ShouldBe("0");
+
+        RunMigrationRunner(project, postgres);
+
+        postgres.Psql(DatabasePassword, "select string_agg(table_schema, ',' order by table_schema) from information_schema.tables where table_name = 'outbox_messages'").ShouldBe("billing,shipping");
+    }
+
     [Fact]
     public void Every_backend_option_of_lean_crud_has_a_pack()
     {
@@ -122,6 +152,7 @@ public sealed class LeanCrudBackendTests
         project.Build();
 
         using var postgres = Container.Postgres(DatabasePassword);
+        RunMigrationRunner(project, postgres);
         using var host = project.StartHost(Dependencies(postgres));
 
         (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
@@ -206,6 +237,7 @@ public sealed class LeanCrudBackendTests
         project.Build();
 
         using var postgres = Container.Postgres(DatabasePassword);
+        RunMigrationRunner(project, postgres);
         using var host = project.StartHost(Dependencies(postgres));
 
         (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/void")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
@@ -256,6 +288,8 @@ public sealed class LeanCrudBackendTests
             """);
         project.Write("tests/Modules/Billing.Tests/RetriedCommitTests.cs", """
             using Microsoft.EntityFrameworkCore;
+            using Microsoft.EntityFrameworkCore.Infrastructure;
+            using Microsoft.EntityFrameworkCore.Storage;
             using Microsoft.Extensions.Configuration;
             using Microsoft.Extensions.DependencyInjection;
             using Shop.Contracts;
@@ -291,7 +325,7 @@ public sealed class LeanCrudBackendTests
                     await using (var scope = provider.CreateAsyncScope())
                     {
                         var context = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
-                        await context.Database.EnsureCreatedAsync(cancellationToken);
+                        await context.GetService<IRelationalDatabaseCreator>().CreateTablesAsync(cancellationToken);
                         var unitOfWork = scope.ServiceProvider.GetRequiredService<IBillingUnitOfWork>();
 
                         context.Add(new Note { Id = noteId, Text = "paid" });
@@ -312,6 +346,7 @@ public sealed class LeanCrudBackendTests
         project.Build();
 
         using var postgres = Container.Postgres(DatabasePassword);
+        RunMigrationRunner(project, postgres);
         var (exitCode, output) = project.Test(
             "tests/Modules/Billing.Tests/Billing.Tests.csproj",
             new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" });
