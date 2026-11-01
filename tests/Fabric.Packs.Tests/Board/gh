@@ -62,16 +62,29 @@ case "${positional[0]} ${positional[1]:-}" in
           ($labels | split(",") | map(select(. != ""))) as $wanted
           | map(select(.state == $state)
                 | select([.labels[].name] as $have | all($wanted[]; . as $w | $have | index($w)))
-                | select($assignee == "" or ([.assignees[].login] | index($assignee))))' "$issues"
+                | select($assignee == "" or ([.assignees[].login] | index($assignee))))
+          | sort_by(-.number)' "$issues" > "$state/page.json"
+        # Pages like GitHub: newest first, per_page at a time; --paginate prints every page as its own array.
+        size="$(param per_page)"; size="${size:-30}"
+        pages="$(jq --argjson size "$size" '[range(0; length; $size) as $at | .[$at:$at + $size]] | if length == 0 then [[]] else . end' "$state/page.json")"
+        if [ -n "${flag[paginate]:-}" ]; then jq -c '.[]' <<< "$pages"; else jq -c '.[0]' <<< "$pages"; fi
+        # A change someone makes right after the list was answered, once.
+        if [ -e "$state/after-list" ]; then bash "$state/after-list"; rm "$state/after-list"; fi
         ;;
-      "GET issues/"*) jq --argjson number "${path#issues/}" '.[] | select(.number == $number)' "$issues" ;;
+      "GET issues/"*)
+        # fail-issue-read holds the number of the single-issue read that fails, as a server error would.
+        reads=$(( $(cat "$state/issue-reads" 2>/dev/null || echo 0) + 1 )); echo "$reads" > "$state/issue-reads"
+        if [ "$(cat "$state/fail-issue-read" 2>/dev/null)" = "$reads" ]; then echo '{"message":"Service Unavailable"}' >&2; exit 1; fi
+        jq --argjson number "${path#issues/}" '.[] | select(.number == $number)' "$issues" ;;
       "POST issues/"*"/comments")
         n="${path#issues/}"; n="${n%/comments}"; file="$state/comments/$n.json"; mkdir -p "$state/comments"
         [ -e "$file" ] || echo '[]' > "$file"
         jq --arg body "${flag[f:body]}" --arg at "$now_iso" '. + [{body: $body, created_at: $at}]' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
         echo "{}"
         ;;
-      "POST issues/"*"/labels") n="${path#issues/}"; key='f:labels[]'; update_issue "${n%/labels}" ".labels += [{name: \"${flag[$key]}\"}]"; echo "[]" ;;
+      "POST issues/"*"/labels")
+        if [ -e "$state/reject-labels" ]; then echo '{"message":"Server Error"}' >&2; exit 1; fi
+        n="${path#issues/}"; key='f:labels[]'; update_issue "${n%/labels}" ".labels += [{name: \"${flag[$key]}\"}]"; echo "[]" ;;
       "DELETE issues/"*"/labels/"*)
         n="${path#issues/}"; name="$(sed 's/%3A/:/g' <<< "${n#*/labels/}")"
         if ! jq -e --argjson number "${n%%/*}" --arg name "$name" '.[] | select(.number == $number) | .labels | any(.name == $name)' "$issues" > /dev/null; then
@@ -93,6 +106,7 @@ case "${positional[0]} ${positional[1]:-}" in
         echo '{"id":1}'
         ;;
       "GET pulls?"*)
+        if [ -e "$state/fail-pulls" ]; then echo '{"message":"Service Unavailable"}' >&2; exit 1; fi
         head="$(tr '&' '\n' <<< "${path#pulls?}" | sed -n 's/^head=//p' | sed 's/%3A/:/g; s/%2F/\//g; s/^[^:]*://')"
         jq --arg head "$head" 'map(select(.head.ref == $head))' "$state/prs.json" 2>/dev/null || echo '[]'
         ;;

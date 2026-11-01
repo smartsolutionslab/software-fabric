@@ -25,6 +25,8 @@ fi
 owner=""
 fewest=""
 if [ -n "$lane" ]; then
+  # Read first: a failure inside `< <(...)` would go unnoticed and look like a lane without owners.
+  owners="$(yq -r "(.lanes[\"$lane\"].owners // [])[]" "$owners_file")"
   while read -r login; do
     [ -n "$login" ] || continue
     open="$(board_issues "assignee=$(board_uri "$login")" | jq length)"
@@ -32,14 +34,20 @@ if [ -n "$lane" ]; then
       owner="$login"
       fewest="$open"
     fi
-  done < <(yq -r "(.lanes[\"$lane\"].owners // [])[]" "$owners_file")
+  done <<< "$owners"
 fi
 
-board_park "$issue" "Escalated ($label)." || { echo "Parking #$issue's branch failed; not escalated." >&2; exit 1; }
+# The escalation label holds the issue before the branch is parked and before agent:claimed stops holding it: a
+# next.sh already past its list rechecks the issue, not agent:claimed, so either other order lets it take the issue.
+board_add_label "$issue" "$label"
+if ! board_park "$issue" "Escalated ($label)."; then
+  board_remove_label "$issue" "$label"
+  echo "Parking #$issue's branch failed; not escalated." >&2
+  exit 1
+fi
 board_unclaim "$issue"
 board_status "$issue" Blocked
 if [ -n "$owner" ]; then
-  board_add_label "$issue" "$label"
   board_assign "$issue" "$owner"
   board_comment "$issue" "@$owner, this needs you ($label):
 
@@ -47,7 +55,6 @@ $message
 
 Unassign yourself once answered; the issue then returns to Todo and the next agent resumes on its branch."
 else
-  board_add_label "$issue" "$label"
   board_comment "$issue" "This needs a developer ($label), but no owner of lane '${lane:-none}' in docs/owners.yml has capacity:
 
 $message"

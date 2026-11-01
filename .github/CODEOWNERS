@@ -1,0 +1,4 @@
+# A change to the review gate or the board protocol needs a human (ADR-0004): the review workflow file comes from
+# the pull request itself, so only this review stops a pull request from switching its own gate off.
+/.github/ @notonlywhite
+/packs/base/fabric/ @notonlywhite

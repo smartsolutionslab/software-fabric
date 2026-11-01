@@ -1,0 +1,20 @@
+name: agent-executor
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  trailers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Every commit on an agent branch names its executor
+        run: bash .github/scripts/board/check-trailers.sh "$BRANCH" "$BASE" "$HEAD"
+        env:
+          BRANCH: ${{ github.head_ref }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+
