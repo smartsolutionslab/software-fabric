@@ -12,7 +12,8 @@ public sealed class {{ module.namespace }}DbContextFactory : IDesignTimeDbContex
         const string connectionString = "Server=localhost";
         const string schema = {{ module.namespace }}DbContext.Schema;
         var options = new DbContextOptionsBuilder<{{ module.namespace }}DbContext>();
-{{ slots["persistence.options"] }}
+{{ # The statements are indented for the options lambda in PersistenceRegistration; here they sit four spaces out. ~}}
+{{ slots["persistence.options"] | string.slice 4 | string.replace "\n    " "\n" }}
         return new {{ module.namespace }}DbContext(options.Options, NoServices.Instance);
     }
 }

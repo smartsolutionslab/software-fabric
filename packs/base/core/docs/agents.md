@@ -2,6 +2,7 @@
 
 - Run `dotnet tool restore` once after cloning; local tools are pinned in `.config/dotnet-tools.json`.
 - Build everything with `dotnet build build.proj`. Run locally with `dotnet run --project src/AppHost`.
+- Format with `bash .github/scripts/format.sh` before you push. CI runs it with `--verify-no-changes` and fails on any file `dotnet format` would change, modules and tests included.
 - `src/AppHost` is the only composition root. A new database, broker or service is an Aspire resource there, never a hand-written connection string.
 - Each bounded context is a module under `src/Modules/<Module>/` with Domain, Application, Infrastructure and Api projects. Add one with `fabric add-module <name>`; never copy another module.
 - Modules never reference each other. They talk through `src/Contracts`.

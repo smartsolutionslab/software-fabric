@@ -21,6 +21,7 @@ files:
   - { template: templates/build.proj.sbn, target: build.proj }
   - { template: templates/Solution.slnx.sbn, target: Solution.slnx }
   - { template: templates/ci.yml.sbn, target: ".github/workflows/ci.yml" }
+  - { template: templates/format.sh.sbn, target: ".github/scripts/format.sh" }
   - { template: templates/pull_request_template.md.sbn, target: ".github/pull_request_template.md" }
   - { template: templates/AppHost/AppHost.csproj.sbn, target: src/AppHost/AppHost.csproj }
   - { template: templates/AppHost/AppHost.cs.sbn, target: src/AppHost/AppHost.cs }
@@ -100,3 +101,4 @@ gates:
   - { kind: architecture-test, describes: "HttpClients from AddServiceDefaults() retry only idempotent methods; a POST or PATCH gets one attempt.", file: templates/tests/HttpClientsRetryOnlyIdempotentMethods.cs.sbn }
   - { kind: architecture-test, describes: "RetryEveryMethod() opts one HttpClient back into retrying POST and PATCH on transient failures.", file: templates/tests/RetryEveryMethodOptsAClientBackIn.cs.sbn }
   - { kind: ci-step, describes: "build.proj builds every project with warnings as errors.", file: templates/ci.yml.sbn }
+  - { kind: ci-step, describes: "Every project under src/ and tests/ is formatted as dotnet format would format it (whitespace and code style).", file: templates/format.sh.sbn }
