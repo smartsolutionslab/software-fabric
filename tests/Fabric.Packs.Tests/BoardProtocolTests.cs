@@ -1027,4 +1027,65 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         exitCode.ShouldBe(0, output);
         Directory.Delete(repository, recursive: true);
     }
+
+    [Theory]
+    [InlineData("Two, not a conventional commit")]
+    [InlineData("feature: an unknown type")]
+    [InlineData("feat(nowhere): a scope the project does not have")]
+    [InlineData("fix: ")]
+    [InlineData("feat(board): a header that goes on and on, well past the hundred and twenty characters a commit header may have in this project")]
+    public void A_commit_in_the_pull_request_that_is_not_a_conventional_commit_fails_the_check_by_name(string message)
+    {
+        var repository = Repository("feat(board): one\n\nAgent-Executor: claude-cloud/a", message);
+        var commit = Shell.Run(repository, "git", "rev-parse", "--short", "HEAD").Output.Trim();
+
+        var (exitCode, output) = RunIn(repository, "check-commits.sh", "base", "HEAD");
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain($"{commit} {message.TrimEnd()}");
+        output.ShouldNotContain("feat(board): one");
+        Directory.Delete(repository, recursive: true);
+    }
+
+    [Fact]
+    public void A_pull_request_whose_commits_are_all_conventional_commits_passes()
+    {
+        var repository = Repository("feat(board): one\n\nAgent-Executor: claude-cloud/a", "fix: two, without a scope", "refactor(web)!: three, breaking");
+
+        var (exitCode, output) = RunIn(repository, "check-commits.sh", "base", "HEAD");
+
+        exitCode.ShouldBe(0, output);
+        Directory.Delete(repository, recursive: true);
+    }
+
+    [Fact]
+    public void Commits_before_the_pull_request_and_merge_commits_in_it_are_not_checked()
+    {
+        var repository = Repository("Not conventional, but already on main");
+        Shell.Run(repository, "git", "tag", "--force", "base").ExitCode.ShouldBe(0);
+        var feature = Shell.Run(repository, BoardProject.GitIdentity, "git", "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "feat: one").Output.Trim();
+        var merge = Shell.Run(repository, BoardProject.GitIdentity, "git", "commit-tree", "HEAD^{tree}", "-p", feature, "-p", "HEAD", "-m", "Merge branch 'main' into agent/7").Output.Trim();
+        Shell.Run(repository, "git", "update-ref", "HEAD", merge).ExitCode.ShouldBe(0);
+
+        var (exitCode, output) = RunIn(repository, "check-commits.sh", "base", "HEAD");
+
+        exitCode.ShouldBe(0, output);
+        Directory.Delete(repository, recursive: true);
+    }
+
+    [Fact]
+    public void A_module_in_fabric_yaml_is_a_scope_without_a_list_kept_by_hand()
+    {
+        using var project = new GeneratedProject("saas-standard-react");
+        var check = Path.Combine(project.ProjectDirectory, ".github/scripts/board/check-commits.sh");
+        var repository = Repository("feat(billing): invoices");
+
+        var (exitCodeBefore, outputBefore) = Shell.Run(repository, "bash", check, "base", "HEAD");
+        project.AddModule("billing");
+        var (exitCodeAfter, outputAfter) = Shell.Run(repository, "bash", check, "base", "HEAD");
+
+        exitCodeBefore.ShouldBe(1, outputBefore);
+        exitCodeAfter.ShouldBe(0, outputAfter);
+        Directory.Delete(repository, recursive: true);
+    }
 }
