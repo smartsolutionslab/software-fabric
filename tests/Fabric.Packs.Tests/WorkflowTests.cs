@@ -32,9 +32,10 @@ public sealed partial class WorkflowTests
               - { name: pinned-in-flow, uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 }
               - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
               - run: echo "a step that only mentions uses in its text"
+              - {"uses":"actions/checkout@v4"}
         """;
 
-    private static readonly int[] SpellingsUnpinnedLines = [7, 8, 9, 11, 13];
+    private static readonly int[] SpellingsUnpinnedLines = [7, 8, 9, 11, 13, 16];
 
     /// <summary>The profiles the real packs generate alone, which profile CI builds (ADR-0003).</summary>
     public static TheoryData<string> Profiles => new(
@@ -124,8 +125,10 @@ public sealed partial class WorkflowTests
             Directory.CreateDirectory(Path.Combine(root, ".github", "workflows"));
             File.WriteAllText(Path.Combine(root, ".github", "workflows", "spellings.yml"), Spellings);
 
+            File.WriteAllText(Path.Combine(root, ".github", "workflows", "extra.yaml"), "jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v4\n");
+
             Unpinned(root, Workflows(root)).Select(entry => entry[..entry.IndexOf(": ", StringComparison.Ordinal)])
-                .ShouldBe(SpellingsUnpinnedLines.Select(line => $".github/workflows/spellings.yml:{line}"));
+                .ShouldBe([".github/workflows/extra.yaml:4", .. SpellingsUnpinnedLines.Select(line => $".github/workflows/spellings.yml:{line}")]);
         }
         finally
         {
