@@ -424,6 +424,43 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     }
 
     [Fact]
+    public void A_claim_that_loses_the_race_to_create_the_branch_moves_on_to_the_next_issue()
+    {
+        Issues(Issue(7, "Pay an invoice", ReadyBackend), Issue(9, "Refund an invoice", ReadyBackend));
+        var hook = Path.Combine(origin, "hooks", "pre-receive");
+        File.WriteAllText(hook, "#!/bin/sh\nunset GIT_QUARANTINE_PATH\ngit update-ref refs/heads/agent/7 refs/heads/main\nrm \"$0\"\n");
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(0, output);
+        output.Trim().ShouldBe("9 agent/9");
+        Head("agent/7").ShouldNotBe("chore(board): claim #7");
+        Field(7, "STATUS").ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_branch_github_reports_as_created_meanwhile_is_a_lost_race()
+    {
+        var (_, output) = RunLib("""
+            board_git() {
+              if [ "$1" = push ]; then
+                printf 'To github.com:acme/shop.git\n!\tb77fe8c6:refs/heads/agent/7\t[remote rejected] (cannot lock ref %s: reference already exists)\nDone\n' "'refs/heads/agent/7'"
+                return 1
+              fi
+              git -C "$board_root" "$@"
+            }
+            base="$(board_fetch main)"
+            board_mark agent/7 "$base" "chore(board): claim #7"; echo "outcome=$?"
+            """);
+
+        output.ShouldContain("outcome=2", Case.Sensitive, output);
+    }
+
+    [Fact]
     public void Dry_run_an_agent_claims_an_issue_releases_it_and_the_next_agent_resumes_its_branch()
     {
         Issues(Issue(7, "Pay an invoice", ReadyBackend));
