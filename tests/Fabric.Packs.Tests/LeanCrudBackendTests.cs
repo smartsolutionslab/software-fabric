@@ -356,6 +356,163 @@ public sealed class LeanCrudBackendTests
     }
 
     [Fact]
+    public async Task The_backoff_starts_when_a_slow_consumer_fails_not_when_its_batch_started()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoiceVoidedV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoiceVoidedV1(Guid InvoiceId) : IIntegrationEvent;
+            """);
+        project.Write("src/Modules/Billing/Billing.Api/VoidInvoice.cs", """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.Contracts.Billing;
+            using Shop.Modules.Billing.Application;
+
+            namespace Shop.Modules.Billing.Api;
+
+            public sealed class VoidInvoice : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints) =>
+                    endpoints.MapPost("/invoices/{id}/void", async (Guid id, IBillingUnitOfWork unitOfWork, CancellationToken cancellationToken) =>
+                    {
+                        await unitOfWork.PublishAsync(new InvoiceVoidedV1(id));
+                        await unitOfWork.CommitAsync(cancellationToken);
+                        return Results.Accepted();
+                    }).AllowAnonymous();
+            }
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoiceVoidedConsumer.cs", """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoiceVoidedConsumer
+            {
+                private static int calls;
+
+                public static async Task Handle(InvoiceVoidedV1 message, CancellationToken cancellationToken)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1.5), cancellationToken);
+                    if (Interlocked.Increment(ref calls) == 1)
+                    {
+                        throw new InvalidOperationException($"The carrier timed out on {message.InvoiceId}.");
+                    }
+                }
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        RunMigrationRunner(project, postgres);
+        using var host = project.StartHost(Dependencies(postgres));
+
+        (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/void")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        const string Voided = "from billing.outbox_messages where type like 'Shop.Contracts.Billing.InvoiceVoidedV1,%'";
+        var delivered = "f";
+        for (var attempt = 0; attempt < 60 && delivered != "t"; attempt++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            delivered = postgres.Psql(DatabasePassword, $"select delivered_at is not null {Voided}");
+        }
+
+        delivered.ShouldBe("t");
+
+        // The failure came at least 1.5 s after the message was created, and the first delay is 1 s.
+        postgres.Psql(DatabasePassword, $"select next_attempt_at >= created_at + interval '2.5 seconds' {Voided}").ShouldBe("t");
+    }
+
+    [Fact]
+    public void A_unit_of_work_refuses_to_commit_inside_a_transaction_it_did_not_open()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.Write("tests/Modules/Billing.Tests/CallerTransactionTests.cs", """
+            using Microsoft.EntityFrameworkCore;
+            using Microsoft.Extensions.Configuration;
+            using Microsoft.Extensions.DependencyInjection;
+            using Shop.Contracts;
+            using Shop.Modules.Billing.Api;
+            using Shop.Modules.Billing.Application;
+            using Shop.Modules.Billing.Infrastructure.Persistence;
+
+            namespace Shop.Modules.Billing.Tests;
+
+            public sealed record InvoiceIssuedV1(Guid InvoiceId) : IIntegrationEvent;
+
+            public class CallerTransactionTests
+            {
+                [Fact]
+                public async Task Commit_inside_a_callers_transaction_is_refused()
+                {
+                    var cancellationToken = TestContext.Current.CancellationToken;
+                    var services = new ServiceCollection().AddLogging();
+                    var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+                    new BillingModule().AddServices(services, configuration);
+                    await using var provider = services.BuildServiceProvider();
+
+                    await using var scope = provider.CreateAsyncScope();
+                    var context = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+                    var unitOfWork = scope.ServiceProvider.GetRequiredService<IBillingUnitOfWork>();
+                    await unitOfWork.PublishAsync(new InvoiceIssuedV1(Guid.NewGuid()));
+
+                    await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+                    var refusal = await Should.ThrowAsync<InvalidOperationException>(() => unitOfWork.CommitAsync(cancellationToken));
+                    refusal.Message.ShouldContain("opens its own transaction");
+                }
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        RunMigrationRunner(project, postgres);
+        var (exitCode, output) = project.Test(
+            "tests/Modules/Billing.Tests/Billing.Tests.csproj",
+            new Dictionary<string, string> { ["ConnectionStrings__database"] = Dependencies(postgres)["ConnectionStrings__database"] });
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+    }
+
+    [Fact]
+    public void An_async_void_consumer_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IIntegrationEvent;
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoicePaidConsumer
+            {
+                public static async void Handle(InvoicePaidV1 message)
+                {
+                    await Task.Yield();
+                    _ = message;
+                }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Shipping.Application.InvoicePaidConsumer.Handle is async void; a consumer that awaits returns Task.");
+    }
+
+    [Fact]
     public void A_consumer_that_handles_something_other_than_an_integration_event_fails_the_architecture_tests()
     {
         using var project = new GeneratedProject(Profile, Frontend);
