@@ -377,6 +377,101 @@ public sealed class EventDrivenBackendTests
     }
 
     [Fact]
+    public void A_query_inheriting_the_write_side_from_a_base_class_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Application/Support/StoreHolder.cs", """
+            namespace Shop.Modules.Billing.Application.Support;
+
+            public abstract class StoreHolder
+            {
+                private IBillingAggregateStore? store;
+
+                protected bool HasStore => store is not null;
+
+                protected void Use(IBillingAggregateStore invoices) => store = invoices;
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Application/Queries/Inherited/InheritedQuery.cs", """
+            using Shop.Modules.Billing.Application.Support;
+
+            namespace Shop.Modules.Billing.Application.Queries.Inherited;
+
+            public sealed class InheritedQuery : StoreHolder
+            {
+                public bool Ready => HasStore;
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application.Queries.Inherited.InheritedQuery reads the write side (IBillingAggregateStore)");
+    }
+
+    [Fact]
+    public void An_adapter_over_the_event_store_that_takes_more_than_the_store_is_still_registered()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Application/IBillingAuditTrail.cs", """
+            namespace Shop.Modules.Billing.Application;
+
+            public interface IBillingAuditTrail
+            {
+                bool Verbose { get; }
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Infrastructure/EventStore/BillingAuditTrail.cs", """
+            using Marten;
+            using Microsoft.Extensions.Logging;
+            using Shop.Modules.Billing.Application;
+
+            namespace Shop.Modules.Billing.Infrastructure.EventStore;
+
+            public sealed class BillingAuditTrail(IDocumentStore store, ILogger<BillingAuditTrail> logger) : IBillingAuditTrail
+            {
+                public IDocumentStore Store { get; } = store;
+
+                public bool Verbose => logger.IsEnabled(LogLevel.Debug);
+            }
+            """);
+        project.Write("tests/Modules/Billing.Tests/AdapterTests.cs", """
+            using Microsoft.Extensions.Configuration;
+            using Microsoft.Extensions.DependencyInjection;
+            using Shop.Modules.Billing.Api;
+            using Shop.Modules.Billing.Application;
+
+            namespace Shop.Modules.Billing.Tests;
+
+            public class AdapterTests
+            {
+                [Fact]
+                public void An_adapter_with_further_dependencies_is_registered_as_its_application_interface()
+                {
+                    var services = new ServiceCollection().AddLogging();
+                    var configuration = new ConfigurationBuilder()
+                        .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:database"] = "Host=localhost" })
+                        .Build();
+                    new BillingModule().AddServices(services, configuration);
+                    using var provider = services.BuildServiceProvider();
+                    using var scope = provider.CreateScope();
+
+                    scope.ServiceProvider.GetService<IBillingAuditTrail>().ShouldNotBeNull();
+                }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+    }
+
+    [Fact]
     public void The_read_side_gate_checks_only_modules_that_chose_physical_cqrs()
     {
         using var project = new GeneratedProject(Profile, Frontend);
