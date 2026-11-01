@@ -7,7 +7,7 @@ public sealed class ConsumersHandleIntegrationEvents : IArchitectureRule
 {
     private const string IntegrationEvent = "{{ namespace }}.Contracts.IIntegrationEvent";
 
-    public string Description => "Every consumer is a public class whose Handle methods take an integration event first and return void (never async void) or Task.";
+    public string Description => "Every consumer is a public class in an Application project whose Handle methods take an integration event first and return void (never async void) or Task.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -22,6 +22,12 @@ public sealed class ConsumersHandleIntegrationEvents : IArchitectureRule
             if (!consumer.IsPublic)
             {
                 yield return $"{consumer.FullName} is not public; the dispatcher delivers only to public consumers.";
+            }
+
+            if (!consumer.Assembly.GetName().Name!.EndsWith(".Application", StringComparison.Ordinal))
+            {
+                // The dispatcher reads only Application assemblies: anywhere else, its messages would be marked delivered unhandled.
+                yield return $"{consumer.FullName} is outside an Application project; the dispatcher delivers only to consumers there.";
             }
 
             var methods = consumer.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)

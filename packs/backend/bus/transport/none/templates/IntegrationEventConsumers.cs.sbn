@@ -50,12 +50,13 @@ public sealed class IntegrationEventConsumers
         {
             await using var scope = scopes.CreateAsyncScope();
             var consumer = method.IsStatic ? null : ActivatorUtilities.CreateInstance(scope.ServiceProvider, method.DeclaringType!);
-            object?[] arguments = [.. method.GetParameters().Select((parameter, index) => index == 0
-                ? integrationEvent
-                : parameter.ParameterType == typeof(CancellationToken) ? cancellationToken : scope.ServiceProvider.GetRequiredService(parameter.ParameterType))];
-
             try
             {
+                // Inside the try: a parameter that cannot be resolved must not skip the consumer's disposal.
+                object?[] arguments = [.. method.GetParameters().Select((parameter, index) => index == 0
+                    ? integrationEvent
+                    : parameter.ParameterType == typeof(CancellationToken) ? cancellationToken : scope.ServiceProvider.GetRequiredService(parameter.ParameterType))];
+
                 if (method.Invoke(consumer, BindingFlags.DoNotWrapExceptions, null, arguments, null) is Task task)
                 {
                     await task;
