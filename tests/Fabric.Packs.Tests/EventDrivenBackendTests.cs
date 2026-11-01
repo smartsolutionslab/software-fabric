@@ -282,6 +282,65 @@ public sealed class EventDrivenBackendTests
             .ShouldBe("mt_doc_invoicesummary,mt_events,mt_streams");
     }
 
+    [Fact]
+    public void A_query_that_takes_the_write_side_as_a_method_parameter_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Application/Queries/GetInvoice/InvoiceQuery.cs", """
+            namespace Shop.Modules.Billing.Application.Queries.GetInvoice;
+
+            public static class InvoiceQuery
+            {
+                public static IBillingAggregateStore Handle(IBillingAggregateStore store) => store;
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Application/Queries/ListInvoices/InvoiceList.cs", """
+            namespace Shop.Modules.Billing.Application.Queries.ListInvoices;
+
+            public sealed class InvoiceList(TimeProvider clock)
+            {
+                public Microsoft.EntityFrameworkCore.DbContext Handle(Microsoft.EntityFrameworkCore.DbContext context)
+                {
+                    _ = clock.GetUtcNow();
+                    return context;
+                }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application.Queries.GetInvoice.InvoiceQuery reads the write side (IBillingAggregateStore)");
+        output.ShouldContain("Shop.Modules.Billing.Application.Queries.ListInvoices.InvoiceList reads the write side (DbContext)");
+    }
+
+    [Fact]
+    public void A_modules_event_store_lives_in_the_schema_its_dbcontext_uses()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing-2");
+        project.Write("src/Modules/Billing2/Billing2.Domain/Notes/NoteAdded.cs", """
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing2.Domain.Notes;
+
+            public sealed record NoteAdded(Guid Note) : IDomainEvent;
+            """);
+        project.Build();
+
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "Modules", "Billing2", "Billing2.Infrastructure", "Persistence", "Billing2DbContext.cs"))
+            .ShouldContain("public const string Schema = \"billing_2\";");
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (runnerExitCode, runnerOutput) = project.DotNetCommand(Database(postgres), "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+        runnerExitCode.ShouldBe(0, runnerOutput);
+
+        postgres.Psql(DatabasePassword, "select string_agg(table_schema, ',') from information_schema.tables where table_name = 'mt_events'")
+            .ShouldBe("billing_2");
+    }
+
     private static Dictionary<string, string> Database(Container postgres) => new()
     {
         ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}",
