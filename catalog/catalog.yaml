@@ -164,6 +164,26 @@ dimensions:
       schema-per-tenant:   { tier: supported }
       database-per-tenant: { tier: supported }
 
+  backend.llm:
+    scope: project
+    default: none
+    note: "One provider per project, behind Microsoft.Extensions.AI's IChatClient. ADR-0010."
+    options:
+      none:         { tier: supported, note: "the project calls no language model" }
+      anthropic:    { tier: experimental }
+      openai:       { tier: experimental }
+      azure-openai: { tier: experimental }
+      ollama:       { tier: experimental, note: "a local model server" }
+
+  backend.mcp:
+    scope: project
+    multi: true
+    default: []
+    note: "Empty: the project neither exposes nor uses MCP services. Official C# MCP SDK. ADR-0010."
+    options:
+      server: { tier: experimental, note: "the project exposes MCP tools, opted in per command or query" }
+      client: { tier: experimental, note: "the project uses external MCP servers" }
+
   # ─────────────────────────── Backend · per module ──────────────────────────
 
   module.style:
