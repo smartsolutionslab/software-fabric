@@ -272,7 +272,7 @@ public sealed class LeanCrudBackendTests
                 private static int serializations;
 
             #pragma warning disable CA1065 // The fixture's whole point: the outbox insert fails once.
-                public string Check => Interlocked.Increment(ref serializations) == 1 ? throw new InvalidOperationException("The outbox insert failed once.") : "ok";
+                public string Check => Interlocked.Increment(ref serializations) == 1 ? throw new InvalidOperationException("The outbox insert failed once.") : NoteId.ToString();
             #pragma warning restore CA1065
             }
 
