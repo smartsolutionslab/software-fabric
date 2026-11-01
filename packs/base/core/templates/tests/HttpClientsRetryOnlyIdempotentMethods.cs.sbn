@@ -1,0 +1,36 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A request that reached the server, was applied and lost its response looks exactly like one that never arrived,
+/// so retrying a POST or PATCH can apply it twice. The default HttpClient pipeline retries only the methods RFC 9110
+/// calls idempotent, on a 503 and on a transport failure alike.
+/// </summary>
+public sealed class HttpClientsRetryOnlyIdempotentMethods : IArchitectureRule
+{
+    private static readonly (HttpMethod Method, RetryProbe.Failure Failure, int Attempts)[] Cases =
+    [
+        (HttpMethod.Get, RetryProbe.Failure.ServiceUnavailable, RetryProbe.EveryAttempt),
+        (HttpMethod.Put, RetryProbe.Failure.ServiceUnavailable, RetryProbe.EveryAttempt),
+        (HttpMethod.Delete, RetryProbe.Failure.ServiceUnavailable, RetryProbe.EveryAttempt),
+        (HttpMethod.Post, RetryProbe.Failure.ServiceUnavailable, 1),
+        (HttpMethod.Patch, RetryProbe.Failure.ServiceUnavailable, 1),
+        (HttpMethod.Get, RetryProbe.Failure.TransportThrows, RetryProbe.EveryAttempt),
+        (HttpMethod.Post, RetryProbe.Failure.TransportThrows, 1),
+    ];
+
+    public string Description => "HttpClients from AddServiceDefaults() retry GET, HEAD, PUT, DELETE, OPTIONS and TRACE, never POST or PATCH.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var (method, failure, expected) in Cases)
+        {
+            var attempts = RetryProbe.Attempts(method, failure, client => client);
+            if (attempts != expected)
+            {
+                yield return $"A {method} that failed with {failure} was attempted {attempts} times by a default HttpClient; expected {expected}.";
+            }
+        }
+    }
+}
