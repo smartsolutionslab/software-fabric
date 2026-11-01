@@ -24,9 +24,12 @@ public sealed class QueriesReadOnlyReadModels : IArchitectureRule
 
         foreach (var type in queries)
         {
+            // Whatever reaches the type: constructor and method parameters (a handler's Handle may be static) and fields.
             var dependencies = type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                 .SelectMany(constructor => constructor.GetParameters().Select(parameter => parameter.ParameterType))
-                .Concat(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Select(field => field.FieldType))
+                .Concat(type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                    .SelectMany(method => method.GetParameters().Select(parameter => parameter.ParameterType)))
+                .Concat(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Select(field => field.FieldType))
                 .Distinct();
 
             foreach (var dependency in dependencies.Where(IsWriteSide))
