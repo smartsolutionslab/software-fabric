@@ -32,6 +32,8 @@ public sealed class ErrorHandlingTests
 
         public sealed record IssueInvoiceRequest(decimal Amount);
 
+        public sealed record NoteRequest(string? Text);
+
         public sealed class Invoices : IEndpoint
         {
             public void Map(IEndpointRouteBuilder endpoints)
@@ -39,6 +41,12 @@ public sealed class ErrorHandlingTests
                 endpoints.MapPost("/invoices", (IssueInvoiceRequest request) =>
                     Result<decimal, ApiError>.Success(Amount.From(request.Amount).Value).ToHttpResult());
                 endpoints.MapPost("/invoices/broken", string () => throw new InvalidOperationException("connection string Password=hunter2"));
+                endpoints.MapPost("/invoices/notes", (NoteRequest request) =>
+                {
+                    Ensure.That(request.Text!).IsNotNull();
+                    return Result<string, ApiError>.Success(request.Text!).ToHttpResult();
+                });
+                endpoints.MapPost("/invoices/misused", string () => throw new ArgumentException("connection string Password=hunter2"));
             }
         }
         """;
@@ -93,6 +101,107 @@ public sealed class ErrorHandlingTests
                 body.ShouldNotContain("hunter2");
                 body.ShouldNotContain("InvalidOperationException");
             }
+
+            [Fact]
+            public async Task A_failed_null_guard_answers_400_problem_details()
+            {
+                var cancellationToken = TestContext.Current.CancellationToken;
+                using var client = await aspire.CreateHostClientAsync("developer");
+
+                using var response = await client.PostAsJsonAsync(new Uri("/billing/invoices/notes", UriKind.Relative), new { Text = (string?)null }, cancellationToken);
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                response.StatusCode.ShouldBe(HttpStatusCode.BadRequest, body);
+                using var problem = JsonDocument.Parse(body);
+                problem.RootElement.GetProperty("code").GetString().ShouldBe("invalid-argument", body);
+            }
+
+            [Fact]
+            public async Task An_argument_exception_not_thrown_by_a_guard_answers_500_without_its_details()
+            {
+                var cancellationToken = TestContext.Current.CancellationToken;
+                using var client = await aspire.CreateHostClientAsync("developer");
+
+                using var response = await client.PostAsync(new Uri("/billing/invoices/misused", UriKind.Relative), null, cancellationToken);
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                response.StatusCode.ShouldBe(HttpStatusCode.InternalServerError, body);
+                response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json", body);
+                body.ShouldNotContain("hunter2");
+                body.ShouldNotContain("ArgumentException");
+            }
+        }
+        """;
+
+    private const string BclAmount = """
+        namespace Shop.Modules.Billing.Domain.Invoices;
+
+        public sealed record Amount
+        {
+            private Amount(decimal value) => Value = value;
+
+            public decimal Value { get; }
+
+            public static Amount From(decimal value)
+            {
+                ArgumentOutOfRangeException.ThrowIfNegative(value);
+                return new Amount(value);
+            }
+        }
+        """;
+
+    private const string BclInvoicesEndpoint = """
+        using Microsoft.AspNetCore.Builder;
+        using Microsoft.AspNetCore.Http;
+        using Microsoft.AspNetCore.Routing;
+        using Shop.BuildingBlocks.Api;
+        using Shop.Modules.Billing.Domain.Invoices;
+
+        namespace Shop.Modules.Billing.Api;
+
+        public sealed record IssueInvoiceRequest(decimal Amount);
+
+        public sealed class Invoices : IEndpoint
+        {
+            public void Map(IEndpointRouteBuilder endpoints) =>
+                endpoints.MapPost("/invoices", (IssueInvoiceRequest request) =>
+                    Result<decimal, ApiError>.Success(Amount.From(request.Amount).Value).ToHttpResult());
+        }
+        """;
+
+    private const string BclGuardTests = """
+        using System.Net;
+        using System.Net.Http.Json;
+
+        namespace Shop.Integration.Tests;
+
+        public class GuardTests(AspireFixture aspire)
+        {
+            [Fact]
+            public async Task A_failed_bcl_guard_answers_500_without_its_details()
+            {
+                var cancellationToken = TestContext.Current.CancellationToken;
+                using var client = await aspire.CreateHostClientAsync("developer");
+
+                using var response = await client.PostAsJsonAsync(new Uri("/billing/invoices", UriKind.Relative), new { Amount = -1m }, cancellationToken);
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                response.StatusCode.ShouldBe(HttpStatusCode.InternalServerError, body);
+                response.Content.Headers.ContentType?.MediaType.ShouldBe("application/problem+json", body);
+                body.ShouldNotContain("non-negative");
+                body.ShouldNotContain("ArgumentOutOfRangeException");
+            }
+
+            [Fact]
+            public async Task A_valid_value_still_succeeds()
+            {
+                var cancellationToken = TestContext.Current.CancellationToken;
+                using var client = await aspire.CreateHostClientAsync("developer");
+
+                using var response = await client.PostAsJsonAsync(new Uri("/billing/invoices", UriKind.Relative), new { Amount = 12.5m }, cancellationToken);
+
+                response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(cancellationToken));
+            }
         }
         """;
 
@@ -106,8 +215,33 @@ public sealed class ErrorHandlingTests
         project.Write("tests/Integration.Tests/GuardTests.cs", GuardTests);
         project.Build();
 
-        // Only these tests: the new endpoints make the frontend's OpenAPI copy stale, which another test reports.
-        var (exitCode, output) = project.DotNetCommand(
+        var (exitCode, output) = RunGuardTests(project);
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+        output.ShouldContain("succeeded: 5");
+    }
+
+    [Fact]
+    public void With_bcl_guards_a_failed_guard_is_indistinguishable_from_a_bug_and_answers_a_bare_500()
+    {
+        using var project = new GeneratedProject("saas-standard-react", "backend.guards=bcl");
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Amount.cs", BclAmount);
+        project.Write("src/Modules/Billing/Billing.Api/Invoices.cs", BclInvoicesEndpoint);
+        project.Write("tests/Integration.Tests/GuardTests.cs", BclGuardTests);
+        project.Build();
+
+        var (exitCode, output) = RunGuardTests(project);
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+        output.ShouldContain("succeeded: 2");
+    }
+
+    /// <summary>Only the guard tests: the new endpoints make the frontend's OpenAPI copy stale, which another test reports.</summary>
+    private static (int ExitCode, string Output) RunGuardTests(GeneratedProject project) =>
+        project.DotNetCommand(
             new Dictionary<string, string>(),
             "test",
             "--project",
@@ -118,9 +252,4 @@ public sealed class ErrorHandlingTests
             "--no-ansi",
             "--filter-class",
             "Shop.Integration.Tests.GuardTests");
-
-        exitCode.ShouldBe(0, output);
-        output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 3");
-    }
 }
