@@ -1,0 +1,10 @@
+namespace {{ namespace }}.BuildingBlocks.Domain;
+
+/// <summary>An aggregate's domain events as the dispatcher sees them, whatever the aggregate's identity type.</summary>
+public interface IHasDomainEvents
+{
+    IReadOnlyList<IDomainEvent> DomainEvents { get; }
+
+    /// <summary>Removes exactly these events (by reference): they are delivered, or their changes were accepted.</summary>
+    void RemoveDomainEvents(IReadOnlyCollection<IDomainEvent> domainEvents);
+}

@@ -24,6 +24,19 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
     }
 {{~ end ~}}
 
+{{~ if slots["persistence.interceptors"] != "" ~}}
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        {{ not_null "optionsBuilder" }}
+
+        // Per instance: an interceptor may keep state for the context it belongs to.
+        optionsBuilder.AddInterceptors(
+{{ slots["persistence.interceptors"] }});
+        base.OnConfiguring(optionsBuilder);
+    }
+{{~ end ~}}
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         {{ not_null "modelBuilder" }}

@@ -179,6 +179,25 @@ public sealed class SaasStandardReactTests
     }
 
     [Fact]
+    public void Every_module_context_builds_its_model_with_an_aggregate_that_raises_domain_events()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        AddAnAggregateThatRaisesEvents(project, "Billing", "Invoice", "Pay", "InvoicePaid");
+        AddAnAggregateThatRaisesEvents(project, "Shipping", "Parcel", "Ship", "ParcelShipped");
+        project.Build();
+
+        foreach (var module in new[] { "Billing", "Shipping" })
+        {
+            var (exitCode, output) = project.Test($"tests/Modules/{module}.Tests/{module}.Tests.csproj");
+
+            exitCode.ShouldBe(0, output);
+            output.ShouldContain("succeeded: 2");
+        }
+    }
+
+    [Fact]
     public void A_domain_error_that_speaks_http_fails_the_architecture_tests()
     {
         using var project = new GeneratedProject(Profile);
@@ -426,5 +445,68 @@ public sealed class SaasStandardReactTests
         var (exitCode, output) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/check-red-first.sh", bodyFile, changedFiles);
 
         exitCode.ShouldBe(expectedExitCode, output);
+    }
+
+    /// <summary>An aggregate in the module that raises an event, its EF configuration, and a module test that builds the module context's model.</summary>
+    private static void AddAnAggregateThatRaisesEvents(GeneratedProject project, string module, string aggregate, string change, string raised)
+    {
+        project.Write($"src/Modules/{module}/{module}.Domain/{aggregate}s/{aggregate}.cs", $$"""
+            using Shop.BuildingBlocks.Domain;
+
+            namespace Shop.Modules.{{module}}.Domain.{{aggregate}}s;
+
+            public sealed record {{aggregate}}Id(Guid Value);
+
+            public sealed record {{raised}}({{aggregate}}Id {{aggregate}}) : IDomainEvent;
+
+            public sealed class {{aggregate}}({{aggregate}}Id id) : AggregateRoot<{{aggregate}}Id>(id)
+            {
+                public bool Done { get; private set; }
+
+                public void {{change}}()
+                {
+                    Done = true;
+                    Raise(new {{raised}}(Id));
+                }
+            }
+            """);
+        project.Write($"src/Modules/{module}/{module}.Infrastructure/Persistence/Configurations/{aggregate}Configuration.cs", $$"""
+            using Microsoft.EntityFrameworkCore;
+            using Microsoft.EntityFrameworkCore.Metadata.Builders;
+            using Shop.Modules.{{module}}.Domain.{{aggregate}}s;
+
+            namespace Shop.Modules.{{module}}.Infrastructure.Persistence.Configurations;
+
+            public sealed class {{aggregate}}Configuration : IEntityTypeConfiguration<{{aggregate}}>
+            {
+                public void Configure(EntityTypeBuilder<{{aggregate}}> builder)
+                {
+                    builder.ToTable("{{aggregate}}s");
+                    builder.HasKey(row => row.Id);
+                    builder.Property(row => row.Id).HasConversion(id => id.Value, value => new {{aggregate}}Id(value));
+                    builder.Property(row => row.Done);
+                }
+            }
+            """);
+        project.Write($"tests/Modules/{module}.Tests/ModelTests.cs", $$"""
+            using Shop.Modules.{{module}}.Domain.{{aggregate}}s;
+            using Shop.Modules.{{module}}.Infrastructure.Persistence;
+
+            namespace Shop.Modules.{{module}}.Tests;
+
+            public class ModelTests
+            {
+                [Fact]
+                public void The_context_maps_an_aggregate_that_raises_domain_events_without_its_events()
+                {
+                    using var context = new {{module}}DbContextFactory().CreateDbContext([]);
+
+                    var mapped = context.Model.FindEntityType(typeof({{aggregate}})).ShouldNotBeNull();
+
+                    mapped.FindProperty(nameof({{aggregate}}.DomainEvents)).ShouldBeNull();
+                    mapped.FindNavigation(nameof({{aggregate}}.DomainEvents)).ShouldBeNull();
+                }
+            }
+            """);
     }
 }
