@@ -18,6 +18,43 @@ public sealed class FrontendTests
     }
 
     [Fact]
+    public void The_generated_web_app_passes_its_format_check_and_a_formatting_violation_fails_it()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var app = Path.Combine(web, "app");
+
+        // What CI has on disk when it checks formatting: the generated client and the build output included.
+        foreach (var step in new[] { "install", "build" })
+        {
+            var (stepExitCode, stepOutput) = Shell.Run(web, "pnpm", step);
+            stepExitCode.ShouldBe(0, $"pnpm {step}:\n{stepOutput}");
+        }
+
+        var (cleanExitCode, cleanOutput) = Shell.Run(app, "pnpm", "format:check");
+        cleanExitCode.ShouldBe(0, $"pnpm format:check on the untouched project:\n{cleanOutput}");
+
+        project.Write("web/app/src/unformatted.ts", "export const greeting = \"hello\"\n");
+
+        var (exitCode, output) = Shell.Run(app, "pnpm", "format:check");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("src/unformatted.ts");
+    }
+
+    [Fact]
+    public void The_generated_ci_checks_formatting_after_installing_the_workspace()
+    {
+        using var project = new GeneratedProject(Profile);
+        var ci = File.ReadAllText(Path.Combine(project.ProjectDirectory, ".github", "workflows", "ci.yml"));
+
+        ci.ShouldContain("      - run: pnpm format:check\n        working-directory: web/app\n");
+        ci.IndexOf("run: pnpm format:check", StringComparison.Ordinal)
+            .ShouldBeGreaterThan(ci.IndexOf("run: pnpm install --frozen-lockfile", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void The_app_host_runs_the_web_app_with_aspire()
     {
         using var project = new GeneratedProject(Profile);
