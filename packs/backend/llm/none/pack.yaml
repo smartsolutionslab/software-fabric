@@ -1,0 +1,7 @@
+option: backend.llm.none
+files: []
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "Nothing to check: the project calls no language model; using one is a backend.llm choice, not a package added by hand." }
