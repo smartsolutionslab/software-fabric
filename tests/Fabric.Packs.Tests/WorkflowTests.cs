@@ -154,7 +154,9 @@ public sealed partial class WorkflowTests
         Misgrouped(Repository.Root).ShouldBeEmpty();
 
     private static IEnumerable<string> Workflows(string root) =>
-        Directory.EnumerateFiles(Path.Combine(root, ".github", "workflows"), "*.yml").Order();
+        Directory.EnumerateFiles(Path.Combine(root, ".github", "workflows"))
+            .Where(path => path.EndsWith(".yml", StringComparison.Ordinal) || path.EndsWith(".yaml", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal);
 
     /// <summary>
     /// Every line with a <c>uses</c> key that is not a local action or <c>uses: action@&lt;40 hex&gt; # v…</c>. It
@@ -222,7 +224,7 @@ public sealed partial class WorkflowTests
     private static partial Regex Uses();
 
     /// <summary>A <c>uses</c> key anywhere YAML allows one: a block or flow mapping, quoted or not.</summary>
-    [GeneratedRegex(@"(^|[\s{,])[""']?uses[""']?\s*:(\s|$)")]
+    [GeneratedRegex(@"(^|[\s{,])[""']?uses[""']?\s*:")]
     private static partial Regex UsesKey();
 
     [GeneratedRegex(@"^\s*(-\s+)?uses:\s*[^@\s]+@[0-9a-f]{40}\s+#\s*v\d\S*\s*$")]

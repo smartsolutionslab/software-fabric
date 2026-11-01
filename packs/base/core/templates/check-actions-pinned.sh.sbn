@@ -7,7 +7,7 @@
 # be a plain `uses: <action>@<sha> # <tag>` step. Any other spelling is reported, never let through.
 set -euo pipefail
 
-key="(^|[[:space:]{,])[\"']?uses[\"']?[[:space:]]*:([[:space:]]|\$)"
+key="(^|[[:space:]{,])[\"']?uses[\"']?[[:space:]]*:"
 pinned='^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*[^@[:space:]]+@[0-9a-f]{40}[[:space:]]+#[[:space:]]*v[0-9]'
 local_action='^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*\./'
 status=0
