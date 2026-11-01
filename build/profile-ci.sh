@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Profile CI (ADR-0003, roadmap M1-09): generates a profile with the CLI from the real packs, no stand-ins, adds a
 # module, and runs what the generated project's own CI (.github/workflows/ci.yml) runs: backend build and tests, the
-# web app's install, build, lint and tests, and the end-to-end tests against the running application.
+# web app's install, build, lint, tests and format check, and the end-to-end tests against the running application.
 # Needs a Release build of the solution, Docker, Node 22 with pnpm, the Aspire CLI bundle and Playwright's Chromium.
 # Usage: build/profile-ci.sh <profile>
 set -euo pipefail
@@ -41,6 +41,10 @@ for command in "install --frozen-lockfile" build lint test; do
   (cd web && pnpm $command)
   echo "::endgroup::"
 done
+
+step "pnpm format:check"
+(cd web/app && pnpm format:check)
+echo "::endgroup::"
 
 step "end-to-end"
 (cd web/app && pnpm exec playwright install chromium)

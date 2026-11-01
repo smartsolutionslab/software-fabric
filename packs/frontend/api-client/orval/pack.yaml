@@ -13,6 +13,7 @@ slots:
   - { slot: web.scripts, template: templates/scripts.sbn }
   - { slot: web.prepare, template: templates/prepare.sbn }
   - { slot: web.lint-ignores, template: templates/lint-ignore.sbn }
+  - { slot: web.format-ignores, template: templates/format-ignore.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

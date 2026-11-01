@@ -1,1 +1,1 @@
-          { group: ['react-router-dom'], message: 'Use react-router (docs/adr).' }
+            { group: ['react-router-dom'], message: 'Use react-router (docs/adr).' }

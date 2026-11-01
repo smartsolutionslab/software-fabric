@@ -5,6 +5,8 @@ files:
   - { template: templates/vite.config.ts.sbn, target: web/app/vite.config.ts }
   - { template: templates/tsconfig.json.sbn, target: web/app/tsconfig.json }
   - { template: templates/eslint.config.js.sbn, target: web/app/eslint.config.js }
+  - { template: templates/prettierrc.json.sbn, target: web/app/.prettierrc.json }
+  - { template: templates/prettierignore.sbn, target: web/app/.prettierignore }
   - { template: templates/main.tsx.sbn, target: web/app/src/main.tsx }
   - { template: templates/index.css.sbn, target: web/app/src/index.css }
   - { template: templates/test-setup.ts.sbn, target: web/app/src/test-setup.ts }
@@ -19,6 +21,7 @@ declares-slots:
   - { slot: web.env, description: "Members of ImportMetaEnv: the VITE_ variables the app reads." }
   - { slot: web.test-setup, description: "Statements of src/test-setup.ts, run before every Vitest file." }
   - { slot: web.lint-ignores, description: "Entries of eslint's ignores (generated files).", separator: ",\n" }
+  - { slot: web.format-ignores, description: "Lines of web/app/.prettierignore: files a tool writes, not people (the generated client, openapi.json)." }
   - { slot: web.dependencies, description: "Entries of web/app's dependencies ('\"zod\": \"4.6.7\"').", separator: ",\n" }
   - { slot: web.dev-dependencies, description: "Entries of web/app's devDependencies.", separator: ",\n" }
   - { slot: web.vite-imports, description: "Import lines of vite.config.ts." }
@@ -26,7 +29,7 @@ declares-slots:
   - { slot: web.imports, description: "Import lines of src/main.tsx." }
   - { slot: web.providers, description: "Wrappers around the app, outermost first: (children: ReactNode) => ReactNode.", separator: ",\n" }
   - { slot: web.styles, description: "Lines of src/index.css." }
-  - { slot: web.restricted-imports, description: "Entries of the no-restricted-imports patterns ({ group: [...], message: '...' }).", separator: ",\n" }
+  - { slot: web.restricted-imports, description: "Entries of the no-restricted-imports patterns ({ group: [...], message: '...' }), indented twelve spaces as Prettier prints them.", separator: ",\n" }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-version.sbn }
   - { slot: apphost.packages, template: templates/apphost-package.sbn }
@@ -34,8 +37,10 @@ slots:
   - { slot: apphost.web-wiring, template: templates/apphost-web-wiring.sbn }
   - { slot: ci.backend-steps, template: templates/ci-backend-steps.sbn, order: 5 }
   - { slot: ci.e2e-steps, template: templates/ci-e2e-steps.sbn }
+  - { slot: ci.frontend-steps, template: templates/ci-frontend-steps.sbn, order: 20 }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
   - { kind: lint-rule, describes: "TypeScript strict (tsc -b in the build) and the strict typescript-eslint rules fail the frontend job.", file: templates/eslint.config.js.sbn }
+  - { kind: ci-step, describes: "pnpm format:check (Prettier) runs in the frontend job; a file Prettier would change fails CI.", file: templates/ci-frontend-steps.sbn }

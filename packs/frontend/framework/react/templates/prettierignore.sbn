@@ -1,0 +1,3 @@
+# Prettier also skips what .gitignore lists (test-results, playwright-report).
+dist
+{{ slots["web.format-ignores"] }}

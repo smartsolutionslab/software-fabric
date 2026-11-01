@@ -7,12 +7,13 @@ files:
   - { template: templates/OpenApiDocumentTests.cs.sbn, target: tests/Integration.Tests/OpenApiDocumentTests.cs }
 declares-slots:
   - { slot: web.api-imports, description: "Import lines of src/api/baseApi.ts. Every api-client pack declares it." }
-  - { slot: web.api-headers, description: "Statements in prepareHeaders with Headers headers in scope (credentials). Every api-client pack declares it." }
+  - { slot: web.api-headers, description: "Statements in prepareHeaders, a function body, with Headers headers in scope (credentials). Every api-client pack declares it." }
 slots:
   - { slot: web.dev-dependencies, template: templates/dev-dependency.sbn }
   - { slot: web.scripts, template: templates/scripts.sbn }
   - { slot: web.prepare, template: templates/prepare.sbn }
   - { slot: web.lint-ignores, template: templates/lint-ignore.sbn }
+  - { slot: web.format-ignores, template: templates/format-ignore.sbn }
   - { slot: web.store-imports, template: templates/store-import.sbn }
   - { slot: web.store-reducers, template: templates/store-reducer.sbn }
   - { slot: web.store-middleware, template: templates/store-middleware.sbn }

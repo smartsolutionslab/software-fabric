@@ -4,7 +4,8 @@ import { hasAuthParams, useAuth } from 'react-oidc-context';
 /** Renders its children for a signed-in user and sends everyone else to the identity provider. */
 export function SignedIn({ children }: { children: ReactNode }) {
   const auth = useAuth();
-  const mustSignIn = !auth.isAuthenticated && !auth.isLoading && !auth.activeNavigator && !auth.error && !hasAuthParams();
+  const mustSignIn =
+    !auth.isAuthenticated && !auth.isLoading && !auth.activeNavigator && !auth.error && !hasAuthParams();
 
   useEffect(() => {
     if (mustSignIn) {

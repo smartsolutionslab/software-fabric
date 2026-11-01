@@ -6,6 +6,8 @@
     "dev": "{{ if slots["web.prepare"] != "" }}{{ slots["web.prepare"] }} && {{ end }}vite",
     "build": "{{ if slots["web.prepare"] != "" }}{{ slots["web.prepare"] }} && {{ end }}tsc -b && vite build",
     "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "{{ if slots["web.prepare"] != "" }}{{ slots["web.prepare"] }} && {{ end }}vitest run",
     "e2e": "playwright test"{{ if slots["web.scripts"] != "" }},
 {{ slots["web.scripts"] }}{{ end }}
@@ -30,6 +32,7 @@
     "eslint-plugin-react-refresh": "0.5.7",
     "globals": "17.13.0",
     "jsdom": "30.1.3",
+    "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",
     "vite": "8.3.5",

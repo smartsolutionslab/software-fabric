@@ -1,4 +1,4 @@
-      const token = accessToken();
-      if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
-      }
+  const token = accessToken();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }

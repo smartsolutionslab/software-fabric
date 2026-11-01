@@ -1,1 +1,1 @@
-          { group: ['ag-grid-*'], message: 'Use DataTable from src/components/ui (docs/adr).' }
+            { group: ['ag-grid-*'], message: 'Use DataTable from src/components/ui (docs/adr).' }

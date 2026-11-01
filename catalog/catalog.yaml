@@ -261,6 +261,7 @@ dimensions:
       web.env: { description: "Members of the typed environment: the VITE_ variables the app reads." }
       web.test-setup: { description: "Statements of the test setup file, run before every test file." }
       web.lint-ignores: { description: "Entries of eslint's ignores (generated files).", separator: ",\n" }
+      web.format-ignores: { description: "Lines of the formatter's ignore file: files a tool writes, not people." }
       web.restricted-imports: { description: "Entries of eslint's no-restricted-imports patterns.", separator: ",\n" }
       web.vite-imports: { description: "Import lines of vite.config.ts." }
       web.vite-plugins: { description: "Entries of vite.config.ts's plugins array.", separator: ",\n" }
@@ -332,7 +333,7 @@ dimensions:
     # Role slots (ADR-0008): every client's pack declares them; the auth client puts its token on every request.
     role-slots:
       web.api-imports: { description: "Import lines of the API client's base module." }
-      web.api-headers: { description: "Statements that set request headers (headers, a Headers object) before every call." }
+      web.api-headers: { description: "Statements that set request headers (headers, a Headers object) before every call, indented as a function body (two spaces)." }
     note: "Always generated from the backend's OpenAPI document; CI fails when it is stale."
     options:
       rtk-query-codegen:

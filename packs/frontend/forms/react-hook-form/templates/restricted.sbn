@@ -1,1 +1,1 @@
-          { group: ['formik', 'react-final-form', 'final-form'], message: 'Use react-hook-form (docs/adr).' }
+            { group: ['formik', 'react-final-form', 'final-form'], message: 'Use react-hook-form (docs/adr).' }

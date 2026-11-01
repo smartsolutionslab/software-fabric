@@ -7,8 +7,10 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   {
     ignores: [
-      'dist'{{ if slots["web.lint-ignores"] != "" }},
-{{ slots["web.lint-ignores"] }}{{ end }}
+      // Build output, then the files a generator writes.
+      'dist',
+{{- if slots["web.lint-ignores"] != "" }}
+{{ slots["web.lint-ignores"] }},{{ end }}
     ],
   },
   {
@@ -19,11 +21,16 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
-      'no-restricted-imports': ['error', {
-        patterns: [
-{{ slots["web.restricted-imports"] }}
-        ],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            // Each chosen library bans its alternatives.
+{{- if slots["web.restricted-imports"] != "" }}
+{{ slots["web.restricted-imports"] }},{{ end }}
+          ],
+        },
+      ],
     },
   },
 );
