@@ -14,3 +14,5 @@ frontend
 board
 ci
 deps
+errors
+guards
