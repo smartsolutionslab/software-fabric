@@ -16,8 +16,8 @@ public class CatalogReaderTests
         var catalog = ReadRepositoryCatalog();
 
         catalog.Version.ShouldBe(1);
-        catalog.Dimensions.Count.ShouldBe(44);
-        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(121);
+        catalog.Dimensions.Count.ShouldBe(45);
+        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(124);
         catalog.Profiles.Keys.ShouldBe(
             ["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud"],
             ignoreOrder: false);
@@ -82,6 +82,15 @@ public class CatalogReaderTests
         uiLibraries["shadcn"].Requires.Select(condition => condition.ToString()).ShouldBe(["frontend.framework == react", "frontend.styling == tailwind"]);
         uiLibraries["mui"].Conflicts.Select(condition => condition.ToString()).ShouldBe(["frontend.styling == tailwind"]);
         catalog.Dimensions["module.event-store"].Options["kurrentdb"].Tier.ShouldBe(SupportTier.Experimental);
+    }
+
+    [Theory]
+    [InlineData("backend.auth", "none")]
+    [InlineData("backend.authorization", "roles")]
+    [InlineData("backend.authorization", "claims")]
+    public void An_authentication_or_authorization_option_without_a_pack_is_experimental(string dimension, string option)
+    {
+        ReadRepositoryCatalog().Dimensions[dimension].Options[option].Tier.ShouldBe(SupportTier.Experimental);
     }
 
     [Fact]
