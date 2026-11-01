@@ -20,17 +20,20 @@ In Progress, In Review, Blocked, Done), `Lane`, `Executor`, `Priority`,
 `Size`.
 
 **Eligibility.** An agent takes an issue only if it carries
-`agent:ready`, has **no human assignee**, is neither `agent:blocked` nor
-`agent:claimed`, and its lane is one the agent serves. `agent:claimed` is
+`agent:ready`, has **no human assignee**, carries none of `agent:blocked`,
+`agent:claimed` or `needs:*`, and its lane is one the agent serves. An
+escalation no owner had capacity for has no assignee, so its `needs:*`
+label is what holds it for a developer. `agent:claimed` is
 set on a claim and removed when it ends, so a claimed issue looks taken
 even without a board; the branch, not the label, is the lock. The lane is a `lane:<name>` label, so
 eligibility needs no board access. A human assignee means the issue
 belongs to that human, without exception.
 
 **Claim.** The branch is the lock. The agent pushes an empty claim
-commit to `agent/<issue>-<slug>`; a second agent's claim, built on a
+commit to `agent/<issue>`; a second agent's claim, built on a
 different commit, is not a fast-forward and is rejected, so it moves to the
-next issue. The winner then sets `Status` and `Executor` and posts a claim
+next issue. The name holds nothing that can change: with the title in it, two
+agents that each saw no branch could push two locks for one issue. The winner then sets `Status` and `Executor` and posts a claim
 comment.
 
 **Lease.** Every push renews the claim. A scheduled janitor workflow
@@ -61,6 +64,15 @@ structured findings and are required checks. The author weighs findings
 — they are input, not instructions — and after two review rounds an
 unresolved PR goes to `agent:blocked`. Merge through the merge queue on
 green CI and passed reviews.
+
+**The gate is not the author's to change.** A pull request must not pick its
+own reviewer or post its own verdict, so the review workflow runs the board
+scripts, the findings schema and the reviewer briefs from the base branch.
+The workflow file itself still comes from the pull request (GitHub runs a
+`pull_request` workflow as the head defines it; `pull_request_target` would
+hand the reviewer's API keys to a job that reads untrusted code). So
+`.github/` has a code owner, and the default branch's protection requires the
+code owner's review and the review check: a change to the gate needs a human.
 
 **Traceability.** Every agent commit carries an `Agent-Executor:` trailer
 `<family>-<runtime>/<detail>` (e.g. `claude-cloud/lane-billing`,

@@ -1,0 +1,25 @@
+name: board-janitor
+
+# Returns lapsed claims to Todo (board protocol, docs/adr).
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: read
+
+jobs:
+  janitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/board/janitor.sh
+        env:
+          # The default token cannot edit a GitHub Project; BOARD_TOKEN can (scopes repo and project).
+          GH_TOKEN: ${{ secrets.BOARD_TOKEN || github.token }}
+          BOARD_PROJECT_OWNER: ${{ vars.BOARD_PROJECT_OWNER }}
+          BOARD_PROJECT_NUMBER: ${{ vars.BOARD_PROJECT_NUMBER }}
+

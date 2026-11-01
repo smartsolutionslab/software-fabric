@@ -8,7 +8,13 @@ pr="$1"
 findings_file="$2"
 reviewer="$3"
 
-if ! findings="$(jq -ce '.findings | arrays' "$findings_file" 2> /dev/null)"; then
+# The schema, checked here too: a severity the summary does not know would be counted as optional.
+if ! findings="$(jq -ce '.findings | arrays | select(all(.[];
+    type == "object"
+    and (.severity == "blocking" or .severity == "optional")
+    and (.file | type) == "string"
+    and ((.line | type) == "number" or .line == null)
+    and (.message | type) == "string"))' "$findings_file" 2> /dev/null)" || [ -z "$findings" ]; then
   echo "The $reviewer review did not report its findings in the shape .github/review-findings.schema.json asks for. It answered:" >&2
   head -c 4000 "$findings_file" >&2
   echo >&2
@@ -38,7 +44,7 @@ payload="$work/review.json"
 # The summary, then the findings the selector picks as a list, if any.
 body() {
   local list
-  list="$(listed "$1")"
+  list="$(listed "$1")" || return 1
   if [ -n "$list" ]; then
     printf '%s\n\n%s' "$summary" "$list"
   else
@@ -46,7 +52,8 @@ body() {
   fi
 }
 
-jq -n --arg body "$(body '.[] | select(.line == null)')" --argjson findings "$findings" '{
+general="$(body '.[] | select(.line == null)')"
+jq -n --arg body "$general" --argjson findings "$findings" '{
   event: "COMMENT",
   body: $body,
   comments: [$findings[] | select(.line != null) | {path: .file, line: .line, side: "RIGHT", body: "**\(.severity)**: \(.message)"}]
@@ -54,7 +61,8 @@ jq -n --arg body "$(body '.[] | select(.line == null)')" --argjson findings "$fi
 
 if ! review "$payload" 2> "$work/refused"; then
   echo "GitHub refused the line comments ($(head -c 300 "$work/refused")); posting every finding in the review body." >&2
-  jq -n --arg body "$(body '.[]')" '{event: "COMMENT", body: $body}' > "$payload"
+  everything="$(body '.[]')"
+  jq -n --arg body "$everything" '{event: "COMMENT", body: $body}' > "$payload"
   review "$payload"
 fi
 
