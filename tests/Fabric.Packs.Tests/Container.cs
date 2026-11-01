@@ -13,6 +13,8 @@ internal sealed class Container : IDisposable
         Port = port;
     }
 
+    public string Id => id;
+
     public int Port { get; }
 
     public static Container Postgres(string password)
