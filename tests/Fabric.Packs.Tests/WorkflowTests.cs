@@ -15,10 +15,14 @@ public sealed partial class WorkflowTests
 
     private const string Group = "${{ github.workflow }}-${{ github.ref }}";
 
-    /// <summary>A workflow naming actions in every way YAML allows; only line 14 is pinned as the checks require.</summary>
+    /// <summary>
+    /// A workflow naming step actions in the ways YAML allows (flow mappings, quoted keys and values, a folded value),
+    /// with a comment and a run script that mention <c>uses:</c> and are not steps' actions.
+    /// </summary>
     private const string Spellings = """
         name: spellings
         on: push
+        # Previously uses: actions/checkout@v4
         jobs:
           flow:
             runs-on: ubuntu-latest
@@ -29,13 +33,21 @@ public sealed partial class WorkflowTests
               - name: folded
                 uses: >-
                   pnpm/action-setup@v4
-              - { name: pinned-in-flow, uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 }
+              - {"uses":"actions/cache@v4"}
+              - run: echo "uses: actions/checkout@v4 is a workflow key"
+              - uses: docker://alpine:3.20
               - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-              - run: echo "a step that only mentions uses in its text"
-              - {"uses":"actions/checkout@v4"}
+              - uses: actions/cache/save@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+              - uses: ./.github/actions/local
+              - uses: docker://alpine@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+              - { name: pinned-in-flow, uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 }
         """;
 
-    private static readonly int[] SpellingsUnpinnedLines = [7, 8, 9, 11, 13, 16];
+    /// <summary>The <c>uses</c> keys on these lines name no commit (or digest); the comment (3) and run script (15) are no steps.</summary>
+    private static readonly int[] SpellingsUnpinnedLines = [8, 9, 10, 12, 14, 16];
+
+    /// <summary>The generator's own check also wants the version in a comment, which line 21 lacks.</summary>
+    private static readonly int[] SpellingsUnpinnedOrUncommentedLines = [.. SpellingsUnpinnedLines, 21];
 
     /// <summary>The profiles the real packs generate alone, which profile CI builds (ADR-0003).</summary>
     public static TheoryData<string> Profiles => new(
@@ -59,76 +71,46 @@ public sealed partial class WorkflowTests
         Unpinned(packs, Directory.EnumerateFiles(packs, "*", SearchOption.AllDirectories).Order()).ShouldBeEmpty();
     }
 
+    /// <summary>
+    /// The gate in a generated project (the owner's decision on #54): an architecture rule that parses the workflow YAML
+    /// and fails a step's <c>uses</c> that is not pinned to a commit, a local action or a docker image by digest.
+    /// </summary>
     [Fact]
-    public void A_generated_project_s_CI_checks_that_its_actions_are_pinned_and_a_fresh_project_passes()
+    public void A_generated_project_s_architecture_rules_fail_a_step_action_not_pinned_to_a_commit_however_it_is_spelled()
     {
         using var project = new GeneratedProject("lean-crud");
-        var ci = File.ReadAllText(Path.Combine(project.ProjectDirectory, ".github", "workflows", "ci.yml"));
+        project.Build();
 
-        ci.ShouldContain("run: bash .github/scripts/check-actions-pinned.sh");
-        var (exitCode, output) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/check-actions-pinned.sh");
-        exitCode.ShouldBe(0, output);
-    }
+        var (freshExitCode, freshOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        freshExitCode.ShouldBe(0, freshOutput);
 
-    [Fact]
-    public void An_action_used_by_tag_or_without_its_version_fails_the_generated_check()
-    {
-        using var project = new GeneratedProject("lean-crud");
-        var ciPath = Path.Combine(project.ProjectDirectory, ".github", "workflows", "ci.yml");
-        var ci = File.ReadAllText(ciPath);
-        var pinned = Uses().Match(ci.Split('\n').First(line => line.Contains("actions/checkout@", StringComparison.Ordinal))).Groups["action"].Value;
-        File.WriteAllText(ciPath, ci.Replace(pinned, "actions/checkout@v4", StringComparison.Ordinal));
-        project.Write(".github/workflows/extra.yml", $"""
-            name: extra
-            on: push
-            jobs:
-              extra:
-                runs-on: ubuntu-latest
-                steps:
-                  - uses: {pinned}
-                  - uses: ./.github/actions/local
-            """);
+        project.Write(".github/workflows/spellings.yaml", Spellings);
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
 
-        var (exitCode, output) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/check-actions-pinned.sh");
-
-        exitCode.ShouldBe(1, output);
-        output.ShouldContain("file=.github/workflows/ci.yml,line=", Case.Sensitive, output);
-        output.ShouldContain("actions/checkout@v4", Case.Sensitive, output);
-        output.ShouldContain("file=.github/workflows/extra.yml,line=7::", Case.Sensitive, output);
-        output.ShouldNotContain("./.github/actions/local", Case.Sensitive, output);
-    }
-
-    [Fact]
-    public void An_action_spelled_as_a_flow_mapping_quoted_or_on_its_own_line_fails_the_generated_check()
-    {
-        using var project = new GeneratedProject("lean-crud");
-        project.Write(".github/workflows/spellings.yml", Spellings);
-
-        var (exitCode, output) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/check-actions-pinned.sh");
-
-        exitCode.ShouldBe(1, output);
+        exitCode.ShouldNotBe(0, output);
         foreach (var line in SpellingsUnpinnedLines)
         {
-            output.ShouldContain($"file=.github/workflows/spellings.yml,line={line}::", Case.Sensitive, output);
+            output.ShouldContain($".github/workflows/spellings.yaml:{line}: ", Case.Sensitive, output);
         }
 
-        output.Split('\n').Count(text => text.Contains("file=.github/workflows/spellings.yml,", StringComparison.Ordinal))
-            .ShouldBe(SpellingsUnpinnedLines.Length, output);
+        foreach (var line in Enumerable.Range(1, Spellings.Split('\n').Length).Except(SpellingsUnpinnedLines))
+        {
+            output.ShouldNotContain($".github/workflows/spellings.yaml:{line}: ", Case.Sensitive, output);
+        }
     }
 
     [Fact]
-    public void The_generator_s_own_check_finds_an_action_however_the_workflow_spells_it()
+    public void The_generator_s_own_check_finds_a_step_action_however_the_workflow_spells_it_and_ignores_comments_and_scripts()
     {
         var root = Directory.CreateTempSubdirectory("fabric-spellings-").FullName;
         try
         {
             Directory.CreateDirectory(Path.Combine(root, ".github", "workflows"));
             File.WriteAllText(Path.Combine(root, ".github", "workflows", "spellings.yml"), Spellings);
-
             File.WriteAllText(Path.Combine(root, ".github", "workflows", "extra.yaml"), "jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v4\n");
 
             Unpinned(root, Workflows(root)).Select(entry => entry[..entry.IndexOf(": ", StringComparison.Ordinal)])
-                .ShouldBe([".github/workflows/extra.yaml:4", .. SpellingsUnpinnedLines.Select(line => $".github/workflows/spellings.yml:{line}")]);
+                .ShouldBe([".github/workflows/extra.yaml:4", .. SpellingsUnpinnedOrUncommentedLines.Select(line => $".github/workflows/spellings.yml:{line}")]);
         }
         finally
         {
@@ -219,9 +201,6 @@ public sealed partial class WorkflowTests
 
     private static string? Scalar(YamlMappingNode node, string key) =>
         node.Children.TryGetValue(new YamlScalarNode(key), out var value) ? ((YamlScalarNode)value).Value : null;
-
-    [GeneratedRegex(@"^\s*(?:-\s+)?uses:\s*(?<action>\S+)(?<rest>.*)$")]
-    private static partial Regex Uses();
 
     /// <summary>A <c>uses</c> key anywhere YAML allows one: a block or flow mapping, quoted or not.</summary>
     [GeneratedRegex(@"(^|[\s{,])[""']?uses[""']?\s*:")]
