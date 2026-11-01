@@ -9,4 +9,4 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: architecture-test, describes: "Nothing in a Queries namespace of a module that chose physical CQRS depends on an aggregate store, an aggregate or a DbContext.", file: templates/QueriesReadOnlyReadModels.cs.sbn }
+  - { kind: architecture-test, describes: "Nothing in a Queries namespace of a module that chose physical CQRS depends on an aggregate store, an aggregate or a DbContext, even wrapped in a generic, an array or a delegate, or takes a service locator.", file: templates/QueriesReadOnlyReadModels.cs.sbn }

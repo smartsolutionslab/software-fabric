@@ -12,9 +12,17 @@ public sealed class QueriesReadOnlyReadModels : IArchitectureRule
         "Microsoft.EntityFrameworkCore.DbContext",
     ];
 
+    // Through one of these any write-side type is a call away, so no check of declared types could hold.
+    private static readonly string[] ServiceLocators =
+    [
+        "System.IServiceProvider",
+        "Microsoft.Extensions.DependencyInjection.IServiceScopeFactory",
+        "Microsoft.Extensions.DependencyInjection.IServiceScope",
+    ];
+
     private const string ReadModels = "{{ namespace }}.BuildingBlocks.ReadModels.IReadModels";
 
-    public string Description => "Nothing in a Queries namespace of a physical-CQRS module depends on the write side (aggregate stores, aggregates, DbContexts); queries read read models.";
+    public string Description => "Nothing in a Queries namespace of a physical-CQRS module depends on the write side (aggregate stores, aggregates, DbContexts), even wrapped in a generic, an array or a delegate, or takes a service locator; queries read read models.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -41,9 +49,16 @@ public sealed class QueriesReadOnlyReadModels : IArchitectureRule
                 .Concat(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static).Select(field => field.FieldType))
                 .Distinct();
 
-            foreach (var dependency in dependencies.Where(IsWriteSide))
+            foreach (var dependency in dependencies)
             {
-                yield return $"{type.FullName} reads the write side ({dependency.Name}); a query reads read models through I<Module>ReadModels.";
+                if (Reaches(dependency, IsServiceLocator))
+                {
+                    yield return $"{type.FullName} takes a service locator ({Display(dependency)}); a query gets I<Module>ReadModels injected, never looked up.";
+                }
+                else if (Reaches(dependency, IsWriteSide))
+                {
+                    yield return $"{type.FullName} reads the write side ({Display(dependency)}); a query reads read models through I<Module>ReadModels.";
+                }
             }
         }
     }
@@ -55,16 +70,80 @@ public sealed class QueriesReadOnlyReadModels : IArchitectureRule
         return name[..name.LastIndexOf('.')];
     }
 
-    private static bool IsWriteSide(Type type)
+    /// <summary>
+    /// Whether the type, or any type it is built from, matches: generic arguments (IDbContextFactory&lt;TContext&gt;,
+    /// Func&lt;T&gt;, IEnumerable&lt;T&gt;), element types (T[], ref T) and a delegate's parameter and return types.
+    /// </summary>
+    private static bool Reaches(Type root, Func<Type, bool> matches)
+    {
+        HashSet<Type> seen = [];
+        Stack<Type> pending = new([root]);
+        while (pending.TryPop(out var type))
+        {
+            if (type.IsGenericParameter || !seen.Add(type))
+            {
+                continue;
+            }
+
+            if (matches(type))
+            {
+                return true;
+            }
+
+            if (type.HasElementType)
+            {
+                pending.Push(type.GetElementType()!);
+            }
+
+            foreach (var argument in type.IsGenericType ? type.GetGenericArguments() : [])
+            {
+                pending.Push(argument);
+            }
+
+            if (typeof(Delegate).IsAssignableFrom(type) && type.GetMethod("Invoke") is { } invoke)
+            {
+                pending.Push(invoke.ReturnType);
+                foreach (var parameter in invoke.GetParameters())
+                {
+                    pending.Push(parameter.ParameterType);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsWriteSide(Type type) => IsOrDerives(type, WriteSide);
+
+    private static bool IsServiceLocator(Type type) => IsOrDerives(type, ServiceLocators);
+
+    private static bool IsOrDerives(Type type, string[] names)
     {
         for (var current = type; current is not null; current = current.BaseType)
         {
-            if (WriteSide.Contains(current.FullName) || current.GetInterfaces().Any(contract => WriteSide.Contains(contract.FullName)))
+            if (names.Contains(current.FullName) || current.GetInterfaces().Any(contract => names.Contains(contract.FullName)))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /// <summary>IDbContextFactory&lt;DbContext&gt; rather than IDbContextFactory`1.</summary>
+    private static string Display(Type type)
+    {
+        if (type.IsArray)
+        {
+            return Display(type.GetElementType()!) + "[]";
+        }
+
+        if (!type.IsGenericType)
+        {
+            return type.Name;
+        }
+
+        var name = type.Name[..type.Name.IndexOf('`', StringComparison.Ordinal)];
+        return $"{name}<{string.Join(", ", type.GetGenericArguments().Select(Display))}>";
     }
 }
