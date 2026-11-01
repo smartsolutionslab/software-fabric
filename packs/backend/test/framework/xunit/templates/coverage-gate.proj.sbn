@@ -4,7 +4,8 @@
     dotnet msbuild .github/scripts/coverage-gate.proj -p:CoverageDirectory=<directory of *.cobertura.xml reports>
     Lines are merged across the reports, so a line any test project runs is covered. Each module's Domain and
     Application assembly ({{ namespace }}.Modules.<Module>.<Layer>, named after the project's ModuleLayer) and the
-    Kernel are checked against tests/coverage.props; an assembly with no executable lines has nothing to check.
+    Kernel are checked against tests/coverage.props; an assembly with no executable lines has nothing to check. Code
+    source generators write (under obj/) is not counted.
   -->
   <Import Project="$(MSBuildThisFileDirectory)../../tests/coverage.props" />
 
@@ -59,7 +60,13 @@
 
                 foreach (var type in package.Descendants("class"))
                 {
-                    var file = (string)type.Attribute("filename");
+                    // What a source generator writes lands under obj/: it is not this project's code to test.
+                    var file = ((string)type.Attribute("filename")).Replace('\\', '/');
+                    if (file.Contains("/obj/"))
+                    {
+                        continue;
+                    }
+
                     foreach (var line in type.Elements("lines").Elements("line"))
                     {
                         var key = file + ":" + (string)line.Attribute("number");

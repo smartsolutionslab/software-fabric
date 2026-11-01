@@ -18,7 +18,7 @@ CI runs the tests with code coverage (Microsoft.Testing.Extensions.CodeCoverage)
 | Application | each module's `<Module>.Application` | 80 % |
 | Kernel | `src/Kernel` | 90 % |
 
-The layer is the one the module project's name carries (`ModuleLayer` in `src/Modules/Directory.Build.props`), so a new module is gated without a list. Each assembly is checked on its own, so a well-tested module cannot hide an untested one; a line counts as covered when any test project runs it. An assembly with no executable lines has nothing to check. Infrastructure, Api and the host are left to the integration tests, which run the host in its own process and are not measured.
+The layer is the one the module project's name carries (`ModuleLayer` in `src/Modules/Directory.Build.props`), so a new module is gated without a list. Each assembly is checked on its own, so a well-tested module cannot hide an untested one; a line counts as covered when any test project runs it. An assembly with no executable lines has nothing to check, and code that source generators write (under `obj/`) is not counted: it is not this project's code to test. Infrastructure, Api and the host are left to the integration tests, which run the host in its own process and are not measured.
 
 **To change a threshold, edit `tests/coverage.props`**; the gate reads it on every run. Lowering one is a decision for this project's ADRs, not a way to get a pull request through.
 
