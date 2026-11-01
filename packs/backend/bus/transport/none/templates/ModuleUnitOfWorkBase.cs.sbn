@@ -36,7 +36,8 @@ public abstract class ModuleUnitOfWork<TContext>(TContext context, IServiceProvi
             : null;
         await using (transaction)
         {
-            await context.SaveChangesAsync(cancellationToken);
+            // The tracked changes stay pending until the commit succeeds, so a retry after a failure saves them again.
+            await context.SaveChangesAsync(acceptAllChangesOnSuccess: false, cancellationToken);
             await Outbox.AddAsync(context, queued, cancellationToken);
             if (transaction is not null)
             {
@@ -44,6 +45,7 @@ public abstract class ModuleUnitOfWork<TContext>(TContext context, IServiceProvi
             }
         }
 
+        context.ChangeTracker.AcceptAllChanges();
         queued.Clear();
         services.GetService<OutboxSignal>()?.Notify();
     }
