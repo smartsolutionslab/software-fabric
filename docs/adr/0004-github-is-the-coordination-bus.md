@@ -95,3 +95,11 @@ before the first `-`, decides who reviews.
   `git push` for branches; a branch rename or delete is never needed. The merge
   queue and the two-review-round limit are rules in AGENTS.md, not yet
   automation.
+- *As built (#96):* the reviewer runs as GitHub Copilot CLI, headless,
+  instead of each vendor's action and API key. The family rule is
+  unchanged; the family picks the model, pinned in `cross-model-review.yml`
+  with the CLI's version. The workflow's own token was refused ("Access
+  denied by policy settings"), since Copilot is licensed to the owner, not
+  the organisation, so Copilot signs in with the owner's fine-grained token
+  (Copilot Requests) from the `COPILOT_GITHUB_TOKEN` secret, and each review
+  spends the owner's premium requests. A missing secret fails the review.

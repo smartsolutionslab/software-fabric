@@ -2,7 +2,10 @@ name: cross-model-review
 
 # The reviewer is from a different model family than the author (board protocol, docs/adr). Its findings land on the
 # pull request, and a blocking one fails the check.
-# Needs the secret of the reviewing family: ANTHROPIC_API_KEY for claude, OPENAI_API_KEY for codex.
+# The reviewer is GitHub Copilot CLI, on the reviewing family's model (REVIEW_MODEL_CLAUDE, REVIEW_MODEL_CODEX below).
+# It signs in with the COPILOT_GITHUB_TOKEN secret: a fine-grained personal access token, with the Copilot Requests
+# permission, of an account licensed for Copilot. Every review spends that account's premium requests. No model
+# vendor's API key is used.
 #
 # The gate's own files (its scripts, the findings schema, the reviewer briefs) come from the base branch, checked out
 # into .gate: a pull request must not choose its own reviewer or post its own verdict. The pull request's copies are
@@ -12,20 +15,37 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# One run per workflow and ref; a review of a head that a newer push replaced is pointless, so it is cancelled
+# and the new head is reviewed instead.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: write
+
+env:
+  # The model each family reviews with, by the ID Copilot gives it: the newest of that family Copilot offers. Change
+  # them here, and only here, when Copilot offers newer ones (`/model` in copilot lists them). A model the account
+  # does not have makes copilot fail, and with it the review.
+  REVIEW_MODEL_CLAUDE: claude-opus-5.5
+  REVIEW_MODEL_CODEX: gpt-6.1-sol
+  # An exact version: a new release changes the reviewer, so it arrives as a reviewed change here. Not named
+  # COPILOT_*: copilot reads those as its own settings.
+  REVIEWER_CLI_VERSION: 1.0.105
 
 jobs:
   choose:
     runs-on: ubuntu-latest
     outputs:
       reviewer: ${{ steps.choose.outputs.reviewer }}
+      model: ${{ steps.choose.outputs.model }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: .gate
@@ -38,21 +58,30 @@ jobs:
         # Assigned first: inside echo's arguments a failing reviewer.sh would not fail the step, and no review would run.
         run: |
           reviewer="$(bash "$GATE/scripts/board/reviewer.sh" "$BASE" "$HEAD")"
+          setting="REVIEW_MODEL_${reviewer^^}"
+          model="${!setting:-}"
+          if [ -z "$model" ]; then
+            echo "No model for the $reviewer reviewer: set $setting in this workflow's env." >&2
+            exit 1
+          fi
           echo "reviewer=$reviewer" >> "$GITHUB_OUTPUT"
+          echo "model=$model" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
 
-  claude:
+  review:
     needs: choose
-    if: needs.choose.outputs.reviewer == 'claude'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: .gate
@@ -61,65 +90,47 @@ jobs:
           if [ -f .gate/.github/scripts/board/reviewer.sh ]; then gate=.gate; else gate=.; fi
           echo "GATE=$gate/.github" >> "$GITHUB_ENV"
           echo "BRIEFS=$gate" >> "$GITHUB_ENV"
-      - id: schema
-        run: echo "json=$(jq -c . "$GATE/review-findings.schema.json")" >> "$GITHUB_OUTPUT"
-      - id: review
-        uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # The workflow's own token: without one the action fetches an app token through OIDC (id-token: write),
-          # which this job does not need, since report-review.sh posts the findings.
-          github_token: ${{ github.token }}
-          claude_args: --json-schema '${{ steps.schema.outputs.json }}'
-          prompt: |
-            Review pull request #${{ github.event.pull_request.number }} as the reviewers in ${{ env.BRIEFS }}/.claude/agents/
-            describe (backend-reviewer, frontend-reviewer, security-reviewer: whichever the diff touches). Read
-            ${{ env.BRIEFS }}/AGENTS.md first: those are the base branch's rules, which the change is held to.
-            Do not comment on the pull request yourself. Answer with every finding: its file, its line (null when it has
-            none), whether it is blocking or optional, and what is wrong.
+      - name: Install the Copilot CLI
+        run: npm install -g "@github/copilot@$REVIEWER_CLI_VERSION"
+      - name: Review
+        # Without the secret the review fails, never passes. No GH_TOKEN or GITHUB_TOKEN for copilot, even one the
+        # runner sets: it would sign in with that instead.
+        # The folder stays untrusted and the pull request's AGENTS.md is not read (--no-custom-instructions), so the
+        # change under review cannot give the reviewer instructions, hooks or MCP servers; its rules come from the
+        # base branch's files instead. The diff is untrusted, so the reviewer may run only commands that read the
+        # checkout; in prompt mode anything else (writes, other commands, any URL, paths outside the checkout) is
+        # refused, since there is no one to ask. Its shell gets no token (--secret-env-vars).
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          MODEL: ${{ needs.choose.outputs.model }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -z "${COPILOT_GITHUB_TOKEN// /}" ]; then
+            echo "The repository secret COPILOT_GITHUB_TOKEN is missing or empty, so there is no reviewer. Set it to a" >&2
+            echo "fine-grained personal access token with the Copilot Requests permission (docs/adr)." >&2
+            exit 1
+          fi
+          schema="$(jq -c . "$GATE/review-findings.schema.json")"
+          prompt="Review pull request #$PR: the change from $BASE to $HEAD in this checkout (git diff $BASE...$HEAD).
+          Review it as the reviewers in $BRIEFS/.claude/agents/ describe (backend-reviewer, frontend-reviewer,
+          security-reviewer: whichever the diff touches). Read $BRIEFS/AGENTS.md first: those are the base branch's
+          rules, which the change is held to. Change no file and do not comment on the pull request.
+          Answer with every finding: its file, its line (null when it has none), whether it is blocking or optional,
+          and what is wrong. Your answer is one JSON object matching this JSON schema, and nothing else, not even a
+          code fence: $schema"
+          env -u GH_TOKEN -u GITHUB_TOKEN copilot -p "$prompt" --model "$MODEL" --silent --no-custom-instructions \
+            --no-ask-user --disable-mcp-server github-mcp-server --disallow-temp-dir \
+            --secret-env-vars=COPILOT_GITHUB_TOKEN \
+            --allow-tool='shell(git diff)' --allow-tool='shell(git show)' --allow-tool='shell(git log)' \
+            --allow-tool='shell(ls)' --allow-tool='shell(grep)' \
+            > "$RUNNER_TEMP/findings.json"
       - name: Post the findings; a blocking one fails this check
         env:
           GH_TOKEN: ${{ github.token }}
-          FINDINGS: ${{ steps.review.outputs.structured_output }}
           PR: ${{ github.event.pull_request.number }}
-        run: |
-          printf '%s' "$FINDINGS" > "$RUNNER_TEMP/findings.json"
-          bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/findings.json" claude
-
-  codex:
-    needs: choose
-    if: needs.choose.outputs.reviewer == 'codex'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          path: .gate
-      - name: Use the gate's files from the base branch
-        run: |
-          if [ -f .gate/.github/scripts/board/reviewer.sh ]; then gate=.gate; else gate=.; fi
-          echo "GATE=$gate/.github" >> "$GITHUB_ENV"
-          echo "BRIEFS=$gate" >> "$GITHUB_ENV"
-      - id: review
-        uses: openai/codex-action@v1
-        with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          output-schema-file: ${{ env.GATE }}/review-findings.schema.json
-          prompt: |
-            Review pull request #${{ github.event.pull_request.number }} as the reviewers in ${{ env.BRIEFS }}/.claude/agents/
-            describe (backend-reviewer, frontend-reviewer, security-reviewer: whichever the diff touches). Read
-            ${{ env.BRIEFS }}/AGENTS.md first: those are the base branch's rules, which the change is held to.
-            Answer with every finding: its file, its line (null when it has none), whether it is blocking or optional,
-            and what is wrong.
-      - name: Post the findings; a blocking one fails this check
-        env:
-          GH_TOKEN: ${{ github.token }}
-          FINDINGS: ${{ steps.review.outputs.final-message }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          printf '%s' "$FINDINGS" > "$RUNNER_TEMP/findings.json"
-          bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/findings.json" codex
+          REVIEWER: ${{ needs.choose.outputs.reviewer }}
+          MODEL: ${{ needs.choose.outputs.model }}
+        run: bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/findings.json" "$REVIEWER ($MODEL)"
 
