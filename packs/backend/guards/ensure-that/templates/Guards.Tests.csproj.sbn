@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Tests of the Kernel's guards (src/Kernel/Ensure.cs); every project references the Kernel already. -->
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Kernel.Tests</RootNamespace>
+  </PropertyGroup>
+
+</Project>

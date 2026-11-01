@@ -1,0 +1,1 @@
+Test after: write tests for the behaviour the change adds or alters, each checking a result, and run `bash .github/scripts/test.sh` after a Release build. Return its output; if the coverage gate fails, name the assembly and the lines still untested.

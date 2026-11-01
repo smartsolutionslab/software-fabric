@@ -2,6 +2,9 @@ option: backend.test.framework.xunit
 files:
   - { template: templates/ArchitectureRulesTests.cs.sbn, target: tests/Architecture.Tests/ArchitectureRulesTests.cs }
   - { template: templates/ModuleTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/{{ module.namespace }}ModuleTests.cs", per-module: true }
+  - { template: templates/coverage.props.sbn, target: tests/coverage.props }
+  - { template: templates/coverage-gate.proj.sbn, target: .github/scripts/coverage-gate.proj }
+  - { template: templates/test.sh.sbn, target: .github/scripts/test.sh }
 declares-slots:
   - { slot: tests.assert-no-violations, description: "One statement asserting that IReadOnlyList<string> violations is empty, with string description as the message.", cardinality: exactly-one }
   - { slot: tests.assert-does-not-throw, description: "One statement asserting that Action buildContainer does not throw.", cardinality: exactly-one }
@@ -16,3 +19,4 @@ agents:
 adr: docs/adr.md
 gates:
   - { kind: unit-test, describes: "Every architecture rule runs as a test and fails it on any violation.", file: templates/ArchitectureRulesTests.cs.sbn }
+  - { kind: ci-step, describes: "Each module's Domain and Application, and the Kernel, keep the line coverage tests/coverage.props sets (90 %, 80 % and 90 % by default); CI fails below it, naming the assembly, the layer and the number.", file: templates/coverage-gate.proj.sbn }

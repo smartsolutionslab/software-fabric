@@ -1,0 +1,70 @@
+{{~ if project["backend.test.framework"] != "xunit" || project["backend.test.assertions"] != "shouldly" ~}}
+#error The minimal result style's Kernel tests are written for xUnit and Shouldly only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using System.Globalization;
+using System.Net;
+
+namespace {{ namespace }}.Kernel.Tests;
+
+public class ResultTests
+{
+    private static readonly ApiError NotFound = ApiError.NotFound("billing.invoice-not-found", "No such invoice.");
+
+    [Fact]
+    public void A_success_has_its_value_and_no_error()
+    {
+        var result = Result<int, ApiError>.Success(42);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldBe(42);
+        Should.Throw<InvalidOperationException>(() => result.Error);
+    }
+
+    [Fact]
+    public void A_failure_has_its_error_and_no_value()
+    {
+        var result = Result<int, ApiError>.Failure(NotFound);
+
+        result.IsSuccess.ShouldBeFalse();
+        result.Error.ShouldBe(NotFound);
+        Should.Throw<InvalidOperationException>(() => result.Value);
+    }
+
+    [Fact]
+    public void A_failure_needs_an_error() =>
+        Should.Throw<ArgumentException>(() => Result<int, ApiError>.Failure(null!));
+
+    [Fact]
+    public void Match_takes_the_branch_of_the_outcome()
+    {
+        Result<int, ApiError>.Success(42).Match(value => value.ToString(CultureInfo.InvariantCulture), error => error.Code).ShouldBe("42");
+        Result<int, ApiError>.Failure(NotFound).Match(value => value.ToString(CultureInfo.InvariantCulture), error => error.Code).ShouldBe("billing.invoice-not-found");
+    }
+
+    [Fact]
+    public void Map_error_translates_a_failure_and_keeps_a_success()
+    {
+        Result<int, string>.Success(42).MapError(code => ApiError.Validation(code, "Invalid.")).Value.ShouldBe(42);
+        Result<int, string>.Failure("billing.invalid").MapError(code => ApiError.Validation(code, "Invalid.")).Error.Code.ShouldBe("billing.invalid");
+    }
+
+    [Fact]
+    public void Each_api_error_factory_gives_its_status()
+    {
+        NotFound.Status.ShouldBe(HttpStatusCode.NotFound);
+        ApiError.Validation("billing.invalid", "Invalid.").Status.ShouldBe(HttpStatusCode.BadRequest);
+        ApiError.Conflict("billing.duplicate", "Duplicate.").Status.ShouldBe(HttpStatusCode.Conflict);
+        ApiError.Forbidden("billing.forbidden", "Forbidden.").Status.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public void A_domain_error_becomes_an_api_error_with_the_status_application_gives_it()
+    {
+        var error = ApiError.From(new InvoiceOverdue(), HttpStatusCode.Conflict);
+
+        error.ShouldBe(new ApiError("billing.invoice-overdue", "The invoice is overdue.", HttpStatusCode.Conflict));
+        Unit.Value.ShouldBe(default(Unit));
+    }
+
+    private sealed record InvoiceOverdue() : DomainError("billing.invoice-overdue", "The invoice is overdue.");
+}
