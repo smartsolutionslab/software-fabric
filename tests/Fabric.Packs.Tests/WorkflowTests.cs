@@ -1,0 +1,258 @@
+using System.Text.RegularExpressions;
+using Fabric.Core.Generation;
+using YamlDotNet.RepresentationModel;
+
+namespace Fabric.Packs.Tests;
+
+/// <summary>
+/// Generated workflows and this repository's own run actions pinned to a commit, since a tag can be moved to code
+/// nobody reviewed, and one run per workflow and ref, so a push does not leave the runs before it queued up.
+/// </summary>
+public sealed partial class WorkflowTests
+{
+    /// <summary>They write to issues and the board; a cancelled or superseded run would lose a write.</summary>
+    private static readonly string[] BoardWriters = ["board-janitor.yml", "board-return.yml"];
+
+    private const string Group = "${{ github.workflow }}-${{ github.ref }}";
+
+    /// <summary>
+    /// A workflow naming step actions in the ways YAML allows (flow mappings, quoted keys and values, a folded value),
+    /// with a comment and a run script that mention <c>uses:</c> and are not steps' actions.
+    /// </summary>
+    private const string Spellings = """
+        name: spellings
+        on: push
+        # Previously uses: actions/checkout@v4
+        jobs:
+          flow:
+            runs-on: ubuntu-latest
+            steps:
+              - { uses: actions/checkout@v4 }
+              - uses: "actions/setup-node@v4"
+              - "uses": actions/setup-dotnet@v4
+              - name: folded
+                uses: >-
+                  pnpm/action-setup@v4
+              - {"uses":"actions/cache@v4"}
+              - run: 'echo "uses: actions/checkout@v4 is a workflow key"'
+              - uses: docker://alpine:3.20
+              - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+              - uses: actions/cache/save@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+              - uses: ./.github/actions/local
+              - uses: docker://alpine@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+              - { name: pinned-in-flow, uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 }
+        """;
+
+    /// <summary>The <c>uses</c> keys on these lines name no commit (or digest); the comment (3) and run script (15) are no steps.</summary>
+    private static readonly int[] SpellingsUnpinnedLines = [8, 9, 10, 12, 14, 16];
+
+    /// <summary>The generator's own check also wants the version in a comment, which line 21 lacks.</summary>
+    private static readonly int[] SpellingsUnpinnedOrUncommentedLines = [.. SpellingsUnpinnedLines, 21];
+
+    /// <summary>The profiles the real packs generate alone, which profile CI builds (ADR-0003).</summary>
+    public static TheoryData<string> Profiles => new(
+        Repository.Catalog.Profiles.Keys.Where(profile => Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, []).Errors.Count == 0));
+
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void Every_action_a_generated_workflow_uses_is_pinned_to_a_commit(string profile)
+    {
+        using var project = new GeneratedProject(profile);
+
+        Unpinned(project.ProjectDirectory, Workflows(project.ProjectDirectory)).ShouldBeEmpty();
+    }
+
+    /// <summary>Also the packs no complete profile chooses yet: any file a pack writes workflow steps from.</summary>
+    [Fact]
+    public void Every_action_a_pack_template_uses_is_pinned_to_a_commit()
+    {
+        var packs = Path.Combine(Repository.Root, "packs");
+
+        UnpinnedTemplateLines(packs, Directory.EnumerateFiles(packs, "*", SearchOption.AllDirectories).Order()).ShouldBeEmpty();
+    }
+
+    /// <summary>
+    /// The gate in a generated project (the owner's decision on #54): an architecture rule that parses the workflow YAML
+    /// and fails a step's <c>uses</c> that is not pinned to a commit, a local action or a docker image by digest.
+    /// </summary>
+    [Fact]
+    public void A_generated_project_s_architecture_rules_fail_a_step_action_not_pinned_to_a_commit_however_it_is_spelled()
+    {
+        using var project = new GeneratedProject("lean-crud");
+        project.Build();
+
+        var (freshExitCode, freshOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        freshExitCode.ShouldBe(0, freshOutput);
+
+        project.Write(".github/workflows/spellings.yaml", Spellings);
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        foreach (var line in SpellingsUnpinnedLines)
+        {
+            output.ShouldContain($".github/workflows/spellings.yaml:{line}: ", Case.Sensitive, output);
+        }
+
+        foreach (var line in Enumerable.Range(1, Spellings.Split('\n').Length).Except(SpellingsUnpinnedLines))
+        {
+            output.ShouldNotContain($".github/workflows/spellings.yaml:{line}: ", Case.Sensitive, output);
+        }
+    }
+
+    [Fact]
+    public void The_generator_s_own_check_finds_a_step_action_however_the_workflow_spells_it_and_ignores_comments_and_scripts()
+    {
+        var root = Directory.CreateTempSubdirectory("fabric-spellings-").FullName;
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, ".github", "workflows"));
+            File.WriteAllText(Path.Combine(root, ".github", "workflows", "spellings.yml"), Spellings);
+            File.WriteAllText(Path.Combine(root, ".github", "workflows", "extra.yaml"), "jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v4\n");
+
+            Unpinned(root, Workflows(root)).Select(entry => entry[..entry.IndexOf(": ", StringComparison.Ordinal)])
+                .ShouldBe([".github/workflows/extra.yaml:4", .. SpellingsUnpinnedOrUncommentedLines.Select(line => $".github/workflows/spellings.yml:{line}")]);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Every_action_this_repository_s_workflows_use_is_pinned_to_a_commit() =>
+        Unpinned(Repository.Root, Workflows(Repository.Root)).ShouldBeEmpty();
+
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void A_generated_workflow_runs_once_per_ref_and_cancels_only_where_a_newer_run_supersedes_it(string profile)
+    {
+        using var project = new GeneratedProject(profile);
+
+        Misgrouped(project.ProjectDirectory).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void This_repository_s_workflows_run_once_per_ref_and_cancel_only_where_a_newer_run_supersedes_it() =>
+        Misgrouped(Repository.Root).ShouldBeEmpty();
+
+    private static IEnumerable<string> Workflows(string root) =>
+        Directory.EnumerateFiles(Path.Combine(root, ".github", "workflows"))
+            .Where(path => path.EndsWith(".yml", StringComparison.Ordinal) || path.EndsWith(".yaml", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Every step <c>uses</c> in these workflows, read as YAML as the generated rule reads them, that is not a local
+    /// action, a docker image by digest, or an action pinned to a commit with its version in a comment on that line.
+    /// </summary>
+    private static List<string> Unpinned(string root, IEnumerable<string> workflows)
+    {
+        List<string> problems = [];
+        foreach (var path in workflows)
+        {
+            var lines = File.ReadAllLines(path);
+            var stream = new YamlStream();
+            stream.Load(new StringReader(string.Join('\n', lines)));
+            foreach (var (keyLine, valueLine, uses) in stream.Documents.SelectMany(document => StepActions(document.RootNode)))
+            {
+                var pinned = PinnedAction().IsMatch(uses) && VersionComment().IsMatch(lines[valueLine - 1]);
+                if (!pinned && !LocalOrDigest().IsMatch(uses))
+                {
+                    problems.Add($"{Path.GetRelativePath(root, path).Replace('\\', '/')}:{keyLine}: {uses}");
+                }
+            }
+        }
+
+        return problems;
+    }
+
+    private static IEnumerable<(long KeyLine, long ValueLine, string Uses)> StepActions(YamlNode workflow) =>
+        from job in Value(workflow, "jobs") is YamlMappingNode jobs ? jobs.Children.Values : Enumerable.Empty<YamlNode>()
+        from step in Value(job, "steps") is YamlSequenceNode steps ? steps.Children : Enumerable.Empty<YamlNode>()
+        from entry in step is YamlMappingNode mapping ? mapping.Children : Enumerable.Empty<KeyValuePair<YamlNode, YamlNode>>()
+        where entry.Key is YamlScalarNode { Value: "uses" }
+        select ((long)entry.Key.Start.Line, (long)entry.Value.Start.Line, entry.Value is YamlScalarNode { Value: { } value } ? value : entry.Value.ToString());
+
+    private static YamlNode? Value(YamlNode? node, string key) =>
+        node is YamlMappingNode mapping && mapping.Children.TryGetValue(new YamlScalarNode(key), out var value) ? value : null;
+
+    /// <summary>
+    /// Pack templates are not YAML until rendered, so they are read by line: every block-style <c>uses:</c> line names a
+    /// commit with its version in a comment. Other spellings are caught in the generated workflows above.
+    /// </summary>
+    private static List<string> UnpinnedTemplateLines(string root, IEnumerable<string> files) =>
+    [
+        .. files.SelectMany(path => File.ReadLines(path)
+            .Select((line, index) => (Line: line, Number: index + 1))
+            .Where(entry => TemplateUses().IsMatch(entry.Line) && !TemplatePinned().IsMatch(entry.Line) && !TemplateLocal().IsMatch(entry.Line))
+            .Select(entry => $"{Path.GetRelativePath(root, path).Replace('\\', '/')}:{entry.Number}: {entry.Line.Trim()}")),
+    ];
+
+    /// <summary>Every workflow whose top-level <c>concurrency</c> differs from what its triggers call for.</summary>
+    private static List<string> Misgrouped(string root)
+    {
+        List<string> problems = [];
+        foreach (var path in Workflows(root))
+        {
+            var name = Path.GetFileName(path);
+            var stream = new YamlStream();
+            stream.Load(new StringReader(File.ReadAllText(path)));
+            var workflow = (YamlMappingNode)stream.Documents[0].RootNode;
+            workflow.Children.TryGetValue(new YamlScalarNode("concurrency"), out var concurrency);
+
+            if (BoardWriters.Contains(name))
+            {
+                if (concurrency is not null)
+                {
+                    problems.Add($"{name}: writes to the board and must not share a concurrency group");
+                }
+
+                continue;
+            }
+
+            if (concurrency is not YamlMappingNode settings)
+            {
+                problems.Add($"{name}: has no concurrency group");
+                continue;
+            }
+
+            var triggers = workflow.Children[new YamlScalarNode("on")] is YamlMappingNode events
+                ? events.Children.Keys.Select(key => key.ToString()).ToList()
+                : [];
+            var cancel = triggers.SequenceEqual(["pull_request"]) ? "true" : "${{ github.event_name == 'pull_request' }}";
+
+            if (Scalar(settings, "cancel-in-progress") != cancel)
+            {
+                problems.Add($"{name}: cancel-in-progress is '{Scalar(settings, "cancel-in-progress")}', expected '{cancel}'");
+            }
+
+            if (Scalar(settings, "group") != Group)
+            {
+                problems.Add($"{name}: group is '{Scalar(settings, "group")}', expected '{Group}'");
+            }
+        }
+
+        return problems;
+    }
+
+    private static string? Scalar(YamlMappingNode node, string key) =>
+        node.Children.TryGetValue(new YamlScalarNode(key), out var value) ? ((YamlScalarNode)value).Value : null;
+
+    /// <summary>A <c>uses</c> key anywhere YAML allows one: a block or flow mapping, quoted or not.</summary>
+    [GeneratedRegex(@"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[^@\s]+)?@[0-9a-f]{40}$")]
+    private static partial Regex PinnedAction();
+
+    [GeneratedRegex(@"@[0-9a-f]{40}[""']?\s*\}?\s*#\s*v\d")]
+    private static partial Regex VersionComment();
+
+    [GeneratedRegex(@"^(\./.*|docker://[^@\s]+@sha256:[0-9a-f]{64})$")]
+    private static partial Regex LocalOrDigest();
+
+    [GeneratedRegex(@"^\s*(-\s+)?uses:")]
+    private static partial Regex TemplateUses();
+
+    [GeneratedRegex(@"^\s*(-\s+)?uses:\s*[^@\s]+@[0-9a-f]{40}\s+#\s*v\d\S*\s*$")]
+    private static partial Regex TemplatePinned();
+
+    [GeneratedRegex(@"^\s*(-\s+)?uses:\s*\./")]
+    private static partial Regex TemplateLocal();
+}

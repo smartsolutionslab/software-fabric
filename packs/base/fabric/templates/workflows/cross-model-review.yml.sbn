@@ -12,6 +12,12 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# One run per workflow and ref; a review of a head that a newer push replaced is pointless, so it is cancelled
+# and the new head is reviewed instead.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: write
@@ -22,10 +28,10 @@ jobs:
     outputs:
       reviewer: ${{ steps.choose.outputs.reviewer }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: .gate
@@ -49,10 +55,10 @@ jobs:
     if: needs.choose.outputs.reviewer == 'claude'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: .gate
@@ -64,7 +70,7 @@ jobs:
       - id: schema
         run: echo "json=$(jq -c . "$GATE/review-findings.schema.json")" >> "$GITHUB_OUTPUT"
       - id: review
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d # v1.0.266
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           # The workflow's own token: without one the action fetches an app token through OIDC (id-token: write),
@@ -91,10 +97,10 @@ jobs:
     if: needs.choose.outputs.reviewer == 'codex'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: .gate
@@ -104,7 +110,7 @@ jobs:
           echo "GATE=$gate/.github" >> "$GITHUB_ENV"
           echo "BRIEFS=$gate" >> "$GITHUB_ENV"
       - id: review
-        uses: openai/codex-action@v1
+        uses: openai/codex-action@bdf19a4a223ec2549a3e2274a0cf61556bc07675 # v1.13
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           output-schema-file: ${{ env.GATE }}/review-findings.schema.json

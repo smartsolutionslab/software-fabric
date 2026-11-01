@@ -3,6 +3,7 @@
 - Run `dotnet tool restore` once after cloning; local tools are pinned in `.config/dotnet-tools.json`.
 - Build everything with `dotnet build build.proj`. Run locally with `dotnet run --project src/AppHost`.
 - Format with `bash .github/scripts/format.sh` before you push. CI runs it with `--verify-no-changes` and fails on any file `dotnet format` would change, modules and tests included.
+- A workflow step's `uses:` names a full 40-character commit SHA with its version tag in a comment (`actions/checkout@<sha> # v4.4.0`), never a tag or branch: a tag can be moved to code nobody reviewed. The architecture rule `WorkflowActionsArePinned` fails the tests otherwise.
 - Code style fails the Release build or the format check (`.editorconfig`), so write it the way the rules want:
   - `var` for every local it compiles for: `var invoice = await invoices.FindAsync(id, cancellationToken);`. Write the type only where `var` cannot: a collection expression (`List<Invoice> invoices = [];`, never `new()` or `new List<Invoice>()`), target-typed `new()`, `default`.
   - One file-scoped namespace per file (`namespace <Namespace>.Modules.Billing.Domain;`), matching the folder the file is in (wiring code in `Wiring/` excepted, see below).

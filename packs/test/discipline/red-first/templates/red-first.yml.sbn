@@ -4,11 +4,17 @@ on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
 
+# One run per workflow and ref; a newer push or body edit is checked against the latest body and diff, so the run
+# before it is cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   failing-tests-quoted:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
       - name: Source changes quote the tests they made fail first

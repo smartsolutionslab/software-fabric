@@ -5,6 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />
     <ProjectReference Include="../../src/ServiceDefaults/ServiceDefaults.csproj" />
     <ProjectReference Include="../../src/Modules/*/*.*/*.csproj" />
