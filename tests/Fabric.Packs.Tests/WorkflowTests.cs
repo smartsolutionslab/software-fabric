@@ -38,6 +38,45 @@ public sealed partial class WorkflowTests
     }
 
     [Fact]
+    public void A_generated_project_s_CI_checks_that_its_actions_are_pinned_and_a_fresh_project_passes()
+    {
+        using var project = new GeneratedProject("lean-crud");
+        var ci = File.ReadAllText(Path.Combine(project.ProjectDirectory, ".github", "workflows", "ci.yml"));
+
+        ci.ShouldContain("run: bash .github/scripts/check-actions-pinned.sh");
+        var (exitCode, output) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/check-actions-pinned.sh");
+        exitCode.ShouldBe(0, output);
+    }
+
+    [Fact]
+    public void An_action_used_by_tag_or_without_its_version_fails_the_generated_check()
+    {
+        using var project = new GeneratedProject("lean-crud");
+        var ciPath = Path.Combine(project.ProjectDirectory, ".github", "workflows", "ci.yml");
+        var ci = File.ReadAllText(ciPath);
+        var pinned = Uses().Match(ci.Split('\n').First(line => line.Contains("actions/checkout@", StringComparison.Ordinal))).Groups["action"].Value;
+        File.WriteAllText(ciPath, ci.Replace(pinned, "actions/checkout@v4", StringComparison.Ordinal));
+        project.Write(".github/workflows/extra.yml", $"""
+            name: extra
+            on: push
+            jobs:
+              extra:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: {pinned}
+                  - uses: ./.github/actions/local
+            """);
+
+        var (exitCode, output) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/check-actions-pinned.sh");
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain("file=.github/workflows/ci.yml,line=", Case.Sensitive, output);
+        output.ShouldContain("actions/checkout@v4", Case.Sensitive, output);
+        output.ShouldContain("file=.github/workflows/extra.yml,line=7::", Case.Sensitive, output);
+        output.ShouldNotContain("./.github/actions/local", Case.Sensitive, output);
+    }
+
+    [Fact]
     public void Every_action_this_repository_s_workflows_use_is_pinned_to_a_commit() =>
         Unpinned(Repository.Root, Workflows(Repository.Root)).ShouldBeEmpty();
 
