@@ -1,0 +1,127 @@
+using System.Text.RegularExpressions;
+using Fabric.Core.Generation;
+using YamlDotNet.RepresentationModel;
+
+namespace Fabric.Packs.Tests;
+
+/// <summary>
+/// Generated workflows and this repository's own run actions pinned to a commit, since a tag can be moved to code
+/// nobody reviewed, and one run per workflow and ref, so a push does not leave the runs before it queued up.
+/// </summary>
+public sealed partial class WorkflowTests
+{
+    /// <summary>They write to issues and the board; a cancelled or superseded run would lose a write.</summary>
+    private static readonly string[] BoardWriters = ["board-janitor.yml", "board-return.yml"];
+
+    private const string Group = "${{ github.workflow }}-${{ github.ref }}";
+
+    /// <summary>The profiles the real packs generate alone, which profile CI builds (ADR-0003).</summary>
+    public static TheoryData<string> Profiles => new(
+        Repository.Catalog.Profiles.Keys.Where(profile => Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, []).Errors.Count == 0));
+
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void Every_action_a_generated_workflow_uses_is_pinned_to_a_commit(string profile)
+    {
+        using var project = new GeneratedProject(profile);
+
+        Unpinned(project.ProjectDirectory, Workflows(project.ProjectDirectory)).ShouldBeEmpty();
+    }
+
+    /// <summary>Also the packs no complete profile chooses yet: any file a pack writes workflow steps from.</summary>
+    [Fact]
+    public void Every_action_a_pack_template_uses_is_pinned_to_a_commit()
+    {
+        var packs = Path.Combine(Repository.Root, "packs");
+
+        Unpinned(packs, Directory.EnumerateFiles(packs, "*", SearchOption.AllDirectories).Order()).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Every_action_this_repository_s_workflows_use_is_pinned_to_a_commit() =>
+        Unpinned(Repository.Root, Workflows(Repository.Root)).ShouldBeEmpty();
+
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void A_generated_workflow_runs_once_per_ref_and_cancels_only_where_a_newer_run_supersedes_it(string profile)
+    {
+        using var project = new GeneratedProject(profile);
+
+        Misgrouped(project.ProjectDirectory).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void This_repository_s_workflows_run_once_per_ref_and_cancel_only_where_a_newer_run_supersedes_it() =>
+        Misgrouped(Repository.Root).ShouldBeEmpty();
+
+    private static IEnumerable<string> Workflows(string root) =>
+        Directory.EnumerateFiles(Path.Combine(root, ".github", "workflows"), "*.yml").Order();
+
+    /// <summary>Every <c>uses:</c> that is not a local action, a 40-hex commit and a version comment.</summary>
+    private static List<string> Unpinned(string root, IEnumerable<string> files) =>
+    [
+        .. files.SelectMany(path => File.ReadLines(path)
+            .Select((line, index) => (Line: line, Number: index + 1))
+            .Select(entry => (entry.Number, Match: Uses().Match(entry.Line)))
+            .Where(entry => entry.Match.Success
+                && !entry.Match.Groups["action"].Value.StartsWith("./", StringComparison.Ordinal)
+                && !Pinned().IsMatch(entry.Match.Groups["action"].Value + entry.Match.Groups["rest"].Value))
+            .Select(entry => $"{Path.GetRelativePath(root, path).Replace('\\', '/')}:{entry.Number}: {entry.Match.Value.Trim()}")),
+    ];
+
+    /// <summary>Every workflow whose top-level <c>concurrency</c> differs from what its triggers call for.</summary>
+    private static List<string> Misgrouped(string root)
+    {
+        List<string> problems = [];
+        foreach (var path in Workflows(root))
+        {
+            var name = Path.GetFileName(path);
+            var stream = new YamlStream();
+            stream.Load(new StringReader(File.ReadAllText(path)));
+            var workflow = (YamlMappingNode)stream.Documents[0].RootNode;
+            workflow.Children.TryGetValue(new YamlScalarNode("concurrency"), out var concurrency);
+
+            if (BoardWriters.Contains(name))
+            {
+                if (concurrency is not null)
+                {
+                    problems.Add($"{name}: writes to the board and must not share a concurrency group");
+                }
+
+                continue;
+            }
+
+            if (concurrency is not YamlMappingNode settings)
+            {
+                problems.Add($"{name}: has no concurrency group");
+                continue;
+            }
+
+            var triggers = workflow.Children[new YamlScalarNode("on")] is YamlMappingNode events
+                ? events.Children.Keys.Select(key => key.ToString()).ToList()
+                : [];
+            var cancel = triggers.SequenceEqual(["pull_request"]) ? "true" : "${{ github.event_name == 'pull_request' }}";
+
+            if (Scalar(settings, "cancel-in-progress") != cancel)
+            {
+                problems.Add($"{name}: cancel-in-progress is '{Scalar(settings, "cancel-in-progress")}', expected '{cancel}'");
+            }
+
+            if (Scalar(settings, "group") != Group)
+            {
+                problems.Add($"{name}: group is '{Scalar(settings, "group")}', expected '{Group}'");
+            }
+        }
+
+        return problems;
+    }
+
+    private static string? Scalar(YamlMappingNode node, string key) =>
+        node.Children.TryGetValue(new YamlScalarNode(key), out var value) ? ((YamlScalarNode)value).Value : null;
+
+    [GeneratedRegex(@"^\s*(?:-\s+)?uses:\s*(?<action>\S+)(?<rest>.*)$")]
+    private static partial Regex Uses();
+
+    [GeneratedRegex(@"^[^@\s]+@[0-9a-f]{40}\s+#\s*v\d\S*$")]
+    private static partial Regex Pinned();
+}
