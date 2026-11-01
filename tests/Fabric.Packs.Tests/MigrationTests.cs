@@ -60,4 +60,41 @@ public sealed class MigrationTests
         postgres.Psql(DatabasePassword, "select count(*) from information_schema.tables where table_schema = 'billing' and table_name = 'notes'").ShouldBe("1");
         postgres.Psql(DatabasePassword, "select \"MigrationId\" from billing.\"__EFMigrationsHistory\"").ShouldEndWith("_Initial");
     }
+
+    [Fact]
+    public void A_step_another_pack_puts_in_the_migration_runner_runs_after_the_migrations_with_the_runners_services()
+    {
+        // contract-tests has no pack yet; the probe takes its place and fills the slot (an await shows the step may be async).
+        using var probe = new ProbePack("backend.test.extras.contract-tests", new Dictionary<string, string>
+        {
+            ["migration-runner.steps"] = """
+                await Task.Yield();
+                var configured = host.Services.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>().GetConnectionString("database") is not null;
+                Console.WriteLine($"probe step ran after the migrations; database configured: {configured}");
+                """,
+        });
+        using var project = new GeneratedProject(Profile, [probe.Manifest], "backend.test.extras=contract-tests");
+        project.AddModule("billing");
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = project.DotNetCommand(
+            new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
+            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("probe step ran after the migrations; database configured: True");
+    }
+
+    [Fact]
+    public void Without_a_step_the_migration_runner_ends_with_the_migrations()
+    {
+        using var project = new GeneratedProject(Profile);
+
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "MigrationRunner", "Program.cs")).ShouldEndWith("""
+                await ((DbContext)scope.ServiceProvider.GetRequiredService(context)).Database.MigrateAsync();
+            }
+
+            """);
+    }
 }

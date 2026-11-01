@@ -13,8 +13,20 @@ internal sealed class GeneratedProject : IDisposable
     private readonly IReadOnlyDictionary<string, Core.Packs.PackManifest> packs;
 
     public GeneratedProject(string profile, params string[] overrides)
+        : this(profile, [], overrides)
     {
-        packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, profile, overrides);
+    }
+
+    /// <param name="replacements">Packs that take the place of the real pack or stand-in for their option.</param>
+    public GeneratedProject(string profile, IReadOnlyList<Core.Packs.PackManifest> replacements, params string[] overrides)
+    {
+        var completed = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, profile, overrides).ToDictionary();
+        foreach (var replacement in replacements)
+        {
+            completed[replacement.Option] = replacement;
+        }
+
+        packs = completed;
         ProjectDirectory = Path.Combine(root, "shop");
 
         var generated = Generator.New(Repository.Catalog, packs, "shop", profile, overrides);
