@@ -1,0 +1,51 @@
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Domain;
+using {{ namespace }}.BuildingBlocks.DomainEvents;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class EveryDomainEventHasAReaction : IArchitectureRule
+{
+    public string Description => "Every domain event in a Domain project is sealed and has a reaction the dispatcher delivers to (DomainEventReactions), unless it is marked [DeliberatelyUnhandled]; every reaction is one the dispatcher delivers to.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var types = model.ModuleAssemblies.SelectMany(assembly => assembly.GetTypes()).ToList();
+        foreach (var problem in types.Where(DomainEventReactions.IsReaction).Select(DomainEventReactions.Problem).OfType<string>())
+        {
+            yield return problem;
+        }
+
+        // The dispatcher's own discovery: an event counts as handled only by a reaction it delivers to.
+        var delivered = model.ModuleAssemblies
+            .Where(assembly => assembly.GetName().Name!.EndsWith(".Application", StringComparison.Ordinal))
+            .SelectMany(DomainEventReactions.In)
+            .ToList();
+        var events = types.Where(type => type is { IsInterface: false, IsAbstract: false }
+            && typeof(IDomainEvent).IsAssignableFrom(type)
+            && type.Assembly.GetName().Name!.EndsWith(".Domain", StringComparison.Ordinal));
+
+        foreach (var domainEvent in events)
+        {
+            var problem = DomainEventReactions.EventProblem(domainEvent);
+            if (problem is not null)
+            {
+                yield return problem;
+                continue;
+            }
+
+            var reactions = delivered.Where(registration => registration.Event == domainEvent).Select(registration => registration.Reaction.FullName).ToList();
+            var unhandled = domainEvent.GetCustomAttribute<DeliberatelyUnhandledAttribute>() is not null;
+            if (reactions.Count == 0 && !unhandled)
+            {
+                yield return $"{domainEvent.FullName} has no reaction; add an IDomainEventReaction<{domainEvent.Name}> to the module's Application project, or mark the event [DeliberatelyUnhandled(\"why\")].";
+            }
+            else if (reactions.Count > 0 && unhandled)
+            {
+                yield return $"{domainEvent.FullName} is marked deliberately unhandled, but {string.Join(", ", reactions)} handles it.";
+            }
+        }
+    }
+}

@@ -1,0 +1,360 @@
+using System.Data.Common;
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace {{ namespace }}.BuildingBlocks.DomainEvents;
+
+/// <summary>
+/// Hands the domain events of one module context's tracked aggregates to their reactions once the changes that raised
+/// them are committed: right after SaveChangesAsync, or, inside a transaction the context began, after that
+/// transaction commits. A rollback, a failed commit or a transaction disposed without commit delivers nothing. Each
+/// reaction runs in a service scope of its own; one that throws is logged and never reaches the caller, whose save
+/// or commit has already happened. A save it cannot vouch for (synchronous, inside an ambient TransactionScope, in a
+/// transaction it did not begin or that has application savepoints) fails before saving.
+/// One instance per context instance: it keeps that context's pending events.
+/// </summary>
+public sealed partial class DomainEventDispatch(IServiceProvider services) : ISaveChangesInterceptor, IDbTransactionInterceptor
+{
+    private readonly List<Saving> saving = [];
+    private readonly List<Pending> pending = [];
+    private DbTransaction? pendingFor;
+    private DbTransaction? notBegunHere;
+    private DbTransaction? withSavepoints;
+    private bool insideSave;
+
+    public InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
+    {
+        {{ not_null "eventData" }}
+        Collect(eventData.Context!, isAsync: false);
+        return result;
+    }
+
+    public ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+    {
+        {{ not_null "eventData" }}
+        Collect(eventData.Context!, isAsync: true);
+        return ValueTask.FromResult(result);
+    }
+
+    public int SavedChanges(SaveChangesCompletedEventData eventData, int result)
+    {
+        // A synchronous save with events never gets here: Collect refused it.
+        insideSave = false;
+        saving.Clear();
+        return result;
+    }
+
+    public async ValueTask<int> SavedChangesAsync(SaveChangesCompletedEventData eventData, int result, CancellationToken cancellationToken = default)
+    {
+        {{ not_null "eventData" }}
+        insideSave = false;
+        await DeliverAsync(Saved(eventData.Context!), cancellationToken);
+        return result;
+    }
+
+    public void SaveChangesFailed(DbContextErrorEventData eventData) => Forget();
+
+    public Task SaveChangesFailedAsync(DbContextErrorEventData eventData, CancellationToken cancellationToken = default)
+    {
+        Forget();
+        return Task.CompletedTask;
+    }
+
+    public void SaveChangesCanceled(DbContextEventData eventData) => Forget();
+
+    public Task SaveChangesCanceledAsync(DbContextEventData eventData, CancellationToken cancellationToken = default)
+    {
+        Forget();
+        return Task.CompletedTask;
+    }
+
+    public DbTransaction TransactionStarted(DbConnection connection, TransactionEndEventData eventData, DbTransaction result)
+    {
+        Begin(null);
+        return result;
+    }
+
+    public ValueTask<DbTransaction> TransactionStartedAsync(DbConnection connection, TransactionEndEventData eventData, DbTransaction result, CancellationToken cancellationToken = default)
+    {
+        Begin(null);
+        return ValueTask.FromResult(result);
+    }
+
+    public DbTransaction TransactionUsed(DbConnection connection, TransactionEventData eventData, DbTransaction result)
+    {
+        Begin(result);
+        return result;
+    }
+
+    public ValueTask<DbTransaction> TransactionUsedAsync(DbConnection connection, TransactionEventData eventData, DbTransaction result, CancellationToken cancellationToken = default)
+    {
+        Begin(result);
+        return ValueTask.FromResult(result);
+    }
+
+    public InterceptionResult TransactionCommitting(DbTransaction transaction, TransactionEventData eventData, InterceptionResult result)
+    {
+        if (transaction == pendingFor && pending.Count > 0)
+        {
+            throw new InvalidOperationException("The transaction has domain events to dispatch once it commits; commit it with CommitAsync: reactions are asynchronous.");
+        }
+
+        return result;
+    }
+
+    public async Task TransactionCommittedAsync(DbTransaction transaction, TransactionEndEventData eventData, CancellationToken cancellationToken = default)
+    {
+        if (transaction != pendingFor)
+        {
+            return;
+        }
+
+        List<Pending> committed = [.. pending];
+        ClearPending();
+        foreach (var retained in committed.Where(item => item.RetainedBy is not null).GroupBy(item => item.RetainedBy!))
+        {
+            retained.Key.RemoveDomainEvents([.. retained.Select(item => item.Event)]);
+        }
+
+        await DeliverAsync([.. committed.Select(item => item.Event)], cancellationToken);
+    }
+
+    public void TransactionRolledBack(DbTransaction transaction, TransactionEndEventData eventData) => Abandon(transaction);
+
+    public Task TransactionRolledBackAsync(DbTransaction transaction, TransactionEndEventData eventData, CancellationToken cancellationToken = default)
+    {
+        Abandon(transaction);
+        return Task.CompletedTask;
+    }
+
+    public void TransactionFailed(DbTransaction transaction, TransactionErrorEventData eventData) => Abandon(transaction);
+
+    public Task TransactionFailedAsync(DbTransaction transaction, TransactionErrorEventData eventData, CancellationToken cancellationToken = default)
+    {
+        Abandon(transaction);
+        return Task.CompletedTask;
+    }
+
+    public InterceptionResult CreatingSavepoint(DbTransaction transaction, TransactionEventData eventData, InterceptionResult result)
+    {
+        Savepoint(transaction);
+        return result;
+    }
+
+    public ValueTask<InterceptionResult> CreatingSavepointAsync(DbTransaction transaction, TransactionEventData eventData, InterceptionResult result, CancellationToken cancellationToken = default)
+    {
+        Savepoint(transaction);
+        return ValueTask.FromResult(result);
+    }
+
+    /// <summary>Takes note of the events about to be saved; refuses the save when their delivery could not follow the commit.</summary>
+    private void Collect(DbContext context, bool isAsync)
+    {
+        var transaction = context.Database.CurrentTransaction?.GetDbTransaction();
+        if (pendingFor is not null && pendingFor != transaction)
+        {
+            // Pending events of a transaction that ended without a commit EF Core reported: it did not commit.
+            ClearPending();
+        }
+
+        saving.Clear();
+        foreach (var entry in context.ChangeTracker.Entries<IHasDomainEvents>())
+        {
+            IDomainEvent[] events = [.. entry.Entity.DomainEvents.Where(domainEvent => !pending.Any(item => ReferenceEquals(item.Event, domainEvent)))];
+            if (events.Length > 0)
+            {
+                saving.Add(new Saving(entry, events));
+            }
+        }
+
+        var refusal = saving.Count == 0 ? null : Refusal(context, transaction, isAsync);
+        if (refusal is not null)
+        {
+            saving.Clear();
+            throw new InvalidOperationException(refusal);
+        }
+
+        insideSave = true;
+    }
+
+    private string? Refusal(DbContext context, DbTransaction? transaction, bool isAsync)
+    {
+        var name = context.GetType().Name;
+        if (!isAsync)
+        {
+            return $"{name} has domain events to dispatch; save with SaveChangesAsync: reactions are asynchronous.";
+        }
+
+        if (services.GetService(typeof(IServiceScopeFactory)) is null || services.GetService(typeof(ILogger<DomainEventDispatch>)) is null)
+        {
+            return $"{name} was created without the application's services (or without logging), so it cannot run the reactions of its domain events or report their failures.";
+        }
+
+        if (System.Transactions.Transaction.Current is not null)
+        {
+            return $"{name} has domain events to dispatch inside an ambient TransactionScope, whose outcome it cannot see; use a transaction from {name}.Database.BeginTransactionAsync.";
+        }
+
+        if (transaction is not null && transaction == notBegunHere)
+        {
+            return $"{name} has domain events to dispatch in a transaction it did not begin (UseTransaction), whose commit it cannot see; use {name}.Database.BeginTransactionAsync.";
+        }
+
+        return transaction is not null && transaction == withSavepoints
+            ? $"{name} has domain events to dispatch in a transaction with savepoints; a rollback to one would undo changes whose events were already pending. Save the events outside savepoints."
+            : null;
+    }
+
+    /// <summary>The events of a successful save: delivered now without a transaction, pending its commit within one.</summary>
+    private List<IDomainEvent> Saved(DbContext context)
+    {
+        List<Saving> saved = [.. saving];
+        saving.Clear();
+
+        var transaction = context.Database.CurrentTransaction?.GetDbTransaction();
+        List<IDomainEvent> deliverNow = [];
+        foreach (var (entry, events) in saved)
+        {
+            // Accepted changes (the default) leave the entry unchanged or detached: the events go with them. Changes
+            // not accepted stay pending, so the events stay on the aggregate until the commit, for a retry to save again.
+            var accepted = entry.State is EntityState.Unchanged or EntityState.Detached;
+            if (transaction is null || accepted)
+            {
+                entry.Entity.RemoveDomainEvents(events);
+            }
+
+            if (transaction is null)
+            {
+                deliverNow.AddRange(events);
+            }
+            else
+            {
+                pendingFor = transaction;
+                pending.AddRange(events.Select(domainEvent => new Pending(accepted ? null : entry.Entity, domainEvent)));
+            }
+        }
+
+        return deliverNow;
+    }
+
+    /// <summary>
+    /// Runs after the caller's changes are committed, while the caller's own work after the commit (accepting changes,
+    /// flushing an outbox) has yet to run. So nothing here throws into the caller: every failure is logged. The logger
+    /// is resolvable, because a save without one was refused.
+    /// </summary>
+    private async Task DeliverAsync(List<IDomainEvent> events, CancellationToken cancellationToken)
+    {
+        if (events.Count == 0)
+        {
+            return;
+        }
+
+        var logger = services.GetRequiredService<ILogger<DomainEventDispatch>>();
+        List<DomainEventReactionRegistration> registrations;
+        IServiceScopeFactory scopes;
+        try
+        {
+            registrations = [.. services.GetServices<DomainEventReactionRegistration>()];
+            scopes = services.GetRequiredService<IServiceScopeFactory>();
+        }
+        catch (Exception exception)
+        {
+            DispatchFailed(logger, exception, events.Count);
+            return;
+        }
+
+        for (var index = 0; index < events.Count; index++)
+        {
+            var domainEvent = events[index];
+            foreach (var registration in registrations.Where(registration => registration.Event == domainEvent.GetType()))
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    DispatchCanceled(logger, events.Count - index, domainEvent.GetType().Name);
+                    return;
+                }
+
+                await ReactAsync(scopes, registration, domainEvent, logger, cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>One reaction, from creating its scope to disposing it, with every failure on the way logged.</summary>
+    private static async Task ReactAsync(IServiceScopeFactory scopes, DomainEventReactionRegistration registration, IDomainEvent domainEvent, ILogger logger, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var reaction = scope.ServiceProvider.GetRequiredService(registration.Reaction);
+            var react = typeof(IDomainEventReaction<>).MakeGenericType(registration.Event).GetMethod(nameof(IDomainEventReaction<IDomainEvent>.ReactAsync))!;
+            await (Task)react.Invoke(reaction, BindingFlags.DoNotWrapExceptions, null, [domainEvent, cancellationToken], null)!;
+        }
+        catch (Exception exception)
+        {
+            ReactionFailed(logger, exception, registration.Reaction.FullName, domainEvent.GetType().Name);
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Dispatching domain events failed before any reaction ran; {Count} committed events were not delivered.")]
+    private static partial void DispatchFailed(ILogger logger, Exception exception, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "The domain-event reaction {Reaction} failed on {DomainEvent}; the changes that raised the event are committed, and nothing retries the reaction.")]
+    private static partial void ReactionFailed(ILogger logger, Exception exception, string? reaction, string domainEvent);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Dispatching domain events was canceled at {DomainEvent}; {Remaining} committed events were not delivered to all their reactions.")]
+    private static partial void DispatchCanceled(ILogger logger, int remaining, string domainEvent);
+
+    private void Begin(DbTransaction? notBegunByThisContext)
+    {
+        ClearPending();
+        notBegunHere = notBegunByThisContext;
+        withSavepoints = null;
+    }
+
+    private void Abandon(DbTransaction transaction)
+    {
+        if (transaction == pendingFor)
+        {
+            ClearPending();
+        }
+    }
+
+    private void Savepoint(DbTransaction transaction)
+    {
+        // EF Core's own savepoint inside SaveChanges guards that one save; only the application's are a problem.
+        if (insideSave)
+        {
+            return;
+        }
+
+        if (transaction == pendingFor && pending.Count > 0)
+        {
+            throw new InvalidOperationException("The transaction has domain events pending its commit; a rollback to a savepoint would undo changes whose events are already pending.");
+        }
+
+        withSavepoints = transaction;
+    }
+
+    private void Forget()
+    {
+        insideSave = false;
+        saving.Clear();
+    }
+
+    private void ClearPending()
+    {
+        pending.Clear();
+        pendingFor = null;
+    }
+
+    private sealed record Saving(EntityEntry<IHasDomainEvents> Entry, IDomainEvent[] Events);
+
+    /// <summary>An event saved in the open transaction; RetainedBy is its aggregate while the save did not accept the changes.</summary>
+    private sealed record Pending(IHasDomainEvents? RetainedBy, IDomainEvent Event);
+}
