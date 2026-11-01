@@ -317,6 +317,66 @@ public sealed class EventDrivenBackendTests
     }
 
     [Fact]
+    public void A_query_reaching_the_write_side_through_a_wrapper_or_a_service_locator_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Application/Queries/Wrapped/WrappedQueries.cs", """
+            using Microsoft.EntityFrameworkCore;
+            using Microsoft.Extensions.DependencyInjection;
+
+            namespace Shop.Modules.Billing.Application.Queries.Wrapped;
+
+            public delegate IBillingAggregateStore StoreSource();
+
+            public sealed class FactoryQuery(IDbContextFactory<DbContext> contexts)
+            {
+                public IDbContextFactory<DbContext> Contexts { get; } = contexts;
+            }
+
+            public static class LazyStoreQuery
+            {
+                public static Func<IBillingAggregateStore> Handle(Func<IBillingAggregateStore> store) => store;
+            }
+
+            public sealed class StoresQuery(IEnumerable<IBillingAggregateStore> stores)
+            {
+                public IEnumerable<IBillingAggregateStore> Stores { get; } = stores;
+
+                public static IBillingAggregateStore[] Handle(IBillingAggregateStore[] all) => all;
+            }
+
+            public static class DelegateQuery
+            {
+                public static StoreSource Handle(StoreSource source) => source;
+            }
+
+            public sealed class LocatorQuery(IServiceProvider services)
+            {
+                public IServiceProvider Services { get; } = services;
+            }
+
+            public static class ScopeQuery
+            {
+                public static IServiceScopeFactory Handle(IServiceScopeFactory scopes) => scopes;
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        const string Queries = "Shop.Modules.Billing.Application.Queries.Wrapped.";
+        output.ShouldContain(Queries + "FactoryQuery reads the write side (IDbContextFactory<DbContext>)");
+        output.ShouldContain(Queries + "LazyStoreQuery reads the write side (Func<IBillingAggregateStore>)");
+        output.ShouldContain(Queries + "StoresQuery reads the write side (IEnumerable<IBillingAggregateStore>)");
+        output.ShouldContain(Queries + "StoresQuery reads the write side (IBillingAggregateStore[])");
+        output.ShouldContain(Queries + "DelegateQuery reads the write side (StoreSource)");
+        output.ShouldContain(Queries + "LocatorQuery takes a service locator (IServiceProvider)");
+        output.ShouldContain(Queries + "ScopeQuery takes a service locator (IServiceScopeFactory)");
+    }
+
+    [Fact]
     public void The_read_side_gate_checks_only_modules_that_chose_physical_cqrs()
     {
         using var project = new GeneratedProject(Profile, Frontend);
