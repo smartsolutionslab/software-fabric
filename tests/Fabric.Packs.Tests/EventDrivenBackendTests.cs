@@ -240,9 +240,11 @@ public sealed class EventDrivenBackendTests
         architectureExitCode.ShouldBe(0, architectureOutput);
 
         using var postgres = Container.Postgres(DatabasePassword);
-        var (exitCode, output) = project.Test(
-            "tests/Modules/Billing.Tests/Billing.Tests.csproj",
-            new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" });
+        var database = Database(postgres);
+        var (runnerExitCode, runnerOutput) = project.DotNetCommand(database, "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+        runnerExitCode.ShouldBe(0, runnerOutput);
+
+        var (exitCode, output) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj", database);
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
@@ -251,6 +253,39 @@ public sealed class EventDrivenBackendTests
         postgres.Psql(DatabasePassword, "select count(*) from billing.mt_events").ShouldBe("6");
         postgres.Psql(DatabasePassword, "select count(*) from billing.mt_doc_invoicesummary").ShouldBe("3");
     }
+
+    [Fact]
+    public void The_migration_runner_creates_the_event_store_and_the_application_never_does()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Invoice.cs", Invoice);
+        project.Write("src/Modules/Billing/Billing.Application/ReadModels/InvoiceSummary.cs", InvoiceSummary);
+        project.Write("src/Modules/Billing/Billing.Infrastructure/Projections/InvoiceSummaryProjection.cs", InvoiceSummaryProjection);
+        project.Write("tests/Modules/Billing.Tests/EventStoreTests.cs", EventStoreTests);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var database = Database(postgres);
+
+        // The host never migrates (ef-core's rule): before the runner, the module finds no tables of its own.
+        var (beforeExitCode, beforeOutput) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj", database);
+        beforeExitCode.ShouldNotBe(0, beforeOutput);
+        beforeOutput.ShouldContain("42P01");
+
+        var (runnerExitCode, runnerOutput) = project.DotNetCommand(database, "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+        runnerExitCode.ShouldBe(0, runnerOutput);
+
+        postgres.Psql(
+            DatabasePassword,
+            "select string_agg(table_name, ',' order by table_name) from information_schema.tables where table_schema = 'billing' and table_name in ('mt_doc_invoicesummary', 'mt_events', 'mt_streams')")
+            .ShouldBe("mt_doc_invoicesummary,mt_events,mt_streams");
+    }
+
+    private static Dictionary<string, string> Database(Container postgres) => new()
+    {
+        ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}",
+    };
 
     [Fact]
     public void Breaking_the_event_sourcing_rules_fails_the_architecture_tests()
