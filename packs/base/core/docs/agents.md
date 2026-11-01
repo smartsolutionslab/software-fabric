@@ -3,6 +3,13 @@
 - Run `dotnet tool restore` once after cloning; local tools are pinned in `.config/dotnet-tools.json`.
 - Build everything with `dotnet build build.proj`. Run locally with `dotnet run --project src/AppHost`.
 - Format with `bash .github/scripts/format.sh` before you push. CI runs it with `--verify-no-changes` and fails on any file `dotnet format` would change, modules and tests included.
+- Code style fails the Release build or the format check (`.editorconfig`), so write it the way the rules want:
+  - `var` for every local it compiles for: `var invoice = await invoices.FindAsync(id, cancellationToken);`. Write the type only where `var` cannot: a collection expression (`List<Invoice> invoices = [];`, never `new()` or `new List<Invoice>()`), target-typed `new()`, `default`.
+  - One file-scoped namespace per file (`namespace <Namespace>.Modules.Billing.Domain;`), matching the folder the file is in.
+  - Braces on every `if`, `else`, `for`, `foreach`, `while` and `using`, even around one statement.
+  - `int`, `string`, `bool`, never `Int32`, `String`, `Boolean`; fields nothing reassigns are `readonly`.
+  - Interfaces start with `I`. Private fields are camelCase with no underscore (`gate`, not `_gate`); where a constructor parameter has the field's name, assign with `this.gate = gate;`. Private constants and `static readonly` fields are PascalCase. Async methods in `src/` end in `Async`; test methods are sentences without it.
+  - Never silence a rule with `#pragma`, `NoWarn` or an `.editorconfig` severity; change the code. Migrations made with `dotnet ef` are generated code and left as the tool writes them.
 - `src/AppHost` is the only composition root. A new database, broker or service is an Aspire resource there, never a hand-written connection string.
 - Each bounded context is a module under `src/Modules/<Module>/` with Domain, Application, Infrastructure and Api projects. Add one with `fabric add-module <name>`; never copy another module.
 - Modules never reference each other. They talk through `src/Contracts`.
