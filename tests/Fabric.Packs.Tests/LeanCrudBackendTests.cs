@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 
 namespace Fabric.Packs.Tests;
@@ -134,6 +135,91 @@ public sealed class LeanCrudBackendTests
 
         received.ShouldBe("1");
         postgres.Psql(DatabasePassword, "select count(*) from billing.outbox_messages where delivered_at is not null").ShouldBe("1");
+    }
+
+    [Fact]
+    public async Task A_failing_consumer_is_not_retried_before_its_backoff_has_passed_while_other_events_flow()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IIntegrationEvent;
+            """);
+        project.Write("src/Contracts/Billing/InvoiceVoidedV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoiceVoidedV1(Guid InvoiceId) : IIntegrationEvent;
+            """);
+        project.Write("src/Modules/Billing/Billing.Api/Publish.cs", """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.Contracts.Billing;
+            using Shop.Modules.Billing.Application;
+
+            namespace Shop.Modules.Billing.Api;
+
+            public sealed class Publish : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints)
+                {
+                    endpoints.MapPost("/invoices/{id}/pay", async (Guid id, IBillingUnitOfWork unitOfWork, CancellationToken cancellationToken) =>
+                    {
+                        await unitOfWork.PublishAsync(new InvoicePaidV1(id));
+                        await unitOfWork.CommitAsync(cancellationToken);
+                        return Results.Accepted();
+                    }).AllowAnonymous();
+                    endpoints.MapPost("/invoices/{id}/void", async (Guid id, IBillingUnitOfWork unitOfWork, CancellationToken cancellationToken) =>
+                    {
+                        await unitOfWork.PublishAsync(new InvoiceVoidedV1(id));
+                        await unitOfWork.CommitAsync(cancellationToken);
+                        return Results.Accepted();
+                    }).AllowAnonymous();
+                }
+            }
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoicePaidConsumer
+            {
+                public static void Handle(InvoicePaidV1 message) => _ = message;
+            }
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoiceVoidedConsumer.cs", """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoiceVoidedConsumer
+            {
+                public static void Handle(InvoiceVoidedV1 message) =>
+                    throw new InvalidOperationException($"The carrier is down; {message.InvoiceId} cannot be cancelled yet.");
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        using var host = project.StartHost(Dependencies(postgres));
+
+        (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/void")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        // Keep the dispatcher busy: each delivered event sends it straight round its loop again.
+        for (var paid = 0; paid < 40; paid++)
+        {
+            (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+            await Task.Delay(25, TestContext.Current.CancellationToken);
+        }
+
+        const string Voided = "from billing.outbox_messages where type like 'Shop.Contracts.Billing.InvoiceVoidedV1,%'";
+        int.Parse(postgres.Psql(DatabasePassword, $"select attempts {Voided}"), CultureInfo.InvariantCulture).ShouldBeInRange(1, 3);
+        postgres.Psql(DatabasePassword, $"select delivered_at is null and next_attempt_at > now() {Voided}").ShouldBe("t");
     }
 
     [Fact]
