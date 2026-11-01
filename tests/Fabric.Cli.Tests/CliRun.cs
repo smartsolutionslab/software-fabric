@@ -21,6 +21,8 @@ internal static class Paths
 
     public static string RepositoryCatalog { get; } = Path.Combine(Repository, "catalog", "catalog.yaml");
 
+    public static string RepositoryPacks { get; } = Path.Combine(Repository, "packs");
+
     private static string Locate()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

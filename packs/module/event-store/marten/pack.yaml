@@ -1,7 +1,7 @@
 option: module.event-store.marten
 files:
   - { template: templates/MartenAggregateStore.cs.sbn, target: src/BuildingBlocks/EventStore/MartenAggregateStore.cs }
-  - { template: templates/EventStoreRegistration.cs.sbn, target: src/BuildingBlocks/EventStore/EventStoreRegistration.cs }
+  - { template: templates/EventStoreRegistration.cs.sbn, target: src/BuildingBlocks/EventStore/Wiring/EventStoreRegistration.cs }
   - { template: templates/ModuleEventStore.cs.sbn, target: src/BuildingBlocks/EventStore/ModuleEventStore.cs }
   - { template: templates/ModuleAggregateStore.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/EventStore/{{ module.namespace }}AggregateStore.cs", per-module: true }
   - { template: templates/OnlyInfrastructureUsesMarten.cs.sbn, target: tests/Architecture.Tests/Rules/OnlyInfrastructureUsesMarten.cs }

@@ -105,6 +105,42 @@ public class ChoiceResolverTests
     }
 
     [Fact]
+    public void Without_authentication_authorization_and_the_browser_sign_in_are_inactive()
+    {
+        var choices = ResolveSuccessfully("saas-standard-react", "backend.auth=none");
+
+        choices.Project["backend.auth"].ShouldBe(["none"]);
+        choices.Project.ShouldNotContainKey("backend.authorization");
+        choices.Project.ShouldNotContainKey("frontend.auth-client");
+    }
+
+    [Fact]
+    public void With_authentication_authorization_defaults_to_signed_in_only()
+    {
+        var choices = ResolveSuccessfully("saas-standard-react");
+
+        choices.Project["backend.authorization"].ShouldBeEmpty();
+        choices.Project["frontend.auth-client"].ShouldBe(["oidc-client-ts"]);
+    }
+
+    [Theory]
+    [InlineData("backend.authorization=", new string[0])]
+    [InlineData("backend.authorization=roles", new[] { "roles" })]
+    [InlineData("backend.authorization=claims", new[] { "claims" })]
+    [InlineData("backend.authorization=roles,claims", new[] { "roles", "claims" })]
+    public void Authorization_takes_any_set_of_roles_and_claims(string setting, string[] expected)
+    {
+        ResolveSuccessfully("saas-standard-react", setting).Project["backend.authorization"].ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Rejects_authorization_without_authentication_and_says_why()
+    {
+        SingleError(RepositoryCatalog, "saas-standard-react", "backend.auth=none", "backend.authorization=roles").ShouldBe(
+            "backend.authorization is set to roles, but it only applies when backend.auth != none, and backend.auth is none.");
+    }
+
+    [Fact]
     public void Values_follow_catalog_order()
     {
         var choices = ResolveSuccessfully("saas-standard-vue");

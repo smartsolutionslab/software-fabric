@@ -96,6 +96,19 @@ public sealed class NewCommandTests : IDisposable
         run.Error.ShouldContain("error: no pack for backend.database=postgres.");
     }
 
+    [Theory]
+    [InlineData("backend.auth=none", "no pack for backend.auth=none.")]
+    [InlineData("backend.authorization=roles,claims", "no pack for backend.authorization=roles.")]
+    [InlineData("backend.authorization=roles,claims", "no pack for backend.authorization=claims.")]
+    public void An_authentication_or_authorization_option_without_a_pack_yet_writes_nothing(string setting, string error)
+    {
+        var run = CliRun.Of("new", Path.Combine(root, "unbuilt"), "--profile", "lean-crud", "--set", setting, "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain($"error: {error}");
+        Directory.Exists(Path.Combine(root, "unbuilt")).ShouldBeFalse();
+    }
+
     [Fact]
     public void The_name_option_wins_over_the_directory_name()
     {

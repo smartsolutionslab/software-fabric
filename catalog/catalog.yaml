@@ -143,6 +143,17 @@ dimensions:
       keycloak:     { tier: supported }
       entra-id:     { tier: supported }
       generic-oidc: { tier: supported }
+      none:         { tier: experimental, note: "no authentication: every endpoint is anonymous and there is no sign-in" }
+
+  backend.authorization:
+    scope: project
+    multi: true
+    active-when: "backend.auth != none"
+    default: []
+    note: "Empty: every module endpoint requires a signed-in user and nothing more. ADR-0009."
+    options:
+      roles:  { tier: experimental, note: "access by role: the identity provider's roles in the token" }
+      claims: { tier: experimental, note: "access by claim or profile information (department, email_verified, a custom attribute)" }
 
   backend.tenancy:
     scope: project
@@ -461,6 +472,7 @@ dimensions:
 
   frontend.auth-client:
     scope: project
+    active-when: "backend.auth != none"
     default: oidc-client-ts
     options:
       oidc-client-ts: { tier: supported }
