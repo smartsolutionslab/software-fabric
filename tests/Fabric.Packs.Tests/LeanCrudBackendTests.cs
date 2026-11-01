@@ -224,14 +224,36 @@ public sealed class LeanCrudBackendTests
             }
             """);
         project.Write("src/Modules/Shipping/Shipping.Application/InvoiceVoidedConsumer.cs", """
+            using System.Collections.Concurrent;
             using Shop.Contracts.Billing;
 
             namespace Shop.Modules.Shipping.Application;
 
             public sealed class InvoiceVoidedConsumer
             {
-                public static void Handle(InvoiceVoidedV1 message) =>
+                /// <summary>When each attempt started, in Unix milliseconds.</summary>
+                public static ConcurrentQueue<long> Attempts { get; } = [];
+
+                public static void Handle(InvoiceVoidedV1 message)
+                {
+                    Attempts.Enqueue(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
                     throw new InvalidOperationException($"The carrier is down; {message.InvoiceId} cannot be cancelled yet.");
+                }
+            }
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Api/VoidedAttempts.cs", """
+            using System.Globalization;
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.Modules.Shipping.Application;
+
+            namespace Shop.Modules.Shipping.Api;
+
+            public sealed class VoidedAttempts : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints) =>
+                    endpoints.MapGet("/voided-attempts", () => string.Join(',', InvoiceVoidedConsumer.Attempts.Select(attempt => attempt.ToString(CultureInfo.InvariantCulture)))).AllowAnonymous();
             }
             """);
         project.Build();
@@ -249,9 +271,29 @@ public sealed class LeanCrudBackendTests
             await Task.Delay(25, TestContext.Current.CancellationToken);
         }
 
+        // The assertions compare attempts with each other, never with the clock when the test happens to look:
+        // however long the requests above took, every gap between attempts must be at least its backoff.
+        long[] attempts = [];
+        for (var poll = 0; poll < 30 && attempts.Length < 2; poll++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            var recorded = await (await host.GetAsync("/shipping/voided-attempts")).Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            attempts = [.. recorded.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(attempt => long.Parse(attempt, CultureInfo.InvariantCulture))];
+        }
+
+        attempts.Length.ShouldBeGreaterThanOrEqualTo(2);
+        for (var retry = 1; retry < attempts.Length; retry++)
+        {
+            (attempts[retry] - attempts[retry - 1]).ShouldBeGreaterThanOrEqualTo(1000L << (retry - 1), $"attempt {retry + 1} came too early");
+        }
+
+        // The row agrees: its next attempt waits the doubled delay after the last failure it recorded.
         const string Voided = "from billing.outbox_messages where type like 'Shop.Contracts.Billing.InvoiceVoidedV1,%'";
-        int.Parse(postgres.Psql(DatabasePassword, $"select attempts {Voided}"), CultureInfo.InvariantCulture).ShouldBeInRange(1, 3);
-        postgres.Psql(DatabasePassword, $"select delivered_at is null and next_attempt_at > now() {Voided}").ShouldBe("t");
+        var row = postgres.Psql(DatabasePassword, $"select attempts || ',' || (extract(epoch from next_attempt_at) * 1000)::bigint {Voided}").Split(',');
+        var failures = int.Parse(row[0], CultureInfo.InvariantCulture);
+        var nextAttempt = long.Parse(row[1], CultureInfo.InvariantCulture);
+        failures.ShouldBeLessThan(10, "the message must not have been dead-lettered");
+        nextAttempt.ShouldBeGreaterThanOrEqualTo(attempts[failures - 1] + (1000L << (failures - 1)));
     }
 
     [Fact]
@@ -353,6 +395,155 @@ public sealed class LeanCrudBackendTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
+    }
+
+    [Fact]
+    public async Task A_consumer_whose_call_timed_out_is_retried_and_the_host_keeps_running()
+    {
+        using var project = ConsumerProject(
+            "InvoicePaidConsumer",
+            """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoicePaidConsumer
+            {
+                private static int calls;
+
+                public static int Received => Math.Max(0, Volatile.Read(ref calls) - 1);
+
+                // An HTTP call that timed out: the cancellation is the consumer's own, not the host stopping.
+                public static void Handle(InvoicePaidV1 message)
+                {
+                    if (Interlocked.Increment(ref calls) == 1)
+                    {
+                        throw new TaskCanceledException($"The carrier did not answer for {message.InvoiceId}.");
+                    }
+                }
+            }
+            """,
+            "InvoicePaidConsumer.Received.ToString(System.Globalization.CultureInfo.InvariantCulture)");
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        RunMigrationRunner(project, postgres);
+        using var host = project.StartHost(Dependencies(postgres));
+
+        (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        (await PollConsumerAsync(host, "1")).ShouldBe("1");
+        (await host.GetAsync("/alive")).StatusCode.ShouldBe(HttpStatusCode.OK);
+        postgres.Psql(DatabasePassword, "select attempts from billing.outbox_messages where delivered_at is not null").ShouldBe("2");
+    }
+
+    [Fact]
+    public async Task A_disposable_consumer_is_disposed_after_it_handled_a_message()
+    {
+        using var project = ConsumerProject(
+            "InvoicePaidConsumer",
+            """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoicePaidConsumer : IAsyncDisposable
+            {
+                private static int handled;
+                private static int disposed;
+                private bool open = true;
+
+                public static string Counts => $"{Volatile.Read(ref handled)},{Volatile.Read(ref disposed)}";
+
+                public void Handle(InvoicePaidV1 message)
+                {
+                    _ = message;
+                    if (open)
+                    {
+                        Interlocked.Increment(ref handled);
+                    }
+                }
+
+                public ValueTask DisposeAsync()
+                {
+                    open = false;
+                    Interlocked.Increment(ref disposed);
+                    return ValueTask.CompletedTask;
+                }
+            }
+            """,
+            "InvoicePaidConsumer.Counts");
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        RunMigrationRunner(project, postgres);
+        using var host = project.StartHost(Dependencies(postgres));
+
+        (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        (await PollConsumerAsync(host, "1,1")).ShouldBe("1,1");
+    }
+
+    /// <summary>billing publishes InvoicePaidV1 on POST /billing/invoices/{id}/pay; shipping's consumer reports on GET /shipping/consumer.</summary>
+    private static GeneratedProject ConsumerProject(string consumer, string consumerSource, string report)
+    {
+        var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IIntegrationEvent;
+            """);
+        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.Contracts.Billing;
+            using Shop.Modules.Billing.Application;
+
+            namespace Shop.Modules.Billing.Api;
+
+            public sealed class PayInvoice : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints) =>
+                    endpoints.MapPost("/invoices/{id}/pay", async (Guid id, IBillingUnitOfWork unitOfWork, CancellationToken cancellationToken) =>
+                    {
+                        await unitOfWork.PublishAsync(new InvoicePaidV1(id));
+                        await unitOfWork.CommitAsync(cancellationToken);
+                        return Results.Accepted();
+                    }).AllowAnonymous();
+            }
+            """);
+        project.Write($"src/Modules/Shipping/Shipping.Application/{consumer}.cs", consumerSource);
+        project.Write("src/Modules/Shipping/Shipping.Api/ConsumerReport.cs", $$"""
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.Modules.Shipping.Application;
+
+            namespace Shop.Modules.Shipping.Api;
+
+            public sealed class ConsumerReport : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints) =>
+                    endpoints.MapGet("/consumer", () => {{report}}).AllowAnonymous();
+            }
+            """);
+        project.Build();
+        return project;
+    }
+
+    /// <summary>Reads the consumer's report until it is the expected one, or returns the last one after 30 s.</summary>
+    private static async Task<string> PollConsumerAsync(RunningHost host, string expected)
+    {
+        var report = string.Empty;
+        for (var poll = 0; poll < 60 && report != expected; poll++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            report = await (await host.GetAsync("/shipping/consumer")).Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        }
+
+        return report;
     }
 
     [Fact]
