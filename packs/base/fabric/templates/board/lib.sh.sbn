@@ -65,7 +65,10 @@ board_executor_of() {
 # fast-forward and is rejected: of two agents taking the same step, one wins.
 # Each commit carries a nonce: two agents with the same identity, parent and second would otherwise build the same
 # commit, and the second push would report the branch "up to date" and succeed. An up-to-date push still counts as lost.
-# Returns 0 when pushed, 2 when another agent moved the branch first, 1 on any other failure (printed).
+# A branch another agent created while this push was in flight is refused as "[remote rejected]", like a hook or a
+# permission refusal, so only its reason tells them apart: GitHub gives "reference already exists" as the reason, git's
+# own server gives "failed to update ref" and names the existing ref on stderr.
+# Returns 0 when pushed, 2 when another agent moved or created the branch first, 1 on any other failure (printed).
 board_mark() {
   local branch="$1" base="$2" message="$3" commit output nonce
   nonce="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')" || return 1
@@ -84,6 +87,11 @@ board_mark() {
     return 0
   fi
   if grep -q $'\t\[rejected\]' <<< "$output"; then
+    return 2
+  fi
+  if grep -q $'\t\[remote rejected\] (.*reference already exists)$' <<< "$output" ||
+    { grep -q $'\t\[remote rejected\] (failed to update ref)$' <<< "$output" &&
+      grep -qF "cannot lock ref 'refs/heads/$branch': reference already exists" <<< "$output"; }; then
     return 2
   fi
   echo "$output" >&2
