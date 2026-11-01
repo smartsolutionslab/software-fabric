@@ -317,6 +317,43 @@ public sealed class EventDrivenBackendTests
     }
 
     [Fact]
+    public void The_read_side_gate_checks_only_modules_that_chose_physical_cqrs()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.AddModule("ledger");
+
+        // add-module refuses a CQRS option new to the project (its pack writes a project-wide rule), so a logical module
+        // beside physical ones is made by hand: ledger loses the read side only the physical pack renders per module.
+        File.Delete(Path.Combine(project.ProjectDirectory, "src", "Modules", "Ledger", "Ledger.Application", "ILedgerReadModels.cs"));
+        File.Delete(Path.Combine(project.ProjectDirectory, "src", "Modules", "Ledger", "Ledger.Infrastructure", "ReadModels", "LedgerReadModels.cs"));
+
+        project.Write("src/Modules/Ledger/Ledger.Application/Queries/GetEntry/EntryQuery.cs", """
+            namespace Shop.Modules.Ledger.Application.Queries.GetEntry;
+
+            public static class EntryQuery
+            {
+                public static ILedgerAggregateStore Handle(ILedgerAggregateStore store) => store;
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Application/Queries/GetInvoice/InvoiceQuery.cs", """
+            namespace Shop.Modules.Billing.Application.Queries.GetInvoice;
+
+            public static class InvoiceQuery
+            {
+                public static IBillingAggregateStore Handle(IBillingAggregateStore store) => store;
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application.Queries.GetInvoice.InvoiceQuery reads the write side (IBillingAggregateStore)");
+        output.ShouldNotContain("Shop.Modules.Ledger.Application.Queries.GetEntry.EntryQuery reads the write side");
+    }
+
+    [Fact]
     public void A_modules_event_store_lives_in_the_schema_its_dbcontext_uses()
     {
         using var project = new GeneratedProject(Profile, Frontend);
