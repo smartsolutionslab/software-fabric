@@ -103,6 +103,54 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         prompt.ShouldContain("\"findings\"");
     }
 
+    /// <summary>
+    /// The diff under review is untrusted: a prompt injected into it must not get the reviewer to run anything that
+    /// writes, reaches the network, or reads the token. Copilot asks no one in prompt mode, so what is not allowed is
+    /// refused (copilot help permissions).
+    /// </summary>
+    [Fact]
+    public void The_reviewer_may_run_only_read_only_commands_and_its_shell_never_sees_the_token()
+    {
+        string[] readOnly = ["shell(git diff)", "shell(git show)", "shell(git log)", "shell(ls)", "shell(grep)"];
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings);
+
+        run.ExitCode.ShouldBe(0, run.Log);
+        var arguments = run.CopilotArguments.ShouldNotBeNull(run.Log);
+        foreach (var broad in new[] { "--allow-all-tools", "--allow-all", "--yolo", "--allow-all-paths", "--allow-all-urls", "--allow-url" })
+        {
+            arguments.ShouldNotContain(argument => argument == broad || argument.StartsWith(broad + "=", StringComparison.Ordinal), string.Join(' ', arguments));
+        }
+
+        var allowed = Values(arguments, "--allow-tool");
+        allowed.ShouldContain("shell(git diff)");
+        allowed.ShouldBeSubsetOf(readOnly);
+        Values(arguments, "--secret-env-vars").SelectMany(value => value.Split(',')).ShouldContain("COPILOT_GITHUB_TOKEN");
+    }
+
+    /// <summary>Copilot reads COPILOT_* variables as its own settings (copilot help environment); the workflow sets only its token.</summary>
+    [Fact]
+    public void The_workflow_sets_no_copilot_variable_but_the_token()
+    {
+        var root = Root();
+        var jobs = (YamlMappingNode)root["jobs"];
+        var names = Mapping(root, "env").Keys
+            .Concat(jobs.Children.Values.Cast<YamlMappingNode>().SelectMany(job => Mapping(job, "env").Keys))
+            .Concat(jobs.Children.Values.Cast<YamlMappingNode>()
+                .SelectMany(job => ((YamlSequenceNode)job["steps"]).Cast<YamlMappingNode>())
+                .SelectMany(step => Mapping(step, "env").Keys));
+
+        names.Where(name => name.StartsWith("COPILOT_", StringComparison.Ordinal)).Distinct().ShouldBe(["COPILOT_GITHUB_TOKEN"]);
+    }
+
+    /// <summary>A flag's values, given as <c>--flag value</c> or <c>--flag=value</c>.</summary>
+    private static List<string> Values(List<string> arguments, string flag) =>
+    [
+        .. arguments.Select((argument, index) => argument == flag && index + 1 < arguments.Count
+            ? arguments[index + 1]
+            : argument.StartsWith(flag + "=", StringComparison.Ordinal) ? argument[(flag.Length + 1)..] : null)
+            .OfType<string>(),
+    ];
+
     [Theory]
     [InlineData("I reviewed the change; it looks fine.", 0)]
     [InlineData("```json\n{\"findings\": []}\n```", 0)]
