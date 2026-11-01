@@ -44,6 +44,138 @@ public sealed class FrontendTests
     }
 
     [Fact]
+    public void A_test_that_waits_for_a_count_instead_of_a_condition_fails_lint()
+    {
+        using var project = new GeneratedProject(Profile);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, $"pnpm install:\n{installOutput}");
+
+        // Waiting on the condition, and driving fake timers forward, are what a test should do; lint accepts them.
+        project.Write("web/app/src/waits/condition.test.tsx", ConditionTest);
+        var (cleanExitCode, cleanOutput) = Shell.Run(web, "pnpm", "lint");
+        cleanExitCode.ShouldBe(0, $"pnpm lint with a test that waits for its condition:\n{cleanOutput}");
+
+        project.Write("web/app/src/waits/counted.test.tsx", CountedTest);
+        project.Write("web/app/src/waits/settled.test.tsx", SettledTest);
+
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldNotContain("condition.test.tsx");
+        output.ShouldContain("counted.test.tsx");
+        output.ShouldContain("settled.test.tsx");
+        output.ShouldContain("A fixed count of timer yields is not a bound on work that advances in another phase of the event loop");
+        output.ShouldContain("A settle may not immediately precede an assertion");
+        output.ShouldContain("6 problems (6 errors, 0 warnings)");
+    }
+
+    /// <summary>A test that waits for what it asserts: lint has nothing to say about it.</summary>
+    private const string ConditionTest = """
+        import { waitFor } from '@testing-library/react';
+        import { afterEach, expect, test, vi } from 'vitest';
+
+        afterEach(() => {
+          vi.useRealTimers();
+        });
+
+        test('waits for the condition', async () => {
+          let ready = false;
+          setTimeout(() => {
+            ready = true;
+          }, 10);
+
+          await waitFor(() => expect(ready).toBe(true));
+        });
+
+        test('drives fake timers forward', async () => {
+          vi.useFakeTimers();
+          let ready = false;
+          setTimeout(() => {
+            ready = true;
+          }, 100);
+
+          await vi.advanceTimersByTimeAsync(100);
+          expect(ready).toBe(true);
+        });
+        """;
+
+    /// <summary>Three loops that yield to the timer a fixed number of times: a literal bound, a named bound, a fixed array.</summary>
+    private const string CountedTest = """
+        import { expect, test } from 'vitest';
+
+        const ROUNDS = 10;
+
+        test('a literal count of timer yields', async () => {
+          let ready = false;
+          setTimeout(() => {
+            ready = true;
+          }, 0);
+          for (let i = 0; i < 10; i += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+          expect(ready).toBe(true);
+        });
+
+        test('a named count of timer yields', async () => {
+          let ready = false;
+          setTimeout(() => {
+            ready = true;
+          }, 0);
+          for (let i = 0; i < ROUNDS; i += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+          expect(ready).toBe(true);
+        });
+
+        test('a timer yield per element of a fixed array', async () => {
+          let ready = false;
+          setTimeout(() => {
+            ready = true;
+          }, 0);
+          for (const delay of [0, 0, 0]) {
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+          expect(ready).toBe(true);
+        });
+        """;
+
+    /// <summary>Three settles immediately before an assertion: a raw timer promise, a sleep helper, an act with nothing in it.</summary>
+    private const string SettledTest = """
+        import { act } from '@testing-library/react';
+        import { expect, test } from 'vitest';
+
+        const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+        test('a raw timer promise before the assertion', async () => {
+          let ready = false;
+          setTimeout(() => {
+            ready = true;
+          }, 0);
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          expect(ready).toBe(true);
+        });
+
+        test('a sleep before the assertion', async () => {
+          let ready = false;
+          setTimeout(() => {
+            ready = true;
+          }, 0);
+          await sleep(50);
+          expect(ready).toBe(true);
+        });
+
+        test('an empty act before the assertion', async () => {
+          let ready = false;
+          setTimeout(() => {
+            ready = true;
+          }, 0);
+          await act(async () => {});
+          expect(ready).toBe(true);
+        });
+        """;
+
+    [Fact]
     public void The_generated_ci_checks_formatting_after_installing_the_workspace()
     {
         using var project = new GeneratedProject(Profile);

@@ -43,4 +43,5 @@ agents:
 adr: docs/adr.md
 gates:
   - { kind: lint-rule, describes: "TypeScript strict (tsc -b in the build) and the strict typescript-eslint rules fail the frontend job.", file: templates/eslint.config.js.sbn }
+  - { kind: lint-rule, describes: "In *.test.ts(x), a loop of awaited promises or a settle right before expect fails lint: tests wait for a condition (findBy*, waitFor), not a count.", file: templates/eslint.config.js.sbn }
   - { kind: ci-step, describes: "pnpm format:check (Prettier) runs in the frontend job; a file Prettier would change fails CI.", file: templates/ci-frontend-steps.sbn }
