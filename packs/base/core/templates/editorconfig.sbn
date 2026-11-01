@@ -101,6 +101,12 @@ dotnet_naming_symbols.async_methods.required_modifiers = async
 dotnet_naming_style.ends_in_async.required_suffix = Async
 dotnet_naming_style.ends_in_async.capitalization = pascal_case
 
+# Wiring code is the one exception to namespaces that match the folder: an extension method that wires a choice into
+# the host or a module is declared in the Microsoft.* namespace it extends, so no shared file needs a using per choice,
+# and it lives in a Wiring/ folder so that exception has a place. Nothing else may be in a Microsoft.* namespace.
+[src/**/Wiring/*.cs]
+dotnet_diagnostic.IDE0130.severity = none
+
 # Test names are sentences with underscores.
 [tests/**.cs]
 dotnet_diagnostic.CA1707.severity = none

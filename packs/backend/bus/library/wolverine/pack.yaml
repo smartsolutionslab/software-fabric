@@ -1,8 +1,8 @@
 option: backend.bus.library.wolverine
 files:
-  - { template: templates/Messaging.cs.sbn, target: src/Host/Messaging.cs }
+  - { template: templates/Messaging.cs.sbn, target: src/Host/Wiring/Messaging.cs }
   - { template: templates/ModuleUnitOfWorkBase.cs.sbn, target: src/BuildingBlocks/Messaging/ModuleUnitOfWork.cs }
-  - { template: templates/UnitOfWorkRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/UnitOfWorkRegistration.cs }
+  - { template: templates/UnitOfWorkRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/UnitOfWorkRegistration.cs }
   - { template: templates/ModuleUnitOfWork.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/{{ module.namespace }}UnitOfWork.cs", per-module: true }
   - { template: templates/ConsumersHandleIntegrationEvents.cs.sbn, target: tests/Architecture.Tests/Rules/ConsumersHandleIntegrationEvents.cs }
 slots:
