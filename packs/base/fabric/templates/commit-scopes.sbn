@@ -1,0 +1,15 @@
+# The scopes a commit may name besides the modules in fabric.yaml, one per line (board protocol, docs/adr).
+# Every module is a scope by itself; never list one here.
+apphost
+host
+kernel
+contracts
+building-blocks
+service-defaults
+migrations
+web
+architecture
+integration
+ci
+board
+deps

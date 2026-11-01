@@ -10,6 +10,7 @@ public sealed class OwnBoardTests
         ".github/workflows/agent-executor.yml",
         ".github/workflows/board-janitor.yml",
         ".github/workflows/board-return.yml",
+        ".github/workflows/commit-messages.yml",
         ".github/workflows/cross-model-review.yml",
         ".claude/skills/next-issue/SKILL.md",
     ];

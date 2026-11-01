@@ -6,6 +6,7 @@ Agents coordinate through GitHub only: issues, labels, branches and the board. T
 - **The branch is the lock.** Work only on the `agent/<issue>` branch you claimed. If it already has commits, resume them.
 - **Push at least every two hours.** A claim lapses after `BOARD_LEASE_HOURS` without a push and without an open pull request; the janitor then parks the branch and returns the issue to Todo.
 - **Every commit names its executor** with the trailer `Agent-Executor: <family>-<runtime>/<detail>`, e.g. `Agent-Executor: claude-cloud/lane-backend` or `Agent-Executor: codex-cloud/lane-frontend`. CI rejects an agent branch with a commit that lacks it, and the trailer decides who reviews: always a model family that did not write the change.
+- **Every commit is a Conventional Commit**: `<type>(<scope>): <subject>`, e.g. `feat(billing): pay an invoice`. The type is one of `build chore ci docs feat fix perf refactor revert style test`; the scope, when there is one, is a module in `fabric.yaml` or one of `.github/commit-scopes`. A new module is a scope by itself; never list it by hand. CI checks every commit a pull request adds (`check-commits.sh`).
 - **Escalate instead of guessing**, with `escalate.sh <issue> <label> "<message>"`:
   - `needs:decision`: a decision a developer must make; the message is the concrete question.
   - `agent:blocked`: a phase failed twice; the message is the verbatim failure.

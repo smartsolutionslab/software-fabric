@@ -33,7 +33,7 @@ Milestones M0 and M1 are **supervised**: stop at every gate in
 on, through the board protocol in ADR-0004.
 
 - Branch from `main`; one issue per branch; PRs target `main`.
-- Conventional Commits.
+- Conventional Commits; a scope is one of `.github/commit-scopes`. CI checks every commit a PR adds.
 - Tests first for new behaviour; quote the failing output in the PR.
 
 ## Board protocol (from M2)

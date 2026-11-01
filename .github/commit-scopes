@@ -1,0 +1,16 @@
+# The scopes a commit in this repository may name, one per line (check-commits.sh, board protocol).
+# This repository has no fabric.yaml, so its scopes are all listed here: the parts of the generator and the board.
+generator
+cli
+core
+catalog
+choices
+rendering
+schema
+packs
+base
+backend
+frontend
+board
+ci
+deps
