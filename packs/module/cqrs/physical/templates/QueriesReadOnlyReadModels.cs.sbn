@@ -12,13 +12,22 @@ public sealed class QueriesReadOnlyReadModels : IArchitectureRule
         "Microsoft.EntityFrameworkCore.DbContext",
     ];
 
-    public string Description => "Nothing in a Queries namespace depends on the write side (aggregate stores, aggregates, DbContexts); queries read read models.";
+    private const string ReadModels = "{{ namespace }}.BuildingBlocks.ReadModels.IReadModels";
+
+    public string Description => "Nothing in a Queries namespace of a physical-CQRS module depends on the write side (aggregate stores, aggregates, DbContexts); queries read read models.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
         {{ not_null "model" }}
 
+        // module.cqrs is per module: only modules with a read side (I<Module>ReadModels) chose physical CQRS.
+        var physical = model.ModuleAssemblies
+            .Where(assembly => assembly.GetTypes().Any(type => type.IsInterface && type.GetInterfaces().Any(contract => contract.FullName == ReadModels)))
+            .Select(ModuleOf)
+            .ToHashSet(StringComparer.Ordinal);
+
         var queries = model.ModuleAssemblies
+            .Where(assembly => physical.Contains(ModuleOf(assembly)))
             .SelectMany(assembly => assembly.GetTypes())
             .Where(type => type.Namespace?.Contains(".Queries", StringComparison.Ordinal) == true);
 
@@ -37,6 +46,13 @@ public sealed class QueriesReadOnlyReadModels : IArchitectureRule
                 yield return $"{type.FullName} reads the write side ({dependency.Name}); a query reads read models through I<Module>ReadModels.";
             }
         }
+    }
+
+    /// <summary><c>{{ namespace }}.Modules.Billing.Application</c> belongs to module <c>{{ namespace }}.Modules.Billing</c>.</summary>
+    private static string ModuleOf(Assembly assembly)
+    {
+        var name = assembly.GetName().Name!;
+        return name[..name.LastIndexOf('.')];
     }
 
     private static bool IsWriteSide(Type type)

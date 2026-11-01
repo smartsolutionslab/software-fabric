@@ -14,4 +14,4 @@ Built for event-sourced modules on Marten. Generating it for any other combinati
 
 - A query can have exactly the shape a screen needs, and adding one never changes the write model.
 - A new read model, or a changed projection, needs its table rebuilt from the events; Marten's projection rebuild does that, but it is not wired into a command or the migration runner yet.
-- An architecture rule fails the build when anything in a Queries namespace depends on an aggregate store, an aggregate or a DbContext.
+- An architecture rule fails the build when anything in a Queries namespace of a module that chose physical CQRS depends on an aggregate store, an aggregate or a DbContext. Modules with another CQRS choice are left to their own rules.
