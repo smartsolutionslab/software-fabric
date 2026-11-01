@@ -20,6 +20,12 @@ public static class Outbox
     /// <summary>A message that failed this often is left for a developer; its last error is in the row.</summary>
     public const int MaximumAttempts = 10;
 
+    /// <summary>How long a message waits after its first failure; each further failure doubles it.</summary>
+    public static readonly TimeSpan FirstRetryDelay = TimeSpan.FromSeconds(1);
+
+    /// <summary>The longest a failed message waits before its next attempt.</summary>
+    public static readonly TimeSpan MaximumRetryDelay = TimeSpan.FromMinutes(5);
+
     private static readonly ConcurrentDictionary<string, bool> Created = new(StringComparer.Ordinal);
 
     public static async Task EnsureCreatedAsync(DbContext context, CancellationToken cancellationToken)
@@ -42,6 +48,7 @@ public static class Outbox
                     created_at timestamptz not null default now(),
                     delivered_at timestamptz null,
                     attempts integer not null default 0,
+                    next_attempt_at timestamptz null,
                     last_error text null);
                 """),
             cancellationToken);
@@ -74,7 +81,7 @@ public static class Outbox
             .SqlQueryRaw<OutboxMessage>(
                 Sql(SchemaOf(context), """
                     select id as "Id", type as "Type", payload as "Payload" from "$schema$".outbox_messages
-                    where delivered_at is null and attempts < {0}
+                    where delivered_at is null and attempts < {0} and (next_attempt_at is null or next_attempt_at <= now())
                     order by id
                     limit {1}
                     for update skip locked
@@ -94,13 +101,21 @@ public static class Outbox
             cancellationToken);
     }
 
+    /// <summary>Records the failure and holds the message back: 1 s after the first failure, doubling, at most 5 minutes.</summary>
     public static Task MarkFailedAsync(DbContext context, Guid id, string error, CancellationToken cancellationToken)
     {
         {{ not_null "context" }}
 
+        // attempts on the right is the value before this update: 1 s * 2^0 after the first failure.
         return context.Database.ExecuteSqlRawAsync(
-            Sql(SchemaOf(context), """update "$schema$".outbox_messages set attempts = attempts + 1, last_error = {1} where id = {0}"""),
-            [id, error],
+            Sql(SchemaOf(context), """
+                update "$schema$".outbox_messages
+                set attempts = attempts + 1,
+                    next_attempt_at = now() + least(make_interval(secs => {2} * power(2, attempts)), make_interval(secs => {3})),
+                    last_error = {1}
+                where id = {0}
+                """),
+            [id, error, FirstRetryDelay.TotalSeconds, MaximumRetryDelay.TotalSeconds],
             cancellationToken);
     }
 
