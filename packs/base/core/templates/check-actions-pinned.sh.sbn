@@ -1,0 +1,26 @@
+{%{#!/usr/bin/env bash
+# Every action a workflow uses names a full 40-character commit SHA with its version tag in a comment
+# (`uses: actions/checkout@<sha> # v4.4.0`): a tag can be moved to code nobody reviewed. Local actions (./...) are
+# part of the repository and need no pin. Run it from the repository root: bash .github/scripts/check-actions-pinned.sh
+set -euo pipefail
+
+pinned='uses:[[:space:]]*[^@[:space:]]+@[0-9a-f]{40}[[:space:]]+#[[:space:]]*v[0-9]'
+local_action='uses:[[:space:]]*\./'
+status=0
+
+shopt -s nullglob
+for file in .github/workflows/*.yml .github/workflows/*.yaml; do
+  while IFS=: read -r line text; do
+    if [[ $text =~ $local_action || $text =~ $pinned ]]; then
+      continue
+    fi
+    echo "::error file=$file,line=$line::not pinned to a commit with its version in a comment:${text}"
+    status=1
+  done < <(grep -nE '^[[:space:]]*(-[[:space:]]+)?uses:' "$file" || true)
+done
+
+if [ "$status" -ne 0 ]; then
+  echo "Pin each action above to the commit its tag points to, with the tag in a comment: uses: <action>@<sha> # <tag>"
+fi
+exit "$status"
+}%}
