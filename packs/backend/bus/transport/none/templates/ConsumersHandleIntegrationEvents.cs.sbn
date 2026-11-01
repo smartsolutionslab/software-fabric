@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace {{ namespace }}.Architecture.Tests.Rules;
 
@@ -6,7 +7,7 @@ public sealed class ConsumersHandleIntegrationEvents : IArchitectureRule
 {
     private const string IntegrationEvent = "{{ namespace }}.Contracts.IIntegrationEvent";
 
-    public string Description => "Every consumer is a public class whose Handle methods take an integration event first and return void or Task.";
+    public string Description => "Every consumer is a public class whose Handle methods take an integration event first and return void (never async void) or Task.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -41,6 +42,11 @@ public sealed class ConsumersHandleIntegrationEvents : IArchitectureRule
                 else if (method.ReturnType != typeof(void) && method.ReturnType != typeof(Task))
                 {
                     yield return $"{consumer.FullName}.{method.Name} returns {method.ReturnType.Name}; a consumer returns void or Task.";
+                }
+                else if (method.ReturnType == typeof(void) && method.GetCustomAttribute<AsyncStateMachineAttribute>() is not null)
+                {
+                    // The dispatcher would mark the message delivered before the handler finished, and lose its exceptions.
+                    yield return $"{consumer.FullName}.{method.Name} is async void; a consumer that awaits returns Task.";
                 }
             }
         }

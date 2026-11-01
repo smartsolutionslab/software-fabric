@@ -22,25 +22,25 @@ public abstract class ModuleUnitOfWork<TContext>(TContext context, IServiceProvi
 
     public async Task CommitAsync(CancellationToken cancellationToken)
     {
+        // It cannot know when, or whether, a caller's transaction commits, so it would forget changes a rollback undid.
+        if (context.Database.CurrentTransaction is not null)
+        {
+            throw new InvalidOperationException(
+                $"{GetType().Name} opens its own transaction; commit it outside the transaction the caller began on {typeof(TContext).Name}.");
+        }
+
         if (queued.Count == 0)
         {
             await context.SaveChangesAsync(cancellationToken);
             return;
         }
 
-        // A transaction the caller opened is theirs to commit; the events join it.
-        var transaction = context.Database.CurrentTransaction is null
-            ? await context.Database.BeginTransactionAsync(cancellationToken)
-            : null;
-        await using (transaction)
+        await using (var transaction = await context.Database.BeginTransactionAsync(cancellationToken))
         {
             // The tracked changes stay pending until the commit succeeds, so a retry after a failure saves them again.
             await context.SaveChangesAsync(acceptAllChangesOnSuccess: false, cancellationToken);
             await Outbox.AddAsync(context, queued, cancellationToken);
-            if (transaction is not null)
-            {
-                await transaction.CommitAsync(cancellationToken);
-            }
+            await transaction.CommitAsync(cancellationToken);
         }
 
         context.ChangeTracker.AcceptAllChanges();

@@ -97,12 +97,13 @@ public static class Outbox
     {
         {{ not_null "context" }}
 
-        // attempts on the right is the value before this update: 1 s * 2^0 after the first failure.
+        // attempts on the right is the value before this update: 1 s * 2^0 after the first failure. clock_timestamp(), not
+        // now(): now() is when the batch's transaction began, before its consumers ran.
         return context.Database.ExecuteSqlRawAsync(
             Sql(SchemaOf(context), """
                 update "$schema$".outbox_messages
                 set attempts = attempts + 1,
-                    next_attempt_at = now() + least(make_interval(secs => {2} * power(2, attempts)), make_interval(secs => {3})),
+                    next_attempt_at = clock_timestamp() + least(make_interval(secs => {2} * power(2, attempts)), make_interval(secs => {3})),
                     last_error = {1}
                 where id = {0}
                 """),
