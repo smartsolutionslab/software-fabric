@@ -1,0 +1,16 @@
+namespace {{ namespace }}.BuildingBlocks.ReadModels;
+
+/// <summary>The read side of a module: read models fed by projections, never the aggregates. Each module has its own (I&lt;Module&gt;ReadModels).</summary>
+public interface IReadModels
+{
+{{~ if project["backend.absence"] == "option" ~}}
+    Task<Option<TReadModel>> FindAsync<TReadModel>(Guid id, CancellationToken cancellationToken)
+        where TReadModel : class;
+{{~ else ~}}
+    Task<TReadModel?> FindAsync<TReadModel>(Guid id, CancellationToken cancellationToken)
+        where TReadModel : class;
+{{~ end ~}}
+
+    Task<IReadOnlyList<TReadModel>> ListAsync<TReadModel>(CancellationToken cancellationToken)
+        where TReadModel : class;
+}

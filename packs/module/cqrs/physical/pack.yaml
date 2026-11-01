@@ -1,0 +1,12 @@
+option: module.cqrs.physical
+files:
+  - { template: templates/IReadModels.cs.sbn, target: src/BuildingBlocks/ReadModels/IReadModels.cs }
+  - { template: templates/MartenReadModels.cs.sbn, target: src/BuildingBlocks/ReadModels/MartenReadModels.cs }
+  - { template: templates/ModuleReadModels.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/I{{ module.namespace }}ReadModels.cs", per-module: true }
+  - { template: templates/ModuleMartenReadModels.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/ReadModels/{{ module.namespace }}ReadModels.cs", per-module: true }
+  - { template: templates/QueriesReadOnlyReadModels.cs.sbn, target: tests/Architecture.Tests/Rules/QueriesReadOnlyReadModels.cs }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Nothing in a Queries namespace of a module that chose physical CQRS depends on an aggregate store, an aggregate or a DbContext, even wrapped in a generic, an array or a delegate, or takes a service locator. It checks the dependencies a query and its base classes declare, not what code reaches through static calls or reflection.", file: templates/QueriesReadOnlyReadModels.cs.sbn }

@@ -30,6 +30,28 @@ internal sealed class Container : IDisposable
         return container;
     }
 
+    /// <summary>
+    /// A single-node Kafka (the image Aspire runs). A client is told the broker's address by the broker itself, so it
+    /// listens on the same port inside and outside the container and advertises that one.
+    /// </summary>
+    public static Container Kafka()
+    {
+        var port = FreePort();
+        var id = Docker(
+            "run", "--detach", "--publish", $"127.0.0.1:{port}:{port}",
+            "--env", $"KAFKA_LISTENERS=PLAINTEXT://localhost:29092,CONTROLLER://localhost:29093,PLAINTEXT_HOST://0.0.0.0:{port}",
+            "--env", $"KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:29092,PLAINTEXT_HOST://localhost:{port}",
+            "confluentinc/confluent-local:8.2.0").Trim();
+        var container = new Container(id, port);
+        container.WaitUntil("appuser", "kafka-topics", "--bootstrap-server", "localhost:29092", "--list");
+        return container;
+    }
+
+    /// <summary>The first message of a Kafka topic, read with the broker's own console consumer; empty when none arrives in time.</summary>
+    public string FirstKafkaMessage(string topic) =>
+        Run(["exec", "--user", "appuser", id, "kafka-console-consumer", "--bootstrap-server", "localhost:29092", "--topic", topic,
+            "--from-beginning", "--max-messages", "1", "--timeout-ms", "30000"]).Output;
+
     /// <summary>Runs one SQL statement as the postgres user and returns its unaligned, tuples-only output.</summary>
     public string Psql(string password, string sql) =>
         Docker("exec", "--env", $"PGPASSWORD={password}", id, "psql", "-U", "postgres", "-d", "postgres", "-tAc", sql).Trim();
@@ -48,6 +70,13 @@ internal sealed class Container : IDisposable
         var id = Docker([.. arguments]).Trim();
         var mapping = Docker("port", id, containerPort.ToString(System.Globalization.CultureInfo.InvariantCulture)).Trim().Split('\n')[0];
         return new Container(id, int.Parse(mapping[(mapping.LastIndexOf(':') + 1)..], System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    private static int FreePort()
+    {
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        return ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
     }
 
     private void WaitUntil(string user, params string[] command)

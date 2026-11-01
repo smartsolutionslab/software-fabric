@@ -1,0 +1,56 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class EventsAreAppliedByAnAggregate : IArchitectureRule
+{
+    // By name: the rule needs no reference to the building blocks it checks.
+    private const string DomainEvent = "{{ namespace }}.BuildingBlocks.EventSourcing.IDomainEvent";
+    private const string Aggregate = "{{ namespace }}.BuildingBlocks.EventSourcing.EventSourcedAggregate`1";
+
+    public string Description => "Every domain event is applied by an aggregate, and an event-sourced aggregate changes only in its Apply methods.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var assembly in model.ModuleAssemblies.Where(assembly => assembly.GetName().Name!.EndsWith(".Domain", StringComparison.Ordinal)))
+        {
+            var types = assembly.GetTypes();
+            var aggregates = types.Where(IsAggregate).ToList();
+
+            foreach (var domainEvent in types.Where(type => type is { IsClass: true, IsAbstract: false } && type.GetInterfaces().Any(contract => contract.FullName == DomainEvent)))
+            {
+                if (!aggregates.Any(aggregate => Applies(aggregate, domainEvent)))
+                {
+                    yield return $"{domainEvent.FullName} is applied by no aggregate; add Apply({domainEvent.Name}) to the aggregate that raises it, or replaying its stream loses it.";
+                }
+            }
+
+            foreach (var aggregate in aggregates)
+            {
+                foreach (var property in aggregate.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(property => property.SetMethod is { IsPublic: true }))
+                {
+                    yield return $"{aggregate.FullName}.{property.Name} has a public setter; an event-sourced aggregate changes only in its Apply methods.";
+                }
+            }
+        }
+    }
+
+    private static bool Applies(Type aggregate, Type domainEvent) =>
+        aggregate.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+            .Any(method => method.Name == "Apply" && method.GetParameters() is [{ } parameter] && parameter.ParameterType == domainEvent);
+
+    private static bool IsAggregate(Type type)
+    {
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        {
+            if (current.IsGenericType && current.GetGenericTypeDefinition().FullName == Aggregate)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}

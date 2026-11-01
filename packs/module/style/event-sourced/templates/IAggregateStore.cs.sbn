@@ -1,0 +1,18 @@
+namespace {{ namespace }}.BuildingBlocks.EventSourcing;
+
+/// <summary>Loads event-sourced aggregates from their events and stores the events they raise. Each module has its own (I&lt;Module&gt;AggregateStore).</summary>
+public interface IAggregateStore
+{
+{{~ if project["backend.absence"] == "option" ~}}
+    /// <summary>The aggregate rebuilt from its stream, or none when no event was ever stored for <paramref name="id"/>.</summary>
+    Task<Option<TAggregate>> LoadAsync<TAggregate>(IAggregateId id, CancellationToken cancellationToken)
+        where TAggregate : class, IEventSourced;
+{{~ else ~}}
+    /// <summary>The aggregate rebuilt from its stream, or null when no event was ever stored for <paramref name="id"/>.</summary>
+    Task<TAggregate?> LoadAsync<TAggregate>(IAggregateId id, CancellationToken cancellationToken)
+        where TAggregate : class, IEventSourced;
+{{~ end ~}}
+
+    /// <summary>Appends the aggregate's pending events to its stream; fails if another save appended to it since it was loaded.</summary>
+    Task SaveAsync(IEventSourced aggregate, CancellationToken cancellationToken);
+}

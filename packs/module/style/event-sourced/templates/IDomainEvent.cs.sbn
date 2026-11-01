@@ -1,0 +1,6 @@
+namespace {{ namespace }}.BuildingBlocks.EventSourcing;
+
+#pragma warning disable CA1040 // A marker: what happened is the event's own record type and properties.
+/// <summary>Something that happened to an event-sourced aggregate, named in the past tense (InvoicePaid). Stored as it is, forever.</summary>
+public interface IDomainEvent;
+#pragma warning restore CA1040

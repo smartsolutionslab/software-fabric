@@ -1,0 +1,12 @@
+option: backend.bus.transport.kafka
+files: []
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-version.sbn }
+  - { slot: apphost.packages, template: templates/apphost-package.sbn }
+  - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 30 }
+  - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 30 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "The broker becomes healthy and the host, which needs it to start, reports itself healthy; checked by the integration tests of the aspire-fixture pack against the running stack." }

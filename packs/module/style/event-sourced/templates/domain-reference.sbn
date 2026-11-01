@@ -1,0 +1,1 @@
+    <ProjectReference Include="$(MSBuildThisFileDirectory)../BuildingBlocks.EventSourcing/BuildingBlocks.EventSourcing.csproj" />

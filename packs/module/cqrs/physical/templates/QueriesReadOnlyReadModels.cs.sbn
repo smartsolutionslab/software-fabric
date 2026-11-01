@@ -1,0 +1,162 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class QueriesReadOnlyReadModels : IArchitectureRule
+{
+    // By name: the rule needs no reference to what it keeps queries away from.
+    private static readonly string[] WriteSide =
+    [
+        "{{ namespace }}.BuildingBlocks.EventSourcing.IAggregateStore",
+        "{{ namespace }}.BuildingBlocks.EventSourcing.IEventSourced",
+        "Microsoft.EntityFrameworkCore.DbContext",
+    ];
+
+    // Through one of these any write-side type is a call away, so no check of declared types could hold.
+    private static readonly string[] ServiceLocators =
+    [
+        "System.IServiceProvider",
+        "Microsoft.Extensions.DependencyInjection.IServiceScopeFactory",
+        "Microsoft.Extensions.DependencyInjection.IServiceScope",
+    ];
+
+    private const string ReadModels = "{{ namespace }}.BuildingBlocks.ReadModels.IReadModels";
+
+    public string Description => "Nothing in a Queries namespace of a physical-CQRS module depends on the write side (aggregate stores, aggregates, DbContexts), even wrapped in a generic, an array or a delegate, or takes a service locator; queries read read models.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        // module.cqrs is per module: only modules with a read side (I<Module>ReadModels) chose physical CQRS.
+        var physical = model.ModuleAssemblies
+            .Where(assembly => assembly.GetTypes().Any(type => type.IsInterface && type.GetInterfaces().Any(contract => contract.FullName == ReadModels)))
+            .Select(ModuleOf)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var queries = model.ModuleAssemblies
+            .Where(assembly => physical.Contains(ModuleOf(assembly)))
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type.Namespace?.Contains(".Queries", StringComparison.Ordinal) == true);
+
+        foreach (var type in queries)
+        {
+            var dependencies = DeclaredDependencies(type);
+
+            foreach (var dependency in dependencies)
+            {
+                if (Reaches(dependency, IsServiceLocator))
+                {
+                    yield return $"{type.FullName} takes a service locator ({Display(dependency)}); a query gets I<Module>ReadModels injected, never looked up.";
+                }
+                else if (Reaches(dependency, IsWriteSide))
+                {
+                    yield return $"{type.FullName} reads the write side ({Display(dependency)}); a query reads read models through I<Module>ReadModels.";
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// What the type and each of its base classes (up to object) declare: constructor and method parameters (a
+    /// handler's Handle may be static) and fields, private ones included.
+    /// </summary>
+    private static List<Type> DeclaredDependencies(Type type)
+    {
+        const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+        List<Type> dependencies = [];
+        for (var current = type; current is not null && current != typeof(object); current = current.BaseType)
+        {
+            dependencies.AddRange(current.GetConstructors(Declared).SelectMany(constructor => constructor.GetParameters().Select(parameter => parameter.ParameterType)));
+            dependencies.AddRange(current.GetMethods(Declared).SelectMany(method => method.GetParameters().Select(parameter => parameter.ParameterType)));
+            dependencies.AddRange(current.GetFields(Declared).Select(field => field.FieldType));
+        }
+
+        return [.. dependencies.Distinct()];
+    }
+
+    /// <summary><c>{{ namespace }}.Modules.Billing.Application</c> belongs to module <c>{{ namespace }}.Modules.Billing</c>.</summary>
+    private static string ModuleOf(Assembly assembly)
+    {
+        var name = assembly.GetName().Name!;
+        return name[..name.LastIndexOf('.')];
+    }
+
+    /// <summary>
+    /// Whether the type, or any type it is built from, matches: generic arguments (IDbContextFactory&lt;TContext&gt;,
+    /// Func&lt;T&gt;, IEnumerable&lt;T&gt;), element types (T[], ref T) and a delegate's parameter and return types.
+    /// </summary>
+    private static bool Reaches(Type root, Func<Type, bool> matches)
+    {
+        HashSet<Type> seen = [];
+        Stack<Type> pending = new([root]);
+        while (pending.TryPop(out var type))
+        {
+            if (type.IsGenericParameter || !seen.Add(type))
+            {
+                continue;
+            }
+
+            if (matches(type))
+            {
+                return true;
+            }
+
+            if (type.HasElementType)
+            {
+                pending.Push(type.GetElementType()!);
+            }
+
+            foreach (var argument in type.IsGenericType ? type.GetGenericArguments() : [])
+            {
+                pending.Push(argument);
+            }
+
+            if (typeof(Delegate).IsAssignableFrom(type) && type.GetMethod("Invoke") is { } invoke)
+            {
+                pending.Push(invoke.ReturnType);
+                foreach (var parameter in invoke.GetParameters())
+                {
+                    pending.Push(parameter.ParameterType);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsWriteSide(Type type) => IsOrDerives(type, WriteSide);
+
+    private static bool IsServiceLocator(Type type) => IsOrDerives(type, ServiceLocators);
+
+    private static bool IsOrDerives(Type type, string[] names)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            if (names.Contains(current.FullName) || current.GetInterfaces().Any(contract => names.Contains(contract.FullName)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>IDbContextFactory&lt;DbContext&gt; rather than IDbContextFactory`1.</summary>
+    private static string Display(Type type)
+    {
+        if (type.IsArray)
+        {
+            return Display(type.GetElementType()!) + "[]";
+        }
+
+        if (!type.IsGenericType)
+        {
+            return type.Name;
+        }
+
+        var name = type.Name[..type.Name.IndexOf('`', StringComparison.Ordinal)];
+        return $"{name}<{string.Join(", ", type.GetGenericArguments().Select(Display))}>";
+    }
+}

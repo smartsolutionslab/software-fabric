@@ -1,0 +1,12 @@
+using {{ namespace }}.BuildingBlocks.EventStore;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application;
+using Marten;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.EventStore;
+
+public sealed class {{ module.namespace }}AggregateStore(IDocumentStore store)
+    : MartenAggregateStore(store), I{{ module.namespace }}AggregateStore
+{
+    /// <summary>The module's event store lives in this schema, the one its DbContext uses.</summary>
+    public const string Schema = "{{ module.name | string.replace "-" "_" }}";
+}

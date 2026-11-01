@@ -1,0 +1,12 @@
+{{~ if module.values["module.event-store"] != "marten" ~}}
+{{~ # Physical CQRS is built for event-sourced modules on Marten only (ADR-0006: fail loudly, never render nothing). ~}}
+{{ physical_cqrs_needs_an_event_sourced_module_on_marten }}
+{{~ end ~}}
+using {{ namespace }}.BuildingBlocks.ReadModels;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application;
+using Marten;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.ReadModels;
+
+public sealed class {{ module.namespace }}ReadModels(IDocumentStore store)
+    : MartenReadModels(store), I{{ module.namespace }}ReadModels;
