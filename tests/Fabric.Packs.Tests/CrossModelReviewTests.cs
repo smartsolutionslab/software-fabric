@@ -40,26 +40,41 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
     }
 
     [Fact]
-    public void Copilot_signs_in_with_the_workflow_s_own_token_and_without_gh_token()
+    public void Copilot_signs_in_with_the_copilot_secret_and_without_gh_token()
     {
         var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings);
 
         run.ExitCode.ShouldBe(0, run.Log);
-        File.ReadAllText(Path.Combine(Fakes, "copilot-env")).ShouldBe("COPILOT_GITHUB_TOKEN=workflow-token\nGH_TOKEN=unset\nGITHUB_TOKEN=unset\n");
+        File.ReadAllText(Path.Combine(Fakes, "copilot-env")).ShouldBe("COPILOT_GITHUB_TOKEN=personal-token\nGH_TOKEN=unset\nGITHUB_TOKEN=unset\n");
+    }
+
+    /// <summary>Actions gives a secret the repository does not have as an empty string.</summary>
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Without_the_copilot_secret_the_review_fails_naming_it_and_copilot_does_not_run(string secret)
+    {
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, secret: secret);
+
+        run.ExitCode.ShouldNotBe(0, run.Log);
+        run.Log.ShouldContain("COPILOT_GITHUB_TOKEN");
+        run.Log.ShouldContain("Copilot Requests");
+        run.CopilotArguments.ShouldBeNull(run.Log);
+        Reviews().ShouldBeEmpty();
     }
 
     [Fact]
-    public void The_review_job_may_spend_copilot_requests_and_uses_no_model_vendor_s_key()
+    public void The_review_job_uses_the_copilot_secret_alone_and_no_model_vendor_s_key()
     {
         var workflow = File.ReadAllText(WorkflowPath);
         var jobs = (YamlMappingNode)Root()["jobs"];
 
         jobs.Children.Keys.Select(key => ((YamlScalarNode)key).Value).ShouldBe(["choose", "review"]);
         var permissions = (YamlMappingNode)((YamlMappingNode)jobs["review"])["permissions"];
-        ((YamlScalarNode)permissions["copilot-requests"]).Value.ShouldBe("write");
+        permissions.Children.Keys.Select(key => ((YamlScalarNode)key).Value).ShouldNotContain("copilot-requests");
         workflow.ShouldNotContain("ANTHROPIC_API_KEY");
         workflow.ShouldNotContain("OPENAI_API_KEY");
-        workflow.ShouldNotContain("secrets.");
+        SecretReference().Matches(workflow).Select(match => match.Groups[1].Value).Distinct().ShouldBe(["COPILOT_GITHUB_TOKEN"]);
     }
 
     [Fact]
@@ -129,7 +144,7 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
     /// <paramref name="answer"/> and exiting with <paramref name="copilotExitCode"/>. The gate's files are the generated
     /// project's, as the base branch's checkout in .gate.
     /// </summary>
-    private ReviewRun Review(string commitMessage, string answer, int copilotExitCode = 0)
+    private ReviewRun Review(string commitMessage, string answer, int copilotExitCode = 0, string secret = "personal-token")
     {
         var workspace = Path.Combine(state, "workspace");
         Directory.CreateDirectory(workspace);
@@ -146,6 +161,7 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
             ["github.event.pull_request.head.sha"] = "HEAD",
             ["github.event.pull_request.number"] = "5",
             ["github.token"] = "workflow-token",
+            ["secrets.COPILOT_GITHUB_TOKEN"] = secret,
         };
         var choose = RunJob("choose", workspace, expressions);
         if (choose.ExitCode != 0)
@@ -292,6 +308,9 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
 
     [GeneratedRegex(@"\$\{\{\s*(.+?)\s*\}\}")]
     private static partial Regex Expression();
+
+    [GeneratedRegex(@"secrets\.([A-Za-z0-9_]+)")]
+    private static partial Regex SecretReference();
 
     [GeneratedRegex(@"^@github/copilot@\d+\.\d+\.\d+$")]
     private static partial Regex ExactCopilotVersion();
