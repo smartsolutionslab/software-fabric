@@ -84,6 +84,15 @@ public class CatalogReaderTests
         catalog.Dimensions["module.event-store"].Options["kurrentdb"].Tier.ShouldBe(SupportTier.Experimental);
     }
 
+    [Theory]
+    [InlineData("backend.auth", "none")]
+    [InlineData("backend.authorization", "roles")]
+    [InlineData("backend.authorization", "claims")]
+    public void An_authentication_or_authorization_option_without_a_pack_is_experimental(string dimension, string option)
+    {
+        ReadRepositoryCatalog().Dimensions[dimension].Options[option].Tier.ShouldBe(SupportTier.Experimental);
+    }
+
     [Fact]
     public void Reads_yes_and_no_as_option_names_not_booleans()
     {
