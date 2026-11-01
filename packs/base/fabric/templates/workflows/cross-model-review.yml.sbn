@@ -3,8 +3,9 @@
 # The reviewer is from a different model family than the author (board protocol, docs/adr). Its findings land on the
 # pull request, and a blocking one fails the check.
 # The reviewer is GitHub Copilot CLI, on the reviewing family's model (REVIEW_MODEL_CLAUDE, REVIEW_MODEL_CODEX below).
-# It signs in with this workflow's own token, which may spend Copilot requests (copilot-requests: write): the
-# repository's owner needs Copilot, with the CLI allowed by its policies. No model vendor's API key is used.
+# It signs in with the COPILOT_GITHUB_TOKEN secret: a fine-grained personal access token, with the Copilot Requests
+# permission, of an account licensed for Copilot. Every review spends that account's premium requests. No model
+# vendor's API key is used.
 #
 # The gate's own files (its scripts, the findings schema, the reviewer briefs) come from the base branch, checked out
 # into .gate: a pull request must not choose its own reviewer or post its own verdict. The pull request's copies are
@@ -75,7 +76,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      copilot-requests: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -92,17 +92,23 @@ jobs:
       - name: Install the Copilot CLI
         run: npm install -g "@github/copilot@$COPILOT_CLI_VERSION"
       - name: Review
-        # No GH_TOKEN or GITHUB_TOKEN for copilot, even one the runner sets: it would sign in with that and fail.
+        # Without the secret the review fails, never passes. No GH_TOKEN or GITHUB_TOKEN for copilot, even one the
+        # runner sets: it would sign in with that instead.
         # The folder stays untrusted and the pull request's AGENTS.md is not read (--no-custom-instructions), so the
         # change under review cannot give the reviewer instructions, hooks or MCP servers; its rules come from the
         # base branch's files instead.
         env:
-          COPILOT_GITHUB_TOKEN: ${{ github.token }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           MODEL: ${{ needs.choose.outputs.model }}
           PR: ${{ github.event.pull_request.number }}
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
+          if [ -z "${COPILOT_GITHUB_TOKEN// /}" ]; then
+            echo "The repository secret COPILOT_GITHUB_TOKEN is missing or empty, so there is no reviewer. Set it to a" >&2
+            echo "fine-grained personal access token with the Copilot Requests permission (docs/adr)." >&2
+            exit 1
+          fi
           schema="$(jq -c . "$GATE/review-findings.schema.json")"
           prompt="Review pull request #$PR: the change from $BASE to $HEAD in this checkout (git diff $BASE...$HEAD).
           Review it as the reviewers in $BRIEFS/.claude/agents/ describe (backend-reviewer, frontend-reviewer,
