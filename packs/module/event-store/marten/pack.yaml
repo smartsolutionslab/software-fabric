@@ -2,12 +2,14 @@ option: module.event-store.marten
 files:
   - { template: templates/MartenAggregateStore.cs.sbn, target: src/BuildingBlocks/EventStore/MartenAggregateStore.cs }
   - { template: templates/EventStoreRegistration.cs.sbn, target: src/BuildingBlocks/EventStore/EventStoreRegistration.cs }
+  - { template: templates/ModuleEventStore.cs.sbn, target: src/BuildingBlocks/EventStore/ModuleEventStore.cs }
   - { template: templates/ModuleAggregateStore.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/EventStore/{{ module.namespace }}AggregateStore.cs", per-module: true }
   - { template: templates/OnlyInfrastructureUsesMarten.cs.sbn, target: tests/Architecture.Tests/Rules/OnlyInfrastructureUsesMarten.cs }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
   - { slot: buildingblocks.packages, template: templates/buildingblocks-packages.sbn }
   - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 30 }
+  - { slot: migration-runner.steps, template: templates/migration-runner-step.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

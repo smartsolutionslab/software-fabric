@@ -10,7 +10,7 @@ The module's `<Module>AggregateStore` (Infrastructure, `EventStore/`) implements
 
 Only a module's Infrastructure project references Marten; an architecture rule fails the build otherwise.
 
-The store creates and updates its tables on first use (`AutoCreate.CreateOrUpdate`). The EF Core migration runner does not apply Marten's schema yet; until it does, the database user the host runs as needs the right to create tables in the module's schema.
+The MigrationRunner creates and updates every module's event store tables (streams, events and the projections' read models) after the EF Core migrations; the host never changes the schema (`AutoCreate.None`), so a module whose tables are missing fails rather than creating them.
 
 Built without tenancy only: generating it with a tenancy option fails, because the streams are not separated by tenant yet.
 

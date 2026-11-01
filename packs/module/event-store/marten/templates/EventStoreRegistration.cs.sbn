@@ -2,69 +2,39 @@
 {{~ # Marten's streams are not separated by tenant yet; rendering them would leak (ADR-0006: fail loudly). ~}}
 {{ marten_event_store_needs_backend_tenancy_none }}
 {{~ end ~}}
-using System.Text.RegularExpressions;
-using {{ namespace }}.BuildingBlocks.EventSourcing;
+using {{ namespace }}.BuildingBlocks.EventStore;
 using {{ namespace }}.BuildingBlocks.Modules;
 using JasperFx;
-using JasperFx.Events.Projections;
 using Marten;
 using Microsoft.Extensions.Configuration;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
-public static partial class EventStoreRegistration
+public static class EventStoreRegistration
 {
-    private const string ConnectionStringName = "database";
-
     /// <summary>
-    /// Gives the module its own Marten store, in its own schema of the project's database, when its Infrastructure
-    /// project has adapters over one: classes whose constructor takes an <see cref="IDocumentStore"/>. Each adapter is
-    /// registered as the module's Application interfaces it implements (I&lt;Module&gt;AggregateStore, ...). The store
-    /// knows the module's domain events and runs the projections of its Infrastructure project inline.
+    /// Gives the module its own Marten store when its Infrastructure project has adapters over one: classes whose
+    /// constructor takes an <see cref="IDocumentStore"/>. Each adapter is registered as the module's Application
+    /// interfaces it implements (I&lt;Module&gt;AggregateStore, ...). The store never changes the database's schema; the
+    /// MigrationRunner applies it (<see cref="ApplyEventStoreSchemasAsync"/>).
     /// </summary>
     public static IServiceCollection AddModuleEventStore<TModule>(this IServiceCollection services, IConfiguration configuration)
         where TModule : IModule
     {
         {{ not_null "configuration" }}
 
-        var infrastructure = ModuleAssemblies.Of<TModule>("Infrastructure");
-        var adapters = infrastructure.GetTypes()
-            .Where(type => type is { IsClass: true, IsAbstract: false }
-                && type.GetConstructors().Any(constructor => constructor.GetParameters() is [{ ParameterType: var parameter }] && parameter == typeof(IDocumentStore)))
-            .ToList();
-        if (adapters.Count == 0)
+        var module = ModuleEventStore.Of(ModuleAssemblies.Of<TModule>("Infrastructure"));
+        if (module is null)
         {
             return services;
         }
 
-        var connectionString = configuration.GetConnectionString(ConnectionStringName)
-            ?? throw new InvalidOperationException($"Connection string '{ConnectionStringName}' is missing; Aspire provides it.");
-        var schema = SchemaOf(typeof(TModule));
-        var domainEvents = ModuleAssemblies.Of<TModule>("Domain").GetTypes()
-            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(IDomainEvent).IsAssignableFrom(type))
-            .ToList();
-        var projections = infrastructure.GetTypes()
-            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(IProjectionSource<IDocumentOperations, IQuerySession>).IsAssignableFrom(type))
-            .ToList();
-
+        var connectionString = ModuleEventStore.ConnectionString(configuration);
         var key = typeof(TModule).FullName!;
-        services.AddKeyedSingleton<IDocumentStore>(key, (_, _) => DocumentStore.For(options =>
-        {
-            options.Connection(connectionString);
-            options.DatabaseSchemaName = schema;
-            options.Events.DatabaseSchemaName = schema;
-            options.UseSystemTextJsonForSerialization();
-            // The store creates its tables on first use; see docs/adr for why this is not a migration yet.
-            options.AutoCreateSchemaObjects = AutoCreate.CreateOrUpdate;
-            options.Events.AddEventTypes(domainEvents);
-            foreach (var projection in projections)
-            {
-                options.Projections.Add((IProjectionSource<IDocumentOperations, IQuerySession>)Activator.CreateInstance(projection)!, ProjectionLifecycle.Inline);
-            }
-        }));
+        services.AddKeyedSingleton<IDocumentStore>(key, (_, _) => DocumentStore.For(options => module.Configure(options, connectionString, AutoCreate.None)));
 
         var application = ModuleAssemblies.Of<TModule>("Application");
-        foreach (var adapter in adapters)
+        foreach (var adapter in module.Adapters)
         {
             foreach (var contract in adapter.GetInterfaces().Where(contract => contract.Assembly == application))
             {
@@ -75,10 +45,21 @@ public static partial class EventStoreRegistration
         return services;
     }
 
-    /// <summary>The module's schema, as its DbContext names it: BillingModule is billing, OrderHandlingModule order_handling.</summary>
-    private static string SchemaOf(Type module) =>
-        WordStart().Replace(module.Name[..^"Module".Length], "_$1").ToLowerInvariant();
+    /// <summary>Creates or updates the tables of every module's event store: streams, events and the projections' read models.</summary>
+    public static async Task ApplyEventStoreSchemasAsync(this IServiceProvider services)
+    {
+        {{ not_null "services" }}
 
-    [GeneratedRegex("(?<!^)([A-Z])")]
-    private static partial Regex WordStart();
+        var connectionString = ModuleEventStore.ConnectionString(services.GetRequiredService<IConfiguration>());
+        var modules = Directory.EnumerateFiles(AppContext.BaseDirectory, "{{ namespace }}.Modules.*.Infrastructure.dll")
+            .Order(StringComparer.Ordinal)
+            .Select(path => ModuleEventStore.Of(System.Reflection.Assembly.LoadFrom(path)))
+            .OfType<ModuleEventStore>();
+
+        foreach (var module in modules)
+        {
+            using var store = DocumentStore.For(options => module.Configure(options, connectionString, AutoCreate.CreateOrUpdate));
+            await store.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
+        }
+    }
 }
