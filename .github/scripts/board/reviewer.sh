@@ -13,11 +13,20 @@ families="$(
 )"
 
 case "$families" in
-  "") echo "${BOARD_DEFAULT_REVIEWER}" ;;
-  claude) echo codex ;;
-  codex) echo claude ;;
+  "") reviewer="${BOARD_DEFAULT_REVIEWER:-}" ;;
+  claude) reviewer=codex ;;
+  codex) reviewer=claude ;;
   *)
     echo "Commits by more than one model family ($(tr '\n' ' ' <<< "$families")): no family is independent of them all." >&2
+    exit 1
+    ;;
+esac
+
+# Anything else would match neither review job, and the workflow would pass without a review.
+case "$reviewer" in
+  claude | codex) echo "$reviewer" ;;
+  *)
+    echo "The reviewer is '$reviewer' (BOARD_DEFAULT_REVIEWER); it must be claude or codex." >&2
     exit 1
     ;;
 esac

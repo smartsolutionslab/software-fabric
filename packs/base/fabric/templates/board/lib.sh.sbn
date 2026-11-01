@@ -34,10 +34,16 @@ board_default_branch() {
   board_git ls-remote --symref origin HEAD | sed -nE 's#^ref: refs/heads/([^[:space:]]+)[[:space:]]+HEAD$#\1#p'
 }
 
-# The issue's branch on the remote, or nothing. It is agent/<issue> and nothing more: a name taken from anything
-# that can change, such as the title, would let two agents that each saw no branch push two different locks.
+# The issue's branch on the remote, or nothing. A claim creates agent/<issue> and nothing more: a name taken from
+# anything that can change, such as the title, would let two agents that each saw no branch push two different locks.
+# A branch claimed under the earlier name, agent/<issue>-<slug>, is still that issue's lock and is resumed as it is.
 board_branch_for() {
-  board_git ls-remote --heads origin "refs/heads/agent/$1" | awk -v ref="refs/heads/agent/$1" '$2 == ref { print "agent/" substr(ref, 18); exit }'
+  local heads
+  heads="$(board_git ls-remote --heads origin)" || return 1
+  awk -v exact="refs/heads/agent/$1" -v earlier="refs/heads/agent/$1-" '
+    $2 == exact { found = $2 }
+    index($2, earlier) == 1 && first == "" { first = $2 }
+    END { name = found != "" ? found : first; if (name != "") { sub("refs/heads/", "", name); print name } }' <<< "$heads"
 }
 
 # Fetches a remote branch and prints its last commit.

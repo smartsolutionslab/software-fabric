@@ -65,6 +65,15 @@ structured findings and are required checks. The author weighs findings
 unresolved PR goes to `agent:blocked`. Merge through the merge queue on
 green CI and passed reviews.
 
+**The gate is not the author's to change.** A pull request must not pick its
+own reviewer or post its own verdict, so the review workflow runs the board
+scripts, the findings schema and the reviewer briefs from the base branch.
+The workflow file itself still comes from the pull request (GitHub runs a
+`pull_request` workflow as the head defines it; `pull_request_target` would
+hand the reviewer's API keys to a job that reads untrusted code). So
+`.github/` has a code owner, and the default branch's protection requires the
+code owner's review and the review check: a change to the gate needs a human.
+
 **Traceability.** Every agent commit carries an `Agent-Executor:` trailer
 `<family>-<runtime>/<detail>` (e.g. `claude-cloud/lane-billing`,
 `claude-local/<host>`, `codex-cloud/lane-web`). The family, the part

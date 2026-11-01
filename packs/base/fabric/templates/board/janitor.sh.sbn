@@ -8,8 +8,9 @@ lease=$((BOARD_LEASE_HOURS * 3600))
 
 board_git ls-remote --heads origin | awk 'index($2, "refs/heads/agent/") == 1 { sub("refs/heads/", "", $2); print $2 }' | while read -r branch; do
   issue="${branch#agent/}"
-  # Only agent/<issue> is a lock; anything else under agent/ is someone's branch, not a claim.
-  [[ "$issue" =~ ^[0-9]+$ ]] || continue
+  # A lock is agent/<issue>, or agent/<issue>-<slug> from before; anything else under agent/ is not a claim.
+  [[ "$issue" =~ ^[0-9]+(-.*)?$ ]] || continue
+  issue="${issue%%-*}"
   # A stray agent/ branch without an open issue is not a claim: a merged pull request leaves its branch behind.
   [ "$(board_issue "$issue" 2>/dev/null | jq -r .state)" = open ] || continue
 
@@ -45,6 +46,12 @@ board_git ls-remote --heads origin | awk 'index($2, "refs/heads/agent/") == 1 { 
     # Parks the head whose age was checked; a push since then means the claim is alive after all.
     board_park "$issue" "The claim lapsed: no push for ${BOARD_LEASE_HOURS} h and no open pull request." "$head" || continue
     board_unclaim "$issue"
+    # A claim that took the parked branch meanwhile keeps its label and its board fields.
+    head="$(board_fetch "$branch")" || continue
+    if ! board_parked "$head"; then
+      board_add_label "$issue" agent:claimed
+      continue
+    fi
     board_status "$issue" Todo
     board_executor "$issue" ""
     board_comment "$issue" "The claim on \`$branch\` lapsed: no push for ${BOARD_LEASE_HOURS} h and no open pull request. Back to Todo; the work so far stays on the branch."

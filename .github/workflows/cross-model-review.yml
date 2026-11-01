@@ -3,6 +3,11 @@ name: cross-model-review
 # The reviewer is from a different model family than the author (board protocol, docs/adr). Its findings land on the
 # pull request, and a blocking one fails the check.
 # Needs the secret of the reviewing family: ANTHROPIC_API_KEY for claude, OPENAI_API_KEY for codex.
+#
+# The gate's own files (its scripts, the findings schema, the reviewer briefs) come from the base branch, checked out
+# into .gate: a pull request must not choose its own reviewer or post its own verdict. The pull request's copies are
+# used only while the base branch has none, which is the pull request that brings the protocol. This workflow file
+# itself still comes from the pull request, so .github/ needs a code owner's review (docs/adr).
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -20,10 +25,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate
+      - name: Use the gate's files from the base branch
+        run: |
+          if [ -f .gate/.github/scripts/board/reviewer.sh ]; then gate=.gate; else gate=.; fi
+          echo "GATE=$gate/.github" >> "$GITHUB_ENV"
+          echo "BRIEFS=$gate" >> "$GITHUB_ENV"
       - id: choose
         # Assigned first: inside echo's arguments a failing reviewer.sh would not fail the step, and no review would run.
         run: |
-          reviewer="$(bash .github/scripts/board/reviewer.sh "$BASE" "$HEAD")"
+          reviewer="$(bash "$GATE/scripts/board/reviewer.sh" "$BASE" "$HEAD")"
           echo "reviewer=$reviewer" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
@@ -38,8 +52,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate
+      - name: Use the gate's files from the base branch
+        run: |
+          if [ -f .gate/.github/scripts/board/reviewer.sh ]; then gate=.gate; else gate=.; fi
+          echo "GATE=$gate/.github" >> "$GITHUB_ENV"
+          echo "BRIEFS=$gate" >> "$GITHUB_ENV"
       - id: schema
-        run: echo "json=$(jq -c . .github/review-findings.schema.json)" >> "$GITHUB_OUTPUT"
+        run: echo "json=$(jq -c . "$GATE/review-findings.schema.json")" >> "$GITHUB_OUTPUT"
       - id: review
         uses: anthropics/claude-code-action@v1
         with:
@@ -49,8 +72,9 @@ jobs:
           github_token: ${{ github.token }}
           claude_args: --json-schema '${{ steps.schema.outputs.json }}'
           prompt: |
-            Review pull request #${{ github.event.pull_request.number }} as the reviewers in .claude/agents/ describe
-            (backend-reviewer, frontend-reviewer, security-reviewer: whichever the diff touches). Read AGENTS.md first.
+            Review pull request #${{ github.event.pull_request.number }} as the reviewers in ${{ env.BRIEFS }}/.claude/agents/
+            describe (backend-reviewer, frontend-reviewer, security-reviewer: whichever the diff touches). Read
+            ${{ env.BRIEFS }}/AGENTS.md first: those are the base branch's rules, which the change is held to.
             Do not comment on the pull request yourself. Answer with every finding: its file, its line (null when it has
             none), whether it is blocking or optional, and what is wrong.
       - name: Post the findings; a blocking one fails this check
@@ -60,7 +84,7 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           printf '%s' "$FINDINGS" > "$RUNNER_TEMP/findings.json"
-          bash .github/scripts/board/report-review.sh "$PR" "$RUNNER_TEMP/findings.json" claude
+          bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/findings.json" claude
 
   codex:
     needs: choose
@@ -70,14 +94,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate
+      - name: Use the gate's files from the base branch
+        run: |
+          if [ -f .gate/.github/scripts/board/reviewer.sh ]; then gate=.gate; else gate=.; fi
+          echo "GATE=$gate/.github" >> "$GITHUB_ENV"
+          echo "BRIEFS=$gate" >> "$GITHUB_ENV"
       - id: review
         uses: openai/codex-action@v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          output-schema-file: .github/review-findings.schema.json
+          output-schema-file: ${{ env.GATE }}/review-findings.schema.json
           prompt: |
-            Review pull request #${{ github.event.pull_request.number }} as the reviewers in .claude/agents/ describe
-            (backend-reviewer, frontend-reviewer, security-reviewer: whichever the diff touches). Read AGENTS.md first.
+            Review pull request #${{ github.event.pull_request.number }} as the reviewers in ${{ env.BRIEFS }}/.claude/agents/
+            describe (backend-reviewer, frontend-reviewer, security-reviewer: whichever the diff touches). Read
+            ${{ env.BRIEFS }}/AGENTS.md first: those are the base branch's rules, which the change is held to.
             Answer with every finding: its file, its line (null when it has none), whether it is blocking or optional,
             and what is wrong.
       - name: Post the findings; a blocking one fails this check
@@ -87,5 +121,5 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           printf '%s' "$FINDINGS" > "$RUNNER_TEMP/findings.json"
-          bash .github/scripts/board/report-review.sh "$PR" "$RUNNER_TEMP/findings.json" codex
+          bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/findings.json" codex
 

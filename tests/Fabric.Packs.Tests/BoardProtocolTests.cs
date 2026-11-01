@@ -130,6 +130,9 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     private (int ExitCode, string Output) RunLib(string commands) =>
         Bash(ProjectDirectory, ["-c", $"source {Path.Combine(ProjectDirectory, ".github/scripts/board/lib.sh")}; set +e; {commands}"]);
 
+    /// <summary>Environment a test adds to every script it runs, such as a setting board.env would hold.</summary>
+    private readonly Dictionary<string, string> extraEnvironment = [];
+
     private (int ExitCode, string Output) Bash(string directory, string[] arguments)
     {
         var fake = Path.Combine(AppContext.BaseDirectory, "Board");
@@ -152,6 +155,11 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
             ["BOARD_PROJECT_NUMBER"] = "1",
             ["BOARD_NOW"] = Now.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture),
         };
+        foreach (var (name, value) in extraEnvironment)
+        {
+            environment[name] = value;
+        }
+
         return Shell.Run(directory, environment, "bash", arguments);
     }
 
@@ -527,17 +535,66 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     }
 
     [Fact]
-    public void The_janitor_takes_only_agent_slash_issue_for_a_lock()
+    public void A_claim_made_under_the_old_branch_name_still_holds_the_issue()
+    {
+        Issues(Issue(7, "Pay an invoice", ReadyBackend));
+        Branch("agent/7" + "-pay-an-invoice", "chore(board): claim #7", Now.AddMinutes(-10));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(3, output);
+        HasBranch("agent/7").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_janitor_returns_a_lapsed_claim_made_under_the_old_branch_name()
     {
         Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
-        Branch("agent/7" + "-pay-an-invoice", "Work in progress", Now.AddHours(-30));
+        Branch("agent/7" + "-pay-an-invoice", "chore(board): claim #7", Now.AddHours(-30));
 
         var (exitCode, output) = Run("janitor.sh");
 
         exitCode.ShouldBe(0, output);
-        output.ShouldNotContain("#7");
-        Head("agent/7" + "-pay-an-invoice").ShouldBe("Work in progress");
+        output.ShouldContain("Returned #7 to Todo.");
+        Head("agent/7" + "-pay-an-invoice").ShouldBe("chore(board): release #7");
+        HasBranch("agent/7").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_janitor_leaves_an_agent_branch_without_an_issue_number_alone()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/notes", "Work in progress", Now.AddHours(-30));
+
+        var (exitCode, output) = Run("janitor.sh");
+
+        exitCode.ShouldBe(0, output);
+        Head("agent/notes").ShouldBe("Work in progress");
+    }
+
+    [Fact]
+    public void A_lapse_the_janitor_returns_keeps_a_claim_that_lands_meanwhile()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddHours(-6));
+        // Another agent claims the parked branch the moment the janitor's release lands.
+        var hook = Path.Combine(origin, "hooks", "post-receive");
+        File.WriteAllText(hook, $$"""
+            #!/bin/sh
+            rm "$0"
+            git --git-dir='{{origin}}' update-ref refs/heads/agent/7 "$(git --git-dir='{{origin}}' commit-tree 'refs/heads/agent/7^{tree}' -p refs/heads/agent/7 -m 'chore(board): claim #7')"
+            """);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var (exitCode, output) = Run("janitor.sh");
+
+        exitCode.ShouldBe(0, output);
+        Head("agent/7").ShouldBe("chore(board): claim #7");
         Labels(IssueState(7)).ShouldContain("agent:claimed");
+        Field(7, "STATUS").ShouldNotBe("Todo");
     }
 
     [Fact]
@@ -854,6 +911,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
                 ["GITHUB_REPOSITORY"] = "acme/shop",
                 ["BASE"] = "base",
                 ["HEAD"] = "HEAD",
+                ["GATE"] = Path.Combine(ProjectDirectory, ".github"),
                 ["PATH"] = Path.Combine(AppContext.BaseDirectory, "Board") + ":" + Environment.GetEnvironmentVariable("PATH"),
             },
             "bash",
@@ -864,6 +922,31 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         exitCode.ShouldNotBe(0, $"{script}\n{log}");
         log.ShouldContain("more than one model family");
         Directory.Delete(repository, recursive: true);
+    }
+
+    [Theory]
+    [InlineData("gpt")]
+    [InlineData("Codex")]
+    public void A_default_reviewer_that_is_no_family_fails_instead_of_skipping_the_review(string defaultReviewer)
+    {
+        var repository = Repository("Plain change");
+        extraEnvironment["BOARD_DEFAULT_REVIEWER"] = defaultReviewer;
+
+        var (exitCode, output) = RunIn(repository, "reviewer.sh", "base", "HEAD");
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain("claude or codex");
+        Directory.Delete(repository, recursive: true);
+    }
+
+    [Fact]
+    public void The_review_gate_runs_its_own_scripts_and_schema_from_the_base_branch()
+    {
+        var workflow = File.ReadAllText(Path.Combine(ProjectDirectory, ".github", "workflows", "cross-model-review.yml"));
+
+        workflow.ShouldContain("ref: ${{ github.event.pull_request.base.sha }}");
+        workflow.ShouldNotContain("bash .github/scripts/board/");
+        workflow.ShouldNotContain("output-schema-file: .github/");
     }
 
     [Fact]
