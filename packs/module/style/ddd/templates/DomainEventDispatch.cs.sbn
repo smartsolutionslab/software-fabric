@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace {{ namespace }}.BuildingBlocks.DomainEvents;
 
@@ -13,11 +14,12 @@ namespace {{ namespace }}.BuildingBlocks.DomainEvents;
 /// Hands the domain events of one module context's tracked aggregates to their reactions once the changes that raised
 /// them are committed: right after SaveChangesAsync, or, inside a transaction the context began, after that
 /// transaction commits. A rollback, a failed commit or a transaction disposed without commit delivers nothing. Each
-/// reaction runs in a service scope of its own. A save it cannot vouch for (synchronous, inside an ambient
-/// TransactionScope, in a transaction it did not begin or that has application savepoints) fails before saving.
+/// reaction runs in a service scope of its own; one that throws is logged and never reaches the caller, whose save
+/// or commit has already happened. A save it cannot vouch for (synchronous, inside an ambient TransactionScope, in a
+/// transaction it did not begin or that has application savepoints) fails before saving.
 /// One instance per context instance: it keeps that context's pending events.
 /// </summary>
-public sealed class DomainEventDispatch(IServiceProvider services) : ISaveChangesInterceptor, IDbTransactionInterceptor
+public sealed partial class DomainEventDispatch(IServiceProvider services) : ISaveChangesInterceptor, IDbTransactionInterceptor
 {
     private readonly List<Saving> saving = [];
     private readonly List<Pending> pending = [];
@@ -189,9 +191,9 @@ public sealed class DomainEventDispatch(IServiceProvider services) : ISaveChange
             return $"{name} has domain events to dispatch; save with SaveChangesAsync: reactions are asynchronous.";
         }
 
-        if (services.GetService(typeof(IServiceScopeFactory)) is null)
+        if (services.GetService(typeof(IServiceScopeFactory)) is null || services.GetService(typeof(ILogger<DomainEventDispatch>)) is null)
         {
-            return $"{name} was created without the application's services, so it cannot find the reactions of its domain events.";
+            return $"{name} was created without the application's services (or without logging), so it cannot run the reactions of its domain events or report their failures.";
         }
 
         if (System.Transactions.Transaction.Current is not null)
@@ -250,27 +252,41 @@ public sealed class DomainEventDispatch(IServiceProvider services) : ISaveChange
 
         var registrations = services.GetServices<DomainEventReactionRegistration>().ToList();
         var scopes = services.GetRequiredService<IServiceScopeFactory>();
-        foreach (var domainEvent in events)
+        var logger = services.GetRequiredService<ILogger<DomainEventDispatch>>();
+        for (var index = 0; index < events.Count; index++)
         {
+            var domainEvent = events[index];
             var contract = typeof(IDomainEventReaction<>).MakeGenericType(domainEvent.GetType());
             var react = contract.GetMethod(nameof(IDomainEventReaction<IDomainEvent>.ReactAsync))!;
             foreach (var registration in registrations.Where(registration => registration.Event == domainEvent.GetType()))
             {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    DispatchCanceled(logger, events.Count - index, domainEvent.GetType().Name);
+                    return;
+                }
+
+                // The caller's changes are committed and its own work after the commit (accepting changes, flushing an
+                // outbox) still has to run, so a failing reaction is reported here and never thrown into the caller.
                 await using var scope = scopes.CreateAsyncScope();
                 try
                 {
                     var reaction = scope.ServiceProvider.GetRequiredService(registration.Reaction);
                     await (Task)react.Invoke(reaction, BindingFlags.DoNotWrapExceptions, null, [domainEvent, cancellationToken], null)!;
                 }
-                catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+                catch (Exception exception)
                 {
-                    throw new DomainEventDispatchException(
-                        $"{registration.Reaction.FullName} failed on {domainEvent.GetType().Name}. The changes that raised it are committed; the event's remaining reactions and the events after it were not delivered.",
-                        exception);
+                    ReactionFailed(logger, exception, registration.Reaction.FullName, domainEvent.GetType().Name);
                 }
             }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "The domain-event reaction {Reaction} failed on {DomainEvent}; the changes that raised the event are committed, and nothing retries the reaction.")]
+    private static partial void ReactionFailed(ILogger logger, Exception exception, string? reaction, string domainEvent);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Dispatching domain events was canceled at {DomainEvent}; {Remaining} committed events were not delivered to all their reactions.")]
+    private static partial void DispatchCanceled(ILogger logger, int remaining, string domainEvent);
 
     private void Begin(DbTransaction? notBegunByThisContext)
     {
