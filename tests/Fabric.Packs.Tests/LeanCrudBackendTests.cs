@@ -223,6 +223,104 @@ public sealed class LeanCrudBackendTests
     }
 
     [Fact]
+    public void A_commit_retried_after_the_outbox_insert_failed_saves_the_changes_and_the_event()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Domain/Note.cs", """
+            namespace Shop.Modules.Billing.Domain;
+
+            public sealed class Note
+            {
+                public Guid Id { get; set; }
+
+                public string Text { get; set; } = string.Empty;
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/Configurations/NoteConfiguration.cs", """
+            using Microsoft.EntityFrameworkCore;
+            using Microsoft.EntityFrameworkCore.Metadata.Builders;
+            using Shop.Modules.Billing.Domain;
+
+            namespace Shop.Modules.Billing.Infrastructure.Persistence.Configurations;
+
+            public sealed class NoteConfiguration : IEntityTypeConfiguration<Note>
+            {
+                public void Configure(EntityTypeBuilder<Note> builder)
+                {
+                    builder.ToTable("notes");
+                    builder.HasKey(note => note.Id);
+                    builder.Property(note => note.Text);
+                }
+            }
+            """);
+        project.Write("tests/Modules/Billing.Tests/RetriedCommitTests.cs", """
+            using Microsoft.EntityFrameworkCore;
+            using Microsoft.Extensions.Configuration;
+            using Microsoft.Extensions.DependencyInjection;
+            using Shop.Contracts;
+            using Shop.Modules.Billing.Api;
+            using Shop.Modules.Billing.Application;
+            using Shop.Modules.Billing.Domain;
+            using Shop.Modules.Billing.Infrastructure.Persistence;
+
+            namespace Shop.Modules.Billing.Tests;
+
+            /// <summary>Serializing it fails the first time, so the first commit fails after the entity was saved and before the outbox insert.</summary>
+            public sealed record NoteAddedV1(Guid NoteId) : IIntegrationEvent
+            {
+                private static int serializations;
+
+            #pragma warning disable CA1065 // The fixture's whole point: the outbox insert fails once.
+                public string Check => Interlocked.Increment(ref serializations) == 1 ? throw new InvalidOperationException("The outbox insert failed once.") : "ok";
+            #pragma warning restore CA1065
+            }
+
+            public class RetriedCommitTests
+            {
+                [Fact]
+                public async Task A_commit_retried_after_a_failure_saves_the_changes_and_the_event()
+                {
+                    var cancellationToken = TestContext.Current.CancellationToken;
+                    var services = new ServiceCollection().AddLogging();
+                    var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+                    new BillingModule().AddServices(services, configuration);
+                    await using var provider = services.BuildServiceProvider();
+                    var noteId = Guid.NewGuid();
+
+                    await using (var scope = provider.CreateAsyncScope())
+                    {
+                        var context = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+                        await context.Database.EnsureCreatedAsync(cancellationToken);
+                        var unitOfWork = scope.ServiceProvider.GetRequiredService<IBillingUnitOfWork>();
+
+                        context.Add(new Note { Id = noteId, Text = "paid" });
+                        await unitOfWork.PublishAsync(new NoteAddedV1(noteId));
+                        await Should.ThrowAsync<InvalidOperationException>(() => unitOfWork.CommitAsync(cancellationToken));
+                        await unitOfWork.CommitAsync(cancellationToken);
+                    }
+
+                    await using (var scope = provider.CreateAsyncScope())
+                    {
+                        var context = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+                        (await context.Set<Note>().CountAsync(note => note.Id == noteId, cancellationToken)).ShouldBe(1);
+                        (await context.Database.SqlQueryRaw<int>("select count(*)::int as \"Value\" from billing.outbox_messages").SingleAsync(cancellationToken)).ShouldBe(1);
+                    }
+                }
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = project.Test(
+            "tests/Modules/Billing.Tests/Billing.Tests.csproj",
+            new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" });
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+    }
+
+    [Fact]
     public void A_consumer_that_handles_something_other_than_an_integration_event_fails_the_architecture_tests()
     {
         using var project = new GeneratedProject(Profile, Frontend);
