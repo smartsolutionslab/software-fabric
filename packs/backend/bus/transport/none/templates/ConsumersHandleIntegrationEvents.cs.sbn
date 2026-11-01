@@ -1,13 +1,11 @@
 using System.Reflection;
-using System.Runtime.CompilerServices;
+using {{ namespace }}.BuildingBlocks.Messaging;
 
 namespace {{ namespace }}.Architecture.Tests.Rules;
 
 public sealed class ConsumersHandleIntegrationEvents : IArchitectureRule
 {
-    private const string IntegrationEvent = "{{ namespace }}.Contracts.IIntegrationEvent";
-
-    public string Description => "Every consumer is a public class in an Application project whose Handle methods take an integration event first and return void (never async void) or Task.";
+    public string Description => "Every consumer's Handle method is one the dispatcher delivers to (IntegrationEventConsumers.Problem): a public class in an Application project, not generic, taking a sealed integration event first, returning void (never async void) or Task.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -15,21 +13,10 @@ public sealed class ConsumersHandleIntegrationEvents : IArchitectureRule
 
         var consumers = model.ModuleAssemblies
             .SelectMany(assembly => assembly.GetTypes())
-            .Where(type => type is { IsClass: true, IsAbstract: false } && type.Name.EndsWith("Consumer", StringComparison.Ordinal));
+            .Where(type => type.IsClass && type.Name.EndsWith("Consumer", StringComparison.Ordinal));
 
         foreach (var consumer in consumers)
         {
-            if (!consumer.IsPublic)
-            {
-                yield return $"{consumer.FullName} is not public; the dispatcher delivers only to public consumers.";
-            }
-
-            if (!consumer.Assembly.GetName().Name!.EndsWith(".Application", StringComparison.Ordinal))
-            {
-                // The dispatcher reads only Application assemblies: anywhere else, its messages would be marked delivered unhandled.
-                yield return $"{consumer.FullName} is outside an Application project; the dispatcher delivers only to consumers there.";
-            }
-
             var methods = consumer.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
                 .Where(method => method.Name.StartsWith("Handle", StringComparison.Ordinal) || method.Name.StartsWith("Consume", StringComparison.Ordinal))
                 .ToList();
@@ -38,22 +25,12 @@ public sealed class ConsumersHandleIntegrationEvents : IArchitectureRule
                 yield return $"{consumer.FullName} has no public Handle method.";
             }
 
-            foreach (var method in methods)
+            // The dispatcher's own definition, so the gate accepts nothing discovery would skip or fail on.
+            foreach (var problem in methods.Select(method => method.Name == "Handle"
+                ? IntegrationEventConsumers.Problem(method)
+                : $"{consumer.FullName}.{method.Name} does not handle an integration event.").OfType<string>().Distinct(StringComparer.Ordinal))
             {
-                var message = method.GetParameters().FirstOrDefault()?.ParameterType;
-                if (method.Name != "Handle" || message is null || !message.GetInterfaces().Any(contract => contract.FullName == IntegrationEvent))
-                {
-                    yield return $"{consumer.FullName}.{method.Name} does not handle an integration event.";
-                }
-                else if (method.ReturnType != typeof(void) && method.ReturnType != typeof(Task))
-                {
-                    yield return $"{consumer.FullName}.{method.Name} returns {method.ReturnType.Name}; a consumer returns void or Task.";
-                }
-                else if (method.ReturnType == typeof(void) && method.GetCustomAttribute<AsyncStateMachineAttribute>() is not null)
-                {
-                    // The dispatcher would mark the message delivered before the handler finished, and lose its exceptions.
-                    yield return $"{consumer.FullName}.{method.Name} is async void; a consumer that awaits returns Task.";
-                }
+                yield return problem;
             }
         }
     }
