@@ -482,6 +482,78 @@ public sealed class LeanCrudBackendTests
         (await PollConsumerAsync(host, "1,1")).ShouldBe("1,1");
     }
 
+    [Fact]
+    public async Task A_disposable_consumer_is_disposed_when_a_handle_parameter_cannot_be_resolved()
+    {
+        using var project = ConsumerProject(
+            "InvoicePaidConsumer",
+            """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            #pragma warning disable CA1040 // A service nobody registers: resolving it fails.
+            public interface ICarrier;
+            #pragma warning restore CA1040
+
+            public sealed class InvoicePaidConsumer : IDisposable
+            {
+                private static int disposed;
+                private bool open = true;
+
+                public static string Report => Volatile.Read(ref disposed) > 0 ? "disposed" : "not disposed";
+
+                public void Handle(InvoicePaidV1 message, ICarrier carrier)
+                {
+                    _ = (message, carrier, open);
+                }
+
+                public void Dispose()
+                {
+                    open = false;
+                    Interlocked.Increment(ref disposed);
+                }
+            }
+            """,
+            "InvoicePaidConsumer.Report");
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        RunMigrationRunner(project, postgres);
+        using var host = project.StartHost(Dependencies(postgres));
+
+        (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        (await PollConsumerAsync(host, "disposed")).ShouldBe("disposed");
+    }
+
+    [Fact]
+    public void A_consumer_outside_an_application_project_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IIntegrationEvent;
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Infrastructure/InvoicePaidConsumer.cs", """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Infrastructure;
+
+            public sealed class InvoicePaidConsumer
+            {
+                public static void Handle(InvoicePaidV1 message) => _ = message;
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Shipping.Infrastructure.InvoicePaidConsumer is outside an Application project; the dispatcher delivers only to consumers there.");
+    }
+
     /// <summary>billing publishes InvoicePaidV1 on POST /billing/invoices/{id}/pay; shipping's consumer reports on GET /shipping/consumer.</summary>
     private static GeneratedProject ConsumerProject(string consumer, string consumerSource, string report)
     {
