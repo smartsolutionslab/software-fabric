@@ -59,10 +59,11 @@ options, when a project needs modules that decide access differently.
 - No profile changes its choices: every profile authenticates and takes
   `backend.authorization: []`, which is what it generated before.
 - `backend.auth=none`, `backend.authorization=roles` and
-  `backend.authorization=claims` have no packs yet. Until they do, `fabric new`
-  fails with `no pack for ...` for them, as for every unbuilt option
-  (ADR-0003). The packs are their own issues; each ships its agent rules and
-  a gate (ADR-0002).
+  `backend.authorization=claims` have no packs yet, so they are
+  `experimental` (ADR-0003). Until they have packs, `fabric new` fails with
+  `no pack for ...` for them, as for every unbuilt option. The packs are their
+  own issues. Each ships its agent rules and a gate (ADR-0002), and an option
+  becomes `supported` once the matrix builds it and it passes.
 - Packs that branch on `backend.auth` (ADR-0006) gain a value to handle: with
   `none` they must render something valid or fail loudly, never silently
   assume a provider.
