@@ -1,0 +1,21 @@
+{{~ if project["frontend.framework"] != "react" || project["frontend.state"] != "tanstack-query" ~}}
+throw new Error('The orval pack generates TanStack Query hooks for React only so far; frontend.state is {{ project["frontend.state"] }} (docs/adr/0006 of the generator).');
+{{~ else ~}}
+import { defineConfig } from 'orval';
+
+// pnpm codegen turns openapi.json into src/api/generated.ts: TanStack Query hooks whose every call goes through apiFetch.
+export default defineConfig({
+  api: {
+    input: './openapi.json',
+    output: {
+      target: './src/api/generated.ts',
+      client: 'react-query',
+      httpClient: 'fetch',
+      override: {
+        mutator: { path: './src/api/baseApi.ts', name: 'apiFetch' },
+        fetch: { includeHttpResponseReturnType: false },
+      },
+    },
+  },
+});
+{{~ end ~}}

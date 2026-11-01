@@ -1,0 +1,25 @@
+{{ slots["web.api-imports"] }}
+
+/** A response outside 2xx; the generated hooks report it as their error. */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, body: string) {
+    super(`The API answered ${status}: ${body}`);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/** Every generated call (src/api/generated.ts) goes through here; /api reaches the host. */
+export async function apiFetch<T>(url: string, init: RequestInit): Promise<T> {
+  const headers = new Headers(init.headers);
+{{ slots["web.api-headers"] }}
+  const response = await fetch(`/api${url}`, { ...init, headers });
+  const body = await response.text();
+  if (!response.ok) {
+    throw new ApiError(response.status, body);
+  }
+
+  return (body === '' ? undefined : JSON.parse(body)) as T;
+}

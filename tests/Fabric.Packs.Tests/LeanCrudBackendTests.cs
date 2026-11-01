@@ -4,16 +4,13 @@ using System.Net;
 namespace Fabric.Packs.Tests;
 
 /// <summary>
-/// lean-crud's backend from the real packs: no broker, no tenancy, CRUD modules without CQRS. Its frontend packs are
-/// M2-02b; until then the project uses saas-standard-react's frontend so it generates and builds.
+/// lean-crud's backend from the real packs: no broker, no tenancy, CRUD modules without CQRS.
 /// </summary>
 [Collection(FixedPorts.Name)]
 public sealed class LeanCrudBackendTests
 {
     private const string Profile = "lean-crud";
     private const string DatabasePassword = "fabric-tests";
-
-    private static readonly string[] Frontend = ["frontend.state=redux-toolkit", "frontend.api-client=rtk-query-codegen"];
 
     private static readonly string[] BackendOptions = ["backend.bus.transport.none", "backend.tenancy.none", "module.style.crud", "module.cqrs.none"];
 
@@ -35,7 +32,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public async Task The_migration_runner_creates_every_modules_outbox_table_and_the_host_creates_none()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
         project.AddModule("shipping");
         project.Build();
@@ -65,7 +62,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void A_lean_crud_project_builds_and_a_new_modules_tests_and_the_architecture_rules_pass()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
         project.Build();
 
@@ -87,7 +84,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public async Task An_integration_event_crosses_two_modules_in_process_through_the_outbox_without_a_broker()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
         project.AddModule("shipping");
         project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
@@ -171,7 +168,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public async Task A_failing_consumer_is_not_retried_before_its_backoff_has_passed_while_other_events_flow()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
         project.AddModule("shipping");
         project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
@@ -299,7 +296,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void A_commit_retried_after_the_outbox_insert_failed_saves_the_changes_and_the_event()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
         project.Write("src/Modules/Billing/Billing.Domain/Note.cs", """
             namespace Shop.Modules.Billing.Domain;
@@ -529,7 +526,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void A_consumer_outside_an_application_project_fails_the_architecture_tests()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("shipping");
         project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
             namespace Shop.Contracts.Billing;
@@ -588,7 +585,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void A_handler_for_a_base_event_type_fails_the_architecture_tests()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("shipping");
         project.Write("src/Contracts/Billing/InvoiceEvents.cs", InvoiceEvents);
         project.Write("src/Modules/Shipping/Shipping.Application/InvoiceEventConsumer.cs", BaseEventConsumer);
@@ -603,7 +600,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void A_generic_handler_fails_the_architecture_tests()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("shipping");
         project.Write("src/Modules/Shipping/Shipping.Application/AnyEventConsumer.cs", GenericConsumer);
         project.Build();
@@ -617,7 +614,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void Discovery_accepts_exactly_the_consumers_the_gate_accepts()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("shipping");
         project.Write("src/Contracts/Billing/InvoiceEvents.cs", InvoiceEvents);
         project.Write("src/Modules/Shipping/Shipping.Application/InvoiceEventConsumer.cs", BaseEventConsumer);
@@ -705,7 +702,7 @@ public sealed class LeanCrudBackendTests
     /// <summary>billing publishes InvoicePaidV1 on POST /billing/invoices/{id}/pay; shipping's consumer reports on GET /shipping/consumer.</summary>
     private static GeneratedProject ConsumerProject(string consumer, string consumerSource, string report)
     {
-        var project = new GeneratedProject(Profile, Frontend);
+        var project = new GeneratedProject(Profile);
         project.AddModule("billing");
         project.AddModule("shipping");
         project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
@@ -769,7 +766,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public async Task The_backoff_starts_when_a_slow_consumer_fails_not_when_its_batch_started()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
         project.AddModule("shipping");
         project.Write("src/Contracts/Billing/InvoiceVoidedV1.cs", """
@@ -842,7 +839,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void A_unit_of_work_refuses_to_commit_inside_a_transaction_it_did_not_open()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
         project.Write("tests/Modules/Billing.Tests/CallerTransactionTests.cs", """
             using Microsoft.EntityFrameworkCore;
@@ -894,7 +891,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void An_async_void_consumer_fails_the_architecture_tests()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("shipping");
         project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
             namespace Shop.Contracts.Billing;
@@ -926,7 +923,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void A_consumer_that_handles_something_other_than_an_integration_event_fails_the_architecture_tests()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("shipping");
         project.Write("src/Modules/Shipping/Shipping.Application/TextConsumer.cs", """
             namespace Shop.Modules.Shipping.Application;
@@ -947,7 +944,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void An_entity_that_knows_ef_core_fails_the_architecture_tests()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
         project.Write("src/Modules/Billing/Billing.Domain/Billing.Domain.csproj", """
             <Project Sdk="Microsoft.NET.Sdk">
@@ -980,7 +977,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void A_tenant_id_in_a_project_without_tenancy_fails_the_architecture_tests()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
         project.Write("src/Modules/Billing/Billing.Domain/Invoice.cs", """
             namespace Shop.Modules.Billing.Domain;
@@ -1003,7 +1000,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void A_read_model_in_a_module_without_cqrs_fails_the_architecture_tests()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
         project.Write("src/Modules/Billing/Billing.Application/InvoiceReadModel.cs", """
             namespace Shop.Modules.Billing.Application;
@@ -1021,7 +1018,7 @@ public sealed class LeanCrudBackendTests
     [Fact]
     public void The_generated_integration_tests_pass_against_the_running_aspire_stack()
     {
-        using var project = new GeneratedProject(Profile, Frontend);
+        using var project = new GeneratedProject(Profile);
         project.Build();
 
         var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");

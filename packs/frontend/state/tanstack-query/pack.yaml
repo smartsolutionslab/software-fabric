@@ -1,0 +1,13 @@
+option: frontend.state.tanstack-query
+files:
+  - { template: templates/query-provider.tsx.sbn, target: web/app/src/providers/query.tsx }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.imports, template: templates/import.sbn, order: 5 }
+  - { slot: web.providers, template: templates/provider.sbn, order: 10 }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 15 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing a store library (Redux, Zustand, MobX, Jotai, Recoil, Valtio) or another server-data cache (SWR, Apollo) fails lint.", file: templates/restricted.sbn }
