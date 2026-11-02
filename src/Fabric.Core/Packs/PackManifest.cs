@@ -20,34 +20,3 @@ public sealed record PackManifest(
 
     public bool IsBase => Dimension == BaseDimension;
 }
-
-public sealed record PackFile(string Template, string Target, bool PerModule);
-
-public sealed record SlotContribution(string Slot, string Template, int Order);
-
-public enum SlotCardinality
-{
-    ZeroOrMore,
-    ExactlyOne,
-    AtMostOne,
-}
-
-/// <param name="Separator">Joins the slot's contributions; <c>null</c> means a newline.</param>
-public sealed record SlotDeclaration(string Slot, string Description, SlotCardinality Cardinality, string? Separator = null);
-
-public sealed record PackAgents(string AgentsMd, IReadOnlyDictionary<string, string> Briefs);
-
-public enum GateKind
-{
-    ArchitectureTest,
-    Analyzer,
-    LintRule,
-    CiStep,
-    UnitTest,
-    EndToEndTest,
-}
-
-public sealed record PackGate(GateKind Kind, string Describes, string? File);
-
-/// <summary>Packs keyed by option id in ordinal order, plus every problem found while loading.</summary>
-public sealed record PackLoadResult(IReadOnlyDictionary<string, PackManifest> Packs, IReadOnlyList<string> Errors);

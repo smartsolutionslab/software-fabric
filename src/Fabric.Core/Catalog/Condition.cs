@@ -1,13 +1,5 @@
 namespace Fabric.Core.Catalog;
 
-public enum ConditionOperator
-{
-    Equals,
-    NotEquals,
-    In,
-    Has,
-}
-
 /// <summary>One rule condition, as defined in docs/catalog-rules.md.</summary>
 public sealed record Condition(string Dimension, ConditionOperator Operator, IReadOnlyList<string> Options)
 {
