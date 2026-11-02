@@ -873,6 +873,51 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Reviews().ShouldBeEmpty();
     }
 
+    /// <summary>
+    /// Copilot's CLI cannot hold the model to the schema, and models write prose before their answer: the findings are
+    /// the last top-level object in the answer that has the schema's shape, wherever it stands. A code fence is prose.
+    /// </summary>
+    [Theory]
+    [InlineData("I read the diff. One thing blocks:\n\n" + MixedFindings)]
+    [InlineData("Here are the findings:\n```json\n" + MixedFindings + "\n```\n")]
+    [InlineData("""Mind the `{` in Invoice.cs, and "quotes". """ + MixedFindings + "\nThat is all.")]
+    [InlineData("""{"findings": [{"severity": "major"}]} """ + MixedFindings)]
+    [InlineData(MixedFindings + """ {"findings": "none"}""")]
+    public void The_findings_are_the_last_object_in_the_answer_that_has_the_schema_s_shape(string answer)
+    {
+        var (exitCode, output) = Run("report-review.sh", "5", Findings(answer), "codex");
+
+        exitCode.ShouldBe(1, output);
+        var review = Reviews().ShouldHaveSingleItem()!;
+        ((string)review["body"]!).ShouldContain("1 blocking, 1 optional");
+        ((string)review["comments"]!.AsArray().ShouldHaveSingleItem()!["body"]!).ShouldContain("Paying twice charges twice.");
+    }
+
+    [Fact]
+    public void Of_two_objects_in_the_findings_shape_the_last_one_counts()
+    {
+        var answer = MixedFindings + "\nOn second thought, that was wrong:\n" + """{"findings": []}""";
+
+        var (exitCode, output) = Run("report-review.sh", "5", Findings(answer), "codex");
+
+        exitCode.ShouldBe(0, output);
+        ((string)Reviews().ShouldHaveSingleItem()!["body"]!).ShouldEndWith("No findings.");
+    }
+
+    /// <summary>Only a top-level object is an answer; one quoted inside another object is not.</summary>
+    [Theory]
+    [InlineData("""So far: {"draft": {"findings": []}, "done": false}""")]
+    [InlineData("""The answer would look like {"findings": [ but I could not finish.""")]
+    [InlineData("```json\n{\"findings\": [{\"severity\": \"blocker\", \"file\": \"a.cs\", \"line\": 1, \"message\": \"Wrong.\"}]}\n```")]
+    public void An_answer_without_a_top_level_object_in_the_findings_shape_fails_the_review(string answer)
+    {
+        var (exitCode, output) = Run("report-review.sh", "5", Findings(answer), "codex");
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain("did not report its findings");
+        Reviews().ShouldBeEmpty();
+    }
+
     [Fact]
     public void When_github_refuses_a_line_comment_every_finding_goes_into_the_review_body()
     {
