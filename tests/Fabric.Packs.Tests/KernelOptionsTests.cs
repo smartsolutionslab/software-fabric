@@ -66,6 +66,28 @@ public sealed class KernelOptionsTests
     }
 
     [Fact]
+    public void A_project_that_stops_reading_the_guard_ban_list_fails_the_architecture_tests_by_name()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Application/Billing.Application.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <ItemGroup>
+                <AdditionalFiles Remove="@(AdditionalFiles)" />
+              </ItemGroup>
+            </Project>
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("src/Modules/Billing/Billing.Application/Billing.Application.csproj does not read build/guards/BannedSymbols.txt");
+        output.ShouldNotContain("Billing.Domain.csproj");
+        output.ShouldNotContain("Kernel.csproj");
+    }
+
+    [Fact]
     public void A_nullable_return_from_application_code_breaks_the_absence_rule()
     {
         using var project = new GeneratedProject(Profile);
