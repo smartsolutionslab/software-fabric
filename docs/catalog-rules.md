@@ -25,7 +25,7 @@ catalog agree.
 
 | Field | Meaning |
 |---|---|
-| `tier` | `supported` (built and tested in the matrix) or `experimental` (generated with a warning). |
+| `tier` | `supported` (built and tested in the matrix) or `experimental` (generated with a warning). An option without a pack under `packs/` is `experimental`; the PR that adds its pack moves it to `supported` (ADR-0003). `SupportTierTests` fails the build when a `supported` option has no pack. |
 | `requires` | List of conditions, **all** of which must hold when this option is chosen. |
 | `conflicts` | List of conditions, **none** of which may hold when this option is chosen. |
 | `note` | Human text. Not interpreted. |

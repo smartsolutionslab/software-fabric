@@ -10,6 +10,10 @@ example of every rule on it.
 `packs/frontend/ui-library/shadcn/` holds `frontend.ui-library.shadcn`, and
 `pack.yaml` must say `option: frontend.ui-library.shadcn`.
 
+Until its pack exists an option is `tier: experimental` in the catalog. The
+pack's PR moves it to `supported`; a test fails the build when a `supported`
+option has no pack (ADR-0003).
+
 Packs under `packs/base/` are the **base**: always part of every project,
 no catalog entry. The base declares the slots the other packs fill.
 
