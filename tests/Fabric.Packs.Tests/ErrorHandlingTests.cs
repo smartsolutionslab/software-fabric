@@ -211,7 +211,7 @@ public sealed class ErrorHandlingTests
         using var project = new GeneratedProject("saas-standard-react");
         project.AddModule("billing");
         project.Write("src/Modules/Billing/Billing.Domain/Invoices/Amount.cs", Amount);
-        project.Write("src/Modules/Billing/Billing.Api/Invoices.cs", InvoicesEndpoint);
+        project.WriteTypes("src/Modules/Billing/Billing.Api", InvoicesEndpoint);
         project.Write("tests/Integration.Tests/GuardTests.cs", GuardTests);
         project.Build();
 
@@ -228,7 +228,7 @@ public sealed class ErrorHandlingTests
         using var project = new GeneratedProject("saas-standard-react", "backend.guards=bcl");
         project.AddModule("billing");
         project.Write("src/Modules/Billing/Billing.Domain/Invoices/Amount.cs", BclAmount);
-        project.Write("src/Modules/Billing/Billing.Api/Invoices.cs", BclInvoicesEndpoint);
+        project.WriteTypes("src/Modules/Billing/Billing.Api", BclInvoicesEndpoint);
         project.Write("tests/Integration.Tests/GuardTests.cs", BclGuardTests);
         project.Build();
 

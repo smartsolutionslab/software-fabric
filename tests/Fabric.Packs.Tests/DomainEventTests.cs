@@ -411,9 +411,9 @@ public sealed class DomainEventTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Invoice.cs", Invoice);
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Invoices", Invoice);
         project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/Configurations/InvoiceConfiguration.cs", InvoiceConfiguration);
-        project.Write("src/Modules/Billing/Billing.Application/Invoices/InvoiceReactions.cs", Reactions);
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Invoices", Reactions);
         project.Write("tests/Modules/Billing.Tests/DomainEventTests.cs", DispatchTests);
         project.Write("tests/Modules/Billing.Tests/RecordingLoggerProvider.cs", RecordingLogger);
         project.Build();
@@ -437,9 +437,9 @@ public sealed class DomainEventTests
     {
         using var project = new GeneratedProject("lean-crud", "module.style=ddd", "module.cqrs=logical");
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Invoice.cs", Invoice);
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Invoices", Invoice);
         project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/Configurations/InvoiceConfiguration.cs", InvoiceConfiguration);
-        project.Write("src/Modules/Billing/Billing.Application/Invoices/InvoiceReactions.cs", Reactions);
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Invoices", Reactions);
         project.Write("src/Contracts/Billing/InvoiceVoidedV1.cs", """
             namespace Shop.Contracts.Billing;
 
@@ -508,7 +508,7 @@ public sealed class DomainEventTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Domain/Invoices/InvoiceEvents.cs", """
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Invoices", """
             using Shop.BuildingBlocks.Domain;
 
             namespace Shop.Modules.Billing.Domain.Invoices;
@@ -529,7 +529,7 @@ public sealed class DomainEventTests
 
             public abstract record InvoiceEvent(Guid Invoice) : IDomainEvent;
             """);
-        project.Write("src/Modules/Billing/Billing.Application/Invoices/InvoiceReactions.cs", """
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Invoices", """
             using Shop.BuildingBlocks.Domain;
             using Shop.BuildingBlocks.DomainEvents;
             using Shop.Modules.Billing.Domain.Invoices;
@@ -588,7 +588,7 @@ public sealed class DomainEventTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Domain/Invoices/InvoiceEvents.cs", """
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Invoices", """
             using Shop.BuildingBlocks.Domain;
 
             namespace Shop.Modules.Billing.Domain.Invoices;

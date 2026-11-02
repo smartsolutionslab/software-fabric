@@ -89,7 +89,7 @@ public sealed class SaasStandardReactTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Invoice.cs", """
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Invoices", """
             using Shop.BuildingBlocks.Domain;
 
             namespace Shop.Modules.Billing.Domain.Invoices;
@@ -111,7 +111,7 @@ public sealed class SaasStandardReactTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Invoice.cs", """
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Invoices", """
             using Shop.BuildingBlocks.Domain;
 
             namespace Shop.Modules.Billing.Domain.Invoices;
@@ -141,7 +141,7 @@ public sealed class SaasStandardReactTests
                 }
             }
             """);
-        project.Write("src/Modules/Billing/Billing.Application/Commands/PayInvoice/PayInvoice.cs", """
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/PayInvoice", """
             using System.Net;
             using Shop.BuildingBlocks.Messaging;
             using Shop.Modules.Billing.Domain.Invoices;
@@ -450,7 +450,7 @@ public sealed class SaasStandardReactTests
     /// <summary>An aggregate in the module that raises an event, its EF configuration, and a module test that builds the module context's model.</summary>
     private static void AddAnAggregateThatRaisesEvents(GeneratedProject project, string module, string aggregate, string change, string raised)
     {
-        project.Write($"src/Modules/{module}/{module}.Domain/{aggregate}s/{aggregate}.cs", $$"""
+        project.WriteTypes($"src/Modules/{module}/{module}.Domain/{aggregate}s", $$"""
             using Shop.BuildingBlocks.Domain;
 
             namespace Shop.Modules.{{module}}.Domain.{{aggregate}}s;
