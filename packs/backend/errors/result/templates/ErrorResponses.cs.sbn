@@ -1,4 +1,5 @@
 {{~ if project["backend.guards"] == "ensure-that" ~}}
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -10,11 +11,21 @@ public static partial class ErrorResponses
 {
     /// <summary>
     /// Problem details for every error the host answers: a failed guard (<see cref="GuardException"/>) is a 400
-    /// with the code <see cref="GuardExceptionHandler.Code"/>; any other exception, an
+    /// with the code <see cref="GuardExceptionHandler.Code"/>; a request the endpoint cannot read or bind
+    /// (<see cref="BadHttpRequestException"/>) answers its own status, a 400; any other exception, an
     /// <see cref="ArgumentException"/> included, is a 500 that says nothing about itself.
     /// </summary>
     public static IServiceCollection AddErrorResponses(this IServiceCollection services) =>
-        services.AddProblemDetails().AddExceptionHandler<GuardExceptionHandler>();
+        services.AddProblemDetails()
+            .Configure<ExceptionHandlerOptions>(options => options.StatusCodeSelector = StatusOf)
+            .AddExceptionHandler<GuardExceptionHandler>();
+
+    /// <summary>
+    /// Minimal APIs throw <see cref="BadHttpRequestException"/> for a request they cannot bind in Development only;
+    /// elsewhere they answer 400 themselves. Either way it is the caller's fault, not a bug.
+    /// </summary>
+    private static int StatusOf(Exception exception) =>
+        exception is BadHttpRequestException badRequest ? badRequest.StatusCode : StatusCodes.Status500InternalServerError;
 
     /// <summary>
     /// The backstop for preconditions. A <see cref="GuardException"/> that escapes an endpoint was thrown by
@@ -61,16 +72,28 @@ public static partial class ErrorResponses
     }
 }
 {{~ else ~}}
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+
 namespace Microsoft.Extensions.DependencyInjection;
 
 public static class ErrorResponses
 {
     /// <summary>
-    /// Problem details for every error the host answers. Every exception is a 500 that says nothing about itself: with
-    /// the BCL guards a failed precondition is a plain <see cref="ArgumentException"/>, indistinguishable from one a bug
-    /// throws, so none answers 400 (docs/adr, errors).
+    /// Problem details for every error the host answers. A request the endpoint cannot read or bind
+    /// (<see cref="BadHttpRequestException"/>) answers its own status, a 400. Every other exception is a 500 that says
+    /// nothing about itself: with the BCL guards a failed precondition is a plain <see cref="ArgumentException"/>,
+    /// indistinguishable from one a bug throws, so none answers 400 (docs/adr, errors).
     /// </summary>
     public static IServiceCollection AddErrorResponses(this IServiceCollection services) =>
-        services.AddProblemDetails();
+        services.AddProblemDetails()
+            .Configure<ExceptionHandlerOptions>(options => options.StatusCodeSelector = StatusOf);
+
+    /// <summary>
+    /// Minimal APIs throw <see cref="BadHttpRequestException"/> for a request they cannot bind in Development only;
+    /// elsewhere they answer 400 themselves. Either way it is the caller's fault, not a bug.
+    /// </summary>
+    private static int StatusOf(Exception exception) =>
+        exception is BadHttpRequestException badRequest ? badRequest.StatusCode : StatusCodes.Status500InternalServerError;
 }
 {{~ end ~}}

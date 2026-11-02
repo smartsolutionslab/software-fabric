@@ -15,6 +15,8 @@ Every failed `Ensure.That` guard, a null check included, throws `GuardException`
 With the BCL guards a failed precondition is a `500`. `ArgumentNullException.ThrowIfNull` and its relatives throw plain `ArgumentException`s, which cannot be told apart from one a bug throws (a duplicate dictionary key, a library's own argument check), so the host maps no exception to `400`: every exception answers `500` problem details with no message, type or stack trace. Choose `backend.guards=ensure-that` to answer invalid input with `400`.
 {{~ end ~}}
 
+A request the endpoint cannot read or bind (a query value its type's `TryParse` refuses, such as a page size above `PageSize.Maximum`, or a body that is not JSON) is the caller's fault too. Minimal APIs throw `BadHttpRequestException` for it in Development only and answer `400` themselves elsewhere; the exception handler answers that exception with its own status code, so it is `400` problem details in every environment rather than a `500` in Development.
+
 This is a backstop, not a way to report errors: a failure a caller should expect is still a `Result`. Decided by the repository owner on 2026-11-01: only a failed guard becomes `400`; any other `ArgumentException` is a bug.
 
 ## Consequences
