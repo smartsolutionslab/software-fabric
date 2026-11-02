@@ -7,7 +7,8 @@ namespace Fabric.Packs.Tests;
 /// <summary>
 /// The generated cross-model review workflow, run step by step as Actions would run it, with stand-ins for the
 /// Copilot CLI, npm and gh: the reviewer is GitHub Copilot CLI, on the model of the family that wrote none of the
-/// commits, and only findings in the schema's shape pass.
+/// commits, and only findings in the schema's shape pass. Each job runs in its own workspace, as on its own runner;
+/// the review's answer reaches the report job only as the artifact it uploads.
 /// </summary>
 public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFixture<BoardProject>, IDisposable
 {
@@ -40,42 +41,101 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
     }
 
     [Fact]
-    public void Copilot_signs_in_with_the_copilot_secret_and_without_gh_token()
+    public void Copilot_signs_in_with_the_workflow_token_and_without_gh_token()
     {
         var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings);
 
         run.ExitCode.ShouldBe(0, run.Log);
-        File.ReadAllText(Path.Combine(Fakes, "copilot-env")).ShouldBe("COPILOT_GITHUB_TOKEN=personal-token\nGH_TOKEN=unset\nGITHUB_TOKEN=unset\n");
+        File.ReadAllText(Path.Combine(Fakes, "copilot-env")).ShouldBe("COPILOT_GITHUB_TOKEN=workflow-token\nGH_TOKEN=unset\nGITHUB_TOKEN=unset\n");
     }
 
-    /// <summary>Actions gives a secret the repository does not have as an empty string.</summary>
-    [Theory]
-    [InlineData("")]
-    [InlineData("  ")]
-    public void Without_the_copilot_secret_the_review_fails_naming_it_and_copilot_does_not_run(string secret)
+    /// <summary>
+    /// The review is billed to the organisation through the workflow's own token: no secret, no personal token, no model
+    /// vendor's key. The reviewer's job can call Copilot and read the repository, nothing more; only the report job,
+    /// which never runs the reviewer, can write to the pull request.
+    /// </summary>
+    [Fact]
+    public void The_reviewer_s_job_cannot_write_to_the_pull_request_and_no_secret_is_used()
     {
-        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, secret: secret);
+        var workflow = File.ReadAllText(WorkflowPath);
+        var root = Root();
+        var jobs = (YamlMappingNode)root["jobs"];
 
-        run.ExitCode.ShouldNotBe(0, run.Log);
-        run.Log.ShouldContain("COPILOT_GITHUB_TOKEN");
-        run.Log.ShouldContain("Copilot Requests");
-        run.CopilotArguments.ShouldBeNull(run.Log);
-        Reviews().ShouldBeEmpty();
+        jobs.Children.Keys.Select(key => ((YamlScalarNode)key).Value).ShouldBe(["choose", "review", "report"]);
+        SecretReference().Matches(workflow).ShouldBeEmpty();
+        workflow.ShouldNotContain("ANTHROPIC_API_KEY");
+        workflow.ShouldNotContain("OPENAI_API_KEY");
+        Mapping((YamlMappingNode)jobs["review"], "permissions").ShouldBe(new Dictionary<string, string>
+        {
+            ["contents"] = "read",
+            ["copilot-requests"] = "write",
+        });
+        Mapping((YamlMappingNode)jobs["report"], "permissions").ShouldBe(new Dictionary<string, string>
+        {
+            ["contents"] = "read",
+            ["pull-requests"] = "write",
+        });
+        Mapping(root, "permissions").Values.ShouldNotContain("write");
+        Mapping((YamlMappingNode)jobs["choose"], "permissions").Values.ShouldNotContain("write");
     }
 
     [Fact]
-    public void The_review_job_uses_the_copilot_secret_alone_and_no_model_vendor_s_key()
+    public void The_report_job_takes_the_gate_from_the_base_sha_and_never_runs_the_reviewer()
     {
-        var workflow = File.ReadAllText(WorkflowPath);
         var jobs = (YamlMappingNode)Root()["jobs"];
+        var report = ((YamlSequenceNode)((YamlMappingNode)jobs["report"])["steps"]).Cast<YamlMappingNode>().ToList();
+        var review = ((YamlSequenceNode)((YamlMappingNode)jobs["review"])["steps"]).Cast<YamlMappingNode>().ToList();
 
-        jobs.Children.Keys.Select(key => ((YamlScalarNode)key).Value).ShouldBe(["choose", "review"]);
-        var permissions = (YamlMappingNode)((YamlMappingNode)jobs["review"])["permissions"];
-        permissions.Children.Keys.Select(key => ((YamlScalarNode)key).Value).ShouldNotContain("copilot-requests");
-        workflow.ShouldNotContain("ANTHROPIC_API_KEY");
-        workflow.ShouldNotContain("OPENAI_API_KEY");
-        SecretReference().Matches(workflow).Select(match => match.Groups[1].Value).Distinct().ShouldBe(["COPILOT_GITHUB_TOKEN"]);
+        report.ShouldContain(step => Uses(step).StartsWith("actions/checkout@", StringComparison.Ordinal)
+            && Mapping(step, "with").GetValueOrDefault("ref") == "${{ github.event.pull_request.base.sha }}"
+            && Mapping(step, "with").GetValueOrDefault("path") == ".gate");
+        report.ShouldNotContain(step => Script(step).Contains("copilot", StringComparison.Ordinal));
+        review.ShouldNotContain(step => Script(step).Contains("report-review.sh", StringComparison.Ordinal));
     }
+
+    /// <summary>
+    /// The reviewer reads an untrusted diff, and the scripts that decide its verdict could be in its workspace: what it
+    /// writes there must not change the verdict. Only its answer reaches the report job.
+    /// </summary>
+    [Fact]
+    public void A_reviewer_that_rewrites_the_gate_s_scripts_does_not_change_the_verdict()
+    {
+        var blocking = """{"findings": [{"severity": "blocking", "file": "src/Invoice.cs", "line": 12, "message": "Paying twice charges twice."}]}""";
+
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", blocking, tamper: true);
+
+        File.ReadAllText(Path.Combine(state, "workspace-review", ".gate", ".github", "scripts", "board", "report-review.sh")).ShouldContain("tampered");
+        run.ExitCode.ShouldNotBe(0, run.Log);
+        run.FailedJob.ShouldBe("report", run.Log);
+        ((string)Reviews().ShouldHaveSingleItem()!["body"]!).ShouldContain("1 blocking");
+    }
+
+    [Fact]
+    public void The_report_job_posts_the_findings_the_review_job_answered_after_its_prose()
+    {
+        var answer = "I read the diff.\n\n" + """{"findings": [{"severity": "optional", "file": "src/Invoice.cs", "line": 3, "message": "Shorter name?"}]}""";
+
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", answer);
+
+        run.ExitCode.ShouldBe(0, run.Log);
+        ((string)Reviews().ShouldHaveSingleItem()!["body"]!).ShouldContain("0 blocking, 1 optional");
+    }
+
+    [Fact]
+    public void A_reviewer_that_crashes_fails_the_review_job_and_nothing_is_posted()
+    {
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, copilotExitCode: 1);
+
+        run.ExitCode.ShouldNotBe(0, run.Log);
+        run.FailedJob.ShouldBe("review", run.Log);
+        Reviews().ShouldBeEmpty();
+    }
+
+    private static string Uses(YamlMappingNode step) =>
+        step.Children.TryGetValue(new YamlScalarNode("uses"), out var uses) ? ((YamlScalarNode)uses).Value! : "";
+
+    private static string Script(YamlMappingNode step) =>
+        step.Children.TryGetValue(new YamlScalarNode("run"), out var run) ? ((YamlScalarNode)run).Value! : "";
 
     [Fact]
     public void The_copilot_cli_is_installed_at_an_exact_version()
@@ -153,7 +213,6 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
 
     [Theory]
     [InlineData("I reviewed the change; it looks fine.", 0)]
-    [InlineData("```json\n{\"findings\": []}\n```", 0)]
     [InlineData("""{"findings": [{"severity": "blocking", "file": "src/Invoice.cs", "line": 12, "message": "Paying twice charges twice."}]}""", 0)]
     [InlineData(NoFindings, 1)]
     public void A_review_fails_unless_copilot_answers_in_the_findings_shape_with_nothing_blocking(string answer, int copilotExitCode)
@@ -185,23 +244,18 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         return File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))!.AsArray() : [];
     }
 
-    private sealed record ReviewRun(int ExitCode, string Log, List<string>? CopilotArguments);
+    private sealed record ReviewRun(int ExitCode, string Log, List<string>? CopilotArguments, string? FailedJob = null);
 
     /// <summary>
     /// A pull request of one commit, reviewed: the choose job, then the review job, with the copilot stand-in answering
-    /// <paramref name="answer"/> and exiting with <paramref name="copilotExitCode"/>. The gate's files are the generated
-    /// project's, as the base branch's checkout in .gate.
+    /// <paramref name="answer"/> and exiting with <paramref name="copilotExitCode"/>, then the report job; a job that
+    /// fails stops the run, as its dependants are skipped. Each job has its own workspace holding the pull request's
+    /// commits and the gate's files (the generated project's, as the base branch's checkout in .gate). With
+    /// <paramref name="tamper"/> the reviewer overwrites every report-review.sh in its workspace.
     /// </summary>
-    private ReviewRun Review(string commitMessage, string answer, int copilotExitCode = 0, string secret = "personal-token")
+    private ReviewRun Review(string commitMessage, string answer, int copilotExitCode = 0, bool tamper = false)
     {
-        var workspace = Path.Combine(state, "workspace");
-        Directory.CreateDirectory(workspace);
-        BoardProject.Git(workspace, "init", "--quiet", "--initial-branch=main");
-        BoardProject.Git(workspace, "commit", "--quiet", "--allow-empty", "-m", "base");
-        BoardProject.Git(workspace, "tag", "base");
-        BoardProject.Git(workspace, "commit", "--quiet", "--allow-empty", "-m", commitMessage);
-        Directory.CreateSymbolicLink(Path.Combine(workspace, ".gate"), board.Project.ProjectDirectory);
-        WriteFakes(answer, copilotExitCode);
+        WriteFakes(answer, copilotExitCode, tamper);
 
         Dictionary<string, string> expressions = new()
         {
@@ -209,33 +263,81 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
             ["github.event.pull_request.head.sha"] = "HEAD",
             ["github.event.pull_request.number"] = "5",
             ["github.token"] = "workflow-token",
-            ["secrets.COPILOT_GITHUB_TOKEN"] = secret,
         };
-        var choose = RunJob("choose", workspace, expressions);
-        if (choose.ExitCode != 0)
+        var log = "";
+        foreach (var name in new[] { "choose", "review", "report" })
         {
-            return new ReviewRun(choose.ExitCode, choose.Log, null);
+            var job = RunJob(name, Workspace(name, commitMessage), expressions);
+            log += job.Log;
+            if (job.ExitCode != 0)
+            {
+                return new ReviewRun(job.ExitCode, log, CopilotArguments(), name);
+            }
+
+            foreach (var (output, value) in job.Outputs)
+            {
+                expressions[$"needs.{name}.outputs.{output}"] = value;
+            }
         }
 
-        foreach (var (name, value) in choose.Outputs)
-        {
-            expressions[$"needs.choose.outputs.{name}"] = value;
-        }
-
-        var review = RunJob("review", workspace, expressions);
-        var arguments = Path.Combine(Fakes, "copilot-args");
-        List<string>? copilotArguments = File.Exists(arguments) ? [.. File.ReadAllText(arguments).Split('\0')[..^1]] : null;
-        return new ReviewRun(review.ExitCode, choose.Log + review.Log, copilotArguments);
+        return new ReviewRun(0, log, CopilotArguments());
     }
 
-    private void WriteFakes(string answer, int copilotExitCode)
+    private List<string>? CopilotArguments()
+    {
+        var arguments = Path.Combine(Fakes, "copilot-args");
+        return File.Exists(arguments) ? [.. File.ReadAllText(arguments).Split('\0')[..^1]] : null;
+    }
+
+    /// <summary>A job's own checkout: the pull request's commits, and the gate's files from the base branch in .gate.</summary>
+    private string Workspace(string job, string commitMessage)
+    {
+        var workspace = Path.Combine(state, $"workspace-{job}");
+        Directory.CreateDirectory(workspace);
+        BoardProject.Git(workspace, "init", "--quiet", "--initial-branch=main");
+        BoardProject.Git(workspace, "commit", "--quiet", "--allow-empty", "-m", "base");
+        BoardProject.Git(workspace, "tag", "base");
+        BoardProject.Git(workspace, "commit", "--quiet", "--allow-empty", "-m", commitMessage);
+        foreach (var entry in new[] { ".github", ".claude", "AGENTS.md" })
+        {
+            Copy(Path.Combine(board.Project.ProjectDirectory, entry), Path.Combine(workspace, ".gate", entry));
+        }
+
+        return workspace;
+    }
+
+    private static void Copy(string source, string target)
+    {
+        if (File.Exists(source))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(source, target, overwrite: true);
+            return;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            Copy(file, Path.Combine(target, Path.GetRelativePath(source, file)));
+        }
+    }
+
+    private void WriteFakes(string answer, int copilotExitCode, bool tamper)
     {
         Directory.CreateDirectory(Fakes);
         File.WriteAllText(Path.Combine(Fakes, "answer"), answer);
+        var tampering = tamper
+            ? """
+                for script in .gate/.github/scripts/board/report-review.sh .github/scripts/board/report-review.sh; do
+                  mkdir -p "$(dirname "$script")"
+                  printf '#!/usr/bin/env bash\n# tampered\nexit 0\n' > "$script"
+                done
+                """
+            : "";
         Fake("copilot", $$"""
             #!/usr/bin/env bash
             printf '%s\0' "$@" > "$FAKES/copilot-args"
             printf 'COPILOT_GITHUB_TOKEN=%s\nGH_TOKEN=%s\nGITHUB_TOKEN=%s\n' "${COPILOT_GITHUB_TOKEN-unset}" "${GH_TOKEN-unset}" "${GITHUB_TOKEN-unset}" > "$FAKES/copilot-env"
+            {{tampering}}
             cat "$FAKES/answer"
             exit {{copilotExitCode}}
             """);
@@ -259,8 +361,9 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
 
     /// <summary>
     /// Runs a job's <c>run</c> steps in order as Actions does (bash -eo pipefail, GITHUB_ENV and GITHUB_OUTPUT carried
-    /// over); its <c>uses</c> steps are checkouts, which the workspace stands in for. An expression the test does not
-    /// know, a secret say, fails the test.
+    /// over). Of its <c>uses</c> steps, artifact uploads and downloads move files through the run's artifact store; the
+    /// rest are checkouts, which the workspace stands in for. An expression the test does not know, a secret say, fails
+    /// the test.
     /// </summary>
     private JobRun RunJob(string name, string workspace, Dictionary<string, string> expressions)
     {
@@ -292,6 +395,7 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         {
             if (!step.Children.TryGetValue(new YamlScalarNode("run"), out var run))
             {
+                TransferArtifact(step, expressions, environment, steps);
                 continue;
             }
 
@@ -326,6 +430,27 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         return new JobRun(0, log, outputs);
     }
 
+    /// <summary>The run's artifact store: an upload copies its file under the artifact's name, a download copies it back.</summary>
+    private void TransferArtifact(
+        YamlMappingNode step,
+        Dictionary<string, string> expressions,
+        Dictionary<string, string> environment,
+        Dictionary<string, Dictionary<string, string>> steps)
+    {
+        var uses = Uses(step);
+        var with = Mapping(step, "with").ToDictionary(entry => entry.Key, entry => Evaluate(entry.Value, expressions, environment, steps));
+        if (uses.StartsWith("actions/upload-artifact@", StringComparison.Ordinal))
+        {
+            File.Exists(with["path"]).ShouldBeTrue($"The artifact {with["name"]} has no file at {with["path"]}.");
+            var store = Directory.CreateDirectory(Path.Combine(state, "artifacts", with["name"])).FullName;
+            File.Copy(with["path"], Path.Combine(store, Path.GetFileName(with["path"])), overwrite: true);
+        }
+        else if (uses.StartsWith("actions/download-artifact@", StringComparison.Ordinal))
+        {
+            Copy(Path.Combine(state, "artifacts", with["name"]), with["path"]);
+        }
+    }
+
     private static Dictionary<string, string> Lines(string path) =>
         File.ReadAllLines(path).Where(line => line.Contains('=', StringComparison.Ordinal))
             .Select(line => line.Split('=', 2))
@@ -343,6 +468,11 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
             if (parts is ["env", var variable])
             {
                 return environment.GetValueOrDefault(variable, "");
+            }
+
+            if (parts is ["runner", "temp"])
+            {
+                return environment["RUNNER_TEMP"];
             }
 
             if (parts is ["steps", var step, "outputs", var output])
