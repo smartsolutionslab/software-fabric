@@ -146,4 +146,61 @@ public sealed class DtoMappingTests
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("Shop.Modules.Billing.Application.Queries.Totals.GetTotalHandler builds TotalDto itself;");
     }
+
+    private const string Shares = """
+        using System.Linq.Expressions;
+        using Shop.BuildingBlocks.Messaging;
+
+        namespace Shop.Modules.Billing.Application.Queries.Shares;
+
+        public record struct ShareDto
+        {
+            public decimal Share { get; init; }
+        }
+
+        public static class ShareMappings
+        {
+            public static ShareDto ToShareDto(this decimal share) => new() { Share = share };
+        }
+
+        public sealed record DescribeShare(decimal Share) : IQuery<Result<string, ApiError>>;
+
+        public sealed record ListShares : IQuery<Result<IReadOnlyList<ShareDto>, ApiError>>;
+
+        public sealed class DescribeShareHandler : IQueryHandler<DescribeShare, Result<string, ApiError>>
+        {
+            public async Task<Result<string, ApiError>> HandleAsync(DescribeShare query, CancellationToken cancellationToken)
+            {
+                await Task.Yield();
+                return Success($"{typeof(ShareDto).Name} {query.Share.ToShareDto().Share}");
+            }
+        }
+
+        public sealed class ListSharesHandler : IQueryHandler<ListShares, Result<IReadOnlyList<ShareDto>, ApiError>>
+        {
+            private static readonly decimal[] Shares = [0.25m, 0.75m];
+
+            public async Task<Result<IReadOnlyList<ShareDto>, ApiError>> HandleAsync(ListShares query, CancellationToken cancellationToken)
+            {
+                await Task.Yield();
+                ShareDto[] shares = [.. Shares.AsQueryable().Select(share => new ShareDto { Share = share })];
+                return Success<IReadOnlyList<ShareDto>>(shares);
+            }
+        }
+        """;
+
+    [Fact]
+    public void A_struct_dto_built_in_an_expression_tree_fails_the_architecture_tests_and_a_typeof_of_one_does_not()
+    {
+        using var project = new GeneratedProject("saas-standard-react");
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/Shares", Shares);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application.Queries.Shares.ListSharesHandler builds ShareDto itself;");
+        output.ShouldNotContain("DescribeShareHandler builds");
+    }
 }
