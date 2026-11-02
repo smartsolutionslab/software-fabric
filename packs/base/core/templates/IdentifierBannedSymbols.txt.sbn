@@ -1,0 +1,1 @@
+M:System.Guid.NewGuid;Create identifiers with Guid.CreateVersion7(), which is time-ordered and keeps indexes compact (docs/adr)
