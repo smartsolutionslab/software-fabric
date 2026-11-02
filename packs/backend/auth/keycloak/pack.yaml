@@ -1,7 +1,7 @@
 option: backend.auth.keycloak
 files:
   - { template: templates/realm.json.sbn, target: src/AppHost/realms/realm.json }
-  - { template: templates/Authentication.cs.sbn, target: src/Host/Authentication.cs }
+  - { template: templates/Authentication.cs.sbn, target: src/Host/Wiring/Authentication.cs }
   - { template: templates/CurrentUser.cs.sbn, target: src/Host/CurrentUser.cs }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }

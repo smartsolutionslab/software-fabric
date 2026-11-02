@@ -3,11 +3,11 @@ option: backend.bus.transport.none
 # in each module's schema and are delivered in-process by the host. Owns the same unit-of-work files a messaging
 # library's pack owns; the two are never chosen together.
 files:
-  - { template: templates/Messaging.cs.sbn, target: src/Host/Messaging.cs }
+  - { template: templates/Messaging.cs.sbn, target: src/Host/Wiring/Messaging.cs }
   - { template: templates/ModuleUnitOfWorkBase.cs.sbn, target: src/BuildingBlocks/Messaging/ModuleUnitOfWork.cs }
-  - { template: templates/UnitOfWorkRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/UnitOfWorkRegistration.cs }
+  - { template: templates/UnitOfWorkRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/UnitOfWorkRegistration.cs }
   - { template: templates/Outbox.cs.sbn, target: src/BuildingBlocks/Messaging/Outbox.cs }
-  - { template: templates/OutboxTables.cs.sbn, target: src/BuildingBlocks/Messaging/OutboxTables.cs }
+  - { template: templates/OutboxTables.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/OutboxTables.cs }
   - { template: templates/OutboxSignal.cs.sbn, target: src/BuildingBlocks/Messaging/OutboxSignal.cs }
   - { template: templates/OutboxDispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/OutboxDispatcher.cs }
   - { template: templates/IntegrationEventConsumers.cs.sbn, target: src/BuildingBlocks/Messaging/IntegrationEventConsumers.cs }

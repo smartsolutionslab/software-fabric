@@ -1,7 +1,7 @@
 option: backend.errors.result
 files:
-  - { template: templates/ResultHttpExtensions.cs.sbn, target: src/BuildingBlocks/Http/ResultHttpExtensions.cs }
-  - { template: templates/ErrorResponses.cs.sbn, target: src/BuildingBlocks/Http/ErrorResponses.cs }
+  - { template: templates/ResultHttpExtensions.cs.sbn, target: src/BuildingBlocks/Http/Wiring/ResultHttpExtensions.cs }
+  - { template: templates/ErrorResponses.cs.sbn, target: src/BuildingBlocks/Http/Wiring/ErrorResponses.cs }
   - { template: templates/HandlersReturnResults.cs.sbn, target: tests/Architecture.Tests/Rules/HandlersReturnResults.cs }
 slots:
   - { slot: host.services, template: templates/host-services.sbn }

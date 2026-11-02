@@ -3,6 +3,13 @@
 - Run `dotnet tool restore` once after cloning; local tools are pinned in `.config/dotnet-tools.json`.
 - Build everything with `dotnet build build.proj`. Run locally with `dotnet run --project src/AppHost`.
 - Format with `bash .github/scripts/format.sh` before you push. CI runs it with `--verify-no-changes` and fails on any file `dotnet format` would change, modules and tests included.
+- Code style fails the Release build or the format check (`.editorconfig`), so write it the way the rules want:
+  - `var` for every local it compiles for: `var invoice = await invoices.FindAsync(id, cancellationToken);`. Write the type only where `var` cannot: a collection expression (`List<Invoice> invoices = [];`, never `new()` or `new List<Invoice>()`), target-typed `new()`, `default`.
+  - One file-scoped namespace per file (`namespace <Namespace>.Modules.Billing.Domain;`), matching the folder the file is in (wiring code in `Wiring/` excepted, see below).
+  - Braces on every `if`, `else`, `for`, `foreach`, `while` and `using`, even around one statement.
+  - `int`, `string`, `bool`, never `Int32`, `String`, `Boolean`; fields nothing reassigns are `readonly`.
+  - Interfaces start with `I`. Private fields are camelCase with no underscore (`gate`, not `_gate`); where a constructor parameter has the field's name, assign with `this.gate = gate;`. Private constants and `static readonly` fields are PascalCase. Async methods in `src/` end in `Async`; test methods are sentences without it.
+  - Never silence a rule with `#pragma`, `NoWarn` or an `.editorconfig` severity; change the code. Migrations made with `dotnet ef` are generated code and left as the tool writes them.
 - `src/AppHost` is the only composition root. A new database, broker or service is an Aspire resource there, never a hand-written connection string.
 - Each bounded context is a module under `src/Modules/<Module>/` with Domain, Application, Infrastructure and Api projects. Add one with `fabric add-module <name>`; never copy another module.
 - Modules never reference each other. They talk through `src/Contracts`.
@@ -10,5 +17,5 @@
 - `src/Kernel` holds what every project may use, the Domain included: guards, results, absence. It is referenced and imported everywhere; never add a dependency to it.
 - A new package version goes in `Directory.Packages.props`; projects reference it without a version.
 - An architecture rule is a class implementing `IArchitectureRule` in `tests/Architecture.Tests/Rules/`; it runs with the other tests.
-- Code that wires a choice into the host or into every module is an extension method in the `Microsoft.Extensions.DependencyInjection` (services) or `Microsoft.AspNetCore.Builder` (app) namespace, so no shared file needs a `using` per choice.
+- Code that wires a choice into the host or into every module is an extension method in the `Microsoft.Extensions.DependencyInjection` (services) or `Microsoft.AspNetCore.Builder` (app) namespace, so no shared file needs a `using` per choice. It lives in a `Wiring/` folder inside its project (`src/BuildingBlocks/Api/Wiring/EndpointDiscovery.cs`), the only place a namespace may differ from the folder; nothing outside `Wiring/` is in a `Microsoft.*` namespace.
 - HttpClients retry only GET, HEAD, PUT, DELETE, OPTIONS and TRACE; a POST or PATCH gets one attempt. Only a client whose POSTs or PATCHes are idempotent in fact (a token mint) may opt back in with `.RetryEveryMethod()` on its `IHttpClientBuilder`, with a comment at that call site saying why a second attempt cannot apply twice. Never replace the retry predicate in `src/ServiceDefaults`.

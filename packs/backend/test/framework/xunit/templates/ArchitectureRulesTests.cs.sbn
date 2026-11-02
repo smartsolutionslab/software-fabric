@@ -4,7 +4,7 @@ public class ArchitectureRulesTests
 {
     private static readonly ArchitectureModel Model = ArchitectureModel.Load();
 
-    public static TheoryData<string> Rules { get; } = new(ArchitectureModel.Rules.Select(rule => rule.GetType().Name));
+    public static TheoryData<string> Rules { get; } = [.. ArchitectureModel.Rules.Select(rule => rule.GetType().Name)];
 
     [Theory]
     [MemberData(nameof(Rules))]

@@ -11,7 +11,7 @@ public sealed class FormattingTests
     /// Overrides that let a profile be generated while its frontend packs are not written yet. Only frontend dimensions
     /// are overridden, so the backend checked is the profile's own.
     /// </summary>
-    private static readonly Dictionary<string, string[]> FrontendStandIns = new()
+    internal static readonly Dictionary<string, string[]> FrontendStandIns = new()
     {
         ["saas-standard-vue"] =
         [
@@ -82,7 +82,7 @@ public sealed class FormattingTests
     }
 
     /// <summary>Runs the backend CI's "Check formatting" step, as written in the generated ci.yml.</summary>
-    private static (int ExitCode, string Output) RunFormatCheck(GeneratedProject project)
+    internal static (int ExitCode, string Output) RunFormatCheck(GeneratedProject project)
     {
         var lines = File.ReadAllLines(Path.Combine(project.ProjectDirectory, ".github", "workflows", "ci.yml"));
         var step = Array.FindIndex(lines, line => line.Trim() == StepName);

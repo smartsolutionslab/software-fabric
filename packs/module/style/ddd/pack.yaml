@@ -9,7 +9,7 @@ files:
   - { template: templates/IDomainEventReaction.cs.sbn, target: src/BuildingBlocks/DomainEvents/IDomainEventReaction.cs }
   - { template: templates/DomainEventReactions.cs.sbn, target: src/BuildingBlocks/DomainEvents/DomainEventReactions.cs }
   - { template: templates/DomainEventDispatch.cs.sbn, target: src/BuildingBlocks/DomainEvents/DomainEventDispatch.cs }
-  - { template: templates/DomainEventRegistration.cs.sbn, target: src/BuildingBlocks/DomainEvents/DomainEventRegistration.cs }
+  - { template: templates/DomainEventRegistration.cs.sbn, target: src/BuildingBlocks/DomainEvents/Wiring/DomainEventRegistration.cs }
   - { template: templates/DomainIsPure.cs.sbn, target: tests/Architecture.Tests/Rules/DomainIsPure.cs }
   - { template: templates/DomainErrorsCarryNoHttp.cs.sbn, target: tests/Architecture.Tests/Rules/DomainErrorsCarryNoHttp.cs }
   - { template: templates/EveryDomainEventHasAReaction.cs.sbn, target: tests/Architecture.Tests/Rules/EveryDomainEventHasAReaction.cs }

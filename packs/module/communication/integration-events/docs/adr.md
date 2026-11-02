@@ -6,7 +6,7 @@
 
 Modules tell each other what happened through integration events: records in `src/Contracts/<Module>/`, implementing `IIntegrationEvent`, named in the past tense with a version suffix (`InvoicePaidV1`). An event is published through the module's unit of work (`I<Module>UnitOfWork.PublishAsync`) and sent only when `CommitAsync` succeeds, so a change and the event announcing it are saved together or not at all.
 
-Another module reacts with a consumer — a class named `<Event>Consumer` in its Application project with a `Handle(<Event>)` method.
+Another module reacts with a consumer — a class named `<Event>Consumer` in its Application project with a `Handle(<Event>)` method, or `HandleAsync(<Event>)` when it awaits.
 
 ## Consequences
 

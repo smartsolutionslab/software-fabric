@@ -1,7 +1,7 @@
 option: backend.api-style.minimal-apis
 files:
   - { template: templates/IEndpoint.cs.sbn, target: src/BuildingBlocks/Api/IEndpoint.cs }
-  - { template: templates/EndpointDiscovery.cs.sbn, target: src/BuildingBlocks/Api/EndpointDiscovery.cs }
+  - { template: templates/EndpointDiscovery.cs.sbn, target: src/BuildingBlocks/Api/Wiring/EndpointDiscovery.cs }
   - { template: templates/NoControllers.cs.sbn, target: tests/Architecture.Tests/Rules/NoControllers.cs }
 slots:
   - { slot: modules.endpoints, template: templates/module-endpoints.sbn, order: 10 }

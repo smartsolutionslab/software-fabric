@@ -10,7 +10,7 @@ At the HTTP edge, `ToHttpResult()` turns a success into `200` with the value and
 
 A failed precondition is the one exception a caller can cause, and only a guard can say that it was one.
 {{~ if project["backend.guards"] == "ensure-that" ~}}
-Every failed `Ensure.That` guard, a null check included, throws `GuardException` (an `ArgumentException`, `src/Kernel`). The host's exception handler (`GuardExceptionHandler`, `src/BuildingBlocks/Http/ErrorResponses.cs`) answers exactly that type with `400` problem details carrying the code `invalid-argument` and the guard's message, and logs it at Information. Every other exception, a plain `ArgumentException` included, is a bug and answers `500` problem details with no message, type or stack trace.
+Every failed `Ensure.That` guard, a null check included, throws `GuardException` (an `ArgumentException`, `src/Kernel`). The host's exception handler (`GuardExceptionHandler`, `src/BuildingBlocks/Http/Wiring/ErrorResponses.cs`) answers exactly that type with `400` problem details carrying the code `invalid-argument` and the guard's message, and logs it at Information. Every other exception, a plain `ArgumentException` included, is a bug and answers `500` problem details with no message, type or stack trace.
 {{~ else ~}}
 With the BCL guards a failed precondition is a `500`. `ArgumentNullException.ThrowIfNull` and its relatives throw plain `ArgumentException`s, which cannot be told apart from one a bug throws (a duplicate dictionary key, a library's own argument check), so the host maps no exception to `400`: every exception answers `500` problem details with no message, type or stack trace. Choose `backend.guards=ensure-that` to answer invalid input with `400`.
 {{~ end ~}}

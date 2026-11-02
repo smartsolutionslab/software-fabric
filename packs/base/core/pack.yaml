@@ -28,8 +28,8 @@ files:
   - { template: templates/AppHost/appsettings.json.sbn, target: src/AppHost/appsettings.json }
   - { template: templates/AppHost/launchSettings.json.sbn, target: src/AppHost/Properties/launchSettings.json }
   - { template: templates/ServiceDefaults/ServiceDefaults.csproj.sbn, target: src/ServiceDefaults/ServiceDefaults.csproj }
-  - { template: templates/ServiceDefaults/Extensions.cs.sbn, target: src/ServiceDefaults/Extensions.cs }
-  - { template: templates/ServiceDefaults/IdempotentRetry.cs.sbn, target: src/ServiceDefaults/IdempotentRetry.cs }
+  - { template: templates/ServiceDefaults/Extensions.cs.sbn, target: src/ServiceDefaults/Wiring/Extensions.cs }
+  - { template: templates/ServiceDefaults/IdempotentRetry.cs.sbn, target: src/ServiceDefaults/Wiring/IdempotentRetry.cs }
   - { template: templates/BuildingBlocks/BuildingBlocks.csproj.sbn, target: src/BuildingBlocks/BuildingBlocks.csproj }
   - { template: templates/BuildingBlocks/IModule.cs.sbn, target: src/BuildingBlocks/Modules/IModule.cs }
   - { template: templates/BuildingBlocks/ModuleDiscovery.cs.sbn, target: src/BuildingBlocks/Modules/ModuleDiscovery.cs }

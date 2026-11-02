@@ -25,9 +25,9 @@ public sealed partial class ServiceDefaultsTests
     public void The_retry_rule_fails_a_project_whose_defaults_retry_every_method()
     {
         using var project = new GeneratedProject(Profile);
-        var extensions = Path.Combine(project.ProjectDirectory, "src", "ServiceDefaults", "Extensions.cs");
+        var extensions = Path.Combine(project.ProjectDirectory, "src", "ServiceDefaults", "Wiring", "Extensions.cs");
         var retryingEveryMethod = StandardResilienceHandler().Replace(File.ReadAllText(extensions), "AddStandardResilienceHandler()");
-        project.Write("src/ServiceDefaults/Extensions.cs", retryingEveryMethod);
+        project.Write("src/ServiceDefaults/Wiring/Extensions.cs", retryingEveryMethod);
         project.Build();
 
         var (exitCode, output) = project.Test(ArchitectureTests);

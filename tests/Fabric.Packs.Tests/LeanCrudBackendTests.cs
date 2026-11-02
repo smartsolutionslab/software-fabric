@@ -629,9 +629,18 @@ public sealed class LeanCrudBackendTests
                 public static void Handle(InvoicePaidV1 message) => _ = message;
             }
 
+            public sealed class AwaitingInvoicePaidConsumer
+            {
+                public static async Task HandleAsync(InvoicePaidV1 message)
+                {
+                    await Task.Yield();
+                    _ = message;
+                }
+            }
+
             public sealed class LateInvoicePaidConsumer
             {
-                public static async void Handle(InvoicePaidV1 message)
+                public static async void HandleAsync(InvoicePaidV1 message)
                 {
                     await Task.Yield();
                     _ = message;
@@ -673,18 +682,18 @@ public sealed class LeanCrudBackendTests
                         .SelectMany(assembly => assembly.GetTypes())
                         .Where(type => type.Name.EndsWith("Consumer", StringComparison.Ordinal))
                         .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
-                        .Where(method => method.Name == "Handle")
+                        .Where(method => method.Name is "Handle" or "HandleAsync")
                         .ToList();
-                    handlers.Count.ShouldBe(6);
+                    handlers.Count.ShouldBe(7);
 
                     foreach (var handler in handlers)
                     {
                         var type = handler.DeclaringType!.FullName!;
-                        var gateAccepts = !violations.Any(violation => violation.StartsWith($"{type}.Handle ", StringComparison.Ordinal) || violation.StartsWith($"{type} ", StringComparison.Ordinal));
-                        discovered.Contains(handler).ShouldBe(gateAccepts, $"{type}.Handle: the gate says {(gateAccepts ? "valid" : "invalid")}");
+                        var gateAccepts = !violations.Any(violation => violation.StartsWith($"{type}.{handler.Name} ", StringComparison.Ordinal) || violation.StartsWith($"{type} ", StringComparison.Ordinal));
+                        discovered.Contains(handler).ShouldBe(gateAccepts, $"{type}.{handler.Name}: the gate says {(gateAccepts ? "valid" : "invalid")}");
                     }
 
-                    discovered.Select(handler => handler.DeclaringType!.Name).ShouldBe(["InvoicePaidConsumer"]);
+                    discovered.Select(handler => handler.DeclaringType!.Name).Order(StringComparer.Ordinal).ShouldBe(["AwaitingInvoicePaidConsumer", "InvoicePaidConsumer"]);
                 }
             }
             """);
@@ -804,7 +813,7 @@ public sealed class LeanCrudBackendTests
             {
                 private static int calls;
 
-                public static async Task Handle(InvoiceVoidedV1 message, CancellationToken cancellationToken)
+                public static async Task HandleAsync(InvoiceVoidedV1 message, CancellationToken cancellationToken)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1.5), cancellationToken);
                     if (Interlocked.Increment(ref calls) == 1)
@@ -905,7 +914,7 @@ public sealed class LeanCrudBackendTests
 
             public sealed class InvoicePaidConsumer
             {
-                public static async void Handle(InvoicePaidV1 message)
+                public static async void HandleAsync(InvoicePaidV1 message)
                 {
                     await Task.Yield();
                     _ = message;
@@ -917,7 +926,7 @@ public sealed class LeanCrudBackendTests
         var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
 
         exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("Shop.Modules.Shipping.Application.InvoicePaidConsumer.Handle is async void; a consumer that awaits returns Task.");
+        output.ShouldContain("Shop.Modules.Shipping.Application.InvoicePaidConsumer.HandleAsync is async void; a consumer that awaits returns Task.");
     }
 
     [Fact]

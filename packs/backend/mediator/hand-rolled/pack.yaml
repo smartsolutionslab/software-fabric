@@ -2,7 +2,7 @@ option: backend.mediator.hand-rolled
 files:
   - { template: templates/Requests.cs.sbn, target: src/BuildingBlocks/Messaging/Requests.cs }
   - { template: templates/Dispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/Dispatcher.cs }
-  - { template: templates/MessagingRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/MessagingRegistration.cs }
+  - { template: templates/MessagingRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/MessagingRegistration.cs }
   - { template: templates/EveryRequestHasOneHandler.cs.sbn, target: tests/Architecture.Tests/Rules/EveryRequestHasOneHandler.cs }
 slots:
   - { slot: host.services, template: templates/host-services.sbn }

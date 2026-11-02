@@ -98,6 +98,13 @@ declared in `Microsoft.Extensions.DependencyInjection` (services) or
 `Microsoft.AspNetCore.Builder` (app). Shared files then need no `using`
 per choice, and the code behind the call is in a file the pack owns.
 
+That file's target is a `Wiring/` folder inside the project that holds the
+extension (`src/BuildingBlocks/Api/Wiring/EndpointDiscovery.cs`,
+`src/Host/Wiring/Authentication.cs`; added in #39). Generated projects
+enforce namespaces that match the folder (IDE0130) everywhere except
+`src/**/Wiring/*.cs`, so wiring code is the only code in a `Microsoft.*`
+namespace, and a pack that puts one anywhere else fails the build.
+
 ## Slots
 
 Cardinality `0+` unless stated. "Separator" is what joins contributions
