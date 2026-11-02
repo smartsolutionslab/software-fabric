@@ -7,6 +7,7 @@ files:
   - { template: templates/NoServices.cs.sbn, target: src/BuildingBlocks/Persistence/NoServices.cs }
   - { template: templates/MigrationRunner.csproj.sbn, target: src/MigrationRunner/MigrationRunner.csproj }
   - { template: templates/MigrationRunner.cs.sbn, target: src/MigrationRunner/Program.cs }
+  - { template: templates/UniqueConstraintResponses.cs.sbn, target: src/BuildingBlocks/Persistence/Wiring/UniqueConstraintResponses.cs }
   - { template: templates/DesignTimeFactory.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/{{ module.namespace }}DbContextFactory.cs", per-module: true }
 declares-slots:
   - { slot: persistence.options, description: "Statements configuring the DbContextOptionsBuilder options for the database provider, given string connectionString and string schema (the module's; for its migrations history), each indented twelve spaces.", cardinality: exactly-one }
@@ -24,6 +25,7 @@ slots:
   - { slot: apphost.project-references, template: templates/apphost-project-reference.sbn }
   - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 15 }
   - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 5 }
+  - { slot: host.services, template: templates/host-services.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

@@ -1,0 +1,88 @@
+{{~ if project["backend.database"] == "postgres" || project["backend.database"] == "sqlserver" ~}}
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http;
+{{~ if project["backend.database"] == "sqlserver" ~}}
+using Microsoft.Data.SqlClient;
+{{~ end ~}}
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+{{~ if project["backend.database"] == "postgres" ~}}
+using Npgsql;
+{{~ end ~}}
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static partial class UniqueConstraintResponses
+{
+    /// <summary>
+    /// A write a unique index refuses answers <c>409</c> problem details with the code
+    /// <see cref="UniqueConstraintExceptionHandler.Code"/>; every other database failure stays a <c>500</c>.
+    /// </summary>
+    public static IServiceCollection AddUniqueConstraintResponses(this IServiceCollection services) =>
+        services.AddProblemDetails()
+            .AddExceptionHandler<UniqueConstraintExceptionHandler>();
+
+    /// <summary>
+    /// The backstop for a race past an application-level uniqueness check. The check stays the primary signal: it
+    /// answers with an error that names the rule. Between the check and the insert another writer can take the key;
+    /// the unique index then refuses the second insert, and this answers <c>409</c> instead of <c>500</c>.
+    /// </summary>
+    private sealed partial class UniqueConstraintExceptionHandler(IProblemDetailsService problemDetails, ILogger<UniqueConstraintExceptionHandler> logger) : IExceptionHandler
+    {
+        /// <summary>The <c>code</c> of every problem a unique-index violation answers.</summary>
+        public const string Code = "already-exists";
+
+        public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
+        {
+            {{ not_null "httpContext" }}
+
+            if (!IsUniqueViolation(exception))
+            {
+                return false;
+            }
+
+            LogRefused(logger);
+
+            httpContext.Response.StatusCode = StatusCodes.Status409Conflict;
+
+            // Nothing from the exception reaches the caller: its message names the index and quotes the colliding values.
+            await problemDetails.TryWriteAsync(new ProblemDetailsContext
+            {
+                HttpContext = httpContext,
+                ProblemDetails =
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Title = "Something with that name or key already exists.",
+                    Detail = "Choose a different one; retrying this request unchanged is refused again.",
+                    Extensions = { ["code"] = Code },
+                },
+            });
+
+            return true;
+        }
+
+        /// <summary>
+        /// Matched on the database's error code, never on the exception type alone: <see cref="DbUpdateConcurrencyException"/>
+        /// is a <see cref="DbUpdateException"/> too, and a lost update is not a duplicate key. EF Core wraps the
+        /// provider's exception on SaveChanges; raw SQL throws it unwrapped.
+        /// </summary>
+        private static bool IsUniqueViolation(Exception exception) => exception switch
+        {
+{{~ if project["backend.database"] == "postgres" ~}}
+            PostgresException postgres => postgres.SqlState == PostgresErrorCodes.UniqueViolation,
+            DbUpdateException { InnerException: PostgresException inner } => inner.SqlState == PostgresErrorCodes.UniqueViolation,
+{{~ else ~}}
+            // 2601: a duplicate key in a unique index; 2627: in a unique or primary key constraint.
+            SqlException sql => sql.Number is 2601 or 2627,
+            DbUpdateException { InnerException: SqlException inner } => inner.Number is 2601 or 2627,
+{{~ end ~}}
+            _ => false,
+        };
+
+        [LoggerMessage(Level = LogLevel.Information, Message = "A unique index refused the write; answered 409")]
+        private static partial void LogRefused(ILogger logger);
+    }
+}
+{{~ else ~}}
+#error The unique-constraint responses of backend.data-access.ef-core know PostgreSQL and SQL Server only; add this database's duplicate-key error codes to the pack.
+{{~ end ~}}

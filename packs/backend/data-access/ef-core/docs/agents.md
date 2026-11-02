@@ -5,3 +5,4 @@
 - The connection string is named `database` and comes from Aspire; never hard-code one.
 - A model change needs a migration in the same PR: `dotnet ef migrations add <Name> --project src/Modules/<Module>/<Module>.Infrastructure --startup-project src/MigrationRunner --context <Module>DbContext`. Never edit an applied migration; add another.
 - Migrations run in `src/MigrationRunner` before the host starts; the host never migrates. A model without a matching migration makes the runner fail.
+- Back every uniqueness rule twice: check for the existing name or key in the handler and return a `Result` failure with its own code, and give the column a unique index (`HasIndex(...).IsUnique()`). A write the index refuses because another writer won the race answers `409` with the code `already-exists`; never catch that exception yourself.
