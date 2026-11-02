@@ -42,6 +42,13 @@ files:
   - { template: templates/BuildingBlocks/ModuleAssemblies.cs.sbn, target: src/BuildingBlocks/Modules/ModuleAssemblies.cs }
   - { template: templates/Contracts/Contracts.csproj.sbn, target: src/Contracts/Contracts.csproj }
   - { template: templates/Kernel/Kernel.csproj.sbn, target: src/Kernel/Kernel.csproj }
+  - { template: templates/Kernel/Page.cs.sbn, target: src/Kernel/Page.cs }
+  - { template: templates/Kernel/PageSize.cs.sbn, target: src/Kernel/PageSize.cs }
+  - { template: templates/Kernel/PagedResult.cs.sbn, target: src/Kernel/PagedResult.cs }
+  - { template: templates/Kernel/SortDirection.cs.sbn, target: src/Kernel/SortDirection.cs }
+  - { template: templates/Kernel/Sorting.cs.sbn, target: src/Kernel/Sorting.cs }
+  - { template: templates/tests/Paging.Tests.csproj.sbn, target: tests/Kernel/Paging.Tests/Paging.Tests.csproj }
+  - { template: templates/tests/PagingTests.cs.sbn, target: tests/Kernel/Paging.Tests/PagingTests.cs }
   - { template: templates/Modules/Directory.Build.props.sbn, target: src/Modules/Directory.Build.props }
   - { template: templates/tests/Directory.Build.props.sbn, target: tests/Directory.Build.props }
   - { template: templates/tests/Architecture.Tests.csproj.sbn, target: tests/Architecture.Tests/Architecture.Tests.csproj }

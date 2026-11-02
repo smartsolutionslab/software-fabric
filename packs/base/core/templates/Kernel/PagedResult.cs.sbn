@@ -1,0 +1,7 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>
+/// One page of a list query and how many items the whole list holds (docs/adr). What a list endpoint answers; the
+/// OpenAPI document describes it, so the frontend's generated client has the type.
+/// </summary>
+public sealed record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int Page, int PageSize);

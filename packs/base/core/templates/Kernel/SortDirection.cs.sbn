@@ -1,0 +1,7 @@
+namespace {{ namespace }}.Kernel;
+
+public enum SortDirection
+{
+    Ascending,
+    Descending,
+}

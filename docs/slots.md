@@ -29,7 +29,7 @@ src/
   ServiceDefaults/              base
   BuildingBlocks/               base; packs add their own files under it
   Contracts/                    base
-  Kernel/                       base (project); guards, result and absence packs add Ensure, Result, ApiError, Option
+  Kernel/                       base (project; Page, PageSize, PagedResult, Sorting); guards, result and absence packs add Ensure, Result, ApiError, Option
   Host/                         backend.topology.modular-monolith
   MigrationRunner/              backend.data-access.ef-core (applies every module's migrations, then exits)
   Modules/
@@ -40,7 +40,8 @@ src/
 tests/
   Directory.Build.props         base; test packages and usings by slot
   Architecture.Tests/           base; packs add gate tests as their own files
-  Integration.Tests/            backend.test.integration.aspire-fixture
+  Integration.Tests/            backend.test.integration.aspire-fixture; the REST pack adds ListEndpointsArePagedTests
+  Kernel/Paging.Tests/          base; the guards, absence and result packs add their own Kernel test projects
   Modules/<Module>.Tests/       base (per module)
 web/
   package.json  pnpm-workspace.yaml   frontend.workspace.pnpm-workspaces

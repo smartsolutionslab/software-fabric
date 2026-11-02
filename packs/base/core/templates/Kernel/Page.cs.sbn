@@ -1,0 +1,41 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+
+namespace {{ namespace }}.Kernel;
+
+/// <summary>
+/// A page of a list query, counted from 1 (docs/adr). A list endpoint binds it from <c>?page=</c>: anything but a
+/// whole number from 1 to <see cref="Maximum"/> is a 400 before the endpoint runs.
+/// </summary>
+public sealed record Page
+{
+    /// <summary>The last page whose first item still has an <see cref="int"/> offset at the largest page size.</summary>
+    public const int Maximum = (int.MaxValue / PageSize.Maximum) + 1;
+
+    private Page(int value) => Value = value;
+
+    public static Page First { get; } = new(1);
+
+    public int Value { get; }
+
+    public static bool TryFrom(int value, [NotNullWhen(true)] out Page? page)
+    {
+        page = value is >= 1 and <= Maximum ? new Page(value) : null;
+        return page is not null;
+    }
+
+    /// <summary>Binds a query string value; the minimal API answers 400 when it returns <see langword="false"/>.</summary>
+    public static bool TryParse(string? value, IFormatProvider? provider, [NotNullWhen(true)] out Page? page)
+    {
+        page = null;
+        return int.TryParse(value, NumberStyles.None, provider ?? CultureInfo.InvariantCulture, out var number) && TryFrom(number, out page);
+    }
+
+    /// <summary>How many items come before this page: what a query skips.</summary>
+    public int Skip(PageSize pageSize)
+    {
+        {{ not_null "pageSize" }}
+
+        return (Value - 1) * pageSize.Value;
+    }
+}

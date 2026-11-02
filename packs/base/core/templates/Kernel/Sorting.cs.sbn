@@ -1,0 +1,8 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>
+/// The order a list query returns its items in: a field the query declares as an enum
+/// (<c>enum InvoiceSortField { Number, IssuedOn }</c>), so a caller can sort by nothing the query did not offer.
+/// </summary>
+public sealed record Sorting<TField>(TField Field, SortDirection Direction)
+    where TField : struct, Enum;
