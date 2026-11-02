@@ -103,3 +103,12 @@ before the first `-`, decides who reviews.
   the organisation, so Copilot signs in with the owner's fine-grained token
   (Copilot Requests) from the `COPILOT_GITHUB_TOKEN` secret, and each review
   spends the owner's premium requests. A missing secret fails the review.
+- *As built (#98):* once the organisation had Copilot, its policy "Copilot
+  CLI billed to the organization" and both models, the workflow's own token
+  (`copilot-requests: write`) signed in, so the review uses no secret and
+  is billed to the organisation. The verdict moved out of the reviewer's
+  job: `review` holds no token that can write to the pull request and hands
+  its answer on as an artifact; `report` checks the gate out of the base
+  branch afresh and posts it. The CLI cannot enforce the schema, so the
+  findings are the last top-level object of that shape in the answer, and
+  an answer without one still fails.
