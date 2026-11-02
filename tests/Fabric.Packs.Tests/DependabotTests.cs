@@ -99,6 +99,102 @@ public sealed partial class DependabotTests
         }
     }
 
+    /// <summary>
+    /// The owner's decision on #55: red-first lets a pull request by dependabot[bot] that changes dependency manifests
+    /// and lockfiles only pass with a note, though it changes web/ and quotes no failing tests; anything else it holds
+    /// to the rule. The workflow's step runs as Actions would run it, against a pull request of one commit.
+    /// </summary>
+    [Theory]
+    [InlineData("dependabot[bot]", false, 0)]
+    [InlineData("dependabot[bot]", true, 1)]
+    [InlineData("developer", false, 1)]
+    public void Red_first_passes_a_dependabot_update_of_manifests_only_with_a_note_and_holds_everything_else(string author, bool alsoSource, int expectedExitCode)
+    {
+        using var project = new GeneratedProject("saas-standard-react");
+        var change = CrossModelReviewTests.DependencyUpdate.ToDictionary();
+        if (alsoSource)
+        {
+            change["src/Kernel/Paid.cs"] = ("namespace Shop.Kernel;\n", "namespace Shop.Kernel;\n\npublic sealed record Paid;\n");
+        }
+
+        var directory = project.ProjectDirectory;
+        foreach (var (file, (before, _)) in change)
+        {
+            project.Write(file, before);
+        }
+
+        BoardProject.Git(directory, "init", "--quiet", "--initial-branch=main");
+        BoardProject.Git(directory, "add", "--all");
+        BoardProject.Git(directory, "commit", "--quiet", "-m", "base");
+        var baseSha = BoardProject.Git(directory, "rev-parse", "HEAD");
+        foreach (var (file, (_, after)) in change)
+        {
+            project.Write(file, after);
+        }
+
+        BoardProject.Git(directory, "add", "--all");
+        BoardProject.Git(directory, "commit", "--quiet", "-m", "chore(deps): Bump the dependencies");
+
+        var (exitCode, output) = RunRedFirst(directory, new Dictionary<string, string>
+        {
+            ["github.event.pull_request.body"] = "Bumps the dependencies.",
+            ["github.event.pull_request.base.sha"] = baseSha,
+            ["github.event.pull_request.user.login"] = author,
+        });
+
+        exitCode.ShouldBe(expectedExitCode, output);
+        if (expectedExitCode == 0)
+        {
+            output.ShouldContain("Dependency update by Dependabot: not reviewed by a model; build, tests and the other gates apply", Case.Sensitive, output);
+        }
+    }
+
+    /// <summary>Runs every <c>run</c> step of red-first.yml in the checkout, with the given expressions; a checkout step is the directory itself.</summary>
+    private static (int ExitCode, string Output) RunRedFirst(string directory, Dictionary<string, string> expressions)
+    {
+        var stream = new YamlStream();
+        stream.Load(new StringReader(File.ReadAllText(Path.Combine(directory, ".github", "workflows", "red-first.yml"))));
+        var jobs = Value(stream.Documents[0].RootNode, "jobs").ShouldBeOfType<YamlMappingNode>();
+        var runnerTemp = Directory.CreateTempSubdirectory("fabric-runner-").FullName;
+        try
+        {
+            var output = "";
+            foreach (var step in jobs.Children.Values.SelectMany(job => Value(job, "steps").ShouldBeOfType<YamlSequenceNode>().Children))
+            {
+                if (Scalar(step, "run") is not { } script)
+                {
+                    continue;
+                }
+
+                Dictionary<string, string> environment = new(BoardProject.GitIdentity) { ["RUNNER_TEMP"] = runnerTemp };
+                if (Value(step, "env") is YamlMappingNode env)
+                {
+                    foreach (var (key, value) in env.Children)
+                    {
+                        environment[((YamlScalarNode)key).Value!] = Expression().Replace(((YamlScalarNode)value).Value!, match =>
+                        {
+                            expressions.ShouldContainKey(match.Groups[1].Value, $"red-first.yml uses ${{{{ {match.Groups[1].Value} }}}}, which this test does not provide.");
+                            return expressions[match.Groups[1].Value];
+                        });
+                    }
+                }
+
+                var (exitCode, stepOutput) = Shell.Run(directory, environment, "bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", script);
+                output += stepOutput;
+                if (exitCode != 0)
+                {
+                    return (exitCode, output);
+                }
+            }
+
+            return (0, output);
+        }
+        finally
+        {
+            Directory.Delete(runnerTemp, recursive: true);
+        }
+    }
+
     /// <summary>Every option of a frontend dimension the profile chooses.</summary>
     private static IEnumerable<string> FrontendOptions(string profile)
     {
@@ -160,4 +256,7 @@ public sealed partial class DependabotTests
 
     [GeneratedRegex(@"^(?<type>[a-z]+)\((?<scope>[a-z0-9-]+)\)$")]
     private static partial Regex ConventionalPrefix();
+
+    [GeneratedRegex(@"\$\{\{\s*(.+?)\s*\}\}")]
+    private static partial Regex Expression();
 }
