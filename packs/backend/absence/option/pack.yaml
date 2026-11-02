@@ -2,6 +2,10 @@ option: backend.absence.option
 files:
   - { template: templates/Option.cs.sbn, target: src/Kernel/Option.cs }
   - { template: templates/NoNullableReturns.cs.sbn, target: tests/Architecture.Tests/Rules/NoNullableReturns.cs }
+  - { template: templates/Absence.Tests.csproj.sbn, target: tests/Kernel/Absence.Tests/Absence.Tests.csproj }
+  - { template: templates/OptionTests.cs.sbn, target: tests/Kernel/Absence.Tests/OptionTests.cs }
+slots:
+  - { slot: solution.projects, template: templates/solution-project.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

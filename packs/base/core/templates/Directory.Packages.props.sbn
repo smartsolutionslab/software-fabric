@@ -11,6 +11,7 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.17.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
 {{ slots["dotnet.package-versions"] }}
   </ItemGroup>
 </Project>

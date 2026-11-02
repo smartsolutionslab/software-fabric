@@ -1,0 +1,1 @@
+Test after: the change is done when its tests pass and the coverage gate (`bash .github/scripts/test.sh`) passes. Do not lower a threshold in `tests/coverage.props` or weaken a test to get there; hand the gap back to the test writer.

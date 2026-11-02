@@ -5,6 +5,8 @@ on:
   issues:
     types: [unassigned]
 
+# No concurrency group: each run returns a different issue, and every run has the same ref, so a group would cancel
+# the pending return of one issue for another's.
 permissions:
   contents: read
   issues: write
@@ -13,7 +15,7 @@ jobs:
   return-to-todo:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: bash .github/scripts/board/return-to-todo.sh "${{ github.event.issue.number }}"
         env:
           GH_TOKEN: ${{ secrets.BOARD_TOKEN || github.token }}

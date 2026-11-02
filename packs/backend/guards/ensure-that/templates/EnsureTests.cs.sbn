@@ -1,0 +1,115 @@
+{{~ if project["backend.test.framework"] != "xunit" || project["backend.test.assertions"] != "shouldly" ~}}
+#error The ensure-that pack's Kernel tests are written for xUnit and Shouldly only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using System.Text.RegularExpressions;
+
+namespace {{ namespace }}.Kernel.Tests;
+
+public partial class EnsureTests
+{
+    private static readonly Guid InvoiceIdentifier = new("0193a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b");
+
+    [Fact]
+    public void A_string_that_meets_every_guard_passes_them_all() =>
+        Should.NotThrow(() => Ensure.That("INV-0001", "number")
+            .IsNotNull()
+            .IsNotNullOrWhiteSpace()
+            .HasMinLength(3)
+            .HasMaxLength(20)
+            .StartsWith("INV-", StringComparison.Ordinal)
+            .Matches(InvoiceNumber(), "must be INV- and digits")
+            .Satisfies(text => text.Length == 8, "must be eight characters"));
+
+    [Fact]
+    public void A_null_string_fails_its_null_guard() =>
+        Should.Throw<GuardException>(() => Ensure.That((string)null!, "number").IsNotNull())
+            .Message.ShouldStartWith("number must not be null.");
+
+    [Fact]
+    public void A_blank_string_fails_its_blank_guard() =>
+        Should.Throw<GuardException>(() => Ensure.That(" ", "number").IsNotNullOrWhiteSpace())
+            .Message.ShouldStartWith("number must not be null or whitespace.");
+
+    [Fact]
+    public void A_short_string_fails_its_minimum_length() =>
+        Should.Throw<GuardException>(() => Ensure.That("IN", "number").HasMinLength(3))
+            .Message.ShouldStartWith("number must be at least 3 character(s).");
+
+    [Fact]
+    public void A_long_string_fails_its_maximum_length() =>
+        Should.Throw<GuardException>(() => Ensure.That("INV-0001", "number").HasMaxLength(4))
+            .Message.ShouldStartWith("number must be no more than 4 character(s).");
+
+    [Fact]
+    public void A_string_without_the_prefix_fails_it() =>
+        Should.Throw<GuardException>(() => Ensure.That("ORD-1", "number").StartsWith("INV-", StringComparison.Ordinal))
+            .Message.ShouldStartWith("number must start with 'INV-'.");
+
+    [Fact]
+    public void A_string_that_does_not_match_fails_with_the_message_given() =>
+        Should.Throw<GuardException>(() => Ensure.That("INV-X", "number").Matches(InvoiceNumber(), "must be INV- and digits"))
+            .Message.ShouldStartWith("number: must be INV- and digits");
+
+    [Fact]
+    public void A_string_that_does_not_satisfy_the_predicate_fails_with_the_message_given() =>
+        Should.Throw<GuardException>(() => Ensure.That("INV-1", "number").Satisfies(text => text.Length == 8, "must be eight characters"))
+            .Message.ShouldStartWith("number: must be eight characters");
+
+    [Fact]
+    public void An_object_guard_names_the_argument_it_was_given()
+    {
+        object invoice = null!;
+
+        Should.Throw<GuardException>(() => Ensure.That(invoice).IsNotNull()).ParamName.ShouldBe("invoice");
+        Should.NotThrow(() => Ensure.That(new object()).IsNotNull());
+    }
+
+    [Fact]
+    public void An_empty_guid_fails_with_the_default_or_the_given_message()
+    {
+        Should.Throw<GuardException>(() => Ensure.That(Guid.Empty).IsNotEmpty())
+            .Message.ShouldStartWith("Guid.Empty must not be empty.");
+        Should.Throw<GuardException>(() => Ensure.That(Guid.Empty).IsNotEmpty("an invoice needs an identifier"))
+            .Message.ShouldStartWith("Guid.Empty: an invoice needs an identifier");
+        Should.NotThrow(() => Ensure.That(InvoiceIdentifier).IsNotEmpty());
+    }
+
+    [Fact]
+    public void A_number_inside_its_bounds_passes()
+    {
+        var quantity = 5;
+        var amount = 9.5m;
+
+        Should.NotThrow(() => Ensure.That(quantity).AtLeast(1).InRange(1, 10).Satisfies(value => value % 5 == 0, "must be a multiple of five"));
+        Should.NotThrow(() => Ensure.That(amount).AtLeast(0m).InRange(0m, 10m));
+    }
+
+    [Fact]
+    public void A_number_outside_its_bounds_fails_naming_the_bound_and_the_value()
+    {
+        var quantity = 0;
+
+        Should.Throw<GuardException>(() => Ensure.That(quantity).AtLeast(1))
+            .Message.ShouldStartWith("quantity must be >= 1; got 0.");
+        Should.Throw<GuardException>(() => Ensure.That(quantity).InRange(1, 10))
+            .Message.ShouldStartWith("quantity must be in [1, 10]; got 0.");
+        Should.Throw<GuardException>(() => Ensure.That(quantity + 11).InRange(1, 10))
+            .Message.ShouldStartWith("quantity + 11 must be in [1, 10]; got 11.");
+        Should.Throw<GuardException>(() => Ensure.That(quantity).Satisfies(value => value > 0, "must be positive"))
+            .Message.ShouldStartWith("quantity: must be positive");
+    }
+
+    [Fact]
+    public void A_guard_exception_is_an_argument_exception_that_keeps_what_it_is_given()
+    {
+        var inner = new InvalidOperationException("inner");
+
+        new GuardException().ShouldBeAssignableTo<ArgumentException>();
+        new GuardException("message").Message.ShouldBe("message");
+        new GuardException("message", inner).InnerException.ShouldBeSameAs(inner);
+        new GuardException("message", "number").ParamName.ShouldBe("number");
+    }
+
+    [GeneratedRegex("^INV-[0-9]+$")]
+    private static partial Regex InvoiceNumber();
+}
