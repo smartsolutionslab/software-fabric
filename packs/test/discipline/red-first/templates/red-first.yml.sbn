@@ -18,10 +18,19 @@ jobs:
         with:
           fetch-depth: 0
       - name: Source changes quote the tests they made fail first
+        # A dependency update by Dependabot (its author dependabot[bot], manifests and lockfiles only) quotes no failing
+        # test; the base branch's dependency-update.sh decides it, the pull request's copy only while the base has none.
         env:
           BODY: ${{ github.event.pull_request.body }}
           BASE: ${{ github.event.pull_request.base.sha }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
+          exemption=.github/scripts/board/dependency-update.sh
+          git show "$BASE:$exemption" > "$RUNNER_TEMP/dependency-update.sh" 2>/dev/null || cp "$exemption" "$RUNNER_TEMP/dependency-update.sh"
+          if note="$(bash "$RUNNER_TEMP/dependency-update.sh" "$AUTHOR" "$BASE" HEAD)"; then
+            echo "::notice title=red-first::$note"
+            exit 0
+          fi
           printf '%s' "$BODY" > "$RUNNER_TEMP/body.md"
           git diff --name-only "$BASE"...HEAD > "$RUNNER_TEMP/changed.txt"
           bash .github/scripts/check-red-first.sh "$RUNNER_TEMP/body.md" "$RUNNER_TEMP/changed.txt"

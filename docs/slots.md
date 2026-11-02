@@ -44,6 +44,7 @@ web/
   package.json  pnpm-workspace.yaml   frontend.workspace.pnpm-workspaces
   app/                          frontend.framework.react
 .github/workflows/ci.yml        base; steps by slot
+.github/dependabot.yml          base; an entry per package ecosystem by slot
 ```
 
 ## Modules register by convention, never by list
@@ -198,6 +199,7 @@ is a defect in the second pack.
 | `ci.frontend-steps` | 〃 | pnpm, react (`pnpm format:check`), rtk-query-codegen (generated client is current), accessibility |
 | `readme.first-steps` *(added for #11)* | `README.md` (`## First steps`, printed by `fabric new`) | pnpm (create and commit `web/pnpm-lock.yaml`) |
 | `ci.e2e-steps` *(added in M1-09)* | `.github/workflows/ci.yml` | react (builds, then `.github/scripts/e2e.sh` starts the AppHost and runs Playwright); without a contribution there is no e2e job |
+| `dependabot.updates` *(added for #55)* | `.github/dependabot.yml` (base writes the NuGet and GitHub Actions entries) | pnpm (npm for `/web`); a pack that adds a package ecosystem adds its entry here |
 
 ## Generator changes this needs
 

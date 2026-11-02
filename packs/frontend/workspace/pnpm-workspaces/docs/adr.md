@@ -9,3 +9,4 @@
 ## Consequences
 
 - Commit `web/pnpm-lock.yaml` once `pnpm install` has created it; CI then installs exactly what you tested.
+- Dependabot updates the workspace's packages through its npm entry for `/web`, which also updates `pnpm-lock.yaml`.
