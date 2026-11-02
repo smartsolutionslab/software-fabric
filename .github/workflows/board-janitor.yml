@@ -6,6 +6,8 @@ on:
     - cron: "17 * * * *"
   workflow_dispatch:
 
+# No concurrency group: the janitor writes to issues, branches and the board, so cancelling a run halfway would leave
+# a claim half returned, and it runs once an hour, so there is no queue of runs to thin out.
 permissions:
   contents: write
   issues: write
@@ -15,7 +17,7 @@ jobs:
   janitor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: bash .github/scripts/board/janitor.sh
         env:
           # The default token cannot edit a GitHub Project; BOARD_TOKEN can (scopes repo and project).

@@ -5,12 +5,18 @@ on:
     branches: [main]
   pull_request:
 
+# One run per workflow and ref. A newer push to a pull request makes the run before it pointless, so it is cancelled;
+# a run on main is never cancelled while it runs (one that is still waiting gives way to the newer push's).
+{%{concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+}%}
 jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           global-json-file: global.json
       # The AppHost uses the Aspire CLI bundle (DCP and dashboard); set it up before anything builds the AppHost.
@@ -23,15 +29,15 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 {{ slots["ci.frontend-steps"] }}
 {{ if slots["ci.e2e-steps"] != "" }}
 
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           global-json-file: global.json
       - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
