@@ -16,6 +16,7 @@ files:
   - { template: templates/dotnet-tools.json.sbn, target: ".config/dotnet-tools.json" }
   - { template: templates/editorconfig.sbn, target: ".editorconfig" }
   - { template: templates/stylecop.json.sbn, target: stylecop.json }
+  - { template: templates/TimeBannedSymbols.txt.sbn, target: build/time/BannedSymbols.txt }
   - { template: templates/gitignore.sbn, target: ".gitignore" }
   - { template: templates/Directory.Build.props.sbn, target: Directory.Build.props }
   - { template: templates/Directory.Packages.props.sbn, target: Directory.Packages.props }
@@ -105,6 +106,7 @@ gates:
   - { kind: architecture-test, describes: "HttpClients from AddServiceDefaults() retry only idempotent methods; a POST or PATCH gets one attempt.", file: templates/tests/HttpClientsRetryOnlyIdempotentMethods.cs.sbn }
   - { kind: architecture-test, describes: "RetryEveryMethod() opts one HttpClient back into retrying POST and PATCH on transient failures.", file: templates/tests/RetryEveryMethodOptsAClientBackIn.cs.sbn }
   - { kind: architecture-test, describes: "Every workflow step uses an action pinned to a full commit SHA, a local action or a docker image by digest.", file: templates/tests/WorkflowActionsArePinned.cs.sbn }
+  - { kind: analyzer, describes: "DateTime.Now, DateTime.UtcNow, DateTimeOffset.Now and DateTimeOffset.UtcNow are banned (RS0030) in every project but the AppHost; the time comes from TimeProvider.", file: templates/TimeBannedSymbols.txt.sbn }
   - { kind: analyzer, describes: "One top-level type per file, named after the type (StyleCop SA1402, SA1649); nested types and generated migrations excepted.", file: templates/stylecop.json.sbn }
   - { kind: ci-step, describes: "build.proj builds every project with warnings as errors.", file: templates/ci.yml.sbn }
   - { kind: ci-step, describes: "Every project under src/ and tests/ is formatted as dotnet format would format it (whitespace and code style).", file: templates/format.sh.sbn }
