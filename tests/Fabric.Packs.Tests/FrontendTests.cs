@@ -176,6 +176,47 @@ public sealed class FrontendTests
         """;
 
     [Fact]
+    public void The_editorconfig_indents_web_files_as_the_prettier_config_does_and_csharp_with_four_spaces()
+    {
+        using var project = new GeneratedProject(Profile);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, $"pnpm install:\n{installOutput}");
+
+        // Prettier resolves both files itself: its own config with .editorconfig ignored, and .editorconfig alone
+        // (an empty config file in place of .prettierrc.json).
+        project.Write("indent-probe/empty.json", "{}");
+        project.Write("web/app/indent-probe.mjs", IndentProbe);
+        string[] files = ["src/App.tsx", "index.html", "eslint.config.js", "package.json", "../../src/Host/Program.cs"];
+        var (exitCode, output) = Shell.Run(Path.Combine(web, "app"), "node", ["indent-probe.mjs", .. files]);
+        exitCode.ShouldBe(0, output);
+
+        var widths = output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split(' '))
+            .ToDictionary(fields => fields[0], fields => (Prettier: fields[1], EditorConfig: fields[2]));
+        foreach (var file in files[..^1])
+        {
+            widths[file].EditorConfig.ShouldBe(widths[file].Prettier, $"{file}: .editorconfig indent vs .prettierrc.json tabWidth");
+        }
+
+        widths["src/App.tsx"].Prettier.ShouldBe("2");
+        widths["../../src/Host/Program.cs"].EditorConfig.ShouldBe("4");
+    }
+
+    /// <summary>Prints "file prettier-tabWidth editorconfig-tabWidth" for each argument.</summary>
+    private const string IndentProbe = """
+        import { fileURLToPath } from 'node:url';
+        import * as prettier from 'prettier';
+
+        const empty = fileURLToPath(new URL('../../indent-probe/empty.json', import.meta.url));
+        for (const file of process.argv.slice(2)) {
+          const own = await prettier.resolveConfig(file, { editorconfig: false });
+          const editorconfig = await prettier.resolveConfig(file, { editorconfig: true, config: empty });
+          console.log(file, own?.tabWidth, editorconfig?.tabWidth);
+        }
+        """;
+
+    [Fact]
     public void The_generated_ci_checks_formatting_after_installing_the_workspace()
     {
         using var project = new GeneratedProject(Profile);
