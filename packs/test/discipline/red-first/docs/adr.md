@@ -11,4 +11,5 @@ A behaviour-preserving change (a refactor) quotes the covering tests passing bef
 ## Consequences
 
 - A test that was never red proves nothing about the code it claims to test; the quoted output is the evidence a reviewer can check.
+- A dependency update by Dependabot quotes no failing test: a pull request whose author is `dependabot[bot]` and which changes dependency manifests and lockfiles only passes the check with a note (the board's `dependency-update.sh` decides it, see the board protocol's ADR). Any other pull request touching `src/` or `web/`, Dependabot's included, still needs the section.
 - Agents split the work: the test writer writes and runs the tests and hands over the output; the engineer makes them pass without editing them.

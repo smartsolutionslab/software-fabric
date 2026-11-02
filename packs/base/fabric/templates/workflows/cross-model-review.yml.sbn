@@ -16,6 +16,11 @@
 # into .gate: a pull request must not choose its own reviewer or post its own verdict. The pull request's copies are
 # used only while the base branch has none, which is the pull request that brings the protocol. This workflow file
 # itself still comes from the pull request, so .github/ needs a code owner's review (docs/adr).
+#
+# A dependency update by Dependabot is not reviewed by a model: Dependabot's runs get a read-only token and no
+# secrets. choose decides it with the base branch's dependency-update.sh (the pull request's author is
+# dependabot[bot], and it changes dependency manifests and lockfiles only); review and report then pass with a note,
+# and every other check still applies.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -45,6 +50,8 @@ jobs:
     outputs:
       reviewer: ${{ steps.choose.outputs.reviewer }}
       model: ${{ steps.choose.outputs.model }}
+      exempt: ${{ steps.exempt.outputs.exempt }}
+      note: ${{ steps.exempt.outputs.note }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -58,6 +65,22 @@ jobs:
           if [ -f .gate/.github/scripts/board/reviewer.sh ]; then gate=.gate; else gate=.; fi
           echo "GATE=$gate/.github" >> "$GITHUB_ENV"
           echo "BRIEFS=$gate" >> "$GITHUB_ENV"
+      - id: exempt
+        name: A dependency update by Dependabot is not reviewed by a model
+        # The author is the pull request's, not the actor of a re-run.
+        run: |
+          if note="$(bash "$GATE/scripts/board/dependency-update.sh" "$AUTHOR" "$BASE" "$HEAD")"; then
+            echo "::notice title=cross-model review::$note"
+            echo "exempt=true" >> "$GITHUB_OUTPUT"
+            echo "note=$note" >> "$GITHUB_OUTPUT"
+          else
+            echo "$note"
+            echo "exempt=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
       - id: choose
         # Assigned first: inside echo's arguments a failing reviewer.sh would not fail the step, and no review would run.
         run: |
@@ -82,6 +105,8 @@ jobs:
     permissions:
       contents: read
       copilot-requests: write
+    env:
+      EXEMPT: ${{ needs.choose.outputs.exempt }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -96,7 +121,12 @@ jobs:
           echo "GATE=$gate/.github" >> "$GITHUB_ENV"
           echo "BRIEFS=$gate" >> "$GITHUB_ENV"
       - name: Install the Copilot CLI
-        run: npm install -g "@github/copilot@$REVIEWER_CLI_VERSION"
+        run: |
+          if [ "$EXEMPT" = true ]; then
+            echo "Dependency update by Dependabot: not reviewed by a model."
+            exit 0
+          fi
+          npm install -g "@github/copilot@$REVIEWER_CLI_VERSION"
       - name: Review
         # Copilot signs in with the workflow's token, and with nothing else: no GH_TOKEN or GITHUB_TOKEN, even one the
         # runner sets.
@@ -112,6 +142,10 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
+          if [ "$EXEMPT" = true ]; then
+            echo "Dependency update by Dependabot: not reviewed by a model." | tee "$RUNNER_TEMP/answer"
+            exit 0
+          fi
           schema="$(jq -c . "$GATE/review-findings.schema.json")"
           prompt="Review pull request #$PR: the change from $BASE to $HEAD in this checkout (git diff $BASE...$HEAD).
           Review it as the reviewers in $BRIEFS/.claude/agents/ describe (backend-reviewer, frontend-reviewer,
@@ -140,6 +174,9 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    env:
+      EXEMPT: ${{ needs.choose.outputs.exempt }}
+      NOTE: ${{ needs.choose.outputs.note }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -160,5 +197,11 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           REVIEWER: ${{ needs.choose.outputs.reviewer }}
           MODEL: ${{ needs.choose.outputs.model }}
-        run: bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/review/answer" "$REVIEWER ($MODEL)"
+        # An exempt pull request posts nothing: Dependabot's token cannot write to it.
+        run: |
+          if [ "$EXEMPT" = true ]; then
+            echo "::notice title=cross-model review::$NOTE"
+            exit 0
+          fi
+          bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/review/answer" "$REVIEWER ($MODEL)"
 }%}
