@@ -1,0 +1,62 @@
+{{~ if project["backend.topology"] != "modular-monolith" ~}}
+#error The keycloak pack's endpoint rule starts the modular-monolith host only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// An endpoint is anonymous only where it is mapped, with <c>.AllowAnonymous()</c>; everything else requires
+/// authorization. Module routes inherit it from their group, so this catches what is mapped beside a group or on the
+/// host. It reads the host's own endpoint table, in Development so the endpoints mapped there only count too.
+/// </summary>
+public sealed class EveryEndpointDeclaresItsAuthorization : IArchitectureRule
+{
+    public string Description => "Every endpoint of the host requires authorization or is mapped with AllowAnonymous().";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        using var host = new MappedHost();
+        return [.. host.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Where(endpoint => endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null && endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Count == 0)
+            .Select(endpoint => $"{Name(endpoint)} is mapped with neither RequireAuthorization() nor AllowAnonymous().")
+            .Order(StringComparer.Ordinal)];
+    }
+
+    private static string Name(RouteEndpoint endpoint)
+    {
+        var methods = endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? [];
+        var route = "/" + endpoint.RoutePattern.RawText?.TrimStart('/');
+        return methods.Count == 0 ? route : $"{string.Join(',', methods)} {route}";
+    }
+
+    /// <summary>
+    /// The host with every endpoint mapped but nothing started: no hosted service runs, so the configuration Aspire
+    /// would provide only has to be present, never reachable.
+    /// </summary>
+    private sealed class MappedHost : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment(Environments.Development);
+            builder.UseSetting("ConnectionStrings:database", "Host=localhost;Database=unused");
+{{~ if project["backend.bus.transport"] == "kafka" ~}}
+            builder.UseSetting("ConnectionStrings:messaging", "localhost:9092");
+{{~ else if project["backend.bus.transport"] != "none" ~}}
+            builder.UseSetting("ConnectionStrings:messaging", "amqp://localhost");
+{{~ end ~}}
+            builder.UseSetting("Authentication:Authority", "http://localhost/realms/unused");
+            builder.ConfigureServices(services => services.RemoveAll<IHostedService>());
+        }
+    }
+}

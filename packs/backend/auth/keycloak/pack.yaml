@@ -3,6 +3,7 @@ files:
   - { template: templates/realm.json.sbn, target: src/AppHost/realms/realm.json }
   - { template: templates/Authentication.cs.sbn, target: src/Host/Wiring/Authentication.cs }
   - { template: templates/CurrentUser.cs.sbn, target: src/Host/CurrentUser.cs }
+  - { template: templates/EveryEndpointDeclaresItsAuthorization.cs.sbn, target: tests/Architecture.Tests/Rules/EveryEndpointDeclaresItsAuthorization.cs }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
   - { slot: apphost.packages, template: templates/apphost-package.sbn }
@@ -14,8 +15,10 @@ slots:
   - { slot: host.middleware, template: templates/host-middleware.sbn, order: -10 }
   - { slot: modules.endpoints, template: templates/module-endpoints.sbn, order: -10 }
   - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 10 }
+  - { slot: tests.architecture.references, template: templates/architecture-tests-references.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
   - { kind: ci-step, describes: "A module endpoint answers 401 without a token; checked by the integration tests of the aspire-fixture pack against the running stack." }
+  - { kind: architecture-test, describes: "Every endpoint of the host requires authorization or is mapped with AllowAnonymous().", file: templates/EveryEndpointDeclaresItsAuthorization.cs.sbn }
