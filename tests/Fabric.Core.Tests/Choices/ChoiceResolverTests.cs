@@ -140,6 +140,47 @@ public class ChoiceResolverTests
             "backend.authorization is set to roles, but it only applies when backend.auth != none, and backend.auth is none.");
     }
 
+    [Theory]
+    [InlineData("saas-standard-react")]
+    [InlineData("saas-standard-vue")]
+    [InlineData("industrial-event-driven-mfe")]
+    [InlineData("lean-crud")]
+    public void Every_profile_uses_no_llm_and_no_mcp(string profile)
+    {
+        var choices = ResolveSuccessfully(profile);
+
+        choices.Project["backend.llm"].ShouldBe(["none"]);
+        choices.Project["backend.mcp"].ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("anthropic")]
+    [InlineData("openai")]
+    [InlineData("azure-openai")]
+    [InlineData("ollama")]
+    public void The_llm_takes_each_provider(string provider)
+    {
+        ResolveSuccessfully("saas-standard-react", $"backend.llm={provider}").Project["backend.llm"].ShouldBe([provider]);
+    }
+
+    [Fact]
+    public void Rejects_two_llm_providers_in_one_project()
+    {
+        SingleError(RepositoryCatalog, "saas-standard-react", "backend.llm=anthropic,openai").ShouldBe(
+            "backend.llm takes one option, got 2: anthropic, openai.");
+    }
+
+    [Theory]
+    [InlineData("backend.mcp=", new string[0])]
+    [InlineData("backend.mcp=server", new[] { "server" })]
+    [InlineData("backend.mcp=client", new[] { "client" })]
+    [InlineData("backend.mcp=server,client", new[] { "server", "client" })]
+    public void Mcp_takes_any_set_of_server_and_client(string setting, string[] expected)
+    {
+        ResolveSuccessfully("saas-standard-react", setting).Project["backend.mcp"].ShouldBe(expected);
+    }
+
     [Fact]
     public void Values_follow_catalog_order()
     {
