@@ -1007,6 +1007,36 @@ public sealed class LeanCrudBackendTests
     }
 
     [Fact]
+    public void A_model_client_in_a_project_without_an_llm_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Application/Billing.Application.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <ItemGroup>
+                <PackageReference Include="Microsoft.Extensions.AI.Abstractions" VersionOverride="10.5.2" />
+              </ItemGroup>
+            </Project>
+            """);
+        project.Write("src/Modules/Billing/Billing.Application/InvoiceSummaries.cs", """
+            using Microsoft.Extensions.AI;
+
+            namespace Shop.Modules.Billing.Application;
+
+            public sealed class InvoiceSummaries(IChatClient chat)
+            {
+                public IChatClient Chat { get; } = chat;
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application references Microsoft.Extensions.AI.Abstractions, but this project calls no language model (backend.llm: none).");
+    }
+
+    [Fact]
     public void A_read_model_in_a_module_without_cqrs_fails_the_architecture_tests()
     {
         using var project = new GeneratedProject(Profile);
