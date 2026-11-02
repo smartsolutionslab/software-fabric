@@ -8,7 +8,7 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
 
-[*.{json,yml,yaml,props,proj,csproj,slnx,ts,tsx,css}]
+[*.{json,yml,yaml,props,proj,csproj,slnx,js,jsx,ts,tsx,css,html}]
 indent_size = 2
 
 # Code style, enforced by the build: EnforceCodeStyleInBuild reports these, TreatWarningsAsErrors fails on them.
