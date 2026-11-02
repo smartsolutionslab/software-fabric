@@ -325,7 +325,7 @@ public sealed class LeanCrudBackendTests
                 }
             }
             """);
-        project.Write("tests/Modules/Billing.Tests/RetriedCommitTests.cs", """
+        project.WriteTypes("tests/Modules/Billing.Tests", """
             using Microsoft.EntityFrameworkCore;
             using Microsoft.EntityFrameworkCore.Infrastructure;
             using Microsoft.EntityFrameworkCore.Storage;
@@ -398,7 +398,6 @@ public sealed class LeanCrudBackendTests
     public async Task A_consumer_whose_call_timed_out_is_retried_and_the_host_keeps_running()
     {
         using var project = ConsumerProject(
-            "InvoicePaidConsumer",
             """
             using Shop.Contracts.Billing;
 
@@ -437,7 +436,6 @@ public sealed class LeanCrudBackendTests
     public async Task A_disposable_consumer_is_disposed_after_it_handled_a_message()
     {
         using var project = ConsumerProject(
-            "InvoicePaidConsumer",
             """
             using Shop.Contracts.Billing;
 
@@ -483,7 +481,6 @@ public sealed class LeanCrudBackendTests
     public async Task A_disposable_consumer_is_disposed_when_a_handle_parameter_cannot_be_resolved()
     {
         using var project = ConsumerProject(
-            "InvoicePaidConsumer",
             """
             using Shop.Contracts.Billing;
 
@@ -587,7 +584,7 @@ public sealed class LeanCrudBackendTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("shipping");
-        project.Write("src/Contracts/Billing/InvoiceEvents.cs", InvoiceEvents);
+        project.WriteTypes("src/Contracts/Billing", InvoiceEvents);
         project.Write("src/Modules/Shipping/Shipping.Application/InvoiceEventConsumer.cs", BaseEventConsumer);
         project.Build();
 
@@ -616,10 +613,10 @@ public sealed class LeanCrudBackendTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("shipping");
-        project.Write("src/Contracts/Billing/InvoiceEvents.cs", InvoiceEvents);
+        project.WriteTypes("src/Contracts/Billing", InvoiceEvents);
         project.Write("src/Modules/Shipping/Shipping.Application/InvoiceEventConsumer.cs", BaseEventConsumer);
         project.Write("src/Modules/Shipping/Shipping.Application/AnyEventConsumer.cs", GenericConsumer);
-        project.Write("src/Modules/Shipping/Shipping.Application/Consumers.cs", """
+        project.WriteTypes("src/Modules/Shipping/Shipping.Application", """
             using Shop.Contracts.Billing;
 
             namespace Shop.Modules.Shipping.Application;
@@ -709,7 +706,7 @@ public sealed class LeanCrudBackendTests
     }
 
     /// <summary>billing publishes InvoicePaidV1 on POST /billing/invoices/{id}/pay; shipping's consumer reports on GET /shipping/consumer.</summary>
-    private static GeneratedProject ConsumerProject(string consumer, string consumerSource, string report)
+    private static GeneratedProject ConsumerProject(string consumerSource, string report)
     {
         var project = new GeneratedProject(Profile);
         project.AddModule("billing");
@@ -740,7 +737,7 @@ public sealed class LeanCrudBackendTests
                     }).AllowAnonymous();
             }
             """);
-        project.Write($"src/Modules/Shipping/Shipping.Application/{consumer}.cs", consumerSource);
+        project.WriteTypes("src/Modules/Shipping/Shipping.Application", consumerSource);
         project.Write("src/Modules/Shipping/Shipping.Api/ConsumerReport.cs", $$"""
             using Microsoft.AspNetCore.Builder;
             using Microsoft.AspNetCore.Routing;
@@ -850,7 +847,7 @@ public sealed class LeanCrudBackendTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
-        project.Write("tests/Modules/Billing.Tests/CallerTransactionTests.cs", """
+        project.WriteTypes("tests/Modules/Billing.Tests", """
             using Microsoft.EntityFrameworkCore;
             using Microsoft.Extensions.Configuration;
             using Microsoft.Extensions.DependencyInjection;

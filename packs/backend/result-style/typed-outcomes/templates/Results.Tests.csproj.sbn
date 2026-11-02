@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Tests of the Kernel's results (src/Kernel/Result.cs and its errors); every project references the Kernel already. -->
+  <!-- Tests of the Kernel's results (src/Kernel/Result.cs, Outcome.cs and the errors); every project references the Kernel already. -->
   <PropertyGroup>
     <RootNamespace>{{ namespace }}.Kernel.Tests</RootNamespace>
   </PropertyGroup>

@@ -1,0 +1,30 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>
+/// Guard chain for a <see cref="Guid"/> argument.
+/// <see cref="IsNotEmpty"/> throws <see cref="GuardException"/> on
+/// <see cref="Guid.Empty"/> — the value-type analogue of
+/// <see cref="EnsuredObject{T}.IsNotNull"/>.
+/// </summary>
+public readonly struct EnsuredGuid
+{
+    private readonly Guid value;
+    private readonly string parameter;
+
+    internal EnsuredGuid(Guid value, string parameter)
+    {
+        this.value = value;
+        this.parameter = parameter;
+    }
+
+    public EnsuredGuid IsNotEmpty(string? message = null)
+    {
+        if (value == Guid.Empty)
+        {
+            throw new GuardException(
+                message is null ? $"{parameter} must not be empty." : $"{parameter}: {message}",
+                parameter);
+        }
+        return this;
+    }
+}

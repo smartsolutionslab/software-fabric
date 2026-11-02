@@ -230,7 +230,7 @@ public sealed class EventDrivenBackendTests
     {
         using var project = new GeneratedProject(Profile, Frontend);
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Invoice.cs", Invoice);
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Invoices", Invoice);
         project.Write("src/Modules/Billing/Billing.Application/ReadModels/InvoiceSummary.cs", InvoiceSummary);
         project.Write("src/Modules/Billing/Billing.Infrastructure/Projections/InvoiceSummaryProjection.cs", InvoiceSummaryProjection);
         project.Write("tests/Modules/Billing.Tests/EventStoreTests.cs", EventStoreTests);
@@ -259,7 +259,7 @@ public sealed class EventDrivenBackendTests
     {
         using var project = new GeneratedProject(Profile, Frontend);
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Invoice.cs", Invoice);
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Invoices", Invoice);
         project.Write("src/Modules/Billing/Billing.Application/ReadModels/InvoiceSummary.cs", InvoiceSummary);
         project.Write("src/Modules/Billing/Billing.Infrastructure/Projections/InvoiceSummaryProjection.cs", InvoiceSummaryProjection);
         project.Write("tests/Modules/Billing.Tests/EventStoreTests.cs", EventStoreTests);
@@ -321,7 +321,7 @@ public sealed class EventDrivenBackendTests
     {
         using var project = new GeneratedProject(Profile, Frontend);
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Application/Queries/Wrapped/WrappedQueries.cs", """
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/Wrapped", """
             using Microsoft.EntityFrameworkCore;
             using Microsoft.Extensions.DependencyInjection;
 
@@ -543,7 +543,7 @@ public sealed class EventDrivenBackendTests
     {
         using var project = new GeneratedProject(Profile, Frontend);
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Invoice.cs", Invoice);
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Invoices", Invoice);
         project.Write("src/Modules/Billing/Billing.Domain/Invoices/InvoiceVoided.cs", """
             using Shop.BuildingBlocks.EventSourcing;
 

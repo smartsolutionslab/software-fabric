@@ -7,9 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace {{ namespace }}.BuildingBlocks.Messaging;
 
-/// <summary>The module DbContexts whose outbox tables the dispatcher reads.</summary>
-public sealed record OutboxContexts(IReadOnlyList<Type> Types);
-
 /// <summary>
 /// Delivers committed integration events in-process: reads each module's outbox table, hands every message to its
 /// consumers and marks it delivered. Woken by <see cref="OutboxSignal"/> after a commit, and polls in case a wake was missed.

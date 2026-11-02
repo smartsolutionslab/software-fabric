@@ -64,7 +64,7 @@ public sealed class SignInTests
     {
         using var project = new GeneratedProject("saas-standard-react");
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Api/Notes.cs", NotesEndpoint);
+        project.WriteTypes("src/Modules/Billing/Billing.Api", NotesEndpoint);
         project.Build();
 
         // The new endpoint makes the frontend's OpenAPI copy stale: the integration tests say so and rewrite it.

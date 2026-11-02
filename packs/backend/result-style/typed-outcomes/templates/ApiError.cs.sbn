@@ -15,12 +15,3 @@ public abstract record ApiError(string Code, string Message, HttpStatusCode Stat
         return new DomainFailure(error, status);
     }
 }
-
-/// <summary>An <see cref="ApiError"/> made from a <see cref="DomainError"/> by <see cref="ApiError.From"/>.</summary>
-public sealed record DomainFailure : ApiError
-{
-    internal DomainFailure(DomainError error, HttpStatusCode status)
-        : base(error.Code, error.Message, status) => Error = error;
-
-    public DomainError Error { get; }
-}

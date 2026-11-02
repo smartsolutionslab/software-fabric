@@ -90,6 +90,21 @@ dotnet_naming_symbols.private_fields.applicable_kinds = field
 dotnet_naming_symbols.private_fields.applicable_accessibilities = private
 dotnet_naming_style.camel_case.capitalization = camel_case
 
+# One type per file, named after the type (StyleCop). SA1402: a second top-level type of any kind (stylecop.json lists
+# them all; nested types do not count). SA1649: the file is named after its first type, a generic one by its plain
+# name (Result<TValue, TError> in Result.cs). Every other StyleCop rule is off; SA0001 has no category, so it is named.
+dotnet_diagnostic.SA1402.severity = warning
+dotnet_diagnostic.SA1649.severity = warning
+dotnet_diagnostic.SA0001.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.DocumentationRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.LayoutRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.MaintainabilityRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.NamingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.OrderingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.ReadabilityRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpacingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpecialRules.severity = none
+
 # Async methods end in Async. Not in tests/: a test method is named as a sentence, async or not.
 [src/**.cs]
 dotnet_naming_rule.async_methods_end_in_async.severity = warning

@@ -3,9 +3,6 @@ using {{ namespace }}.BuildingBlocks.Domain;
 
 namespace {{ namespace }}.BuildingBlocks.DomainEvents;
 
-/// <summary>One reaction of one event type, as discovered in a module's Application assembly.</summary>
-public sealed record DomainEventReactionRegistration(Type Event, Type Reaction);
-
 /// <summary>
 /// What a domain-event reaction the dispatcher delivers to is, in one place: discovery (<see cref="In"/>) registers
 /// only reactions without a <see cref="Problem"/>, and the architecture rule EveryDomainEventHasAReaction fails every

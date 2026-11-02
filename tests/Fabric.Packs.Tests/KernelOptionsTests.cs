@@ -33,7 +33,7 @@ public sealed class KernelOptionsTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Application/InvoiceLookup.cs", InvoiceLookup);
+        project.WriteTypes("src/Modules/Billing/Billing.Application", InvoiceLookup);
         project.Build();
 
         var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
