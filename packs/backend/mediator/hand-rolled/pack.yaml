@@ -1,6 +1,10 @@
 option: backend.mediator.hand-rolled
 files:
-  - { template: templates/Requests.cs.sbn, target: src/BuildingBlocks/Messaging/Requests.cs }
+  - { template: templates/ICommand.cs.sbn, target: src/BuildingBlocks/Messaging/ICommand.cs }
+  - { template: templates/IQuery.cs.sbn, target: src/BuildingBlocks/Messaging/IQuery.cs }
+  - { template: templates/ICommandHandler.cs.sbn, target: src/BuildingBlocks/Messaging/ICommandHandler.cs }
+  - { template: templates/IQueryHandler.cs.sbn, target: src/BuildingBlocks/Messaging/IQueryHandler.cs }
+  - { template: templates/IDispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/IDispatcher.cs }
   - { template: templates/Dispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/Dispatcher.cs }
   - { template: templates/MessagingRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/MessagingRegistration.cs }
   - { template: templates/EveryRequestHasOneHandler.cs.sbn, target: tests/Architecture.Tests/Rules/EveryRequestHasOneHandler.cs }

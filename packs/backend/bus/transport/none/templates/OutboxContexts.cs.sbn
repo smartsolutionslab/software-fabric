@@ -1,0 +1,4 @@
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+/// <summary>The module DbContexts whose outbox tables the dispatcher reads.</summary>
+public sealed record OutboxContexts(IReadOnlyList<Type> Types);

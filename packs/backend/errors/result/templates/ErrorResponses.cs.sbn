@@ -1,33 +1,28 @@
 {{~ if project["backend.guards"] == "ensure-that" ~}}
-using {{ namespace }}.BuildingBlocks.Http;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace Microsoft.Extensions.DependencyInjection
-{
-    public static class ErrorResponses
-    {
-        /// <summary>
-        /// Problem details for every error the host answers: a failed guard (<see cref="GuardException"/>) is a 400
-        /// with the code <see cref="GuardExceptionHandler.Code"/>; any other exception, an
-        /// <see cref="ArgumentException"/> included, is a 500 that says nothing about itself.
-        /// </summary>
-        public static IServiceCollection AddErrorResponses(this IServiceCollection services) =>
-            services.AddProblemDetails().AddExceptionHandler<GuardExceptionHandler>();
-    }
-}
+namespace Microsoft.Extensions.DependencyInjection;
 
-namespace {{ namespace }}.BuildingBlocks.Http
+public static partial class ErrorResponses
 {
+    /// <summary>
+    /// Problem details for every error the host answers: a failed guard (<see cref="GuardException"/>) is a 400
+    /// with the code <see cref="GuardExceptionHandler.Code"/>; any other exception, an
+    /// <see cref="ArgumentException"/> included, is a 500 that says nothing about itself.
+    /// </summary>
+    public static IServiceCollection AddErrorResponses(this IServiceCollection services) =>
+        services.AddProblemDetails().AddExceptionHandler<GuardExceptionHandler>();
+
     /// <summary>
     /// The backstop for preconditions. A <see cref="GuardException"/> that escapes an endpoint was thrown by
     /// <c>Ensure.That</c> in a guard or a value object's factory on the caller's input, so it answers 400 problem details.
     /// Expected failures are Results, not exceptions. Every other exception, a plain <see cref="ArgumentException"/>
     /// included, is a bug: it is left to the exception handler middleware, which answers 500 without details.
     /// </summary>
-    public sealed partial class GuardExceptionHandler(IProblemDetailsService problemDetails, ILogger<GuardExceptionHandler> logger) : IExceptionHandler
+    private sealed partial class GuardExceptionHandler(IProblemDetailsService problemDetails, ILogger<GuardExceptionHandler> logger) : IExceptionHandler
     {
         /// <summary>The <c>code</c> of every problem a failed guard answers.</summary>
         public const string Code = "invalid-argument";

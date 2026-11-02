@@ -1,0 +1,4 @@
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+/// <summary>A pending row of a module's outbox table.</summary>
+public sealed record OutboxMessage(Guid Id, string Type, string Payload);
