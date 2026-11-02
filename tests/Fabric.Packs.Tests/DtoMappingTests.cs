@@ -110,4 +110,40 @@ public sealed class DtoMappingTests
         output.ShouldNotContain("InvoiceRowMappings builds");
         output.ShouldContain("failed: 1");
     }
+
+    private const string Totals = """
+        using Shop.BuildingBlocks.Messaging;
+
+        namespace Shop.Modules.Billing.Application.Queries.Totals;
+
+        public record struct TotalDto
+        {
+            public decimal Total { get; init; }
+        }
+
+        public sealed record GetTotal(decimal Total) : IQuery<Result<TotalDto, ApiError>>;
+
+        public sealed class GetTotalHandler : IQueryHandler<GetTotal, Result<TotalDto, ApiError>>
+        {
+            public async Task<Result<TotalDto, ApiError>> HandleAsync(GetTotal query, CancellationToken cancellationToken)
+            {
+                await Task.Yield();
+                return Success(new TotalDto { Total = query.Total });
+            }
+        }
+        """;
+
+    [Fact]
+    public void A_handler_that_builds_a_struct_dto_with_an_object_initializer_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject("saas-standard-react");
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/Totals", Totals);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application.Queries.Totals.GetTotalHandler builds TotalDto itself;");
+    }
 }
