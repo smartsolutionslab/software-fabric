@@ -3,9 +3,14 @@ name: cross-model-review
 # The reviewer is from a different model family than the author (board protocol, docs/adr). Its findings land on the
 # pull request, and a blocking one fails the check.
 # The reviewer is GitHub Copilot CLI, on the reviewing family's model (REVIEW_MODEL_CLAUDE, REVIEW_MODEL_CODEX below).
-# It signs in with the COPILOT_GITHUB_TOKEN secret: a fine-grained personal access token, with the Copilot Requests
-# permission, of an account licensed for Copilot. Every review spends that account's premium requests. No model
-# vendor's API key is used.
+# It signs in with this workflow's own token (copilot-requests: write), so every review is billed to the organisation:
+# that needs the organisation policy "Copilot CLI billed to the organization" and both models enabled. No secret, no
+# personal token and no model vendor's API key is used.
+#
+# Three jobs, each its own required check: choose picks the model, review runs the reviewer, report posts its findings
+# (a blocking one fails report; a reviewer that crashes fails review). The reviewer reads an untrusted diff, so its
+# job holds no token that can write to the pull request, and nothing it writes reaches the verdict but its answer,
+# which report takes as an artifact into a fresh checkout.
 #
 # The gate's own files (its scripts, the findings schema, the reviewer briefs) come from the base branch, checked out
 # into .gate: a pull request must not choose its own reviewer or post its own verdict. The pull request's copies are
@@ -23,12 +28,11 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write
 
 env:
   # The model each family reviews with, by the ID Copilot gives it: the newest of that family Copilot offers. Change
-  # them here, and only here, when Copilot offers newer ones (`/model` in copilot lists them). A model the account
-  # does not have makes copilot fail, and with it the review.
+  # them here, and only here, when Copilot offers newer ones (`copilot help config` lists them). A model the
+  # organisation has not enabled makes copilot fail, and with it the review.
   REVIEW_MODEL_CLAUDE: claude-opus-5.5
   REVIEW_MODEL_CODEX: gpt-6.1-sol
   # An exact version: a new release changes the reviewer, so it arrives as a reviewed change here. Not named
@@ -74,9 +78,10 @@ jobs:
   review:
     needs: choose
     runs-on: ubuntu-latest
+    # Read the repository and call Copilot: nothing that writes to the pull request.
     permissions:
       contents: read
-      pull-requests: write
+      copilot-requests: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -93,25 +98,20 @@ jobs:
       - name: Install the Copilot CLI
         run: npm install -g "@github/copilot@$REVIEWER_CLI_VERSION"
       - name: Review
-        # Without the secret the review fails, never passes. No GH_TOKEN or GITHUB_TOKEN for copilot, even one the
-        # runner sets: it would sign in with that instead.
+        # Copilot signs in with the workflow's token, and with nothing else: no GH_TOKEN or GITHUB_TOKEN, even one the
+        # runner sets.
         # The folder stays untrusted and the pull request's AGENTS.md is not read (--no-custom-instructions), so the
         # change under review cannot give the reviewer instructions, hooks or MCP servers; its rules come from the
         # base branch's files instead. The diff is untrusted, so the reviewer may run only commands that read the
         # checkout; in prompt mode anything else (writes, other commands, any URL, paths outside the checkout) is
         # refused, since there is no one to ask. Its shell gets no token (--secret-env-vars).
         env:
-          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          COPILOT_GITHUB_TOKEN: ${{ github.token }}
           MODEL: ${{ needs.choose.outputs.model }}
           PR: ${{ github.event.pull_request.number }}
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ -z "${COPILOT_GITHUB_TOKEN// /}" ]; then
-            echo "The repository secret COPILOT_GITHUB_TOKEN is missing or empty, so there is no reviewer. Set it to a" >&2
-            echo "fine-grained personal access token with the Copilot Requests permission (docs/adr)." >&2
-            exit 1
-          fi
           schema="$(jq -c . "$GATE/review-findings.schema.json")"
           prompt="Review pull request #$PR: the change from $BASE to $HEAD in this checkout (git diff $BASE...$HEAD).
           Review it as the reviewers in $BRIEFS/.claude/agents/ describe (backend-reviewer, frontend-reviewer,
@@ -125,12 +125,40 @@ jobs:
             --secret-env-vars=COPILOT_GITHUB_TOKEN \
             --allow-tool='shell(git diff)' --allow-tool='shell(git show)' --allow-tool='shell(git log)' \
             --allow-tool='shell(ls)' --allow-tool='shell(grep)' \
-            > "$RUNNER_TEMP/findings.json"
+            > "$RUNNER_TEMP/answer"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: review-answer
+          path: ${{ runner.temp }}/answer
+          if-no-files-found: error
+
+  report:
+    needs: [choose, review]
+    runs-on: ubuntu-latest
+    # The only job that can write to the pull request. It never runs the reviewer, and takes the gate's files from a
+    # checkout of its own: of the review, only the answer reaches it.
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate
+      - name: Use the gate's files from the base branch
+        run: |
+          if [ -f .gate/.github/scripts/board/report-review.sh ]; then gate=.gate; else gate=.; fi
+          echo "GATE=$gate/.github" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: review-answer
+          path: ${{ runner.temp }}/review
       - name: Post the findings; a blocking one fails this check
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           REVIEWER: ${{ needs.choose.outputs.reviewer }}
           MODEL: ${{ needs.choose.outputs.model }}
-        run: bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/findings.json" "$REVIEWER ($MODEL)"
+        run: bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/review/answer" "$REVIEWER ($MODEL)"
 
