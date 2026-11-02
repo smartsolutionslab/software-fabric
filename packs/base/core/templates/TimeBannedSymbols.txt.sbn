@@ -1,0 +1,4 @@
+P:System.DateTime.Now;Get the time from TimeProvider (time.GetLocalNow()), injected or passed in (docs/adr)
+P:System.DateTime.UtcNow;Get the time from TimeProvider (time.GetUtcNow()), injected or passed in (docs/adr)
+P:System.DateTimeOffset.Now;Get the time from TimeProvider (time.GetLocalNow()), injected or passed in (docs/adr)
+P:System.DateTimeOffset.UtcNow;Get the time from TimeProvider (time.GetUtcNow()), injected or passed in (docs/adr)

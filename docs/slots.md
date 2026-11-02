@@ -22,6 +22,7 @@ global.json  .editorconfig  Directory.Build.props  Directory.Packages.props  bui
 Solution.slnx                   base
 .config/dotnet-tools.json       base; tools by slot (dotnet-ef from ef-core)
 build/guards/BannedSymbols.txt  backend.guards.ensure-that
+build/time/BannedSymbols.txt    base (DateTime.Now and friends; the time comes from TimeProvider)
 src/
   AppHost/                      base (Aspire composition root)
   ServiceDefaults/              base

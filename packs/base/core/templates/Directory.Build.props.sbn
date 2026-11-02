@@ -17,8 +17,10 @@
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Link="stylecop.json" />
   </ItemGroup>
 
+  <!-- The time comes from TimeProvider, never DateTime.Now and friends (RS0030); the AppHost composes processes and is exempt. -->
   <ItemGroup Condition="'$(MSBuildProjectName)' != 'AppHost'">
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)build/time/BannedSymbols.txt" />
   </ItemGroup>
 
   <!-- src/Kernel is available everywhere but the AppHost, which composes processes and needs none of it. -->

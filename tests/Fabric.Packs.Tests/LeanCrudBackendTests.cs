@@ -233,7 +233,7 @@ public sealed class LeanCrudBackendTests
 
                 public static void Handle(InvoiceVoidedV1 message)
                 {
-                    Attempts.Enqueue(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+                    Attempts.Enqueue(TimeProvider.System.GetUtcNow().ToUnixTimeMilliseconds());
                     throw new InvalidOperationException($"The carrier is down; {message.InvoiceId} cannot be cancelled yet.");
                 }
             }
