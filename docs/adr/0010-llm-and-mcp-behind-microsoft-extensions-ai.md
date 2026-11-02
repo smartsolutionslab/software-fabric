@@ -130,8 +130,13 @@ Anthropic. The `anthropic` pack's issue settles it; the rule above (one
 
 - No profile changes its choices: every profile takes `backend.llm: none`
   and `backend.mcp: []`. `backend.llm.none` has a pack, so every profile that
-  generated before still generates; it adds an ADR and agent rules and no
-  code.
+  generated before still generates. Its gate is an architecture rule: no
+  module references `Microsoft.Extensions.AI` or a provider SDK.
+- The MCP SDK depends on `Microsoft.Extensions.AI` [7]. The `server` and
+  `client` packs therefore meet that rule when `backend.llm` is `none`; how
+  they do (the rule branching on `backend.mcp`, ADR-0006, or MCP code kept
+  out of the modules) is settled in their issues, not by weakening the rule
+  here.
 - `anthropic`, `openai`, `azure-openai`, `ollama`, `server` and `client` have
   no packs yet, so they are `experimental` (ADR-0003), and `fabric new` fails
   with `no pack for ...` for them. Each pack is its own issue, ships its agent

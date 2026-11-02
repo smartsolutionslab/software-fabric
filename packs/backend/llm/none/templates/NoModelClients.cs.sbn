@@ -1,0 +1,24 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class NoModelClients : IArchitectureRule
+{
+    private static readonly string[] ModelClients = ["Microsoft.Extensions.AI", "OpenAI", "Azure.AI.OpenAI", "Anthropic", "OllamaSharp"];
+
+    public string Description => "No module references a model client or a provider SDK: this project calls no language model.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var assembly in model.ModuleAssemblies)
+        {
+            foreach (var reference in assembly.GetReferencedAssemblies().Select(reference => reference.Name!).Where(IsModelClient).Order(StringComparer.Ordinal))
+            {
+                yield return $"{assembly.GetName().Name} references {reference}, but this project calls no language model (backend.llm: none).";
+            }
+        }
+    }
+
+    private static bool IsModelClient(string reference) =>
+        ModelClients.Any(client => reference == client || reference.StartsWith(client + ".", StringComparison.Ordinal));
+}

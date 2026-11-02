@@ -1,7 +1,8 @@
 option: backend.llm.none
-files: []
+files:
+  - { template: templates/NoModelClients.cs.sbn, target: tests/Architecture.Tests/Rules/NoModelClients.cs }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: ci-step, describes: "Nothing to check: the project calls no language model; using one is a backend.llm choice, not a package added by hand." }
+  - { kind: architecture-test, describes: "No module references Microsoft.Extensions.AI or a provider SDK (OpenAI, Azure.AI.OpenAI, Anthropic, OllamaSharp): the project calls no language model.", file: templates/NoModelClients.cs.sbn }
