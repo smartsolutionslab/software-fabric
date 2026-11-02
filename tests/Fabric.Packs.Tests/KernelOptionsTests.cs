@@ -88,6 +88,45 @@ public sealed class KernelOptionsTests
     }
 
     [Fact]
+    public void A_project_that_stops_reading_the_guard_ban_list_only_in_the_tested_configuration_is_named()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Application/Billing.Application.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <ItemGroup Condition="'$(Configuration)' == 'Release'">
+                <AdditionalFiles Remove="@(AdditionalFiles)" />
+              </ItemGroup>
+            </Project>
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("src/Modules/Billing/Billing.Application/Billing.Application.csproj does not read build/guards/BannedSymbols.txt");
+    }
+
+    [Fact]
+    public void A_project_that_stops_reading_the_guard_ban_list_only_in_another_configuration_passes()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Application/Billing.Application.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+                <AdditionalFiles Remove="@(AdditionalFiles)" />
+              </ItemGroup>
+            </Project>
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+    }
+
+    [Fact]
     public void A_nullable_return_from_application_code_breaks_the_absence_rule()
     {
         using var project = new GeneratedProject(Profile);
