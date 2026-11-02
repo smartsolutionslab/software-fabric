@@ -112,7 +112,7 @@ public sealed class EventDrivenBackendTests
             {
                 var cancellationToken = TestContext.Current.CancellationToken;
                 await using var provider = Provider();
-                var id = new InvoiceId(Guid.NewGuid());
+                var id = new InvoiceId(Guid.CreateVersion7());
 
                 await using (var scope = provider.CreateAsyncScope())
                 {
@@ -138,7 +138,7 @@ public sealed class EventDrivenBackendTests
             {
                 var cancellationToken = TestContext.Current.CancellationToken;
                 await using var provider = Provider();
-                var id = new InvoiceId(Guid.NewGuid());
+                var id = new InvoiceId(Guid.CreateVersion7());
 
                 await using (var scope = provider.CreateAsyncScope())
                 {
@@ -168,7 +168,7 @@ public sealed class EventDrivenBackendTests
                 await using var scope = provider.CreateAsyncScope();
 
                 var loaded = await scope.ServiceProvider.GetRequiredService<IBillingAggregateStore>()
-                    .LoadAsync<Invoice>(new InvoiceId(Guid.NewGuid()), TestContext.Current.CancellationToken);
+                    .LoadAsync<Invoice>(new InvoiceId(Guid.CreateVersion7()), TestContext.Current.CancellationToken);
 
                 loaded.HasValue.ShouldBeFalse();
             }
@@ -178,7 +178,7 @@ public sealed class EventDrivenBackendTests
             {
                 var cancellationToken = TestContext.Current.CancellationToken;
                 await using var provider = Provider();
-                var id = new InvoiceId(Guid.NewGuid());
+                var id = new InvoiceId(Guid.CreateVersion7());
 
                 await using (var scope = provider.CreateAsyncScope())
                 {
