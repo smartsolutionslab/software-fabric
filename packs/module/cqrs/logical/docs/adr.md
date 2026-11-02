@@ -15,3 +15,4 @@ No separate read store; that is the physical variant.
 - Queries can be optimised (projections, no tracking) without touching the write model.
 - Every handler that returns the same DTO uses the same mapping, so copies cannot drift apart.
 - The rule recognises a DTO by its name (`*Dto`) and looks only at code inside the handler type; a DTO built by another class the handler calls is not seen.
+- A struct DTO that is zero-initialised or built with an object initializer without a constructor call (`new TotalDto { Total = 1 }` on a struct with no constructor) is not seen: that compiles to `initobj`, which Release async state machines also emit to clear hoisted fields, so it cannot tell construction from cleanup. Give a struct DTO a constructor, or make it a record class.

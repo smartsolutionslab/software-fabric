@@ -37,13 +37,14 @@ public sealed class {{ module.namespace }}HandlersBuildNoDtos : IArchitectureRul
     }
 
     /// <summary>
-    /// The *Dto types the handler's code builds or hands to an expression tree to build, including the code the compiler
-    /// moves into nested types: lambdas, closures and async state machines.
+    /// The *Dto types whose constructors the handler's code calls or hands to an expression tree, including the code the
+    /// compiler moves into nested types: lambdas, closures and async state machines.
     /// </summary>
     private static IEnumerable<Type> BuiltDtos(Type handler) =>
         WithNested(handler)
             .SelectMany(type => type.GetMethods(Declared).Cast<MethodBase>().Concat(type.GetConstructors(Declared)))
-            .SelectMany(TypesBuilt)
+            .SelectMany(ConstructorsUsed)
+            .Select(constructor => constructor.DeclaringType!)
             .Where(type => Name(type).EndsWith("Dto", StringComparison.Ordinal));
 
     /// <summary>PageDto rather than PageDto`1.</summary>
@@ -53,18 +54,16 @@ public sealed class {{ module.namespace }}HandlersBuildNoDtos : IArchitectureRul
         type.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic).SelectMany(WithNested).Prepend(type);
 
     /// <summary>
-    /// Types a method body builds: the owner of a constructor it names with newobj, call (a struct built in place) or
-    /// ldtoken (an expression tree's New), and a struct it zeroes with initobj (new() of a struct without a constructor) or
-    /// hands to Expression.New(Type) (an expression tree's New of such a struct: ldtoken, Type.GetTypeFromHandle,
-    /// Expression.New). A typeof of a struct alone builds nothing.
+    /// Constructors a method body names with newobj, call (a struct built in place) or ldtoken (an expression tree's New).
+    /// A struct built without a constructor call compiles to initobj, which async state machines also emit to clear
+    /// hoisted fields, so it is not seen.
     /// </summary>
-    private static IEnumerable<Type> TypesBuilt(MethodBase method)
+    private static IEnumerable<ConstructorInfo> ConstructorsUsed(MethodBase method)
     {
         var il = method.GetMethodBody()?.GetILAsByteArray() ?? [];
         var typeArguments = method.DeclaringType is { IsGenericType: true } declaring ? declaring.GetGenericArguments() : null;
         var methodArguments = method is MethodInfo { IsGenericMethod: true } ? method.GetGenericArguments() : null;
 
-        Type? tokened = null;
         var position = 0;
         while (position < il.Length)
         {
@@ -72,33 +71,13 @@ public sealed class {{ module.namespace }}HandlersBuildNoDtos : IArchitectureRul
             var code = OpCodesByValue[twoBytes ? unchecked((short)(0xFE00 | il[position + 1])) : il[position]];
             position += twoBytes ? 2 : 1;
 
-            var member = code == OpCodes.Newobj || code == OpCodes.Call || code == OpCodes.Ldtoken || code == OpCodes.Initobj
-                ? method.Module.ResolveMember(BitConverter.ToInt32(il, position), typeArguments, methodArguments)
-                : null;
+            if ((code == OpCodes.Newobj || code == OpCodes.Call || code == OpCodes.Ldtoken)
+                && method.Module.ResolveMember(BitConverter.ToInt32(il, position), typeArguments, methodArguments) is ConstructorInfo constructor)
+            {
+                yield return constructor;
+            }
+
             position += OperandSize(code, il, position);
-
-            if (member is ConstructorInfo constructor)
-            {
-                yield return constructor.DeclaringType!;
-            }
-            else if (member is Type { IsValueType: true } zeroed && code == OpCodes.Initobj)
-            {
-                yield return zeroed;
-            }
-            else if (tokened is not null && member is MethodInfo { Name: "New" } expressionNew
-                && expressionNew.DeclaringType?.FullName == "System.Linq.Expressions.Expression"
-                && expressionNew.GetParameters() is [{ ParameterType: var parameter }] && parameter == typeof(Type))
-            {
-                yield return tokened;
-            }
-
-            // A struct's token stays pending across the Type.GetTypeFromHandle call that turns it into a Type.
-            tokened = member switch
-            {
-                Type { IsValueType: true } token when code == OpCodes.Ldtoken => token,
-                MethodInfo { Name: nameof(Type.GetTypeFromHandle) } fromHandle when fromHandle.DeclaringType == typeof(Type) => tokened,
-                _ => null,
-            };
         }
     }
 
