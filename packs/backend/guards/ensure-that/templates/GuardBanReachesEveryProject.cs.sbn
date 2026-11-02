@@ -1,0 +1,104 @@
+using System.Diagnostics;
+using System.Text.Json;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// The Banned API analyzer bans the BCL guards only in a project that reads the ban list as an AdditionalFiles item.
+/// A project that stops reading it (the item dropped or removed, the list renamed, a project outside the import)
+/// still builds green, so every project is evaluated as MSBuild sees it. The list keeps its exact name, because the
+/// analyzer finds ban lists by that name (roslyn-analyzers#5622).
+/// </summary>
+public sealed class GuardBanReachesEveryProject : IArchitectureRule
+{
+    private const string BanList = "build/guards/BannedSymbols.txt";
+
+    /// <summary>The one project the ban leaves out: it composes processes and references no kernel.</summary>
+    private const string Exempt = "AppHost";
+
+    public string Description => $"Every project but the {Exempt} reads {BanList}, so the BCL guards do not compile there (RS0030).";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var root = RepositoryRoot();
+        var banList = Path.GetFullPath(Path.Combine(root, BanList));
+        if (!File.Exists(banList))
+        {
+            return [$"{BanList} does not exist; the analyzer reads a ban list only under the name BannedSymbols.txt."];
+        }
+
+        return [.. Projects(root)
+            .AsParallel()
+            .AsOrdered()
+            .SelectMany(project => ProjectViolations(root, project, banList))];
+    }
+
+    /// <summary>Every project file in the repository, outside build output, dependencies and hidden directories.</summary>
+    private static IEnumerable<string> Projects(string root) =>
+        Directory.EnumerateFiles(root, "*.csproj", SearchOption.AllDirectories)
+            .Where(path => !Path.GetRelativePath(root, path)
+                .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                .Any(segment => segment is "bin" or "obj" or "node_modules" || segment.StartsWith('.')))
+            .Where(path => Path.GetFileNameWithoutExtension(path) != Exempt)
+            .Order(StringComparer.Ordinal);
+
+    private static IEnumerable<string> ProjectViolations(string root, string project, string banList)
+    {
+        var name = Path.GetRelativePath(root, project).Replace('\\', '/');
+        var (exitCode, output) = AdditionalFiles(project);
+        if (exitCode != 0)
+        {
+            return [$"{name} could not be evaluated (dotnet msbuild exited with {exitCode}):\n{output}"];
+        }
+
+        using var document = JsonDocument.Parse(output);
+        var reads = document.RootElement.TryGetProperty("Items", out var items)
+            && items.TryGetProperty("AdditionalFiles", out var additionalFiles)
+            && additionalFiles.EnumerateArray().Any(file => file.TryGetProperty("FullPath", out var fullPath)
+                && Path.GetFullPath(fullPath.GetString() ?? string.Empty) == banList);
+        if (reads)
+        {
+            return [];
+        }
+
+        return [$"{name} does not read {BanList} as an AdditionalFiles item, so the BCL guards compile there."];
+    }
+
+    /// <summary>The project's AdditionalFiles items as MSBuild evaluates them, in its JSON form.</summary>
+    private static (int ExitCode, string Output) AdditionalFiles(string project)
+    {
+        var start = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in new[] { "msbuild", project, "-getItem:AdditionalFiles", "-nologo" })
+        {
+            start.ArgumentList.Add(argument);
+        }
+
+        start.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
+        start.Environment["DOTNET_NOLOGO"] = "1";
+
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("dotnet did not start.");
+        var standardError = process.StandardError.ReadToEndAsync();
+        var standardOutput = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+        var errors = standardError.Result;
+        return (process.ExitCode, process.ExitCode == 0 ? standardOutput : standardOutput + errors);
+    }
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+}

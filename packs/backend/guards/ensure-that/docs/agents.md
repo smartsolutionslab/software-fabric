@@ -2,5 +2,5 @@
 
 - Guard arguments with `Ensure.That(x)`: `.IsNotNull()`, `.IsNotNullOrWhiteSpace()`, `.HasMaxLength(n)`, `.Matches(regex, message)`, `.IsNotEmpty()` for `Guid`, `.AtLeast(n)` / `.InRange(min, max)` for numbers, `.Satisfies(predicate, message)` for the rest.
 - Every failed guard throws `GuardException` (an `ArgumentException`); do not throw `ArgumentException` by hand for a precondition, add a method to the chain or use `.Satisfies(...)`.
-- `ArgumentNullException.ThrowIfNull` and the other BCL `ThrowIf*` helpers do not compile here (RS0030).
+- `ArgumentNullException.ThrowIfNull` and the other BCL `ThrowIf*` helpers do not compile here (RS0030). Keep `build/guards/BannedSymbols.txt` under that exact name and read by every project but the AppHost; an architecture rule evaluates each project and names one that stops reading it.
 - Validate at trust boundaries and in value-object factories; do not guard every private method.
