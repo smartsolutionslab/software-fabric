@@ -1,8 +1,11 @@
 option: module.cqrs.logical
 files:
   - { template: templates/RequestsLiveInCommandsOrQueries.cs.sbn, target: tests/Architecture.Tests/Rules/RequestsLiveInCommandsOrQueries.cs }
+  # Per module: the rule checks only the modules that chose logical CQRS, so another module may choose none or physical.
+  - { template: templates/HandlersBuildNoDtos.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}HandlersBuildNoDtos.cs", per-module: true }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
   - { kind: architecture-test, describes: "Commands live in a Commands namespace and queries in a Queries namespace.", file: templates/RequestsLiveInCommandsOrQueries.cs.sbn }
+  - { kind: architecture-test, describes: "No command or query handler of a logical-CQRS module builds a *Dto: not with new, not in a lambda or expression tree, not in a helper of its own. It reads the handler's compiled code, nested lambdas and state machines included; a DTO built by code the handler calls elsewhere is that code's concern.", file: templates/HandlersBuildNoDtos.cs.sbn }
