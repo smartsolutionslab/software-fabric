@@ -1,0 +1,50 @@
+using Microsoft.AspNetCore.OpenApi;
+using Microsoft.OpenApi;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class OpenApiPaging
+{
+    /// <summary>
+    /// Describes a <see cref="Page"/> or <see cref="PageSize"/> parameter as the integer range it binds, where the
+    /// OpenAPI generator would call any type it parses a string; the frontend's generated client then takes numbers.
+    /// </summary>
+    public static OpenApiOptions DescribePaging(this OpenApiOptions options)
+    {
+        {{ not_null "options" }}
+
+        return options.AddOperationTransformer((operation, context, cancellationToken) =>
+        {
+            foreach (var description in context.Description.ParameterDescriptions)
+            {
+                var schema = Describe(description.Type);
+                if (schema is null)
+                {
+                    continue;
+                }
+
+                foreach (var parameter in (operation.Parameters ?? []).OfType<OpenApiParameter>().Where(parameter => parameter.Name == description.Name))
+                {
+                    parameter.Schema = schema;
+                }
+            }
+
+            return Task.CompletedTask;
+        });
+    }
+
+    private static OpenApiSchema? Describe(Type? type)
+    {
+        if (type == typeof(Page))
+        {
+            return new OpenApiSchema { Type = JsonSchemaType.Integer, Format = "int32", Minimum = "1", Maximum = Page.Maximum.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+        }
+
+        if (type == typeof(PageSize))
+        {
+            return new OpenApiSchema { Type = JsonSchemaType.Integer, Format = "int32", Minimum = "1", Maximum = PageSize.Maximum.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+        }
+
+        return null;
+    }
+}

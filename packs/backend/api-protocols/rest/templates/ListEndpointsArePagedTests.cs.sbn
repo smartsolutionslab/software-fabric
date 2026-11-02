@@ -1,0 +1,64 @@
+{{~ if project["backend.test.integration"] != "aspire-fixture" ~}}
+#error The REST pack checks list endpoints through the aspire-fixture integration tests only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using System.Text.Json.Nodes;
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>
+/// A list endpoint answers <see cref="PagedResult{T}"/> and takes <c>page</c> and <c>pageSize</c> from the query
+/// (docs/adr). Read from the OpenAPI document the running host serves: a GET whose success is a JSON array, or a
+/// <c>PagedResult</c>, is a list endpoint.
+/// </summary>
+public class ListEndpointsArePagedTests(AspireFixture aspire)
+{
+    private const string PagedResultSchema = "#/components/schemas/PagedResultOf";
+
+    [Fact]
+    public async Task Every_list_endpoint_answers_a_paged_result_and_takes_page_and_page_size()
+    {
+        using var client = aspire.CreateHostClient();
+        var document = JsonNode.Parse(await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative), TestContext.Current.CancellationToken))!;
+
+        List<string> violations = [];
+        foreach (var (path, item) in document["paths"]?.AsObject() ?? [])
+        {
+            var operation = item?["get"];
+            var schema = operation?["responses"]?["200"]?["content"]?["application/json"]?["schema"];
+            if (schema is null)
+            {
+                continue;
+            }
+
+            if (IsArray(schema))
+            {
+                violations.Add($"GET {path} answers a plain list; a list endpoint answers PagedResult<T>.");
+            }
+            else if (IsPagedResult(schema) && !(TakesFromQuery(operation!, "page") && TakesFromQuery(operation!, "pageSize")))
+            {
+                violations.Add($"GET {path} answers PagedResult<T> but does not take page and pageSize from the query.");
+            }
+        }
+
+        {{~ if project["backend.test.assertions"] == "shouldly" ~}}
+        violations.ShouldBeEmpty(string.Join(Environment.NewLine, violations));
+        {{~ else ~}}
+        violations.Should().BeEmpty(string.Join(Environment.NewLine, violations));
+        {{~ end ~}}
+    }
+
+    private static bool IsArray(JsonNode schema) =>
+        schema["type"] switch
+        {
+            JsonValue type => type.GetValue<string>() == "array",
+            JsonArray types => types.Any(type => type?.GetValue<string>() == "array"),
+            _ => false,
+        };
+
+    private static bool IsPagedResult(JsonNode schema) =>
+        schema["$ref"]?.GetValue<string>().StartsWith(PagedResultSchema, StringComparison.Ordinal) == true;
+
+    private static bool TakesFromQuery(JsonNode operation, string name) =>
+        operation["parameters"]?.AsArray().Any(parameter =>
+            parameter?["in"]?.GetValue<string>() == "query" && parameter["name"]?.GetValue<string>() == name) == true;
+}

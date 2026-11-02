@@ -1,5 +1,7 @@
 option: backend.api-protocols.rest
-files: []
+files:
+  - { template: templates/OpenApiPaging.cs.sbn, target: src/Host/Wiring/OpenApiPaging.cs }
+  - { template: templates/ListEndpointsArePagedTests.cs.sbn, target: tests/Integration.Tests/ListEndpointsArePagedTests.cs }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-version.sbn }
   - { slot: host.packages, template: templates/host-package.sbn }
@@ -10,3 +12,4 @@ agents:
 adr: docs/adr.md
 gates:
   - { kind: ci-step, describes: "GET /openapi/v1.json answers with the API description; checked by the integration tests of the aspire-fixture pack against the running stack." }
+  - { kind: unit-test, describes: "A list endpoint (a GET whose success is a JSON array or a PagedResult in the served OpenAPI document) answers PagedResult<T> and takes page and pageSize from the query; an integration test reads the document from the running host.", file: templates/ListEndpointsArePagedTests.cs.sbn }
