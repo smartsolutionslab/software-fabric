@@ -17,6 +17,7 @@
 - Modules never reference each other. They talk through `src/Contracts`.
 - Nothing may need a line per module in a shared file (no module list in Program.cs, no per-module ProjectReference). Registration is by convention: implement `IModule` once per module.
 - `src/Kernel` holds what every project may use, the Domain included: guards, results, absence. It is referenced and imported everywhere; never add a dependency to it.
+- A query behind a list endpoint takes a `Page` and a `PageSize` (`src/Kernel`) and returns `PagedResult<T>(Items, TotalCount, Page, PageSize)`: skip `page.Skip(pageSize)`, take `pageSize.Value`, and count the whole list. A page size is at most `PageSize.Maximum` (100); `Page.TryFrom` / `PageSize.TryFrom` refuse anything outside the range. A query sorts by a `Sorting<TField>` whose field is an enum the query declares. Only an internal lookup no endpoint answers with (a small fixed set) may return a plain list.
 - A new package version goes in `Directory.Packages.props`; projects reference it without a version.
 - Dependabot (`.github/dependabot.yml`) keeps every package ecosystem current, weekly: minor and patch updates grouped, majors one by one. A new ecosystem (another `package.json` workspace, a Dockerfile) gets its own entry there in the same pull request.
 - An architecture rule is a class implementing `IArchitectureRule` in `tests/Architecture.Tests/Rules/`; it runs with the other tests.

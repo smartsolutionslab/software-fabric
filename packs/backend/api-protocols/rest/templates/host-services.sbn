@@ -1,1 +1,1 @@
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.DescribePaging());

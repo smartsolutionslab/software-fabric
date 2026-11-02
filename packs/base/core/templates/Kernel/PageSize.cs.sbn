@@ -1,0 +1,34 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+
+namespace {{ namespace }}.Kernel;
+
+/// <summary>
+/// How many items a page of a list query holds, from 1 to <see cref="Maximum"/> (docs/adr). A list endpoint binds it
+/// from <c>?pageSize=</c>: anything outside that range is a 400 before the endpoint runs, so no caller can ask for
+/// the whole table.
+/// </summary>
+public sealed record PageSize
+{
+    public const int Maximum = 100;
+
+    private PageSize(int value) => Value = value;
+
+    /// <summary>What a list endpoint uses when the caller names no page size.</summary>
+    public static PageSize Default { get; } = new(20);
+
+    public int Value { get; }
+
+    public static bool TryFrom(int value, [NotNullWhen(true)] out PageSize? pageSize)
+    {
+        pageSize = value is >= 1 and <= Maximum ? new PageSize(value) : null;
+        return pageSize is not null;
+    }
+
+    /// <summary>Binds a query string value; the minimal API answers 400 when it returns <see langword="false"/>.</summary>
+    public static bool TryParse(string? value, IFormatProvider? provider, [NotNullWhen(true)] out PageSize? pageSize)
+    {
+        pageSize = null;
+        return int.TryParse(value, NumberStyles.None, provider ?? CultureInfo.InvariantCulture, out var number) && TryFrom(number, out pageSize);
+    }
+}
