@@ -1,0 +1,11 @@
+option: test.discipline.test-after
+files: []
+agents:
+  agents-md: docs/agents.md
+  briefs:
+    test-writer: docs/test-writer.md
+    backend-engineer: docs/engineer.md
+    frontend-engineer: docs/engineer.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "Each module's Domain and Application, and the Kernel, keep the line coverage tests/coverage.props sets; the coverage gate of the test framework pack fails CI below it." }

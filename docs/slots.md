@@ -127,7 +127,7 @@ Cardinality `0+` unless stated. "Separator" is what joins contributions
 | `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
 | `dotnet.build-properties` | `Directory.Build.props` | packs adding analyzers or properties (result, red-first) |
-| `solution.projects` *(added in M1-02)* | `Solution.slnx` | packs owning a project: modular-monolith (Host), aspire-fixture (Integration.Tests) |
+| `solution.projects` *(added in M1-02)* | `Solution.slnx` | packs owning a project: modular-monolith (Host), aspire-fixture (Integration.Tests), ensure-that, option and the result styles (their tests under `tests/Kernel/`) |
 | `modules.packages.domain` | `src/Modules/Directory.Build.props` | — (Domain stays dependency-free) |
 | `modules.packages.application` | 〃 | wolverine, mediator |
 | `modules.packages.infrastructure` | 〃 | ef-core, postgres, wolverine |
@@ -193,7 +193,7 @@ is a defect in the second pack.
 
 | Slot | File | Filled by |
 |---|---|---|
-| `ci.backend-steps` | `.github/workflows/ci.yml` | xunit (runs every test project; the integration tests need Docker, which GitHub's runners have) |
+| `ci.backend-steps` | `.github/workflows/ci.yml` | xunit (runs every test project with code coverage, then the coverage gate; the integration tests need Docker, which GitHub's runners have) |
 | `pr-template.sections` *(added in M1-06)* | `.github/pull_request_template.md` | fabric (`## Spec and plan`), red-first (`## Tests observed failing`) |
 | `ci.frontend-steps` | 〃 | pnpm, react (`pnpm format:check`), rtk-query-codegen (generated client is current), accessibility |
 | `readme.first-steps` *(added for #11)* | `README.md` (`## First steps`, printed by `fabric new`) | pnpm (create and commit `web/pnpm-lock.yaml`) |

@@ -1,0 +1,64 @@
+{{~ if project["backend.test.framework"] != "xunit" || project["backend.test.assertions"] != "shouldly" ~}}
+#error The option pack's Kernel tests are written for xUnit and Shouldly only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+namespace {{ namespace }}.Kernel.Tests;
+
+public class OptionTests
+{
+    private static readonly Option<string> Number = Option<string>.Some("INV-1");
+    private static readonly Option<string> Nothing = Option<string>.None;
+
+    [Fact]
+    public void Some_has_its_value_and_none_has_none()
+    {
+        Number.HasValue.ShouldBeTrue();
+        Number.Value.ShouldBe("INV-1");
+        Nothing.HasValue.ShouldBeFalse();
+        Should.Throw<InvalidOperationException>(() => Nothing.Value);
+    }
+
+    [Fact]
+    public void Some_refuses_null() =>
+        Should.Throw<ArgumentNullException>(() => Option<string>.Some(null!));
+
+    [Fact]
+    public void Match_takes_the_branch_of_the_case_it_is()
+    {
+        Number.Match(number => number, () => "none").ShouldBe("INV-1");
+        Nothing.Match(number => number, () => "none").ShouldBe("none");
+    }
+
+    [Fact]
+    public void Map_changes_a_value_and_leaves_none_none()
+    {
+        Number.Map(number => number.Length).ShouldBe(Option<int>.Some(5));
+        Nothing.Map(number => number.Length).ShouldBe(Option<int>.None);
+    }
+
+    [Fact]
+    public void Get_or_default_falls_back_only_without_a_value()
+    {
+        Number.GetOrDefault("INV-0").ShouldBe("INV-1");
+        Nothing.GetOrDefault("INV-0").ShouldBe("INV-0");
+    }
+
+    [Fact]
+    public void Options_are_equal_when_both_are_none_or_both_hold_equal_values()
+    {
+        (Number == Option<string>.Some("INV-1")).ShouldBeTrue();
+        (Nothing == Option<string>.None).ShouldBeTrue();
+        (Number != Nothing).ShouldBeTrue();
+        (Number != Option<string>.Some("INV-2")).ShouldBeTrue();
+        Number.Equals((object)Option<string>.Some("INV-1")).ShouldBeTrue();
+        Number.Equals("INV-1").ShouldBeFalse();
+        Number.GetHashCode().ShouldBe(Option<string>.Some("INV-1").GetHashCode());
+        Nothing.GetHashCode().ShouldBe(Option<string>.None.GetHashCode());
+    }
+
+    [Fact]
+    public void An_option_says_what_it_holds()
+    {
+        Number.ToString().ShouldBe("Some(INV-1)");
+        Nothing.ToString().ShouldBe("None");
+    }
+}
