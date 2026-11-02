@@ -83,14 +83,16 @@ public sealed class PagingTests
 
         public sealed class InvoiceNumberEndpoints : IEndpoint
         {
+            private static readonly string[] FirstNumbers = ["INV-0001", "INV-0002"];
+
             public void Map(IEndpointRouteBuilder endpoints)
             {
                 endpoints.MapGet("/invoice-numbers", async (Page? page, PageSize? pageSize, IDispatcher dispatcher, CancellationToken cancellationToken) =>
                     TypedResults.Ok(await dispatcher.QueryAsync(new ListInvoiceNumbers(page ?? Page.First, pageSize ?? PageSize.Default), cancellationToken)))
                     .AllowAnonymous();
-                endpoints.MapGet("/all-invoice-numbers", () => TypedResults.Ok(new[] { "INV-0001", "INV-0002" }))
+                endpoints.MapGet("/all-invoice-numbers", () => TypedResults.Ok(FirstNumbers))
                     .AllowAnonymous();
-                endpoints.MapGet("/invoice-numbers/first", () => TypedResults.Ok(new PagedResult<string>(["INV-0001"], 25, 1, 1)))
+                endpoints.MapGet("/invoice-numbers/first", () => TypedResults.Ok(new PagedResult<string>(FirstNumbers, 25, 1, 2)))
                     .AllowAnonymous();
                 endpoints.MapGet("/invoice-count", () => TypedResults.Ok(25))
                     .AllowAnonymous();
