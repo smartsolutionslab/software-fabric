@@ -1,4 +1,5 @@
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    // The frontend's client is generated from the document without signing in.
+    app.MapOpenApi().AllowAnonymous();
 }
