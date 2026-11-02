@@ -9,4 +9,10 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
+
+  <!-- One type per file, named after the type: SA1402 and SA1649, configured in stylecop.json and .editorconfig. -->
+  <ItemGroup>
+    <PackageReference Include="StyleCop.Analyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)stylecop.json" Link="stylecop.json" />
+  </ItemGroup>
 </Project>

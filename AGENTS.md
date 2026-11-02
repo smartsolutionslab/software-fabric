@@ -26,6 +26,14 @@ The generator, not a generated project. It turns a set of choices from
    timestamps, random IDs or machine paths in generated files.
 5. **Nothing is "supported" that the matrix does not build** (ADR-0003).
 
+## Code
+
+- One top-level type per file under `src/` and `tests/`, and the file is named after it (StyleCop SA1402, SA1649,
+  the same configuration as generated projects): `PackManifest.cs` holds `PackManifest`. That counts every kind: a
+  class, record, struct, interface, enum or delegate, however small, gets its own file. Only types nested inside
+  another type, and generated code, are exempt. A Release build fails on a violation.
+- Never silence a rule with `#pragma`, `[SuppressMessage]`, `NoWarn` or an `.editorconfig` severity; change the code.
+
 ## Workflow
 
 Milestones M0 and M1 are **supervised**: stop at every gate in
