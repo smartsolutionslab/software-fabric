@@ -101,6 +101,7 @@ declares-slots:
   - { slot: tests.build-properties, description: "Properties for every test project." }
   - { slot: tests.packages, description: "<PackageReference> lines for every test project." }
   - { slot: tests.usings, description: "<Using> lines for every test project." }
+  - { slot: tests.architecture.references, description: "<PackageReference> and <ProjectReference> lines for tests/Architecture.Tests, for a rule that looks at more than the module assemblies (the host, say)." }
   - { slot: pr-template.sections, description: "Sections every pull request description has, each starting with a ## heading.", separator: "\n\n" }
   - { slot: ci.backend-steps, description: "Steps of the backend CI job, indented six spaces." }
   - { slot: ci.frontend-steps, description: "Steps of the frontend CI job, indented six spaces." }

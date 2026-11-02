@@ -32,7 +32,8 @@ internal static class RetryProbe
     /// <param name="client">Configures the probed client beyond the defaults (an opt-in), or returns it unchanged.</param>
     public static int Attempts(HttpMethod method, Failure failure, Func<IHttpClientBuilder, IHttpClientBuilder> client)
     {
-        var builder = Host.CreateEmptyApplicationBuilder(settings: null);
+        // Qualified: once a rule references the host project, a bare Host names the {{ namespace }}.Host namespace.
+        var builder = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(settings: null);
         builder.AddServiceDefaults();
 
         var server = new FailingServer(failure);
