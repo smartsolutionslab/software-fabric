@@ -37,14 +37,13 @@ public sealed class {{ module.namespace }}HandlersBuildNoDtos : IArchitectureRul
     }
 
     /// <summary>
-    /// The *Dto types whose constructors the handler's code calls or hands to an expression tree, including the code the
-    /// compiler moves into nested types: lambdas, closures and async state machines.
+    /// The *Dto types the handler's code builds or hands to an expression tree to build, including the code the compiler
+    /// moves into nested types: lambdas, closures and async state machines.
     /// </summary>
     private static IEnumerable<Type> BuiltDtos(Type handler) =>
         WithNested(handler)
             .SelectMany(type => type.GetMethods(Declared).Cast<MethodBase>().Concat(type.GetConstructors(Declared)))
-            .SelectMany(ConstructorsUsed)
-            .Select(constructor => constructor.DeclaringType!)
+            .SelectMany(TypesBuilt)
             .Where(type => Name(type).EndsWith("Dto", StringComparison.Ordinal));
 
     /// <summary>PageDto rather than PageDto`1.</summary>
@@ -53,8 +52,12 @@ public sealed class {{ module.namespace }}HandlersBuildNoDtos : IArchitectureRul
     private static IEnumerable<Type> WithNested(Type type) =>
         type.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic).SelectMany(WithNested).Prepend(type);
 
-    /// <summary>Constructors a method body names with newobj, call (a struct built in place) or ldtoken (an expression tree's New).</summary>
-    private static IEnumerable<ConstructorInfo> ConstructorsUsed(MethodBase method)
+    /// <summary>
+    /// Types a method body builds: the owner of a constructor it names with newobj, call (a struct built in place) or
+    /// ldtoken (an expression tree's New), and a struct it zeroes with initobj (new() of a struct without a constructor) or
+    /// names with ldtoken (an expression tree's New of such a struct).
+    /// </summary>
+    private static IEnumerable<Type> TypesBuilt(MethodBase method)
     {
         var il = method.GetMethodBody()?.GetILAsByteArray() ?? [];
         var typeArguments = method.DeclaringType is { IsGenericType: true } declaring ? declaring.GetGenericArguments() : null;
@@ -67,10 +70,17 @@ public sealed class {{ module.namespace }}HandlersBuildNoDtos : IArchitectureRul
             var code = OpCodesByValue[twoBytes ? unchecked((short)(0xFE00 | il[position + 1])) : il[position]];
             position += twoBytes ? 2 : 1;
 
-            if ((code == OpCodes.Newobj || code == OpCodes.Call || code == OpCodes.Ldtoken)
-                && method.Module.ResolveMember(BitConverter.ToInt32(il, position), typeArguments, methodArguments) is ConstructorInfo constructor)
+            if (code == OpCodes.Newobj || code == OpCodes.Call || code == OpCodes.Ldtoken || code == OpCodes.Initobj)
             {
-                yield return constructor;
+                var member = method.Module.ResolveMember(BitConverter.ToInt32(il, position), typeArguments, methodArguments);
+                if (member is ConstructorInfo constructor)
+                {
+                    yield return constructor.DeclaringType!;
+                }
+                else if (member is Type { IsValueType: true } type && (code == OpCodes.Initobj || code == OpCodes.Ldtoken))
+                {
+                    yield return type;
+                }
             }
 
             position += OperandSize(code, il, position);
