@@ -23,6 +23,11 @@
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)build/time/BannedSymbols.txt" />
   </ItemGroup>
 
+  <!-- New identifiers in src/ are time-ordered Guid v7, never Guid.NewGuid (RS0030); tests may still use random Guids as data. -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'AppHost' And $([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)').StartsWith('$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', 'src'))'))">
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)build/ids/BannedSymbols.txt" />
+  </ItemGroup>
+
   <!-- src/Kernel is available everywhere but the AppHost, which composes processes and needs none of it. -->
   <ItemGroup Condition="'$(MSBuildProjectName)' != 'Kernel' And '$(MSBuildProjectName)' != 'AppHost'">
     <ProjectReference Include="$(MSBuildThisFileDirectory)src/Kernel/Kernel.csproj" />

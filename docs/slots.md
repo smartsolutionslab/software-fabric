@@ -23,6 +23,7 @@ Solution.slnx                   base
 .config/dotnet-tools.json       base; tools by slot (dotnet-ef from ef-core)
 build/guards/BannedSymbols.txt  backend.guards.ensure-that
 build/time/BannedSymbols.txt    base (DateTime.Now and friends; the time comes from TimeProvider)
+build/ids/BannedSymbols.txt     base (Guid.NewGuid in src/; identifiers are Guid.CreateVersion7())
 src/
   AppHost/                      base (Aspire composition root)
   ServiceDefaults/              base
