@@ -7,8 +7,6 @@ using YamlDotNet.RepresentationModel;
 
 namespace Fabric.Core.Generation;
 
-public sealed record FabricRecord(string Name, string? Profile, ProjectChoices Choices);
-
 /// <summary>
 /// <c>fabric.yaml</c>: the record of what a generated project chose. Written once by <c>fabric new</c>, extended by
 /// <c>fabric add-module</c>, and read by agents and tools. Multi-valued dimensions are always lists.

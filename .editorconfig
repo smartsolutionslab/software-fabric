@@ -11,6 +11,22 @@ indent_size = 4
 [*.{json,yml,yaml,props,csproj,slnx}]
 indent_size = 2
 
+# One type per file, named after the type (StyleCop). SA1402: a second top-level type of any kind (stylecop.json lists
+# them all; nested types do not count). SA1649: the file is named after its first type, a generic one by its plain
+# name. Every other StyleCop rule is off; SA0001 has no category, so it is named.
+[{src,tests}/**.cs]
+dotnet_diagnostic.SA1402.severity = warning
+dotnet_diagnostic.SA1649.severity = warning
+dotnet_diagnostic.SA0001.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.DocumentationRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.LayoutRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.MaintainabilityRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.NamingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.OrderingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.ReadabilityRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpacingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpecialRules.severity = none
+
 # Test names are sentences with underscores.
 [tests/**.cs]
 dotnet_diagnostic.CA1707.severity = none
