@@ -23,8 +23,8 @@
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)build/time/BannedSymbols.txt" />
   </ItemGroup>
 
-  <!-- New identifiers in src/ are time-ordered Guid v7, never Guid.NewGuid (RS0030); tests may still use random Guids as data. -->
-  <ItemGroup Condition="'$(MSBuildProjectName)' != 'AppHost' And $([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)').StartsWith('$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', 'src'))'))">
+  <!-- Every Guid is a time-ordered Guid v7, never Guid.NewGuid (RS0030), tests included; the AppHost creates none and is exempt. -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'AppHost'">
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)build/ids/BannedSymbols.txt" />
   </ItemGroup>
 

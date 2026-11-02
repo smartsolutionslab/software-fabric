@@ -359,7 +359,7 @@ public sealed class LeanCrudBackendTests
                     var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
                     new BillingModule().AddServices(services, configuration);
                     await using var provider = services.BuildServiceProvider();
-                    var noteId = Guid.NewGuid();
+                    var noteId = Guid.CreateVersion7();
 
                     await using (var scope = provider.CreateAsyncScope())
                     {
@@ -874,7 +874,7 @@ public sealed class LeanCrudBackendTests
                     await using var scope = provider.CreateAsyncScope();
                     var context = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
                     var unitOfWork = scope.ServiceProvider.GetRequiredService<IBillingUnitOfWork>();
-                    await unitOfWork.PublishAsync(new InvoiceIssuedV1(Guid.NewGuid()));
+                    await unitOfWork.PublishAsync(new InvoiceIssuedV1(Guid.CreateVersion7()));
 
                     await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
                     var refusal = await Should.ThrowAsync<InvalidOperationException>(() => unitOfWork.CommitAsync(cancellationToken));

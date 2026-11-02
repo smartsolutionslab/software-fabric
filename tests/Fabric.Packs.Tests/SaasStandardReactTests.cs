@@ -389,7 +389,7 @@ public sealed class SaasStandardReactTests
                         await using var scope = provider.CreateAsyncScope();
                         var context = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
                         await context.Database.EnsureCreatedAsync(cancellationToken);
-                        context.Add(new Note(Guid.NewGuid(), "only for tenant a"));
+                        context.Add(new Note(Guid.CreateVersion7(), "only for tenant a"));
                         await context.SaveChangesAsync(cancellationToken);
                     }
 

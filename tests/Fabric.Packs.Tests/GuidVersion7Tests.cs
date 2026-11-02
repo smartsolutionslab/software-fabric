@@ -1,6 +1,6 @@
 namespace Fabric.Packs.Tests;
 
-/// <summary>The base: new identifiers in src/ are time-ordered Guid v7; Guid.NewGuid does not compile there.</summary>
+/// <summary>The base: every Guid is a time-ordered Guid v7, tests included; Guid.NewGuid does not compile in src/ or tests/.</summary>
 public sealed class GuidVersion7Tests
 {
     private const string Profile = "saas-standard-react";
@@ -28,7 +28,34 @@ public sealed class GuidVersion7Tests
     }
 
     [Fact]
-    public void Src_creates_identifiers_with_guid_v7_and_tests_may_still_use_random_guids()
+    public void A_random_guid_in_a_module_test_project_fails_the_release_build()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("tests/Modules/Billing.Tests/RandomGuidTests.cs", """
+            namespace Shop.Modules.Billing.Tests;
+
+            public sealed class RandomGuidTests
+            {
+                [Fact]
+                public void A_random_guid_is_not_empty()
+                {
+                    Guid.NewGuid().ShouldNotBe(Guid.Empty);
+                }
+            }
+            """);
+
+        var (exitCode, output) = project.TryBuild();
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("RandomGuidTests.cs");
+        output.ShouldContain("RS0030");
+        output.ShouldContain("'Guid.NewGuid()'");
+        output.ShouldContain("Guid.CreateVersion7()");
+    }
+
+    [Fact]
+    public void Src_and_tests_create_guids_with_version_7()
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
@@ -54,9 +81,9 @@ public sealed class GuidVersion7Tests
                 }
 
                 [Fact]
-                public void An_invoice_id_wraps_any_guid_it_is_given()
+                public void An_invoice_id_wraps_the_guid_it_is_given()
                 {
-                    var value = Guid.NewGuid();
+                    var value = Guid.CreateVersion7();
 
                     new InvoiceId(value).Value.ShouldBe(value);
                 }
