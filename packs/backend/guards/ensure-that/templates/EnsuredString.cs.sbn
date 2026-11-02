@@ -1,0 +1,81 @@
+using System.Text.RegularExpressions;
+
+namespace {{ namespace }}.Kernel;
+
+public readonly struct EnsuredString
+{
+    private readonly string value;
+    private readonly string parameter;
+
+    internal EnsuredString(string value, string parameter)
+    {
+        this.value = value;
+        this.parameter = parameter;
+    }
+
+    public EnsuredString IsNotNull()
+    {
+        if (value is null)
+        {
+            throw new GuardException($"{parameter} must not be null.", parameter);
+        }
+        return this;
+    }
+
+    public EnsuredString IsNotNullOrWhiteSpace()
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new GuardException($"{parameter} must not be null or whitespace.", parameter);
+        }
+        return this;
+    }
+
+    public EnsuredString HasMinLength(int minimumLength)
+    {
+        if (value.Length < minimumLength)
+        {
+            throw new GuardException(
+                $"{parameter} must be at least {minimumLength} character(s).", parameter);
+        }
+        return this;
+    }
+
+    public EnsuredString HasMaxLength(int maximumLength)
+    {
+        if (value.Length > maximumLength)
+        {
+            throw new GuardException(
+                $"{parameter} must be no more than {maximumLength} character(s).", parameter);
+        }
+        return this;
+    }
+
+    public EnsuredString StartsWith(string prefix, StringComparison comparison)
+    {
+        if (!value.StartsWith(prefix, comparison))
+        {
+            throw new GuardException(
+                $"{parameter} must start with '{prefix}'.", parameter);
+        }
+        return this;
+    }
+
+    public EnsuredString Matches(Regex pattern, string message)
+    {
+        if (!pattern.IsMatch(value))
+        {
+            throw new GuardException($"{parameter}: {message}", parameter);
+        }
+        return this;
+    }
+
+    public EnsuredString Satisfies(Func<string, bool> predicate, string message)
+    {
+        if (!predicate(value))
+        {
+            throw new GuardException($"{parameter}: {message}", parameter);
+        }
+        return this;
+    }
+}

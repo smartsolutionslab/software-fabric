@@ -1,0 +1,28 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>
+/// Guard chain for a reference-type argument. <see cref="IsNotNull"/>
+/// throws <see cref="GuardException"/>, like every other guard, so a null the
+/// caller sent is the same failed precondition as any other bad value.
+/// </summary>
+public readonly struct EnsuredObject<T>
+    where T : class
+{
+    private readonly T value;
+    private readonly string parameter;
+
+    internal EnsuredObject(T value, string parameter)
+    {
+        this.value = value;
+        this.parameter = parameter;
+    }
+
+    public EnsuredObject<T> IsNotNull()
+    {
+        if (value is null)
+        {
+            throw new GuardException($"{parameter} must not be null.", parameter);
+        }
+        return this;
+    }
+}

@@ -123,7 +123,7 @@ Cardinality `0+` unless stated. "Separator" is what joins contributions
 | Slot | File | Filled by |
 |---|---|---|
 | `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`) |
-| `dotnet.build-items` *(added with the kernel options)* | `Directory.Build.props` | ensure-that (ban list), typed-outcomes (`using static Result`) |
+| `dotnet.build-items` *(added with the kernel options)* | `Directory.Build.props` | ensure-that (ban list), typed-outcomes (`using static Outcome`) |
 | `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
 | `dotnet.build-properties` | `Directory.Build.props` | packs adding analyzers or properties (result, red-first) |

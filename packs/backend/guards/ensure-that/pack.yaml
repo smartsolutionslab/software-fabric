@@ -1,6 +1,10 @@
 option: backend.guards.ensure-that
 files:
   - { template: templates/Ensure.cs.sbn, target: src/Kernel/Ensure.cs }
+  - { template: templates/EnsuredString.cs.sbn, target: src/Kernel/EnsuredString.cs }
+  - { template: templates/EnsuredObject.cs.sbn, target: src/Kernel/EnsuredObject.cs }
+  - { template: templates/EnsuredGuid.cs.sbn, target: src/Kernel/EnsuredGuid.cs }
+  - { template: templates/EnsuredValue.cs.sbn, target: src/Kernel/EnsuredValue.cs }
   - { template: templates/GuardException.cs.sbn, target: src/Kernel/GuardException.cs }
   - { template: templates/BannedSymbols.txt.sbn, target: build/guards/BannedSymbols.txt }
   - { template: templates/Guards.Tests.csproj.sbn, target: tests/Kernel/Guards.Tests/Guards.Tests.csproj }

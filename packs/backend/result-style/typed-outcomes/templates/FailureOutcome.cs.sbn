@@ -1,0 +1,13 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>
+/// Half-built failure. The type argument is the error base the result declares, not the concrete error: generics are
+/// invariant, so each module's <c>&lt;Name&gt;Failures</c> factories return the base.
+/// </summary>
+public readonly struct FailureOutcome<TError>
+    where TError : notnull
+{
+    internal FailureOutcome(TError error) => Error = error;
+
+    internal TError Error { get; }
+}

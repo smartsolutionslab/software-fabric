@@ -10,6 +10,7 @@
   - Braces on every `if`, `else`, `for`, `foreach`, `while` and `using`, even around one statement.
   - `int`, `string`, `bool`, never `Int32`, `String`, `Boolean`; fields nothing reassigns are `readonly`.
   - Interfaces start with `I`. Private fields are camelCase with no underscore (`gate`, not `_gate`); where a constructor parameter has the field's name, assign with `this.gate = gate;`. Private constants and `static readonly` fields are PascalCase. Async methods in `src/` end in `Async`; test methods are sentences without it.
+  - One top-level type per file, and the file is named after it (StyleCop SA1402, SA1649): `Invoice.cs` holds `Invoice`, `Result.cs` holds `Result<TValue, TError>`. That counts every kind: a class, record, struct, interface, enum or delegate, however small, gets its own file. Types nested inside another type are fine (`InvoiceFailures.NotFound`). EF Core migrations are exempt as generated code.
   - Never silence a rule with `#pragma`, `NoWarn` or an `.editorconfig` severity; change the code. Migrations made with `dotnet ef` are generated code and left as the tool writes them.
 - `src/AppHost` is the only composition root. A new database, broker or service is an Aspire resource there, never a hand-written connection string.
 - Each bounded context is a module under `src/Modules/<Module>/` with Domain, Application, Infrastructure and Api projects. Add one with `fabric add-module <name>`; never copy another module.

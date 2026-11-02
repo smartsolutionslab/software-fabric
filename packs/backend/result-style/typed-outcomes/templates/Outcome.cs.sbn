@@ -1,0 +1,11 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>Imported with <c>using static</c> everywhere: <c>Success(dto)</c>, <c>Failure(InvoiceFailures.NotFound(id))</c>.</summary>
+public static class Outcome
+{
+    public static SuccessOutcome<TValue> Success<TValue>(TValue value)
+        where TValue : notnull => new(value);
+
+    public static FailureOutcome<TError> Failure<TError>(TError error)
+        where TError : notnull => new(error);
+}

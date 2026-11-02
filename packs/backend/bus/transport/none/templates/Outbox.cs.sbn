@@ -7,9 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace {{ namespace }}.BuildingBlocks.Messaging;
 
-/// <summary>A pending row of a module's outbox table.</summary>
-public sealed record OutboxMessage(Guid Id, string Type, string Payload);
-
 /// <summary>
 /// The outbox table in a module's schema: integration events saved in the same transaction as the module's changes,
 /// delivered in-process afterwards. The MigrationRunner creates it; it stays out of the module's EF Core model.

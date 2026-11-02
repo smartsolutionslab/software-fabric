@@ -2,13 +2,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace {{ namespace }}.BuildingBlocks.Messaging;
 
-public interface IDispatcher
-{
-    Task<TResult> SendAsync<TResult>(ICommand<TResult> command, CancellationToken cancellationToken);
-
-    Task<TResult> QueryAsync<TResult>(IQuery<TResult> query, CancellationToken cancellationToken);
-}
-
 /// <summary>Resolves the one handler registered for the request's runtime type.</summary>
 public sealed class Dispatcher(IServiceProvider services) : IDispatcher
 {

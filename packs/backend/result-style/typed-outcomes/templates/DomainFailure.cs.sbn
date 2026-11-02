@@ -1,0 +1,12 @@
+using System.Net;
+
+namespace {{ namespace }}.Kernel;
+
+/// <summary>An <see cref="ApiError"/> made from a <see cref="DomainError"/> by <see cref="ApiError.From"/>.</summary>
+public sealed record DomainFailure : ApiError
+{
+    internal DomainFailure(DomainError error, HttpStatusCode status)
+        : base(error.Code, error.Message, status) => Error = error;
+
+    public DomainError Error { get; }
+}

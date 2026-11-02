@@ -6,9 +6,11 @@ files:
   - { template: templates/Messaging.cs.sbn, target: src/Host/Wiring/Messaging.cs }
   - { template: templates/ModuleUnitOfWorkBase.cs.sbn, target: src/BuildingBlocks/Messaging/ModuleUnitOfWork.cs }
   - { template: templates/UnitOfWorkRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/UnitOfWorkRegistration.cs }
+  - { template: templates/OutboxMessage.cs.sbn, target: src/BuildingBlocks/Messaging/OutboxMessage.cs }
   - { template: templates/Outbox.cs.sbn, target: src/BuildingBlocks/Messaging/Outbox.cs }
   - { template: templates/OutboxTables.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/OutboxTables.cs }
   - { template: templates/OutboxSignal.cs.sbn, target: src/BuildingBlocks/Messaging/OutboxSignal.cs }
+  - { template: templates/OutboxContexts.cs.sbn, target: src/BuildingBlocks/Messaging/OutboxContexts.cs }
   - { template: templates/OutboxDispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/OutboxDispatcher.cs }
   - { template: templates/IntegrationEventConsumers.cs.sbn, target: src/BuildingBlocks/Messaging/IntegrationEventConsumers.cs }
   - { template: templates/ModuleUnitOfWork.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/{{ module.namespace }}UnitOfWork.cs", per-module: true }
