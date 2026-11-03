@@ -57,7 +57,13 @@ public sealed class PrimitiveBoundaryTests
             private Invoice(InvoiceId id, InvoiceNumber number)
                 : base(id) => Number = number;
 
-            public InvoiceNumber Number { get; private set; }
+            // A public field is state as surely as a property; the analyzer that would refuse it is silenced on purpose,
+            // because the gate must not rely on it.
+            #pragma warning disable CA1051
+            public readonly string Note = "none";
+            #pragma warning restore CA1051
+
+            public InvoiceNumber Number { get; set; }
 
             public string Reference { get; private set; } = "none";
 
@@ -238,6 +244,8 @@ public sealed class PrimitiveBoundaryTests
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceIssued.Total holds Decimal");
         output.ShouldContain("Shop.Modules.Billing.Application.Commands.Invoices.IssueInvoice.Number holds String");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.IsArchived holds Boolean");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.Note holds String");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.Number has a public setter.");
         output.ShouldNotContain("InvoiceNumber.Value holds");
         output.ShouldNotContain("InvoiceId.Value holds");
         output.ShouldNotContain("Invoice.HasLines holds");
@@ -245,7 +253,8 @@ public sealed class PrimitiveBoundaryTests
         output.ShouldNotContain("FindInvoiceNumber.Number holds");
         output.ShouldNotContain("InvoiceDto.Number holds");
         output.ShouldNotContain("Domain.Customers.");
-        output.ShouldContain("failed: 1");
+        output.ShouldNotContain("Invoice.Reference has a public setter");
+        output.ShouldContain("failed: 2");
 
         var (moduleExitCode, moduleOutput) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj");
         moduleExitCode.ShouldBe(0, moduleOutput);
