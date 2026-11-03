@@ -37,28 +37,39 @@ public sealed partial class ServiceDefaultsTests
               </ItemGroup>
             </Project>
             """);
-        project.Write("src/Modules/Billing/Billing.Infrastructure/BillingHttpClients.cs", """
+        project.Write("src/Modules/Billing/Billing.Infrastructure/BillingHttpClients.cs", """"
             using Microsoft.Extensions.DependencyInjection;
 
             namespace Shop.Modules.Billing.Infrastructure;
 
             public static class BillingHttpClients
             {
-                // AddStandardResilienceHandler() in a comment is prose, not a registration.
+                /* A block comment is prose, not a registration:
+                services.AddHttpClient("prose").AddStandardResilienceHandler();
+                */
+                public const string Example = """
+                    services.AddHttpClient("quoted").AddStandardResilienceHandler();
+                    """;
+
+                // AddStandardResilienceHandler() in a line comment is prose too.
                 public static IServiceCollection AddBillingHttpClients(this IServiceCollection services)
                 {
-                    services.AddHttpClient("payments").AddStandardResilienceHandler();
+                    services.AddHttpClient("payments").AddStandardResilienceHandler /* nested */ ();
+                    services.AddHttpClient("https://ledger.test").AddStandardResilienceHandler();
                     return services;
                 }
             }
-            """);
+            """");
         project.Build();
 
         var (exitCode, output) = project.Test(ArchitectureTests);
 
         exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("src/Modules/Billing/Billing.Infrastructure/BillingHttpClients.cs:10: calls AddStandardResilienceHandler outside src/ServiceDefaults");
-        output.ShouldNotContain("BillingHttpClients.cs:7:");
+        output.ShouldContain("src/Modules/Billing/Billing.Infrastructure/BillingHttpClients.cs:17: calls AddStandardResilienceHandler outside src/ServiceDefaults");
+        output.ShouldContain("src/Modules/Billing/Billing.Infrastructure/BillingHttpClients.cs:18: calls AddStandardResilienceHandler outside src/ServiceDefaults");
+        output.ShouldNotContain("BillingHttpClients.cs:8:");
+        output.ShouldNotContain("BillingHttpClients.cs:11:");
+        output.ShouldNotContain("BillingHttpClients.cs:14:");
     }
 
     [Fact]
