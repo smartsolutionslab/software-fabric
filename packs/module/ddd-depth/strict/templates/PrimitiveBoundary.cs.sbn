@@ -141,15 +141,48 @@ public static class PrimitiveBoundary
 
     /// <summary>
     /// A predicate the model computes (<c>IsPaid =&gt; PaidAt is not null</c>) is an answer, not state. Only a
-    /// <c>bool</c> without a setter counts, and only when its getter does more than return a field
-    /// (<c>ldarg.0; ldfld; ret</c>): <c>IsArchived =&gt; archived</c> is stored state whether the field is the
-    /// compiler's or its own. Reflection cannot tell <c>Total =&gt; total</c> from a computed number as cheaply, so
-    /// anything else get-only stays state.
+    /// <c>bool</c> without a setter counts, and only when its getter does more than return a field:
+    /// <c>IsArchived =&gt; archived</c> is stored state whether the field is the compiler's or its own, volatile or
+    /// not. Reflection cannot tell <c>Total =&gt; total</c> from a computed number as cheaply, so anything else
+    /// get-only stays state.
     /// </summary>
     private static bool IsComputedAnswer(PropertyInfo property) =>
         property.PropertyType == typeof(bool)
         && property.GetSetMethod(nonPublic: true) is null
-        && property.GetGetMethod(nonPublic: true)?.GetMethodBody()?.GetILAsByteArray() is not [0x02, 0x7B, _, _, _, _, 0x2A];
+        && !ReturnsAField(property.GetGetMethod(nonPublic: true)?.GetMethodBody()?.GetILAsByteArray() ?? []);
+
+    /// <summary>
+    /// Whether a getter's IL loads one field of <c>this</c> and returns it, and nothing more: <c>ldarg.0</c>, an
+    /// optional <c>volatile.</c> prefix, <c>ldfld</c>, <c>ret</c>, plus the <c>nop</c>, <c>stloc.0</c>,
+    /// <c>br.s</c> and <c>ldloc.0</c> a Debug build adds around them. Any other instruction computes.
+    /// </summary>
+    private static bool ReturnsAField(byte[] il)
+    {
+        var fieldLoads = 0;
+        for (var index = 0; index < il.Length;)
+        {
+            switch (il[index])
+            {
+                case 0x00 or 0x02 or 0x06 or 0x0A or 0x2A: // nop, ldarg.0, ldloc.0, stloc.0, ret
+                    index += 1;
+                    break;
+                case 0x2B: // br.s <offset>
+                    index += 2;
+                    break;
+                case 0x7B: // ldfld <field>
+                    fieldLoads++;
+                    index += 5;
+                    break;
+                case 0xFE when index + 1 < il.Length && il[index + 1] == 0x13: // volatile.
+                    index += 2;
+                    break;
+                default:
+                    return false;
+            }
+        }
+
+        return fieldLoads == 1;
+    }
 
     private static bool DerivesFrom(Type type, string genericBase)
     {
