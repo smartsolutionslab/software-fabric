@@ -122,6 +122,34 @@ public sealed class NoAuthenticationTests
     }
 
     [Fact]
+    public void A_fallback_authorization_policy_fails_the_architecture_tests()
+    {
+        using var project = NewProject();
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Api/BillingModule.cs", BillingModule(
+            services: "services.AddModuleInfrastructure<BillingModule>(configuration).AddAuthorization(options => options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());",
+            extraMapping: "endpoints.MapGet(\"/billing-open\", () => \"open\");"));
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("The host sets a fallback authorization policy, but the project has no authentication (backend.auth: none).");
+    }
+
+    [Fact]
+    public void The_integration_tests_of_the_untouched_project_pass()
+    {
+        using var project = NewProject();
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+    }
+
+    [Fact]
     public void The_web_app_without_an_auth_client_installs_builds_lints_and_passes_its_tests()
     {
         using var project = NewProject();
