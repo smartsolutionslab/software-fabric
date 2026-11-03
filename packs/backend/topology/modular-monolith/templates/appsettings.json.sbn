@@ -2,7 +2,8 @@
   "Logging": {
     "LogLevel": {
       "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
+      "Microsoft.AspNetCore": "Warning"{{ if slots["host.log-levels"] != "" }},
+{{ slots["host.log-levels"] }}{{ end }}
     }
   },
   "AllowedHosts": "*"
