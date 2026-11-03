@@ -19,5 +19,5 @@ Aspire's Keycloak hosting integration is a preview package (13.6.4-preview); it 
 ## Consequences
 
 - An endpoint open to anonymous callers says so with `.AllowAnonymous()`, visibly, in its own code; one that says nothing fails the architecture tests.
-- The architecture tests reference the host project, so they build and start it; startup code that needs a reachable dependency before its hosted services run would break the rule, not only the host.
+- The architecture tests reference the host project, so they build and start it; startup code that needs a reachable dependency before its hosted services run would break the rule, not only the host. With the host referenced, a bare `Host` in the architecture tests names the project's `<Name>.Host` namespace; write `Microsoft.Extensions.Hosting.Host` there.
 - Production needs a real Keycloak and its authority URL in `Authentication:Authority`.
