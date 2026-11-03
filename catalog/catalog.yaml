@@ -41,6 +41,10 @@ profiles:
     module.style: crud
     module.cqrs: none
 
+  saas-strict-react:
+    extends: saas-standard-react
+    module.ddd-depth: strict
+
 dimensions:
 
   # ─────────────────────────── Backend · project ───────────────────────────
@@ -212,7 +216,10 @@ dimensions:
     default: light
     options:
       light:  { tier: supported, note: "aggregates and value objects for core concepts" }
-      strict: { tier: supported, note: "no primitives on the domain model; architecture test enforced" }
+      strict:
+        tier: supported
+        note: "no primitives on the domain model; architecture test enforced. Not yet for event-sourced modules: value objects do not round-trip through Marten's JSON"
+        requires: ["module.style == ddd"]
 
   module.cqrs:
     scope: module
