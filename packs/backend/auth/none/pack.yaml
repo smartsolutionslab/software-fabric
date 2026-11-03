@@ -1,0 +1,11 @@
+option: backend.auth.none
+files:
+  - { template: templates/NoAuthentication.cs.sbn, target: tests/Architecture.Tests/Rules/NoAuthentication.cs }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: tests.architecture.references, template: templates/architecture-tests-references.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No endpoint of the host requires authorization and the host registers no authentication scheme: the project has no authentication.", file: templates/NoAuthentication.cs.sbn }

@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
+{{- if slots["web.env"] != "" }}
 
 interface ImportMetaEnv {
 {{ slots["web.env"] }}
 }
+{{- end }}

@@ -1,0 +1,76 @@
+{{~ if project["backend.topology"] != "modular-monolith" ~}}
+#error The backend.auth none pack's rule starts the modular-monolith host only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// The project has no authentication (backend.auth: none), so every endpoint is anonymous: none may require
+/// authorization, and the host registers no authentication scheme of its own. Authentication comes from choosing an
+/// identity provider, not from code added by hand. It reads the host's endpoints and services once in Development and
+/// once in Production, so what is added in only one of them is checked too.
+/// </summary>
+public sealed class NoAuthentication : IArchitectureRule
+{
+    private const string Reason = "but the project has no authentication (backend.auth: none).";
+
+    public string Description => "No endpoint requires authorization and the host registers no authentication scheme: the project has no authentication.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        return [.. Found(Environments.Development)
+            .Concat(Found(Environments.Production))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)];
+    }
+
+    private static List<string> Found(string environment)
+    {
+        using var host = new MappedHost(environment);
+        var endpoints = host.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Where(endpoint => endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Count > 0)
+            .Select(endpoint => $"{Name(endpoint)} requires authorization, {Reason}");
+        var schemes = (host.Services.GetService<IAuthenticationSchemeProvider>()?.GetAllSchemesAsync().GetAwaiter().GetResult() ?? [])
+            .Select(scheme => $"The host registers the authentication scheme {scheme.Name}, {Reason}");
+
+        return [.. endpoints.Concat(schemes)];
+    }
+
+    private static string Name(RouteEndpoint endpoint)
+    {
+        var methods = endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? [];
+        var route = "/" + endpoint.RoutePattern.RawText?.TrimStart('/');
+        return methods.Count == 0 ? route : $"{string.Join(',', methods)} {route}";
+    }
+
+    /// <summary>
+    /// The host with every endpoint mapped but nothing started: no hosted service runs, so the configuration Aspire
+    /// would provide only has to be present, never reachable.
+    /// </summary>
+    private sealed class MappedHost(string environment) : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment(environment);
+            builder.UseSetting("ConnectionStrings:database", "Host=localhost;Database=unused");
+{{~ if project["backend.bus.transport"] == "kafka" ~}}
+            builder.UseSetting("ConnectionStrings:messaging", "localhost:9092");
+{{~ else if project["backend.bus.transport"] != "none" ~}}
+            builder.UseSetting("ConnectionStrings:messaging", "amqp://localhost");
+{{~ end ~}}
+            builder.ConfigureServices(services => services.RemoveAll<IHostedService>());
+        }
+    }
+}
