@@ -69,6 +69,25 @@ public sealed class McpClientTests
     }
 
     [Fact]
+    public void The_generated_mcp_tests_leave_out_the_servers_the_application_declares()
+    {
+        using var project = NewProject();
+        var appHost = Path.Combine(project.ProjectDirectory, "src", "AppHost", "AppHost.cs");
+        var declared = File.ReadAllText(appHost).Replace(
+            "builder.Build().Run();",
+            "host.WithMcpServerUrl(\"docs\", builder.AddParameter(\"mcp-docs-url\"), builder.AddParameter(\"mcp-docs-token\", secret: true));\n\nbuilder.Build().Run();",
+            StringComparison.Ordinal);
+        declared.ShouldContain("WithMcpServerUrl(\"docs\"");
+        File.WriteAllText(appHost, declared);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Mcp.Tests/Mcp.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("succeeded: 6");
+    }
+
+    [Fact]
     public void An_mcp_client_created_in_a_module_fails_the_architecture_tests_naming_it()
     {
         using var project = NewProject();
