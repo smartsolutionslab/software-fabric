@@ -7,10 +7,10 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 /// <summary>
 /// EF Core logs every executed command, its SQL text included, at Information under
 /// <c>Microsoft.EntityFrameworkCore.Database.Command</c>, so a settings file whose <c>Default</c> is Information logs
-/// every statement unless it quiets that category. Each shipped <c>appsettings*.json</c> in <c>src</c> is bound as a
-/// host binds it and the logger it configures is asked, rather than its text matched: a misspelled category is inert
-/// and still logs the SQL. A file whose <c>Default</c> is Warning or above already excludes it. The AppHost runs no
-/// DbContext, so its settings are not in scope.
+/// every statement unless it quiets that category. Each shipped <c>appsettings*.json</c> in <c>src</c> that sets a level
+/// able to decide that category is bound as a host binds it, and the logger it configures is asked, for every provider
+/// the file gives its own levels as well as for all of them, rather than its text matched: a misspelled category is
+/// inert and still logs the SQL. The AppHost runs no DbContext, so its settings are not in scope.
 /// </summary>
 public sealed class SqlCommandsAreNotLoggedAtInformation : IArchitectureRule
 {
@@ -39,28 +39,71 @@ public sealed class SqlCommandsAreNotLoggedAtInformation : IArchitectureRule
         foreach (var file in files)
         {
             var logging = new ConfigurationBuilder().AddJsonFile(Path.Combine(root, file), optional: false).Build().GetSection("Logging");
-            if (LogsSql(logging))
+            if (!Governs(logging))
             {
-                var levels = logging.GetSection("LogLevel");
-                var level = levels[SqlCategory];
-                yield return $"{file}: Default '{levels["Default"]}', '{SqlCategory}' {(level is null ? "not set" : $"'{level}'")}, so every SQL statement the process executes reaches the log. Set \"{SqlCategory}\": \"Warning\" under Logging:LogLevel.";
+                continue;
+            }
+
+            foreach (var provider in ProviderSections(logging).Prepend(null))
+            {
+                if (LogsSql(logging, provider))
+                {
+                    var levels = logging.GetSection(provider is null ? "LogLevel" : $"{provider}:LogLevel");
+                    var where = provider is null ? string.Empty : $" (Logging:{provider}:LogLevel)";
+                    yield return $"{file}{where}: Default {Quoted(levels["Default"])}, '{SqlCategory}' {Quoted(levels[SqlCategory])}, so every SQL statement the process executes reaches the log. Set \"{SqlCategory}\": \"Warning\" under Logging:LogLevel{(provider is null ? string.Empty : $" and Logging:{provider}:LogLevel")}.";
+                }
             }
         }
     }
 
+    private static string Quoted(string? value) => value is null ? "not set" : $"'{value}'";
+
     /// <summary>
-    /// Whether the logger this <c>Logging</c> section configures writes the SQL category at Information. The section is applied by
-    /// logging's own configuration binding, so exact names, prefixes and <c>Default</c> resolve as they do in the host.
+    /// Whether the file says anything that can decide the SQL category's level: a <c>Default</c>, a key the category
+    /// starts with, or a wildcard, in <c>Logging:LogLevel</c> or a provider's. A file that says none of these, such as
+    /// an environment file that only changes another category, leaves the level to the file it is layered on.
     /// </summary>
-    private static bool LogsSql(IConfigurationSection logging)
+    private static bool Governs(IConfigurationSection logging) =>
+        ProviderSections(logging)
+            .Select(provider => logging.GetSection($"{provider}:LogLevel"))
+            .Prepend(logging.GetSection("LogLevel"))
+            .SelectMany(levels => levels.GetChildren())
+            .Any(level => level.Key == "Default"
+                || level.Key.Contains('*', StringComparison.Ordinal)
+                || SqlCategory.StartsWith(level.Key, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The providers the file gives their own levels, as <c>Logging:&lt;provider&gt;:LogLevel</c>.</summary>
+    private static IEnumerable<string> ProviderSections(IConfigurationSection logging) =>
+        logging.GetChildren()
+            .Where(section => section.Key != "LogLevel" && section.GetSection("LogLevel").Exists())
+            .Select(section => section.Key)
+            .Order(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Whether a logger configured by this <c>Logging</c> section writes the SQL category at Information, for every
+    /// provider or, given <paramref name="provider"/>, for the provider the file names. The provider's levels are moved
+    /// under the stand-in provider's name, so logging's own filter selection decides: exact names, the longest prefix,
+    /// wildcards, a provider's levels over the global ones, and <c>Default</c> resolve as they do in the host.
+    /// </summary>
+    private static bool LogsSql(IConfigurationSection logging, string? provider)
     {
-        if (!Enum.TryParse(logging["LogLevel:Default"], ignoreCase: true, out LogLevel initial) || initial >= LogLevel.Warning)
+        Dictionary<string, string?> levels = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in logging.GetSection("LogLevel").AsEnumerable(makePathsRelative: true).Where(level => level.Value is not null))
         {
-            return false;
+            levels[$"LogLevel:{key}"] = value;
         }
 
+        if (provider is not null)
+        {
+            foreach (var (key, value) in logging.GetSection($"{provider}:LogLevel").AsEnumerable(makePathsRelative: true).Where(level => level.Value is not null))
+            {
+                levels[$"{typeof(EnabledProvider).FullName}:LogLevel:{key}"] = value;
+            }
+        }
+
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(levels).Build();
         using var factory = LoggerFactory.Create(builder => builder
-            .AddConfiguration(logging)
+            .AddConfiguration(configuration)
             .AddProvider(new EnabledProvider()));
         return factory.CreateLogger(SqlCategory).IsEnabled(LogLevel.Information);
     }
