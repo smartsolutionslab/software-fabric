@@ -136,6 +136,26 @@ public sealed class NoAuthenticationTests
     }
 
     [Fact]
+    public void The_generated_end_to_end_step_passes_with_an_anonymous_visitor_seeing_the_application()
+    {
+        using var project = NewProject();
+        project.AddModule("billing");
+        project.Build();
+
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        foreach (var step in new[] { "install", "build", "lint" })
+        {
+            var (exitCode, output) = Shell.Run(web, "pnpm", step);
+            exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
+        }
+
+        // The generated CI's own end-to-end step: start the AppHost, wait for the app, run Playwright, stop.
+        var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
+        e2eExitCode.ShouldBe(0, e2eOutput);
+        e2eOutput.ShouldContain("1 passed");
+    }
+
+    [Fact]
     public void Column_tenancy_without_authentication_fails_the_build_saying_why()
     {
         using var project = new GeneratedProject("saas-standard-react", NoAuthentication);
