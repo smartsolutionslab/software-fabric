@@ -134,4 +134,49 @@ public sealed class SqlCommandLogLevelTests
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("src/Host/appsettings.json: Default not set, 'Microsoft.EntityFrameworkCore.Database.Command' not set");
     }
+
+    [Fact]
+    public void A_lowercase_default_in_a_provider_section_of_an_environment_file_is_still_checked()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.Write("src/Host/appsettings.Production.json", """
+            {
+              "Logging": {
+                "Console": {
+                  "LogLevel": {
+                    "default": "Information"
+                  }
+                }
+              }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test(ArchitectureTests);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("src/Host/appsettings.Production.json (Logging:Console:LogLevel): Default 'Information', 'Microsoft.EntityFrameworkCore.Database.Command' not set");
+    }
+
+    [Fact]
+    public void An_environment_file_without_an_appsettings_json_beside_it_fails()
+    {
+        using var project = new GeneratedProject(Profile);
+        File.Delete(Path.Combine(project.ProjectDirectory, "src", "Host", "appsettings.json"));
+        project.Write("src/Host/appsettings.Development.json", """
+            {
+              "Logging": {
+                "LogLevel": {
+                  "Microsoft.AspNetCore": "Debug"
+                }
+              }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test(ArchitectureTests);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("src/Host: ships appsettings.Development.json without an appsettings.json");
+    }
 }
