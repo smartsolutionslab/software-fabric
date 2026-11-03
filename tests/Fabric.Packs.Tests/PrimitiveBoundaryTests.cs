@@ -64,6 +64,21 @@ public sealed class PrimitiveBoundaryTests
             internal static Ledger Open() => new(InvoiceId.New());
         }
 
+        public sealed class Account : AggregateRoot<InvoiceId>, IValueObject
+        {
+            private Account(InvoiceId id)
+                : base(id)
+            {
+            }
+
+            public string Holder { get; private set; } = "none";
+
+            public static Account Open() => new(InvoiceId.New());
+        }
+
+        [DeliberatelyUnhandled("The test only needs an event that carries a primitive behind the value-object marker.")]
+        public sealed record InvoiceVoided(InvoiceId Invoice, string Reason) : IDomainEvent, IValueObject;
+
         [DeliberatelyUnhandled("The test only needs an event that carries a primitive.")]
         public sealed record InvoiceIssued(InvoiceId Invoice, decimal Total) : IDomainEvent;
 
@@ -267,6 +282,8 @@ public sealed class PrimitiveBoundaryTests
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.IsArchived holds Boolean");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Ledger.Note holds String");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.LateFee.Surcharge holds Decimal");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Account.Holder holds String");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceVoided.Reason holds String");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.IsFlagged holds Boolean");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.Number has a public setter.");
         output.ShouldNotContain("InvoiceNumber.Value holds");
