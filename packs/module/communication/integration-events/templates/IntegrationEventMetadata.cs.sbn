@@ -1,0 +1,31 @@
+using {{ namespace }}.Contracts;
+{{~ if project["backend.tenancy"] != "none" ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+/// <summary>How a unit of work fills the metadata of an event it publishes.</summary>
+public static class IntegrationEventMetadata
+{
+    /// <summary>
+    /// The event with new metadata: a Guid v7 identifier and the current time{{ if project["backend.tenancy"] != "none" }}, and the current tenant{{ end }}. Called once per
+    /// publish, before the event is saved, so every delivery of it carries the same metadata.
+    /// </summary>
+    public static IntegrationEvent Fill(IntegrationEvent integrationEvent, IServiceProvider services)
+    {
+        {{ not_null "integrationEvent" }}
+        {{ not_null "services" }}
+
+        var time = services.GetRequiredService<TimeProvider>();
+{{~ if project["backend.tenancy"] != "none" ~}}
+        // Like a row, an event belongs to a tenant: one published without a tenant is refused, as saving one would be.
+        var tenantId = services.GetService<ITenantContext>()?.TenantId
+            ?? throw new InvalidOperationException($"{integrationEvent.GetType().Name} is published without a tenant; begin a TenantScope for work outside a request.");
+        return integrationEvent with { Metadata = new EventMetadata(Guid.CreateVersion7(), time.GetUtcNow(), tenantId) };
+{{~ else ~}}
+        return integrationEvent with { Metadata = new EventMetadata(Guid.CreateVersion7(), time.GetUtcNow()) };
+{{~ end ~}}
+    }
+}

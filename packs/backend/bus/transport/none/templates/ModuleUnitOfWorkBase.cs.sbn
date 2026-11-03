@@ -13,10 +13,10 @@ public abstract class ModuleUnitOfWork<TContext>(TContext context, IServiceProvi
 {
     private readonly List<IIntegrationEvent> queued = [];
 
-    public Task PublishAsync(IIntegrationEvent integrationEvent)
+    public Task PublishAsync(IntegrationEvent integrationEvent)
     {
         {{ not_null "integrationEvent" }}
-        queued.Add(integrationEvent);
+        queued.Add(IntegrationEventMetadata.Fill(integrationEvent, services));
         return Task.CompletedTask;
     }
 

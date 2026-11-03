@@ -1,0 +1,28 @@
+using System.Text;
+
+namespace {{ namespace }}.Contracts;
+
+/// <summary>
+/// The base of every integration event. Its <see cref="Metadata"/> is filled by the unit of work that publishes it, never
+/// by the code that creates it: <c>public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;</c>.
+/// </summary>
+public abstract record IntegrationEvent : IIntegrationEvent
+{
+    private readonly EventMetadata? metadata;
+
+    /// <summary>The event's identifier and time; reading it before the event was published is a bug, and throws.</summary>
+    public EventMetadata Metadata
+    {
+        get => metadata ?? throw new InvalidOperationException($"{GetType().Name} has not been published yet; its unit of work fills its metadata.");
+        init => metadata = value;
+    }
+
+    /// <summary>Prints an unpublished event too, without the metadata it does not have yet.</summary>
+    protected virtual bool PrintMembers(StringBuilder builder)
+    {
+        {{ not_null "builder" }}
+
+        builder.Append("Metadata = ").Append(metadata?.ToString() ?? "(unpublished)");
+        return true;
+    }
+}

@@ -443,7 +443,7 @@ public sealed class DomainEventTests
         project.Write("src/Contracts/Billing/InvoiceVoidedV1.cs", """
             namespace Shop.Contracts.Billing;
 
-            public sealed record InvoiceVoidedV1(Guid InvoiceId) : IIntegrationEvent;
+            public sealed record InvoiceVoidedV1(Guid InvoiceId) : IntegrationEvent;
             """);
         project.Write("tests/Modules/Billing.Tests/RecordingLoggerProvider.cs", RecordingLogger);
         project.Write("tests/Modules/Billing.Tests/UnitOfWorkTests.cs", """

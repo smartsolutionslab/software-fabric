@@ -5,7 +5,7 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 
 public sealed partial class IntegrationEventsAreVersionedRecords : IArchitectureRule
 {
-    public string Description => "Every integration event is a record in Contracts whose name ends in V<number>.";
+    public string Description => "Every integration event is a record in Contracts deriving from IntegrationEvent, so its unit of work fills its metadata, and its name ends in V<number>.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -32,7 +32,25 @@ public sealed partial class IntegrationEventsAreVersionedRecords : IArchitecture
             {
                 yield return $"{type.FullName} is not a record.";
             }
+
+            if (!DerivesFromIntegrationEvent(type))
+            {
+                yield return $"{type.FullName} does not derive from IntegrationEvent, so no unit of work can publish it and fill its metadata.";
+            }
         }
+    }
+
+    private static bool DerivesFromIntegrationEvent(Type type)
+    {
+        for (var baseType = type.BaseType; baseType is not null; baseType = baseType.BaseType)
+        {
+            if (baseType.FullName == "{{ namespace }}.Contracts.IntegrationEvent")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     [GeneratedRegex("V[0-9]+$")]
