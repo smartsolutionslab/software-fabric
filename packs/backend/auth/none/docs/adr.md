@@ -8,6 +8,8 @@ The project authenticates nobody. There is no identity provider in the AppHost, 
 
 The architecture rule `NoAuthentication` keeps it that way. It starts the host in-process twice, in Development and in Production (`WebApplicationFactory`, every hosted service removed, placeholder connection strings), and fails for every endpoint that requires authorization (`RequireAuthorization()` or a policy, which would fail at runtime without authentication) and for every authentication scheme the host registers, naming each one.
 
+In place of the auth client's sign-in test, the web app's end-to-end tests start with `e2e/home.spec.ts`: an anonymous visitor opens the application and sees it, so the generated CI's e2e step has a test to run.
+
 ## Consequences
 
 - Anyone who can reach the host can call every endpoint. Whatever stands in front of it (a gateway, a private network) is the only protection, and it is outside this project.
