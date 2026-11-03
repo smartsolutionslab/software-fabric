@@ -63,7 +63,12 @@
       "properties": {
         "template": { "description": "Path inside the pack, rendered with Scriban.", "type": "string" },
         "target": { "description": "Path in the generated project; may use {{ module.name }} for per-module files.", "type": "string" },
-        "per-module": { "description": "Render once per module that chose this option.", "type": "boolean", "default": false }
+        "per-module": { "description": "Render once per module that chose this option.", "type": "boolean", "default": false },
+        "when": {
+          "description": "Scriban condition, evaluated against the model templates see; the file is written only when it is true. Anything but true or false is a generation error.",
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "slotContribution": {
