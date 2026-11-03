@@ -15,15 +15,16 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 
 /// <summary>
 /// The project has no authentication (backend.auth: none), so every endpoint is anonymous: none may require
-/// authorization, and the host registers no authentication scheme of its own. Authentication comes from choosing an
-/// identity provider, not from code added by hand. It reads the host's endpoints and services once in Development and
+/// authorization, the host sets no fallback authorization policy (which would apply to every endpoint), and it
+/// registers no authentication scheme of its own. Authentication comes from choosing an identity provider, not from
+/// code added by hand. It reads the host's endpoints and services once in Development and
 /// once in Production, so what is added in only one of them is checked too.
 /// </summary>
 public sealed class NoAuthentication : IArchitectureRule
 {
     private const string Reason = "but the project has no authentication (backend.auth: none).";
 
-    public string Description => "No endpoint requires authorization and the host registers no authentication scheme: the project has no authentication.";
+    public string Description => "No endpoint requires authorization, no fallback policy applies and the host registers no authentication scheme: the project has no authentication.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -44,8 +45,11 @@ public sealed class NoAuthentication : IArchitectureRule
             .Select(endpoint => $"{Name(endpoint)} requires authorization, {Reason}");
         var schemes = (host.Services.GetService<IAuthenticationSchemeProvider>()?.GetAllSchemesAsync().GetAwaiter().GetResult() ?? [])
             .Select(scheme => $"The host registers the authentication scheme {scheme.Name}, {Reason}");
+        List<string> fallback = host.Services.GetService<IAuthorizationPolicyProvider>()?.GetFallbackPolicyAsync().GetAwaiter().GetResult() is null
+            ? []
+            : [$"The host sets a fallback authorization policy, {Reason}"];
 
-        return [.. endpoints.Concat(schemes)];
+        return [.. endpoints.Concat(schemes).Concat(fallback)];
     }
 
     private static string Name(RouteEndpoint endpoint)

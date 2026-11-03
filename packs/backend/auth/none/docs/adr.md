@@ -6,7 +6,7 @@
 
 The project authenticates nobody. There is no identity provider in the AppHost, the host validates no tokens and has no `/me`, module route groups require no authorization, and the web app has no auth client and no sign-in. Every endpoint is anonymous, by choice: this is for an internal tool, a demo, or a service behind a gateway that authenticates for it.
 
-The architecture rule `NoAuthentication` keeps it that way. It starts the host in-process twice, in Development and in Production (`WebApplicationFactory`, every hosted service removed, placeholder connection strings), and fails for every endpoint that requires authorization (`RequireAuthorization()` or a policy, which would fail at runtime without authentication) and for every authentication scheme the host registers, naming each one.
+The architecture rule `NoAuthentication` keeps it that way. It starts the host in-process twice, in Development and in Production (`WebApplicationFactory`, every hosted service removed, placeholder connection strings), and fails for every endpoint that requires authorization (`RequireAuthorization()` or a policy, which would fail at runtime without authentication), for a fallback authorization policy (which would apply to every endpoint), and for every authentication scheme the host registers, naming each one.
 
 In place of the auth client's sign-in test, the web app's end-to-end tests start with `e2e/home.spec.ts`: an anonymous visitor opens the application and sees it, so the generated CI's e2e step has a test to run.
 

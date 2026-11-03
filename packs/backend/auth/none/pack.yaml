@@ -9,5 +9,5 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: architecture-test, describes: "No endpoint of the host requires authorization and the host registers no authentication scheme: the project has no authentication.", file: templates/NoAuthentication.cs.sbn }
+  - { kind: architecture-test, describes: "No endpoint of the host requires authorization, no fallback authorization policy applies, and the host registers no authentication scheme: the project has no authentication.", file: templates/NoAuthentication.cs.sbn }
   - { kind: end-to-end-test, describes: "An anonymous visitor opens the application without signing in (e2e/home.spec.ts, run against the running AppHost).", file: templates/home.spec.ts.sbn }
