@@ -32,10 +32,14 @@ tell a computed number from stored state.
 (`ConfigureConventions` in `ModuleDbContext`) and reads it back through `From`, so entity configurations never convert
 one by hand. A value object with more than one value (`Money`) is mapped in its configuration as a complex property.
 
+**Scope of the option.** Strict applies to `module.style: ddd` only. An event-sourced module stays light for now: its
+events go through Marten's JSON, which cannot build a value object through its private constructor and `From`.
+
 ## Enforced
 
-An architecture rule per strict module walks from its aggregates, commands and domain events and fails on each
-primitive it reaches, naming the type and property.
+An architecture rule per strict module walks from its aggregates, commands and domain events, through public
+properties and public fields, and fails on each primitive it reaches, naming the type and member. A second rule per
+strict module fails on each public setter of an aggregate root: strict is light and more.
 
 ## Consequences
 

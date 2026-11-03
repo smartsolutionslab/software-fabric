@@ -4,9 +4,9 @@ namespace {{ namespace }}.Architecture.Tests;
 
 /// <summary>
 /// The walk behind each strict module's rule (module.ddd-depth: strict, docs/adr). It starts from the module's
-/// aggregates, commands and domain events, follows every public property into the module's own types (entities,
-/// value objects, the cases of an abstract type) and names each primitive it finds on the way, inside collections and
-/// arrays too. Queries and DTOs are not roots: they are the JSON boundary, where primitives belong.
+/// aggregates, commands and domain events, follows every public property and public instance field into the module's
+/// own types (entities, value objects, the cases of an abstract type) and names each primitive it finds on the way,
+/// inside collections and arrays too. Queries and DTOs are not roots: they are the JSON boundary, where primitives belong.
 /// </summary>
 public static class PrimitiveBoundary
 {
@@ -42,20 +42,15 @@ public static class PrimitiveBoundary
             }
 
             var isValueObject = typeof(IValueObject).IsAssignableFrom(type);
-            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            foreach (var (name, memberType) in State(type, own))
             {
-                if (IsBuildingBlockState(property, own) || IsComputedAnswer(property))
-                {
-                    continue;
-                }
-
-                foreach (var constituent in Constituents(property.PropertyType, []))
+                foreach (var constituent in Constituents(memberType, []))
                 {
                     if (IsPrimitive(constituent))
                     {
                         if (!isValueObject)
                         {
-                            violations.Add($"{type.FullName}.{property.Name} holds {constituent.Name}; introduce a value object (IValueObject<T>).");
+                            violations.Add($"{type.FullName}.{name} holds {constituent.Name}; introduce a value object (IValueObject<T>).");
                         }
                     }
                     else if (own.Contains(constituent.IsGenericType ? constituent.GetGenericTypeDefinition() : constituent))
@@ -76,6 +71,17 @@ public static class PrimitiveBoundary
 
         return [.. violations];
     }
+
+    /// <summary>
+    /// The state a type shows: its public properties, less building-block state and computed answers, and its public
+    /// instance fields, which hold state as surely as a property does even where an analyzer would refuse them.
+    /// </summary>
+    private static IEnumerable<(string Name, Type Type)> State(Type type, HashSet<Type> own) =>
+        type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => !IsBuildingBlockState(property, own) && !IsComputedAnswer(property))
+            .Select(property => (property.Name, property.PropertyType))
+            .Concat(type.GetFields(BindingFlags.Public | BindingFlags.Instance)
+                .Select(field => (field.Name, field.FieldType)));
 
     private static bool IsPrimitive(Type type) => type.IsPrimitive || MeaninglessBclTypes.Contains(type);
 
@@ -116,9 +122,9 @@ public static class PrimitiveBoundary
     }
 
     /// <summary>
-    /// State a building block declares for itself (an aggregate's pending domain events, an event-sourced aggregate's
-    /// version), not the module's: declared outside the module and not typed by the module's own type argument. An
-    /// entity's <c>Id</c> is typed by its <c>TId</c>, so <c>Entity&lt;Guid&gt;</c> still fails.
+    /// State a building block declares for itself (an aggregate's pending domain events), not the module's: declared
+    /// outside the module and not typed by the module's own type argument. An entity's <c>Id</c> is typed by its
+    /// <c>TId</c>, so <c>Entity&lt;Guid&gt;</c> still fails.
     /// </summary>
     private static bool IsBuildingBlockState(PropertyInfo property, HashSet<Type> own)
     {
