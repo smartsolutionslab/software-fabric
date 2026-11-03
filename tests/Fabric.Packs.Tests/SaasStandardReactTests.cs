@@ -262,13 +262,14 @@ public sealed class SaasStandardReactTests
         project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
             namespace Shop.Contracts.Billing;
 
-            public sealed record InvoicePaidV1(Guid InvoiceId) : IIntegrationEvent;
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
             """);
         project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", """
             using Microsoft.AspNetCore.Builder;
             using Microsoft.AspNetCore.Http;
             using Microsoft.AspNetCore.Routing;
             using Shop.BuildingBlocks.Api;
+            using Shop.BuildingBlocks.Tenancy;
             using Shop.Contracts.Billing;
             using Shop.Modules.Billing.Application;
 
@@ -279,55 +280,25 @@ public sealed class SaasStandardReactTests
                 public void Map(IEndpointRouteBuilder endpoints) =>
                     endpoints.MapPost("/invoices/{id}/pay", async (Guid id, IBillingUnitOfWork unitOfWork, CancellationToken cancellationToken) =>
                     {
+                        using var tenant = TenantScope.Begin("tenant-a");
                         await unitOfWork.PublishAsync(new InvoicePaidV1(id));
                         await unitOfWork.CommitAsync(cancellationToken);
                         return Results.Accepted();
                     }).AllowAnonymous();
             }
             """);
-        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", """
-            using System.Collections.Concurrent;
-            using Shop.Contracts.Billing;
-
-            namespace Shop.Modules.Shipping.Application;
-
-            public sealed class InvoicePaidConsumer
-            {
-                public static ConcurrentBag<Guid> Received { get; } = [];
-
-                public static void Handle(InvoicePaidV1 message) => Received.Add(message.InvoiceId);
-            }
-            """);
-        project.Write("src/Modules/Shipping/Shipping.Api/Received.cs", """
-            using Microsoft.AspNetCore.Builder;
-            using Microsoft.AspNetCore.Routing;
-            using Shop.BuildingBlocks.Api;
-            using Shop.Modules.Shipping.Application;
-
-            namespace Shop.Modules.Shipping.Api;
-
-            public sealed class Received : IEndpoint
-            {
-                public void Map(IEndpointRouteBuilder endpoints) =>
-                    endpoints.MapGet("/received", () => InvoicePaidConsumer.Received.Count).AllowAnonymous();
-            }
-            """);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", RedeliveredEvent.Consumer(tenancy: true));
+        project.Write("src/Modules/Shipping/Shipping.Api/Deliveries.cs", RedeliveredEvent.Endpoint);
         project.Build();
 
         using var postgres = Container.Postgres(DatabasePassword);
         using var rabbitMq = Container.RabbitMq();
         using var host = project.StartHost(Dependencies(postgres, rabbitMq));
 
+        var publishedAfter = TimeProvider.System.GetUtcNow();
         (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
 
-        var received = "0";
-        for (var attempt = 0; attempt < 60 && received == "0"; attempt++)
-        {
-            await Task.Delay(500, TestContext.Current.CancellationToken);
-            received = await (await host.GetAsync("/shipping/received")).Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        }
-
-        received.ShouldBe("1");
+        await RedeliveredEvent.ShouldHaveBeenDeliveredTwiceWithTheSameMetadataAsync(host, publishedAfter, "tenant-a", attempts: 60);
     }
 
     [Fact]

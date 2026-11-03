@@ -586,7 +586,7 @@ public sealed class EventDrivenBackendTests
         project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
             namespace Shop.Contracts.Billing;
 
-            public sealed record InvoicePaidV1(Guid InvoiceId) : IIntegrationEvent;
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
             """);
         project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", """
             using Microsoft.AspNetCore.Builder;
@@ -609,33 +609,8 @@ public sealed class EventDrivenBackendTests
                     }).AllowAnonymous();
             }
             """);
-        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", """
-            using System.Collections.Concurrent;
-            using Shop.Contracts.Billing;
-
-            namespace Shop.Modules.Shipping.Application;
-
-            public sealed class InvoicePaidConsumer
-            {
-                public static ConcurrentBag<Guid> Received { get; } = [];
-
-                public static void Handle(InvoicePaidV1 message) => Received.Add(message.InvoiceId);
-            }
-            """);
-        project.Write("src/Modules/Shipping/Shipping.Api/Received.cs", """
-            using Microsoft.AspNetCore.Builder;
-            using Microsoft.AspNetCore.Routing;
-            using Shop.BuildingBlocks.Api;
-            using Shop.Modules.Shipping.Application;
-
-            namespace Shop.Modules.Shipping.Api;
-
-            public sealed class Received : IEndpoint
-            {
-                public void Map(IEndpointRouteBuilder endpoints) =>
-                    endpoints.MapGet("/received", () => InvoicePaidConsumer.Received.Count).AllowAnonymous();
-            }
-            """);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", RedeliveredEvent.Consumer(tenancy: false));
+        project.Write("src/Modules/Shipping/Shipping.Api/Deliveries.cs", RedeliveredEvent.Endpoint);
         project.Build();
 
         using var postgres = Container.Postgres(DatabasePassword);
@@ -647,17 +622,11 @@ public sealed class EventDrivenBackendTests
             ["Authentication__Authority"] = "http://127.0.0.1:1/realms/shop",
         });
 
+        var publishedAfter = TimeProvider.System.GetUtcNow();
         var invoice = Guid.NewGuid();
         (await host.PostAsync($"/billing/invoices/{invoice}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
 
-        var received = "0";
-        for (var attempt = 0; attempt < 120 && received == "0"; attempt++)
-        {
-            await Task.Delay(500, TestContext.Current.CancellationToken);
-            received = await (await host.GetAsync("/shipping/received")).Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        }
-
-        received.ShouldBe("1");
+        await RedeliveredEvent.ShouldHaveBeenDeliveredTwiceWithTheSameMetadataAsync(host, publishedAfter, null, attempts: 120);
 
         // Without a transport Wolverine would deliver the event in process; it must have crossed on the broker.
         kafka.FirstKafkaMessage("Shop.Contracts.Billing.InvoicePaidV1").ShouldContain(invoice.ToString());

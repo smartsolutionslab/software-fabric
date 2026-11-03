@@ -90,7 +90,7 @@ public sealed class LeanCrudBackendTests
         project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
             namespace Shop.Contracts.Billing;
 
-            public sealed record InvoicePaidV1(Guid InvoiceId) : IIntegrationEvent;
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
             """);
         project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", """
             using Microsoft.AspNetCore.Builder;
@@ -113,55 +113,18 @@ public sealed class LeanCrudBackendTests
                     }).AllowAnonymous();
             }
             """);
-        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", """
-            using System.Collections.Concurrent;
-            using Shop.Contracts.Billing;
-
-            namespace Shop.Modules.Shipping.Application;
-
-            public sealed class InvoicePaidConsumer
-            {
-                private readonly ConcurrentBag<Guid> received = Received;
-
-                public static ConcurrentBag<Guid> Received { get; } = [];
-
-                public Task Handle(InvoicePaidV1 message, CancellationToken cancellationToken)
-                {
-                    received.Add(message.InvoiceId);
-                    return Task.CompletedTask;
-                }
-            }
-            """);
-        project.Write("src/Modules/Shipping/Shipping.Api/Received.cs", """
-            using Microsoft.AspNetCore.Builder;
-            using Microsoft.AspNetCore.Routing;
-            using Shop.BuildingBlocks.Api;
-            using Shop.Modules.Shipping.Application;
-
-            namespace Shop.Modules.Shipping.Api;
-
-            public sealed class Received : IEndpoint
-            {
-                public void Map(IEndpointRouteBuilder endpoints) =>
-                    endpoints.MapGet("/received", () => InvoicePaidConsumer.Received.Count).AllowAnonymous();
-            }
-            """);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", RedeliveredEvent.Consumer(tenancy: false));
+        project.Write("src/Modules/Shipping/Shipping.Api/Deliveries.cs", RedeliveredEvent.Endpoint);
         project.Build();
 
         using var postgres = Container.Postgres(DatabasePassword);
         RunMigrationRunner(project, postgres);
         using var host = project.StartHost(Dependencies(postgres));
 
+        var publishedAfter = TimeProvider.System.GetUtcNow();
         (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
 
-        var received = "0";
-        for (var attempt = 0; attempt < 60 && received == "0"; attempt++)
-        {
-            await Task.Delay(500, TestContext.Current.CancellationToken);
-            received = await (await host.GetAsync("/shipping/received")).Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        }
-
-        received.ShouldBe("1");
+        await RedeliveredEvent.ShouldHaveBeenDeliveredTwiceWithTheSameMetadataAsync(host, publishedAfter, null, attempts: 60);
         postgres.Psql(DatabasePassword, "select count(*) from billing.outbox_messages where delivered_at is not null").ShouldBe("1");
     }
 
@@ -174,12 +137,12 @@ public sealed class LeanCrudBackendTests
         project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
             namespace Shop.Contracts.Billing;
 
-            public sealed record InvoicePaidV1(Guid InvoiceId) : IIntegrationEvent;
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
             """);
         project.Write("src/Contracts/Billing/InvoiceVoidedV1.cs", """
             namespace Shop.Contracts.Billing;
 
-            public sealed record InvoiceVoidedV1(Guid InvoiceId) : IIntegrationEvent;
+            public sealed record InvoiceVoidedV1(Guid InvoiceId) : IntegrationEvent;
             """);
         project.Write("src/Modules/Billing/Billing.Api/Publish.cs", """
             using Microsoft.AspNetCore.Builder;
@@ -340,7 +303,7 @@ public sealed class LeanCrudBackendTests
             namespace Shop.Modules.Billing.Tests;
 
             /// <summary>Serializing it fails the first time, so the first commit fails after the entity was saved and before the outbox insert.</summary>
-            public sealed record NoteAddedV1(Guid NoteId) : IIntegrationEvent
+            public sealed record NoteAddedV1(Guid NoteId) : IntegrationEvent
             {
                 private static int serializations;
 
@@ -528,7 +491,7 @@ public sealed class LeanCrudBackendTests
         project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
             namespace Shop.Contracts.Billing;
 
-            public sealed record InvoicePaidV1(Guid InvoiceId) : IIntegrationEvent;
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
             """);
         project.Write("src/Modules/Shipping/Shipping.Infrastructure/InvoicePaidConsumer.cs", """
             using Shop.Contracts.Billing;
@@ -548,10 +511,28 @@ public sealed class LeanCrudBackendTests
         output.ShouldContain("Shop.Modules.Shipping.Infrastructure.InvoicePaidConsumer is outside an Application project; the dispatcher delivers only to consumers there.");
     }
 
+    [Fact]
+    public void An_integration_event_that_does_not_derive_from_the_base_record_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId, EventMetadata Metadata) : IIntegrationEvent;
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Contracts.Billing.InvoicePaidV1 does not derive from IntegrationEvent, so no unit of work can publish it and fill its metadata.");
+    }
+
     private const string InvoiceEvents = """
         namespace Shop.Contracts.Billing;
 
-        public abstract record InvoiceEventV1(Guid InvoiceId) : IIntegrationEvent;
+        public abstract record InvoiceEventV1(Guid InvoiceId) : IntegrationEvent;
 
         public sealed record InvoicePaidV1(Guid InvoiceId) : InvoiceEventV1(InvoiceId);
         """;
@@ -714,7 +695,7 @@ public sealed class LeanCrudBackendTests
         project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
             namespace Shop.Contracts.Billing;
 
-            public sealed record InvoicePaidV1(Guid InvoiceId) : IIntegrationEvent;
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
             """);
         project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", """
             using Microsoft.AspNetCore.Builder;
@@ -778,7 +759,7 @@ public sealed class LeanCrudBackendTests
         project.Write("src/Contracts/Billing/InvoiceVoidedV1.cs", """
             namespace Shop.Contracts.Billing;
 
-            public sealed record InvoiceVoidedV1(Guid InvoiceId) : IIntegrationEvent;
+            public sealed record InvoiceVoidedV1(Guid InvoiceId) : IntegrationEvent;
             """);
         project.Write("src/Modules/Billing/Billing.Api/VoidInvoice.cs", """
             using Microsoft.AspNetCore.Builder;
@@ -858,7 +839,7 @@ public sealed class LeanCrudBackendTests
 
             namespace Shop.Modules.Billing.Tests;
 
-            public sealed record InvoiceIssuedV1(Guid InvoiceId) : IIntegrationEvent;
+            public sealed record InvoiceIssuedV1(Guid InvoiceId) : IntegrationEvent;
 
             public class CallerTransactionTests
             {
@@ -902,7 +883,7 @@ public sealed class LeanCrudBackendTests
         project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
             namespace Shop.Contracts.Billing;
 
-            public sealed record InvoicePaidV1(Guid InvoiceId) : IIntegrationEvent;
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
             """);
         project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", """
             using Shop.Contracts.Billing;
