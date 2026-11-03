@@ -1,0 +1,102 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// EF Core logs every executed command, its SQL text included, at Information under
+/// <c>Microsoft.EntityFrameworkCore.Database.Command</c>, so a settings file whose <c>Default</c> is Information logs
+/// every statement unless it quiets that category. Each shipped <c>appsettings*.json</c> in <c>src</c> is bound as a
+/// host binds it and the logger it configures is asked, rather than its text matched: a misspelled category is inert
+/// and still logs the SQL. A file whose <c>Default</c> is Warning or above already excludes it. The AppHost runs no
+/// DbContext, so its settings are not in scope.
+/// </summary>
+public sealed class SqlCommandsAreNotLoggedAtInformation : IArchitectureRule
+{
+    private const string AppHost = "src/AppHost/";
+
+    private static readonly string SqlCategory = DbLoggerCategory.Database.Command.Name;
+
+    public string Description => $"No shipped appsettings*.json logs '{DbLoggerCategory.Database.Command.Name}' at Information: EF Core writes every SQL statement there.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var root = RepositoryRoot();
+        var files = Directory.EnumerateFiles(Path.Combine(root, "src"), "appsettings*.json", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
+            .Where(path => !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
+            .Where(path => !path.StartsWith(AppHost, StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        if (files.Count == 0)
+        {
+            yield return "No appsettings*.json found under src: a rule that reads nothing passes without checking anything.";
+        }
+
+        foreach (var file in files)
+        {
+            var logging = new ConfigurationBuilder().AddJsonFile(Path.Combine(root, file), optional: false).Build().GetSection("Logging");
+            if (LogsSql(logging))
+            {
+                var levels = logging.GetSection("LogLevel");
+                var level = levels[SqlCategory];
+                yield return $"{file}: Default '{levels["Default"]}', '{SqlCategory}' {(level is null ? "not set" : $"'{level}'")}, so every SQL statement the process executes reaches the log. Set \"{SqlCategory}\": \"Warning\" under Logging:LogLevel.";
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether the logger this <c>Logging</c> section configures writes the SQL category at Information. The section is applied by
+    /// logging's own configuration binding, so exact names, prefixes and <c>Default</c> resolve as they do in the host.
+    /// </summary>
+    private static bool LogsSql(IConfigurationSection logging)
+    {
+        if (!Enum.TryParse(logging["LogLevel:Default"], ignoreCase: true, out LogLevel initial) || initial >= LogLevel.Warning)
+        {
+            return false;
+        }
+
+        using var factory = LoggerFactory.Create(builder => builder
+            .AddConfiguration(logging)
+            .AddProvider(new EnabledProvider()));
+        return factory.CreateLogger(SqlCategory).IsEnabled(LogLevel.Information);
+    }
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+
+    /// <summary>
+    /// Loggers that enable every level, so the file's filters alone decide <see cref="ILogger.IsEnabled"/>. A factory
+    /// without a provider answers false for every category and would pass every file.
+    /// </summary>
+    private sealed class EnabledProvider : ILoggerProvider
+    {
+        public ILogger CreateLogger(string categoryName) => new EnabledLogger();
+
+        public void Dispose() => GC.SuppressFinalize(this);
+
+        private sealed class EnabledLogger : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state)
+                where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            {
+            }
+        }
+    }
+}

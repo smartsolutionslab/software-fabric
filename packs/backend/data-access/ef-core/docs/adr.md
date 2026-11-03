@@ -16,6 +16,8 @@ Every other database failure, a lost update (`DbUpdateConcurrencyException`) inc
 
 This is a backstop for a race, not a way to report a duplicate. An application-level check stays the primary signal: a handler looks for the existing name or key first and returns a `Result` failure with its own code (`billing.invoice-number-taken`) that tells the caller which rule it broke. Two writers can both pass that check before either inserts; the unique index then refuses the second insert, and the caller gets a `409` rather than a server fault. Keep both the check and the index.
 
+The host's `appsettings.json` sets `Microsoft.EntityFrameworkCore.Database.Command` to `Warning`. EF Core writes each executed command, with its SQL text (and its parameter values when sensitive data logging is on), at Information, so a host logging at Information would otherwise log every statement it runs. The architecture rule `SqlCommandsAreNotLoggedAtInformation` binds every `appsettings*.json` under `src` (the AppHost's aside: it runs no DbContext) into a real `LoggerFactory` and asks whether that category is enabled at Information; a misspelled category fails it as surely as a louder level.
+
 ## Consequences
 
 - Modules never join across schemas; another module's data is reached through its contract, not its tables.

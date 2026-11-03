@@ -4,6 +4,7 @@ files:
   - { template: templates/PersistenceRegistration.cs.sbn, target: src/BuildingBlocks/Persistence/Wiring/PersistenceRegistration.cs }
   - { template: templates/ModuleContext.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/{{ module.namespace }}DbContext.cs", per-module: true }
   - { template: templates/OneDbContextPerModule.cs.sbn, target: tests/Architecture.Tests/Rules/OneDbContextPerModule.cs }
+  - { template: templates/SqlCommandsAreNotLoggedAtInformation.cs.sbn, target: tests/Architecture.Tests/Rules/SqlCommandsAreNotLoggedAtInformation.cs }
   - { template: templates/NoServices.cs.sbn, target: src/BuildingBlocks/Persistence/NoServices.cs }
   - { template: templates/MigrationRunner.csproj.sbn, target: src/MigrationRunner/MigrationRunner.csproj }
   - { template: templates/MigrationRunner.cs.sbn, target: src/MigrationRunner/Program.cs }
@@ -26,8 +27,10 @@ slots:
   - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 15 }
   - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 5 }
   - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: host.log-levels, template: templates/host-log-levels.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
   - { kind: architecture-test, describes: "Each module has at most one DbContext, in its Infrastructure project, deriving from ModuleDbContext.", file: templates/OneDbContextPerModule.cs.sbn }
+  - { kind: architecture-test, describes: "No shipped appsettings*.json logs EF Core's SQL commands (Microsoft.EntityFrameworkCore.Database.Command) at Information.", file: templates/SqlCommandsAreNotLoggedAtInformation.cs.sbn }
