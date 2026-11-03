@@ -1,0 +1,7 @@
+namespace {{ namespace }}.BuildingBlocks.Mcp;
+
+/// <summary>A tool call a model asked for, before it runs. The arguments are the model's output: untrusted.</summary>
+/// <param name="Server">The server's name, as the AppHost declares it.</param>
+/// <param name="Tool">The tool's name, as the server lists it.</param>
+/// <param name="Arguments">The arguments the model chose.</param>
+public sealed record McpToolCall(string Server, string Tool, IReadOnlyDictionary<string, object?> Arguments);

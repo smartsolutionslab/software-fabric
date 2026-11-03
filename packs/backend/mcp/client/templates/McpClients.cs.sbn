@@ -29,9 +29,12 @@ internal sealed class McpClients(IReadOnlyList<McpServerDeclaration> servers, IL
         return new McpToolResult(result.IsError == true, text, result.StructuredContent);
     }
 
-    /// <summary>Every declared server's tools as functions a chat client can call (Microsoft.Extensions.AI).</summary>
-    public async Task<IReadOnlyList<AITool>> ChatToolsAsync(CancellationToken cancellationToken) =>
-        [.. (await ToolsByServerAsync(cancellationToken)).Select(entry => entry.Tool)];
+    /// <summary>
+    /// Every declared server's tools as functions a chat client can call (Microsoft.Extensions.AI), named after their
+    /// server, each call run only when <paramref name="allow"/> allows it.
+    /// </summary>
+    public async Task<IReadOnlyList<AITool>> ChatToolsAsync(Func<McpToolCall, bool> allow, CancellationToken cancellationToken) =>
+        [.. (await ToolsByServerAsync(cancellationToken)).Select(entry => new CheckedMcpTool(entry.Server, entry.Tool, allow))];
 
     public async ValueTask DisposeAsync()
     {

@@ -3,8 +3,11 @@ using Microsoft.Extensions.AI;
 
 namespace {{ namespace }}.BuildingBlocks.Mcp;
 
-/// <summary>Offers every declared MCP server's tools to the model, next to the tools the request brings.</summary>
-internal sealed class McpToolsChatClient(IChatClient innerClient, McpClients clients) : DelegatingChatClient(innerClient)
+/// <summary>
+/// Offers every declared MCP server's tools to the model, next to the tools the request brings; a name both offer is a
+/// bug, because the model could not tell the two apart.
+/// </summary>
+internal sealed class McpToolsChatClient(IChatClient innerClient, McpClients clients, Func<McpToolCall, bool> allow) : DelegatingChatClient(innerClient)
 {
     public override async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
         await base.GetResponseAsync(messages, await WithToolsAsync(options, cancellationToken), cancellationToken);
@@ -21,7 +24,14 @@ internal sealed class McpToolsChatClient(IChatClient innerClient, McpClients cli
     private async Task<ChatOptions> WithToolsAsync(ChatOptions? options, CancellationToken cancellationToken)
     {
         var withTools = options?.Clone() ?? new ChatOptions();
-        withTools.Tools = [.. withTools.Tools ?? [], .. await clients.ChatToolsAsync(cancellationToken)];
+        List<AITool> tools = [.. withTools.Tools ?? [], .. await clients.ChatToolsAsync(allow, cancellationToken)];
+        var duplicate = tools.GroupBy(tool => tool.Name, StringComparer.Ordinal).FirstOrDefault(group => group.Count() > 1);
+        if (duplicate is not null)
+        {
+            throw new InvalidOperationException($"Two tools offered to the model are named {duplicate.Key}; the model could not tell them apart.");
+        }
+
+        withTools.Tools = tools;
         return withTools;
     }
 }

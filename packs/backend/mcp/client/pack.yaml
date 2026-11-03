@@ -6,6 +6,8 @@ files:
   - { template: templates/McpToolResult.cs.sbn, target: src/BuildingBlocks/Mcp/McpToolResult.cs }
   - { template: templates/McpServerDeclaration.cs.sbn, target: src/BuildingBlocks/Mcp/McpServerDeclaration.cs }
   - { template: templates/McpClients.cs.sbn, target: src/BuildingBlocks/Mcp/McpClients.cs }
+  - { template: templates/McpToolCall.cs.sbn, target: src/BuildingBlocks/Mcp/McpToolCall.cs }
+  - { template: templates/CheckedMcpTool.cs.sbn, target: src/BuildingBlocks/Mcp/CheckedMcpTool.cs }
   - { template: templates/McpToolsChatClient.cs.sbn, target: src/BuildingBlocks/Mcp/McpToolsChatClient.cs }
   - { template: templates/McpClientRegistration.cs.sbn, target: src/BuildingBlocks/Mcp/Wiring/McpClientRegistration.cs }
   - { template: templates/McpChatTools.cs.sbn, target: src/BuildingBlocks/Mcp/Wiring/McpChatTools.cs }
@@ -29,4 +31,4 @@ agents:
 adr: docs/adr.md
 gates:
   - { kind: architecture-test, describes: "No module references the MCP SDK: MCP clients are created only by AddMcpClients in BuildingBlocks, from the servers the AppHost declares.", file: templates/McpClientsAreCreatedOnlyByTheBuildingBlocks.cs.sbn }
-  - { kind: unit-test, describes: "A server declared in the AppHost, by URL with a bearer token or by command with a secret variable, is listed and called through IMcpTools; a stand-in model's tool call runs on it through UseMcpTools; a stdio server sees none of the host's environment.", file: templates/tests/McpClientTests.cs.sbn }
+  - { kind: unit-test, describes: "A server declared in the AppHost, by URL with a bearer token or by command with a secret variable, is listed and called through IMcpTools; a stand-in model's tool call runs on it through UseMcpTools under the server's name, and a call the project's check refuses never reaches it; a stdio server sees none of the host's environment.", file: templates/tests/McpClientTests.cs.sbn }
