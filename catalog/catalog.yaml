@@ -212,7 +212,7 @@ dimensions:
     default: light
     options:
       light:  { tier: supported, note: "aggregates and value objects for core concepts" }
-      strict: { tier: experimental, note: "no primitives on the domain model; architecture test enforced" }
+      strict: { tier: supported, note: "no primitives on the domain model; architecture test enforced" }
 
   module.cqrs:
     scope: module

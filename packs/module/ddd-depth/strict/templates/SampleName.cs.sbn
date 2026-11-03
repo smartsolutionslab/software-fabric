@@ -1,0 +1,27 @@
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+
+/// <summary>
+/// The shape of a value object in a strict module, emitted by fabric add-module: rename it after a value with rules of
+/// its own (<c>InvoiceNumber</c>) or delete it. It is created only through <see cref="From"/>, which guards the value.
+/// </summary>
+public sealed record SampleName : IValueObject<string>
+{
+    public const int MaxLength = 100;
+
+    private SampleName(string value) => Value = value;
+
+    public string Value { get; }
+
+    public static SampleName From(string value)
+    {
+{{~ if project["backend.guards"] == "ensure-that" ~}}
+        Ensure.That(value).IsNotNullOrWhiteSpace().HasMaxLength(MaxLength);
+{{~ else ~}}
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(value.Length, MaxLength, nameof(value));
+{{~ end ~}}
+        return new SampleName(value);
+    }
+
+    public override string ToString() => Value;
+}

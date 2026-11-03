@@ -1,0 +1,26 @@
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Tests.Samples;
+
+public class SampleNameTests
+{
+    [Fact]
+    public void A_name_holds_its_value()
+    {
+        var name = SampleName.From("Ada");
+
+        name.Value.ShouldBe("Ada");
+        name.ToString().ShouldBe("Ada");
+        name.ShouldBe(SampleName.From("Ada"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_blank_name_is_refused(string value) =>
+        Should.Throw<{{ if project["backend.guards"] == "ensure-that" }}GuardException{{ else }}ArgumentException{{ end }}>(() => SampleName.From(value));
+
+    [Fact]
+    public void A_name_longer_than_the_maximum_is_refused() =>
+        Should.Throw<{{ if project["backend.guards"] == "ensure-that" }}GuardException{{ else }}ArgumentOutOfRangeException{{ end }}>(() => SampleName.From(new string('a', SampleName.MaxLength + 1)));
+}
