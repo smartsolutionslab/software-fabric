@@ -52,6 +52,7 @@ public sealed class PrimitiveBoundaryTests
         {
             private readonly List<string> tags = [];
             private readonly List<InvoiceLine> lines = [];
+            private bool archived;
 
             private Invoice(InvoiceId id, InvoiceNumber number)
                 : base(id) => Number = number;
@@ -65,6 +66,10 @@ public sealed class PrimitiveBoundaryTests
             public IReadOnlyList<InvoiceLine> Lines => lines;
 
             public bool HasLines => lines.Count > 0;
+
+            public bool IsArchived => archived;
+
+            public void Archive() => archived = true;
 
             public static Invoice Issue(InvoiceNumber number)
             {
@@ -232,6 +237,7 @@ public sealed class PrimitiveBoundaryTests
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceLine.Quantity holds Int32");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceIssued.Total holds Decimal");
         output.ShouldContain("Shop.Modules.Billing.Application.Commands.Invoices.IssueInvoice.Number holds String");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.IsArchived holds Boolean");
         output.ShouldNotContain("InvoiceNumber.Value holds");
         output.ShouldNotContain("InvoiceId.Value holds");
         output.ShouldNotContain("Invoice.HasLines holds");
