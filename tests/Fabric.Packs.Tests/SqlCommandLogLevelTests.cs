@@ -66,4 +66,55 @@ public sealed class SqlCommandLogLevelTests
         output.ShouldContain("src/Host/appsettings.Production.json: Default 'Debug', 'Microsoft.EntityFrameworkCore.Database.Command' not set");
         output.ShouldNotContain("src/Host/appsettings.Staging.json");
     }
+
+    [Fact]
+    public void A_louder_sql_level_for_one_provider_or_under_a_quiet_default_fails_and_a_file_that_cannot_decide_it_passes()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.Write("src/Host/appsettings.json", """
+            {
+              "Logging": {
+                "LogLevel": {
+                  "Default": "Information",
+                  "Microsoft.AspNetCore": "Warning",
+                  "Microsoft.EntityFrameworkCore.Database.Command": "Warning"
+                },
+                "Console": {
+                  "LogLevel": {
+                    "Microsoft.EntityFrameworkCore.Database.Command": "Information"
+                  }
+                }
+              },
+              "AllowedHosts": "*"
+            }
+            """);
+        project.Write("src/Host/appsettings.Production.json", """
+            {
+              "Logging": {
+                "LogLevel": {
+                  "Default": "Warning",
+                  "Microsoft.EntityFrameworkCore.Database.Command": "Information"
+                }
+              }
+            }
+            """);
+        project.Write("src/Host/appsettings.Development.json", """
+            {
+              "Logging": {
+                "LogLevel": {
+                  "Microsoft.AspNetCore": "Debug"
+                }
+              }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test(ArchitectureTests);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("src/Host/appsettings.json (Logging:Console:LogLevel): Default not set, 'Microsoft.EntityFrameworkCore.Database.Command' 'Information'");
+        output.ShouldContain("src/Host/appsettings.Production.json: Default 'Warning', 'Microsoft.EntityFrameworkCore.Database.Command' 'Information'");
+        output.ShouldNotContain("src/Host/appsettings.Development.json");
+        output.ShouldNotContain("src/Host/appsettings.json: Default");
+    }
 }
