@@ -117,4 +117,21 @@ public sealed class SqlCommandLogLevelTests
         output.ShouldNotContain("src/Host/appsettings.Development.json");
         output.ShouldNotContain("src/Host/appsettings.json: Default");
     }
+
+    [Fact]
+    public void Host_settings_that_set_no_level_at_all_fail_because_logging_defaults_to_information()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.Write("src/Host/appsettings.json", """
+            {
+              "AllowedHosts": "*"
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test(ArchitectureTests);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("src/Host/appsettings.json: Default not set, 'Microsoft.EntityFrameworkCore.Database.Command' not set");
+    }
 }
