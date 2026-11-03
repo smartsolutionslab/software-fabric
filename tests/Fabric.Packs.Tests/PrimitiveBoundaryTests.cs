@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace Fabric.Packs.Tests;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace Fabric.Packs.Tests;
 /// event of a strict module holds a primitive; queries and DTOs may. Value objects and identifiers map to EF Core by
 /// convention.
 /// </summary>
-public sealed class PrimitiveBoundaryTests
+public sealed partial class PrimitiveBoundaryTests
 {
     private const string Invoices = """
         using Shop.BuildingBlocks.Domain;
@@ -246,6 +248,113 @@ public sealed class PrimitiveBoundaryTests
         }
         """;
 
+    private const string Orders = """
+        using System.Numerics;
+        using Shop.BuildingBlocks.Domain;
+
+        namespace Shop.Modules.Billing.Domain.Orders;
+
+        internal sealed record TypedId<TTag> : IValueObject<Guid>
+        {
+            private TypedId(Guid value) => Value = value;
+
+            public Guid Value { get; }
+
+            public static TypedId<TTag> New() => new(Guid.CreateVersion7());
+
+            public static TypedId<TTag> From(Guid value)
+            {
+                Ensure.That(value).IsNotEmpty();
+                return new TypedId<TTag>(value);
+            }
+        }
+
+        internal sealed record Positive<T> : IValueObject<T>
+            where T : INumber<T>
+        {
+            private Positive(T value) => Value = value;
+
+            public T Value { get; }
+
+            public static Positive<T> From(T value)
+            {
+                if (value <= T.Zero)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value), value, "A positive value is greater than zero.");
+                }
+
+                return new Positive<T>(value);
+            }
+        }
+
+        internal sealed class Order : AggregateRoot<TypedId<Order>>
+        {
+            private readonly List<Positive<int>> parcels = [];
+            private readonly List<int> weights = [];
+
+            private Order(TypedId<Order> id, Positive<int> quantity)
+                : base(id) => Quantity = quantity;
+
+            public Positive<int> Quantity { get; private set; }
+
+            public IReadOnlyList<Positive<int>> Parcels => parcels;
+
+            public IReadOnlyList<int> Weights => weights;
+
+            public static Order Place(Positive<int> quantity) => new(TypedId<Order>.New(), quantity);
+        }
+        """;
+
+    private const string OrdersVisibleToInfrastructure = """
+        using System.Runtime.CompilerServices;
+
+        [assembly: InternalsVisibleTo("Shop.Modules.Billing.Infrastructure")]
+        """;
+
+    private const string OrderConfiguration = """
+        using Microsoft.EntityFrameworkCore;
+        using Microsoft.EntityFrameworkCore.Metadata.Builders;
+        using Shop.Modules.Billing.Domain.Orders;
+
+        namespace Shop.Modules.Billing.Infrastructure.Persistence.Configurations;
+
+        internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
+        {
+            public void Configure(EntityTypeBuilder<Order> builder)
+            {
+                builder.ToTable("orders");
+                builder.HasKey(order => order.Id);
+                builder.Property(order => order.Quantity);
+                builder.Ignore(order => order.Parcels);
+                builder.Ignore(order => order.Weights);
+            }
+        }
+        """;
+
+    private const string OrderModelTests = """
+        using Microsoft.EntityFrameworkCore;
+        using Microsoft.Extensions.DependencyInjection;
+        using Shop.Modules.Billing.Infrastructure.Persistence;
+
+        namespace Shop.Modules.Billing.Tests;
+
+        public class OrderModelTests
+        {
+            [Fact]
+            public void Closed_generic_value_objects_map_to_their_backing_values_by_convention()
+            {
+                using var services = new ServiceCollection().BuildServiceProvider();
+                var options = new DbContextOptionsBuilder<BillingDbContext>().UseNpgsql("Host=localhost").Options;
+                using var context = new BillingDbContext(options, services);
+
+                var order = context.Model.FindEntityType("Shop.Modules.Billing.Domain.Orders.Order").ShouldNotBeNull();
+
+                order.FindProperty("Id").ShouldNotBeNull().GetTypeMapping().Converter.ShouldNotBeNull().ProviderClrType.ShouldBe(typeof(Guid));
+                order.FindProperty("Quantity").ShouldNotBeNull().GetTypeMapping().Converter.ShouldNotBeNull().ProviderClrType.ShouldBe(typeof(int));
+            }
+        }
+        """;
+
     [Fact]
     public void A_strict_module_passes_with_its_samples_and_fails_naming_each_primitive_an_aggregate_command_or_event_holds()
     {
@@ -299,4 +408,32 @@ public sealed class PrimitiveBoundaryTests
         var (moduleExitCode, moduleOutput) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj");
         moduleExitCode.ShouldBe(0, moduleOutput);
     }
+
+    [Fact]
+    public void Generic_value_objects_map_in_ef_and_end_the_walk_while_a_collection_of_primitives_still_fails()
+    {
+        using var project = new GeneratedProject("saas-strict-react");
+        project.AddModule("billing");
+
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Orders", Orders);
+        project.Write("src/Modules/Billing/Billing.Domain/Orders/OrdersVisibleToInfrastructure.cs", OrdersVisibleToInfrastructure);
+        project.WriteTypes("src/Modules/Billing/Billing.Infrastructure/Persistence/Configurations", OrderConfiguration);
+        project.WriteTypes("tests/Modules/Billing.Tests", OrderModelTests);
+        project.Build();
+
+        var (moduleExitCode, moduleOutput) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj");
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        List<string> named = [.. Violation().Matches(output).Select(match => match.Value).Distinct()];
+
+        // Both halves at once, so a run names every case that fails rather than only the first.
+        output.ShouldSatisfyAllConditions(
+            () => moduleExitCode.ShouldBe(0, moduleOutput),
+            () => exitCode.ShouldNotBe(0, output),
+            () => named.ShouldBe(["Shop.Modules.Billing.Domain.Orders.Order.Weights holds Int32"]),
+            () => output.ShouldContain("failed: 1"));
+    }
+
+    [GeneratedRegex(@"Shop\.Modules\.\S+ holds \w+")]
+    private static partial Regex Violation();
 }
