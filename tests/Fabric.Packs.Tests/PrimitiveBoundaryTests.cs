@@ -53,6 +53,7 @@ public sealed class PrimitiveBoundaryTests
             private readonly List<string> tags = [];
             private readonly List<InvoiceLine> lines = [];
             private bool archived;
+            private volatile bool flagged;
 
             private Invoice(InvoiceId id, InvoiceNumber number)
                 : base(id) => Number = number;
@@ -75,7 +76,11 @@ public sealed class PrimitiveBoundaryTests
 
             public bool IsArchived => archived;
 
+            public bool IsFlagged => flagged;
+
             public void Archive() => archived = true;
+
+            public void Flag() => flagged = true;
 
             public static Invoice Issue(InvoiceNumber number)
             {
@@ -245,6 +250,7 @@ public sealed class PrimitiveBoundaryTests
         output.ShouldContain("Shop.Modules.Billing.Application.Commands.Invoices.IssueInvoice.Number holds String");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.IsArchived holds Boolean");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.Note holds String");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.IsFlagged holds Boolean");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.Number has a public setter.");
         output.ShouldNotContain("InvoiceNumber.Value holds");
         output.ShouldNotContain("InvoiceId.Value holds");
