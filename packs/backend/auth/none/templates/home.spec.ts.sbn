@@ -1,0 +1,7 @@
+import { expect, test } from '@playwright/test';
+
+test('an anonymous visitor sees the application', async ({ page }) => {
+  await page.goto('/');
+
+  await expect(page.getByRole('heading', { name: '{{ name }}' })).toBeVisible();
+});
