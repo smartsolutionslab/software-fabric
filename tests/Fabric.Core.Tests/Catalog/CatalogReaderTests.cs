@@ -19,7 +19,7 @@ public class CatalogReaderTests
         catalog.Dimensions.Count.ShouldBe(47);
         catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(131);
         catalog.Profiles.Keys.ShouldBe(
-            ["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud"],
+            ["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud", "saas-strict-react"],
             ignoreOrder: false);
     }
 
