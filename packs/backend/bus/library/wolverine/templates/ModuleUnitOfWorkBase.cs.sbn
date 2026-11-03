@@ -16,10 +16,10 @@ public abstract class ModuleUnitOfWork<TContext>(IServiceProvider services) : IU
 
     private IDbContextOutbox<TContext> Outbox => outbox ??= services.GetRequiredService<IDbContextOutbox<TContext>>();
 
-    public async Task PublishAsync(IIntegrationEvent integrationEvent)
+    public async Task PublishAsync(IntegrationEvent integrationEvent)
     {
         {{ not_null "integrationEvent" }}
-        await Outbox.PublishAsync(integrationEvent);
+        await Outbox.PublishAsync(IntegrationEventMetadata.Fill(integrationEvent, services));
     }
 
     public Task CommitAsync(CancellationToken cancellationToken) => Outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);

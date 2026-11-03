@@ -1,6 +1,9 @@
 option: module.communication.integration-events
 files:
   - { template: templates/IIntegrationEvent.cs.sbn, target: src/Contracts/IIntegrationEvent.cs }
+  - { template: templates/IntegrationEvent.cs.sbn, target: src/Contracts/IntegrationEvent.cs }
+  - { template: templates/EventMetadata.cs.sbn, target: src/Contracts/EventMetadata.cs }
+  - { template: templates/IntegrationEventMetadata.cs.sbn, target: src/BuildingBlocks/Messaging/IntegrationEventMetadata.cs }
   - { template: templates/IUnitOfWork.cs.sbn, target: src/BuildingBlocks/Messaging/IUnitOfWork.cs }
   - { template: templates/ModuleUnitOfWork.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/I{{ module.namespace }}UnitOfWork.cs", per-module: true }
   - { template: templates/IntegrationEventsAreVersionedRecords.cs.sbn, target: tests/Architecture.Tests/Rules/IntegrationEventsAreVersionedRecords.cs }
@@ -10,4 +13,4 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: architecture-test, describes: "Every integration event is a record in Contracts whose name ends in V<number>.", file: templates/IntegrationEventsAreVersionedRecords.cs.sbn }
+  - { kind: architecture-test, describes: "Every integration event is a record in Contracts deriving from IntegrationEvent, so its unit of work fills its metadata, and its name ends in V<number>.", file: templates/IntegrationEventsAreVersionedRecords.cs.sbn }
