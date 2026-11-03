@@ -24,6 +24,31 @@ public sealed class SaasStandardReactTests
         }
         """;
 
+    /// <summary>An endpoint that publishes InvoicePaidV1 for tenant-a through the billing module's unit of work.</summary>
+    private const string PayInvoice = """
+        using Microsoft.AspNetCore.Builder;
+        using Microsoft.AspNetCore.Http;
+        using Microsoft.AspNetCore.Routing;
+        using Shop.BuildingBlocks.Api;
+        using Shop.BuildingBlocks.Tenancy;
+        using Shop.Contracts.Billing;
+        using Shop.Modules.Billing.Application;
+
+        namespace Shop.Modules.Billing.Api;
+
+        public sealed class PayInvoice : IEndpoint
+        {
+            public void Map(IEndpointRouteBuilder endpoints) =>
+                endpoints.MapPost("/invoices/{id}/pay", async (Guid id, IBillingUnitOfWork unitOfWork, CancellationToken cancellationToken) =>
+                {
+                    using var tenant = TenantScope.Begin("tenant-a");
+                    await unitOfWork.PublishAsync(new InvoicePaidV1(id));
+                    await unitOfWork.CommitAsync(cancellationToken);
+                    return Results.Accepted();
+                }).AllowAnonymous();
+        }
+        """;
+
     private const string DatabasePassword = "fabric-tests";
 
     private static Dictionary<string, string> Dependencies(Container postgres, Container rabbitMq) => new()
@@ -264,29 +289,7 @@ public sealed class SaasStandardReactTests
 
             public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
             """);
-        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", """
-            using Microsoft.AspNetCore.Builder;
-            using Microsoft.AspNetCore.Http;
-            using Microsoft.AspNetCore.Routing;
-            using Shop.BuildingBlocks.Api;
-            using Shop.BuildingBlocks.Tenancy;
-            using Shop.Contracts.Billing;
-            using Shop.Modules.Billing.Application;
-
-            namespace Shop.Modules.Billing.Api;
-
-            public sealed class PayInvoice : IEndpoint
-            {
-                public void Map(IEndpointRouteBuilder endpoints) =>
-                    endpoints.MapPost("/invoices/{id}/pay", async (Guid id, IBillingUnitOfWork unitOfWork, CancellationToken cancellationToken) =>
-                    {
-                        using var tenant = TenantScope.Begin("tenant-a");
-                        await unitOfWork.PublishAsync(new InvoicePaidV1(id));
-                        await unitOfWork.CommitAsync(cancellationToken);
-                        return Results.Accepted();
-                    }).AllowAnonymous();
-            }
-            """);
+        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", PayInvoice);
         project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", RedeliveredEvent.Consumer(tenancy: true));
         project.Write("src/Modules/Shipping/Shipping.Api/Deliveries.cs", RedeliveredEvent.Endpoint);
         project.Build();
@@ -302,8 +305,81 @@ public sealed class SaasStandardReactTests
             host,
             publishedAfter,
             "tenant-a",
-            attempts: 60,
-            redeliver: () => RedeliveredEvent.ReplayWolverineDeadLettersAsync(postgres, DatabasePassword));
+            attempts: 60);
+
+        // Wolverine retried the failed delivery by itself; nothing was dead-lettered on the way.
+        RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_consumer_that_always_fails_is_retried_with_backoff_then_dead_lettered()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
+            """);
+        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", PayInvoice);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", """
+            using System.Collections.Concurrent;
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoicePaidConsumer
+            {
+                private readonly ConcurrentQueue<DateTimeOffset> deliveries = Deliveries;
+
+                public static ConcurrentQueue<DateTimeOffset> Deliveries { get; } = [];
+
+                public void Handle(InvoicePaidV1 message)
+                {
+                    deliveries.Enqueue(TimeProvider.System.GetUtcNow());
+                    throw new InvalidOperationException($"Delivery {deliveries.Count} of {message.InvoiceId} fails, as every one does.");
+                }
+            }
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Api/Deliveries.cs", """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.Modules.Shipping.Application;
+
+            namespace Shop.Modules.Shipping.Api;
+
+            public sealed class Deliveries : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints) =>
+                    endpoints.MapGet("/deliveries", () => InvoicePaidConsumer.Deliveries.Select(delivery => delivery.ToUnixTimeMilliseconds()).ToArray()).AllowAnonymous();
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        using var rabbitMq = Container.RabbitMq();
+        using var host = project.StartHost(Dependencies(postgres, rabbitMq));
+
+        (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        // The pack's ADR: seven attempts, the retries 1, 2, 4, 8, 16 and 32 seconds after the failure before them.
+        for (var attempt = 0; attempt < 360 && RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword) == 0; attempt++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+        }
+
+        var body = await (await host.GetAsync("/shipping/deliveries")).Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword).ShouldBe(1, $"Deliveries: {body}");
+
+        var deliveries = System.Text.Json.JsonSerializer.Deserialize<long[]>(body).ShouldNotBeNull();
+        deliveries.Length.ShouldBe(7, body);
+        int[] backoff = [1, 2, 4, 8, 16, 32];
+        for (var retry = 0; retry < backoff.Length; retry++)
+        {
+            (deliveries[retry + 1] - deliveries[retry]).ShouldBeGreaterThanOrEqualTo(backoff[retry] * 1000L - 100, $"Retry {retry + 1}: {body}");
+        }
     }
 
     [Fact]
