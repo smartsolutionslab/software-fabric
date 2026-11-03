@@ -207,11 +207,11 @@ public sealed class PrimitiveBoundaryTests
 
         File.Exists(Path.Combine(project.ProjectDirectory, "src/Modules/Billing/Billing.Domain/Samples/SampleId.cs")).ShouldBeTrue();
         File.Exists(Path.Combine(project.ProjectDirectory, "src/Modules/Billing/Billing.Domain/Samples/SampleName.cs")).ShouldBeTrue();
+        File.Exists(Path.Combine(project.ProjectDirectory, "tests/Architecture.Tests/Rules/BillingHoldsNoPrimitives.cs")).ShouldBeTrue();
 
         project.Build();
         var (untouchedArchitecture, untouchedArchitectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         untouchedArchitecture.ShouldBe(0, untouchedArchitectureOutput);
-        untouchedArchitectureOutput.ShouldContain("BillingHoldsNoPrimitives");
         var (untouchedModule, untouchedModuleOutput) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj");
         untouchedModule.ShouldBe(0, untouchedModuleOutput);
 
