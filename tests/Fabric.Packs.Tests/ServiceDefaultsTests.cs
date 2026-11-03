@@ -56,6 +56,12 @@ public sealed partial class ServiceDefaultsTests
                 {
                     services.AddHttpClient("payments").AddStandardResilienceHandler /* nested */ ();
                     services.AddHttpClient("https://ledger.test").AddStandardResilienceHandler();
+            #if NET10_0_OR_GREATER
+                    services.AddHttpClient("compiled-branch").AddStandardResilienceHandler();
+            #endif
+            #if DEBUG
+                    services.AddHttpClient("debug-branch").AddStandardResilienceHandler();
+            #endif
                     return services;
                 }
             }
@@ -67,6 +73,8 @@ public sealed partial class ServiceDefaultsTests
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("src/Modules/Billing/Billing.Infrastructure/BillingHttpClients.cs:17: calls AddStandardResilienceHandler outside src/ServiceDefaults");
         output.ShouldContain("src/Modules/Billing/Billing.Infrastructure/BillingHttpClients.cs:18: calls AddStandardResilienceHandler outside src/ServiceDefaults");
+        output.ShouldContain("src/Modules/Billing/Billing.Infrastructure/BillingHttpClients.cs:20: calls AddStandardResilienceHandler outside src/ServiceDefaults");
+        output.ShouldContain("src/Modules/Billing/Billing.Infrastructure/BillingHttpClients.cs:23: calls AddStandardResilienceHandler outside src/ServiceDefaults");
         output.ShouldNotContain("BillingHttpClients.cs:8:");
         output.ShouldNotContain("BillingHttpClients.cs:11:");
         output.ShouldNotContain("BillingHttpClients.cs:14:");
