@@ -45,6 +45,25 @@ public sealed class PrimitiveBoundaryTests
             public int Quantity { get; } = quantity;
         }
 
+        public class Fee(InvoiceId id) : Entity<InvoiceId>(id);
+
+        public sealed class LateFee(InvoiceId id, decimal surcharge) : Fee(id)
+        {
+            public decimal Surcharge { get; } = surcharge;
+        }
+
+        internal sealed class Ledger : AggregateRoot<InvoiceId>
+        {
+            public readonly string Note = "none";
+
+            private Ledger(InvoiceId id)
+                : base(id)
+            {
+            }
+
+            internal static Ledger Open() => new(InvoiceId.New());
+        }
+
         [DeliberatelyUnhandled("The test only needs an event that carries a primitive.")]
         public sealed record InvoiceIssued(InvoiceId Invoice, decimal Total) : IDomainEvent;
 
@@ -52,17 +71,12 @@ public sealed class PrimitiveBoundaryTests
         {
             private readonly List<string> tags = [];
             private readonly List<InvoiceLine> lines = [];
+            private readonly List<Fee> fees = [];
             private bool archived;
             private volatile bool flagged;
 
             private Invoice(InvoiceId id, InvoiceNumber number)
                 : base(id) => Number = number;
-
-            // A public field is state as surely as a property; the analyzer that would refuse it is silenced on purpose,
-            // because the gate must not rely on it.
-            #pragma warning disable CA1051
-            public readonly string Note = "none";
-            #pragma warning restore CA1051
 
             public InvoiceNumber Number { get; set; }
 
@@ -71,6 +85,8 @@ public sealed class PrimitiveBoundaryTests
             public IReadOnlyList<string> Tags => tags;
 
             public IReadOnlyList<InvoiceLine> Lines => lines;
+
+            public IReadOnlyList<Fee> Fees => fees;
 
             public bool HasLines => lines.Count > 0;
 
@@ -249,7 +265,8 @@ public sealed class PrimitiveBoundaryTests
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceIssued.Total holds Decimal");
         output.ShouldContain("Shop.Modules.Billing.Application.Commands.Invoices.IssueInvoice.Number holds String");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.IsArchived holds Boolean");
-        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.Note holds String");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Ledger.Note holds String");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.LateFee.Surcharge holds Decimal");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.IsFlagged holds Boolean");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Invoice.Number has a public setter.");
         output.ShouldNotContain("InvoiceNumber.Value holds");
