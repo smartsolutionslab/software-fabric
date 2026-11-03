@@ -1,0 +1,22 @@
+option: module.ddd-depth.strict
+files:
+  - { template: templates/IValueObject.cs.sbn, target: src/Kernel/IValueObject.cs }
+  - { template: templates/IValueObjectOfValue.cs.sbn, target: "src/Kernel/IValueObject{TValue}.cs" }
+  - { template: templates/ValueObjectConverter.cs.sbn, target: src/BuildingBlocks/Persistence/ValueObjectConverter.cs }
+  - { template: templates/ValueObjectConventions.cs.sbn, target: src/BuildingBlocks/Persistence/ValueObjectConventions.cs }
+  - { template: templates/PrimitiveBoundary.cs.sbn, target: tests/Architecture.Tests/PrimitiveBoundary.cs }
+  # Per module: the rule checks only the modules that chose strict, so another module may stay light.
+  - { template: templates/HoldsNoPrimitives.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}HoldsNoPrimitives.cs", per-module: true }
+  - { template: templates/AggregatesHaveNoPublicSetters.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}AggregatesHaveNoPublicSetters.cs", per-module: true }
+  - { template: templates/SampleId.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/SampleId.cs", per-module: true }
+  - { template: templates/SampleName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/SampleName.cs", per-module: true }
+  - { template: templates/SampleIdTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleIdTests.cs", per-module: true }
+  - { template: templates/SampleNameTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleNameTests.cs", per-module: true }
+slots:
+  - { slot: persistence.context-members, template: templates/context-members.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No aggregate of a strict module, nor an entity or value object reachable from it, nor a command or domain event, holds state, in a public property or a public field, typed as a keyword type (string, int, bool, decimal, object, ...) or as Guid, DateTime, DateTimeOffset, DateOnly, TimeOnly, TimeSpan or Uri, collections and arrays included; a value object (IValueObject) that is not itself an aggregate, command or domain event is exempt for its own backing values; private fields are out of scope, and a computed bool whose getter does more than return a field is not state.", file: templates/HoldsNoPrimitives.cs.sbn }
+  - { kind: architecture-test, describes: "No aggregate root of a strict module exposes a public setter (light's rule, so strict is a superset of light).", file: templates/AggregatesHaveNoPublicSetters.cs.sbn }

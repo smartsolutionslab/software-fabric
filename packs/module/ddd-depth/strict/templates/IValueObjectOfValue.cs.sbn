@@ -1,0 +1,11 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>
+/// A value object backed by one value: <c>InvoiceNumber</c> over a <c>string</c>, <c>InvoiceId</c> over a <c>Guid</c>.
+/// It is created only through <c>public static T From(TValue value)</c>, which guards the value; EF Core maps it to
+/// <typeparamref name="TValue"/> by convention.
+/// </summary>
+public interface IValueObject<out TValue> : IValueObject
+{
+    TValue Value { get; }
+}

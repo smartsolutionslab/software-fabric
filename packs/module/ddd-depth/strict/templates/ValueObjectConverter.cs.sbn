@@ -1,0 +1,27 @@
+using System.Linq.Expressions;
+using System.Reflection;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+
+namespace {{ namespace }}.BuildingBlocks.Persistence;
+
+/// <summary>
+/// Stores a value object as its backing value and reads it back through its own <c>From(TValue)</c>, so a value read
+/// from the database passes the same guards as one a caller sends.
+/// </summary>
+public sealed class ValueObjectConverter<TValueObject, TValue>()
+    : ValueConverter<TValueObject, TValue>(valueObject => valueObject.Value, FromValue())
+    where TValueObject : IValueObject<TValue>
+{
+    private static Expression<Func<TValue, TValueObject>> FromValue()
+    {
+        var from = typeof(TValueObject).GetMethod("From", BindingFlags.Public | BindingFlags.Static, [typeof(TValue)]);
+        if (from is null || from.ReturnType != typeof(TValueObject))
+        {
+            throw new InvalidOperationException(
+                $"{typeof(TValueObject).FullName} has no public static {typeof(TValueObject).Name} From({typeof(TValue).Name} value); EF Core needs it to read the value back.");
+        }
+
+        var value = Expression.Parameter(typeof(TValue), "value");
+        return Expression.Lambda<Func<TValue, TValueObject>>(Expression.Call(from, value), value);
+    }
+}

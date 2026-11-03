@@ -1,0 +1,9 @@
+
+    /// <summary>Value objects and identifiers map to their backing values by convention (module.ddd-depth: strict).</summary>
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        {{ not_null "configurationBuilder" }}
+
+        configurationBuilder.MapValueObjects(GetType().Assembly);
+        base.ConfigureConventions(configurationBuilder);
+    }

@@ -1,0 +1,21 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class {{ module.namespace }}HoldsNoPrimitives : IArchitectureRule
+{
+    private const string Module = "{{ namespace }}.Modules.{{ module.namespace }}.";
+    private const string AggregateRoot = "{{ namespace }}.BuildingBlocks.Domain.AggregateRoot`1";
+    private const string DomainEvent = "{{ namespace }}.BuildingBlocks.Domain.IDomainEvent";
+
+    public string Description =>
+        "The {{ module.namespace }} module is strict: no aggregate, entity or value object reachable from one, command or domain event holds a primitive; a value object holds its own backing values.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        return PrimitiveBoundary.Violations(
+            [.. model.ModuleAssemblies.Where(assembly => assembly.GetName().Name!.StartsWith(Module, StringComparison.Ordinal))],
+            AggregateRoot,
+            DomainEvent);
+    }
+}

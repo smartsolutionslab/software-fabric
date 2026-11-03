@@ -1,0 +1,209 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests;
+
+/// <summary>
+/// The walk behind each strict module's rule (module.ddd-depth: strict, docs/adr). It starts from the module's
+/// aggregates, commands and domain events, follows every public property and public instance field into the module's
+/// own types (entities, value objects, and every subclass of a type that is not sealed) and names each primitive it
+/// finds on the way, inside collections and arrays too. Queries and DTOs are not roots: they are the JSON boundary,
+/// where primitives belong.
+/// </summary>
+public static class PrimitiveBoundary
+{
+    /// <summary>
+    /// What the rule bans, as a category rather than a list someone has to remember: every type with a C# keyword
+    /// (the CLR primitives, which include nint and nuint, plus decimal, string and object) and the BCL types that carry
+    /// no domain meaning of their own.
+    /// </summary>
+    private static readonly HashSet<Type> MeaninglessBclTypes =
+    [
+        typeof(decimal), typeof(string), typeof(object),
+        typeof(Guid), typeof(DateTime), typeof(DateTimeOffset), typeof(DateOnly), typeof(TimeOnly), typeof(TimeSpan), typeof(Uri),
+    ];
+
+    /// <param name="assemblies">The module's assemblies; only their types are walked into.</param>
+    /// <param name="aggregateRoot">The full name of the aggregate roots' generic base type definition.</param>
+    /// <param name="domainEvent">The full name of the domain event interface.</param>
+    public static IReadOnlyList<string> Violations(IReadOnlyList<Assembly> assemblies, string aggregateRoot, string domainEvent)
+    {
+        {{ not_null "assemblies" }}
+
+        List<Type> types = [.. assemblies.SelectMany(assembly => assembly.GetTypes())];
+        var own = types.ToHashSet();
+        HashSet<Type> roots = [.. types.Where(type => DerivesFrom(type, aggregateRoot) || Implements(type, domainEvent) || IsCommand(type))];
+        Queue<Type> pending = new(roots);
+        HashSet<Type> seen = [];
+        SortedSet<string> violations = new(StringComparer.Ordinal);
+
+        while (pending.TryDequeue(out var type))
+        {
+            if (!seen.Add(type))
+            {
+                continue;
+            }
+
+            // A root is checked even when it carries the marker: only a value object that is not an aggregate, command
+            // or domain event holds its own backing values.
+            var isValueObject = !roots.Contains(type) && typeof(IValueObject).IsAssignableFrom(type);
+            foreach (var (name, memberType) in State(type, own))
+            {
+                foreach (var constituent in Constituents(memberType, []))
+                {
+                    if (IsPrimitive(constituent))
+                    {
+                        if (!isValueObject)
+                        {
+                            violations.Add($"{type.FullName}.{name} holds {constituent.Name}; introduce a value object (IValueObject<T>).");
+                        }
+                    }
+                    else if (own.Contains(constituent.IsGenericType ? constituent.GetGenericTypeDefinition() : constituent))
+                    {
+                        pending.Enqueue(constituent);
+                    }
+                }
+            }
+
+            if (!type.IsSealed)
+            {
+                foreach (var subtype in types.Where(candidate => candidate != type && type.IsAssignableFrom(candidate)))
+                {
+                    pending.Enqueue(subtype);
+                }
+            }
+        }
+
+        return [.. violations];
+    }
+
+    /// <summary>
+    /// The state a type shows: its public properties, less building-block state and computed answers, and its public
+    /// instance fields, which hold state as surely as a property does even where an analyzer would refuse them.
+    /// </summary>
+    private static IEnumerable<(string Name, Type Type)> State(Type type, HashSet<Type> own) =>
+        type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => !IsBuildingBlockState(property, own) && !IsComputedAnswer(property))
+            .Select(property => (property.Name, property.PropertyType))
+            .Concat(type.GetFields(BindingFlags.Public | BindingFlags.Instance)
+                .Select(field => (field.Name, field.FieldType)));
+
+    private static bool IsPrimitive(Type type) => type.IsPrimitive || MeaninglessBclTypes.Contains(type);
+
+    /// <summary>
+    /// The type itself, its generic arguments and its array element, recursively, with <see cref="Nullable{T}"/>
+    /// unwrapped: <c>IReadOnlyList&lt;string&gt;</c> holds a <c>string</c> as surely as a <c>string</c> property does.
+    /// </summary>
+    private static IEnumerable<Type> Constituents(Type type, HashSet<Type> visited)
+    {
+        var underlying = Nullable.GetUnderlyingType(type) ?? type;
+        if (!visited.Add(underlying))
+        {
+            yield break;
+        }
+
+        if (underlying.IsArray)
+        {
+            foreach (var constituent in Constituents(underlying.GetElementType()!, visited))
+            {
+                yield return constituent;
+            }
+
+            yield break;
+        }
+
+        if (underlying.IsGenericType)
+        {
+            foreach (var argument in underlying.GetGenericArguments())
+            {
+                foreach (var constituent in Constituents(argument, visited))
+                {
+                    yield return constituent;
+                }
+            }
+        }
+
+        yield return underlying;
+    }
+
+    /// <summary>
+    /// State a building block declares for itself (an aggregate's pending domain events), not the module's: declared
+    /// outside the module and not typed by the module's own type argument. An entity's <c>Id</c> is typed by its
+    /// <c>TId</c>, so <c>Entity&lt;Guid&gt;</c> still fails.
+    /// </summary>
+    private static bool IsBuildingBlockState(PropertyInfo property, HashSet<Type> own)
+    {
+        var declaring = property.DeclaringType!;
+        var definition = declaring.IsGenericType ? declaring.GetGenericTypeDefinition() : declaring;
+        if (own.Contains(definition))
+        {
+            return false;
+        }
+
+        var declared = definition.GetProperty(property.Name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+        return declared is null || !declared.PropertyType.ContainsGenericParameters;
+    }
+
+    /// <summary>
+    /// A predicate the model computes (<c>IsPaid =&gt; PaidAt is not null</c>) is an answer, not state. Only a
+    /// <c>bool</c> without a setter counts, and only when its getter does more than return a field:
+    /// <c>IsArchived =&gt; archived</c> is stored state whether the field is the compiler's or its own, volatile or
+    /// not. Reflection cannot tell <c>Total =&gt; total</c> from a computed number as cheaply, so anything else
+    /// get-only stays state.
+    /// </summary>
+    private static bool IsComputedAnswer(PropertyInfo property) =>
+        property.PropertyType == typeof(bool)
+        && property.GetSetMethod(nonPublic: true) is null
+        && !ReturnsAField(property.GetGetMethod(nonPublic: true)?.GetMethodBody()?.GetILAsByteArray() ?? []);
+
+    /// <summary>
+    /// Whether a getter's IL loads one field of <c>this</c> and returns it, and nothing more: <c>ldarg.0</c>, an
+    /// optional <c>volatile.</c> prefix, <c>ldfld</c>, <c>ret</c>, plus the <c>nop</c>, <c>stloc.0</c>,
+    /// <c>br.s</c> and <c>ldloc.0</c> a Debug build adds around them. Any other instruction computes.
+    /// </summary>
+    private static bool ReturnsAField(byte[] il)
+    {
+        var fieldLoads = 0;
+        for (var index = 0; index < il.Length;)
+        {
+            switch (il[index])
+            {
+                case 0x00 or 0x02 or 0x06 or 0x0A or 0x2A: // nop, ldarg.0, ldloc.0, stloc.0, ret
+                    index += 1;
+                    break;
+                case 0x2B: // br.s <offset>
+                    index += 2;
+                    break;
+                case 0x7B: // ldfld <field>
+                    fieldLoads++;
+                    index += 5;
+                    break;
+                case 0xFE when index + 1 < il.Length && il[index + 1] == 0x13: // volatile.
+                    index += 2;
+                    break;
+                default:
+                    return false;
+            }
+        }
+
+        return fieldLoads == 1;
+    }
+
+    private static bool DerivesFrom(Type type, string genericBase)
+    {
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        {
+            if (current.IsGenericType && current.GetGenericTypeDefinition().FullName == genericBase)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool Implements(Type type, string contract) =>
+        !type.IsInterface && type.GetInterfaces().Any(candidate => candidate.FullName == contract);
+
+    private static bool IsCommand(Type type) =>
+        !type.IsInterface && type.GetInterfaces().Any(contract => contract.Name is "ICommand" or "ICommand`1");
+}

@@ -1,0 +1,35 @@
+using System.Reflection;
+using Microsoft.EntityFrameworkCore;
+
+namespace {{ namespace }}.BuildingBlocks.Persistence;
+
+/// <summary>Maps every value object and identifier of a module's Domain to its backing value, so no entity configuration converts one by hand.</summary>
+public static class ValueObjectConventions
+{
+    /// <summary>
+    /// Registers a <see cref="ValueObjectConverter{TValueObject, TValue}"/> for each <see cref="IValueObject{TValue}"/>
+    /// in the Domain project of the module whose Infrastructure assembly holds the context
+    /// (<c>Shop.Modules.Billing.Infrastructure</c> maps <c>Shop.Modules.Billing.Domain</c>).
+    /// </summary>
+    public static ModelConfigurationBuilder MapValueObjects(this ModelConfigurationBuilder configurationBuilder, Assembly contextAssembly)
+    {
+        {{ not_null "configurationBuilder" }}
+        {{ not_null "contextAssembly" }}
+
+        var infrastructure = contextAssembly.GetName().Name!;
+        var domain = Assembly.Load(string.Concat(infrastructure.AsSpan(0, infrastructure.LastIndexOf('.')), ".Domain"));
+        foreach (var type in domain.GetTypes().Where(type => type is { IsClass: true, IsAbstract: false }))
+        {
+            var backing = type.GetInterfaces()
+                .Where(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IValueObject<>))
+                .Select(contract => contract.GetGenericArguments()[0])
+                .ToList();
+            if (backing.Count == 1)
+            {
+                configurationBuilder.Properties(type).HaveConversion(typeof(ValueObjectConverter<,>).MakeGenericType(type, backing[0]));
+            }
+        }
+
+        return configurationBuilder;
+    }
+}

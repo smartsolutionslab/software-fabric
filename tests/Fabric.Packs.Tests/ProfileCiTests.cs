@@ -26,6 +26,7 @@ public sealed class ProfileCiTests
         Listed(output).ShouldBe(CompleteProfiles, output);
         CompleteProfiles.ShouldContain("saas-standard-react");
         CompleteProfiles.ShouldContain("lean-crud");
+        CompleteProfiles.ShouldContain("saas-strict-react");
     }
 
     [Fact]

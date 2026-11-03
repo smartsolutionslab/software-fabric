@@ -22,6 +22,7 @@ public class RuleEvaluatorTests
     [InlineData("saas-standard-vue")]
     [InlineData("industrial-event-driven-mfe")]
     [InlineData("lean-crud")]
+    [InlineData("saas-strict-react")]
     public void Every_profile_satisfies_every_rule(string profile)
     {
         Violations(profile).ShouldBeEmpty();
@@ -52,6 +53,8 @@ public class RuleEvaluatorTests
         "module defaults: module.style=event-sourced requires module.cqrs != none, but module.cqrs is none.")]
     [InlineData("industrial-event-driven-mfe", "backend.database=sqlserver",
         "module defaults: module.event-store=marten requires backend.database == postgres, but backend.database is sqlserver.")]
+    [InlineData("industrial-event-driven-mfe", "module.ddd-depth=strict",
+        "module defaults: module.ddd-depth=strict requires module.style == ddd, but module.style is event-sourced.")]
     public void Rejects_a_known_invalid_combination_in_one_sentence(string profile, string setting, string violation)
     {
         Violations(profile, setting).ShouldContain(violation);
