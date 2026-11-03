@@ -138,4 +138,13 @@ public sealed class ConditionalFileTests : IDisposable
         rendered.Files.ShouldBeEmpty();
         rendered.Errors.ShouldHaveSingleItem().ShouldStartWith("base.core: templates/extra.sbn (extra.txt): when ");
     }
+
+    [Fact]
+    public void A_condition_reading_a_key_the_model_lacks_is_an_error_naming_the_pack_and_the_file()
+    {
+        var rendered = Render("""project["backend.databse"] == "postgres" """);
+
+        rendered.Files.ShouldBeEmpty();
+        rendered.Errors.ShouldHaveSingleItem().ShouldStartWith("base.core: templates/extra.sbn (extra.txt): when ");
+    }
 }
