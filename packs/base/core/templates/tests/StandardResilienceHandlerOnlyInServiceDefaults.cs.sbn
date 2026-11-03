@@ -1,0 +1,74 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// <c>AddServiceDefaults()</c> gives every HttpClient the standard resilience handler. A second
+/// <c>AddStandardResilienceHandler</c> on a client does not replace that pipeline, it nests a whole second one inside
+/// it: four attempts become sixteen, behind two circuit breakers and two total-request budgets. Nothing fails; the
+/// client is only slower and more patient during an outage, when nobody reads registration code. A second call inside
+/// <c>src/ServiceDefaults</c> is what <see cref="HttpClientsRetryOnlyIdempotentMethods"/> counts; this rule covers
+/// every other file. Sources are read because a registration leaves nothing in IL to tell one call from two; a call in
+/// a comment or a string literal is prose, not a registration.
+/// </summary>
+public sealed class StandardResilienceHandlerOnlyInServiceDefaults : IArchitectureRule
+{
+    private const string Registration = "AddStandardResilienceHandler(";
+
+    private const string RegistrationSite = "src/ServiceDefaults/";
+
+    private static readonly string[] ScannedTrees = ["src", "tests"];
+
+    public string Description => "AddStandardResilienceHandler is called only in src/ServiceDefaults, which applies it to every HttpClient.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var root = RepositoryRoot();
+        List<string> violations = [];
+        foreach (var path in ScannedTrees
+            .Select(tree => Path.Combine(root, tree))
+            .Where(Directory.Exists)
+            .SelectMany(tree => Directory.EnumerateFiles(tree, "*.cs", SearchOption.AllDirectories))
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
+            .Where(path => !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
+            .Where(path => !path.StartsWith(RegistrationSite, StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal))
+        {
+            var lines = File.ReadAllLines(Path.Combine(root, path));
+            for (var index = 0; index < lines.Length; index++)
+            {
+                if (Registers(lines[index]))
+                {
+                    violations.Add($"{path}:{index + 1}: calls AddStandardResilienceHandler outside {RegistrationSite}, nesting a second resilience pipeline inside the one AddServiceDefaults() already gives every HttpClient. Configure that pipeline's HttpStandardResilienceOptions instead, or opt a client back into retrying POST and PATCH with RetryEveryMethod().");
+                }
+            }
+        }
+
+        return violations;
+    }
+
+    private static bool Registers(string line)
+    {
+        var at = line.IndexOf(Registration, StringComparison.Ordinal);
+        return at >= 0 && !IsCommented(line, at) && !IsQuoted(line, at);
+    }
+
+    private static bool IsCommented(string line, int at) =>
+        line[..at].Contains("//", StringComparison.Ordinal) || line.TrimStart().StartsWith('*');
+
+    /// <summary>An odd number of quotes before the call puts it inside a string; an escaped quote opens nothing.</summary>
+    private static bool IsQuoted(string line, int at) =>
+        line[..at].Replace("\\\"", string.Empty, StringComparison.Ordinal).Count(character => character == '"') % 2 == 1;
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+}
