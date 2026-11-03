@@ -6,7 +6,7 @@
 
 New behaviour starts with a test that is run and seen failing before the code that makes it pass exists. The failing output is quoted in the pull request under `## Tests observed failing`; a CI check refuses a pull request that changes `src/` or `web/` without it.
 
-A behaviour-preserving change (a refactor) quotes the covering tests passing before and after instead; a refactor without covering tests is a rewrite.
+A behaviour-preserving change (a refactor) quotes its covering tests passing before the change instead, under `## Tests observed passing before the change`; they must pass unmodified after it. The check accepts either section, each with its output in a code block. A refactor without covering tests is a rewrite: it starts by writing them, and a refactor that also fixes a bug is two changes, so the passing tests do not encode the bug.
 
 ## Consequences
 
