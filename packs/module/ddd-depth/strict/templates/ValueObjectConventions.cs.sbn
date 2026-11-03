@@ -44,56 +44,74 @@ public static class ValueObjectConventions
     /// </summary>
     private static HashSet<Type> ValueObjectsOf(Assembly domain)
     {
-        HashSet<Type> valueObjects = [];
-        HashSet<Type> visited = [];
+        var scan = new ValueObjectScan(domain);
         foreach (var type in domain.GetTypes())
         {
-            Collect(type, domain, valueObjects, visited);
+            scan.Collect(type);
 
             // An open definition is not collected itself, but a closed type its members use still is.
             if (type.ContainsGenericParameters)
             {
-                CollectMembers(type, domain, valueObjects, visited);
+                scan.CollectMembers(type);
             }
         }
 
-        return valueObjects;
+        return scan.ValueObjects;
     }
 
-    private static void Collect(Type type, Assembly domain, HashSet<Type> valueObjects, HashSet<Type> visited)
+    private sealed class ValueObjectScan(Assembly domain)
     {
-        if (type.ContainsGenericParameters || !visited.Add(type))
+        private readonly HashSet<Type> visited = [];
+        private readonly HashSet<Type> expanded = [];
+
+        /// <summary>The generic definitions whose members are being walked, so a definition is not entered inside itself.</summary>
+        private readonly HashSet<Type> expanding = [];
+
+        public HashSet<Type> ValueObjects { get; } = [];
+
+        public void Collect(Type type)
         {
-            return;
+            if (type.ContainsGenericParameters)
+            {
+                return;
+            }
+
+            if (visited.Add(type))
+            {
+                if (type.HasElementType)
+                {
+                    Collect(type.GetElementType()!);
+                }
+
+                foreach (var argument in type.IsGenericType ? type.GetGenericArguments() : [])
+                {
+                    Collect(argument);
+                }
+
+                if (type is { IsClass: true, IsAbstract: false } && typeof(IValueObject).IsAssignableFrom(type))
+                {
+                    ValueObjects.Add(type);
+                }
+            }
+
+            // A Domain type's members are walked once per closed type, but never inside a walk of the same definition:
+            // Node<T> holding a Node<List<T>> would otherwise construct a new type at every step.
+            var definition = type.IsGenericType ? type.GetGenericTypeDefinition() : type;
+            if (type.Assembly == domain && !expanding.Contains(definition) && expanded.Add(type))
+            {
+                expanding.Add(definition);
+                CollectMembers(type);
+                expanding.Remove(definition);
+            }
         }
 
-        if (type.HasElementType)
+        public void CollectMembers(Type type)
         {
-            Collect(type.GetElementType()!, domain, valueObjects, visited);
-        }
-
-        foreach (var argument in type.IsGenericType ? type.GetGenericArguments() : [])
-        {
-            Collect(argument, domain, valueObjects, visited);
-        }
-
-        if (type.Assembly == domain)
-        {
-            CollectMembers(type, domain, valueObjects, visited);
-        }
-
-        if (type is { IsClass: true, IsAbstract: false } && typeof(IValueObject).IsAssignableFrom(type))
-        {
-            valueObjects.Add(type);
-        }
-    }
-
-    private static void CollectMembers(Type type, Assembly domain, HashSet<Type> valueObjects, HashSet<Type> visited)
-    {
-        foreach (var member in type.GetProperties(State).Select(property => property.PropertyType)
-            .Concat(type.GetFields(State).Select(field => field.FieldType)))
-        {
-            Collect(member, domain, valueObjects, visited);
+            foreach (var member in type.GetProperties(State).Select(property => property.PropertyType)
+                .Concat(type.GetFields(State).Select(field => field.FieldType)))
+            {
+                Collect(member);
+            }
         }
     }
 }
