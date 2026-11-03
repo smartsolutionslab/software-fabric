@@ -1,0 +1,158 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// EF Core logs every executed command, its SQL text included, at Information under
+/// <c>Microsoft.EntityFrameworkCore.Database.Command</c>, so a settings file whose <c>Default</c> is Information logs
+/// every statement unless it quiets that category; with no level set at all, logging defaults to Information. Each
+/// <c>appsettings.json</c> in <c>src</c>, and each environment's <c>appsettings.*.json</c> that sets a level able to
+/// decide that category, is bound as a host binds it, and the logger it configures is asked, for every provider
+/// the file gives its own levels as well as for all of them, rather than its text matched: a misspelled category is
+/// inert and still logs the SQL. Configuration keys are matched in any case, as configuration matches them. A project
+/// that ships an environment file needs an <c>appsettings.json</c> beside it. The AppHost runs no DbContext, so its
+/// settings are not in scope.
+/// </summary>
+public sealed class SqlCommandsAreNotLoggedAtInformation : IArchitectureRule
+{
+    private const string AppHost = "src/AppHost/";
+
+    private static readonly string SqlCategory = DbLoggerCategory.Database.Command.Name;
+
+    public string Description => $"No shipped appsettings*.json logs '{DbLoggerCategory.Database.Command.Name}' at Information: EF Core writes every SQL statement there.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var root = RepositoryRoot();
+        var files = Directory.EnumerateFiles(Path.Combine(root, "src"), "appsettings*.json", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
+            .Where(path => !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
+            .Where(path => !path.StartsWith(AppHost, StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        if (files.Count == 0)
+        {
+            yield return "No appsettings*.json found under src: a rule that reads nothing passes without checking anything.";
+        }
+
+        foreach (var directory in files
+            .GroupBy(file => file[..file.LastIndexOf('/')], StringComparer.Ordinal)
+            .Where(project => !project.Any(IsBase)))
+        {
+            yield return $"{directory.Key}: ships {string.Join(", ", directory.Select(Path.GetFileName))} without an appsettings.json, so in every environment logging starts from its Information default and writes every SQL statement. Add an appsettings.json with \"{SqlCategory}\": \"Warning\" under Logging:LogLevel.";
+        }
+
+        foreach (var file in files)
+        {
+            var logging = new ConfigurationBuilder().AddJsonFile(Path.Combine(root, file), optional: false).Build().GetSection("Logging");
+            if (!IsBase(file) && !Governs(logging))
+            {
+                continue;
+            }
+
+            foreach (var provider in ProviderSections(logging).Prepend(null))
+            {
+                if (LogsSql(logging, provider))
+                {
+                    var levels = logging.GetSection(provider is null ? "LogLevel" : $"{provider}:LogLevel");
+                    var where = provider is null ? string.Empty : $" (Logging:{provider}:LogLevel)";
+                    yield return $"{file}{where}: Default {Quoted(levels["Default"])}, '{SqlCategory}' {Quoted(levels[SqlCategory])}, so every SQL statement the process executes reaches the log. Set \"{SqlCategory}\": \"Warning\" under Logging:LogLevel{(provider is null ? string.Empty : $" and Logging:{provider}:LogLevel")}.";
+                }
+            }
+        }
+    }
+
+    /// <summary>A project's <c>appsettings.json</c>, which the host reads in every environment.</summary>
+    private static bool IsBase(string file) => string.Equals(Path.GetFileName(file), "appsettings.json", StringComparison.OrdinalIgnoreCase);
+
+    private static string Quoted(string? value) => value is null ? "not set" : $"'{value}'";
+
+    /// <summary>
+    /// Whether an environment file says anything that can decide the SQL category's level: a <c>Default</c>, a key the category
+    /// starts with, or a wildcard, in <c>Logging:LogLevel</c> or a provider's. A file that says none of these, such as
+    /// an environment file that only changes another category, leaves the level to the file it is layered on.
+    /// </summary>
+    private static bool Governs(IConfigurationSection logging) =>
+        ProviderSections(logging)
+            .Select(provider => logging.GetSection($"{provider}:LogLevel"))
+            .Prepend(logging.GetSection("LogLevel"))
+            .SelectMany(levels => levels.GetChildren())
+            .Any(level => string.Equals(level.Key, "Default", StringComparison.OrdinalIgnoreCase)
+                || level.Key.Contains('*', StringComparison.Ordinal)
+                || SqlCategory.StartsWith(level.Key, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The providers the file gives their own levels, as <c>Logging:&lt;provider&gt;:LogLevel</c>.</summary>
+    private static IEnumerable<string> ProviderSections(IConfigurationSection logging) =>
+        logging.GetChildren()
+            .Where(section => !string.Equals(section.Key, "LogLevel", StringComparison.OrdinalIgnoreCase) && section.GetSection("LogLevel").Exists())
+            .Select(section => section.Key)
+            .Order(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Whether a logger configured by this <c>Logging</c> section writes the SQL category at Information, for every
+    /// provider or, given <paramref name="provider"/>, for the provider the file names. The provider's levels are moved
+    /// under the stand-in provider's name, so logging's own filter selection decides: exact names, the longest prefix,
+    /// wildcards, a provider's levels over the global ones, and <c>Default</c> resolve as they do in the host.
+    /// </summary>
+    private static bool LogsSql(IConfigurationSection logging, string? provider)
+    {
+        Dictionary<string, string?> levels = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in logging.GetSection("LogLevel").AsEnumerable(makePathsRelative: true).Where(level => level.Value is not null))
+        {
+            levels[$"LogLevel:{key}"] = value;
+        }
+
+        if (provider is not null)
+        {
+            foreach (var (key, value) in logging.GetSection($"{provider}:LogLevel").AsEnumerable(makePathsRelative: true).Where(level => level.Value is not null))
+            {
+                levels[$"{typeof(EnabledProvider).FullName}:LogLevel:{key}"] = value;
+            }
+        }
+
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(levels).Build();
+        using var factory = LoggerFactory.Create(builder => builder
+            .AddConfiguration(configuration)
+            .AddProvider(new EnabledProvider()));
+        return factory.CreateLogger(SqlCategory).IsEnabled(LogLevel.Information);
+    }
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+
+    /// <summary>
+    /// Loggers that enable every level, so the file's filters alone decide <see cref="ILogger.IsEnabled"/>. A factory
+    /// without a provider answers false for every category and would pass every file.
+    /// </summary>
+    private sealed class EnabledProvider : ILoggerProvider
+    {
+        public ILogger CreateLogger(string categoryName) => new EnabledLogger();
+
+        public void Dispose() => GC.SuppressFinalize(this);
+
+        private sealed class EnabledLogger : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state)
+                where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            {
+            }
+        }
+    }
+}
