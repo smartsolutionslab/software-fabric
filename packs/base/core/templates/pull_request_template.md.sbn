@@ -2,4 +2,6 @@
 
 ## How it was verified
 
+<!-- The change observed working end to end, not only its tests green: what was run (command, request or click path), its output in a code block, and what it did not cover. -->
+
 {{ slots["pr-template.sections"] }}
