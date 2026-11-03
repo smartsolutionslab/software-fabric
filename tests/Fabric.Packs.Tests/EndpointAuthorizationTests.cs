@@ -24,6 +24,25 @@ public sealed class EndpointAuthorizationTests
     }
 
     [Fact]
+    public void An_endpoint_mapped_outside_development_only_is_checked_too()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Api/BillingModule.cs", BillingModule("""
+            if (!endpoints.ServiceProvider.GetRequiredService<IHostEnvironment>().IsDevelopment())
+                    {
+                        endpoints.MapGet("/production-open", () => "open");
+                    }
+            """));
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("GET /production-open is mapped with neither RequireAuthorization() nor AllowAnonymous().");
+    }
+
+    [Fact]
     public void An_endpoint_marked_anonymous_where_it_is_mapped_passes()
     {
         using var project = new GeneratedProject(Profile);
@@ -57,6 +76,7 @@ public sealed class EndpointAuthorizationTests
         using Microsoft.AspNetCore.Routing;
         using Microsoft.Extensions.Configuration;
         using Microsoft.Extensions.DependencyInjection;
+        using Microsoft.Extensions.Hosting;
 
         namespace Shop.Modules.Billing.Api;
 
