@@ -136,6 +136,23 @@ public sealed class NoAuthenticationTests
     }
 
     [Fact]
+    public void The_web_app_without_an_auth_client_passes_its_format_check_after_building()
+    {
+        using var project = NewProject();
+        project.AddModule("billing");
+
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        foreach (var step in new[] { "install", "build" })
+        {
+            var (exitCode, output) = Shell.Run(web, "pnpm", step);
+            exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
+        }
+
+        var (formatExitCode, formatOutput) = Shell.Run(Path.Combine(web, "app"), "pnpm", "format:check");
+        formatExitCode.ShouldBe(0, $"pnpm format:check:\n{formatOutput}");
+    }
+
+    [Fact]
     public void The_generated_end_to_end_step_passes_with_an_anonymous_visitor_seeing_the_application()
     {
         using var project = NewProject();
