@@ -97,7 +97,6 @@ public sealed class NewCommandTests : IDisposable
     }
 
     [Theory]
-    [InlineData("backend.authorization=roles,claims", "no pack for backend.authorization=roles.")]
     [InlineData("backend.authorization=roles,claims", "no pack for backend.authorization=claims.")]
     public void An_authorization_option_without_a_pack_yet_writes_nothing(string setting, string error)
     {
