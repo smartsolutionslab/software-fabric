@@ -6,8 +6,9 @@ using Microsoft.Extensions.Configuration;
 namespace {{ namespace }}.Mcp.Tests;
 
 /// <summary>
-/// The configuration the host receives for the MCP servers declared in the AppHost: the project's own AppHost model,
-/// with the test's servers declared on its host the way AppHost.cs declares them. Nothing is started.
+/// The configuration the host receives for the test's MCP servers, declared on the host of the project's own AppHost
+/// model the way AppHost.cs declares servers. Only the test's declarations are read: a server the application declares
+/// is never resolved or contacted. Nothing is started.
 /// </summary>
 internal static class DeclaredServers
 {
@@ -23,13 +24,13 @@ internal static class DeclaredServers
         }
 
         var host = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "host"));
+        var application = host.Resource.Annotations.OfType<EnvironmentCallbackAnnotation>().ToHashSet();
         declare(builder, host);
 
-        // The host's environment as its declarations add it; only the MCP servers' values are resolved, because the
-        // database's and the other resources' need a running application.
+        // Only what the test's declarations add to the host's environment.
         Dictionary<string, object> environment = [];
         var context = new EnvironmentCallbackContext(builder.ExecutionContext, host.Resource, environment, cancellationToken);
-        foreach (var callback in host.Resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
+        foreach (var callback in host.Resource.Annotations.OfType<EnvironmentCallbackAnnotation>().Where(callback => !application.Contains(callback)))
         {
             await callback.Callback(context);
         }
