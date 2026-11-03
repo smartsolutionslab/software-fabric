@@ -45,7 +45,8 @@ output.
 - `false` leaves the file out; `true` renders it as any other file.
 - A condition that does not parse, fails, or yields anything but `true` or
   `false` is a generation error naming the pack and the file — rule 2:
-  never a silent `false`.
+  never a silent `false`. Reading a key the model lacks fails too, unlike
+  in a template, so a misspelled dimension cannot drop a file unnoticed.
 - A template that renders empty is still written. Only `when` decides
   whether a file exists; an empty render is not a condition.
 - The target is claimed by the pack whatever the condition says

@@ -106,7 +106,10 @@ public static partial class Renderer
 
         try
         {
-            var value = template.Evaluate(Context(globals));
+            // Templates keep Scriban's relaxed member access; a condition does not, so a misspelled key fails instead of reading as false.
+            var context = Context(globals);
+            context.EnableRelaxedMemberAccess = false;
+            var value = template.Evaluate(context);
             if (value is bool holds)
             {
                 return holds;

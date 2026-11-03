@@ -56,9 +56,13 @@ files:
 
 - `false`: the file is not written. `true`: it renders as any other file.
 - Anything else is a generation error naming the pack, the template and the
-  target: a condition that does not parse, reads an unknown name, or yields
-  something other than `true` or `false` (`project["backend.llm"]` alone is a
-  string). It is never taken as `false` (ADR-0006 rule 2).
+  target: a condition that does not parse, reads an unknown name or a key the
+  model lacks (`project["backend.databse"]`), or yields something other than
+  `true` or `false` (`project["backend.llm"]` alone is a string). It is never
+  taken as `false` (ADR-0006 rule 2).
+- A dimension inactive for the project is absent from `project`, so reading
+  it is an error too; test for it first with
+  `object.has_key(project, "<dimension>") && ...`.
 - A template that renders empty is still written, with or without `when`;
   only the condition decides whether a file exists.
 - The target is claimed whatever the condition says, so two packs may not
