@@ -630,8 +630,10 @@ public sealed class EventDrivenBackendTests
             host,
             publishedAfter,
             null,
-            attempts: 120,
-            redeliver: () => RedeliveredEvent.ReplayWolverineDeadLettersAsync(postgres, DatabasePassword));
+            attempts: 120);
+
+        // Wolverine retried the failed delivery by itself; nothing was dead-lettered on the way.
+        RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword).ShouldBe(0);
 
         // Without a transport Wolverine would deliver the event in process; it must have crossed on the broker.
         kafka.FirstKafkaMessage("Shop.Contracts.Billing.InvoicePaidV1").ShouldContain(invoice.ToString());

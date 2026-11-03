@@ -1,3 +1,6 @@
+{{~ if project["backend.auth"] == "none" ~}}
+#error The column tenancy pack reads the tenant from the signed-in user's token, and backend.auth none signs nobody in; choose an identity provider or backend.tenancy none (docs/adr/0009 of the generator).
+{{~ end ~}}
 using Microsoft.AspNetCore.Http;
 
 namespace {{ namespace }}.BuildingBlocks.Tenancy;

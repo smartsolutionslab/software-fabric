@@ -5,6 +5,7 @@ using Fabric.Core.Generation;
 using Fabric.Core.Packs;
 using Scriban;
 using Scriban.Functions;
+using Scriban.Parsing;
 using Scriban.Runtime;
 using Scriban.Syntax;
 
@@ -14,6 +15,7 @@ namespace Fabric.Core.Rendering;
 /// Renders a composition with Scriban. Templates see <c>name</c>, <c>namespace</c>, <c>project</c>,
 /// <c>module_defaults</c>, <c>modules</c>, <c>module</c> (per-module files only) and <c>slots</c> (files only). Nothing from the clock or the machine is
 /// available, unknown variables are errors, and output uses LF, so the same input always renders the same bytes.
+/// A file's <c>when</c> condition sees the same names as its template; the file is written only when it is <c>true</c>.
 /// </summary>
 public static partial class Renderer
 {
@@ -45,6 +47,11 @@ public static partial class Renderer
                 scope["module"] = Module(catalog, module, choices.Modules[module]);
             }
 
+            if (file.File.When is { } condition && !Holds(file, condition, errors, model, scope))
+            {
+                continue;
+            }
+
             if (RenderTemplate(file.Pack, file.File.Template, functions, errors, model, scope) is { } content)
             {
                 files.Add(new RenderedFile(file.Target, content));
@@ -72,21 +79,61 @@ public static partial class Renderer
             return null;
         }
 
-        var context = new TemplateContext(Builtins()) { StrictVariables = true };
-        foreach (var global in globals)
-        {
-            context.PushGlobal(global);
-        }
-
         try
         {
-            return Tidy(template.Render(context).Replace("\r\n", "\n", StringComparison.Ordinal));
+            return Tidy(template.Render(Context(globals)).Replace("\r\n", "\n", StringComparison.Ordinal));
         }
         catch (ScriptRuntimeException exception)
         {
             errors.Add($"{label}: {exception.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Evaluates a file's <c>when</c>. Only <c>true</c> or <c>false</c> is an answer: a condition that does not parse, fails or yields anything else is
+    /// an error naming the pack and the file, never a silent <c>false</c> (ADR-0006 rule 2).
+    /// </summary>
+    private static bool Holds(ComposedFile file, string condition, List<string> errors, params ScriptObject[] globals)
+    {
+        var label = $"{file.Pack.Option}: {file.File.Template} ({file.Target}): when '{condition}'";
+        var template = Template.Parse(condition, "pack.yaml", lexerOptions: new LexerOptions { Mode = ScriptMode.ScriptOnly });
+        if (template.HasErrors)
+        {
+            errors.Add($"{label}: {string.Join("; ", template.Messages)}");
+            return false;
+        }
+
+        try
+        {
+            // Templates keep Scriban's relaxed member access; a condition does not, so a misspelled key fails instead of reading as false.
+            var context = Context(globals);
+            context.EnableRelaxedMemberAccess = false;
+            var value = template.Evaluate(context);
+            if (value is bool holds)
+            {
+                return holds;
+            }
+
+            errors.Add($"{label} must be true or false, got '{value ?? "null"}'.");
+            return false;
+        }
+        catch (ScriptRuntimeException exception)
+        {
+            errors.Add($"{label}: {exception.Message}");
+            return false;
+        }
+    }
+
+    private static TemplateContext Context(ScriptObject[] globals)
+    {
+        var context = new TemplateContext(Builtins()) { StrictVariables = true };
+        foreach (var global in globals)
+        {
+            context.PushGlobal(global);
+        }
+
+        return context;
     }
 
     /// <summary>An empty slot leaves its line behind; whitespace-only lines become empty and blank-line runs collapse to one.</summary>
