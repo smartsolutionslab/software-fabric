@@ -5,8 +5,9 @@ namespace {{ namespace }}.Architecture.Tests;
 /// <summary>
 /// The walk behind each strict module's rule (module.ddd-depth: strict, docs/adr). It starts from the module's
 /// aggregates, commands and domain events, follows every public property and public instance field into the module's
-/// own types (entities, value objects, the cases of an abstract type) and names each primitive it finds on the way,
-/// inside collections and arrays too. Queries and DTOs are not roots: they are the JSON boundary, where primitives belong.
+/// own types (entities, value objects, and every subclass of a type that is not sealed) and names each primitive it
+/// finds on the way, inside collections and arrays too. Queries and DTOs are not roots: they are the JSON boundary,
+/// where primitives belong.
 /// </summary>
 public static class PrimitiveBoundary
 {
@@ -60,7 +61,7 @@ public static class PrimitiveBoundary
                 }
             }
 
-            if (type.IsAbstract)
+            if (!type.IsSealed)
             {
                 foreach (var subtype in types.Where(candidate => candidate != type && type.IsAssignableFrom(candidate)))
                 {
