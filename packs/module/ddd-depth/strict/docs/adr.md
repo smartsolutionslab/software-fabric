@@ -26,15 +26,18 @@ fields; a private field is implementation.
 `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `TimeSpan` and `Uri`. A primitive inside a collection, an array or
 a `Nullable<T>` counts too.
 
-**Exemptions.** A value object holds its own backing values (`InvoiceNumber.Value` is a `string`). An aggregate,
-command or domain event is never a value object for this purpose, even if it implements `IValueObject`. A computed `bool`
-without a setter (`IsPaid => PaidAt is not null`) is an answer, not state, unless its getter only returns a field
-(`IsArchived => archived`), which is stored state. No other get-only property is exempt, because reflection cannot
-tell a computed number from stored state.
+**Exemptions.** A value object holds its own backing values (`InvoiceNumber.Value` is a `string`), a generic one too: a
+`Positive<int>` property holds a value object, not an `int`. An aggregate, command or domain event is never a value
+object for this purpose, even if it implements `IValueObject`. A computed `bool` without a setter
+(`IsPaid => PaidAt is not null`) is an answer, not state, unless its getter only returns a field
+(`IsArchived => archived`), which is stored state. No other get-only property is exempt, because reflection cannot tell
+a computed number from stored state.
 
 **Persistence.** EF Core maps every `IValueObject<T>` of a module's Domain to its backing value by convention
 (`ConfigureConventions` in `ModuleDbContext`) and reads it back through `From`, so entity configurations never convert
-one by hand. A value object with more than one value (`Money`) is mapped in its configuration as a complex property.
+one by hand. A generic value object (`TypedId<TTag>`) is mapped as each closed type the Domain's properties and fields
+use (`TypedId<Customer>`). A value object with more than one value (`Money`) is mapped in its configuration as a complex
+property.
 
 **Scope of the option.** Strict applies to `module.style: ddd` only. An event-sourced module stays light for now: its
 events go through Marten's JSON, which cannot build a value object through its private constructor and `From`.
