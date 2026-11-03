@@ -408,9 +408,12 @@ public sealed class SaasStandardReactTests
     [Theory]
     [InlineData("src/Modules/Billing/Billing.Domain/Invoice.cs", "## What changed\nPaid invoices.", 1)]
     [InlineData("src/Modules/Billing/Billing.Domain/Invoice.cs", "## Tests observed failing\n\n```\nfailed Billing.Tests.An_invoice_can_be_paid\n```", 0)]
+    [InlineData("src/Modules/Billing/Billing.Domain/Invoice.cs", "## Tests observed passing before the change\n\n```\npassed Billing.Tests.An_invoice_can_be_paid\n```", 0)]
+    [InlineData("src/Modules/Billing/Billing.Domain/Invoice.cs", "## Tests observed failing\n\n<!-- Paste the output here. -->\n\n## What changed\n```\nInvoice.Pay\n```", 1)]
+    [InlineData("src/Modules/Billing/Billing.Domain/Invoice.cs", "## Tests observed passing before the change\n\n<!-- Paste the output here. -->\n\n## What changed\n```\nInvoice.Pay\n```", 1)]
     [InlineData("docs/adr/0001-base-core.md", "## What changed\nTypo.", 0)]
     [InlineData("tests/Modules/Billing.Tests/InvoiceTests.cs", "## What changed\nMore tests.", 0)]
-    public void The_red_first_check_wants_failing_output_when_source_changes(string changedFile, string body, int expectedExitCode)
+    public void The_red_first_check_wants_failing_or_characterisation_output_when_source_changes(string changedFile, string body, int expectedExitCode)
     {
         using var project = new GeneratedProject(Profile);
         var bodyFile = Path.Combine(project.ProjectDirectory, "pr-body.md");

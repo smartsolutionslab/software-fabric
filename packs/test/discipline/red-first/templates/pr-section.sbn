@@ -1,3 +1,7 @@
 ## Tests observed failing
 
-<!-- Required when src/ or web/ changes. Paste the new tests failing before the change, in a code block. A refactor pastes the covering tests passing before and after. -->
+<!-- New behaviour: paste the new tests failing before the change, in a code block. Required when src/ or web/ changes, unless the section below is filled instead. -->
+
+## Tests observed passing before the change
+
+<!-- A behaviour-preserving change (a refactor) only: paste its covering tests passing before the change, in a code block; they pass unmodified after it. Delete whichever of these two sections does not apply. -->

@@ -13,6 +13,7 @@ public sealed class OwnBoardTests
         ".github/workflows/commit-messages.yml",
         ".github/workflows/cross-model-review.yml",
         ".claude/skills/next-issue/SKILL.md",
+        ".claude/skills/verify/SKILL.md",
     ];
 
     [Fact]
