@@ -70,42 +70,18 @@ internal static class RedeliveredEvent
         }
         """;
 
-    /// <summary>
-    /// Wolverine retries no failed message by itself: it moves it to its dead letters in the database. Marking it
-    /// replayable is how it is delivered again, the same envelope a second time; this waits until it is there to mark.
-    /// </summary>
-    public static async Task ReplayWolverineDeadLettersAsync(Container postgres, string password)
-    {
-        const string Replay = """
-            with replayed as (update wolverine.wolverine_dead_letters set replayable = true where replayable = false returning 1)
-            select count(*) from replayed
-            """;
-
-        for (var attempt = 0; attempt < 120; attempt++)
-        {
-            if (postgres.Psql(password, "select to_regclass('wolverine.wolverine_dead_letters') is not null") == "t" && postgres.Psql(password, Replay) != "0")
-            {
-                return;
-            }
-
-            await Task.Delay(500, TestContext.Current.CancellationToken);
-        }
-
-        throw new ShouldAssertException("The failed delivery never reached Wolverine's dead letters.");
-    }
+    /// <summary>The messages in Wolverine's dead letters; 0 while its schema does not exist yet.</summary>
+    public static int WolverineDeadLetters(Container postgres, string password) =>
+        postgres.Psql(password, "select to_regclass('wolverine.wolverine_dead_letters') is not null") == "t"
+            ? int.Parse(postgres.Psql(password, "select count(*) from wolverine.wolverine_dead_letters"), System.Globalization.CultureInfo.InvariantCulture)
+            : 0;
 
     /// <summary>
     /// Waits for the second delivery, then checks that both carried the same metadata: a version 7 identifier, a time
     /// between <paramref name="publishedAfter"/> and now, and the tenant when one is expected.
     /// </summary>
-    /// <param name="redeliver">What delivers the failed event again, once it failed; null when the transport retries by itself.</param>
-    public static async Task ShouldHaveBeenDeliveredTwiceWithTheSameMetadataAsync(RunningHost host, DateTimeOffset publishedAfter, string? tenant, int attempts, Func<Task>? redeliver = null)
+    public static async Task ShouldHaveBeenDeliveredTwiceWithTheSameMetadataAsync(RunningHost host, DateTimeOffset publishedAfter, string? tenant, int attempts)
     {
-        if (redeliver is not null)
-        {
-            await redeliver();
-        }
-
         var received = "0";
         for (var attempt = 0; attempt < attempts && received == "0"; attempt++)
         {

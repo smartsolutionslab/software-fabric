@@ -44,6 +44,32 @@ A file's `target` is its path in the generated project, with `/`.
 - Two packs claiming the same target is an error. So is a pack claiming
   `fabric.yaml`, which the generator writes.
 
+## Conditional files
+
+A file entry may carry `when:`, a Scriban condition evaluated against the
+same names its template sees (below), `module` included for per-module files:
+
+```yaml
+files:
+  - { template: templates/FakeChatClient.cs.sbn, target: tests/Fakes/FakeChatClient.cs, when: 'project["backend.llm"] != "none"' }
+```
+
+- `false`: the file is not written. `true`: it renders as any other file.
+- Anything else is a generation error naming the pack, the template and the
+  target: a condition that does not parse, reads an unknown name or a key the
+  model lacks (`project["backend.databse"]`), or yields something other than
+  `true` or `false` (`project["backend.llm"]` alone is a string). It is never
+  taken as `false` (ADR-0006 rule 2).
+- A dimension inactive for the project is absent from `project`, so reading
+  it is an error too; test for it first with
+  `object.has_key(project, "<dimension>") && ...`.
+- A template that renders empty is still written, with or without `when`;
+  only the condition decides whether a file exists.
+- The target is claimed whatever the condition says, so two packs may not
+  share a target by giving it opposite conditions.
+- Template functions from `templates.functions` are not available in a
+  condition; it reads the model, nothing else.
+
 ## What a template sees
 
 Templates are [Scriban](https://github.com/scriban/scriban).

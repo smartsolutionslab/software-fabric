@@ -1,6 +1,7 @@
 using {{ namespace }}.BuildingBlocks.Modules;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
+using Wolverine.ErrorHandling;
 {{~ if project["backend.database"] == "postgres" ~}}
 using Wolverine.Postgresql;
 {{~ else ~}}
@@ -42,6 +43,16 @@ public static class Messaging
             options.UseEntityFrameworkCoreTransactions();
             options.Policies.UseDurableOutboxOnAllSendingEndpoints();
             options.Policies.UseDurableInboxOnAllListeners();
+            // A consumer that throws is tried again, the wait doubling from 1 second, before its message is dead-lettered
+            // (seven attempts, about a minute; see docs/adr). The retry is scheduled in the durable inbox, so the
+            // listener delivers other messages meanwhile.
+            options.OnAnyException().ScheduleRetry(
+                TimeSpan.FromSeconds(1),
+                TimeSpan.FromSeconds(2),
+                TimeSpan.FromSeconds(4),
+                TimeSpan.FromSeconds(8),
+                TimeSpan.FromSeconds(16),
+                TimeSpan.FromSeconds(32));
 {{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
             options.UseRabbitMq(new Uri(broker)).AutoProvision().UseConventionalRouting();
 {{~ else if project["backend.bus.transport"] == "kafka" ~}}
