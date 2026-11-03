@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Xml.Linq;
 
 namespace {{ namespace }}.Architecture.Tests.Rules;
 
@@ -12,8 +13,9 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 /// decide that category, is bound as a host binds it, and the logger it configures is asked, for every provider
 /// the file gives its own levels as well as for all of them, rather than its text matched: a misspelled category is
 /// inert and still logs the SQL. Configuration keys are matched in any case, as configuration matches them. A project
-/// that ships an environment file needs an <c>appsettings.json</c> beside it. The AppHost runs no DbContext, so its
-/// settings are not in scope.
+/// that ships an environment file needs an <c>appsettings.json</c> beside it, and so does each executable project: one
+/// that ships no settings at all logs at logging's effective default, which is asked the same way. The AppHost runs no
+/// DbContext, so its settings are not in scope.
 /// </summary>
 public sealed class SqlCommandsAreNotLoggedAtInformation : IArchitectureRule
 {
@@ -21,7 +23,7 @@ public sealed class SqlCommandsAreNotLoggedAtInformation : IArchitectureRule
 
     private static readonly string SqlCategory = DbLoggerCategory.Database.Command.Name;
 
-    public string Description => $"No shipped appsettings*.json logs '{DbLoggerCategory.Database.Command.Name}' at Information: EF Core writes every SQL statement there.";
+    public string Description => $"No shipped appsettings*.json logs '{DbLoggerCategory.Database.Command.Name}' at Information, and no executable project under src ships without one: EF Core writes every SQL statement there.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -46,6 +48,15 @@ public sealed class SqlCommandsAreNotLoggedAtInformation : IArchitectureRule
             yield return $"{directory.Key}: ships {string.Join(", ", directory.Select(Path.GetFileName))} without an appsettings.json, so in every environment logging starts from its Information default and writes every SQL statement. Add an appsettings.json with \"{SqlCategory}\": \"Warning\" under Logging:LogLevel.";
         }
 
+        var unconfigured = new ConfigurationBuilder().Build().GetSection("Logging");
+        foreach (var project in ExecutableProjects(root).Where(project => !files.Any(file => string.Equals(file[..file.LastIndexOf('/')], project, StringComparison.Ordinal))))
+        {
+            if (LogsSql(unconfigured, provider: null))
+            {
+                yield return $"{project}: ships no appsettings.json, so logging starts from its Information default and writes every SQL statement the process executes. Add an appsettings.json with \"{SqlCategory}\": \"Warning\" under Logging:LogLevel.";
+            }
+        }
+
         foreach (var file in files)
         {
             var logging = new ConfigurationBuilder().AddJsonFile(Path.Combine(root, file), optional: false).Build().GetSection("Logging");
@@ -65,6 +76,24 @@ public sealed class SqlCommandsAreNotLoggedAtInformation : IArchitectureRule
             }
         }
     }
+
+    /// <summary>
+    /// The directories of the projects under <c>src</c> that run as a process (a Web or Worker SDK, or an
+    /// <c>OutputType</c> of Exe), the AppHost aside: each starts its own logging, so each needs settings.
+    /// </summary>
+    private static IEnumerable<string> ExecutableProjects(string root) =>
+        Directory.EnumerateFiles(Path.Combine(root, "src"), "*.csproj", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
+            .Where(path => !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
+            .Where(path => !path.StartsWith(AppHost, StringComparison.Ordinal))
+            .Where(path => IsExecutable(XDocument.Load(Path.Combine(root, path)).Root))
+            .Select(path => path[..path.LastIndexOf('/')])
+            .Order(StringComparer.Ordinal);
+
+    private static bool IsExecutable(XElement? project) =>
+        project is not null
+        && ((string?)project.Attribute("Sdk") is "Microsoft.NET.Sdk.Web" or "Microsoft.NET.Sdk.Worker"
+            || project.Descendants("OutputType").Any(type => string.Equals(type.Value.Trim(), "Exe", StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>A project's <c>appsettings.json</c>, which the host reads in every environment.</summary>
     private static bool IsBase(string file) => string.Equals(Path.GetFileName(file), "appsettings.json", StringComparison.OrdinalIgnoreCase);
