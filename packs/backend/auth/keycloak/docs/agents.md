@@ -5,3 +5,4 @@
 - `GET /me` answers who the caller is (`name`); the frontend uses it.
 - Authorisation rules are policies registered by the module, not role checks inside handlers.
 - Local login: user `developer`, password `developer` (realm import in `src/AppHost/realms/realm.json`, development only).
+- Email Keycloak sends locally (verification, reset password) lands in Mailpit: http://localhost:8025 while the AppHost runs. Mailpit exists only in run mode; a deployed realm configures its own SMTP server.
