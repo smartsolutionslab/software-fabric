@@ -31,7 +31,8 @@ public static class PrimitiveBoundary
 
         List<Type> types = [.. assemblies.SelectMany(assembly => assembly.GetTypes())];
         var own = types.ToHashSet();
-        Queue<Type> pending = new(types.Where(type => DerivesFrom(type, aggregateRoot) || Implements(type, domainEvent) || IsCommand(type)));
+        HashSet<Type> roots = [.. types.Where(type => DerivesFrom(type, aggregateRoot) || Implements(type, domainEvent) || IsCommand(type))];
+        Queue<Type> pending = new(roots);
         HashSet<Type> seen = [];
         SortedSet<string> violations = new(StringComparer.Ordinal);
 
@@ -42,7 +43,9 @@ public static class PrimitiveBoundary
                 continue;
             }
 
-            var isValueObject = typeof(IValueObject).IsAssignableFrom(type);
+            // A root is checked even when it carries the marker: only a value object that is not an aggregate, command
+            // or domain event holds its own backing values.
+            var isValueObject = !roots.Contains(type) && typeof(IValueObject).IsAssignableFrom(type);
             foreach (var (name, memberType) in State(type, own))
             {
                 foreach (var constituent in Constituents(memberType, []))
