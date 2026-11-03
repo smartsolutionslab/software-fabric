@@ -31,7 +31,13 @@ public static class PrimitiveBoundary
 
         List<Type> types = [.. assemblies.SelectMany(assembly => assembly.GetTypes())];
         var own = types.ToHashSet();
-        HashSet<Type> roots = [.. types.Where(type => DerivesFrom(type, aggregateRoot) || Implements(type, domainEvent) || IsCommand(type))];
+        bool IsRoot(Type type) => DerivesFrom(type, aggregateRoot) || Implements(type, domainEvent) || IsCommand(type);
+
+        // Only a value object that is not an aggregate, command or domain event holds its own backing values; a root is
+        // checked even when it carries the marker.
+        bool IsValueObject(Type type) => !IsRoot(type) && typeof(IValueObject).IsAssignableFrom(type);
+
+        HashSet<Type> roots = [.. types.Where(IsRoot)];
         Queue<Type> pending = new(roots);
         HashSet<Type> seen = [];
         SortedSet<string> violations = new(StringComparer.Ordinal);
@@ -43,12 +49,10 @@ public static class PrimitiveBoundary
                 continue;
             }
 
-            // A root is checked even when it carries the marker: only a value object that is not an aggregate, command
-            // or domain event holds its own backing values.
-            var isValueObject = !roots.Contains(type) && typeof(IValueObject).IsAssignableFrom(type);
+            var isValueObject = IsValueObject(type);
             foreach (var (name, memberType) in State(type, own))
             {
-                foreach (var constituent in Constituents(memberType, []))
+                foreach (var constituent in Constituents(memberType, IsValueObject, []))
                 {
                     if (IsPrimitive(constituent))
                     {
@@ -92,8 +96,10 @@ public static class PrimitiveBoundary
     /// <summary>
     /// The type itself, its generic arguments and its array element, recursively, with <see cref="Nullable{T}"/>
     /// unwrapped: <c>IReadOnlyList&lt;string&gt;</c> holds a <c>string</c> as surely as a <c>string</c> property does.
+    /// A value object ends the descent: <c>Positive&lt;int&gt;</c> is the value object, and the <c>int</c> is its own
+    /// backing value, which the walk checks, and exempts, when it reaches the value object's state.
     /// </summary>
-    private static IEnumerable<Type> Constituents(Type type, HashSet<Type> visited)
+    private static IEnumerable<Type> Constituents(Type type, Func<Type, bool> isValueObject, HashSet<Type> visited)
     {
         var underlying = Nullable.GetUnderlyingType(type) ?? type;
         if (!visited.Add(underlying))
@@ -103,7 +109,7 @@ public static class PrimitiveBoundary
 
         if (underlying.IsArray)
         {
-            foreach (var constituent in Constituents(underlying.GetElementType()!, visited))
+            foreach (var constituent in Constituents(underlying.GetElementType()!, isValueObject, visited))
             {
                 yield return constituent;
             }
@@ -111,11 +117,11 @@ public static class PrimitiveBoundary
             yield break;
         }
 
-        if (underlying.IsGenericType)
+        if (underlying.IsGenericType && !isValueObject(underlying))
         {
             foreach (var argument in underlying.GetGenericArguments())
             {
-                foreach (var constituent in Constituents(argument, visited))
+                foreach (var constituent in Constituents(argument, isValueObject, visited))
                 {
                     yield return constituent;
                 }

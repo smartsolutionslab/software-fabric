@@ -6,10 +6,14 @@ namespace {{ namespace }}.BuildingBlocks.Persistence;
 /// <summary>Maps every value object and identifier of a module's Domain to its backing value, so no entity configuration converts one by hand.</summary>
 public static class ValueObjectConventions
 {
+    private const BindingFlags State = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+
     /// <summary>
     /// Registers a <see cref="ValueObjectConverter{TValueObject, TValue}"/> for each <see cref="IValueObject{TValue}"/>
     /// in the Domain project of the module whose Infrastructure assembly holds the context
-    /// (<c>Shop.Modules.Billing.Infrastructure</c> maps <c>Shop.Modules.Billing.Domain</c>).
+    /// (<c>Shop.Modules.Billing.Infrastructure</c> maps <c>Shop.Modules.Billing.Domain</c>). A generic value object is
+    /// registered as each closed type the Domain's properties and fields use (<c>TypedId&lt;Customer&gt;</c>), never as
+    /// its open definition, which EF Core cannot convert.
     /// </summary>
     public static ModelConfigurationBuilder MapValueObjects(this ModelConfigurationBuilder configurationBuilder, Assembly contextAssembly)
     {
@@ -18,7 +22,7 @@ public static class ValueObjectConventions
 
         var infrastructure = contextAssembly.GetName().Name!;
         var domain = Assembly.Load(string.Concat(infrastructure.AsSpan(0, infrastructure.LastIndexOf('.')), ".Domain"));
-        foreach (var type in domain.GetTypes().Where(type => type is { IsClass: true, IsAbstract: false }))
+        foreach (var type in ValueObjectsOf(domain))
         {
             var backing = type.GetInterfaces()
                 .Where(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IValueObject<>))
@@ -31,5 +35,49 @@ public static class ValueObjectConventions
         }
 
         return configurationBuilder;
+    }
+
+    /// <summary>
+    /// The Domain's closed value-object types: those it declares, and those its types' properties and fields use,
+    /// inside collections, arrays and other generic arguments too.
+    /// </summary>
+    private static HashSet<Type> ValueObjectsOf(Assembly domain)
+    {
+        HashSet<Type> valueObjects = [];
+        HashSet<Type> visited = [];
+        foreach (var type in domain.GetTypes())
+        {
+            Collect(type, valueObjects, visited);
+            foreach (var member in type.GetProperties(State).Select(property => property.PropertyType)
+                .Concat(type.GetFields(State).Select(field => field.FieldType)))
+            {
+                Collect(member, valueObjects, visited);
+            }
+        }
+
+        return valueObjects;
+    }
+
+    private static void Collect(Type type, HashSet<Type> valueObjects, HashSet<Type> visited)
+    {
+        if (type.ContainsGenericParameters || !visited.Add(type))
+        {
+            return;
+        }
+
+        if (type.HasElementType)
+        {
+            Collect(type.GetElementType()!, valueObjects, visited);
+        }
+
+        foreach (var argument in type.IsGenericType ? type.GetGenericArguments() : [])
+        {
+            Collect(argument, valueObjects, visited);
+        }
+
+        if (type is { IsClass: true, IsAbstract: false } && typeof(IValueObject).IsAssignableFrom(type))
+        {
+            valueObjects.Add(type);
+        }
     }
 }
