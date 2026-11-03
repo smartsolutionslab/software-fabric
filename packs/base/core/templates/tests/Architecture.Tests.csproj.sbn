@@ -14,4 +14,8 @@
     <ProjectReference Include="../../src/Modules/*/*.*/*.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+{{ slots["tests.architecture.references"] }}
+  </ItemGroup>
+
 </Project>

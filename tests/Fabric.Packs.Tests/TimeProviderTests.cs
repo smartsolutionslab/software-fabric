@@ -85,7 +85,7 @@ public sealed class TimeProviderTests
                 [Fact]
                 public void The_service_defaults_supply_the_system_clock_as_the_time_provider()
                 {
-                    var builder = Host.CreateEmptyApplicationBuilder(settings: null);
+                    var builder = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(settings: null);
                     builder.AddServiceDefaults();
 
                     using var provider = builder.Services.BuildServiceProvider();

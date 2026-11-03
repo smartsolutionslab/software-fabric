@@ -4,7 +4,7 @@
 
 ## Decision
 
-The host describes its HTTP API with ASP.NET Core's built-in OpenAPI generator at `/openapi/v1.json` (Development only). The frontend's API client is generated from this document, so it is the contract between backend and frontend.
+The host describes its HTTP API with ASP.NET Core's built-in OpenAPI generator at `/openapi/v1.json` (Development only), mapped with `.AllowAnonymous()`: code generation reads it without signing in. The frontend's API client is generated from this document, so it is the contract between backend and frontend.
 
 **List endpoints are paged.** A list endpoint takes `Page? page` and `PageSize? pageSize` from the query (the Kernel's types, defaulting to `Page.First` and `PageSize.Default`) and answers `PagedResult<T>`. `Page` and `PageSize` bind through their `TryParse`, so a value outside its range (a page below 1, a page size above `PageSize.Maximum`, anything that is not a whole number) is a `400` before the endpoint runs, and no caller can ask for the whole table. `DescribePaging()` (`src/Host/Wiring/OpenApiPaging.cs`) describes both parameters as the integer range they bind; without it the generator would call any type it parses a string. The document names the response `PagedResultOf<Item>`, so the generated client has the type. Decided by the repository owner (2026-11-01): paging is required for collection queries behind a list endpoint only; an internal lookup that no endpoint answers with, a small fixed set, may return a plain list.
 

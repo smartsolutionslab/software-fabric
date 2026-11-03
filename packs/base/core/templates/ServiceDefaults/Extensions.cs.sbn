@@ -78,8 +78,9 @@ public static class Extensions
         // Health endpoints outside Development need a deliberate decision: https://aka.ms/aspire/healthchecks
         if (app.Environment.IsDevelopment())
         {
-            app.MapHealthChecks(HealthEndpointPath);
-            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions { Predicate = check => check.Tags.Contains("live") });
+            // Probed without a token, by Aspire and by orchestrators, so anonymous where they are mapped.
+            app.MapHealthChecks(HealthEndpointPath).AllowAnonymous();
+            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions { Predicate = check => check.Tags.Contains("live") }).AllowAnonymous();
         }
 
         return app;

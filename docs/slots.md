@@ -140,6 +140,7 @@ Cardinality `0+` unless stated. "Separator" is what joins contributions
 | `tests.build-properties` *(added in M1-02)* | `tests/Directory.Build.props` | xunit (`OutputType Exe` for xUnit v3) |
 | `tests.packages` | `tests/Directory.Build.props` | xunit, shouldly, nsubstitute, aspire-fixture |
 | `tests.usings` | `tests/Directory.Build.props` | xunit, shouldly, nsubstitute |
+| `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak (the host and `Microsoft.AspNetCore.Mvc.Testing`, for its endpoint rule) |
 | `tests.assert-no-violations` *(added in M1-04, declared by the test-framework pack, exactly-one)* | `tests/Architecture.Tests/ArchitectureRulesTests.cs` | shouldly (`violations.ShouldBeEmpty(description);`) |
 | `tests.assert-does-not-throw` *(added in M1-04, declared by the test-framework pack, exactly-one)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs` | shouldly (`Should.NotThrow(buildContainer);`) |
 
