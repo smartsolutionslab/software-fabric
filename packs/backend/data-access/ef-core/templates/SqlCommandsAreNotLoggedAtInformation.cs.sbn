@@ -7,8 +7,9 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 /// <summary>
 /// EF Core logs every executed command, its SQL text included, at Information under
 /// <c>Microsoft.EntityFrameworkCore.Database.Command</c>, so a settings file whose <c>Default</c> is Information logs
-/// every statement unless it quiets that category. Each shipped <c>appsettings*.json</c> in <c>src</c> that sets a level
-/// able to decide that category is bound as a host binds it, and the logger it configures is asked, for every provider
+/// every statement unless it quiets that category; with no level set at all, logging defaults to Information. Each
+/// <c>appsettings.json</c> in <c>src</c>, and each environment's <c>appsettings.*.json</c> that sets a level able to
+/// decide that category, is bound as a host binds it, and the logger it configures is asked, for every provider
 /// the file gives its own levels as well as for all of them, rather than its text matched: a misspelled category is
 /// inert and still logs the SQL. The AppHost runs no DbContext, so its settings are not in scope.
 /// </summary>
@@ -39,7 +40,7 @@ public sealed class SqlCommandsAreNotLoggedAtInformation : IArchitectureRule
         foreach (var file in files)
         {
             var logging = new ConfigurationBuilder().AddJsonFile(Path.Combine(root, file), optional: false).Build().GetSection("Logging");
-            if (!Governs(logging))
+            if (!IsBase(file) && !Governs(logging))
             {
                 continue;
             }
@@ -56,10 +57,13 @@ public sealed class SqlCommandsAreNotLoggedAtInformation : IArchitectureRule
         }
     }
 
+    /// <summary>A project's <c>appsettings.json</c>, which the host reads in every environment.</summary>
+    private static bool IsBase(string file) => Path.GetFileName(file) == "appsettings.json";
+
     private static string Quoted(string? value) => value is null ? "not set" : $"'{value}'";
 
     /// <summary>
-    /// Whether the file says anything that can decide the SQL category's level: a <c>Default</c>, a key the category
+    /// Whether an environment file says anything that can decide the SQL category's level: a <c>Default</c>, a key the category
     /// starts with, or a wildcard, in <c>Logging:LogLevel</c> or a provider's. A file that says none of these, such as
     /// an environment file that only changes another category, leaves the level to the file it is layered on.
     /// </summary>
