@@ -4,3 +4,13 @@ var keycloak = builder.AddKeycloak("keycloak", 8080)
     .WithDataVolume()
     .WithRealmImport("./realms");
 #pragma warning restore ASPIREHOSTINGKEYCLOAK001, ASPIRECERTIFICATES001
+
+if (builder.ExecutionContext.IsRunMode)
+{
+    // Keycloak's email (verification, reset password) lands in Mailpit, whose inbox is http://localhost:8025; the realm points SMTP at it.
+    var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.33")
+        .WithHttpEndpoint(port: 8025, targetPort: 8025)
+        .WithEndpoint(targetPort: 1025, name: "smtp")
+        .WithHttpHealthCheck("/livez");
+    keycloak.WaitFor(mailpit);
+}

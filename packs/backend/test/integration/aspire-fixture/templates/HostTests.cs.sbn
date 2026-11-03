@@ -13,8 +13,17 @@ func equal(actual, expected)
   end
 end ~}}
 using System.Net;
+{{~ if project["backend.auth"] == "keycloak" ~}}
+using System.Net.Http.Headers;
+{{~ end ~}}
 using System.Net.Http.Json;
+{{~ if project["backend.auth"] == "keycloak" ~}}
+using System.Text.Json.Serialization;
+{{~ end ~}}
 using Aspire.Hosting.ApplicationModel;
+{{~ if project["backend.auth"] == "keycloak" ~}}
+using Aspire.Hosting.Testing;
+{{~ end ~}}
 using Microsoft.Extensions.DependencyInjection;
 
 namespace {{ namespace }}.Integration.Tests;
@@ -22,6 +31,10 @@ namespace {{ namespace }}.Integration.Tests;
 public class HostTests(AspireFixture aspire)
 {
     private static readonly TimeSpan ResourceTimeout = TimeSpan.FromMinutes(2);
+{{~ if project["backend.auth"] == "keycloak" ~}}
+
+    private static readonly string[] UpdatePassword = ["UPDATE_PASSWORD"];
+{{~ end ~}}
 
     [Fact]
     public async Task Every_health_checked_resource_becomes_healthy()
@@ -92,6 +105,21 @@ public class HostTests(AspireFixture aspire)
 
         {{ equal "me?.Name" "\"developer\"" }}
     }
+
+    [Fact]
+    public async Task A_reset_password_email_from_the_realm_reaches_mailpit()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var identity = new HttpClient { BaseAddress = aspire.App.GetEndpoint("keycloak", "http") };
+        identity.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await AdminTokenAsync(identity, cancellationToken));
+        var users = await identity.GetFromJsonAsync<RealmUser[]>(new Uri("/admin/realms/{{ name }}/users?username=developer&exact=true", UriKind.Relative), cancellationToken) ?? [];
+
+        using var sent = await identity.PutAsJsonAsync(new Uri($"/admin/realms/{{ name }}/users/{users.Single().Id}/execute-actions-email", UriKind.Relative), UpdatePassword, cancellationToken);
+
+        {{ status "sent" "NoContent" }}
+        var recipient = await RecipientAsync("developer@example.com", cancellationToken);
+        {{ equal "recipient" "\"developer@example.com\"" }}
+    }
 {{~ end ~}}
 {{~ if project["backend.tenancy"] != "none" && project["backend.auth"] == "keycloak" ~}}
 
@@ -109,7 +137,57 @@ public class HostTests(AspireFixture aspire)
     }
 {{~ end ~}}
 
+{{~ if project["backend.auth"] == "keycloak" ~}}
+    /// <summary>A token of the master realm's administrator; Aspire names it "admin" unless the AppHost passes a user name.</summary>
+    private async Task<string> AdminTokenAsync(HttpClient identity, CancellationToken cancellationToken)
+    {
+        var keycloak = aspire.App.Services.GetRequiredService<DistributedApplicationModel>().Resources.OfType<KeycloakResource>().Single();
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = "admin-cli",
+            ["username"] = keycloak.AdminUserNameParameter is { } user ? await user.GetValueAsync(cancellationToken) ?? string.Empty : "admin",
+            ["password"] = await keycloak.AdminPasswordParameter.GetValueAsync(cancellationToken) ?? string.Empty,
+        });
+        using var response = await identity.PostAsync(new Uri("/realms/master/protocol/openid-connect/token", UriKind.Relative), form, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var token = await response.Content.ReadFromJsonAsync<AdminToken>(cancellationToken);
+        return token?.AccessToken ?? throw new InvalidOperationException("The master realm returned no token.");
+    }
+
+    /// <summary>The recipient of the first email Mailpit caught for the address, or an empty string when none arrives.</summary>
+    private async Task<string> RecipientAsync(string address, CancellationToken cancellationToken)
+    {
+        using var mailpit = new HttpClient { BaseAddress = aspire.App.GetEndpoint("mailpit", "http") };
+        for (var attempt = 0; attempt < 30; attempt++)
+        {
+            var inbox = await mailpit.GetFromJsonAsync<Inbox>(new Uri($"/api/v1/search?query=to:{address}", UriKind.Relative), cancellationToken);
+            var recipient = inbox?.Messages.SelectMany(message => message.To).FirstOrDefault(to => to.Address == address);
+            if (recipient is not null)
+            {
+                return recipient.Address;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
+
+        return string.Empty;
+    }
+
+{{~ end ~}}
     private sealed record Me(string? Name);
 
     private sealed record Tenant(string? TenantId);
+{{~ if project["backend.auth"] == "keycloak" ~}}
+
+    private sealed record AdminToken([property: JsonPropertyName("access_token")] string AccessToken);
+
+    private sealed record RealmUser(string Id);
+
+    private sealed record Inbox(IReadOnlyList<Message> Messages);
+
+    private sealed record Message(IReadOnlyList<Recipient> To);
+
+    private sealed record Recipient(string Address);
+{{~ end ~}}
 }

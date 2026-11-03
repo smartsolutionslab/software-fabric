@@ -2,6 +2,15 @@
   "realm": "{{ name }}",
   "enabled": true,
   "registrationAllowed": false,
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "noreply@example.com",
+    "fromDisplayName": "{{ name }}",
+    "ssl": "false",
+    "starttls": "false",
+    "auth": "false"
+  },
 {{~ if project["backend.tenancy"] != "none" ~}}
   "groups": [
     { "name": "tenants", "subGroups": [ { "name": "tenant-a" }, { "name": "tenant-b" } ] }

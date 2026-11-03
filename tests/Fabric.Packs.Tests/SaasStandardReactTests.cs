@@ -402,7 +402,7 @@ public sealed class SaasStandardReactTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 8");
+        output.ShouldContain("succeeded: 9");
     }
 
     [Theory]
