@@ -19,7 +19,8 @@ and is described by `pack.yaml` (schema: `schema/pack.schema.json`).
 A pack contributes to the generated project in exactly two ways:
 
 1. **Files it owns.** Paths no other pack writes to. The generator fails
-   if two selected packs claim the same target path.
+   if two selected packs claim the same target path. A file entry may carry
+   a `when` condition (ADR-0006); the path stays the pack's either way.
 2. **Slot contributions.** A slot is a named extension point declared by
    the base or by another pack — e.g. `backend.module.registration`,
    `apphost.resources`, `frontend.app.bootstrap`. A slot has a cardinality

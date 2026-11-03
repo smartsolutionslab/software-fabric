@@ -36,9 +36,25 @@ The rules:
 4. **The matrix covers the branches** (ADR-0003): the pairwise run picks
    up each branch through the combinations it already generates.
 
+**A whole file may branch too.** A `pack.yaml` file entry may carry
+`when: <Scriban condition>`, evaluated against the same model as the
+templates (`when: project["backend.llm"] != "none"`). This lets the base
+ship a file only some choices need without changing any other choice's
+output.
+
+- `false` leaves the file out; `true` renders it as any other file.
+- A condition that does not parse, fails, or yields anything but `true` or
+  `false` is a generation error naming the pack and the file — rule 2:
+  never a silent `false`.
+- A template that renders empty is still written. Only `when` decides
+  whether a file exists; an empty render is not a condition.
+- The target is claimed by the pack whatever the condition says
+  (ADR-0002), so two packs cannot split a path between them by condition.
+
 ## Consequences
 
 - Wolverine, Keycloak and the Shouldly ban list use branches today; each
   is visible in the template, next to the code it changes.
 - Reviewing a pack means reading its branches against the catalog's
-  options for the dimension it reads.
+  options for the dimension it reads — in its templates and in the
+  `when` of its file entries.
