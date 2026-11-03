@@ -29,6 +29,30 @@ public sealed class SqlCommandLogLevelTests
     }
 
     [Fact]
+    public void The_generated_migration_runner_settings_keep_sql_commands_below_information()
+    {
+        using var project = new GeneratedProject(Profile);
+
+        var settings = Path.Combine(project.ProjectDirectory, "src", "MigrationRunner", "appsettings.json");
+
+        File.Exists(settings).ShouldBeTrue();
+        File.ReadAllText(settings).ShouldContain("\"Microsoft.EntityFrameworkCore.Database.Command\": \"Warning\"");
+    }
+
+    [Fact]
+    public void A_migration_runner_that_ships_no_settings_fails_the_architecture_tests_naming_it()
+    {
+        using var project = new GeneratedProject(Profile);
+        File.Delete(Path.Combine(project.ProjectDirectory, "src", "MigrationRunner", "appsettings.json"));
+        project.Build();
+
+        var (exitCode, output) = project.Test(ArchitectureTests);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("src/MigrationRunner: ships no appsettings.json, so logging starts from its Information default");
+    }
+
+    [Fact]
     public void Setting_the_sql_command_level_back_to_information_or_misspelling_it_fails_the_architecture_tests()
     {
         using var project = new GeneratedProject(Profile);
