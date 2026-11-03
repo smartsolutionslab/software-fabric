@@ -291,6 +291,16 @@ public sealed partial class PrimitiveBoundaryTests
 
         internal sealed class Line<TTag>(TypedId<TTag> id) : Entity<TypedId<TTag>>(id);
 
+        internal sealed class Node<T>
+        {
+            public Node<List<T>>? Next { get; }
+        }
+
+        internal sealed class Route
+        {
+            public Node<Shipment>? Start { get; }
+        }
+
         internal sealed class Order : AggregateRoot<TypedId<Order>>
         {
             private readonly List<Line<Shipment>> lines = [];
