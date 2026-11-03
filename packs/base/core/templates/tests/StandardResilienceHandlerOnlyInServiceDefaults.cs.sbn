@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -37,15 +38,32 @@ public sealed class StandardResilienceHandlerOnlyInServiceDefaults : IArchitectu
             .Where(path => !path.StartsWith(RegistrationSite, StringComparison.Ordinal))
             .Order(StringComparer.Ordinal))
         {
-            var syntax = CSharpSyntaxTree.ParseText(File.ReadAllText(Path.Combine(root, path)), path: path);
-            foreach (var name in syntax.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Select(CalledName).Where(name => name?.Identifier.ValueText == Registration))
+            foreach (var line in RegistrationLines(File.ReadAllText(Path.Combine(root, path)), firstLine: 1))
             {
-                var line = name!.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
                 violations.Add($"{path}:{line}: calls {Registration} outside {RegistrationSite}, nesting a second resilience pipeline inside the one AddServiceDefaults() already gives every HttpClient. Configure that pipeline's HttpStandardResilienceOptions instead, or opt a client back into retrying POST and PATCH with RetryEveryMethod().");
             }
         }
 
         return violations;
+    }
+
+    /// <summary>
+    /// The lines of every call, in any branch of an <c>#if</c>: a branch the parse leaves disabled (<c>DEBUG</c>, a
+    /// target framework symbol) is still compiled by some build, so its text is parsed in turn.
+    /// </summary>
+    private static IEnumerable<int> RegistrationLines(string source, int firstLine)
+    {
+        var root = CSharpSyntaxTree.ParseText(source).GetRoot();
+        var calls = root.DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Select(CalledName)
+            .Where(name => name?.Identifier.ValueText == Registration)
+            .Select(name => firstLine + name!.GetLocation().GetLineSpan().StartLinePosition.Line);
+        var disabled = root.DescendantTrivia()
+            .Where(trivia => trivia.IsKind(SyntaxKind.DisabledTextTrivia))
+            .SelectMany(trivia => RegistrationLines(trivia.ToFullString(), firstLine + trivia.GetLocation().GetLineSpan().StartLinePosition.Line));
+
+        return calls.Concat(disabled);
     }
 
     /// <summary>A call by any spelling: <c>x.Add…()</c>, <c>x?.Add…()</c>, or the bare name under <c>using static</c>.</summary>
