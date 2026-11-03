@@ -24,8 +24,9 @@ caller sends.
 a `Nullable<T>` counts too.
 
 **Exemptions.** A value object holds its own backing values (`InvoiceNumber.Value` is a `string`). A computed `bool`
-without a setter or backing field (`IsPaid => PaidAt is not null`) is an answer, not state; no other get-only property
-is exempt, because reflection cannot tell a computed number from stored state.
+without a setter (`IsPaid => PaidAt is not null`) is an answer, not state, unless its getter only returns a field
+(`IsArchived => archived`), which is stored state. No other get-only property is exempt, because reflection cannot
+tell a computed number from stored state.
 
 **Persistence.** EF Core maps every `IValueObject<T>` of a module's Domain to its backing value by convention
 (`ConfigureConventions` in `ModuleDbContext`) and reads it back through `From`, so entity configurations never convert

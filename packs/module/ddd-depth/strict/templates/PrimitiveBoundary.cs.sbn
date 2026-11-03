@@ -135,13 +135,15 @@ public static class PrimitiveBoundary
 
     /// <summary>
     /// A predicate the model computes (<c>IsPaid =&gt; PaidAt is not null</c>) is an answer, not state. Only a
-    /// <c>bool</c> without a setter or backing field counts: reflection cannot tell <c>Total =&gt; total</c>, which is
-    /// stored state, from a computed number, so anything else get-only stays state.
+    /// <c>bool</c> without a setter counts, and only when its getter does more than return a field
+    /// (<c>ldarg.0; ldfld; ret</c>): <c>IsArchived =&gt; archived</c> is stored state whether the field is the
+    /// compiler's or its own. Reflection cannot tell <c>Total =&gt; total</c> from a computed number as cheaply, so
+    /// anything else get-only stays state.
     /// </summary>
     private static bool IsComputedAnswer(PropertyInfo property) =>
         property.PropertyType == typeof(bool)
         && property.GetSetMethod(nonPublic: true) is null
-        && property.DeclaringType!.GetField($"<{property.Name}>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance) is null;
+        && property.GetGetMethod(nonPublic: true)?.GetMethodBody()?.GetILAsByteArray() is not [0x02, 0x7B, _, _, _, _, 0x2A];
 
     private static bool DerivesFrom(Type type, string genericBase)
     {
