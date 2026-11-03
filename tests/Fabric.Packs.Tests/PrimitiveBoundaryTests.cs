@@ -287,8 +287,13 @@ public sealed partial class PrimitiveBoundaryTests
             }
         }
 
+        internal sealed class Shipment;
+
+        internal sealed class Line<TTag>(TypedId<TTag> id) : Entity<TypedId<TTag>>(id);
+
         internal sealed class Order : AggregateRoot<TypedId<Order>>
         {
+            private readonly List<Line<Shipment>> lines = [];
             private readonly List<Positive<int>> parcels = [];
             private readonly List<int> weights = [];
 
@@ -296,6 +301,8 @@ public sealed partial class PrimitiveBoundaryTests
                 : base(id) => Quantity = quantity;
 
             public Positive<int> Quantity { get; private set; }
+
+            public IReadOnlyList<Line<Shipment>> Lines => lines;
 
             public IReadOnlyList<Positive<int>> Parcels => parcels;
 
@@ -325,8 +332,26 @@ public sealed partial class PrimitiveBoundaryTests
                 builder.ToTable("orders");
                 builder.HasKey(order => order.Id);
                 builder.Property(order => order.Quantity);
+                builder.Ignore(order => order.Lines);
                 builder.Ignore(order => order.Parcels);
                 builder.Ignore(order => order.Weights);
+            }
+        }
+        """;
+
+    private const string OrderLineConfiguration = """
+        using Microsoft.EntityFrameworkCore;
+        using Microsoft.EntityFrameworkCore.Metadata.Builders;
+        using Shop.Modules.Billing.Domain.Orders;
+
+        namespace Shop.Modules.Billing.Infrastructure.Persistence.Configurations;
+
+        internal sealed class OrderLineConfiguration : IEntityTypeConfiguration<Line<Shipment>>
+        {
+            public void Configure(EntityTypeBuilder<Line<Shipment>> builder)
+            {
+                builder.ToTable("order_lines");
+                builder.HasKey(line => line.Id);
             }
         }
         """;
@@ -351,6 +376,18 @@ public sealed partial class PrimitiveBoundaryTests
 
                 order.FindProperty("Id").ShouldNotBeNull().GetTypeMapping().Converter.ShouldNotBeNull().ProviderClrType.ShouldBe(typeof(Guid));
                 order.FindProperty("Quantity").ShouldNotBeNull().GetTypeMapping().Converter.ShouldNotBeNull().ProviderClrType.ShouldBe(typeof(int));
+            }
+
+            [Fact]
+            public void A_closed_generic_value_object_reached_only_through_a_generic_entity_maps_by_convention()
+            {
+                using var services = new ServiceCollection().BuildServiceProvider();
+                var options = new DbContextOptionsBuilder<BillingDbContext>().UseNpgsql("Host=localhost").Options;
+                using var context = new BillingDbContext(options, services);
+
+                var line = context.Model.GetEntityTypes().Single(type => type.ClrType.Name == "Line`1");
+
+                line.FindProperty("Id").ShouldNotBeNull().GetTypeMapping().Converter.ShouldNotBeNull().ProviderClrType.ShouldBe(typeof(Guid));
             }
         }
         """;
@@ -418,6 +455,7 @@ public sealed partial class PrimitiveBoundaryTests
         project.WriteTypes("src/Modules/Billing/Billing.Domain/Orders", Orders);
         project.Write("src/Modules/Billing/Billing.Domain/Orders/OrdersVisibleToInfrastructure.cs", OrdersVisibleToInfrastructure);
         project.WriteTypes("src/Modules/Billing/Billing.Infrastructure/Persistence/Configurations", OrderConfiguration);
+        project.WriteTypes("src/Modules/Billing/Billing.Infrastructure/Persistence/Configurations", OrderLineConfiguration);
         project.WriteTypes("tests/Modules/Billing.Tests", OrderModelTests);
         project.Build();
 
