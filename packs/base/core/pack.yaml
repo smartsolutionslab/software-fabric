@@ -58,6 +58,7 @@ files:
   - { template: templates/tests/RetryProbe.cs.sbn, target: tests/Architecture.Tests/Rules/RetryProbe.cs }
   - { template: templates/tests/HttpClientsRetryOnlyIdempotentMethods.cs.sbn, target: tests/Architecture.Tests/Rules/HttpClientsRetryOnlyIdempotentMethods.cs }
   - { template: templates/tests/RetryEveryMethodOptsAClientBackIn.cs.sbn, target: tests/Architecture.Tests/Rules/RetryEveryMethodOptsAClientBackIn.cs }
+  - { template: templates/tests/StandardResilienceHandlerOnlyInServiceDefaults.cs.sbn, target: tests/Architecture.Tests/Rules/StandardResilienceHandlerOnlyInServiceDefaults.cs }
   - { template: templates/tests/WorkflowActionsArePinned.cs.sbn, target: tests/Architecture.Tests/Rules/WorkflowActionsArePinned.cs }
   - { template: templates/Modules/Domain.csproj.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/{{ module.namespace }}.Domain.csproj", per-module: true }
   - { template: templates/Modules/Application.csproj.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/{{ module.namespace }}.Application.csproj", per-module: true }
@@ -114,6 +115,7 @@ gates:
   - { kind: architecture-test, describes: "Every module's Api assembly has exactly one IModule (ADR-0005).", file: templates/tests/EveryModuleHasOneIModule.cs.sbn }
   - { kind: architecture-test, describes: "HttpClients from AddServiceDefaults() retry only idempotent methods; a POST or PATCH gets one attempt.", file: templates/tests/HttpClientsRetryOnlyIdempotentMethods.cs.sbn }
   - { kind: architecture-test, describes: "RetryEveryMethod() opts one HttpClient back into retrying POST and PATCH on transient failures.", file: templates/tests/RetryEveryMethodOptsAClientBackIn.cs.sbn }
+  - { kind: architecture-test, describes: "AddStandardResilienceHandler is called only in src/ServiceDefaults; a second call nests a second pipeline (4 attempts become 16).", file: templates/tests/StandardResilienceHandlerOnlyInServiceDefaults.cs.sbn }
   - { kind: architecture-test, describes: "Every workflow step uses an action pinned to a full commit SHA, a local action or a docker image by digest.", file: templates/tests/WorkflowActionsArePinned.cs.sbn }
   - { kind: analyzer, describes: "DateTime.Now, DateTime.UtcNow, DateTimeOffset.Now and DateTimeOffset.UtcNow are banned (RS0030) in every project but the AppHost; the time comes from TimeProvider.", file: templates/TimeBannedSymbols.txt.sbn }
   - { kind: analyzer, describes: "Guid.NewGuid is banned (RS0030) in every project but the AppHost, tests included; every Guid is a time-ordered Guid.CreateVersion7().", file: templates/IdentifierBannedSymbols.txt.sbn }

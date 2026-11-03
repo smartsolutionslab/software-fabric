@@ -1,0 +1,90 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// <c>AddServiceDefaults()</c> gives every HttpClient the standard resilience handler. A second
+/// <c>AddStandardResilienceHandler</c> on a client does not replace that pipeline, it nests a whole second one inside
+/// it: four attempts become sixteen, behind two circuit breakers and two total-request budgets. Nothing fails; the
+/// client is only slower and more patient during an outage, when nobody reads registration code. A second call inside
+/// <c>src/ServiceDefaults</c> is what <see cref="HttpClientsRetryOnlyIdempotentMethods"/> counts; this rule covers
+/// every other file. Sources are parsed, not grepped: a registration leaves nothing in IL to tell one call from two, and a
+/// call is found however it is formatted, while a comment or a string literal that spells one is prose.
+/// </summary>
+public sealed class StandardResilienceHandlerOnlyInServiceDefaults : IArchitectureRule
+{
+    private const string Registration = "AddStandardResilienceHandler";
+
+    private const string RegistrationSite = "src/ServiceDefaults/";
+
+    private static readonly string[] ScannedTrees = ["src", "tests"];
+
+    public string Description => "AddStandardResilienceHandler is called only in src/ServiceDefaults, which applies it to every HttpClient.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var root = RepositoryRoot();
+        List<string> violations = [];
+        foreach (var path in ScannedTrees
+            .Select(tree => Path.Combine(root, tree))
+            .Where(Directory.Exists)
+            .SelectMany(tree => Directory.EnumerateFiles(tree, "*.cs", SearchOption.AllDirectories))
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
+            .Where(path => !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
+            .Where(path => !path.StartsWith(RegistrationSite, StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal))
+        {
+            foreach (var line in RegistrationLines(File.ReadAllText(Path.Combine(root, path)), firstLine: 1))
+            {
+                violations.Add($"{path}:{line}: calls {Registration} outside {RegistrationSite}, nesting a second resilience pipeline inside the one AddServiceDefaults() already gives every HttpClient. Configure that pipeline's HttpStandardResilienceOptions instead, or opt a client back into retrying POST and PATCH with RetryEveryMethod().");
+            }
+        }
+
+        return violations;
+    }
+
+    /// <summary>
+    /// The lines of every call, in any branch of an <c>#if</c>: a branch the parse leaves disabled (<c>DEBUG</c>, a
+    /// target framework symbol) is still compiled by some build, so its text is parsed in turn.
+    /// </summary>
+    private static IEnumerable<int> RegistrationLines(string source, int firstLine)
+    {
+        var root = CSharpSyntaxTree.ParseText(source).GetRoot();
+        var calls = root.DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Select(CalledName)
+            .Where(name => name?.Identifier.ValueText == Registration)
+            .Select(name => firstLine + name!.GetLocation().GetLineSpan().StartLinePosition.Line);
+        var disabled = root.DescendantTrivia()
+            .Where(trivia => trivia.IsKind(SyntaxKind.DisabledTextTrivia))
+            .SelectMany(trivia => RegistrationLines(trivia.ToFullString(), firstLine + trivia.GetLocation().GetLineSpan().StartLinePosition.Line));
+
+        return calls.Concat(disabled);
+    }
+
+    /// <summary>A call by any spelling: <c>x.Add…()</c>, <c>x?.Add…()</c>, or the bare name under <c>using static</c>.</summary>
+    private static SimpleNameSyntax? CalledName(InvocationExpressionSyntax invocation) =>
+        invocation.Expression switch
+        {
+            MemberAccessExpressionSyntax access => access.Name,
+            MemberBindingExpressionSyntax binding => binding.Name,
+            SimpleNameSyntax simple => simple,
+            _ => null,
+        };
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+}
