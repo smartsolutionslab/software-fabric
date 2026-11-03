@@ -626,7 +626,12 @@ public sealed class EventDrivenBackendTests
         var invoice = Guid.NewGuid();
         (await host.PostAsync($"/billing/invoices/{invoice}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
 
-        await RedeliveredEvent.ShouldHaveBeenDeliveredTwiceWithTheSameMetadataAsync(host, publishedAfter, null, attempts: 120);
+        await RedeliveredEvent.ShouldHaveBeenDeliveredTwiceWithTheSameMetadataAsync(
+            host,
+            publishedAfter,
+            null,
+            attempts: 120,
+            redeliver: () => RedeliveredEvent.ReplayWolverineDeadLettersAsync(postgres, DatabasePassword));
 
         // Without a transport Wolverine would deliver the event in process; it must have crossed on the broker.
         kafka.FirstKafkaMessage("Shop.Contracts.Billing.InvoicePaidV1").ShouldContain(invoice.ToString());

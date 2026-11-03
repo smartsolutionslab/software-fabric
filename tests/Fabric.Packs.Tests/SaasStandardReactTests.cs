@@ -298,7 +298,12 @@ public sealed class SaasStandardReactTests
         var publishedAfter = TimeProvider.System.GetUtcNow();
         (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
 
-        await RedeliveredEvent.ShouldHaveBeenDeliveredTwiceWithTheSameMetadataAsync(host, publishedAfter, "tenant-a", attempts: 60);
+        await RedeliveredEvent.ShouldHaveBeenDeliveredTwiceWithTheSameMetadataAsync(
+            host,
+            publishedAfter,
+            "tenant-a",
+            attempts: 60,
+            redeliver: () => RedeliveredEvent.ReplayWolverineDeadLettersAsync(postgres, DatabasePassword));
     }
 
     [Fact]
