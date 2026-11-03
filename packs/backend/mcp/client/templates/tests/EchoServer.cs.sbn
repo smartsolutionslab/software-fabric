@@ -10,11 +10,15 @@ public static class EchoServer
     /// <summary>The variable a started server needs, as a stand-in for a credential; it refuses to start without it.</summary>
     public const string TokenVariable = "MCP_TEST_SERVER_TOKEN";
 
-    /// <summary>The server over HTTP on a free local port, answering only requests that carry the bearer token.</summary>
-    public static async Task<WebApplication> StartHttpAsync(string bearerToken, CancellationToken cancellationToken)
+    /// <summary>
+    /// The server over HTTP on a free local port, answering only requests that carry the bearer token; its echo starts
+    /// with the label.
+    /// </summary>
+    public static async Task<WebApplication> StartHttpAsync(string bearerToken, string label, CancellationToken cancellationToken)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Configuration[EchoTools.LabelKey] = label;
         builder.Services.AddMcpServer().WithHttpTransport(options => options.Stateless = true).WithTools([typeof(EchoTools)]);
 
         var app = builder.Build();

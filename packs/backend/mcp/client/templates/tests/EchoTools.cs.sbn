@@ -1,14 +1,18 @@
 using System.ComponentModel;
+using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Server;
 
 namespace {{ namespace }}.Mcp.TestServer;
 
+/// <summary>The test server's tools; the echo carries the server's label, so a test sees which server answered.</summary>
 [McpServerToolType]
-public static class EchoTools
+public sealed class EchoTools(IConfiguration configuration)
 {
+    public const string LabelKey = "EchoLabel";
+
     [McpServerTool(Name = "echo")]
     [Description("Answers with the text it was given.")]
-    public static string Echo(string text) => $"echo: {text}";
+    public string Echo(string text) => $"{configuration[LabelKey] ?? "echo"}: {text}";
 
     [McpServerTool(Name = "sees")]
     [Description("Whether this server's process sees the environment variable.")]

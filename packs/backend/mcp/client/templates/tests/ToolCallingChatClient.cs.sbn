@@ -4,11 +4,14 @@ using Microsoft.Extensions.AI;
 namespace {{ namespace }}.Mcp.Tests;
 
 /// <summary>
-/// A stand-in model: asked first, it calls the offered echo tool; given the tool's result, it answers with it. No test
-/// calls a real model.
+/// A stand-in model: asked first, it calls the named tool if it is offered; given the tool's result, it answers with
+/// it. No test calls a real model.
 /// </summary>
-internal sealed class ToolCallingChatClient : IChatClient
+internal sealed class ToolCallingChatClient(string toolName) : IChatClient
 {
+    /// <summary>The names of the tools the last request offered.</summary>
+    public IReadOnlyList<string> Offered { get; private set; } = [];
+
     public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         var result = messages.SelectMany(message => message.Contents).OfType<FunctionResultContent>().LastOrDefault();
@@ -18,12 +21,13 @@ internal sealed class ToolCallingChatClient : IChatClient
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, $"The tool said: {answer}")));
         }
 
-        if (options?.Tools?.Any(tool => tool.Name == "echo") != true)
+        Offered = [.. options?.Tools?.Select(tool => tool.Name) ?? []];
+        if (!Offered.Contains(toolName))
         {
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "No echo tool was offered.")));
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, $"No tool {toolName} was offered.")));
         }
 
-        var call = new FunctionCallContent("call-1", "echo", new Dictionary<string, object?> { ["text"] = "hello" });
+        var call = new FunctionCallContent("call-1", toolName, new Dictionary<string, object?> { ["text"] = "hello" });
         return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, [call])));
     }
 

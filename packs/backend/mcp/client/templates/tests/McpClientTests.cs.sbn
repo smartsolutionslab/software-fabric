@@ -22,7 +22,7 @@ public sealed class McpClientTests
     public async Task A_server_declared_by_url_lists_its_tools_and_answers_a_call()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var server = await EchoServer.StartHttpAsync(Token, cancellationToken);
+        await using var server = await EchoServer.StartHttpAsync(Token, "echo", cancellationToken);
         await using var services = await HostServicesAsync(DeclareByUrl(withToken: true), UrlParameters(server), cancellationToken);
         var tools = services.GetRequiredService<IMcpTools>();
 
@@ -38,7 +38,7 @@ public sealed class McpClientTests
     public async Task A_server_declared_by_url_without_its_token_refuses_the_client()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var server = await EchoServer.StartHttpAsync(Token, cancellationToken);
+        await using var server = await EchoServer.StartHttpAsync(Token, "echo", cancellationToken);
         await using var services = await HostServicesAsync(DeclareByUrl(withToken: false), UrlParameters(server), cancellationToken);
         var tools = services.GetRequiredService<IMcpTools>();
 
@@ -76,15 +76,65 @@ public sealed class McpClientTests
     public async Task A_tool_call_the_model_asks_for_runs_on_the_server_and_its_result_goes_back_to_the_model()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        await using var server = await EchoServer.StartHttpAsync(Token, cancellationToken);
+        await using var server = await EchoServer.StartHttpAsync(Token, "echo", cancellationToken);
         await using var services = await HostServicesAsync(DeclareByUrl(withToken: true), UrlParameters(server), cancellationToken);
-        using var chat = new ChatClientBuilder(new ToolCallingChatClient()).UseMcpTools().Build(services);
+        using var chat = new ChatClientBuilder(new ToolCallingChatClient("echo-server__echo")).UseMcpTools(AllowEveryCall).Build(services);
 
         var response = await chat.GetResponseAsync("Say hello through the echo tool.", cancellationToken: cancellationToken);
 
         response.Text.ShouldStartWith("The tool said:");
         response.Text.ShouldContain("echo: hello");
     }
+
+    [Fact]
+    public async Task Two_servers_with_a_tool_of_the_same_name_offer_it_under_their_own_names_and_each_call_reaches_its_server()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var first = await EchoServer.StartHttpAsync(Token, "first", cancellationToken);
+        await using var second = await EchoServer.StartHttpAsync(Token, "second", cancellationToken);
+        await using var services = await HostServicesAsync(
+            (builder, host) => host
+                .WithMcpServerUrl("first", builder.AddParameter("first-url"), builder.AddParameter("first-token", secret: true))
+                .WithMcpServerUrl("second", builder.AddParameter("second-url"), builder.AddParameter("second-token", secret: true)),
+            new Dictionary<string, string> { ["first-url"] = Endpoint(first), ["first-token"] = Token, ["second-url"] = Endpoint(second), ["second-token"] = Token },
+            cancellationToken);
+        var model = new ToolCallingChatClient("second__echo");
+        using var chat = new ChatClientBuilder(model).UseMcpTools(AllowEveryCall).Build(services);
+
+        var response = await chat.GetResponseAsync("Say hello through the second server's echo.", cancellationToken: cancellationToken);
+
+        model.Offered.ShouldContain("first__echo");
+        model.Offered.ShouldContain("second__echo");
+        response.Text.ShouldContain("second: hello");
+    }
+
+    [Fact]
+    public async Task A_tool_call_the_check_refuses_never_reaches_the_server_and_the_model_is_told_so()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var server = await EchoServer.StartHttpAsync(Token, "echo", cancellationToken);
+        await using var services = await HostServicesAsync(DeclareByUrl(withToken: true), UrlParameters(server), cancellationToken);
+        List<McpToolCall> checkedCalls = [];
+        using var chat = new ChatClientBuilder(new ToolCallingChatClient("echo-server__echo"))
+            .UseMcpTools(call =>
+            {
+                checkedCalls.Add(call);
+                return false;
+            })
+            .Build(services);
+
+        var response = await chat.GetResponseAsync("Say hello through the echo tool.", cancellationToken: cancellationToken);
+
+        var refused = checkedCalls.ShouldHaveSingleItem();
+        refused.Server.ShouldBe("echo-server");
+        refused.Tool.ShouldBe("echo");
+        refused.Arguments["text"]?.ToString().ShouldBe("hello");
+        response.Text.ShouldNotContain("echo: hello");
+        response.Text.ShouldContain("refused");
+    }
+
+    /// <summary>The check a test passes when the call itself is not under test; a project checks the arguments.</summary>
+    private static bool AllowEveryCall(McpToolCall call) => true;
 
     private static Action<IDistributedApplicationTestingBuilder, IResourceBuilder<ProjectResource>> DeclareByUrl(bool withToken) =>
         (builder, host) => host.WithMcpServerUrl(
@@ -93,7 +143,9 @@ public sealed class McpClientTests
             withToken ? builder.AddParameter("echo-server-token", secret: true) : null);
 
     private static Dictionary<string, string> UrlParameters(WebApplication server) =>
-        new() { ["echo-server-url"] = $"{server.Urls.Single()}/mcp", ["echo-server-token"] = Token };
+        new() { ["echo-server-url"] = Endpoint(server), ["echo-server-token"] = Token };
+
+    private static string Endpoint(WebApplication server) => $"{server.Urls.Single()}/mcp";
 
     private static async Task<ServiceProvider> HostServicesAsync(
         Action<IDistributedApplicationTestingBuilder, IResourceBuilder<ProjectResource>> declare,
