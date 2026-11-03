@@ -39,7 +39,8 @@ public static class ValueObjectConventions
 
     /// <summary>
     /// The Domain's closed value-object types: those it declares, and those its types' properties and fields use,
-    /// inside collections, arrays and other generic arguments too.
+    /// inside collections, arrays and other generic arguments too, and inside the closed Domain types they reach:
+    /// <c>Line&lt;Shipment&gt; : Entity&lt;TypedId&lt;Shipment&gt;&gt;</c> uses <c>TypedId&lt;Shipment&gt;</c>.
     /// </summary>
     private static HashSet<Type> ValueObjectsOf(Assembly domain)
     {
@@ -47,18 +48,19 @@ public static class ValueObjectConventions
         HashSet<Type> visited = [];
         foreach (var type in domain.GetTypes())
         {
-            Collect(type, valueObjects, visited);
-            foreach (var member in type.GetProperties(State).Select(property => property.PropertyType)
-                .Concat(type.GetFields(State).Select(field => field.FieldType)))
+            Collect(type, domain, valueObjects, visited);
+
+            // An open definition is not collected itself, but a closed type its members use still is.
+            if (type.ContainsGenericParameters)
             {
-                Collect(member, valueObjects, visited);
+                CollectMembers(type, domain, valueObjects, visited);
             }
         }
 
         return valueObjects;
     }
 
-    private static void Collect(Type type, HashSet<Type> valueObjects, HashSet<Type> visited)
+    private static void Collect(Type type, Assembly domain, HashSet<Type> valueObjects, HashSet<Type> visited)
     {
         if (type.ContainsGenericParameters || !visited.Add(type))
         {
@@ -67,17 +69,31 @@ public static class ValueObjectConventions
 
         if (type.HasElementType)
         {
-            Collect(type.GetElementType()!, valueObjects, visited);
+            Collect(type.GetElementType()!, domain, valueObjects, visited);
         }
 
         foreach (var argument in type.IsGenericType ? type.GetGenericArguments() : [])
         {
-            Collect(argument, valueObjects, visited);
+            Collect(argument, domain, valueObjects, visited);
+        }
+
+        if (type.Assembly == domain)
+        {
+            CollectMembers(type, domain, valueObjects, visited);
         }
 
         if (type is { IsClass: true, IsAbstract: false } && typeof(IValueObject).IsAssignableFrom(type))
         {
             valueObjects.Add(type);
+        }
+    }
+
+    private static void CollectMembers(Type type, Assembly domain, HashSet<Type> valueObjects, HashSet<Type> visited)
+    {
+        foreach (var member in type.GetProperties(State).Select(property => property.PropertyType)
+            .Concat(type.GetFields(State).Select(field => field.FieldType)))
+        {
+            Collect(member, domain, valueObjects, visited);
         }
     }
 }
