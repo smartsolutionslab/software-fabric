@@ -8,6 +8,7 @@ files:
   - { template: templates/NoServices.cs.sbn, target: src/BuildingBlocks/Persistence/NoServices.cs }
   - { template: templates/MigrationRunner.csproj.sbn, target: src/MigrationRunner/MigrationRunner.csproj }
   - { template: templates/MigrationRunner.cs.sbn, target: src/MigrationRunner/Program.cs }
+  - { template: templates/MigrationRunner.appsettings.json.sbn, target: src/MigrationRunner/appsettings.json }
   - { template: templates/UniqueConstraintResponses.cs.sbn, target: src/BuildingBlocks/Persistence/Wiring/UniqueConstraintResponses.cs }
   - { template: templates/DesignTimeFactory.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/{{ module.namespace }}DbContextFactory.cs", per-module: true }
 declares-slots:
@@ -33,4 +34,4 @@ agents:
 adr: docs/adr.md
 gates:
   - { kind: architecture-test, describes: "Each module has at most one DbContext, in its Infrastructure project, deriving from ModuleDbContext.", file: templates/OneDbContextPerModule.cs.sbn }
-  - { kind: architecture-test, describes: "No shipped appsettings*.json logs EF Core's SQL commands (Microsoft.EntityFrameworkCore.Database.Command) at Information.", file: templates/SqlCommandsAreNotLoggedAtInformation.cs.sbn }
+  - { kind: architecture-test, describes: "No shipped appsettings*.json logs EF Core's SQL commands (Microsoft.EntityFrameworkCore.Database.Command) at Information, and no executable project under src (the AppHost aside) ships without an appsettings.json, which would leave it at the Information default.", file: templates/SqlCommandsAreNotLoggedAtInformation.cs.sbn }
