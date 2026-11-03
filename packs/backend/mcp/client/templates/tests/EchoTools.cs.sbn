@@ -1,0 +1,16 @@
+using System.ComponentModel;
+using ModelContextProtocol.Server;
+
+namespace {{ namespace }}.Mcp.TestServer;
+
+[McpServerToolType]
+public static class EchoTools
+{
+    [McpServerTool(Name = "echo")]
+    [Description("Answers with the text it was given.")]
+    public static string Echo(string text) => $"echo: {text}";
+
+    [McpServerTool(Name = "sees")]
+    [Description("Whether this server's process sees the environment variable.")]
+    public static bool Sees(string variable) => Environment.GetEnvironmentVariable(variable) is not null;
+}

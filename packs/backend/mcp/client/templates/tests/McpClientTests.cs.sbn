@@ -1,0 +1,106 @@
+using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Testing;
+using {{ namespace }}.BuildingBlocks.Mcp;
+using {{ namespace }}.Mcp.TestServer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Mcp.Tests;
+
+/// <summary>
+/// Servers declared in the AppHost, reached by the host's MCP clients: a tiny server each test starts itself, never a
+/// real one. The token is a stand-in, not a credential.
+/// </summary>
+public sealed class McpClientTests
+{
+    private const string Token = "stand-in-token";
+    private const string HostOnlyVariable = "MCP_TESTS_HOST_ONLY";
+
+    [Fact]
+    public async Task A_server_declared_by_url_lists_its_tools_and_answers_a_call()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var server = await EchoServer.StartHttpAsync(Token, cancellationToken);
+        await using var services = await HostServicesAsync(DeclareByUrl(withToken: true), UrlParameters(server), cancellationToken);
+        var tools = services.GetRequiredService<IMcpTools>();
+
+        var listed = await tools.ListAsync(cancellationToken);
+        var result = await tools.CallAsync("echo-server", "echo", new Dictionary<string, object?> { ["text"] = "hello" }, cancellationToken);
+
+        listed.Select(tool => $"{tool.Server}/{tool.Name}").Order(StringComparer.Ordinal).ShouldBe(["echo-server/echo", "echo-server/sees"]);
+        result.IsError.ShouldBeFalse();
+        result.Text.ShouldBe("echo: hello");
+    }
+
+    [Fact]
+    public async Task A_server_declared_by_url_without_its_token_refuses_the_client()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var server = await EchoServer.StartHttpAsync(Token, cancellationToken);
+        await using var services = await HostServicesAsync(DeclareByUrl(withToken: false), UrlParameters(server), cancellationToken);
+        var tools = services.GetRequiredService<IMcpTools>();
+
+        var refusal = await Should.ThrowAsync<HttpRequestException>(() => tools.ListAsync(cancellationToken));
+
+        refusal.StatusCode.ShouldBe(System.Net.HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task A_server_declared_by_command_gets_its_secret_and_none_of_the_hosts_environment()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Environment.SetEnvironmentVariable(HostOnlyVariable, "the host's own configuration");
+        var serverAssembly = Path.Combine(AppContext.BaseDirectory, "Mcp.TestServer.dll");
+        await using var services = await HostServicesAsync(
+            (builder, host) => host.WithMcpServerCommand(
+                "echo-process",
+                builder.AddParameter("echo-process-command"),
+                [serverAssembly],
+                new Dictionary<string, IResourceBuilder<ParameterResource>> { [EchoServer.TokenVariable] = builder.AddParameter("echo-process-token", secret: true) }),
+            new Dictionary<string, string> { ["echo-process-command"] = "dotnet", ["echo-process-token"] = Token },
+            cancellationToken);
+        var tools = services.GetRequiredService<IMcpTools>();
+
+        var echo = await tools.CallAsync("echo-process", "echo", new Dictionary<string, object?> { ["text"] = "hello" }, cancellationToken);
+        var seesToken = await tools.CallAsync("echo-process", "sees", new Dictionary<string, object?> { ["variable"] = EchoServer.TokenVariable }, cancellationToken);
+        var seesHostOnly = await tools.CallAsync("echo-process", "sees", new Dictionary<string, object?> { ["variable"] = HostOnlyVariable }, cancellationToken);
+
+        echo.Text.ShouldBe("echo: hello");
+        seesToken.Text.ShouldBe("true");
+        seesHostOnly.Text.ShouldBe("false");
+    }
+
+    [Fact]
+    public async Task A_tool_call_the_model_asks_for_runs_on_the_server_and_its_result_goes_back_to_the_model()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var server = await EchoServer.StartHttpAsync(Token, cancellationToken);
+        await using var services = await HostServicesAsync(DeclareByUrl(withToken: true), UrlParameters(server), cancellationToken);
+        using var chat = new ChatClientBuilder(new ToolCallingChatClient()).UseMcpTools().Build(services);
+
+        var response = await chat.GetResponseAsync("Say hello through the echo tool.", cancellationToken: cancellationToken);
+
+        response.Text.ShouldStartWith("The tool said:");
+        response.Text.ShouldContain("echo: hello");
+    }
+
+    private static Action<IDistributedApplicationTestingBuilder, IResourceBuilder<ProjectResource>> DeclareByUrl(bool withToken) =>
+        (builder, host) => host.WithMcpServerUrl(
+            "echo-server",
+            builder.AddParameter("echo-server-url"),
+            withToken ? builder.AddParameter("echo-server-token", secret: true) : null);
+
+    private static Dictionary<string, string> UrlParameters(WebApplication server) =>
+        new() { ["echo-server-url"] = $"{server.Urls.Single()}/mcp", ["echo-server-token"] = Token };
+
+    private static async Task<ServiceProvider> HostServicesAsync(
+        Action<IDistributedApplicationTestingBuilder, IResourceBuilder<ProjectResource>> declare,
+        IReadOnlyDictionary<string, string> parameters,
+        CancellationToken cancellationToken)
+    {
+        var configuration = await DeclaredServers.HostConfigurationAsync(declare, parameters, cancellationToken);
+        return new ServiceCollection().AddLogging().AddMcpClients(configuration).BuildServiceProvider();
+    }
+}

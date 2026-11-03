@@ -1,0 +1,12 @@
+using System.Text.Json;
+
+namespace {{ namespace }}.BuildingBlocks.Mcp;
+
+/// <summary>
+/// What a tool answered: untrusted input. Parse it into a typed shape and check it before using it; never execute
+/// it, interpolate it into SQL or markup, or pass it on as another tool's argument unchecked.
+/// </summary>
+/// <param name="IsError">The tool reports that it failed; <paramref name="Text"/> says why, in the server's words.</param>
+/// <param name="Text">The text the tool returned, its text blocks joined by newlines.</param>
+/// <param name="Structured">The structured result, when the tool returns one.</param>
+public sealed record McpToolResult(bool IsError, string Text, JsonElement? Structured);

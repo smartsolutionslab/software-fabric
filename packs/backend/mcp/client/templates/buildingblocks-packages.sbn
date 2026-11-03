@@ -1,0 +1,2 @@
+    <PackageReference Include="ModelContextProtocol.Core" />
+    <PackageReference Include="Microsoft.Extensions.AI" />

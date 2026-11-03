@@ -1,0 +1,27 @@
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.BuildingBlocks.Mcp;
+
+/// <summary>Offers every declared MCP server's tools to the model, next to the tools the request brings.</summary>
+internal sealed class McpToolsChatClient(IChatClient innerClient, McpClients clients) : DelegatingChatClient(innerClient)
+{
+    public override async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+        await base.GetResponseAsync(messages, await WithToolsAsync(options, cancellationToken), cancellationToken);
+
+    public override async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var withTools = await WithToolsAsync(options, cancellationToken);
+        await foreach (var update in base.GetStreamingResponseAsync(messages, withTools, cancellationToken))
+        {
+            yield return update;
+        }
+    }
+
+    private async Task<ChatOptions> WithToolsAsync(ChatOptions? options, CancellationToken cancellationToken)
+    {
+        var withTools = options?.Clone() ?? new ChatOptions();
+        withTools.Tools = [.. withTools.Tools ?? [], .. await clients.ChatToolsAsync(cancellationToken)];
+        return withTools;
+    }
+}

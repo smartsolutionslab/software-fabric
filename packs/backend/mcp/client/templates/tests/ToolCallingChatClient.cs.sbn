@@ -1,0 +1,38 @@
+using System.Text.Json;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Mcp.Tests;
+
+/// <summary>
+/// A stand-in model: asked first, it calls the offered echo tool; given the tool's result, it answers with it. No test
+/// calls a real model.
+/// </summary>
+internal sealed class ToolCallingChatClient : IChatClient
+{
+    public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        var result = messages.SelectMany(message => message.Contents).OfType<FunctionResultContent>().LastOrDefault();
+        if (result is not null)
+        {
+            var answer = result.Result is JsonElement { ValueKind: JsonValueKind.String } text ? text.GetString() : result.Result?.ToString();
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, $"The tool said: {answer}")));
+        }
+
+        if (options?.Tools?.Any(tool => tool.Name == "echo") != true)
+        {
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "No echo tool was offered.")));
+        }
+
+        var call = new FunctionCallContent("call-1", "echo", new Dictionary<string, object?> { ["text"] = "hello" });
+        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, [call])));
+    }
+
+    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("The stand-in model does not stream.");
+
+    public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+    public void Dispose()
+    {
+    }
+}

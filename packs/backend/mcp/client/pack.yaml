@@ -1,0 +1,32 @@
+option: backend.mcp.client
+files:
+  - { template: templates/McpServers.cs.sbn, target: src/AppHost/Wiring/McpServers.cs }
+  - { template: templates/IMcpTools.cs.sbn, target: src/BuildingBlocks/Mcp/IMcpTools.cs }
+  - { template: templates/McpToolDescription.cs.sbn, target: src/BuildingBlocks/Mcp/McpToolDescription.cs }
+  - { template: templates/McpToolResult.cs.sbn, target: src/BuildingBlocks/Mcp/McpToolResult.cs }
+  - { template: templates/McpServerDeclaration.cs.sbn, target: src/BuildingBlocks/Mcp/McpServerDeclaration.cs }
+  - { template: templates/McpClients.cs.sbn, target: src/BuildingBlocks/Mcp/McpClients.cs }
+  - { template: templates/McpToolsChatClient.cs.sbn, target: src/BuildingBlocks/Mcp/McpToolsChatClient.cs }
+  - { template: templates/McpClientRegistration.cs.sbn, target: src/BuildingBlocks/Mcp/Wiring/McpClientRegistration.cs }
+  - { template: templates/McpChatTools.cs.sbn, target: src/BuildingBlocks/Mcp/Wiring/McpChatTools.cs }
+  - { template: templates/McpClientsAreCreatedOnlyByTheBuildingBlocks.cs.sbn, target: tests/Architecture.Tests/Rules/McpClientsAreCreatedOnlyByTheBuildingBlocks.cs }
+  - { template: templates/tests/Mcp.TestServer.csproj.sbn, target: tests/Mcp.TestServer/Mcp.TestServer.csproj }
+  - { template: templates/tests/EchoTools.cs.sbn, target: tests/Mcp.TestServer/EchoTools.cs }
+  - { template: templates/tests/EchoServer.cs.sbn, target: tests/Mcp.TestServer/EchoServer.cs }
+  - { template: templates/tests/Program.cs.sbn, target: tests/Mcp.TestServer/Program.cs }
+  - { template: templates/tests/Mcp.Tests.csproj.sbn, target: tests/Mcp.Tests/Mcp.Tests.csproj }
+  - { template: templates/tests/DeclaredServers.cs.sbn, target: tests/Mcp.Tests/DeclaredServers.cs }
+  - { template: templates/tests/ToolCallingChatClient.cs.sbn, target: tests/Mcp.Tests/ToolCallingChatClient.cs }
+  - { template: templates/tests/McpClientTests.cs.sbn, target: tests/Mcp.Tests/McpClientTests.cs }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: buildingblocks.packages, template: templates/buildingblocks-packages.sbn }
+  - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: solution.projects, template: templates/solution-projects.sbn }
+  - { slot: readme.sections, template: templates/readme-section.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No module references the MCP SDK: MCP clients are created only by AddMcpClients in BuildingBlocks, from the servers the AppHost declares.", file: templates/McpClientsAreCreatedOnlyByTheBuildingBlocks.cs.sbn }
+  - { kind: unit-test, describes: "A server declared in the AppHost, by URL with a bearer token or by command with a secret variable, is listed and called through IMcpTools; a stand-in model's tool call runs on it through UseMcpTools; a stdio server sees none of the host's environment.", file: templates/tests/McpClientTests.cs.sbn }

@@ -1,0 +1,2 @@
+  <Project Path="tests/Mcp.Tests/Mcp.Tests.csproj" />
+  <Project Path="tests/Mcp.TestServer/Mcp.TestServer.csproj" />
