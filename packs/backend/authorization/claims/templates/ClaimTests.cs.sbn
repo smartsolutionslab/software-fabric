@@ -1,0 +1,66 @@
+{{~ if project["backend.auth"] != "keycloak" ~}}
+#error The claims pack's sample users and their department come from the Keycloak realm only so far; another identity provider needs its own way to put a department into the token (docs/adr/0006 of the generator).
+{{~ end ~}}
+{{~ if project["backend.test.integration"] != "aspire-fixture" ~}}
+#error The claims pack tests a module's sample policy through the aspire-fixture integration tests only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+{{~ roles = project["backend.authorization"] | array.contains "roles" ~}}
+{{~ func status(response, code)
+  if project["backend.test.assertions"] == "shouldly"
+    ret response + ".StatusCode.ShouldBe(HttpStatusCode." + code + ");"
+  else
+    ret response + ".StatusCode.Should().Be(HttpStatusCode." + code + ");"
+  end
+end ~}}
+{{~ func request(test, user, code) ~}}
+
+    [Fact]
+    public async Task {{ test }}()
+    {
+        using var client = await aspire.CreateHostClientAsync("{{ user }}");
+
+        using var response = await client.GetAsync(ManagePermission, TestContext.Current.CancellationToken);
+
+        {{ status "response" code }}
+    }
+{{~ end ~}}
+using System.Net;
+
+namespace {{ namespace }}.Integration.Tests;
+
+{{~ if roles ~}}
+/// <summary>
+/// The {{ module.name }} module's sample policy {{ module.name }}.manage requires the realm role manager and the claim
+/// department=finance: developer holds both, clerk only the role, analyst only the claim.
+/// </summary>
+{{~ else ~}}
+/// <summary>
+/// The {{ module.name }} module's sample policy {{ module.name }}.manage requires the claim department=finance, which
+/// developer and analyst hold; clerk is in sales and visitor has no department.
+/// </summary>
+{{~ end ~}}
+public class {{ module.namespace }}ClaimTests(AspireFixture aspire)
+{
+    private static readonly Uri ManagePermission = new("/{{ module.name }}/permissions/manage", UriKind.Relative);
+{{~ if roles ~}}
+{{~ request "A_user_with_the_manager_role_in_the_finance_department_is_allowed" "developer" "OK" ~}}
+{{~ request "A_user_with_only_the_manager_role_is_forbidden" "clerk" "Forbidden" ~}}
+{{~ request "A_user_with_only_the_finance_department_is_forbidden" "analyst" "Forbidden" ~}}
+{{~ request "A_user_with_neither_is_forbidden" "visitor" "Forbidden" ~}}
+{{~ else ~}}
+{{~ request "A_user_in_the_finance_department_is_allowed" "developer" "OK" ~}}
+{{~ request "Another_user_in_the_finance_department_is_allowed" "analyst" "OK" ~}}
+{{~ request "A_user_in_another_department_is_forbidden" "clerk" "Forbidden" ~}}
+{{~ request "A_user_without_a_department_is_forbidden" "visitor" "Forbidden" ~}}
+
+    [Fact]
+    public async Task An_anonymous_caller_is_unauthorized()
+    {
+        using var client = aspire.CreateHostClient();
+
+        using var response = await client.GetAsync(ManagePermission, TestContext.Current.CancellationToken);
+
+        {{ status "response" "Unauthorized" }}
+    }
+{{~ end ~}}
+}

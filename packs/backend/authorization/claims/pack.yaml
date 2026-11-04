@@ -1,0 +1,10 @@
+option: backend.authorization.claims
+files:
+  - { template: templates/OnlyModulePoliciesCheckClaims.cs.sbn, target: tests/Architecture.Tests/Rules/OnlyModulePoliciesCheckClaims.cs }
+  - { template: templates/ClaimTests.cs.sbn, target: "tests/Integration.Tests/{{ module.namespace }}ClaimTests.cs", per-module: true }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Claims are checked only where a module's IModulePolicies registers a policy (RequireClaim): HasClaim anywhere under src/ outside a claims transformation, or RequireClaim outside an IModulePolicies, fails the build naming file and line.", file: templates/OnlyModulePoliciesCheckClaims.cs.sbn }
+  - { kind: unit-test, describes: "A module's sample policy <module>.manage requires department=finance (and the role manager with roles): the integration tests give a user who meets it 200, a user in another department, one without a department and, with roles, one with only the role or only the claim 403, against the running stack.", file: templates/ClaimTests.cs.sbn }
