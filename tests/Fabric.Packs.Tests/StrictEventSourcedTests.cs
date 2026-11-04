@@ -161,6 +161,14 @@ public sealed class StrictEventSourcedTests
             }
 
             [Fact]
+            public void An_omitted_value_object_is_refused_rather_than_read_as_null()
+            {
+                using var stored = new MemoryStream(Encoding.UTF8.GetBytes("""{"Invoice":"0190a6d4-0000-7000-8000-000000000001","Lines":3}"""));
+
+                Should.Throw<JsonException>(() => Serializer().FromJson<InvoiceIssued>(stored));
+            }
+
+            [Fact]
             public void A_value_object_declared_nullable_may_be_null()
             {
                 using var stored = new MemoryStream(Encoding.UTF8.GetBytes("""{"Invoice":"0190a6d4-0000-7000-8000-000000000001","Number":"INV-2","Previous":null}"""));
