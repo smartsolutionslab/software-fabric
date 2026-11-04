@@ -453,14 +453,33 @@ public sealed partial class PrimitiveBoundaryTests
 
         namespace Shop.Modules.Billing.Domain.Routes;
 
-        public sealed class Waypoint;
+        internal sealed class Waypoint;
 
-        public sealed class Node<T>
+        internal sealed class Node<T>
         {
             public Node<List<T>>? Next { get; }
         }
 
-        public sealed class Route : AggregateRoot<RouteId>
+        internal sealed record Wrapper<T> : IValueObject<T>
+            where T : class
+        {
+            private Wrapper(T value) => Value = value;
+
+            public T Value { get; }
+
+            public static Wrapper<T> From(T value)
+            {
+                Ensure.That(value).IsNotNull();
+                return new Wrapper<T>(value);
+            }
+        }
+
+        internal sealed class Cargo
+        {
+            public string Text { get; } = string.Empty;
+        }
+
+        internal sealed class Route : AggregateRoot<RouteId>
         {
             private Route(RouteId id)
                 : base(id)
@@ -469,12 +488,14 @@ public sealed partial class PrimitiveBoundaryTests
 
             public Node<Waypoint>? Start { get; }
 
+            public Wrapper<Wrapper<Cargo>>? Load { get; }
+
             public int Hops { get; }
 
             public static Route Plan() => new(RouteId.New());
         }
 
-        public sealed record RouteId : IValueObject<Guid>
+        internal sealed record RouteId : IValueObject<Guid>
         {
             private RouteId(Guid value) => Value = value;
 
@@ -585,7 +606,7 @@ public sealed partial class PrimitiveBoundaryTests
     }
 
     [Fact]
-    public void A_self_expanding_generic_type_reachable_from_an_aggregate_ends_the_walk()
+    public void A_self_expanding_generic_type_ends_the_walk_and_a_finitely_nested_one_is_still_walked_through()
     {
         using var project = new GeneratedProject("saas-strict-react");
         project.AddModule("billing");
@@ -600,7 +621,11 @@ public sealed partial class PrimitiveBoundaryTests
         output.ShouldSatisfyAllConditions(
             () => ended.ShouldBeTrue($"The architecture tests did not end within 3 minutes.\n{output}"),
             () => exitCode.ShouldNotBe(0, output),
-            () => named.ShouldBe(["Shop.Modules.Billing.Domain.Routes.Route.Hops holds Int32"]),
+            () => named.ShouldBe(
+            [
+                "Shop.Modules.Billing.Domain.Routes.Cargo.Text holds String",
+                "Shop.Modules.Billing.Domain.Routes.Route.Hops holds Int32",
+            ]),
             () => output.ShouldContain("failed: 1"));
     }
 
