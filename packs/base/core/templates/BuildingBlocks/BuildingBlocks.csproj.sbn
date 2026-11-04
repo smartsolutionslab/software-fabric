@@ -6,6 +6,9 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+{{~ if project["backend.llm"] != "none" ~}}
+    <PackageReference Include="Microsoft.Extensions.AI" />
+{{~ end ~}}
 {{ slots["buildingblocks.packages"] }}
   </ItemGroup>
 

@@ -1,0 +1,4 @@
+{{~ if project["backend.llm"] != "none" ~}}
+        // The host registers the project's IChatClient; a module's test stands in for it and never calls a real model.
+        services.AddSingleton<Microsoft.Extensions.AI.IChatClient>(_ => new {{ namespace }}.Tests.Fakes.FakeChatClient("unused"));
+{{~ end ~}}
