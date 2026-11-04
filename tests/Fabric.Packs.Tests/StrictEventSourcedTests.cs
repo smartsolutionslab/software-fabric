@@ -655,6 +655,35 @@ public sealed class StrictEventSourcedTests
         exitCode.ShouldBe(0, output);
     }
 
+    [Fact]
+    public void The_walk_ends_on_a_collection_of_itself()
+    {
+        // The walk reads a collection through its elements, which here are the collection again.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using System.Collections.ObjectModel;
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed class RecursiveCollection : Collection<RecursiveCollection>;
+
+            public sealed record InvoiceNested(InvoiceId Invoice, RecursiveCollection Nested) : IDomainEvent;
+
+            public sealed class Nesting : EventSourcedAggregate<InvoiceId>
+            {
+                private Nesting()
+                {
+                }
+
+                private void Apply(InvoiceNested nested) => Id = nested.Invoice;
+            }
+            """);
+
+        output.ShouldNotContain("Stack overflow");
+        output.ShouldNotContain("InvoiceNested.Nested carries");
+        exitCode.ShouldBe(0, output);
+    }
+
     private static (int ExitCode, string Output) ArchitectureTestsWith(string types)
     {
         using var project = new GeneratedProject("industrial-event-driven-mfe", Choices);
