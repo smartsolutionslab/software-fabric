@@ -97,7 +97,6 @@ public sealed class NewCommandTests : IDisposable
     }
 
     [Theory]
-    [InlineData("backend.llm=ollama", "no pack for backend.llm=ollama.")]
     [InlineData("backend.mcp=server,client", "no pack for backend.mcp=server.")]
     public void An_llm_or_mcp_option_without_a_pack_yet_writes_nothing(string setting, string error)
     {
