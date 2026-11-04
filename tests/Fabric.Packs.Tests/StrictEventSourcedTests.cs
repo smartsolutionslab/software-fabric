@@ -485,6 +485,79 @@ public sealed class StrictEventSourcedTests
         exitCode.ShouldNotBe(0, output);
     }
 
+    [Fact]
+    public void The_walk_does_not_follow_the_tag_of_a_generic_value_object_into_the_type_it_names()
+    {
+        // TypedId<Invoice> is stored as its Guid; the Invoice aggregate it names is never read from the event. Internal,
+        // because a public generic type may not declare From (CA1000).
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            internal sealed record TypedId<TTag> : IValueObject<Guid>
+            {
+                private TypedId(Guid value) => Value = value;
+
+                public Guid Value { get; }
+
+                public static TypedId<TTag> From(Guid value)
+                {
+                    Ensure.That(value).IsNotEmpty();
+                    return new TypedId<TTag>(value);
+                }
+            }
+
+            internal sealed record InvoiceTagged(InvoiceId Invoice, TypedId<Invoice> Tag) : IDomainEvent;
+
+            internal sealed class Tagging : EventSourcedAggregate<InvoiceId>
+            {
+                private Tagging()
+                {
+                }
+
+                private void Apply(InvoiceTagged tagged) => Id = tagged.Invoice;
+            }
+            """);
+
+        output.ShouldNotContain("Invoices.Invoice.Number carries");
+        output.ShouldNotContain("Invoices.Invoice.Lines carries");
+        exitCode.ShouldBe(0, output);
+    }
+
+    [Fact]
+    public void Each_closed_type_of_a_generic_domain_type_an_event_holds_is_checked()
+    {
+        // Envelope<Marker> carries no value object, Envelope<InvoiceNumber> does: {} leaves its Value null without From.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record Envelope<T>
+            {
+                public T Value { get; init; } = default!;
+            }
+
+            public sealed record Marker;
+
+            public sealed record InvoiceEnveloped(InvoiceId Invoice, Envelope<Marker> First, Envelope<InvoiceNumber> Second) : IDomainEvent;
+
+            public sealed class Enveloping : EventSourcedAggregate<InvoiceId>
+            {
+                private Enveloping()
+                {
+                }
+
+                private void Apply(InvoiceEnveloped enveloped) => Id = enveloped.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Envelope`1[Shop.Modules.Billing.Domain.Invoices.InvoiceNumber].Value carries a value object outside its constructor");
+        output.ShouldNotContain("Envelope`1[Shop.Modules.Billing.Domain.Invoices.Marker].Value carries");
+        exitCode.ShouldNotBe(0, output);
+    }
+
     private static (int ExitCode, string Output) ArchitectureTestsWith(string types)
     {
         using var project = new GeneratedProject("industrial-event-driven-mfe", Choices);
