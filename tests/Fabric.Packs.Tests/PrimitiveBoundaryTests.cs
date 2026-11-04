@@ -689,6 +689,49 @@ public sealed partial class PrimitiveBoundaryTests
             public T Value => values.Length > 0 ? values[0] : default!;
         }
 
+        internal sealed record Beacon<T> : IValueObject<T>
+        {
+            private Beacon(T value) => Value = value;
+
+            public T Value { get; }
+
+            public Beacon<Tuple<T, int>>? Next { get; }
+
+            public Shade<T>? Shade { get; }
+
+            public static Beacon<T> From(T value) => new(value);
+        }
+
+        internal sealed class Shade<T>
+        {
+            public Palette<T>.Status Level { get; }
+        }
+
+        internal class Gauge<T>
+        {
+            private readonly T[] values = [];
+
+            public T Value => values.Length > 0 ? values[0] : default!;
+        }
+
+        internal sealed class Knot<T, TNext> : Gauge<T>
+        {
+            public new readonly T Value = default!;
+
+            public Loop<T, TNext>? Next { get; }
+        }
+
+        internal sealed record Loop<T, TNext> : IValueObject<T>
+        {
+            private Loop(T value) => Value = value;
+
+            public T Value { get; }
+
+            public Knot<T, List<TNext>>? Inner { get; }
+
+            public static Loop<T, TNext> From(T value) => new(value);
+        }
+
         internal sealed class Signal : AggregateRoot<SignalId>
         {
             private Signal(SignalId id)
@@ -701,6 +744,10 @@ public sealed partial class PrimitiveBoundaryTests
             public Lamp<Marker>? Lamp { get; }
 
             public Chain<bool>? Checks { get; }
+
+            public Beacon<Marker>? Beacon { get; }
+
+            public Loop<bool, Marker>? Loop { get; }
 
             public static Signal Raise() => new(SignalId.New());
         }
@@ -879,7 +926,9 @@ public sealed partial class PrimitiveBoundaryTests
         List<string> named = [.. Violation().Matches(output).Select(match => match.Value).Distinct()];
 
         // INode<IEnumerable<Marker>> is reached, and SpecialNode : INode<List<Marker>> is assignable to it. Answer<bool>.Value
-        // is a computed bool, but Answer<List<bool>>.Value, reached through Chain<List<bool>>, is not.
+        // is a computed bool, but Answer<List<bool>>.Value, reached through Chain<List<bool>>, is not. Shade<Tuple<Marker, int>>
+        // holds an enum, not the int of its enclosing type's argument. Knot's field Value stores a bool that the computed
+        // property it hides does not.
         output.ShouldSatisfyAllConditions(
             () => ended.ShouldBeTrue($"The architecture tests did not end within 3 minutes.\n{output}"),
             () => exitCode.ShouldNotBe(0, output),
@@ -887,6 +936,8 @@ public sealed partial class PrimitiveBoundaryTests
             () => output.ShouldMatch(@"Signals\.Answer`1\[\[System\.Collections\.Generic\.List`1\[\[System\.Boolean,[^;]*\]\]\.Value holds Boolean"),
             () => output.ShouldNotMatch(@"Signals\.Answer`1\[\[System\.Boolean,"),
             () => output.ShouldNotContain("value__"),
+            () => output.ShouldNotMatch(@"Signals\.Shade`1\[[^;]*\.Level holds"),
+            () => output.ShouldMatch(@"Signals\.Knot`2\[\[System\.Boolean,[^;]*\]\]\.Value holds Boolean"),
             () => output.ShouldContain("failed: 1"));
     }
 
