@@ -15,6 +15,11 @@ public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
+{{~ if project["backend.llm"] != "none" ~}}
+
+    /// <summary>The name Microsoft.Extensions.AI's UseOpenTelemetry gives the model's traces and metrics by default.</summary>
+    private const string ModelTelemetry = "Experimental.Microsoft.Extensions.AI";
+{{~ end ~}}
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
@@ -45,9 +50,17 @@ public static class Extensions
             .WithMetrics(metrics => metrics
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
+{{~ if project["backend.llm"] != "none" ~}}
+                .AddRuntimeInstrumentation()
+                .AddMeter(ModelTelemetry))
+{{~ else ~}}
                 .AddRuntimeInstrumentation())
+{{~ end ~}}
             .WithTracing(tracing => tracing
                 .AddSource(builder.Environment.ApplicationName)
+{{~ if project["backend.llm"] != "none" ~}}
+                .AddSource(ModelTelemetry)
+{{~ end ~}}
                 .AddAspNetCoreInstrumentation(options =>
                     options.Filter = context =>
                         !context.Request.Path.StartsWithSegments(HealthEndpointPath)

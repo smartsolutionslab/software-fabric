@@ -15,7 +15,11 @@ tenancy option is chosen.
 
 Slots cannot express this: a contribution to a slot the other pack does
 not declare is an error, and the alternative — one slot per pair of
-options — would multiply slots by the size of the catalog.
+options — would multiply slots by the size of the catalog. (A
+contribution marked `optional: true` is the one exception, ADR-0002: it
+is dropped when no selected pack declares its slot. It covers a pack that
+adds to another choice's slot when that choice is present; it does not
+let a pack's own output differ by choice.)
 
 ## Decision
 

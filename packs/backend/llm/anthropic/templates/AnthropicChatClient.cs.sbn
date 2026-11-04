@@ -1,0 +1,28 @@
+using Anthropic;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class AnthropicChatClient
+{
+    /// <summary>
+    /// Registers Claude, through the official Anthropic package, as the project's <see cref="IChatClient"/>. The key and
+    /// the model come from the AppHost's parameters <c>anthropic-api-key</c> and <c>anthropic-model</c>
+    /// (<c>Anthropic:ApiKey</c>, <c>Anthropic:Model</c>). They are read when the client is first needed, and a missing one
+    /// fails there, naming its parameter; registering sends nothing.
+    /// </summary>
+    public static ChatClientBuilder AddAnthropicChatClient(this IServiceCollection services, IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        return services.AddModelChatClient(_ =>
+            new AnthropicClient { ApiKey = Required(configuration, "Anthropic:ApiKey", "anthropic-api-key") }
+                .AsIChatClient(Required(configuration, "Anthropic:Model", "anthropic-model")));
+    }
+
+    private static string Required(IConfiguration configuration, string key, string parameter) =>
+        configuration[key] is { Length: > 0 } value
+            ? value
+            : throw new InvalidOperationException($"{key} is not set. The AppHost supplies it from its parameter '{parameter}': set that with dotnet user-secrets (Parameters:{parameter}) or in the deployment's secret store.");
+}

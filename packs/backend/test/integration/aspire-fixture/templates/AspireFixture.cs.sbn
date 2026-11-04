@@ -35,6 +35,8 @@ public sealed class AspireFixture : IAsyncLifetime
             }
         }
 
+{{ slots["integration-tests.parameters"] }}
+
         app = await builder.BuildAsync(timeout.Token);
         await app.StartAsync(timeout.Token);
         await app.ResourceNotifications.WaitForResourceHealthyAsync("host", timeout.Token);

@@ -114,6 +114,12 @@ namespace, and a pack that puts one anywhere else fails the build.
 Cardinality `0+` unless stated. "Separator" is what joins contributions
 (new, see Generator changes); default is a newline.
 
+A contribution to a slot no selected pack declares is an error, unless
+it carries `optional: true` (added for #134): then it is dropped when the
+slot is undeclared and renders as usual when it is declared. That lets a
+pack fill a slot of a choice it can be combined with but does not need
+(docs/packs.md, ADR-0002).
+
 ### Agent setup and docs
 
 | Slot | File | Separator | Filled by (saas-standard-react) |
@@ -143,6 +149,8 @@ Cardinality `0+` unless stated. "Separator" is what joins contributions
 | `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak (the host and `Microsoft.AspNetCore.Mvc.Testing`, for its endpoint rule) |
 | `tests.assert-no-violations` *(added in M1-04, declared by the test-framework pack, exactly-one)* | `tests/Architecture.Tests/ArchitectureRulesTests.cs` | shouldly (`violations.ShouldBeEmpty(description);`) |
 | `tests.assert-does-not-throw` *(added in M1-04, declared by the test-framework pack, exactly-one)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs` | shouldly (`Should.NotThrow(buildContainer);`) |
+| `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides) |
+| `integration-tests.parameters` *(added for #77, declared by aspire-fixture)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter) |
 
 **One package, one owner.** A `PackageVersion` is declared by exactly
 one pack; others only reference it. Two packs declaring the same version

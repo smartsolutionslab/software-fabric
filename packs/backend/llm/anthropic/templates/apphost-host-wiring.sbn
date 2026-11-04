@@ -1,0 +1,3 @@
+
+    .WithEnvironment("Anthropic__ApiKey", anthropicApiKey)
+    .WithEnvironment("Anthropic__Model", anthropicModel)

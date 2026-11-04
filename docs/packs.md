@@ -98,6 +98,23 @@ the slot's `separator` (a newline unless declared — JSON lists declare
 `",\n"`). A slot declared twice, a contribution to a slot no selected
 pack declares, and a cardinality breach are errors.
 
+A contribution may carry `optional: true` when the slot belongs to a
+choice the pack may be combined with but does not require — a converter
+for an event store that only some projects have:
+
+```yaml
+slots:
+  - { slot: event-store.json-converters, template: templates/converter.sbn, optional: true }
+```
+
+If no selected pack declares the slot, the contribution is dropped and
+generation goes on; if one does, it counts towards the slot's cardinality
+and renders like any other. Without `optional` (or with `false`) an
+undeclared slot stays an error naming the pack and the slot, so a
+misspelled slot name is still caught everywhere it is not marked
+optional. Mark a contribution optional only when some valid combination
+of choices has no pack declaring its slot.
+
 A generated web app must pass its own `pnpm format:check` (Prettier), so a
 contribution to a file under `web/` is written as Prettier prints it at
 the depth where it lands; the template adds the trailing comma after the

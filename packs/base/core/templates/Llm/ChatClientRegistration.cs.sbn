@@ -1,0 +1,23 @@
+using Microsoft.Extensions.AI;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class ChatClientRegistration
+{
+    /// <summary>
+    /// Registers the project's one <see cref="IChatClient"/>: the provider's client, which the chosen backend.llm pack
+    /// creates, with logging and OpenTelemetry around it. Code depends on <see cref="IChatClient"/> and never names the
+    /// provider. Further middleware (<c>UseMcpTools</c>, say) chains on the builder this returns.
+    /// </summary>
+    /// <param name="services">The host's services.</param>
+    /// <param name="providerClient">Creates the provider's client when it is first needed, from configuration the AppHost supplies.</param>
+    public static ChatClientBuilder AddModelChatClient(this IServiceCollection services, Func<IServiceProvider, IChatClient> providerClient)
+    {
+        {{ not_null "services" }}
+        {{ not_null "providerClient" }}
+
+        return services.AddChatClient(providerClient)
+            .UseLogging()
+            .UseOpenTelemetry();
+    }
+}
