@@ -57,7 +57,14 @@ checks the constructor System.Text.Json actually selects (the one marked `[JsonC
 parameterless one, else the only public one), not every public constructor: beside a public parameterless constructor,
 a constructor taking `InvoiceNumber` is never called when an event is read. It also refuses an optional parameter for a
 value object that is not declared nullable (`InvoiceNumber Number = null!`), since an omitted optional parameter takes
-its default instead of failing; `InvoiceNumber? Previous = null` stays allowed. Both settings hold
+its default instead of failing; `InvoiceNumber? Previous = null` stays allowed. The rule looks into the domain types an
+event holds too, at any depth (alone, nullable, in a collection or an array), and checks their public properties the
+same way: an event taking `InvoiceDetails Details` by constructor still reads `"Details":{}`, so `InvoiceDetails` takes
+its `InvoiceNumber` by constructor as well, and a property holding a domain type that carries a value object (an
+`IReadOnlyList<InvoiceLine>` of lines built from value objects) is itself a constructor parameter. A domain type is a
+concrete type of the module's Domain that is not a value object or an enum. The walk enters each one once, so a type
+that holds itself (`InvoiceChain? Next`) ends it, and a generic one once per generic definition, as the first closed
+type it reaches; the arguments of every other closed type are still walked. Both settings hold
 for every event and document in the store, read models included: a read model whose constructor later gains a
 parameter can no longer read the rows stored before it, so give the new parameter a default or rebuild the projection.
 

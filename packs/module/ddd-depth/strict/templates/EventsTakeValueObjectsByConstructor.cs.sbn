@@ -7,6 +7,7 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 /// The {{ module.namespace }} module is strict and event-sourced: an event carries its value objects as required
 /// parameters of the constructor System.Text.Json selects, so a stored event that lacks one fails to read
 /// (RespectRequiredConstructorParameters) instead of leaving it null without <c>From</c> (module.ddd-depth: strict, docs/adr).
+/// A domain type the event holds, at any depth, carries its value objects the same way.
 /// </summary>
 public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : IArchitectureRule
 {
@@ -14,31 +15,40 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
     private const string DomainEvent = "{{ namespace }}.BuildingBlocks.EventSourcing.IDomainEvent";
 
     public string Description =>
-        "The {{ module.namespace }} module is strict and event-sourced: every value object an event carries is a required parameter of the constructor System.Text.Json selects.";
+        "The {{ module.namespace }} module is strict and event-sourced: every value object an event carries, itself or through a domain type it holds, is a required parameter of the constructor System.Text.Json selects.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
         {{ not_null "model" }}
 
-        return model.ModuleAssemblies
+        List<Type> holders = [];
+        HashSet<Type> entered = [];
+        foreach (var domainEvent in model.ModuleAssemblies
             .Where(assembly => assembly.GetName().Name == Domain)
             .SelectMany(assembly => assembly.GetTypes())
-            .Where(type => !type.IsAbstract && !type.IsInterface && type.GetInterfaces().Any(contract => contract.FullName == DomainEvent))
-            .SelectMany(Violations);
+            .Where(type => !type.IsAbstract && !type.IsInterface && type.GetInterfaces().Any(contract => contract.FullName == DomainEvent)))
+        {
+            if (entered.Add(domainEvent))
+            {
+                Hold(domainEvent, holders, entered);
+            }
+        }
+
+        return holders.SelectMany(Violations);
     }
 
-    private static IEnumerable<string> Violations(Type domainEvent)
+    private static IEnumerable<string> Violations(Type holder)
     {
         // System.Text.Json matches a constructor parameter to a property by name, ignoring case.
         Dictionary<string, ParameterInfo> parameters = new(StringComparer.OrdinalIgnoreCase);
-        foreach (var parameter in JsonConstructor(domainEvent)?.GetParameters() ?? [])
+        foreach (var parameter in JsonConstructor(holder)?.GetParameters() ?? [])
         {
             parameters[parameter.Name!] = parameter;
         }
 
         NullabilityInfoContext nullability = new();
 
-        foreach (var property in domainEvent.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        foreach (var property in holder.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (!CarriesValueObject(property.PropertyType, []))
             {
@@ -47,12 +57,44 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
 
             if (!parameters.TryGetValue(property.Name, out var parameter))
             {
-                yield return $"{domainEvent.FullName}.{property.Name} carries a value object outside its constructor; make it a parameter of the constructor System.Text.Json selects ([JsonConstructor], else the public parameterless one, else the only public one), so a stored event without it fails to read.";
+                yield return $"{holder}.{property.Name} carries a value object outside its constructor; make it a parameter of the constructor System.Text.Json selects ([JsonConstructor], else the public parameterless one, else the only public one), so a stored event without it fails to read.";
             }
             else if (parameter.IsOptional && nullability.Create(parameter).ReadState != NullabilityState.Nullable)
             {
-                yield return $"{domainEvent.FullName}.{property.Name} carries a value object through an optional constructor parameter; remove its default, or declare it nullable, so a stored event without it fails to read.";
+                yield return $"{holder}.{property.Name} carries a value object through an optional constructor parameter; remove its default, or declare it nullable, so a stored event without it fails to read.";
             }
+        }
+    }
+
+    /// <summary>Adds the holder, and every domain type its public properties hold, to the types whose members are checked.</summary>
+    private static void Hold(Type holder, List<Type> holders, HashSet<Type> entered)
+    {
+        holders.Add(holder);
+        foreach (var property in holder.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            Reach(property.PropertyType, holders, entered);
+        }
+    }
+
+    private static void Reach(Type type, List<Type> holders, HashSet<Type> entered)
+    {
+        if (type.IsArray)
+        {
+            Reach(type.GetElementType()!, holders, entered);
+            return;
+        }
+
+        if (type.IsGenericType)
+        {
+            foreach (var argument in type.GetGenericArguments())
+            {
+                Reach(argument, holders, entered);
+            }
+        }
+
+        if (Enters(type, entered))
+        {
+            Hold(type, holders, entered);
         }
     }
 
@@ -74,20 +116,27 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
             ?? (constructors.Length == 1 ? constructors[0] : null);
     }
 
-    /// <summary>Whether the type is a value object, or holds one in a <see cref="Nullable{T}"/>, an array or a generic argument.</summary>
-    private static bool CarriesValueObject(Type type, HashSet<Type> visited)
-    {
-        if (!visited.Add(type))
-        {
-            return false;
-        }
+    /// <summary>
+    /// Whether the type is a value object, or holds one in a <see cref="Nullable{T}"/>, an array, a generic argument or a
+    /// public property of a domain type.
+    /// </summary>
+    private static bool CarriesValueObject(Type type, HashSet<Type> entered) =>
+        typeof(IValueObject).IsAssignableFrom(type)
+        || (type.IsArray && CarriesValueObject(type.GetElementType()!, entered))
+        || (type.IsGenericType && type.GetGenericArguments().Any(argument => CarriesValueObject(argument, entered)))
+        || (Enters(type, entered) && type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Any(property => CarriesValueObject(property.PropertyType, entered)));
 
-        if (typeof(IValueObject).IsAssignableFrom(type))
-        {
-            return true;
-        }
-
-        return (type.IsArray && CarriesValueObject(type.GetElementType()!, visited))
-            || (type.IsGenericType && type.GetGenericArguments().Any(argument => CarriesValueObject(argument, visited)));
-    }
+    /// <summary>
+    /// Whether the walk looks into a domain type's members: a concrete type of this module's Domain that is not a value
+    /// object or an enum, once per walk. A generic one is looked into once per generic definition, as the first closed type
+    /// reached, so <c>Node&lt;T&gt;</c> holding a <c>Node&lt;List&lt;T&gt;&gt;</c> does not construct a new type at every
+    /// step; the arguments of every other closed type are still walked.
+    /// </summary>
+    private static bool Enters(Type type, HashSet<Type> entered) =>
+        !type.IsAbstract
+        && !type.IsEnum
+        && !type.IsGenericParameter
+        && type.Assembly.GetName().Name == Domain
+        && !typeof(IValueObject).IsAssignableFrom(type)
+        && entered.Add(type.IsGenericType ? type.GetGenericTypeDefinition() : type);
 }
