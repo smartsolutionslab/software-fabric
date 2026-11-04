@@ -1,0 +1,38 @@
+import { act, render, screen } from '@testing-library/react';
+import { useState } from 'react';
+import { expect, test } from 'vitest';
+import { type ServerEventsConnection, ServerEventsContext } from './ServerEventsContext';
+import { useServerEvent } from './useServerEvent';
+
+interface TestEvent {
+  text: string;
+}
+
+function LatestTestEvent() {
+  const [text, setText] = useState('nothing yet');
+  useServerEvent<TestEvent>('TestEvent', (event) => setText(event.text));
+  return <p>{text}</p>;
+}
+
+test('a component sees the server events it listens for, and stops listening when it unmounts', async () => {
+  const handlers = new Map<string, (payload: unknown) => void>();
+  const connection: ServerEventsConnection = {
+    on: (name, handler) => handlers.set(name, handler),
+    off: (name, handler) => {
+      if (handlers.get(name) === handler) {
+        handlers.delete(name);
+      }
+    },
+  };
+
+  const { unmount } = render(
+    <ServerEventsContext value={connection}>
+      <LatestTestEvent />
+    </ServerEventsContext>,
+  );
+  act(() => handlers.get('TestEvent')?.({ text: 'hello from the host' }));
+
+  expect(await screen.findByText('hello from the host')).toBeInTheDocument();
+  unmount();
+  expect(handlers.has('TestEvent')).toBe(false);
+});

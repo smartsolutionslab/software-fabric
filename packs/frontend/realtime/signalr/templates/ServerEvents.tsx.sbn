@@ -1,0 +1,21 @@
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { connectServerEvents } from './connection';
+import { ServerEventsContext } from './ServerEventsContext';
+
+/** Holds one connection to the host's event hub while it is mounted; useServerEvent listens on it. */
+export function ServerEvents({ children }: { children: ReactNode }) {
+  const [connection] = useState(connectServerEvents);
+  const lifecycle = useRef(Promise.resolve());
+
+  useEffect(() => {
+    // One after the other: StrictMode mounts twice, and a connection starts again only once it has stopped.
+    lifecycle.current = lifecycle.current
+      .then(() => connection.start())
+      .catch((error: unknown) => console.warn('Server events are not connected.', error));
+    return () => {
+      lifecycle.current = lifecycle.current.then(() => connection.stop());
+    };
+  }, [connection]);
+
+  return <ServerEventsContext value={connection}>{children}</ServerEventsContext>;
+}

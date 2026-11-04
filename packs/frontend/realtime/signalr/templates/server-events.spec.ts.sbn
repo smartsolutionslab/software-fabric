@@ -1,0 +1,41 @@
+{{~ if project["backend.auth"] != "keycloak" && project["backend.auth"] != "none" ~}}
+throw new Error('This test knows Keycloak\'s login page only so far (docs/adr/0006 of the generator).');
+{{~ end ~}}
+import { expect, test } from '@playwright/test';
+
+test('a server event reaches the {{ if project["backend.auth"] == "none" }}browser{{ else }}signed-in browser{{ end }} over its own connection', async ({ page }) => {
+  const frames: string[] = [];
+  page.on('websocket', (socket) => {
+    if (socket.url().includes('/api/hubs/events')) {
+      socket.on('framereceived', ({ payload }) => {
+        frames.push(payload.toString());
+      });
+    }
+  });
+
+  await page.goto('/');
+{{~ if project["backend.auth"] == "keycloak" ~}}
+  await page.getByLabel('Username or email').fill('developer');
+  await page.getByLabel('Password', { exact: true }).fill('developer');
+  await page.getByRole('button', { name: 'Sign In' }).click();
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+
+  // The token the app signed in with, from where react-oidc-context keeps it.
+  const token = await page.evaluate(() => {
+    const key = Object.keys(sessionStorage).find((name) => name.startsWith('oidc.user:'));
+    const user: unknown = JSON.parse((key && sessionStorage.getItem(key)) || '{}');
+    return typeof user === 'object' && user && 'access_token' in user ? String(user.access_token) : '';
+  });
+  const headers = { Authorization: `Bearer ${token}` };
+{{~ else ~}}
+  const headers = {};
+{{~ end ~}}
+
+  // The browser joins its group just after it connects, so the event is sent until it arrives.
+  const text = `hello from the host ${Date.now()}`;
+  await expect(async () => {
+    const sent = await page.request.post('/api/hubs/events/test', { headers, data: { text } });
+    expect(sent.status()).toBe(204);
+    expect(frames.some((frame) => frame.includes(text))).toBe(true);
+  }).toPass({ timeout: 30_000 });
+});

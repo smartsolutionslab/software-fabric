@@ -1,0 +1,24 @@
+import { useContext, useEffect } from 'react';
+import { ServerEventsContext } from './ServerEventsContext';
+
+/**
+ * Calls handler with every event the host sends under name (the event's type: 'InvoicePaidV1') while the component is
+ * mounted. Pass a stable handler (useCallback); a new one each render listens again each render.
+ */
+export function useServerEvent<T>(name: string, handler: (payload: T) => void) {
+  const connection = useConnection();
+
+  useEffect(() => {
+    const receive = (payload: unknown) => handler(payload as T);
+    connection.on(name, receive);
+    return () => connection.off(name, receive);
+  }, [connection, name, handler]);
+}
+
+function useConnection() {
+  const connection = useContext(ServerEventsContext);
+  if (!connection) {
+    throw new Error('useServerEvent needs the ServerEvents provider (src/providers/serverEvents.tsx).');
+  }
+  return connection;
+}

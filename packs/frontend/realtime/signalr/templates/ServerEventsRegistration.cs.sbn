@@ -1,0 +1,48 @@
+{{~ if project["backend.auth"] != "none" && project["backend.auth"] != "keycloak" ~}}
+#error The signalr pack reads the browser's token for backend.auth keycloak only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using {{ namespace }}.BuildingBlocks.Realtime;
+using {{ namespace }}.Host.Realtime;
+{{~ if project["backend.auth"] != "none" ~}}
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+{{~ end ~}}
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class ServerEventsRegistration
+{
+{{~ if project["backend.auth"] == "none" ~}}
+    /// <summary>SignalR and <see cref="IBrowserEvents"/>, which sends through the hub at /hubs/events.</summary>
+    public static IServiceCollection AddServerEvents(this IServiceCollection services)
+    {
+        services.AddSignalR();
+        return services.AddScoped<IBrowserEvents, HubBrowserEvents>();
+    }
+{{~ else ~}}
+    /// <summary>
+    /// SignalR and <see cref="IBrowserEvents"/>, which sends through the hub at /hubs/events. A browser cannot put a
+    /// header on a WebSocket or an EventSource, so SignalR's client sends the access token as the access_token query
+    /// parameter there; the bearer handler reads it for the hub's path only.
+    /// </summary>
+    public static IServiceCollection AddServerEvents(this IServiceCollection services)
+    {
+        services.AddSignalR();
+        services.AddScoped<IBrowserEvents, HubBrowserEvents>();
+        return services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+        {
+            options.Events ??= new JwtBearerEvents();
+            var received = options.Events.OnMessageReceived;
+            options.Events.OnMessageReceived = async context =>
+            {
+                await received(context);
+                if (context.Token is null
+                    && context.HttpContext.Request.Path.StartsWithSegments("/hubs/events", StringComparison.Ordinal)
+                    && context.Request.Query["access_token"] is [{ Length: > 0 } token])
+                {
+                    context.Token = token;
+                }
+            };
+        });
+    }
+{{~ end ~}}
+}
