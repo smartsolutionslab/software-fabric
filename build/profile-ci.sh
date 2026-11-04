@@ -4,10 +4,28 @@
 # tests and coverage gate, the web app's install, build, lint, tests and format check, and the end-to-end tests against the running
 # application.
 # Needs a Release build of the solution, Docker, Node 22 with pnpm, the Aspire CLI bundle and Playwright's Chromium.
-# Usage: build/profile-ci.sh <profile>
+#
+# Overrides go to `fabric new` as they are, so a pack can go through profile CI before the profile that needs it is
+# complete: build/profile-ci.sh saas-standard-react --set frontend.design-system=tokens-and-components
+# Usage: build/profile-ci.sh <profile> [--set dimension=option ...]
 set -euo pipefail
 
+usage() {
+  echo "Usage: build/profile-ci.sh <profile> [--set dimension=option ...]" >&2
+  exit 2
+}
+
+[[ $# -ge 1 && $1 != -* ]] || usage
 profile="$1"
+shift
+sets=()
+while [[ $# -gt 0 ]]; do
+  [[ $1 == --set && $# -ge 2 ]] || usage
+  sets+=(--set "$2")
+  shift 2
+done
+# What the step names and the last line call this run: the profile, and the overrides when there are any.
+run="$profile${sets[*]:+ ${sets[*]}}"
 repository="$(cd "$(dirname "$0")/.." && pwd)"
 cli="$repository/src/Fabric.Cli/bin/Release/net10.0/fabric.dll"
 work="$(mktemp -d)"
@@ -16,11 +34,11 @@ trap 'rm -rf "$work"' EXIT
 fabric() { dotnet "$cli" "$@"; }
 
 project="$work/shop"
-fabric new "$project" --profile "$profile"
+fabric new "$project" --profile "$profile" "${sets[@]}"
 fabric add-module billing --project "$project"
 cd "$project"
 
-step() { echo "::group::$profile: $1"; }
+step() { echo "::group::$run: $1"; }
 
 step "backend format check"
 bash .github/scripts/format.sh --verify-no-changes
@@ -54,4 +72,4 @@ step "end-to-end"
 bash .github/scripts/e2e.sh
 echo "::endgroup::"
 
-echo "profile $profile: generated, built, tested, end to end"
+echo "profile $run: generated, built, tested, end to end"
