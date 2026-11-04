@@ -170,4 +170,17 @@ public sealed class KernelOptionsTests
         var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         exitCode.ShouldBe(0, output);
     }
+
+    [Fact]
+    public void Minimal_results_with_ensure_that_guards_build_and_pass_their_tests()
+    {
+        using var project = new GeneratedProject(Profile, "backend.result-style=minimal");
+        project.AddModule("billing");
+        project.Build();
+
+        var (resultsExitCode, resultsOutput) = project.Test("tests/Kernel/Results.Tests/Results.Tests.csproj");
+        resultsExitCode.ShouldBe(0, resultsOutput);
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        exitCode.ShouldBe(0, output);
+    }
 }
