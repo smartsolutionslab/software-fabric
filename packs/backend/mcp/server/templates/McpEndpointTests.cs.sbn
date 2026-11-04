@@ -1,3 +1,4 @@
+{{~ auth = project["backend.auth"] != "none" ~}}
 {{~ keycloak = project["backend.auth"] == "keycloak" ~}}
 using System.Net;
 using System.Net.Http.Headers;
@@ -13,7 +14,7 @@ public class McpEndpointTests(AspireFixture aspire)
         """;
 
     private static readonly Uri Endpoint = new("/mcp", UriKind.Relative);
-{{~ if keycloak ~}}
+{{~ if auth ~}}
 
     [Fact]
     public async Task An_anonymous_caller_is_unauthorized()
@@ -24,6 +25,8 @@ public class McpEndpointTests(AspireFixture aspire)
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
+{{~ end ~}}
+{{~ if keycloak ~}}
 
     [Fact]
     public async Task A_signed_in_user_starts_a_session()
@@ -34,7 +37,8 @@ public class McpEndpointTests(AspireFixture aspire)
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
-{{~ else ~}}
+{{~ end ~}}
+{{~ if !auth ~}}
 
     [Fact]
     public async Task An_anonymous_caller_starts_a_session()
