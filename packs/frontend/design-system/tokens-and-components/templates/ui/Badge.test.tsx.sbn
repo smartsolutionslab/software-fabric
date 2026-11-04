@@ -1,0 +1,9 @@
+import { render, screen } from '@testing-library/react';
+import { expect, test } from 'vitest';
+import { Badge } from './Badge';
+
+test('a badge shows its label in the tone it is given', () => {
+  render(<Badge tone="primary">New</Badge>);
+
+  expect(screen.getByText('New')).toHaveClass('bg-primary', 'text-primary-foreground');
+});

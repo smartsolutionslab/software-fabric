@@ -1,0 +1,41 @@
+{{~ if project["frontend.framework"] != "react" || project["frontend.styling"] != "tailwind" ~}}
+throw new Error('The tokens-and-components pack builds React components styled with Tailwind only so far; frontend.framework is {{ project["frontend.framework"] }}, frontend.styling is {{ project["frontend.styling"] }} (docs/adr/0006 of the generator).');
+{{~ end ~}}
+// Compiles the design tokens (src/*.tokens.json, W3C DTCG: $value, $type) to CSS.
+// dist/tokens.css: every token as a CSS variable on :root (--ds-color-primary), for any consumer.
+// dist/theme.css: the same tokens under Tailwind's names (--color-primary), read by @theme, so bg-primary uses them.
+// A reference to a token that does not exist ({color.missing}) fails the build.
+import StyleDictionary from 'style-dictionary';
+
+const prefix = 'ds';
+
+StyleDictionary.registerFormat({
+  name: 'tailwind/theme',
+  format: ({ dictionary }) =>
+    [
+      "@import './tokens.css';",
+      '',
+      '@theme inline {',
+      ...dictionary.allTokens.map((token) => `  --${token.path.join('-')}: var(--${token.name});`),
+      '}',
+      '',
+    ].join('\n'),
+});
+
+const dictionary = new StyleDictionary({
+  source: ['src/**/*.tokens.json'],
+  log: { errors: { brokenReferences: 'throw' } },
+  platforms: {
+    css: {
+      transformGroup: 'css',
+      prefix,
+      buildPath: 'dist/',
+      files: [
+        { destination: 'tokens.css', format: 'css/variables', options: { outputReferences: true } },
+        { destination: 'theme.css', format: 'tailwind/theme' },
+      ],
+    },
+  },
+});
+
+await dictionary.buildAllPlatforms();
