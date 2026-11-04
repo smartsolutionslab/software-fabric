@@ -1,0 +1,13 @@
+import type { ReactNode } from 'react';
+
+export function RequirePermission({
+  fallback = null,
+}: {
+  role?: string;
+  claim?: string;
+  value?: string;
+  fallback?: ReactNode;
+  children: ReactNode;
+}) {
+  return <>{fallback}</>;
+}
