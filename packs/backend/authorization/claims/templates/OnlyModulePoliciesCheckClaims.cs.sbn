@@ -1,0 +1,93 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A claim decides access in one place: the policy a module's <c>IModulePolicies</c> registers with <c>RequireClaim</c>.
+/// Handlers, endpoints and services name the policy instead, so who may do what stays readable in one file per module.
+/// Reading a claim to show it (<c>FindFirst</c>, as <c>GET /me</c> does) is not a check and stays allowed; asking whether
+/// the user has one (<c>HasClaim</c>) is. A claims transformation (<c>IClaimsTransformation</c>) shapes the claims every
+/// policy reads and is exempt. Sources under <c>src/</c> are parsed, not grepped: a comment or a string is prose.
+/// </summary>
+public sealed class OnlyModulePoliciesCheckClaims : IArchitectureRule
+{
+    private const string Registration = "IModulePolicies";
+
+    private const string Transformation = "IClaimsTransformation";
+
+    public string Description => "Claims are checked only in a module's IModulePolicies (RequireClaim); everything else names a policy.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var root = RepositoryRoot();
+        List<string> violations = [];
+        foreach (var path in Directory.EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
+            .Where(path => !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal))
+        {
+            var source = CSharpSyntaxTree.ParseText(File.ReadAllText(Path.Combine(root, path))).GetRoot();
+            foreach (var (line, check) in ClaimChecks(source))
+            {
+                violations.Add($"{path}:{line}: checks a claim ({check}) outside a module's IModulePolicies. Register a policy <module>.<permission> that requires the claim there, and name it with RequireAuthorization(...).");
+            }
+        }
+
+        return violations;
+    }
+
+    private static IEnumerable<(int Line, string Check)> ClaimChecks(SyntaxNode source)
+    {
+        foreach (var invocation in source.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        {
+            var check = CalledName(invocation) switch
+            {
+                "HasClaim" when !Implements(invocation, Registration) && !Implements(invocation, Transformation) => "HasClaim",
+                "RequireClaim" when !Implements(invocation, Registration) => "RequireClaim",
+                _ => null,
+            };
+            if (check is not null)
+            {
+                yield return (invocation.GetLocation().GetLineSpan().StartLinePosition.Line + 1, check);
+            }
+        }
+    }
+
+    /// <summary>A call by any spelling: <c>x.Name()</c>, <c>x?.Name()</c>, or the bare name.</summary>
+    private static string? CalledName(InvocationExpressionSyntax invocation) =>
+        invocation.Expression switch
+        {
+            MemberAccessExpressionSyntax access => access.Name.Identifier.ValueText,
+            MemberBindingExpressionSyntax binding => binding.Name.Identifier.ValueText,
+            SimpleNameSyntax simple => simple.Identifier.ValueText,
+            _ => null,
+        };
+
+    private static bool Implements(SyntaxNode node, string interfaceName) =>
+        node.Ancestors().OfType<TypeDeclarationSyntax>().Any(type =>
+            type.BaseList?.Types.Any(baseType => RightmostTypeName(baseType.Type) == interfaceName) == true);
+
+    private static string? RightmostTypeName(TypeSyntax type) =>
+        type switch
+        {
+            SimpleNameSyntax simple => simple.Identifier.ValueText,
+            QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
+            _ => null,
+        };
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+}
