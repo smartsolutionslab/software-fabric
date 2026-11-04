@@ -1,6 +1,7 @@
 option: frontend.test.extras.accessibility
 files:
-  - { template: templates/accessibility.test.tsx.sbn, target: web/app/src/accessibility.test.tsx }
+  - { template: templates/accessibility.test.tsx.sbn, target: web/app/src/accessibility.test.tsx, when: 'project["frontend.framework"] == "react"' }
+  - { template: templates/accessibility.test.ts.sbn, target: web/app/src/accessibility.test.ts, when: 'project["frontend.framework"] == "vue"' }
   - { template: templates/vitest-axe.d.ts.sbn, target: web/app/src/vitest-axe.d.ts }
 slots:
   - { slot: web.dev-dependencies, template: templates/dev-dependencies.sbn }
@@ -10,3 +11,4 @@ agents:
 adr: docs/adr.md
 gates:
   - { kind: unit-test, describes: "axe finds no violations on the start page; any new screen gets the same check.", file: templates/accessibility.test.tsx.sbn }
+  - { kind: unit-test, describes: "With Vue, axe finds no violations on the start page rendered through the router (src/accessibility.test.ts).", file: templates/accessibility.test.ts.sbn }

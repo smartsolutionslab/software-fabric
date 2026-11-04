@@ -1,0 +1,48 @@
+option: frontend.framework.vue
+files:
+  - { template: templates/package.json.sbn, target: web/app/package.json }
+  - { template: templates/index.html.sbn, target: web/app/index.html }
+  - { template: templates/vite.config.ts.sbn, target: web/app/vite.config.ts }
+  - { template: templates/tsconfig.json.sbn, target: web/app/tsconfig.json }
+  - { template: templates/eslint.config.js.sbn, target: web/app/eslint.config.js }
+  - { template: templates/prettierrc.json.sbn, target: web/app/.prettierrc.json }
+  - { template: templates/prettierignore.sbn, target: web/app/.prettierignore }
+  - { template: templates/main.ts.sbn, target: web/app/src/main.ts }
+  - { template: templates/index.css.sbn, target: web/app/src/index.css }
+  - { template: templates/test-setup.ts.sbn, target: web/app/src/test-setup.ts }
+  - { template: templates/Home.vue.sbn, target: web/app/src/pages/Home.vue }
+  - { template: templates/env.d.ts.sbn, target: web/app/src/vite-env.d.ts }
+  - { template: templates/playwright.config.ts.sbn, target: web/app/playwright.config.ts }
+  - { template: templates/gitignore.sbn, target: web/app/.gitignore }
+  - { template: templates/e2e.sh.sbn, target: ".github/scripts/e2e.sh" }
+# Every role slot of frontend.framework (catalog, ADR-0008), with the catalog's separators.
+declares-slots:
+  - { slot: web.scripts, description: "Entries of web/app's scripts ('\"codegen\": \"...\"').", separator: ",\n" }
+  - { slot: web.prepare, description: "Commands run before dev, build and test (code generators), joined with ' && '.", separator: " && " }
+  - { slot: web.env, description: "Members of ImportMetaEnv: the VITE_ variables the app reads." }
+  - { slot: web.test-setup, description: "Statements of src/test-setup.ts, run before every Vitest file." }
+  - { slot: web.lint-ignores, description: "Entries of eslint's ignores (generated files).", separator: ",\n" }
+  - { slot: web.format-ignores, description: "Lines of web/app/.prettierignore: files a tool writes, not people (the generated client, openapi.json)." }
+  - { slot: web.dependencies, description: "Entries of web/app's dependencies ('\"zod\": \"4.6.7\"').", separator: ",\n" }
+  - { slot: web.dev-dependencies, description: "Entries of web/app's devDependencies.", separator: ",\n" }
+  - { slot: web.vite-imports, description: "Import lines of vite.config.ts." }
+  - { slot: web.vite-plugins, description: "Entries of vite.config.ts's plugins array.", separator: ",\n" }
+  - { slot: web.imports, description: "Import lines of src/main.ts." }
+  - { slot: web.providers, description: "Providers, outermost first: (app: App, root: Component) => Component, installing into the app and returning the root, wrapped or as it came.", separator: ",\n" }
+  - { slot: web.styles, description: "Lines of src/index.css." }
+  - { slot: web.restricted-imports, description: "Entries of the no-restricted-imports patterns ({ group: [...], message: '...' }), indented twelve spaces as Prettier prints them.", separator: ",\n" }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-version.sbn }
+  - { slot: apphost.packages, template: templates/apphost-package.sbn }
+  - { slot: apphost.web, template: templates/apphost-web.sbn }
+  - { slot: apphost.web-wiring, template: templates/apphost-web-wiring.sbn }
+  - { slot: ci.backend-steps, template: templates/ci-backend-steps.sbn, order: 5 }
+  - { slot: ci.e2e-steps, template: templates/ci-e2e-steps.sbn }
+  - { slot: ci.frontend-steps, template: templates/ci-frontend-steps.sbn, order: 20 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "TypeScript strict (vue-tsc -b in the build, .vue files included) and eslint-plugin-vue's essential rules with typescript-eslint's strict ones fail the frontend job.", file: templates/eslint.config.js.sbn }
+  - { kind: lint-rule, describes: "In *.test.ts, a loop of awaited promises or a settle right before expect fails lint: tests wait for a condition (findBy*, waitFor), not a count.", file: templates/eslint.config.js.sbn }
+  - { kind: ci-step, describes: "pnpm format:check (Prettier) runs in the frontend job; a file Prettier would change fails CI.", file: templates/ci-frontend-steps.sbn }

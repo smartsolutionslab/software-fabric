@@ -1,0 +1,4 @@
+            {
+              group: ['unplugin-vue-router', 'unplugin-vue-router/*'],
+              message: 'Routes are declared in src/router.ts and src/modules/*/routes.ts (docs/adr).',
+            }

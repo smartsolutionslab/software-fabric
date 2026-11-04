@@ -1,0 +1,5 @@
+
+    // OIDC redirect URIs name this port (src/AppHost/realms); the dev server proxies /api to the host.
+    .WithEndpoint("http", endpoint => endpoint.Port = 5173)
+    .WithReference(host)
+    .WaitFor(host)

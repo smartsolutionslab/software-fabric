@@ -1,4 +1,8 @@
-{{~ if project["frontend.framework"] != "react" || project["frontend.state"] != "tanstack-query" ~}}
+{{~ react = project["frontend.framework"] == "react" && project["frontend.state"] == "tanstack-query" ~}}
+{{~ vue = project["frontend.framework"] == "vue" && project["frontend.state"] == "pinia-tanstack-query" ~}}
+{{~ if project["frontend.framework"] == "vue" && !vue ~}}
+throw new Error('The orval pack generates TanStack Query hooks for Vue with frontend.state pinia-tanstack-query only so far; frontend.state is {{ project["frontend.state"] }} (docs/adr/0006 of the generator).');
+{{~ else if !react && !vue ~}}
 throw new Error('The orval pack generates TanStack Query hooks for React only so far; frontend.state is {{ project["frontend.state"] }} (docs/adr/0006 of the generator).');
 {{~ else ~}}
 import { defineConfig } from 'orval';
@@ -9,7 +13,7 @@ export default defineConfig({
     input: './openapi.json',
     output: {
       target: './src/api/generated.ts',
-      client: 'react-query',
+      client: '{{ if vue }}vue-query{{ else }}react-query{{ end }}',
       httpClient: 'fetch',
       override: {
         mutator: { path: './src/api/baseApi.ts', name: 'apiFetch' },
