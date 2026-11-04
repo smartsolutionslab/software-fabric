@@ -1,3 +1,4 @@
+{{~ typed = object.has_key(project, "backend.result-style") && project["backend.result-style"] == "typed-outcomes" ~}}
 using {{ namespace }}.BuildingBlocks.Messaging;
 
 namespace {{ namespace }}.Mcp.Server.Tests;
@@ -8,6 +9,10 @@ public sealed class WhisperHandler : IQueryHandler<Whisper, Result<Shouted, ApiE
     {
         {{ not_null "query" }}
 
+{{~ if typed ~}}
         return Task.FromResult<Result<Shouted, ApiError>>(Success(new Shouted(query.Text.ToLowerInvariant())));
+{{~ else ~}}
+        return Task.FromResult(Result<Shouted, ApiError>.Success(new Shouted(query.Text.ToLowerInvariant())));
+{{~ end ~}}
     }
 }

@@ -1,3 +1,4 @@
+{{~ typed = object.has_key(project, "backend.result-style") && project["backend.result-style"] == "typed-outcomes" ~}}
 using {{ namespace }}.BuildingBlocks.Messaging;
 
 namespace {{ namespace }}.Mcp.Server.Tests;
@@ -9,6 +10,10 @@ public sealed class ApproveHandler(Approvals approvals) : ICommandHandler<Approv
         {{ not_null "command" }}
 
         approvals.Numbers.Add(command.Number);
+{{~ if typed ~}}
         return Task.FromResult<Result<Approved, ApiError>>(Success(new Approved(command.Number)));
+{{~ else ~}}
+        return Task.FromResult(Result<Approved, ApiError>.Success(new Approved(command.Number)));
+{{~ end ~}}
     }
 }
