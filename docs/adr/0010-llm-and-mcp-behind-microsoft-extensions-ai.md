@@ -160,6 +160,22 @@ managed identity would be a runtime switch between two auth paths
 (ADR-0001), so it is a later option of its own. The repository owner
 accepted all four.
 
+**Settled on 2026-11-04 (issue #80):** `ollama` uses the community
+`OllamaSharp` 5.5.0, whose `OllamaApiClient` is an `IChatClient` itself
+(provider name `ollama`) and which depends on `Microsoft.Extensions.AI`
+>= 10.8.0, so the base's 10.11.0 satisfies it. Microsoft's
+`Microsoft.Extensions.AI.Ollama` is deprecated and was never stable; its
+NuGet notice recommends `OllamaSharp`. Aspire has no Ollama hosting
+integration of its own, so the AppHost uses
+`CommunityToolkit.Aspire.Hosting.Ollama` 13.6.1, which depends on the
+`Aspire.Hosting` 13.6.4 the base pins: an `ollama/ollama` container at the
+tag the package pins (0.34.4), with a data volume, and a model resource
+that pulls the model at start, which the host waits for. The default
+model is `llama3.2:1b`. The integration-test fixture removes the Ollama
+resources and gives the host an endpoint nothing listens on, so no test
+pulls the image or a model. Read from the packages' nuspecs and
+assemblies; the repository owner accepted all of it.
+
 ## Consequences
 
 - No profile changes its choices: every profile takes `backend.llm: none`
@@ -181,7 +197,7 @@ accepted all four.
   `fabric new` fails with `no pack for ...` for an option still without one.
   Each pack is its own issue, ships its agent rules and a gate (ADR-0002), and
   becomes `supported` once the matrix builds it. `client` (#82),
-  `anthropic` (#77), `openai` (#78) and `azure-openai` (#79) have packs
-  and stay `experimental` until then.
+  `anthropic` (#77), `openai` (#78), `azure-openai` (#79) and `ollama`
+  (#80) have packs and stay `experimental` until then.
 - `backend.llm.agents`, retrieval-augmented generation and evaluations are
   later decisions, each with its own ADR.

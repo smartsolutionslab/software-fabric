@@ -1,0 +1,1 @@
+- Start the AppHost with Docker running: the first start pulls the Ollama image and the model `llama3.2:1b` (about 1.3 GB) into a data volume, and the host waits until the model is there. There is no key to set.
