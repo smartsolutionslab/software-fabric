@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Reflection;
 using System.Text.Json.Serialization;
 
@@ -48,7 +49,7 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
 
         NullabilityInfoContext nullability = new();
 
-        foreach (var property in holder.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        foreach (var property in Members(holder))
         {
             if (!CarriesValueObject(property.PropertyType, [], [holder]))
             {
@@ -71,7 +72,7 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
     {
         holders.Add(holder);
         path.Add(holder);
-        foreach (var property in holder.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        foreach (var property in Members(holder))
         {
             Reach(property.PropertyType, holders, entered, path);
         }
@@ -87,18 +88,9 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
             return;
         }
 
-        if (type.IsArray)
+        foreach (var content in Contents(type, path))
         {
-            Reach(type.GetElementType()!, holders, entered, path);
-            return;
-        }
-
-        if (type.IsGenericType)
-        {
-            foreach (var argument in type.GetGenericArguments())
-            {
-                Reach(argument, holders, entered, path);
-            }
+            Reach(content, holders, entered, path);
         }
 
         if (Enters(type, entered, path))
@@ -126,8 +118,8 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
     }
 
     /// <summary>
-    /// Whether the type is a value object, or holds one in a <see cref="Nullable{T}"/>, an array, a generic argument or a
-    /// public property of a domain type.
+    /// Whether the type is a value object, or holds one in its contents (<see cref="Contents"/>) or in a member of a domain
+    /// type.
     /// </summary>
     private static bool CarriesValueObject(Type type, HashSet<Type> entered, List<Type> path)
     {
@@ -136,12 +128,7 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
             return true;
         }
 
-        if (type.IsArray)
-        {
-            return CarriesValueObject(type.GetElementType()!, entered, path);
-        }
-
-        if (type.IsGenericType && type.GetGenericArguments().Any(argument => CarriesValueObject(argument, entered, path)))
+        if (Contents(type, path).Any(content => CarriesValueObject(content, entered, path)))
         {
             return true;
         }
@@ -152,23 +139,60 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
         }
 
         path.Add(type);
-        var carries = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Any(property => CarriesValueObject(property.PropertyType, entered, path));
+        var carries = Members(type).Any(property => CarriesValueObject(property.PropertyType, entered, path));
         path.RemoveAt(path.Count - 1);
         return carries;
     }
 
+    /// <summary>The members System.Text.Json reads: public properties, neither indexers nor always ignored.</summary>
+    private static IEnumerable<PropertyInfo> Members(Type type) =>
+        type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => property.GetIndexParameters().Length == 0
+                && property.GetCustomAttribute<JsonIgnoreAttribute>() is not { Condition: JsonIgnoreCondition.Always });
+
+    /// <summary>
+    /// What System.Text.Json reads a type's value as, other than members: an array's or a collection's elements (a
+    /// dictionary's keys and values through its <see cref="KeyValuePair{TKey, TValue}"/>), and the arguments of a generic
+    /// type from outside the Domain (<see cref="Nullable{T}"/>). A generic domain type is read through its members only, so
+    /// a phantom argument (<c>Reference&lt;Invoice&gt;</c>) is not followed, unless the walk does not enter it (see
+    /// <see cref="Expands"/>): then its arguments stand in for its members.
+    /// </summary>
+    private static IEnumerable<Type> Contents(Type type, List<Type> path)
+    {
+        if (type.IsArray)
+        {
+            return [type.GetElementType()!];
+        }
+
+        if (IsCollection(type))
+        {
+            return type.GetInterfaces()
+                .Append(type)
+                .Where(contract => contract.IsInterface && contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                .Select(contract => contract.GetGenericArguments()[0])
+                .Distinct();
+        }
+
+        return type.IsGenericType && (!InDomain(type) || Expands(type, path)) ? type.GetGenericArguments() : [];
+    }
+
+    private static bool IsCollection(Type type) => type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(type);
+
+    private static bool InDomain(Type type) => type.Assembly.GetName().Name == Domain;
+
     /// <summary>
     /// Whether the walk looks into a domain type's members: a concrete type of this module's Domain that is not a value
-    /// object or an enum, each closed type once per walk. A closed generic type larger than the nearest closed type of the
+    /// object, an enum or a collection, each closed type once per walk. A closed generic type larger than the nearest closed type of the
     /// same generic definition the walk is already inside of is not entered, so <c>Node&lt;T&gt;</c> holding a
-    /// <c>Node&lt;List&lt;T&gt;&gt;</c> does not construct a new type at every step; its arguments are still walked.
+    /// <c>Node&lt;List&lt;T&gt;&gt;</c> does not construct a new type at every step; its arguments are walked instead.
     /// </summary>
     private static bool Enters(Type type, HashSet<Type> entered, List<Type> path) =>
         !type.IsAbstract
         && !type.IsEnum
         && !type.IsGenericParameter
-        && type.Assembly.GetName().Name == Domain
+        && InDomain(type)
         && !typeof(IValueObject).IsAssignableFrom(type)
+        && !IsCollection(type)
         && !Expands(type, path)
         && entered.Add(type);
 

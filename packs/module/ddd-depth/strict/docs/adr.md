@@ -62,11 +62,16 @@ event holds too, at any depth (alone, nullable, in a collection or an array), an
 same way: an event taking `InvoiceDetails Details` by constructor still reads `"Details":{}`, so `InvoiceDetails` takes
 its `InvoiceNumber` by constructor as well, and a property holding a domain type that carries a value object (an
 `IReadOnlyList<InvoiceLine>` of lines built from value objects) is itself a constructor parameter. A domain type is a
-concrete type of the module's Domain that is not a value object or an enum. The walk stops at a value object, which is
-stored as its backing value, so `TypedId<Invoice>` never makes it look into `Invoice`. It enters each closed type once,
-so a type that holds itself (`InvoiceChain? Next`) ends it, and `Envelope<Marker>` and `Envelope<InvoiceNumber>` are
-checked each. It does not enter a closed type larger than the nearest closed type of the same generic definition it is
-already inside of (`Node<T>` holding a `Node<List<T>>`), whose arguments it still walks. Both settings hold
+concrete type of the module's Domain that is not a value object, an enum or a collection. The walk follows only what
+System.Text.Json reads: public properties that are neither indexers nor `[JsonIgnore]`d, and of an array or a collection
+(a domain one too, `InvoiceNumberCollection : Collection<InvoiceNumber>`) its elements, not its members. It stops at a
+value object, which is stored as its backing value, so `TypedId<Invoice>` never makes it look into `Invoice`, and it
+reads a generic domain type through its members only, so `Reference<TTag>(InvoiceId Id)` used as `Reference<Invoice>`
+does not either; the arguments of a generic type from outside the Domain (`Nullable<T>`, `Option<T>`) are walked. It
+enters each closed type once, so a type that holds itself (`InvoiceChain? Next`) ends it, and `Envelope<Marker>` and
+`Envelope<InvoiceNumber>` are checked each. It does not enter a closed type larger than the nearest closed type of the
+same generic definition it is already inside of (`Node<T>` holding a `Node<List<T>>`), and walks that type's arguments
+instead. Both settings hold
 for every event and document in the store, read models included: a read model whose constructor later gains a
 parameter can no longer read the rows stored before it, so give the new parameter a default or rebuild the projection.
 
