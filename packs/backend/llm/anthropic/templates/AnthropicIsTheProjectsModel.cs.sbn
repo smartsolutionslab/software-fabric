@@ -1,0 +1,60 @@
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// The host's <see cref="IChatClient"/> is Claude, with the model the AppHost supplies, behind the logging and
+/// OpenTelemetry every model call gets; and a host started without the key says which parameter is missing. The client
+/// is resolved and inspected, never called.
+/// </summary>
+public sealed class AnthropicIsTheProjectsModel : IArchitectureRule
+{
+    private const string Model = "claude-haiku-5-5";
+
+    public string Description => "AddAnthropicChatClient registers Claude behind logging and OpenTelemetry, with the AppHost's key and model; a missing key fails naming its parameter.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        List<string> violations = [];
+        using (var services = Services(new() { ["Anthropic:ApiKey"] = "not-a-real-key", ["Anthropic:Model"] = Model }))
+        {
+            var client = services.GetRequiredService<IChatClient>();
+            var metadata = client.GetService<ChatClientMetadata>();
+            if (metadata is not { ProviderName: "anthropic", DefaultModelId: Model })
+            {
+                violations.Add($"The registered IChatClient is '{metadata?.ProviderName} {metadata?.DefaultModelId}', not 'anthropic {Model}' from Anthropic:Model.");
+            }
+
+            if (client.GetService<LoggingChatClient>() is null || client.GetService<OpenTelemetryChatClient>() is null)
+            {
+                violations.Add("The registered IChatClient is not wrapped with UseLogging and UseOpenTelemetry; register it through AddModelChatClient.");
+            }
+        }
+
+        using (var services = Services(new() { ["Anthropic:Model"] = Model }))
+        {
+            try
+            {
+                services.GetRequiredService<IChatClient>();
+                violations.Add("Without Anthropic:ApiKey the IChatClient still resolved; it must fail, naming the parameter anthropic-api-key.");
+            }
+            catch (InvalidOperationException exception) when (exception.Message.Contains("anthropic-api-key", StringComparison.Ordinal))
+            {
+            }
+        }
+
+        return violations;
+    }
+
+    private static ServiceProvider Services(Dictionary<string, string?> settings)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        var services = new ServiceCollection().AddLogging();
+        services.AddAnthropicChatClient(configuration);
+        return services.BuildServiceProvider();
+    }
+}

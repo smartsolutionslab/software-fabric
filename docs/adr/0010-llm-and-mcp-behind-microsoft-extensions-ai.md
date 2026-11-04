@@ -126,6 +126,15 @@ Not confirmed by these sources: which package gives Anthropic an
 Anthropic. The `anthropic` pack's issue settles it; the rule above (one
 `IChatClient`, registered in Infrastructure) holds whichever package it is.
 
+**Settled on 2026-11-03 (issue #77):** the official `Anthropic` package,
+published by Anthropic, gives Claude an `IChatClient`. Its NuGet package
+13.4.0 depends on `Microsoft.Extensions.AI.Abstractions` (>= 10.5.1) and
+ships the adapter `AsIChatClient` (namespace `Microsoft.Extensions.AI`),
+whose metadata names the provider `anthropic`; read from the package's own
+assembly and XML documentation. The repository owner chose it over the
+community `Anthropic.SDK`, consistent with "no third-party package" for
+MCP, and `claude-haiku-5-5` as the generated default model.
+
 ## Consequences
 
 - No profile changes its choices: every profile takes `backend.llm: none`

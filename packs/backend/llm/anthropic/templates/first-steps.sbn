@@ -1,0 +1,1 @@
+- Give the AppHost your Anthropic API key, which stays out of the repository: `dotnet user-secrets set Parameters:anthropic-api-key <key> --project src/AppHost`. Without it the host cannot call Claude; the tests never need it.
