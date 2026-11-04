@@ -1,0 +1,4 @@
+            // A null for a value object that is not nullable, or a constructor member missing from the JSON, fails instead of skipping From.
+            json.RespectNullableAnnotations = true;
+            json.RespectRequiredConstructorParameters = true;
+            json.Converters.Add(new ValueObjectJsonConverterFactory());

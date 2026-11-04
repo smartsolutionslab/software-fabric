@@ -29,6 +29,14 @@ public class RuleEvaluatorTests
     }
 
     [Theory]
+    [InlineData("saas-standard-react")]
+    [InlineData("industrial-event-driven-mfe")]
+    public void Strict_ddd_depth_is_allowed_for_ddd_and_event_sourced_modules(string profile)
+    {
+        Violations(profile, "module.ddd-depth=strict").ShouldBeEmpty();
+    }
+
+    [Theory]
     [InlineData("saas-standard-vue", "frontend.state=redux-toolkit",
         "frontend.state=redux-toolkit requires frontend.framework == react, but frontend.framework is vue.")]
     [InlineData("saas-standard-react", "frontend.styling=css-modules",
@@ -53,8 +61,6 @@ public class RuleEvaluatorTests
         "module defaults: module.style=event-sourced requires module.cqrs != none, but module.cqrs is none.")]
     [InlineData("industrial-event-driven-mfe", "backend.database=sqlserver",
         "module defaults: module.event-store=marten requires backend.database == postgres, but backend.database is sqlserver.")]
-    [InlineData("industrial-event-driven-mfe", "module.ddd-depth=strict",
-        "module defaults: module.ddd-depth=strict requires module.style == ddd, but module.style is event-sourced.")]
     public void Rejects_a_known_invalid_combination_in_one_sentence(string profile, string setting, string violation)
     {
         Violations(profile, setting).ShouldContain(violation);

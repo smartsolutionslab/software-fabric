@@ -4,19 +4,28 @@ files:
   - { template: templates/IValueObjectOfValue.cs.sbn, target: "src/Kernel/IValueObject{TValue}.cs" }
   - { template: templates/ValueObjectConverter.cs.sbn, target: src/BuildingBlocks/Persistence/ValueObjectConverter.cs }
   - { template: templates/ValueObjectConventions.cs.sbn, target: src/BuildingBlocks/Persistence/ValueObjectConventions.cs }
+  # Only beside Marten: the converter is registered through its slot, which no other event store declares.
+  - { template: templates/ValueObjectJsonConverterFactory.cs.sbn, target: src/BuildingBlocks/EventStore/ValueObjectJsonConverterFactory.cs, when: 'object.has_key(slots, "event-store.json-converters")' }
+  - { template: templates/ValueObjectJsonConverter.cs.sbn, target: src/BuildingBlocks/EventStore/ValueObjectJsonConverter.cs, when: 'object.has_key(slots, "event-store.json-converters")' }
   - { template: templates/PrimitiveBoundary.cs.sbn, target: tests/Architecture.Tests/PrimitiveBoundary.cs }
   # Per module: the rule checks only the modules that chose strict, so another module may stay light.
   - { template: templates/HoldsNoPrimitives.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}HoldsNoPrimitives.cs", per-module: true }
   - { template: templates/AggregatesHaveNoPublicSetters.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}AggregatesHaveNoPublicSetters.cs", per-module: true }
+  - { template: templates/ValueObjectsHaveOneValue.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}ValueObjectsHaveOneValue.cs", per-module: true, when: 'module.values["module.style"] == "event-sourced"' }
+  - { template: templates/EventsTakeValueObjectsByConstructor.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}EventsTakeValueObjectsByConstructor.cs", per-module: true, when: 'module.values["module.style"] == "event-sourced"' }
   - { template: templates/SampleId.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/SampleId.cs", per-module: true }
   - { template: templates/SampleName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/SampleName.cs", per-module: true }
   - { template: templates/SampleIdTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleIdTests.cs", per-module: true }
   - { template: templates/SampleNameTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleNameTests.cs", per-module: true }
 slots:
   - { slot: persistence.context-members, template: templates/context-members.sbn }
+  # Marten is chosen only with event-sourced modules; a project of ddd modules has no event store to register with.
+  - { slot: event-store.json-converters, template: templates/json-converters.sbn, optional: true }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
   - { kind: architecture-test, describes: "No aggregate of a strict module, nor an entity or value object reachable from it, nor a command or domain event, holds state, in a public property or a public field, typed as a keyword type (string, int, bool, decimal, object, ...) or as Guid, DateTime, DateTimeOffset, DateOnly, TimeOnly, TimeSpan or Uri, collections and arrays included; a value object (IValueObject) that is not itself an aggregate, command or domain event is exempt for its own backing values, and a generic one (Positive<int>) is not looked into for them; private fields are out of scope, and a computed bool whose getter does more than return a field is not state.", file: templates/HoldsNoPrimitives.cs.sbn }
   - { kind: architecture-test, describes: "No aggregate root of a strict module exposes a public setter (light's rule, so strict is a superset of light).", file: templates/AggregatesHaveNoPublicSetters.cs.sbn }
+  - { kind: architecture-test, describes: "Every value object in the Domain of a strict event-sourced module implements IValueObject<T> for exactly one T: the event store writes a value object as its one backing value, so a value object over several values (Money) is refused for now.", file: templates/ValueObjectsHaveOneValue.cs.sbn }
+  - { kind: architecture-test, describes: "Every value object a domain event of a strict event-sourced module carries, in a public property, alone or inside a collection, array or Nullable, is a parameter of the constructor System.Text.Json selects ([JsonConstructor], else the public parameterless one, else the only public one; matched by name, ignoring case), and not an optional one unless declared nullable, so RespectRequiredConstructorParameters refuses a stored event without it.", file: templates/EventsTakeValueObjectsByConstructor.cs.sbn }

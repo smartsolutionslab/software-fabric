@@ -216,10 +216,7 @@ dimensions:
     default: light
     options:
       light:  { tier: supported, note: "aggregates and value objects for core concepts" }
-      strict:
-        tier: supported
-        note: "no primitives on the domain model; architecture test enforced. Not yet for event-sourced modules: value objects do not round-trip through Marten's JSON"
-        requires: ["module.style == ddd"]
+      strict: { tier: supported, note: "no primitives on the domain model; architecture test enforced" }
 
   module.cqrs:
     scope: module

@@ -1,0 +1,93 @@
+using System.Reflection;
+using System.Text.Json.Serialization;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// The {{ module.namespace }} module is strict and event-sourced: an event carries its value objects as required
+/// parameters of the constructor System.Text.Json selects, so a stored event that lacks one fails to read
+/// (RespectRequiredConstructorParameters) instead of leaving it null without <c>From</c> (module.ddd-depth: strict, docs/adr).
+/// </summary>
+public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : IArchitectureRule
+{
+    private const string Domain = "{{ namespace }}.Modules.{{ module.namespace }}.Domain";
+    private const string DomainEvent = "{{ namespace }}.BuildingBlocks.EventSourcing.IDomainEvent";
+
+    public string Description =>
+        "The {{ module.namespace }} module is strict and event-sourced: every value object an event carries is a required parameter of the constructor System.Text.Json selects.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        return model.ModuleAssemblies
+            .Where(assembly => assembly.GetName().Name == Domain)
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => !type.IsAbstract && !type.IsInterface && type.GetInterfaces().Any(contract => contract.FullName == DomainEvent))
+            .SelectMany(Violations);
+    }
+
+    private static IEnumerable<string> Violations(Type domainEvent)
+    {
+        // System.Text.Json matches a constructor parameter to a property by name, ignoring case.
+        Dictionary<string, ParameterInfo> parameters = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var parameter in JsonConstructor(domainEvent)?.GetParameters() ?? [])
+        {
+            parameters[parameter.Name!] = parameter;
+        }
+
+        NullabilityInfoContext nullability = new();
+
+        foreach (var property in domainEvent.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (!CarriesValueObject(property.PropertyType, []))
+            {
+                continue;
+            }
+
+            if (!parameters.TryGetValue(property.Name, out var parameter))
+            {
+                yield return $"{domainEvent.FullName}.{property.Name} carries a value object outside its constructor; make it a parameter of the constructor System.Text.Json selects ([JsonConstructor], else the public parameterless one, else the only public one), so a stored event without it fails to read.";
+            }
+            else if (parameter.IsOptional && nullability.Create(parameter).ReadState != NullabilityState.Nullable)
+            {
+                yield return $"{domainEvent.FullName}.{property.Name} carries a value object through an optional constructor parameter; remove its default, or declare it nullable, so a stored event without it fails to read.";
+            }
+        }
+    }
+
+    /// <summary>
+    /// The constructor System.Text.Json deserialises with: the one marked [JsonConstructor], else the public parameterless
+    /// one, else the only public one. A struct without the attribute is built by its default constructor, so none.
+    /// </summary>
+    private static ConstructorInfo? JsonConstructor(Type type)
+    {
+        var marked = type.GetConstructors(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .FirstOrDefault(constructor => constructor.IsDefined(typeof(JsonConstructorAttribute), inherit: false));
+        if (marked is not null || type.IsValueType)
+        {
+            return marked;
+        }
+
+        var constructors = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance);
+        return constructors.FirstOrDefault(constructor => constructor.GetParameters().Length == 0)
+            ?? (constructors.Length == 1 ? constructors[0] : null);
+    }
+
+    /// <summary>Whether the type is a value object, or holds one in a <see cref="Nullable{T}"/>, an array or a generic argument.</summary>
+    private static bool CarriesValueObject(Type type, HashSet<Type> visited)
+    {
+        if (!visited.Add(type))
+        {
+            return false;
+        }
+
+        if (typeof(IValueObject).IsAssignableFrom(type))
+        {
+            return true;
+        }
+
+        return (type.IsArray && CarriesValueObject(type.GetElementType()!, visited))
+            || (type.IsGenericType && type.GetGenericArguments().Any(argument => CarriesValueObject(argument, visited)));
+    }
+}

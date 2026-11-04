@@ -1,0 +1,37 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace {{ namespace }}.BuildingBlocks.EventStore;
+
+/// <summary>
+/// Writes every value object (<see cref="IValueObject{TValue}"/>) as its backing value and reads it back through its own
+/// <c>From(TValue)</c>, so the events and documents of every module's event store need no converter per value object,
+/// and a value read from the store passes the same guards as one a caller sends.
+/// </summary>
+public sealed class ValueObjectJsonConverterFactory : JsonConverterFactory
+{
+    public override bool CanConvert(Type typeToConvert) => BackingValue(typeToConvert) is not null;
+
+    public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options)
+    {
+        {{ not_null "typeToConvert" }}
+
+        var backing = BackingValue(typeToConvert)
+            ?? throw new InvalidOperationException($"{typeToConvert.FullName} is not a value object over one value.");
+        return (JsonConverter)Activator.CreateInstance(typeof(ValueObjectJsonConverter<,>).MakeGenericType(typeToConvert, backing))!;
+    }
+
+    /// <summary>The <c>TValue</c> of a value object (a sealed record, so a class) over exactly one value; null for anything else.</summary>
+    private static Type? BackingValue(Type type)
+    {
+        if (!type.IsClass)
+        {
+            return null;
+        }
+
+        List<Type> backing = [.. type.GetInterfaces()
+            .Where(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IValueObject<>))
+            .Select(contract => contract.GetGenericArguments()[0])];
+        return backing.Count == 1 ? backing[0] : null;
+    }
+}
