@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using Fabric.Core.Generation;
 
@@ -5,7 +7,8 @@ namespace Fabric.Packs.Tests;
 
 /// <summary>
 /// Profile CI (ADR-0003) runs every profile whose packs all exist: build/complete-profiles.sh lists them for the
-/// workflow's matrix, and says which profiles it leaves out and why.
+/// workflow's matrix, and says which profiles it leaves out and why. build/profile-ci.sh takes overrides, so a pack
+/// can go through profile CI before its profile is complete.
 /// </summary>
 public sealed class ProfileCiTests
 {
@@ -49,6 +52,83 @@ public sealed class ProfileCiTests
         foreach (var profile in CatalogProfiles)
         {
             workflow.ShouldNotContain($"profile-ci.sh {profile}", Case.Sensitive, "the workflow names a profile; the matrix comes from build/complete-profiles.sh.");
+        }
+    }
+
+    [Fact]
+    public void An_override_is_what_profile_CI_generates()
+    {
+        var (_, output, fabricYaml) = ProfileCiUntilItsFirstStep("saas-standard-react", "--set", "module.ddd-depth=strict");
+
+        output.ShouldContain("::group::saas-standard-react --set module.ddd-depth=strict: ", Case.Sensitive, output);
+        fabricYaml.ShouldNotBeNull(output);
+        fabricYaml.ShouldContain("  module.ddd-depth: strict\n", Case.Sensitive, output);
+    }
+
+    [Fact]
+    public void An_override_the_catalog_refuses_stops_profile_CI_before_its_first_step()
+    {
+        var (exitCode, output, _) = ProfileCiUntilItsFirstStep("saas-standard-react", "--set", "frontend.design-system=no-such-option");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("'no-such-option' is not an option of frontend.design-system", Case.Sensitive, output);
+        output.ShouldNotContain("::group::", Case.Sensitive, output);
+    }
+
+    [Fact]
+    public void An_argument_that_is_not_an_override_is_refused()
+    {
+        var (exitCode, output, _) = ProfileCiUntilItsFirstStep("saas-standard-react", "module.ddd-depth=strict");
+
+        exitCode.ShouldBe(2, output);
+        output.ShouldContain("Usage: build/profile-ci.sh <profile> [--set dimension=option ...]", Case.Sensitive, output);
+        output.ShouldNotContain("::group::", Case.Sensitive, output);
+    }
+
+    /// <summary>
+    /// Runs build/profile-ci.sh only as far as its first CI step, so a test sees what it generated without running the
+    /// generated project's CI. Its work directory is made in a temporary directory of the test's own, so the generated
+    /// project's <c>fabric.yaml</c> can be read when the script got that far, and nothing is left behind.
+    /// </summary>
+    private static (int ExitCode, string Output, string? FabricYaml) ProfileCiUntilItsFirstStep(params string[] arguments)
+    {
+        var temporary = Directory.CreateTempSubdirectory("profile-ci-test-");
+        try
+        {
+            var start = new ProcessStartInfo("bash") { WorkingDirectory = Repository.Root, RedirectStandardOutput = true, RedirectStandardError = true };
+            start.ArgumentList.Add("build/profile-ci.sh");
+            foreach (var argument in arguments)
+            {
+                start.ArgumentList.Add(argument);
+            }
+
+            start.Environment["TMPDIR"] = temporary.FullName;
+            using var process = Process.Start(start)!;
+            var error = process.StandardError.ReadToEndAsync();
+            var output = new StringBuilder();
+            var stepped = false;
+            while (process.StandardOutput.ReadLine() is { } line)
+            {
+                output.AppendLine(line);
+                if (line.StartsWith("::group::", StringComparison.Ordinal))
+                {
+                    stepped = true;
+                    process.Kill(entireProcessTree: true);
+                    break;
+                }
+            }
+
+            process.WaitForExit();
+            var fabricYaml = Directory.GetDirectories(temporary.FullName)
+                .Select(work => Path.Combine(work, "shop", "fabric.yaml"))
+                .Where(File.Exists)
+                .Select(File.ReadAllText)
+                .SingleOrDefault();
+            return (stepped ? -1 : process.ExitCode, output + error.Result, fabricYaml);
+        }
+        finally
+        {
+            temporary.Delete(recursive: true);
         }
     }
 
