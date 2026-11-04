@@ -1,2 +1,1 @@
     <PackageVersion Include="ModelContextProtocol.Core" Version="2.3.0" />
-    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />

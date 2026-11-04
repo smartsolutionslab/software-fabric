@@ -176,6 +176,10 @@ accepted all four.
   provider is chosen or the MCP client is (owner's decision on #77,
   2026-11-04), and neither the provider packs nor `backend.mcp.client`
   declare it themselves.
+- `ModelContextProtocol.AspNetCore` has one owner too: the base declares
+  its version for the MCP client (owner's decision on #81, 2026-11-04),
+  whose tests start a tiny server with it; `backend.mcp.client` declares
+  only `ModelContextProtocol.Core`.
 - `anthropic`, `openai`, `azure-openai`, `ollama`, `server` and `client` had
   no packs when this was decided, so they are `experimental` (ADR-0003), and
   `fabric new` fails with `no pack for ...` for an option still without one.
