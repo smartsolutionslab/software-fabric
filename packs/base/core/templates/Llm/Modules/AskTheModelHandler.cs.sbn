@@ -1,0 +1,26 @@
+{{~ if !object.has_key(project, "backend.result-style") ~}}
+#error The sample model query returns a Result; backend.errors without one has no branch here yet (docs/adr/0006 of the generator).
+{{~ end ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.Queries.AskTheModel;
+
+/// <summary>
+/// Asks the model through <see cref="IChatClient"/>, whichever provider the project chose. The answer is the model's
+/// output: untrusted input, returned as text and never executed or put into SQL or markup.
+/// </summary>
+public sealed class AskTheModelHandler(IChatClient model) : IQueryHandler<AskTheModel, Result<string, ApiError>>
+{
+    public async Task<Result<string, ApiError>> HandleAsync(AskTheModel query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        var response = await model.GetResponseAsync(query.Question, cancellationToken: cancellationToken);
+{{~ if object.has_key(project, "backend.result-style") && project["backend.result-style"] == "typed-outcomes" ~}}
+        return Success(response.Text);
+{{~ else ~}}
+        return Result<string, ApiError>.Success(response.Text);
+{{~ end ~}}
+    }
+}

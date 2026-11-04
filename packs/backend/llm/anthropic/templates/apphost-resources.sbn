@@ -1,0 +1,4 @@
+// Claude through the Anthropic API: the key is a secret (dotnet user-secrets set Parameters:anthropic-api-key ...), the
+// model a parameter with a default (claude-sonnet-5-5 or claude-opus-5-5 for harder questions, at a higher price).
+var anthropicApiKey = builder.AddParameter("anthropic-api-key", secret: true);
+var anthropicModel = builder.AddParameter("anthropic-model", "claude-haiku-5-5", publishValueAsDefault: true);
