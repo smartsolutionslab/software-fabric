@@ -34,7 +34,7 @@ public sealed class PolicyOwnershipTests
         public sealed class ApprovalPolicies : IModulePolicies
         {
             public void AddPolicies(AuthorizationBuilder policies) =>
-                policies.AddPolicy("billing.approve", policy => policy.RequireAuthenticatedUser());
+                policies.AddPolicy("{0}", policy => policy.RequireAuthenticatedUser());
         }
         """;
 
@@ -62,7 +62,7 @@ public sealed class PolicyOwnershipTests
         project.AddModule("billing");
         project.AddModule("shipping");
         project.WriteTypes("src/Modules/Billing/Billing.Api", BillingApprovalPolicies.Replace("{0}", "RequireRole(\"manager\")", StringComparison.Ordinal));
-        project.WriteTypes("src/Modules/Shipping/Shipping.Api", ShippingApprovalPolicies);
+        project.WriteTypes("src/Modules/Shipping/Shipping.Api", ShippingApprovalPolicies.Replace("{0}", "billing.approve", StringComparison.Ordinal));
         project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/Approve", ApproveTool);
         project.Build();
 
@@ -76,7 +76,22 @@ public sealed class PolicyOwnershipTests
         project.AddModule("billing");
         project.AddModule("shipping");
         project.WriteTypes("src/Modules/Billing/Billing.Api", BillingApprovalPolicies.Replace("{0}", "RequireClaim(\"department\", \"finance\")", StringComparison.Ordinal));
-        project.WriteTypes("src/Modules/Shipping/Shipping.Api", ShippingApprovalPolicies);
+        project.WriteTypes("src/Modules/Shipping/Shipping.Api", ShippingApprovalPolicies.Replace("{0}", "billing.approve", StringComparison.Ordinal));
+        project.Build();
+
+        await ShouldFailNamingBoth(project);
+    }
+
+    [Fact]
+    public async Task A_policy_another_module_registers_in_another_case_fails_the_architecture_tests_and_stops_the_host_naming_both()
+    {
+        // The host's policy table ignores case, so BILLING.APPROVE replaces billing.approve as surely as the same spelling.
+        using var project = NewProject("backend.authorization=roles", "backend.mcp=server");
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.WriteTypes("src/Modules/Billing/Billing.Api", BillingApprovalPolicies.Replace("{0}", "RequireRole(\"manager\")", StringComparison.Ordinal));
+        project.WriteTypes("src/Modules/Shipping/Shipping.Api", ShippingApprovalPolicies.Replace("{0}", "BILLING.APPROVE", StringComparison.Ordinal));
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/Approve", ApproveTool);
         project.Build();
 
         await ShouldFailNamingBoth(project);
