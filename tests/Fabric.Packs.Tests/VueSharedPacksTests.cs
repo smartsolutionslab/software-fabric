@@ -112,6 +112,9 @@ public sealed partial class VueSharedPacksTests
         plain.ShouldContain("✓ src/auth/SignedIn.test.ts > a signed-in user sees who they are and the application", customMessage: testOutput);
         plain.ShouldContain("✓ src/auth/SignedIn.test.ts > coming back from the identity provider completes the sign-in and drops its parameters from the address", customMessage: testOutput);
         plain.ShouldContain("✓ src/auth/SignedIn.test.ts > a failed sign-in is shown, not retried", customMessage: testOutput);
+        plain.ShouldContain("✓ src/auth/SignedIn.test.ts > a session whose access token expires sends the user back to the identity provider", customMessage: testOutput);
+        plain.ShouldContain("✓ src/auth/SignedIn.test.ts > a failed silent renewal is shown", customMessage: testOutput);
+        plain.ShouldContain("✓ src/auth/SignedIn.test.ts > a redirect to the identity provider that fails is shown", customMessage: testOutput);
         plain.ShouldContain("✓ src/components/ui/DataTable.test.ts > the table shows a header and one row per item", customMessage: testOutput);
         plain.ShouldContain("✓ src/pages/NotesTable.test.ts > the notes table has a header and a cell per note", customMessage: testOutput);
     }
