@@ -61,6 +61,9 @@ generated twice and compared, a module added, every real profile validated.
 `build/profile-ci.sh saas-standard-react` generates that profile from the
 real packs and runs the generated project's CI steps against it (Docker,
 Node 22 with pnpm and the Aspire CLI bundle needed).
+`build/profile-ci.sh saas-standard-react --set frontend.design-system=tokens-and-components`
+does the same with overrides, so a pack can go through profile CI before
+the profile that needs it is complete.
 
 ## Stack of the generator itself
 
