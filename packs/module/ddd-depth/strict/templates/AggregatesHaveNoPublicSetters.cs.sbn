@@ -28,7 +28,7 @@ public sealed class {{ module.namespace }}AggregatesHaveNoPublicSetters : IArchi
     {
         for (var current = type.BaseType; current is not null; current = current.BaseType)
         {
-            if (current.IsGenericType && current.GetGenericTypeDefinition().FullName == "{{ namespace }}.BuildingBlocks.Domain.AggregateRoot`1")
+            if (current.IsGenericType && current.GetGenericTypeDefinition().FullName == "{{ namespace }}.BuildingBlocks.{{ if module.values["module.style"] == "event-sourced" }}EventSourcing.EventSourcedAggregate{{ else }}Domain.AggregateRoot{{ end }}`1")
             {
                 return true;
             }

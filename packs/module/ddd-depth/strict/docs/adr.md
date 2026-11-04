@@ -43,8 +43,33 @@ one by hand. A generic value object (`TypedId<TTag>`) is mapped as each closed t
 use (`TypedId<Customer>`). A value object with more than one value (`Money`) is mapped in its configuration as a complex
 property.
 
-**Scope of the option.** Strict applies to `module.style: ddd` only. An event-sourced module stays light for now: its
-events go through Marten's JSON, which cannot build a value object through its private constructor and `From`.
+{{~ if object.has_key(slots, "event-store.json-converters") ~}}
+**Event store.** An event-sourced module may be strict too. Marten serialises its events and documents with
+System.Text.Json, and a converter registered with every module's store writes a value object as its backing value and
+reads it back through `From`, so no value object carries a `[JsonConverter]` attribute and a value read from the store
+passes the same guards as one a caller sends. An event-sourced aggregate's identity is a value object over a `Guid` that
+is also its `IAggregateId`. A JSON `null` for a value object that is not declared nullable fails to read
+(`RespectNullableAnnotations`), so it never skips `From`; one declared nullable (`InvoiceNumber?`) may be null. A
+constructor member missing from the JSON fails to read too (`RespectRequiredConstructorParameters`). So that this covers
+every value object an event carries, an architecture rule per strict event-sourced module requires each one to be a
+constructor (positional) parameter of the event, never a property set by an initialiser (`{ get; init; }`). The rule
+checks the constructor System.Text.Json actually selects (the one marked `[JsonConstructor]`, else the public
+parameterless one, else the only public one), not every public constructor: beside a public parameterless constructor,
+a constructor taking `InvoiceNumber` is never called when an event is read. It also refuses an optional parameter for a
+value object that is not declared nullable (`InvoiceNumber Number = null!`), since an omitted optional parameter takes
+its default instead of failing; `InvoiceNumber? Previous = null` stays allowed. Both settings hold
+for every event and document in the store, read models included: a read model whose constructor later gains a
+parameter can no longer read the rows stored before it, so give the new parameter a default or rebuild the projection.
+
+**Known gap: a `null` element in a collection.** System.Text.Json applies neither nullable annotations nor converters to
+a collection's elements, so `IReadOnlyList<InvoiceNumber>` reads `[null]` as a list holding a null, without `From`.
+Stored events are written by the application, which never writes one; the gap is accepted, not enforced.
+
+**Not yet in event-sourced modules: value objects over several values.** The converter writes a value object as its one
+backing value, so `Money` (an amount and a currency) cannot be stored in an event. An architecture rule per strict
+event-sourced module refuses a value object that is not an `IValueObject<T>` for exactly one `T`, until a JSON shape for
+several values is decided; then the rule can be lifted.
+{{~ end ~}}
 
 ## Enforced
 

@@ -1,0 +1,48 @@
+using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace {{ namespace }}.BuildingBlocks.EventStore;
+
+/// <summary>One value object's JSON: its backing value, as a value or a dictionary key, read back through <c>From(TValue)</c>. Made by <see cref="ValueObjectJsonConverterFactory"/>.</summary>
+public sealed class ValueObjectJsonConverter<TValueObject, TValue> : JsonConverter<TValueObject>
+    where TValueObject : class, IValueObject<TValue>
+    where TValue : notnull
+{
+    private static readonly Func<TValue, TValueObject> From = FromValue();
+
+    public override TValueObject Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        From(JsonSerializer.Deserialize<TValue>(ref reader, options)!);
+
+    public override void Write(Utf8JsonWriter writer, TValueObject value, JsonSerializerOptions options)
+    {
+        {{ not_null "value" }}
+
+        JsonSerializer.Serialize(writer, value.Value, options);
+    }
+
+    /// <summary>A dictionary keyed by a value object: the key is written as its backing value's property name.</summary>
+    public override TValueObject ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        From(Backing(options).ReadAsPropertyName(ref reader, typeof(TValue), options));
+
+    public override void WriteAsPropertyName(Utf8JsonWriter writer, TValueObject value, JsonSerializerOptions options)
+    {
+        {{ not_null "value" }}
+
+        Backing(options).WriteAsPropertyName(writer, value.Value, options);
+    }
+
+    private static JsonConverter<TValue> Backing(JsonSerializerOptions options) => (JsonConverter<TValue>)options.GetConverter(typeof(TValue));
+
+    private static Func<TValue, TValueObject> FromValue()
+    {
+        var from = typeof(TValueObject).GetMethod("From", BindingFlags.Public | BindingFlags.Static, [typeof(TValue)]);
+        if (from is null || from.ReturnType != typeof(TValueObject))
+        {
+            throw new InvalidOperationException(
+                $"{typeof(TValueObject).FullName} has no public static {typeof(TValueObject).Name} From({typeof(TValue).Name} value); the event store needs it to read the value back.");
+        }
+
+        return from.CreateDelegate<Func<TValue, TValueObject>>();
+    }
+}

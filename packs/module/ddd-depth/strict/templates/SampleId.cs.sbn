@@ -1,10 +1,14 @@
+{{~ if module.values["module.style"] == "event-sourced" ~}}
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+
+{{~ end ~}}
 namespace {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
 
 /// <summary>
 /// The shape of an identifier in a strict module, emitted by fabric add-module: rename it after your aggregate
 /// (<c>InvoiceId</c>) or delete it. A new one is a time-ordered Guid v7; an empty Guid is never one.
 /// </summary>
-public sealed record SampleId : IValueObject<Guid>
+public sealed record SampleId : IValueObject<Guid>{{ if module.values["module.style"] == "event-sourced" }}, IAggregateId{{ end }}
 {
     private SampleId(Guid value) => Value = value;
 
