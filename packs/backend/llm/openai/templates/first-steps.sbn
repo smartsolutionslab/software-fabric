@@ -1,0 +1,1 @@
+- Give the AppHost your OpenAI API key, which stays out of the repository: `dotnet user-secrets set Parameters:openai-api-key <key> --project src/AppHost`. Without it the host cannot call the model; the tests never need it.

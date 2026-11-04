@@ -1,0 +1,3 @@
+
+    .WithEnvironment("OpenAI__ApiKey", openAIApiKey)
+    .WithEnvironment("OpenAI__Model", openAIModel)
