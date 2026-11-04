@@ -549,6 +549,91 @@ public sealed partial class PrimitiveBoundaryTests
         }
         """;
 
+    private const string Crates = """
+        using Shop.BuildingBlocks.Domain;
+
+        namespace Shop.Modules.Billing.Domain.Crates;
+
+        internal sealed class Marker;
+
+        internal sealed record Box<T> : IValueObject<T>
+            where T : class
+        {
+            private Box(T value) => Value = value;
+
+            public T Value { get; }
+
+            public Cell<T>? State { get; }
+
+            public Box<List<string>>? Next { get; }
+
+            public static Box<T> From(T value)
+            {
+                Ensure.That(value).IsNotNull();
+                return new Box<T>(value);
+            }
+        }
+
+        internal sealed class Cell<T>
+            where T : class
+        {
+            public T? Value { get; }
+        }
+
+        internal sealed record Sleeve<T> : IValueObject<T>
+            where T : class
+        {
+            private Sleeve(T value) => Value = value;
+
+            public T Value { get; }
+
+            public Holder<T>? State { get; }
+
+            public Sleeve<Tuple<T, int>>? Next { get; }
+
+            public static Sleeve<T> From(T value)
+            {
+                Ensure.That(value).IsNotNull();
+                return new Sleeve<T>(value);
+            }
+        }
+
+        internal sealed class Holder<T>
+            where T : class
+        {
+            public T? Value { get; }
+        }
+
+        internal sealed class Crate : AggregateRoot<CrateId>
+        {
+            private Crate(CrateId id)
+                : base(id)
+            {
+            }
+
+            public Box<Marker>? Packing { get; }
+
+            public Sleeve<Marker>? Cover { get; }
+
+            public static Crate Pack() => new(CrateId.New());
+        }
+
+        internal sealed record CrateId : IValueObject<Guid>
+        {
+            private CrateId(Guid value) => Value = value;
+
+            public Guid Value { get; }
+
+            public static CrateId New() => new(Guid.CreateVersion7());
+
+            public static CrateId From(Guid value)
+            {
+                Ensure.That(value).IsNotEmpty();
+                return new CrateId(value);
+            }
+        }
+        """;
+
     [Fact]
     public void A_strict_module_passes_with_its_samples_and_fails_naming_each_primitive_an_aggregate_command_or_event_holds()
     {
@@ -667,6 +752,29 @@ public sealed partial class PrimitiveBoundaryTests
             ]),
             () => output.ShouldContain("].Label holds String"),
             () => output.ShouldNotContain("Manifest.Note holds"),
+            () => output.ShouldContain("failed: 1"));
+    }
+
+    [Fact]
+    public void State_built_from_a_larger_generic_types_arguments_is_walked_whether_or_not_the_growth_ends()
+    {
+        using var project = new GeneratedProject("saas-strict-react");
+        project.AddModule("billing");
+
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Crates", Crates);
+        project.Build();
+
+        var (ended, exitCode, output) = TestWithin(project, "tests/Architecture.Tests/Architecture.Tests.csproj", TimeSpan.FromMinutes(3));
+
+        List<string> named = [.. Violation().Matches(output).Select(match => match.Value).Distinct()];
+
+        // Box<List<string>> is one fixed type, so the graph is finite; Sleeve<Tuple<T, int>> grows without end.
+        output.ShouldSatisfyAllConditions(
+            () => ended.ShouldBeTrue($"The architecture tests did not end within 3 minutes.\n{output}"),
+            () => exitCode.ShouldNotBe(0, output),
+            () => output.ShouldMatch(@"Crates\.Cell`1\[\[System\.Collections\.Generic\.List`1\[\[System\.String,[^;]*\]\]\.Value holds String"),
+            () => output.ShouldMatch(@"Crates\.Holder`1\[\[System\.Tuple`2\[\[Shop\.Modules\.Billing\.Domain\.Crates\.Marker,[^;]*\],\[System\.Int32,[^;]*\]\]\.Value holds Int32"),
+            () => named.ShouldBeEmpty(),
             () => output.ShouldContain("failed: 1"));
     }
 
