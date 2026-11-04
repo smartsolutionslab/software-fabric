@@ -50,6 +50,19 @@ public static class PrimitiveBoundary
         // or smaller is entered as usual (Wrapper<Wrapper<Cargo>> reaches Wrapper<Cargo>, TypedId<Order> reaches
         // TypedId<Customer>), so the walk stays what it was wherever it ended before. Of a type it does not enter, it
         // still reaches what the arguments the definition holds as state bring in, and nothing a phantom tag names.
+        void EnqueueSubtypes(Type type, Type[] inside)
+        {
+            if (type.IsSealed)
+            {
+                return;
+            }
+
+            foreach (var subtype in types.Where(candidate => candidate != type && type.IsAssignableFrom(candidate)))
+            {
+                pending.Enqueue((subtype, inside));
+            }
+        }
+
         void Reach(Type type, Type[] inside)
         {
             if (type.IsEnum || !own.Contains(type.IsGenericType ? type.GetGenericTypeDefinition() : type))
@@ -62,6 +75,9 @@ public static class PrimitiveBoundary
                 pending.Enqueue((type, inside));
                 return;
             }
+
+            // Its subclasses are types the module declares, so there are finitely many, and the walk still enters them.
+            EnqueueSubtypes(type, inside);
 
             var definition = type.GetGenericTypeDefinition();
             var arguments = type.GetGenericArguments();
@@ -105,13 +121,7 @@ public static class PrimitiveBoundary
                 }
             }
 
-            if (!type.IsSealed)
-            {
-                foreach (var subtype in types.Where(candidate => candidate != type && type.IsAssignableFrom(candidate)))
-                {
-                    pending.Enqueue((subtype, inside));
-                }
-            }
+            EnqueueSubtypes(type, inside);
         }
 
         return [.. violations];

@@ -56,9 +56,9 @@ The walk visits each closed type once, and does not enter a closed type larger t
 generic definition it is already inside of: `Node<T>` holding a `Node<List<T>>` would otherwise construct a new type at
 every step and never end. A closed type of the same size or smaller is entered as usual, so `Wrapper<Wrapper<Cargo>>`
 still reaches `Cargo`, and the walk is what it was wherever it ended before. Of a type it does not enter, it still
-reaches what the arguments the definition holds as state bring in (`Wrapper<T>` holds its `T`), and nothing a phantom
-tag names: `TypedId<TTag>` holds a `Guid`, not its tag, so `TypedId<Customer>` never makes the walk look into
-`Customer`.
+reaches the subclasses the module declares of it (`SpecialNode : Node<List<Waypoint>>`) and what the arguments the
+definition holds as state bring in (`Wrapper<T>` holds its `T`), and nothing a phantom tag names: `TypedId<TTag>` holds
+a `Guid`, not its tag, so `TypedId<Customer>` never makes the walk look into `Customer`.
 
 ## Consequences
 
