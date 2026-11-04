@@ -844,6 +844,46 @@ public sealed class StrictEventSourcedTests
         exitCode.ShouldNotBe(0, output);
     }
 
+    [Fact]
+    public void Closed_types_a_recurring_generic_type_holds_whose_optional_parameter_differs_in_nullability_are_checked_each()
+    {
+        // Node<InvoiceNumber> and Node<Payload> show no violation, but their Envelope<Payload> does where Envelope<InvoiceNumber> does not.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using System.Text.Json.Serialization;
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public readonly record struct Payload
+            {
+                [JsonConstructor]
+                public Payload(InvoiceNumber number) => Number = number;
+
+                public InvoiceNumber Number { get; }
+            }
+
+            public sealed record Envelope<T>(T? Value = default);
+
+            public sealed record Node<T>(Node<List<T>>? Next, Envelope<T> Data);
+
+            public sealed record InvoiceNoded(InvoiceId Invoice, Node<InvoiceNumber> First, Node<Payload> Second) : IDomainEvent;
+
+            public sealed class Noding : EventSourcedAggregate<InvoiceId>
+            {
+                private Noding()
+                {
+                }
+
+                private void Apply(InvoiceNoded noded) => Id = noded.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Envelope`1[Shop.Modules.Billing.Domain.Invoices.Payload].Value carries a value object through an optional constructor parameter");
+        output.ShouldNotContain("Envelope`1[Shop.Modules.Billing.Domain.Invoices.InvoiceNumber].Value carries");
+        output.ShouldNotContain("Payload.Number carries");
+        exitCode.ShouldNotBe(0, output);
+    }
+
     private static (int ExitCode, string Output) ArchitectureTestsWith(string types)
     {
         using var project = new GeneratedProject("industrial-event-driven-mfe", Choices);
