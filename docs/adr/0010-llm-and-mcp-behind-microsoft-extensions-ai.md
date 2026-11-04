@@ -151,10 +151,11 @@ MCP, and `claude-haiku-5-5` as the generated default model.
   provider is chosen or the MCP client is (owner's decision on #77,
   2026-11-04), and neither the provider packs nor `backend.mcp.client`
   declare it themselves.
-- `anthropic`, `openai`, `azure-openai`, `ollama`, `server` and `client` have
-  no packs yet, so they are `experimental` (ADR-0003), and `fabric new` fails
-  with `no pack for ...` for them. Each pack is its own issue, ships its agent
-  rules and a gate (ADR-0002), and becomes `supported` once the matrix builds
-  it.
+- `anthropic`, `openai`, `azure-openai`, `ollama`, `server` and `client` had
+  no packs when this was decided, so they are `experimental` (ADR-0003), and
+  `fabric new` fails with `no pack for ...` for an option still without one.
+  Each pack is its own issue, ships its agent rules and a gate (ADR-0002), and
+  becomes `supported` once the matrix builds it. `client` (#82) and
+  `anthropic` (#77) have packs and stay `experimental` until then.
 - `backend.llm.agents`, retrieval-augmented generation and evaluations are
   later decisions, each with its own ADR.

@@ -14,4 +14,4 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: architecture-test, describes: "AddAnthropicChatClient registers Claude as the project's IChatClient behind logging and OpenTelemetry, with the key and model the AppHost supplies; a missing key fails naming its parameter. No request is sent.", file: templates/AnthropicIsTheProjectsModel.cs.sbn }
+  - { kind: architecture-test, describes: "The host's Program.cs calls AddAnthropicChatClient, which registers Claude as the project's IChatClient behind logging and OpenTelemetry, with the key and model the AppHost supplies; a missing key fails naming its parameter. No request is sent.", file: templates/AnthropicIsTheProjectsModel.cs.sbn }

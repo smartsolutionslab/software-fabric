@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,19 +9,30 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 /// <summary>
 /// The host's <see cref="IChatClient"/> is Claude, with the model the AppHost supplies, behind the logging and
 /// OpenTelemetry every model call gets; and a host started without the key says which parameter is missing. The client
-/// is resolved and inspected, never called.
+/// is resolved and inspected, never called. The host's <c>Program.cs</c> is parsed, not run, to find the registration:
+/// module tests register a stand-in model, so without it a use case that takes <see cref="IChatClient"/> would pass
+/// its tests and fail in the host.
 /// </summary>
 public sealed class AnthropicIsTheProjectsModel : IArchitectureRule
 {
     private const string Model = "claude-haiku-5-5";
 
-    public string Description => "AddAnthropicChatClient registers Claude behind logging and OpenTelemetry, with the AppHost's key and model; a missing key fails naming its parameter.";
+    private const string Registration = "AddAnthropicChatClient";
+
+    private const string HostProgram = "src/Host/Program.cs";
+
+    public string Description => "The host calls AddAnthropicChatClient, which registers Claude behind logging and OpenTelemetry, with the AppHost's key and model; a missing key fails naming its parameter.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
         {{ not_null "model" }}
 
         List<string> violations = [];
+        if (!HostRegistersTheClient())
+        {
+            violations.Add($"{HostProgram} never calls {Registration}: the host has no IChatClient, and a use case that takes one fails to resolve.");
+        }
+
         using (var services = Services(new() { ["Anthropic:ApiKey"] = "not-a-real-key", ["Anthropic:Model"] = Model }))
         {
             var client = services.GetRequiredService<IChatClient>();
@@ -48,6 +61,27 @@ public sealed class AnthropicIsTheProjectsModel : IArchitectureRule
         }
 
         return violations;
+    }
+
+    private static bool HostRegistersTheClient()
+    {
+        var program = Path.Combine(RepositoryRoot(), HostProgram);
+        return File.Exists(program)
+            && CSharpSyntaxTree.ParseText(File.ReadAllText(program)).GetRoot().DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(call => call.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: Registration });
+    }
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
     }
 
     private static ServiceProvider Services(Dictionary<string, string?> settings)

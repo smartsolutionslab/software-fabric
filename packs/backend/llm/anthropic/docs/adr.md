@@ -13,6 +13,6 @@ The project calls Claude through the Anthropic API.
 
 ## Consequences
 
-- An architecture rule resolves the registered client, without calling it, and fails when it is not Claude with the configured model, not wrapped with logging and OpenTelemetry, or when a missing key does not name its parameter.
+- An architecture rule fails when the host's `Program.cs` does not call `AddAnthropicChatClient` (module tests register a stand-in model, so they would not notice), and resolves the registered client, without calling it, failing when it is not Claude with the configured model, not wrapped with logging and OpenTelemetry, or when a missing key does not name its parameter.
 - The integration tests give `anthropic-api-key` a value Anthropic does not accept; they start the application but never call the model. No test needs a real key.
 - Every request costs money and sends its content to Anthropic. A use case that sends personal or confidential data to the model needs that decision recorded first.
