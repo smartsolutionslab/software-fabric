@@ -1,0 +1,14 @@
+import type { ComponentProps } from 'react';
+
+const tones = {
+  accent: 'bg-accent text-accent-foreground',
+  primary: 'bg-primary text-primary-foreground',
+} as const;
+
+type BadgeProps = ComponentProps<'span'> & { tone?: keyof typeof tones };
+
+/** A short label for a state or a count, in one of the design system's tones. */
+export function Badge({ tone = 'accent', className, ...props }: BadgeProps) {
+  const classes = ['inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium', tones[tone], className];
+  return <span className={classes.filter(Boolean).join(' ')} {...props} />;
+}

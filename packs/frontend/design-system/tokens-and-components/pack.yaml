@@ -1,0 +1,31 @@
+option: frontend.design-system.tokens-and-components
+files:
+  - { template: templates/tokens/package.json.sbn, target: web/packages/tokens/package.json }
+  - { template: templates/tokens/build.mjs.sbn, target: web/packages/tokens/build.mjs }
+  - { template: templates/tokens/color.tokens.json.sbn, target: web/packages/tokens/src/color.tokens.json }
+  - { template: templates/tokens/radius.tokens.json.sbn, target: web/packages/tokens/src/radius.tokens.json }
+  - { template: templates/ui/package.json.sbn, target: web/packages/ui/package.json }
+  - { template: templates/ui/tsconfig.json.sbn, target: web/packages/ui/tsconfig.json }
+  - { template: templates/ui/vite.config.ts.sbn, target: web/packages/ui/vite.config.ts }
+  - { template: templates/ui/eslint.config.js.sbn, target: web/packages/ui/eslint.config.js }
+  - { template: templates/ui/gitignore.sbn, target: web/packages/ui/.gitignore }
+  - { template: templates/ui/storybook-main.ts.sbn, target: web/packages/ui/.storybook/main.ts }
+  - { template: templates/ui/storybook-preview.ts.sbn, target: web/packages/ui/.storybook/preview.ts }
+  - { template: templates/ui/storybook.css.sbn, target: web/packages/ui/.storybook/storybook.css }
+  - { template: templates/ui/index.ts.sbn, target: web/packages/ui/src/index.ts }
+  - { template: templates/ui/Badge.tsx.sbn, target: web/packages/ui/src/Badge.tsx }
+  - { template: templates/ui/Badge.stories.tsx.sbn, target: web/packages/ui/src/Badge.stories.tsx }
+  - { template: templates/ui/Badge.test.tsx.sbn, target: web/packages/ui/src/Badge.test.tsx }
+  - { template: templates/ui/test-setup.ts.sbn, target: web/packages/ui/src/test-setup.ts }
+slots:
+  - { slot: web.workspace-packages, template: templates/workspace-packages.sbn, order: 10 }
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.prepare, template: templates/prepare.sbn }
+  - { slot: web.styles, template: templates/styles.sbn, order: 20 }
+  - { slot: readme.sections, template: templates/readme.sbn, order: 25 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "The token build fails on a token that references one that does not exist (Style Dictionary throws on broken references); pnpm build runs it.", file: templates/tokens/build.mjs.sbn }
+  - { kind: ci-step, describes: "The ui package's build type-checks its components and stories and builds Storybook; a story that does not compile fails the frontend job.", file: templates/ui/package.json.sbn }

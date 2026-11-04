@@ -1,0 +1,3 @@
+@import '@{{ name }}/tokens/theme.css';
+/* Tailwind finds class names in web/app only; the design system's components name utilities too. */
+@source '../../packages/ui/src';

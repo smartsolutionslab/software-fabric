@@ -1,0 +1,2 @@
+// The design system's components; the app imports them from @{{ name }}/ui, never from a file in src/.
+export { Badge } from './Badge';
