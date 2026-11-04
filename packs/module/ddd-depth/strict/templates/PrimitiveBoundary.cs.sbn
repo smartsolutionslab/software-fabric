@@ -38,17 +38,21 @@ public static class PrimitiveBoundary
         bool IsValueObject(Type type) => !IsRoot(type) && typeof(IValueObject).IsAssignableFrom(type);
 
         HashSet<Type> roots = [.. types.Where(IsRoot)];
-        Queue<Type> pending = new(roots);
+
+        // Each pending type carries the generic definitions the walk is inside of when it reaches it.
+        Queue<(Type Type, Type[] Within)> pending = new(roots.Select(root => (root, Array.Empty<Type>())));
         HashSet<Type> seen = [];
         SortedSet<string> violations = new(StringComparer.Ordinal);
 
-        while (pending.TryDequeue(out var type))
+        while (pending.TryDequeue(out var next))
         {
+            var (type, within) = next;
             if (!seen.Add(type))
             {
                 continue;
             }
 
+            var inside = type.IsGenericType ? [.. within, type.GetGenericTypeDefinition()] : within;
             var isValueObject = IsValueObject(type);
             foreach (var (name, memberType) in State(type, own))
             {
@@ -61,9 +65,9 @@ public static class PrimitiveBoundary
                             violations.Add($"{type.FullName}.{name} holds {constituent.Name}; introduce a value object (IValueObject<T>).");
                         }
                     }
-                    else if (own.Contains(constituent.IsGenericType ? constituent.GetGenericTypeDefinition() : constituent))
+                    else if (IsWalkedInto(constituent, own, inside))
                     {
-                        pending.Enqueue(constituent);
+                        pending.Enqueue((constituent, inside));
                     }
                 }
             }
@@ -72,7 +76,7 @@ public static class PrimitiveBoundary
             {
                 foreach (var subtype in types.Where(candidate => candidate != type && type.IsAssignableFrom(candidate)))
                 {
-                    pending.Enqueue(subtype);
+                    pending.Enqueue((subtype, inside));
                 }
             }
         }
@@ -90,6 +94,24 @@ public static class PrimitiveBoundary
             .Select(property => (property.Name, property.PropertyType))
             .Concat(type.GetFields(BindingFlags.Public | BindingFlags.Instance)
                 .Select(field => (field.Name, field.FieldType)));
+
+    /// <summary>
+    /// Whether the walk goes on into a type it reached: one of the module's own, but not an enum, which is a named set
+    /// of values rather than state (its compiler-made <c>value__</c> field is not the module's), and not a closed type
+    /// of a generic definition the walk is already inside of. <c>Node&lt;T&gt;</c> holding a
+    /// <c>Node&lt;List&lt;T&gt;&gt;</c> would otherwise construct a new type at every step; the inner one's state is
+    /// the definition's again, already checked.
+    /// </summary>
+    private static bool IsWalkedInto(Type type, HashSet<Type> own, Type[] inside)
+    {
+        if (type.IsEnum)
+        {
+            return false;
+        }
+
+        var definition = type.IsGenericType ? type.GetGenericTypeDefinition() : type;
+        return own.Contains(definition) && !(type.IsGenericType && inside.Contains(definition));
+    }
 
     private static bool IsPrimitive(Type type) => type.IsPrimitive || MeaninglessBclTypes.Contains(type);
 
