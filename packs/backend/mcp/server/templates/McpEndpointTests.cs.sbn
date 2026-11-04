@@ -1,0 +1,64 @@
+{{~ auth = project["backend.auth"] != "none" ~}}
+{{~ keycloak = project["backend.auth"] == "keycloak" ~}}
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>The host's MCP endpoint, started through Aspire: a session begins with the protocol's initialize request.</summary>
+public class McpEndpointTests(AspireFixture aspire)
+{
+    private const string Initialize = """
+        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"integration-tests","version":"1.0.0"}}}
+        """;
+
+    private static readonly Uri Endpoint = new("/mcp", UriKind.Relative);
+{{~ if auth ~}}
+
+    [Fact]
+    public async Task An_anonymous_caller_is_unauthorized()
+    {
+        using var client = aspire.CreateHostClient();
+
+        using var response = await InitializeAsync(client);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+{{~ end ~}}
+{{~ if keycloak ~}}
+
+    [Fact]
+    public async Task A_signed_in_user_starts_a_session()
+    {
+        using var client = await aspire.CreateHostClientAsync("developer");
+
+        using var response = await InitializeAsync(client);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+{{~ end ~}}
+{{~ if !auth ~}}
+
+    [Fact]
+    public async Task An_anonymous_caller_starts_a_session()
+    {
+        using var client = aspire.CreateHostClient();
+
+        using var response = await InitializeAsync(client);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+{{~ end ~}}
+
+    private static async Task<HttpResponseMessage> InitializeAsync(HttpClient client)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, Endpoint)
+        {
+            Content = new StringContent(Initialize, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+        return await client.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+}

@@ -1,0 +1,27 @@
+{{~ typed = object.has_key(project, "backend.result-style") && project["backend.result-style"] == "typed-outcomes" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Mcp.Server.Tests;
+
+public sealed class ShoutHandler : IQueryHandler<Shout, Result<Shouted, ApiError>>
+{
+    public Task<Result<Shouted, ApiError>> HandleAsync(Shout query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        if (query.Text.Length == 0)
+        {
+{{~ if typed ~}}
+            return Task.FromResult<Result<Shouted, ApiError>>(Failure<ApiError>(new NothingToShout()));
+{{~ else ~}}
+            return Task.FromResult(Result<Shouted, ApiError>.Failure(new NothingToShout()));
+{{~ end ~}}
+        }
+
+{{~ if typed ~}}
+        return Task.FromResult<Result<Shouted, ApiError>>(Success(new Shouted(query.Text.ToUpperInvariant())));
+{{~ else ~}}
+        return Task.FromResult(Result<Shouted, ApiError>.Success(new Shouted(query.Text.ToUpperInvariant())));
+{{~ end ~}}
+    }
+}

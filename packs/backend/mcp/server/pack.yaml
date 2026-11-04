@@ -1,0 +1,45 @@
+option: backend.mcp.server
+files:
+  - { template: templates/McpToolAttribute.cs.sbn, target: src/BuildingBlocks/Mcp/McpToolAttribute.cs }
+  - { template: templates/McpToolDefinition.cs.sbn, target: src/BuildingBlocks/Mcp/McpToolDefinition.cs }
+  - { template: templates/McpToolScan.cs.sbn, target: src/BuildingBlocks/Mcp/McpToolScan.cs }
+  - { template: templates/McpToolCatalog.cs.sbn, target: src/BuildingBlocks/Mcp/McpToolCatalog.cs }
+  - { template: templates/RequestTool.cs.sbn, target: src/Host/Mcp/RequestTool.cs }
+  - { template: templates/OptionJsonConverter.cs.sbn, target: src/Host/Mcp/OptionJsonConverter.cs, when: 'project["backend.absence"] == "option"' }
+  - { template: templates/OptionJsonConverterFactory.cs.sbn, target: src/Host/Mcp/OptionJsonConverterFactory.cs, when: 'project["backend.absence"] == "option"' }
+  - { template: templates/McpServerRegistration.cs.sbn, target: src/Host/Wiring/McpServerRegistration.cs }
+  - { template: templates/McpServerEndpoint.cs.sbn, target: src/Host/Wiring/McpServerEndpoint.cs }
+  - { template: templates/EveryMcpToolIsValid.cs.sbn, target: tests/Architecture.Tests/Rules/EveryMcpToolIsValid.cs }
+  - { template: templates/McpEndpointTests.cs.sbn, target: tests/Integration.Tests/McpEndpointTests.cs }
+  - { template: templates/tests/Mcp.Server.Tests.csproj.sbn, target: tests/Mcp.Server.Tests/Mcp.Server.Tests.csproj }
+  - { template: templates/tests/McpHost.cs.sbn, target: tests/Mcp.Server.Tests/McpHost.cs }
+  - { template: templates/tests/McpServerTests.cs.sbn, target: tests/Mcp.Server.Tests/McpServerTests.cs }
+  - { template: templates/tests/Shout.cs.sbn, target: tests/Mcp.Server.Tests/Shout.cs }
+  - { template: templates/tests/Shouted.cs.sbn, target: tests/Mcp.Server.Tests/Shouted.cs }
+  - { template: templates/tests/ShoutHandler.cs.sbn, target: tests/Mcp.Server.Tests/ShoutHandler.cs }
+  - { template: templates/tests/NothingToShout.cs.sbn, target: tests/Mcp.Server.Tests/NothingToShout.cs }
+  - { template: templates/tests/Whisper.cs.sbn, target: tests/Mcp.Server.Tests/Whisper.cs }
+  - { template: templates/tests/WhisperHandler.cs.sbn, target: tests/Mcp.Server.Tests/WhisperHandler.cs }
+  - { template: templates/tests/Lookup.cs.sbn, target: tests/Mcp.Server.Tests/Lookup.cs, when: 'project["backend.absence"] == "option"' }
+  - { template: templates/tests/Found.cs.sbn, target: tests/Mcp.Server.Tests/Found.cs, when: 'project["backend.absence"] == "option"' }
+  - { template: templates/tests/LookupHandler.cs.sbn, target: tests/Mcp.Server.Tests/LookupHandler.cs, when: 'project["backend.absence"] == "option"' }
+  - { template: templates/tests/TestUser.cs.sbn, target: tests/Mcp.Server.Tests/TestUser.cs, when: 'project["backend.auth"] != "none"' }
+  - { template: templates/tests/Approve.cs.sbn, target: tests/Mcp.Server.Tests/Approve.cs, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/tests/Approved.cs.sbn, target: tests/Mcp.Server.Tests/Approved.cs, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/tests/ApproveHandler.cs.sbn, target: tests/Mcp.Server.Tests/ApproveHandler.cs, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/tests/Approvals.cs.sbn, target: tests/Mcp.Server.Tests/Approvals.cs, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/tests/SamplePolicyNames.cs.sbn, target: tests/Mcp.Server.Tests/SamplePolicyNames.cs, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/tests/SamplePolicies.cs.sbn, target: tests/Mcp.Server.Tests/SamplePolicies.cs, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+slots:
+  - { slot: host.packages, template: templates/host-packages.sbn }
+  - { slot: host.services, template: templates/host-services.sbn, order: 30 }
+  - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 30 }
+  - { slot: solution.projects, template: templates/solution-projects.sbn }
+  - { slot: readme.sections, template: templates/readme-section.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "A command or query marked [McpTool] is a valid tool by the same definition the host's discovery uses: it has a description, exactly one handler, and a policy (if it names one) that its own module registers; otherwise the build fails naming the request.", file: templates/EveryMcpToolIsValid.cs.sbn }
+  - { kind: unit-test, describes: "Through the SDK's client, against the real host in process: a marked query is listed with its description and the request record's schema, and a call answers with its handler's result through the dispatcher; an unmarked query is not listed; arguments that do not fit and a failed Result come back as tool errors; an anonymous caller is refused when authentication is on, and a caller without a tool's policy neither sees nor reaches it.", file: templates/tests/McpServerTests.cs.sbn }
+  - { kind: end-to-end-test, describes: "The host started through Aspire refuses an anonymous MCP session when authentication is on and starts one for a signed-in user.", file: templates/McpEndpointTests.cs.sbn }

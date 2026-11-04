@@ -96,17 +96,6 @@ public sealed class NewCommandTests : IDisposable
         run.Error.ShouldContain("error: no pack for backend.database=postgres.");
     }
 
-    [Theory]
-    [InlineData("backend.mcp=server,client", "no pack for backend.mcp=server.")]
-    public void An_llm_or_mcp_option_without_a_pack_yet_writes_nothing(string setting, string error)
-    {
-        var run = CliRun.Of("new", Path.Combine(root, "unbuilt"), "--profile", "lean-crud", "--set", setting, "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
-
-        run.ExitCode.ShouldBe(1);
-        run.Error.ShouldContain($"error: {error}");
-        Directory.Exists(Path.Combine(root, "unbuilt")).ShouldBeFalse();
-    }
-
     [Fact]
     public void A_project_without_an_llm_generates_and_tells_its_agents_so()
     {

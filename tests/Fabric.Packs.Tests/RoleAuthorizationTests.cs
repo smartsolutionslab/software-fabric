@@ -76,8 +76,9 @@ public sealed class RoleAuthorizationTests
         using var project = NewProject(Profile);
         project.AddModule("billing");
 
+        var names = File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "Modules", "Billing", "Billing.Application", "BillingPolicyNames.cs"));
         var policies = File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "Modules", "Billing", "Billing.Api", "BillingPolicies.cs"));
-        policies.ShouldContain("public const string Manage = \"billing.manage\";");
+        names.ShouldContain("public const string Manage = \"billing.manage\";");
         policies.ShouldContain("RequireRole(\"manager\")");
     }
 

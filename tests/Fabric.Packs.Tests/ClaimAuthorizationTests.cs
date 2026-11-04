@@ -114,7 +114,7 @@ public sealed class ClaimAuthorizationTests
         project.AddModule("billing");
 
         var policies = Policies(project);
-        policies.ShouldContain("public const string Manage = \"billing.manage\";");
+        PolicyNames(project).ShouldContain("public const string Manage = \"billing.manage\";");
         policies.ShouldContain("RequireClaim(\"department\", \"finance\")");
         policies.ShouldNotContain("RequireRole");
     }
@@ -236,6 +236,9 @@ public sealed class ClaimAuthorizationTests
 
     private static string Policies(GeneratedProject project) =>
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "Modules", "Billing", "Billing.Api", "BillingPolicies.cs"));
+
+    private static string PolicyNames(GeneratedProject project) =>
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "Modules", "Billing", "Billing.Application", "BillingPolicyNames.cs"));
 
     private static JsonNode Realm(string profile, string authorization)
     {

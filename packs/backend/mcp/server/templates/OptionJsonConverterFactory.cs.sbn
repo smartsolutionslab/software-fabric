@@ -1,0 +1,22 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace {{ namespace }}.Host.Mcp;
+
+/// <summary>Reads and writes every <see cref="Option{T}"/>, wherever it is nested, with <see cref="OptionJsonConverter{T}"/>.</summary>
+public sealed class OptionJsonConverterFactory : JsonConverterFactory
+{
+    public override bool CanConvert(Type typeToConvert)
+    {
+        {{ not_null "typeToConvert" }}
+
+        return typeToConvert.IsGenericType && typeToConvert.GetGenericTypeDefinition() == typeof(Option<>);
+    }
+
+    public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options)
+    {
+        {{ not_null "typeToConvert" }}
+
+        return (JsonConverter)Activator.CreateInstance(typeof(OptionJsonConverter<>).MakeGenericType(typeToConvert.GetGenericArguments()[0]))!;
+    }
+}

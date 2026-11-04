@@ -1,0 +1,5 @@
+using System.Net;
+
+namespace {{ namespace }}.Mcp.Server.Tests;
+
+public sealed record NothingToShout() : ApiError("samples.nothing-to-shout", "There is nothing to shout.", HttpStatusCode.BadRequest);
