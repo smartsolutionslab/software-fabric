@@ -111,6 +111,34 @@ public sealed class DesignSystemTests
     }
 
     [Fact]
+    public void Each_test_in_the_ui_package_starts_from_an_empty_document()
+    {
+        using var project = new GeneratedProject(Profile, Choice);
+        project.Write("web/packages/ui/src/Badges.test.tsx", """
+            import { render, screen } from '@testing-library/react';
+            import { expect, test } from 'vitest';
+            import { Badge } from './Badge';
+
+            test('a first badge', () => {
+              render(<Badge>New</Badge>);
+
+              expect(screen.getByText('New')).toBeInTheDocument();
+            });
+
+            test('a second badge with the same label', () => {
+              render(<Badge tone="primary">New</Badge>);
+
+              expect(screen.getByText('New')).toHaveClass('bg-primary');
+            });
+            """);
+        RunWeb(project, "install");
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "packages", "ui"), "pnpm", "test");
+
+        exitCode.ShouldBe(0, $"pnpm test in web/packages/ui:\n{output}");
+    }
+
+    [Fact]
     public void A_design_system_for_another_styling_than_tailwind_fails_loudly()
     {
         using var project = new GeneratedProject(Profile, Choice, "frontend.styling=css-modules", "frontend.ui-library=radix-headless");
