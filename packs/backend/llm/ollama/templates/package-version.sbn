@@ -1,0 +1,2 @@
+    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.6.1" />
+    <PackageVersion Include="OllamaSharp" Version="5.5.0" />

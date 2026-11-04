@@ -1,0 +1,4 @@
+
+    .WithEnvironment("Ollama__Endpoint", ollama.Resource.PrimaryEndpoint)
+    .WithEnvironment("Ollama__Model", ollamaModel.Resource.ModelName)
+    .WaitFor(ollamaModel)

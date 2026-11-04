@@ -1,0 +1,30 @@
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
+using OllamaSharp;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class OllamaChatClient
+{
+    /// <summary>
+    /// Registers a local model, served by Ollama, as the project's <see cref="IChatClient"/>, through the
+    /// <c>OllamaSharp</c> package, whose client is an <see cref="IChatClient"/> itself. The endpoint and the model come
+    /// from the AppHost's resources <c>ollama</c> and <c>ollama-model</c> (<c>Ollama:Endpoint</c>, <c>Ollama:Model</c>).
+    /// They are read when the client is first needed, and a missing one fails there, naming its source; registering
+    /// sends nothing.
+    /// </summary>
+    public static ChatClientBuilder AddOllamaChatClient(this IServiceCollection services, IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        return services.AddModelChatClient(_ =>
+            new OllamaApiClient(
+                new Uri(Required(configuration, "Ollama:Endpoint", "ollama")),
+                Required(configuration, "Ollama:Model", "ollama-model")));
+    }
+
+    private static string Required(IConfiguration configuration, string key, string resource) =>
+        configuration[key] is { Length: > 0 } value
+            ? value
+            : throw new InvalidOperationException($"{key} is not set. The AppHost supplies it from its resource '{resource}'; a host started without the AppHost needs it in its own configuration.");
+}
