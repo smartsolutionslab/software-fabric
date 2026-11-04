@@ -61,7 +61,7 @@ public sealed class StrictEventSourcedTests
 
         public sealed record InvoiceIssued(InvoiceId Invoice, InvoiceNumber Number, LineCount Lines) : IDomainEvent;
 
-        public sealed record InvoiceRenumbered(InvoiceId Invoice, InvoiceNumber Number) : IDomainEvent;
+        public sealed record InvoiceRenumbered(InvoiceId Invoice, InvoiceNumber Number, InvoiceNumber? Previous) : IDomainEvent;
 
         public sealed class Invoice : EventSourcedAggregate<InvoiceId>
         {
@@ -80,7 +80,7 @@ public sealed class StrictEventSourcedTests
                 return invoice;
             }
 
-            public void Renumber(InvoiceNumber number) => Raise(new InvoiceRenumbered(Id, number));
+            public void Renumber(InvoiceNumber number) => Raise(new InvoiceRenumbered(Id, number, Number));
 
             private void Apply(InvoiceIssued issued)
             {
@@ -95,6 +95,7 @@ public sealed class StrictEventSourcedTests
 
     private const string EventStoreTests = """"
         using System.Text;
+        using System.Text.Json;
         using Microsoft.Extensions.Configuration;
         using Microsoft.Extensions.DependencyInjection;
         using JasperFx;
@@ -149,6 +150,22 @@ public sealed class StrictEventSourcedTests
                 using var stored = new MemoryStream(Encoding.UTF8.GetBytes("""{"Invoice":"0190a6d4-0000-7000-8000-000000000001","Number":"  ","Lines":3}"""));
 
                 Should.Throw<GuardException>(() => Serializer().FromJson<InvoiceIssued>(stored));
+            }
+
+            [Fact]
+            public void A_null_for_a_value_object_that_is_not_nullable_is_refused()
+            {
+                using var stored = new MemoryStream(Encoding.UTF8.GetBytes("""{"Invoice":"0190a6d4-0000-7000-8000-000000000001","Number":null,"Lines":3}"""));
+
+                Should.Throw<JsonException>(() => Serializer().FromJson<InvoiceIssued>(stored));
+            }
+
+            [Fact]
+            public void A_value_object_declared_nullable_may_be_null()
+            {
+                using var stored = new MemoryStream(Encoding.UTF8.GetBytes("""{"Invoice":"0190a6d4-0000-7000-8000-000000000001","Number":"INV-2","Previous":null}"""));
+
+                Serializer().FromJson<InvoiceRenumbered>(stored).Previous.ShouldBeNull();
             }
 
             [Fact]
@@ -226,6 +243,28 @@ public sealed class StrictEventSourcedTests
 
             public sealed record InvoiceVoided(InvoiceId Invoice, string Reason) : IDomainEvent;
             """);
+        project.Write("src/Modules/Billing/Billing.Domain/Invoices/Money.cs", """
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record Money : IValueObject
+            {
+                private Money(decimal amount, string currency)
+                {
+                    Amount = amount;
+                    Currency = currency;
+                }
+
+                public decimal Amount { get; }
+
+                public string Currency { get; }
+
+                public static Money From(decimal amount, string currency)
+                {
+                    Ensure.That(currency).IsNotNullOrWhiteSpace();
+                    return new Money(amount, currency);
+                }
+            }
+            """);
         project.Write("src/Modules/Billing/Billing.Domain/Invoices/Ledger.cs", """
             using Shop.BuildingBlocks.EventSourcing;
 
@@ -250,7 +289,9 @@ public sealed class StrictEventSourcedTests
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceVoided.Reason holds String");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Ledger.Note holds String");
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Ledger.Note has a public setter.");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Money is a value object over more than one value");
         output.ShouldNotContain("Domain.Invoices.Invoice.");
+        output.ShouldNotContain("InvoiceNumber is a value object over");
         output.ShouldNotContain("InvoiceNumber.Value holds");
     }
 
