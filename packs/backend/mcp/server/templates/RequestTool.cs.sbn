@@ -1,0 +1,110 @@
+{{~ policies = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+using System.Text.Json;
+using {{ namespace }}.BuildingBlocks.Mcp;
+using {{ namespace }}.BuildingBlocks.Messaging;
+{{~ if policies ~}}
+using Microsoft.AspNetCore.Authorization;
+{{~ end ~}}
+using Microsoft.Extensions.AI;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
+
+namespace {{ namespace }}.Host.Mcp;
+
+/// <summary>
+/// A marked command or query as an MCP tool. Its input schema is the request record's; a call reads the arguments
+/// into the request and sends it through <see cref="IDispatcher"/>, exactly as an endpoint does, and holds no logic of
+/// its own.
+{{~ if policies ~}}
+/// A policy becomes an <see cref="AuthorizeAttribute"/>, which the SDK's authorization filters check before the call:
+/// a caller without it neither sees the tool nor reaches the handler.
+{{~ end ~}}
+/// </summary>
+public sealed class RequestTool : McpServerTool
+{
+    /// <summary>Web defaults, but a missing argument or a null where the record allows none is refused, not defaulted.</summary>
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        RespectRequiredConstructorParameters = true,
+        RespectNullableAnnotations = true,
+    };
+
+    private readonly McpToolDefinition definition;
+
+    public RequestTool(McpToolDefinition definition)
+    {
+        {{ not_null "definition" }}
+
+        this.definition = definition;
+        ProtocolTool = new Tool
+        {
+            Name = definition.Name,
+            Description = definition.Description,
+            InputSchema = AIJsonUtilities.CreateJsonSchema(definition.Request, serializerOptions: Json),
+            Annotations = new ToolAnnotations { ReadOnlyHint = definition.ReadsOnly },
+        };
+{{~ if policies ~}}
+        Metadata = definition.Policy.Match<IReadOnlyList<object>>(policy => [new AuthorizeAttribute(policy)], () => []);
+{{~ else ~}}
+        Metadata = [];
+{{~ end ~}}
+    }
+
+    public override Tool ProtocolTool { get; }
+
+    public override IReadOnlyList<object> Metadata { get; }
+
+    public override async ValueTask<CallToolResult> InvokeAsync(RequestContext<CallToolRequestParams> request, CancellationToken cancellationToken)
+    {
+        {{ not_null "request" }}
+
+        // The arguments are a caller's, often a model's, input: they become the request record or nothing.
+        var arguments = JsonSerializer.SerializeToElement(request.Params?.Arguments ?? new Dictionary<string, JsonElement>(), Json);
+        object? message;
+        try
+        {
+            message = arguments.Deserialize(definition.Request, Json);
+        }
+        catch (JsonException exception)
+        {
+            return Failed($"The arguments are not a {definition.Request.Name}: {exception.Message}");
+        }
+
+        if (message is null)
+        {
+            return Failed($"The arguments are not a {definition.Request.Name}.");
+        }
+
+        var dispatcher = request.Services!.GetRequiredService<IDispatcher>();
+        var dispatch = typeof(IDispatcher)
+            .GetMethod(definition.ReadsOnly ? nameof(IDispatcher.QueryAsync) : nameof(IDispatcher.SendAsync))!
+            .MakeGenericMethod(definition.Result);
+        var handled = (Task)dispatch.Invoke(dispatcher, [message, cancellationToken])!;
+        await handled;
+        return Answer(handled.GetType().GetProperty(nameof(Task<object>.Result))!.GetValue(handled)!);
+    }
+
+    /// <summary>A Result's value as JSON, or its ApiError as a tool error starting with the error's code.</summary>
+    private static CallToolResult Answer(object result)
+    {
+        var type = result.GetType();
+        if (!type.IsGenericType || type.GetGenericTypeDefinition() != typeof(Result<,>))
+        {
+            return Succeeded(result);
+        }
+
+        if ((bool)type.GetProperty(nameof(Result<object, object>.IsSuccess))!.GetValue(result)!)
+        {
+            return Succeeded(type.GetProperty(nameof(Result<object, object>.Value))!.GetValue(result)!);
+        }
+
+        var error = type.GetProperty(nameof(Result<object, object>.Error))!.GetValue(result)!;
+        return Failed(error is ApiError apiError ? $"{apiError.Code}: {apiError.Message}" : JsonSerializer.Serialize(error, error.GetType(), Json));
+    }
+
+    private static CallToolResult Succeeded(object value) =>
+        new() { Content = [new TextContentBlock { Text = JsonSerializer.Serialize(value, value.GetType(), Json) }] };
+
+    private static CallToolResult Failed(string message) =>
+        new() { IsError = true, Content = [new TextContentBlock { Text = message }] };
+}

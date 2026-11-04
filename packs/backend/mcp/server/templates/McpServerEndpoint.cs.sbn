@@ -1,0 +1,24 @@
+using Microsoft.AspNetCore.Routing;
+
+namespace Microsoft.AspNetCore.Builder;
+
+public static class McpServerEndpoint
+{
+    /// <summary>The route MCP clients connect to.</summary>
+    public const string Route = "/mcp";
+
+    /// <summary>
+    /// The MCP endpoint (streamable HTTP){{ if project["backend.auth"] != "none" }}, for signed-in callers only, as the module routes are{{ end }}.
+    /// It speaks JSON-RPC, not REST, so the OpenAPI document leaves it out.
+    /// </summary>
+    public static IEndpointConventionBuilder MapMcpServer(this IEndpointRouteBuilder endpoints)
+    {
+        {{ not_null "endpoints" }}
+
+        return endpoints.MapMcp(Route)
+{{~ if project["backend.auth"] != "none" ~}}
+            .RequireAuthorization()
+{{~ end ~}}
+            .ExcludeFromDescription();
+    }
+}

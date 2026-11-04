@@ -1,0 +1,10 @@
+## MCP tools
+
+The host exposes MCP tools at `/mcp` (streamable HTTP){{ if project["backend.auth"] != "none" }}, for signed-in callers{{ end }}. A command or query becomes a tool only when its record is marked:
+
+```csharp
+[McpTool("Finds an invoice by its number.")]
+public sealed record FindInvoice(string Number) : IQuery<Result<InvoiceDto, ApiError>>;
+```
+
+It is offered as `billing_find_invoice`, with the record as its input schema, and a call goes through `IDispatcher` like an endpoint's. `tests/Mcp.Server.Tests` calls the host with the SDK's own client.

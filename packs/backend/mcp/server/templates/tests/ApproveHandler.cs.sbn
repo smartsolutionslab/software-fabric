@@ -1,0 +1,14 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Mcp.Server.Tests;
+
+public sealed class ApproveHandler(Approvals approvals) : ICommandHandler<Approve, Result<Approved, ApiError>>
+{
+    public Task<Result<Approved, ApiError>> HandleAsync(Approve command, CancellationToken cancellationToken)
+    {
+        {{ not_null "command" }}
+
+        approvals.Numbers.Add(command.Number);
+        return Task.FromResult<Result<Approved, ApiError>>(Success(new Approved(command.Number)));
+    }
+}

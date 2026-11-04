@@ -1,0 +1,6 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Mcp.Server.Tests;
+
+/// <summary>An unmarked query with a handler like any other: never offered as a tool.</summary>
+public sealed record Whisper(string Text) : IQuery<Result<Shouted, ApiError>>;

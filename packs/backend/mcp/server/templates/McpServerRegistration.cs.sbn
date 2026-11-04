@@ -1,0 +1,61 @@
+{{~ policies = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Mcp;
+using {{ namespace }}.BuildingBlocks.Modules;
+using {{ namespace }}.Host.Mcp;
+using ModelContextProtocol.Server;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class McpServerRegistration
+{
+    /// <summary>
+    /// The MCP server over HTTP, offering every command and query a module marks with <see cref="McpToolAttribute"/>,
+    /// and nothing else. A marked request that is not a valid tool stops the host, naming it.
+    /// </summary>
+    public static IServiceCollection AddMcpServerTools(this IServiceCollection services, IReadOnlyList<IModule> modules)
+    {
+        {{ not_null "services" }}
+        {{ not_null "modules" }}
+
+        services.AddMcpServer()
+{{~ if project["backend.auth"] != "none" ~}}
+            .WithHttpTransport(options => options.Stateless = true)
+            .AddAuthorizationFilters();
+{{~ else ~}}
+            .WithHttpTransport(options => options.Stateless = true);
+{{~ end ~}}
+        foreach (var module in modules)
+        {
+            var api = module.GetType().Assembly;
+            var name = api.GetName().Name!;
+            name = name[..name.LastIndexOf('.')];
+            services.AddMcpRequestTools(name[(name.LastIndexOf('.') + 1)..], ModuleAssemblies.Of(module, "Application"){{ if policies }}, api{{ end }});
+        }
+
+        return services;
+    }
+
+    /// <summary>Offers the requests one assembly marks, as <see cref="AddMcpServerTools"/> does for each module's.</summary>
+{{~ if policies ~}}
+    public static IServiceCollection AddMcpRequestTools(this IServiceCollection services, string module, Assembly application, Assembly api)
+{{~ else ~}}
+    public static IServiceCollection AddMcpRequestTools(this IServiceCollection services, string module, Assembly application)
+{{~ end ~}}
+    {
+        {{ not_null "services" }}
+
+        var scan = McpToolCatalog.Scan(module, application{{ if policies }}, api{{ end }});
+        if (scan.Problems.Count > 0)
+        {
+            throw new InvalidOperationException($"The module {module} marks requests that cannot be MCP tools:{Environment.NewLine}{string.Join(Environment.NewLine, scan.Problems)}");
+        }
+
+        foreach (var tool in scan.Tools)
+        {
+            services.AddSingleton<McpServerTool>(new RequestTool(tool));
+        }
+
+        return services;
+    }
+}

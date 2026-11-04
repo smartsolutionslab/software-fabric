@@ -170,22 +170,26 @@ accepted all four.
   `client` packs therefore meet that rule when `backend.llm` is `none`; how
   they do (the rule branching on `backend.mcp`, ADR-0006, or MCP code kept
   out of the modules) is settled in their issues, not by weakening the rule
-  here.
+  here. Both keep MCP code out of the modules: `client` creates its clients
+  in BuildingBlocks (#82), and `server` puts its `[McpTool]` marker in
+  BuildingBlocks, which references no MCP package, and the SDK in the host
+  alone (#81).
 - `Microsoft.Extensions.AI` has one owner although two dimensions need it:
   the base declares its version and the BuildingBlocks reference when a
   provider is chosen or the MCP client is (owner's decision on #77,
   2026-11-04), and neither the provider packs nor `backend.mcp.client`
   declare it themselves.
 - `ModelContextProtocol.AspNetCore` has one owner too: the base declares
-  its version for the MCP client (owner's decision on #81, 2026-11-04),
-  whose tests start a tiny server with it; `backend.mcp.client` declares
-  only `ModelContextProtocol.Core`.
+  its version whenever `backend.mcp` is not empty (owner's decision on #81,
+  2026-11-04). The server references it from the host, the client from the
+  tiny server its tests start; `backend.mcp.client` declares only
+  `ModelContextProtocol.Core`.
 - `anthropic`, `openai`, `azure-openai`, `ollama`, `server` and `client` had
   no packs when this was decided, so they are `experimental` (ADR-0003), and
   `fabric new` fails with `no pack for ...` for an option still without one.
   Each pack is its own issue, ships its agent rules and a gate (ADR-0002), and
   becomes `supported` once the matrix builds it. `client` (#82),
-  `anthropic` (#77), `openai` (#78) and `azure-openai` (#79) have packs
-  and stay `experimental` until then.
+  `server` (#81), `anthropic` (#77), `openai` (#78) and `azure-openai` (#79)
+  have packs and stay `experimental` until then.
 - `backend.llm.agents`, retrieval-augmented generation and evaluations are
   later decisions, each with its own ADR.

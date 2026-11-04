@@ -1,0 +1,8 @@
+using {{ namespace }}.BuildingBlocks.Mcp;
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Mcp.Server.Tests;
+
+/// <summary>A marked query, as a module's would be: offered as the tool <c>samples_shout</c>.</summary>
+[McpTool("Answers with the text it was given, in capitals.")]
+public sealed record Shout(string Text) : IQuery<Result<Shouted, ApiError>>;

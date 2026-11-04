@@ -1,0 +1,15 @@
+using {{ namespace }}.BuildingBlocks.Modules;
+using Microsoft.AspNetCore.Authorization;
+
+namespace {{ namespace }}.Mcp.Server.Tests;
+
+/// <summary>The samples' policy, registered as a module's <c>&lt;Module&gt;Policies</c> registers its own.</summary>
+public sealed class SamplePolicies : IModulePolicies
+{
+    public void AddPolicies(AuthorizationBuilder policies)
+    {
+        {{ not_null "policies" }}
+
+        policies.AddPolicy(SamplePolicyNames.Manage, policy => policy.RequireClaim(TestUser.PermissionClaim, "manage"));
+    }
+}

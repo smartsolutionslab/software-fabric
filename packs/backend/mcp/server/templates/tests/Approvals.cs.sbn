@@ -1,0 +1,7 @@
+namespace {{ namespace }}.Mcp.Server.Tests;
+
+/// <summary>The numbers <see cref="ApproveHandler"/> approved: a refused call must leave it empty.</summary>
+public sealed class Approvals
+{
+    public List<int> Numbers { get; } = [];
+}
