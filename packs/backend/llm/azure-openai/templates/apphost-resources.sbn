@@ -1,0 +1,6 @@
+// Models deployed in your own Azure OpenAI resource, through its OpenAI v1 endpoint; nothing is provisioned. The endpoint
+// (https://<resource>.openai.azure.com) has no default, the key is a secret (dotnet user-secrets set
+// Parameters:azure-openai-api-key ...), and the deployment must name one in that resource (gpt-5 for harder questions).
+var azureOpenAIEndpoint = builder.AddParameter("azure-openai-endpoint");
+var azureOpenAIDeployment = builder.AddParameter("azure-openai-deployment", "gpt-5-mini", publishValueAsDefault: true);
+var azureOpenAIApiKey = builder.AddParameter("azure-openai-api-key", secret: true);
