@@ -17,7 +17,8 @@ public sealed class ModulePolicyOwners
 
     private const string ApiSuffix = ".Api";
 
-    private readonly Dictionary<string, string> owners = new(StringComparer.Ordinal);
+    // The host's policy table ignores case, so BILLING.APPROVE and billing.approve are one policy.
+    private readonly Dictionary<string, (string Module, string Name)> owners = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Registers the policies of every <see cref="IModulePolicies"/> in a module's Api assembly into the services, and
@@ -41,10 +42,17 @@ public sealed class ModulePolicyOwners
         List<string> conflicts = [];
         foreach (var name in policies.Names)
         {
-            if (!owners.TryAdd(name, module) && owners[name] != module)
+            if (owners.TryAdd(name, (module, name)))
             {
-                var (first, second) = string.CompareOrdinal(owners[name], module) < 0 ? (owners[name], module) : (module, owners[name]);
-                conflicts.Add($"The modules {first} and {second} both register the policy {name}: the host has one policy table, so one registration would silently replace the other. A module registers only its own <module>.<permission> policies.");
+                continue;
+            }
+
+            var (owner, spelling) = owners[name];
+            if (owner != module)
+            {
+                var (first, second) = string.CompareOrdinal(owner, module) < 0 ? (owner, module) : (module, owner);
+                var also = string.Equals(spelling, name, StringComparison.Ordinal) ? string.Empty : $" (the module {module} as {name}; policy names ignore case)";
+                conflicts.Add($"The modules {first} and {second} both register the policy {spelling}{also}: the host has one policy table, so one registration would silently replace the other. A module registers only its own <module>.<permission> policies.");
             }
         }
 
@@ -81,7 +89,7 @@ public sealed class ModulePolicyOwners
 
         private void Remember(string name)
         {
-            if (!names.Contains(name, StringComparer.Ordinal))
+            if (!names.Contains(name, StringComparer.OrdinalIgnoreCase))
             {
                 names.Add(name);
             }
