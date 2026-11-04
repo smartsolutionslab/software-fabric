@@ -1,0 +1,86 @@
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
+
+namespace {{ namespace }}.BuildingBlocks.Mcp;
+
+/// <summary>
+/// The one place MCP clients are created: one per declared server, connected on first use and kept for the host's
+/// lifetime. Its tools reach code through <see cref="IMcpTools"/>, and a chat client through <c>UseMcpTools</c>.
+/// </summary>
+internal sealed class McpClients(IReadOnlyList<McpServerDeclaration> servers, ILoggerFactory loggerFactory) : IMcpTools, IAsyncDisposable
+{
+    private readonly SemaphoreSlim connecting = new(1, 1);
+    private readonly Dictionary<string, McpClient> connected = new(StringComparer.Ordinal);
+
+    public async Task<IReadOnlyList<McpToolDescription>> ListAsync(CancellationToken cancellationToken) =>
+        [.. (await ToolsByServerAsync(cancellationToken)).Select(entry => new McpToolDescription(entry.Server, entry.Tool.Name, entry.Tool.Description))];
+
+    public async Task<McpToolResult> CallAsync(string server, string tool, IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken)
+    {
+        {{ not_blank "server" }}
+        {{ not_blank "tool" }}
+        {{ not_null "arguments" }}
+
+        var client = await ConnectAsync(Declared(server), cancellationToken);
+        var result = await client.CallToolAsync(tool, arguments, cancellationToken: cancellationToken);
+        var text = string.Join('\n', result.Content.OfType<TextContentBlock>().Select(block => block.Text));
+        return new McpToolResult(result.IsError == true, text, result.StructuredContent);
+    }
+
+    /// <summary>
+    /// Every declared server's tools as functions a chat client can call (Microsoft.Extensions.AI), named after their
+    /// server, each call run only when <paramref name="allow"/> allows it.
+    /// </summary>
+    public async Task<IReadOnlyList<AITool>> ChatToolsAsync(Func<McpToolCall, bool> allow, CancellationToken cancellationToken) =>
+        [.. (await ToolsByServerAsync(cancellationToken)).Select(entry => new CheckedMcpTool(entry.Server, entry.Tool, allow))];
+
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var client in connected.Values)
+        {
+            await client.DisposeAsync();
+        }
+
+        connecting.Dispose();
+    }
+
+    private async Task<IReadOnlyList<(string Server, McpClientTool Tool)>> ToolsByServerAsync(CancellationToken cancellationToken)
+    {
+        List<(string Server, McpClientTool Tool)> tools = [];
+        foreach (var server in servers)
+        {
+            var client = await ConnectAsync(server, cancellationToken);
+            foreach (var tool in await client.ListToolsAsync(cancellationToken: cancellationToken))
+            {
+                tools.Add((server.Name, tool));
+            }
+        }
+
+        return tools;
+    }
+
+    private McpServerDeclaration Declared(string server) =>
+        servers.FirstOrDefault(declaration => declaration.Name == server)
+            ?? throw new InvalidOperationException($"No MCP server '{server}' is declared in the AppHost.");
+
+    private async Task<McpClient> ConnectAsync(McpServerDeclaration server, CancellationToken cancellationToken)
+    {
+        await connecting.WaitAsync(cancellationToken);
+        try
+        {
+            if (!connected.TryGetValue(server.Name, out var client))
+            {
+                client = await McpClient.CreateAsync(server.CreateTransport(loggerFactory), loggerFactory: loggerFactory, cancellationToken: cancellationToken);
+                connected[server.Name] = client;
+            }
+
+            return client;
+        }
+        finally
+        {
+            connecting.Release();
+        }
+    }
+}

@@ -1,0 +1,17 @@
+using {{ namespace }}.Mcp.TestServer;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+// Started by a test as an MCP server over stdio: standard output carries the protocol, so logs go to standard error.
+if (Environment.GetEnvironmentVariable(EchoServer.TokenVariable) is null)
+{
+    await Console.Error.WriteLineAsync($"{EchoServer.TokenVariable} is not set.");
+    return 1;
+}
+
+var builder = Host.CreateApplicationBuilder(args);
+builder.Logging.ClearProviders().AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
+builder.Services.AddMcpServer().WithStdioServerTransport().WithTools([typeof(EchoTools)]);
+await builder.Build().RunAsync();
+return 0;

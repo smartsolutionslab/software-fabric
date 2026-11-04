@@ -1,0 +1,26 @@
+using Microsoft.Extensions.AI;
+using ModelContextProtocol.Client;
+
+namespace {{ namespace }}.BuildingBlocks.Mcp;
+
+/// <summary>
+/// One server's tool as a model sees it: named <c>&lt;server&gt;__&lt;tool&gt;</c>, so two servers' tools of the same name
+/// stay apart, and run only when the project's check allows the call; a refused call never reaches the server.
+/// </summary>
+internal sealed class CheckedMcpTool(string server, McpClientTool tool, Func<McpToolCall, bool> allow) : DelegatingAIFunction(tool)
+{
+    public override string Name { get; } = $"{server}__{tool.Name}";
+
+    protected override async ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
+    {
+        {{ not_null "arguments" }}
+
+        var call = new McpToolCall(server, tool.Name, arguments.ToDictionary(argument => argument.Key, argument => argument.Value, StringComparer.Ordinal));
+        if (!allow(call))
+        {
+            return $"The call to {Name} was refused: its arguments did not pass the project's check.";
+        }
+
+        return await base.InvokeCoreAsync(arguments, cancellationToken);
+    }
+}

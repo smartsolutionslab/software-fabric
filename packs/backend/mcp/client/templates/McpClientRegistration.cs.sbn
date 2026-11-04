@@ -1,0 +1,22 @@
+using {{ namespace }}.BuildingBlocks.Mcp;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class McpClientRegistration
+{
+    /// <summary>
+    /// Registers <see cref="IMcpTools"/> over the MCP servers the AppHost declares (<c>Mcp:Servers</c>). A malformed
+    /// declaration fails here, at startup; a server is first contacted when its tools are first needed.
+    /// </summary>
+    public static IServiceCollection AddMcpClients(this IServiceCollection services, IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        var servers = McpServerDeclaration.ReadAll(configuration);
+        return services
+            .AddSingleton(provider => new McpClients(servers, provider.GetRequiredService<ILoggerFactory>()))
+            .AddSingleton<IMcpTools>(provider => provider.GetRequiredService<McpClients>());
+    }
+}
