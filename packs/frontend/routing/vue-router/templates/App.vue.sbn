@@ -1,0 +1,16 @@
+<script setup lang="ts">
+import { RouterLink, RouterView } from 'vue-router';
+import { moduleRoutes } from '@/modules';
+</script>
+
+<template>
+  <div>
+    <nav aria-label="Modules" class="flex gap-4 p-2">
+      <RouterLink to="/">Home</RouterLink>
+      <RouterLink v-for="route in moduleRoutes" :key="route.path" :to="`/${route.path}`">
+        {{ "{{" }} route.title {{ "}}" }}
+      </RouterLink>
+    </nav>
+    <RouterView />
+  </div>
+</template>

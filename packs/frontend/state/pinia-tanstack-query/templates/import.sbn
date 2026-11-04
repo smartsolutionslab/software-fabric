@@ -1,0 +1,2 @@
+import { withPinia } from './providers/pinia';
+import { withQueryClient } from './providers/query';

@@ -1,0 +1,20 @@
+option: frontend.routing.vue-router
+files:
+  - { template: templates/App.vue.sbn, target: web/app/src/App.vue }
+  - { template: templates/App.test.ts.sbn, target: web/app/src/App.test.ts }
+  - { template: templates/router.ts.sbn, target: web/app/src/router.ts }
+  - { template: templates/router-provider.ts.sbn, target: web/app/src/providers/router.ts }
+  - { template: templates/modules.ts.sbn, target: web/app/src/modules/index.ts }
+  - { template: templates/module-routes.ts.sbn, target: "web/app/src/modules/{{ module.name }}/routes.ts", per-module: true }
+  - { template: templates/module-page.vue.sbn, target: "web/app/src/modules/{{ module.name }}/{{ module.namespace }}Page.vue", per-module: true }
+slots:
+  - { slot: web.dependencies, template: templates/dependency.sbn }
+  - { slot: web.imports, template: templates/import.sbn, order: 10 }
+  - { slot: web.providers, template: templates/provider.sbn, order: 20 }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 10 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "The start page renders through the router and names the application (src/App.test.ts).", file: templates/App.test.ts.sbn }
+  - { kind: lint-rule, describes: "Importing unplugin-vue-router (file-based routes) fails lint: routes are declared in src/router.ts and each module's routes.ts.", file: templates/restricted.sbn }
