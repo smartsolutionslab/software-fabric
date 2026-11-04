@@ -634,6 +634,93 @@ public sealed partial class PrimitiveBoundaryTests
         }
         """;
 
+    private const string Signals = """
+        using Shop.BuildingBlocks.Domain;
+
+        namespace Shop.Modules.Billing.Domain.Signals;
+
+        internal sealed class Marker;
+
+        internal interface INode<out T>
+        {
+            INode<IEnumerable<T>>? Next { get; }
+        }
+
+        internal sealed class SpecialNode : INode<List<Marker>>
+        {
+            public INode<IEnumerable<List<Marker>>>? Next => null;
+
+            public string Remark { get; } = string.Empty;
+        }
+
+        internal sealed class Palette<T>
+        {
+            internal enum Status
+            {
+                On,
+                Off,
+            }
+        }
+
+        internal sealed class Lamp<T>
+        {
+            public Lamp<List<T>>? Next { get; }
+
+            public Palette<T>.Status Status { get; }
+        }
+
+        internal sealed record Chain<T> : IValueObject<T>
+        {
+            private Chain(T value) => Value = value;
+
+            public T Value { get; }
+
+            public Chain<List<T>>? Next { get; }
+
+            public Answer<T>? Answer { get; }
+
+            public static Chain<T> From(T value) => new(value);
+        }
+
+        internal sealed class Answer<T>
+        {
+            private readonly T[] values = [];
+
+            public T Value => values.Length > 0 ? values[0] : default!;
+        }
+
+        internal sealed class Signal : AggregateRoot<SignalId>
+        {
+            private Signal(SignalId id)
+                : base(id)
+            {
+            }
+
+            public INode<Marker>? Start { get; }
+
+            public Lamp<Marker>? Lamp { get; }
+
+            public Chain<bool>? Checks { get; }
+
+            public static Signal Raise() => new(SignalId.New());
+        }
+
+        internal sealed record SignalId : IValueObject<Guid>
+        {
+            private SignalId(Guid value) => Value = value;
+
+            public Guid Value { get; }
+
+            public static SignalId New() => new(Guid.CreateVersion7());
+
+            public static SignalId From(Guid value)
+            {
+                Ensure.That(value).IsNotEmpty();
+                return new SignalId(value);
+            }
+        }
+        """;
+
     [Fact]
     public void A_strict_module_passes_with_its_samples_and_fails_naming_each_primitive_an_aggregate_command_or_event_holds()
     {
@@ -775,6 +862,31 @@ public sealed partial class PrimitiveBoundaryTests
             () => output.ShouldMatch(@"Crates\.Cell`1\[\[System\.Collections\.Generic\.List`1\[\[System\.String,[^;]*\]\]\.Value holds String"),
             () => output.ShouldMatch(@"Crates\.Holder`1\[\[System\.Tuple`2\[\[Shop\.Modules\.Billing\.Domain\.Crates\.Marker,[^;]*\],\[System\.Int32,[^;]*\]\]\.Value holds Int32"),
             () => named.ShouldBeEmpty(),
+            () => output.ShouldContain("failed: 1"));
+    }
+
+    [Fact]
+    public void A_recurring_definition_keeps_the_enum_and_computed_answer_exemptions_and_reaches_a_covariant_subclass()
+    {
+        using var project = new GeneratedProject("saas-strict-react");
+        project.AddModule("billing");
+
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Signals", Signals);
+        project.Build();
+
+        var (ended, exitCode, output) = TestWithin(project, "tests/Architecture.Tests/Architecture.Tests.csproj", TimeSpan.FromMinutes(3));
+
+        List<string> named = [.. Violation().Matches(output).Select(match => match.Value).Distinct()];
+
+        // INode<IEnumerable<Marker>> is reached, and SpecialNode : INode<List<Marker>> is assignable to it. Answer<bool>.Value
+        // is a computed bool, but Answer<List<bool>>.Value, reached through Chain<List<bool>>, is not.
+        output.ShouldSatisfyAllConditions(
+            () => ended.ShouldBeTrue($"The architecture tests did not end within 3 minutes.\n{output}"),
+            () => exitCode.ShouldNotBe(0, output),
+            () => named.ShouldBe(["Shop.Modules.Billing.Domain.Signals.SpecialNode.Remark holds String"]),
+            () => output.ShouldMatch(@"Signals\.Answer`1\[\[System\.Collections\.Generic\.List`1\[\[System\.Boolean,[^;]*\]\]\.Value holds Boolean"),
+            () => output.ShouldNotMatch(@"Signals\.Answer`1\[\[System\.Boolean,"),
+            () => output.ShouldNotContain("value__"),
             () => output.ShouldContain("failed: 1"));
     }
 
