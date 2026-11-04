@@ -467,6 +467,8 @@ public sealed partial class PrimitiveBoundaryTests
 
             public T Value { get; }
 
+            public Wrapper<Link<T>>? Linked { get; }
+
             public static Wrapper<T> From(T value)
             {
                 Ensure.That(value).IsNotNull();
@@ -479,6 +481,35 @@ public sealed partial class PrimitiveBoundaryTests
             public string Text { get; } = string.Empty;
         }
 
+        internal sealed class Link<T>
+        {
+            public string Label { get; } = string.Empty;
+        }
+
+        internal sealed class Marker;
+
+        internal sealed class Manifest
+        {
+            public string Note { get; } = string.Empty;
+        }
+
+        internal sealed record Tag<TTag> : IValueObject<Guid>
+        {
+            private Tag(Guid value) => Value = value;
+
+            public Guid Value { get; }
+
+            public Tag<Manifest>? Related { get; }
+
+            public Tag<List<TTag>>? Next { get; }
+
+            public static Tag<TTag> From(Guid value)
+            {
+                Ensure.That(value).IsNotEmpty();
+                return new Tag<TTag>(value);
+            }
+        }
+
         internal sealed class Route : AggregateRoot<RouteId>
         {
             private Route(RouteId id)
@@ -489,6 +520,8 @@ public sealed partial class PrimitiveBoundaryTests
             public Node<Waypoint>? Start { get; }
 
             public Wrapper<Wrapper<Cargo>>? Load { get; }
+
+            public Tag<Marker>? Mark { get; }
 
             public int Hops { get; }
 
@@ -606,7 +639,7 @@ public sealed partial class PrimitiveBoundaryTests
     }
 
     [Fact]
-    public void A_self_expanding_generic_type_ends_the_walk_and_a_finitely_nested_one_is_still_walked_through()
+    public void A_self_expanding_generic_type_ends_the_walk_without_hiding_what_it_holds_or_following_a_phantom_tag()
     {
         using var project = new GeneratedProject("saas-strict-react");
         project.AddModule("billing");
@@ -626,6 +659,8 @@ public sealed partial class PrimitiveBoundaryTests
                 "Shop.Modules.Billing.Domain.Routes.Cargo.Text holds String",
                 "Shop.Modules.Billing.Domain.Routes.Route.Hops holds Int32",
             ]),
+            () => output.ShouldContain("].Label holds String"),
+            () => output.ShouldNotContain("Manifest.Note holds"),
             () => output.ShouldContain("failed: 1"));
     }
 
