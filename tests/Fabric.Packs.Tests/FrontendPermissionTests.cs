@@ -91,25 +91,26 @@ public sealed class FrontendPermissionTests
     }
 
     [Theory]
-    [InlineData(Roles)]
-    [InlineData(Claims)]
-    [InlineData(RolesAndClaims)]
-    public void The_web_app_installs_builds_lints_is_formatted_and_its_permission_tests_pass(string authorization)
+    [InlineData(Roles, "an element that requires the manager role is shown to the developer")]
+    [InlineData(Claims, "an element that requires the finance department is shown to the analyst")]
+    [InlineData(RolesAndClaims, "an element that requires the manager role and the finance department is shown to the developer")]
+    public void The_web_app_installs_builds_lints_is_formatted_and_its_permission_tests_pass(string authorization, string permissionTest)
     {
         using var project = new GeneratedProject(Profile, authorization);
         var web = Path.Combine(project.ProjectDirectory, "web");
+        var app = Path.Combine(web, "app");
 
-        foreach (var step in new[] { "install", "build", "lint", "test" })
+        foreach (var step in new[] { "install", "build", "lint" })
         {
             var (exitCode, output) = Shell.Run(web, "pnpm", step);
             exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
-            if (step == "test")
-            {
-                output.ShouldContain("src/auth/RequirePermission.test.tsx");
-            }
         }
 
-        var (formatExitCode, formatOutput) = Shell.Run(Path.Combine(web, "app"), "pnpm", "format:check");
+        var (testExitCode, testOutput) = Shell.Run(app, "pnpm", "test", "--reporter=verbose");
+        testExitCode.ShouldBe(0, $"pnpm test:\n{testOutput}");
+        testOutput.ShouldContain($"✓ src/auth/RequirePermission.test.tsx > {permissionTest}", customMessage: testOutput);
+
+        var (formatExitCode, formatOutput) = Shell.Run(app, "pnpm", "format:check");
         formatExitCode.ShouldBe(0, $"pnpm format:check:\n{formatOutput}");
     }
 

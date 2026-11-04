@@ -15,42 +15,34 @@ vi.mock('react-oidc-context', () => ({ useAuth: vi.fn() }));
 
 afterEach(cleanup);
 
-// The ID token's claims of the realm's local users (src/AppHost/realms/realm.json).
+// The ID tokens Keycloak issues the realm's local users (src/AppHost/realms/realm.json); a user without a realm role has
+// no realm_access, one without a department no department.
 const users = {
 {{~ if roles ~}}
   developer: {
     preferred_username: 'developer',
-    realm_access: { roles: ['manager', 'default-roles-{{ name }}'] },
+    realm_access: { roles: ['manager'] },
 {{~ if claims ~}}
     department: 'finance',
 {{~ end ~}}
-  },
-  visitor: {
-    preferred_username: 'visitor',
-    realm_access: { roles: ['default-roles-{{ name }}'] },
   },
 {{~ end ~}}
 {{~ if claims ~}}
   analyst: {
     preferred_username: 'analyst',
-{{~ if roles ~}}
-    realm_access: { roles: ['default-roles-{{ name }}'] },
-{{~ end ~}}
     department: 'finance',
   },
   clerk: {
     preferred_username: 'clerk',
 {{~ if roles ~}}
-    realm_access: { roles: ['manager', 'default-roles-{{ name }}'] },
+    realm_access: { roles: ['manager'] },
 {{~ end ~}}
     department: 'sales',
   },
-{{~ if !roles ~}}
+{{~ end ~}}
   visitor: {
     preferred_username: 'visitor',
   },
-{{~ end ~}}
-{{~ end ~}}
 };
 
 function signInAs(user: keyof typeof users) {
