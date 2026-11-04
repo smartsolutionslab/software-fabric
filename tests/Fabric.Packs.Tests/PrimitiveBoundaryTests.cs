@@ -455,9 +455,14 @@ public sealed partial class PrimitiveBoundaryTests
 
         internal sealed class Waypoint;
 
-        internal sealed class Node<T>
+        internal class Node<T>
         {
             public Node<List<T>>? Next { get; }
+        }
+
+        internal sealed class SpecialNode : Node<List<Waypoint>>
+        {
+            public string Remark { get; } = string.Empty;
         }
 
         internal sealed record Wrapper<T> : IValueObject<T>
@@ -639,7 +644,7 @@ public sealed partial class PrimitiveBoundaryTests
     }
 
     [Fact]
-    public void A_self_expanding_generic_type_ends_the_walk_without_hiding_what_it_holds_or_following_a_phantom_tag()
+    public void A_self_expanding_generic_type_ends_the_walk_without_hiding_what_it_holds_its_subclasses_or_following_a_phantom_tag()
     {
         using var project = new GeneratedProject("saas-strict-react");
         project.AddModule("billing");
@@ -658,6 +663,7 @@ public sealed partial class PrimitiveBoundaryTests
             [
                 "Shop.Modules.Billing.Domain.Routes.Cargo.Text holds String",
                 "Shop.Modules.Billing.Domain.Routes.Route.Hops holds Int32",
+                "Shop.Modules.Billing.Domain.Routes.SpecialNode.Remark holds String",
             ]),
             () => output.ShouldContain("].Label holds String"),
             () => output.ShouldNotContain("Manifest.Note holds"),
