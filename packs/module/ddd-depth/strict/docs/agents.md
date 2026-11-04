@@ -6,3 +6,6 @@
 - Never write `HasConversion` for a value object or identifier: EF Core maps them by convention. Map a value object with more than one value as a complex property.
 - An endpoint turns the request's primitives into value objects with `From` before it builds the command.
 - Aggregate roots expose no public setters; state changes go through methods named after what happens. An architecture rule checks this.
+{{~ if object.has_key(module_defaults, "module.event-store") && module_defaults["module.event-store"] == "marten" ~}}
+- In an event-sourced module, events are built from value objects too. Never put `[JsonConverter]` on one: the event store writes a value object as its backing value and reads it back through `From` by convention. An aggregate's identity implements `IValueObject<Guid>` and `IAggregateId`, as `Domain/Samples/SampleId.cs` does.
+{{~ end ~}}

@@ -39,8 +39,13 @@ one by hand. A generic value object (`TypedId<TTag>`) is mapped as each closed t
 use (`TypedId<Customer>`). A value object with more than one value (`Money`) is mapped in its configuration as a complex
 property.
 
-**Scope of the option.** Strict applies to `module.style: ddd` only. An event-sourced module stays light for now: its
-events go through Marten's JSON, which cannot build a value object through its private constructor and `From`.
+{{~ if object.has_key(slots, "event-store.json-converters") ~}}
+**Event store.** An event-sourced module may be strict too. Marten serialises its events and documents with
+System.Text.Json, and a converter registered with every module's store writes a value object as its backing value and
+reads it back through `From`, so no value object carries a `[JsonConverter]` attribute and a value read from the store
+passes the same guards as one a caller sends. An event-sourced aggregate's identity is a value object over a `Guid` that
+is also its `IAggregateId`.
+{{~ end ~}}
 
 ## Enforced
 
