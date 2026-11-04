@@ -52,7 +52,12 @@ is also its `IAggregateId`. A JSON `null` for a value object that is not declare
 (`RespectNullableAnnotations`), so it never skips `From`; one declared nullable (`InvoiceNumber?`) may be null. A
 constructor member missing from the JSON fails to read too (`RespectRequiredConstructorParameters`). So that this covers
 every value object an event carries, an architecture rule per strict event-sourced module requires each one to be a
-constructor (positional) parameter of the event, never a property set by an initialiser (`{ get; init; }`). Both settings hold
+constructor (positional) parameter of the event, never a property set by an initialiser (`{ get; init; }`). The rule
+checks the constructor System.Text.Json actually selects (the one marked `[JsonConstructor]`, else the public
+parameterless one, else the only public one), not every public constructor: beside a public parameterless constructor,
+a constructor taking `InvoiceNumber` is never called when an event is read. It also refuses an optional parameter for a
+value object that is not declared nullable (`InvoiceNumber Number = null!`), since an omitted optional parameter takes
+its default instead of failing; `InvoiceNumber? Previous = null` stays allowed. Both settings hold
 for every event and document in the store, read models included: a read model whose constructor later gains a
 parameter can no longer read the rows stored before it, so give the new parameter a default or rebuild the projection.
 
