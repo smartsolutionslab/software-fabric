@@ -18,6 +18,7 @@ Being signed in is not enough for every endpoint: access can depend on the user'
 ## Gates
 
 - `EveryEndpointPolicyIsRegisteredByItsModule` starts the host in Development and in Production, as `EveryEndpointDeclaresItsAuthorization` does, and fails for a module endpoint whose policy that module's `IModulePolicies` does not register, or which another module registers too (the host has one policy table; the last registration would win). An endpoint belongs to the module whose Api assembly declares its handler.
+- `EveryPolicyIsRegisteredByOneModule` fails for a policy name two modules register, naming both, whether or not an endpoint or an MCP tool names it: whichever registration came last would silently decide what everything naming it requires. The host refuses to start on the same names, because both ask `ModulePolicyOwners` in BuildingBlocks.
 - `OnlyModulePoliciesCheckRoles` parses every source under `src/` and fails, naming file and line, for `IsInRole`, `ClaimTypes.Role`, `[Authorize(Roles = ...)]` anywhere, and `RequireRole` outside a type implementing `IModulePolicies`. `src/Host/KeycloakRoleClaims.cs` is exempt: it is where the roles enter.
 - The integration tests (`<Module>RoleTests`) give `developer` 200, `visitor` 403 and an anonymous caller 401 on each module's sample endpoint, against the running stack.
 
@@ -28,6 +29,7 @@ Being signed in is not enough for every endpoint: access can depend on the user'
 - Whether a policy is the right one for its endpoint, or strong enough: review's to catch.
 - An endpoint mapped outside both Development and Production, or one whose handler is declared outside its module's Api assembly (it is then nobody's, and only `EveryEndpointDeclaresItsAuthorization` checks it).
 - A policy registered under a name without the `<module>.` prefix, as long as no other module registers the same name.
+- A policy added without the builder's `AddPolicy` (through `policies.Services.Configure<AuthorizationOptions>(...)`, say): `ModulePolicyOwners` learns names only from `AddPolicy`, so it cannot see a name registered that way.
 
 ## Consequences
 

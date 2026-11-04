@@ -1,0 +1,135 @@
+namespace Fabric.Packs.Tests;
+
+/// <summary>
+/// A policy name is registered by exactly one module (#150). The host has one policy table, so when two modules
+/// register the same name the later registration replaces the earlier one, and whatever names that policy (an
+/// endpoint, an MCP tool) gets the weaker requirements without any other check noticing. The host refuses to start and
+/// an architecture rule fails, both naming the two modules, whether or not anything names the policy.
+/// </summary>
+[Collection(FixedPorts.Name)]
+public sealed class PolicyOwnershipTests
+{
+    private const string Profile = "lean-crud";
+    private const string Conflict = "The modules Billing and Shipping both register the policy billing.approve";
+
+    private const string BillingApprovalPolicies = """
+        using Microsoft.AspNetCore.Authorization;
+        using Shop.BuildingBlocks.Modules;
+
+        namespace Shop.Modules.Billing.Api;
+
+        public sealed class ApprovalPolicies : IModulePolicies
+        {
+            public void AddPolicies(AuthorizationBuilder policies) =>
+                policies.AddPolicy("billing.approve", policy => policy.{0});
+        }
+        """;
+
+    private const string ShippingApprovalPolicies = """
+        using Microsoft.AspNetCore.Authorization;
+        using Shop.BuildingBlocks.Modules;
+
+        namespace Shop.Modules.Shipping.Api;
+
+        public sealed class ApprovalPolicies : IModulePolicies
+        {
+            public void AddPolicies(AuthorizationBuilder policies) =>
+                policies.AddPolicy("{0}", policy => policy.RequireAuthenticatedUser());
+        }
+        """;
+
+    private const string ApproveTool = """
+        using Shop.BuildingBlocks.Mcp;
+        using Shop.BuildingBlocks.Messaging;
+
+        namespace Shop.Modules.Billing.Application.Commands.Approve;
+
+        [McpTool("Approves an invoice.", Policy = "billing.approve")]
+        public sealed record Approve(int Number) : ICommand<Result<int, ApiError>>;
+
+        public sealed class ApproveHandler : ICommandHandler<Approve, Result<int, ApiError>>
+        {
+            public Task<Result<int, ApiError>> HandleAsync(Approve command, CancellationToken cancellationToken) =>
+                Task.FromResult<Result<int, ApiError>>(Success(command.Number));
+        }
+        """;
+
+    [Fact]
+    public async Task A_policy_another_module_registers_too_fails_the_architecture_tests_and_stops_the_host_naming_both_though_only_an_mcp_tool_names_it()
+    {
+        // The case from the review of #145: Billing's tool needs a manager, Shipping's registration only a signed-in user.
+        using var project = NewProject("backend.authorization=roles", "backend.mcp=server");
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.WriteTypes("src/Modules/Billing/Billing.Api", BillingApprovalPolicies.Replace("{0}", "RequireRole(\"manager\")", StringComparison.Ordinal));
+        project.WriteTypes("src/Modules/Shipping/Shipping.Api", ShippingApprovalPolicies.Replace("{0}", "billing.approve", StringComparison.Ordinal));
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/Approve", ApproveTool);
+        project.Build();
+
+        await ShouldFailNamingBoth(project);
+    }
+
+    [Fact]
+    public async Task A_policy_another_module_registers_too_fails_the_architecture_tests_and_stops_the_host_naming_both_though_nothing_names_it()
+    {
+        using var project = NewProject("backend.authorization=claims");
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.WriteTypes("src/Modules/Billing/Billing.Api", BillingApprovalPolicies.Replace("{0}", "RequireClaim(\"department\", \"finance\")", StringComparison.Ordinal));
+        project.WriteTypes("src/Modules/Shipping/Shipping.Api", ShippingApprovalPolicies.Replace("{0}", "billing.approve", StringComparison.Ordinal));
+        project.Build();
+
+        await ShouldFailNamingBoth(project);
+    }
+
+    [Fact]
+    public async Task A_policy_another_module_registers_in_another_case_fails_the_architecture_tests_and_stops_the_host_naming_both()
+    {
+        // The host's policy table ignores case, so BILLING.APPROVE replaces billing.approve as surely as the same spelling.
+        using var project = NewProject("backend.authorization=roles", "backend.mcp=server");
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.WriteTypes("src/Modules/Billing/Billing.Api", BillingApprovalPolicies.Replace("{0}", "RequireRole(\"manager\")", StringComparison.Ordinal));
+        project.WriteTypes("src/Modules/Shipping/Shipping.Api", ShippingApprovalPolicies.Replace("{0}", "BILLING.APPROVE", StringComparison.Ordinal));
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/Approve", ApproveTool);
+        project.Build();
+
+        await ShouldFailNamingBoth(project);
+    }
+
+    private static async Task ShouldFailNamingBoth(GeneratedProject project)
+    {
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain(Conflict);
+
+        // Each module's own sample policy, <module>.manage, has one owner and is not reported.
+        output.ShouldNotContain("both register the policy billing.manage");
+        output.ShouldNotContain("both register the policy shipping.manage");
+
+        using var host = project.StartHost(new Dictionary<string, string>
+        {
+            ["ConnectionStrings__database"] = "Host=127.0.0.1;Port=1;Database=unused",
+            ["Authentication__Authority"] = "http://127.0.0.1:1/realms/unused",
+        });
+        var stopped = await Should.ThrowAsync<InvalidOperationException>(() => host.GetAsync("/alive"));
+        stopped.Message.ShouldContain(Conflict);
+    }
+
+    /// <summary>A lean-crud project with the overrides; fails while any of its options is generated by a stand-in.</summary>
+    private static GeneratedProject NewProject(params string[] overrides)
+    {
+        var project = new GeneratedProject(Profile, overrides);
+        var standIns = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs", "adr"))
+            .Where(file => File.ReadAllText(file).Contains("This option's pack is not written yet.", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .ToList();
+        if (standIns.Count > 0)
+        {
+            project.Dispose();
+        }
+
+        standIns.ShouldBeEmpty();
+        return project;
+    }
+}

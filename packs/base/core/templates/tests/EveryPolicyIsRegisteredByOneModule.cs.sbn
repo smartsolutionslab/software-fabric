@@ -1,0 +1,28 @@
+using {{ namespace }}.BuildingBlocks.Modules;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// No two modules register a policy under the same name, whether or not an endpoint or a tool names it: the host has
+/// one policy table, so one registration would silently replace the other. The host refuses to start on exactly these
+/// names, because both ask <see cref="ModulePolicyOwners"/>, registering the modules in the order the host does.
+/// </summary>
+public sealed class EveryPolicyIsRegisteredByOneModule : IArchitectureRule
+{
+    private const string ApiSuffix = ".Api";
+
+    public string Description => "Every policy name is registered by one module's IModulePolicies, and by no other module.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var owners = new ModulePolicyOwners();
+        var services = new ServiceCollection();
+        return [.. model.ModuleAssemblies
+            .Where(assembly => assembly.GetName().Name!.EndsWith(ApiSuffix, StringComparison.Ordinal))
+            .OrderBy(assembly => assembly.GetName().Name, StringComparer.Ordinal)
+            .SelectMany(api => owners.Register(api, services))];
+    }
+}
