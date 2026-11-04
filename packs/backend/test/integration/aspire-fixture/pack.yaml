@@ -3,6 +3,8 @@ files:
   - { template: templates/Integration.Tests.csproj.sbn, target: tests/Integration.Tests/Integration.Tests.csproj }
   - { template: templates/AspireFixture.cs.sbn, target: tests/Integration.Tests/AspireFixture.cs }
   - { template: templates/HostTests.cs.sbn, target: tests/Integration.Tests/HostTests.cs }
+declares-slots:
+  - { slot: integration-tests.parameters, description: "Statements on the testing builder (builder) giving AppHost parameters their values for the test run: builder.Configuration[\"Parameters:<name>\"] = \"...\";. Never a real secret." }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-version.sbn }
   - { slot: solution.projects, template: templates/solution-project.sbn }
