@@ -1,0 +1,6 @@
+// A local model server: Ollama in a container (the image the package pins), its models in a data volume, so the model is
+// pulled once per machine on the first start (llama3.2:1b, about 1.3 GB). No key. qwen3:0.6b is smaller, llama3.2 (3B)
+// answers better; the container's WithGPUSupport uses an Nvidia GPU.
+var ollama = builder.AddOllama("ollama")
+    .WithDataVolume();
+var ollamaModel = ollama.AddModel("ollama-model", "llama3.2:1b");
