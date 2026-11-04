@@ -1,0 +1,7 @@
+import '@testing-library/jest-dom/vitest';
+import { cleanup } from '@testing-library/vue';
+import { afterEach } from 'vitest';
+{{ slots["web.test-setup"] }}
+
+// Vitest runs without globals, so Testing Library cannot register its own cleanup.
+afterEach(cleanup);

@@ -1,0 +1,18 @@
+{{~ if project["frontend.routing"] != "vue-router" ~}}
+throw new Error('The accessibility pack renders the Vue start page through vue-router only so far (docs/adr/0006 of the generator).');
+{{~ end ~}}
+import { render } from '@testing-library/vue';
+import { expect, test } from 'vitest';
+import { axe } from 'vitest-axe';
+import { createMemoryHistory } from 'vue-router';
+import App from './App.vue';
+import { createAppRouter } from './router';
+
+test('the start page has no accessibility violations axe can find', async () => {
+  const router = createAppRouter(createMemoryHistory());
+  await router.push('/');
+
+  const { container } = render(App, { global: { plugins: [router] } });
+
+  expect(await axe(container)).toHaveNoViolations();
+});

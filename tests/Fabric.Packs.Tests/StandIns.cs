@@ -33,19 +33,23 @@ internal sealed class StandIns : IDisposable
         var completed = packs.ToDictionary();
         foreach (var option in StoodIn)
         {
-            completed[option] = new PackManifest(
-                option,
-                directory,
-                [],
-                [],
-                [],
-                new PackAgents("agents.md", new Dictionary<string, string>()),
-                "adr.md",
-                [new PackGate(GateKind.UnitTest, "Stand-in: nothing to check yet.", null)]);
+            completed[option] = For(option);
         }
 
         return completed;
     }
+
+    /// <summary>An empty pack for the option, also for one whose real pack does not handle the profile yet.</summary>
+    public PackManifest For(string option) =>
+        new(
+            option,
+            directory,
+            [],
+            [],
+            [],
+            new PackAgents("agents.md", new Dictionary<string, string>()),
+            "adr.md",
+            [new PackGate(GateKind.UnitTest, "Stand-in: nothing to check yet.", null)]);
 
     public void Dispose() => Directory.Delete(directory, recursive: true);
 }

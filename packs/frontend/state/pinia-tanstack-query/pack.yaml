@@ -1,0 +1,14 @@
+option: frontend.state.pinia-tanstack-query
+files:
+  - { template: templates/query-provider.ts.sbn, target: web/app/src/providers/query.ts }
+  - { template: templates/pinia-provider.ts.sbn, target: web/app/src/providers/pinia.ts }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.imports, template: templates/import.sbn, order: 5 }
+  - { slot: web.providers, template: templates/provider.sbn, order: 10 }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 15 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing another store library (Vuex, MobX) or another server-data cache (swrv, Apollo, Pinia Colada) fails lint.", file: templates/restricted.sbn }

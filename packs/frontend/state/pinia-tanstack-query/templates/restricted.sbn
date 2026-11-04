@@ -1,0 +1,4 @@
+            {
+              group: ['vuex', 'mobx', 'mobx-*', 'swrv', '@apollo/*', '@vue/apollo-*', '@pinia/colada'],
+              message: 'Server data: the generated TanStack Query hooks; client state: Pinia stores (docs/adr).',
+            }

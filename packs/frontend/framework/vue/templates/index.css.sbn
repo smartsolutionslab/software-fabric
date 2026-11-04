@@ -1,0 +1,2 @@
+{{ if slots["web.styles"] != "" }}{{ slots["web.styles"] }}
+{{ end }}
