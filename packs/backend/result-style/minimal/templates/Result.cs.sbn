@@ -30,7 +30,12 @@ public sealed class Result<TValue, TError>
 
     public static Result<TValue, TError> Failure(TError error)
     {
+        {{~ if project["backend.guards"] == "ensure-that" ~}}
+        // TError may be a value type, and Ensure.That's object chain takes reference types only.
+        Ensure.That<object>(error).IsNotNull();
+        {{~ else ~}}
         {{ not_null "error" }}
+        {{~ end ~}}
         return new(error);
     }
 #pragma warning restore CA1000
