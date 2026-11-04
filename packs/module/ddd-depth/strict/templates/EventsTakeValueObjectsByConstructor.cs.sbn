@@ -1,0 +1,57 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// The {{ module.namespace }} module is strict and event-sourced: an event carries its value objects as constructor
+/// parameters, so a stored event that lacks one fails to read (RespectRequiredConstructorParameters) instead of leaving it
+/// null without <c>From</c> (module.ddd-depth: strict, docs/adr).
+/// </summary>
+public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : IArchitectureRule
+{
+    private const string Domain = "{{ namespace }}.Modules.{{ module.namespace }}.Domain";
+    private const string DomainEvent = "{{ namespace }}.BuildingBlocks.EventSourcing.IDomainEvent";
+
+    public string Description =>
+        "The {{ module.namespace }} module is strict and event-sourced: every value object an event carries is a parameter of its public constructor.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        return model.ModuleAssemblies
+            .Where(assembly => assembly.GetName().Name == Domain)
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => !type.IsAbstract && !type.IsInterface && type.GetInterfaces().Any(contract => contract.FullName == DomainEvent))
+            .SelectMany(Violations);
+    }
+
+    private static IEnumerable<string> Violations(Type domainEvent)
+    {
+        // System.Text.Json matches a constructor parameter to a property by name, ignoring case.
+        HashSet<string> parameters = new(
+            domainEvent.GetConstructors().SelectMany(constructor => constructor.GetParameters()).Select(parameter => parameter.Name!),
+            StringComparer.OrdinalIgnoreCase);
+
+        return domainEvent.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => CarriesValueObject(property.PropertyType, []) && !parameters.Contains(property.Name))
+            .Select(property => $"{domainEvent.FullName}.{property.Name} carries a value object outside its constructor; make it a constructor parameter, so a stored event without it fails to read.");
+    }
+
+    /// <summary>Whether the type is a value object, or holds one in a <see cref="Nullable{T}"/>, an array or a generic argument.</summary>
+    private static bool CarriesValueObject(Type type, HashSet<Type> visited)
+    {
+        if (!visited.Add(type))
+        {
+            return false;
+        }
+
+        if (typeof(IValueObject).IsAssignableFrom(type))
+        {
+            return true;
+        }
+
+        return (type.IsArray && CarriesValueObject(type.GetElementType()!, visited))
+            || (type.IsGenericType && type.GetGenericArguments().Any(argument => CarriesValueObject(argument, visited)));
+    }
+}

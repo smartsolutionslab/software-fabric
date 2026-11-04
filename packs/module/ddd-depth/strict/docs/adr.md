@@ -46,7 +46,9 @@ reads it back through `From`, so no value object carries a `[JsonConverter]` att
 passes the same guards as one a caller sends. An event-sourced aggregate's identity is a value object over a `Guid` that
 is also its `IAggregateId`. A JSON `null` for a value object that is not declared nullable fails to read
 (`RespectNullableAnnotations`), so it never skips `From`; one declared nullable (`InvoiceNumber?`) may be null. A
-constructor member missing from the JSON fails to read too (`RespectRequiredConstructorParameters`). Both settings hold
+constructor member missing from the JSON fails to read too (`RespectRequiredConstructorParameters`). So that this covers
+every value object an event carries, an architecture rule per strict event-sourced module requires each one to be a
+constructor (positional) parameter of the event, never a property set by an initialiser (`{ get; init; }`). Both settings hold
 for every event and document in the store, read models included: a read model whose constructor later gains a
 parameter can no longer read the rows stored before it, so give the new parameter a default or rebuild the projection.
 
