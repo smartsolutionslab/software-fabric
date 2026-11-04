@@ -77,13 +77,30 @@ An architecture rule per strict module walks from its aggregates, commands and d
 properties and public fields, and fails on each primitive it reaches, naming the type and member. A second rule per
 strict module fails on each public setter of an aggregate root: strict is light and more.
 
-The walk visits each closed type once, and does not enter a closed type larger than the nearest closed type of the same
-generic definition it is already inside of: `Node<T>` holding a `Node<List<T>>` would otherwise construct a new type at
-every step and never end. A closed type of the same size or smaller is entered as usual, so `Wrapper<Wrapper<Cargo>>`
-still reaches `Cargo`, and the walk is what it was wherever it ended before. Of a type it does not enter, it still
-reaches the subclasses the module declares of it (`SpecialNode : Node<List<Waypoint>>`) and what the arguments the
-definition holds as state bring in (`Wrapper<T>` holds its `T`), and nothing a phantom tag names: `TypedId<TTag>` holds
-a `Guid`, not its tag, so `TypedId<Customer>` never makes the walk look into `Customer`.
+The walk visits each closed type once. Before it starts, it decides from the module's generic definitions which ones can
+recur forever: a definition that passes one of its type parameters on, inside a larger type, to a type that leads back
+to it (`Node<T>` holding a `Node<List<T>>`) would construct a new closed type at every step. Every other definition has
+finitely many closed types to visit, and the walk visits each of them, so a larger closed type that does not grow
+(`Box<T>` holding the fixed `Box<List<string>>` and a `Cell<T>`) is walked like any other, and `Cell<List<string>>` is
+reached.
+
+A definition that can recur forever, and each definition it builds from its own type parameters, has its state checked
+once, with each type parameter standing for everything an argument for it was found to hold, wherever the walk uses the
+definition: `Sleeve<T>` holding a `Holder<T>` and a `Sleeve<Tuple<T, int>>`, used as `Sleeve<Marker>`, finds that its
+`T` can hold an `int`, so `Holder<Tuple<Marker, int>>` is named for it. These sets only grow and draw on finitely many
+types, so the walk ends, and it names every member and primitive a walk of all the closed types would name. What a
+value object holds as its backing value stays exempt there too, and a phantom tag is never looked into: `Tag<TTag>`
+holds a `Guid`, not its tag, so `Tag<Customer>` never makes the walk look into `Customer`.
+
+Two limits remain, both for these definitions only:
+
+- **One name per finding.** The walk names a member holding a primitive once, after the first closed type it found
+  holding it there, not once per closed type: there are infinitely many.
+- **A subclass may be walked that is never reached.** The walk enters each subclass the module declares of a closed type
+  it reaches (`SpecialNode : Node<List<Waypoint>>`). For such a definition it tells whether a closed type is reached by
+  matching each type argument on its own, so a subclass of arguments the module never uses together is walked too: with
+  `Pair<Cargo, Marker>` and `Pair<Marker, Cargo>` reached, a subclass of `Pair<Cargo, Cargo>`. That can name a
+  primitive no aggregate reaches; it never hides one.
 
 ## Consequences
 
