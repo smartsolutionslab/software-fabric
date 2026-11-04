@@ -558,6 +558,103 @@ public sealed class StrictEventSourcedTests
         exitCode.ShouldNotBe(0, output);
     }
 
+    [Fact]
+    public void A_property_json_ignores_is_not_walked()
+    {
+        // Source is never written or read, so the Invoice aggregate it holds is not stored with the event.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using System.Text.Json.Serialization;
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record InvoiceSourced(InvoiceId Invoice) : IDomainEvent
+            {
+                [JsonIgnore]
+                public Invoice? Source { get; init; }
+            }
+
+            public sealed class Sourcing : EventSourcedAggregate<InvoiceId>
+            {
+                private Sourcing()
+                {
+                }
+
+                private void Apply(InvoiceSourced sourced) => Id = sourced.Invoice;
+            }
+            """);
+
+        output.ShouldNotContain("InvoiceSourced.Source carries");
+        output.ShouldNotContain("Invoices.Invoice.Number carries");
+        exitCode.ShouldBe(0, output);
+    }
+
+    [Fact]
+    public void A_domain_collection_is_checked_through_its_elements_not_as_an_object()
+    {
+        // System.Text.Json reads a collection as a JSON array, so its Item indexer is no constructor member.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using System.Collections.ObjectModel;
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed class InvoiceNumberCollection : Collection<InvoiceNumber>;
+
+            public sealed record InvoiceEntry
+            {
+                public InvoiceNumber Number { get; init; } = default!;
+            }
+
+            public sealed class InvoiceEntryCollection : Collection<InvoiceEntry>;
+
+            public sealed record InvoiceCollected(InvoiceId Invoice, InvoiceNumberCollection Numbers, InvoiceEntryCollection Entries) : IDomainEvent;
+
+            public sealed class Collecting : EventSourcedAggregate<InvoiceId>
+            {
+                private Collecting()
+                {
+                }
+
+                private void Apply(InvoiceCollected collected) => Id = collected.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceEntry.Number carries a value object outside its constructor");
+        output.ShouldNotContain("Collection.Item carries");
+        output.ShouldNotContain("InvoiceCollected.Numbers carries");
+        output.ShouldNotContain("InvoiceCollected.Entries carries");
+        exitCode.ShouldNotBe(0, output);
+    }
+
+    [Fact]
+    public void The_walk_does_not_follow_a_phantom_type_argument_of_a_domain_wrapper()
+    {
+        // Reference<Invoice> stores only its Id; the Invoice aggregate it names is never read from the event.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record Reference<TTag>(InvoiceId Id);
+
+            public sealed record InvoiceReferenced(InvoiceId Invoice, Reference<Invoice> Source) : IDomainEvent;
+
+            public sealed class Referencing : EventSourcedAggregate<InvoiceId>
+            {
+                private Referencing()
+                {
+                }
+
+                private void Apply(InvoiceReferenced referenced) => Id = referenced.Invoice;
+            }
+            """);
+
+        output.ShouldNotContain("Invoices.Invoice.Number carries");
+        output.ShouldNotContain("Invoices.Invoice.Lines carries");
+        exitCode.ShouldBe(0, output);
+    }
+
     private static (int ExitCode, string Output) ArchitectureTestsWith(string types)
     {
         using var project = new GeneratedProject("industrial-event-driven-mfe", Choices);
