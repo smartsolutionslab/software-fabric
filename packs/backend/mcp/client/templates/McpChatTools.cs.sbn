@@ -1,0 +1,26 @@
+using {{ namespace }}.BuildingBlocks.Mcp;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Microsoft.Extensions.AI;
+
+public static class McpChatTools
+{
+    /// <summary>
+    /// Offers the model every declared MCP server's tools, named <c>&lt;server&gt;__&lt;tool&gt;</c>, and runs the calls it asks
+    /// for (function invocation), handing the results back to it. Needs <c>AddMcpClients</c>.
+    /// </summary>
+    /// <param name="builder">The chat client's pipeline.</param>
+    /// <param name="allow">
+    /// Checks each call before it runs: the arguments are the model's output, untrusted input. A call it refuses never
+    /// reaches the server, and the model is told so. There is no default; allowing every call is a decision.
+    /// </param>
+    public static ChatClientBuilder UseMcpTools(this ChatClientBuilder builder, Func<McpToolCall, bool> allow)
+    {
+        {{ not_null "builder" }}
+        {{ not_null "allow" }}
+
+        return builder
+            .Use((innerClient, services) => new McpToolsChatClient(innerClient, services.GetRequiredService<McpClients>(), allow))
+            .UseFunctionInvocation();
+    }
+}

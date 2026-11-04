@@ -1,0 +1,4 @@
+namespace {{ namespace }}.BuildingBlocks.Mcp;
+
+/// <summary>One tool of a declared MCP server. The description is the server's text: untrusted.</summary>
+public sealed record McpToolDescription(string Server, string Name, string Description);

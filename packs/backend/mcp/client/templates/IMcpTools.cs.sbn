@@ -1,0 +1,18 @@
+namespace {{ namespace }}.BuildingBlocks.Mcp;
+
+/// <summary>
+/// The tools of the external MCP servers the AppHost declares, for code that calls one directly. What a server
+/// answers is untrusted input: check it like a request body before acting on it, and never execute it.
+/// </summary>
+public interface IMcpTools
+{
+    /// <summary>Every declared server's tools.</summary>
+    Task<IReadOnlyList<McpToolDescription>> ListAsync(CancellationToken cancellationToken);
+
+    /// <summary>Calls one tool of one declared server.</summary>
+    /// <param name="server">The server's name, as the AppHost declares it.</param>
+    /// <param name="tool">The tool's name, as the server lists it.</param>
+    /// <param name="arguments">The tool's arguments, serialised to JSON.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    Task<McpToolResult> CallAsync(string server, string tool, IReadOnlyDictionary<string, object?> arguments, CancellationToken cancellationToken);
+}

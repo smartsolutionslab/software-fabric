@@ -1,0 +1,102 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Client;
+
+namespace {{ namespace }}.BuildingBlocks.Mcp;
+
+/// <summary>
+/// One server as the AppHost declares it (<c>WithMcpServerUrl</c>, <c>WithMcpServerCommand</c>), read from
+/// <c>Mcp:Servers:&lt;name&gt;</c>. A class, not a record: a record's ToString would print the credentials.
+/// </summary>
+internal sealed class McpServerDeclaration
+{
+    private const string Servers = "Mcp:Servers";
+
+    private McpServerDeclaration(string name, Uri? url, string? bearerToken, string? command, IReadOnlyList<string> arguments, IReadOnlyDictionary<string, string> environment)
+    {
+        Name = name;
+        Url = url;
+        BearerToken = bearerToken;
+        Command = command;
+        Arguments = arguments;
+        Environment = environment;
+    }
+
+    public string Name { get; }
+
+    private Uri? Url { get; }
+
+    private string? BearerToken { get; }
+
+    private string? Command { get; }
+
+    private IReadOnlyList<string> Arguments { get; }
+
+    private IReadOnlyDictionary<string, string> Environment { get; }
+
+    /// <summary>Every declared server; a declaration that is neither a URL nor a command fails here, at startup.</summary>
+    public static IReadOnlyList<McpServerDeclaration> ReadAll(IConfiguration configuration) =>
+        [.. configuration.GetSection(Servers).GetChildren().OrderBy(server => server.Key, StringComparer.Ordinal).Select(Read)];
+
+    public IClientTransport CreateTransport(ILoggerFactory loggerFactory)
+    {
+        if (Url is not null)
+        {
+            Dictionary<string, string> headers = [];
+            if (BearerToken is not null)
+            {
+                headers["Authorization"] = $"Bearer {BearerToken}";
+            }
+
+            return new HttpClientTransport(new HttpClientTransportOptions { Name = Name, Endpoint = Url, AdditionalHeaders = headers }, loggerFactory);
+        }
+
+        // The process inherits only the basic variables, never the host's connection strings or other servers' secrets.
+        var environment = StdioClientTransportOptions.GetDefaultEnvironmentVariables();
+        foreach (var (variable, value) in Environment)
+        {
+            environment[variable] = value;
+        }
+
+        return new StdioClientTransport(
+            new StdioClientTransportOptions
+            {
+                Name = Name,
+                Command = Command!,
+                Arguments = [.. Arguments],
+                InheritEnvironmentVariables = false,
+                EnvironmentVariables = environment,
+            },
+            loggerFactory);
+    }
+
+    private static McpServerDeclaration Read(IConfigurationSection server)
+    {
+        var url = server["Url"];
+        var command = server["Command"];
+        if (string.IsNullOrWhiteSpace(url) == string.IsNullOrWhiteSpace(command))
+        {
+            throw new InvalidOperationException($"The MCP server '{server.Key}' needs a Url or a Command, not both or neither; declare it in the AppHost with WithMcpServerUrl or WithMcpServerCommand.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(url) && !Uri.TryCreate(url, UriKind.Absolute, out _))
+        {
+            throw new InvalidOperationException($"The MCP server '{server.Key}' has a Url that is not an absolute URI.");
+        }
+
+        var arguments = server.GetSection("Arguments").GetChildren()
+            .OrderBy(argument => int.Parse(argument.Key, System.Globalization.CultureInfo.InvariantCulture))
+            .Select(argument => argument.Value ?? string.Empty)
+            .ToList();
+        var environment = server.GetSection("Environment").GetChildren()
+            .ToDictionary(variable => variable.Key, variable => variable.Value ?? string.Empty, StringComparer.Ordinal);
+
+        return new McpServerDeclaration(
+            server.Key,
+            string.IsNullOrWhiteSpace(url) ? null : new Uri(url, UriKind.Absolute),
+            server["BearerToken"],
+            string.IsNullOrWhiteSpace(command) ? null : command,
+            arguments,
+            environment);
+    }
+}

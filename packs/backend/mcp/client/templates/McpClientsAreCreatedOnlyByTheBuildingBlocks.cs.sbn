@@ -1,0 +1,28 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A module that references the MCP SDK can create a client of its own, outside the servers the AppHost declares, with
+/// credentials of its own and tool results nobody checks. Modules reach MCP servers through IMcpTools instead.
+/// </summary>
+public sealed class McpClientsAreCreatedOnlyByTheBuildingBlocks : IArchitectureRule
+{
+    private const string Sdk = "ModelContextProtocol";
+
+    public string Description => "No module references the MCP SDK: MCP clients are created only by AddMcpClients, from the servers the AppHost declares.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var assembly in model.ModuleAssemblies)
+        {
+            foreach (var reference in assembly.GetReferencedAssemblies().Select(reference => reference.Name!).Where(IsSdk).Order(StringComparer.Ordinal))
+            {
+                yield return $"{assembly.GetName().Name} references {reference}, but MCP clients are created only by AddMcpClients (BuildingBlocks), from the servers the AppHost declares; call their tools through IMcpTools.";
+            }
+        }
+    }
+
+    private static bool IsSdk(string reference) =>
+        reference == Sdk || reference.StartsWith(Sdk + ".", StringComparison.Ordinal);
+}

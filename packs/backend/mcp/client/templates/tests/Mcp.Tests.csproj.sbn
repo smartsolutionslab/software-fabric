@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Mcp.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/AppHost/AppHost.csproj" />
+    <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />
+    <ProjectReference Include="../Mcp.TestServer/Mcp.TestServer.csproj" />
+  </ItemGroup>
+
+</Project>

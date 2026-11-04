@@ -1,0 +1,51 @@
+using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Testing;
+using Microsoft.Extensions.Configuration;
+
+namespace {{ namespace }}.Mcp.Tests;
+
+/// <summary>
+/// The configuration the host receives for the test's MCP servers, declared on the host of the project's own AppHost
+/// model the way AppHost.cs declares servers. Only the test's declarations are read: a server the application declares
+/// is never resolved or contacted. Nothing is started.
+/// </summary>
+internal static class DeclaredServers
+{
+    public static async Task<IConfiguration> HostConfigurationAsync(
+        Action<IDistributedApplicationTestingBuilder, IResourceBuilder<ProjectResource>> declare,
+        IReadOnlyDictionary<string, string> parameters,
+        CancellationToken cancellationToken)
+    {
+        var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AppHost>(cancellationToken);
+        foreach (var (name, value) in parameters)
+        {
+            builder.Configuration[$"Parameters:{name}"] = value;
+        }
+
+        var host = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "host"));
+        var application = host.Resource.Annotations.OfType<EnvironmentCallbackAnnotation>().ToHashSet();
+        declare(builder, host);
+
+        // Only what the test's declarations add to the host's environment.
+        Dictionary<string, object> environment = [];
+        var context = new EnvironmentCallbackContext(builder.ExecutionContext, host.Resource, environment, cancellationToken);
+        foreach (var callback in host.Resource.Annotations.OfType<EnvironmentCallbackAnnotation>().Where(callback => !application.Contains(callback)))
+        {
+            await callback.Callback(context);
+        }
+
+        Dictionary<string, string?> configuration = [];
+        foreach (var (variable, value) in environment.Where(entry => entry.Key.StartsWith("Mcp__", StringComparison.Ordinal)))
+        {
+            configuration[variable.Replace("__", ":", StringComparison.Ordinal)] = value switch
+            {
+                string text => text,
+                IValueProvider provider => await provider.GetValueAsync(cancellationToken),
+                _ => throw new InvalidOperationException($"{variable} is neither text nor a value Aspire resolves."),
+            };
+        }
+
+        return new ConfigurationBuilder().AddInMemoryCollection(configuration).Build();
+    }
+}

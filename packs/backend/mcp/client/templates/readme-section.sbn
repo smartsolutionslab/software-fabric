@@ -1,0 +1,10 @@
+## External MCP servers
+
+The host uses external MCP servers. Declare each one on the host in `src/AppHost/AppHost.cs`, never in a module:
+
+```csharp
+host.WithMcpServerUrl("docs", builder.AddParameter("mcp-docs-url"), builder.AddParameter("mcp-docs-token", secret: true));
+host.WithMcpServerCommand("files", builder.AddParameter("mcp-files-command"), ["--root", "/data"]);
+```
+
+Give the parameters values in the AppHost's user secrets (`dotnet user-secrets set Parameters:mcp-docs-url https://... --project src/AppHost`), never in a committed file. Code calls the tools through `IMcpTools`; `tests/Mcp.Tests` shows both kinds of server against a tiny one of its own.

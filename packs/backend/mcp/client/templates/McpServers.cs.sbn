@@ -1,0 +1,94 @@
+using System.Text.RegularExpressions;
+using Aspire.Hosting.ApplicationModel;
+
+namespace Aspire.Hosting;
+
+/// <summary>
+/// Declares the external MCP servers the host uses. Each one becomes configuration under <c>Mcp:Servers:&lt;name&gt;</c>,
+/// from which the host's <c>AddMcpClients</c> creates the clients; no module wires a server by hand.
+/// </summary>
+public static partial class McpServers
+{
+    /// <summary>A server reached over HTTP. A token, when the server needs one, is a secret sent as a bearer token.</summary>
+    /// <param name="host">The host project, which calls the server.</param>
+    /// <param name="name">The server's name; the host's code names it in calls.</param>
+    /// <param name="url">The server's endpoint, a parameter: it differs per environment.</param>
+    /// <param name="bearerToken">The token the server expects, a secret parameter; null when it expects none.</param>
+    public static IResourceBuilder<ProjectResource> WithMcpServerUrl(
+        this IResourceBuilder<ProjectResource> host,
+        string name,
+        IResourceBuilder<ParameterResource> url,
+        IResourceBuilder<ParameterResource>? bearerToken = null)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        ArgumentNullException.ThrowIfNull(url);
+        var prefix = Prefix(name);
+
+        host.WithEnvironment($"{prefix}__Url", url);
+        if (bearerToken is not null)
+        {
+            host.WithEnvironment($"{prefix}__BearerToken", Secret(bearerToken));
+        }
+
+        return host;
+    }
+
+    /// <summary>
+    /// A server the host starts as a process and talks to over standard input and output. The process sees the basic
+    /// environment (PATH, HOME, ...) and the variables given here, never the host's own configuration or secrets.
+    /// </summary>
+    /// <param name="host">The host project, which starts the server.</param>
+    /// <param name="name">The server's name; the host's code names it in calls.</param>
+    /// <param name="command">The executable, a parameter: where it is installed differs per environment.</param>
+    /// <param name="arguments">The arguments it is started with.</param>
+    /// <param name="environment">Variables the process needs (an API key, say), each a secret parameter.</param>
+    public static IResourceBuilder<ProjectResource> WithMcpServerCommand(
+        this IResourceBuilder<ProjectResource> host,
+        string name,
+        IResourceBuilder<ParameterResource> command,
+        IReadOnlyList<string> arguments,
+        IReadOnlyDictionary<string, IResourceBuilder<ParameterResource>>? environment = null)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(arguments);
+        var prefix = Prefix(name);
+
+        host.WithEnvironment($"{prefix}__Command", command);
+        for (var index = 0; index < arguments.Count; index++)
+        {
+            host.WithEnvironment($"{prefix}__Arguments__{index}", arguments[index]);
+        }
+
+        foreach (var (variable, value) in environment ?? new Dictionary<string, IResourceBuilder<ParameterResource>>())
+        {
+            host.WithEnvironment($"{prefix}__Environment__{variable}", Secret(value));
+        }
+
+        return host;
+    }
+
+    private static string Prefix(string name)
+    {
+        if (name is null || !ServerName().IsMatch(name))
+        {
+            throw new ArgumentException($"An MCP server's name is lower kebab-case (docs, issue-tracker); '{name}' is not.", nameof(name));
+        }
+
+        return $"Mcp__Servers__{name}";
+    }
+
+    private static IResourceBuilder<ParameterResource> Secret(IResourceBuilder<ParameterResource> parameter)
+    {
+        ArgumentNullException.ThrowIfNull(parameter);
+        if (!parameter.Resource.Secret)
+        {
+            throw new ArgumentException($"The parameter '{parameter.Resource.Name}' carries a credential, so it is declared with secret: true.", nameof(parameter));
+        }
+
+        return parameter;
+    }
+
+    [GeneratedRegex("^[a-z0-9]+(-[a-z0-9]+)*$")]
+    private static partial Regex ServerName();
+}
