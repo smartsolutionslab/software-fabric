@@ -1,3 +1,4 @@
+{{~ claims = project["backend.authorization"] | array.contains "claims" ~}}
 # Authorization: by role
 
 **Status:** Accepted (generated)
@@ -10,7 +11,7 @@ Being signed in is not enough for every endpoint: access can depend on the user'
 
 **Keycloak's roles become role claims.** Keycloak puts realm roles in the token's `realm_access` and each client's roles in `resource_access`. `KeycloakRoleClaims` (an `IClaimsTransformation`) copies the realm roles and the roles of the API client `<name>-api` into `ClaimTypes.Role`, which `RequireRole` reads. Roles of other clients (Keycloak's own `account` client, say) are not meant for this API and are left out. The roles live in the identity provider, not in the application: there is no role table and no role-management screen.
 
-**Sample role and users** (development only, in the realm import): the realm role `manager`, held by `developer` (and `developer-b` when the project has tenancy), and the user `visitor` / `visitor` with no roles (in `tenant-a` with tenancy, so a 403 is about the role, not the tenant). `fabric add-module` gives every new module the sample policy `<module>.manage`, which requires `manager`, and the endpoint `GET /<module>/permissions/manage` that requires it: 200 when the caller holds the policy, 403 when not, so a frontend can ask before it offers to manage something, and the integration tests have an endpoint to prove the policy on. The role, the users and the sample policy were decided by the repository owner (2026-11-03); the endpoint is this pack's.
+**Sample role and users** (development only, in the realm import): the realm role `manager`, held by `developer` (and `developer-b` when the project has tenancy), and the user `visitor` / `visitor` with no roles (in `tenant-a` with tenancy, so a 403 is about the role, not the tenant). `fabric add-module` gives every new module the sample policy `<module>.manage`, which requires `manager`{{ if claims }} (and, with claims, `department=finance`: see the claims ADR){{ end }}, and the endpoint `GET /<module>/permissions/manage` that requires it: 200 when the caller holds the policy, 403 when not, so a frontend can ask before it offers to manage something, and the integration tests have an endpoint to prove the policy on. The role, the users and the sample policy were decided by the repository owner (2026-11-03); the endpoint is this pack's.
 
 **Only Keycloak so far.** Other identity providers carry roles elsewhere in their tokens; with one of them the generated host does not compile (`#error`) until this pack learns where.
 
