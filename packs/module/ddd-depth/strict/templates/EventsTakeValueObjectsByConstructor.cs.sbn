@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Reflection;
 using System.Text.Json.Serialization;
 
@@ -7,6 +8,7 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 /// The {{ module.namespace }} module is strict and event-sourced: an event carries its value objects as required
 /// parameters of the constructor System.Text.Json selects, so a stored event that lacks one fails to read
 /// (RespectRequiredConstructorParameters) instead of leaving it null without <c>From</c> (module.ddd-depth: strict, docs/adr).
+/// A domain type the event holds, at any depth, carries its value objects the same way.
 /// </summary>
 public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : IArchitectureRule
 {
@@ -14,45 +16,90 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
     private const string DomainEvent = "{{ namespace }}.BuildingBlocks.EventSourcing.IDomainEvent";
 
     public string Description =>
-        "The {{ module.namespace }} module is strict and event-sourced: every value object an event carries is a required parameter of the constructor System.Text.Json selects.";
+        "The {{ module.namespace }} module is strict and event-sourced: every value object an event carries, itself or through a domain type it holds, is a required parameter of the constructor System.Text.Json selects.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
         {{ not_null "model" }}
 
-        return model.ModuleAssemblies
+        List<Type> holders = [];
+        HashSet<Type> entered = [];
+        HashSet<Type> walked = [];
+        foreach (var domainEvent in model.ModuleAssemblies
             .Where(assembly => assembly.GetName().Name == Domain)
             .SelectMany(assembly => assembly.GetTypes())
-            .Where(type => !type.IsAbstract && !type.IsInterface && type.GetInterfaces().Any(contract => contract.FullName == DomainEvent))
-            .SelectMany(Violations);
+            .Where(type => !type.IsAbstract && !type.IsInterface && type.GetInterfaces().Any(contract => contract.FullName == DomainEvent)))
+        {
+            if (entered.Add(domainEvent))
+            {
+                Hold(domainEvent, holders, entered, walked, []);
+            }
+        }
+
+        return holders.SelectMany(Violations);
     }
 
-    private static IEnumerable<string> Violations(Type domainEvent)
+    private static IEnumerable<string> Violations(Type holder)
     {
         // System.Text.Json matches a constructor parameter to a property by name, ignoring case.
         Dictionary<string, ParameterInfo> parameters = new(StringComparer.OrdinalIgnoreCase);
-        foreach (var parameter in JsonConstructor(domainEvent)?.GetParameters() ?? [])
+        foreach (var parameter in JsonConstructor(holder)?.GetParameters() ?? [])
         {
             parameters[parameter.Name!] = parameter;
         }
 
         NullabilityInfoContext nullability = new();
 
-        foreach (var property in domainEvent.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        foreach (var property in Members(holder))
         {
-            if (!CarriesValueObject(property.PropertyType, []))
+            if (!CarriesValueObject(property.PropertyType, [], [], [holder]))
             {
                 continue;
             }
 
             if (!parameters.TryGetValue(property.Name, out var parameter))
             {
-                yield return $"{domainEvent.FullName}.{property.Name} carries a value object outside its constructor; make it a parameter of the constructor System.Text.Json selects ([JsonConstructor], else the public parameterless one, else the only public one), so a stored event without it fails to read.";
+                yield return $"{holder}.{property.Name} carries a value object outside its constructor; make it a parameter of the constructor System.Text.Json selects ([JsonConstructor], else the public parameterless one, else the only public one), so a stored event without it fails to read.";
             }
             else if (parameter.IsOptional && nullability.Create(parameter).ReadState != NullabilityState.Nullable)
             {
-                yield return $"{domainEvent.FullName}.{property.Name} carries a value object through an optional constructor parameter; remove its default, or declare it nullable, so a stored event without it fails to read.";
+                yield return $"{holder}.{property.Name} carries a value object through an optional constructor parameter; remove its default, or declare it nullable, so a stored event without it fails to read.";
             }
+        }
+    }
+
+    /// <summary>Adds the holder, and every domain type its public properties hold, to the types whose members are checked.</summary>
+    private static void Hold(Type holder, List<Type> holders, HashSet<Type> entered, HashSet<Type> walked, List<Type> path)
+    {
+        holders.Add(holder);
+        path.Add(holder);
+        foreach (var property in Members(holder))
+        {
+            Reach(property.PropertyType, holders, entered, walked, path);
+        }
+
+        path.RemoveAt(path.Count - 1);
+    }
+
+    private static void Reach(Type type, List<Type> holders, HashSet<Type> entered, HashSet<Type> walked, List<Type> path)
+    {
+        // A value object is stored as its backing value: what its type arguments name (TypedId<Invoice>) is never read.
+        if (typeof(IValueObject).IsAssignableFrom(type))
+        {
+            return;
+        }
+
+        if (FirstDescent(type, walked, path))
+        {
+            foreach (var content in Contents(type, path))
+            {
+                Reach(content, holders, entered, walked, path);
+            }
+        }
+
+        if (Enters(type, entered, path))
+        {
+            Hold(type, holders, entered, walked, path);
         }
     }
 
@@ -74,20 +121,106 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
             ?? (constructors.Length == 1 ? constructors[0] : null);
     }
 
-    /// <summary>Whether the type is a value object, or holds one in a <see cref="Nullable{T}"/>, an array or a generic argument.</summary>
-    private static bool CarriesValueObject(Type type, HashSet<Type> visited)
+    /// <summary>
+    /// Whether the type is a value object, or holds one in its contents (<see cref="Contents"/>) or in a member of a domain
+    /// type.
+    /// </summary>
+    private static bool CarriesValueObject(Type type, HashSet<Type> entered, HashSet<Type> walked, List<Type> path)
     {
-        if (!visited.Add(type))
-        {
-            return false;
-        }
-
         if (typeof(IValueObject).IsAssignableFrom(type))
         {
             return true;
         }
 
-        return (type.IsArray && CarriesValueObject(type.GetElementType()!, visited))
-            || (type.IsGenericType && type.GetGenericArguments().Any(argument => CarriesValueObject(argument, visited)));
+        if (FirstDescent(type, walked, path) && Contents(type, path).Any(content => CarriesValueObject(content, entered, walked, path)))
+        {
+            return true;
+        }
+
+        if (!Enters(type, entered, path))
+        {
+            return false;
+        }
+
+        path.Add(type);
+        var carries = Members(type).Any(property => CarriesValueObject(property.PropertyType, entered, walked, path));
+        path.RemoveAt(path.Count - 1);
+        return carries;
     }
+
+    /// <summary>The members System.Text.Json reads: public properties, neither indexers nor always ignored.</summary>
+    private static IEnumerable<PropertyInfo> Members(Type type) =>
+        type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(property => property.GetIndexParameters().Length == 0
+                && property.GetCustomAttribute<JsonIgnoreAttribute>() is not { Condition: JsonIgnoreCondition.Always });
+
+    /// <summary>
+    /// What System.Text.Json reads a type's value as, other than members: an array's or a collection's elements (a
+    /// dictionary's keys and values through its <see cref="KeyValuePair{TKey, TValue}"/>), and the arguments of a generic
+    /// type from outside the Domain (<see cref="Nullable{T}"/>). A generic domain type is read through its members only, so
+    /// a phantom argument (<c>Reference&lt;Invoice&gt;</c>) is not followed, unless the walk does not enter it (see
+    /// <see cref="Expands"/>): then its arguments stand in for its members.
+    /// </summary>
+    private static IEnumerable<Type> Contents(Type type, List<Type> path)
+    {
+        if (type.IsArray)
+        {
+            return [type.GetElementType()!];
+        }
+
+        if (IsCollection(type))
+        {
+            return type.GetInterfaces()
+                .Append(type)
+                .Where(contract => contract.IsInterface && contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                .Select(contract => contract.GetGenericArguments()[0])
+                .Distinct();
+        }
+
+        return type.IsGenericType && (!InDomain(type) || Expands(type, path)) ? type.GetGenericArguments() : [];
+    }
+
+    /// <summary>
+    /// Whether the walk descends into the type's contents for the first time, so a collection of itself
+    /// (<c>RecursiveCollection : Collection&lt;RecursiveCollection&gt;</c>) ends it. The arguments of a closed type the walk
+    /// does not enter because it expands depend on the path, and are smaller than the type, so they are always walked.
+    /// </summary>
+    private static bool FirstDescent(Type type, HashSet<Type> walked, List<Type> path) =>
+        (type.IsGenericType && InDomain(type) && !IsCollection(type) && Expands(type, path)) || walked.Add(type);
+
+    private static bool IsCollection(Type type) => type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(type);
+
+    private static bool InDomain(Type type) => type.Assembly.GetName().Name == Domain;
+
+    /// <summary>
+    /// Whether the walk looks into a domain type's members: a concrete type of this module's Domain that is not a value
+    /// object, an enum or a collection, each closed type once per walk. A closed generic type larger than the nearest closed type of the
+    /// same generic definition the walk is already inside of is not entered, so <c>Node&lt;T&gt;</c> holding a
+    /// <c>Node&lt;List&lt;T&gt;&gt;</c> does not construct a new type at every step; its arguments are walked instead.
+    /// </summary>
+    private static bool Enters(Type type, HashSet<Type> entered, List<Type> path) =>
+        !type.IsAbstract
+        && !type.IsEnum
+        && !type.IsGenericParameter
+        && InDomain(type)
+        && !typeof(IValueObject).IsAssignableFrom(type)
+        && !IsCollection(type)
+        && !Expands(type, path)
+        && entered.Add(type);
+
+    private static bool Expands(Type type, List<Type> path)
+    {
+        if (!type.IsGenericType)
+        {
+            return false;
+        }
+
+        var definition = type.GetGenericTypeDefinition();
+        var nearest = path.LastOrDefault(outer => outer.IsGenericType && outer.GetGenericTypeDefinition() == definition);
+        return nearest is not null && Size(type) > Size(nearest);
+    }
+
+    /// <summary>How many types a closed type is built from: <c>Node&lt;List&lt;int&gt;&gt;</c> is three.</summary>
+    private static int Size(Type type) =>
+        1 + (type.IsArray ? Size(type.GetElementType()!) : type.IsGenericType ? type.GetGenericArguments().Sum(Size) : 0);
 }
