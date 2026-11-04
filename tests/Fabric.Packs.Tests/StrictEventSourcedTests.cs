@@ -795,6 +795,55 @@ public sealed class StrictEventSourcedTests
         exitCode.ShouldNotBe(0, output);
     }
 
+    [Fact]
+    public void The_walk_ends_on_a_recurring_generic_type_an_open_generic_event_holds()
+    {
+        // Linked<T> is walked as declared, so it holds Node<T>, which holds Node<List<T>>, and so on.
+        var (_, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record Node<T>(Node<List<T>>? Next);
+
+            public sealed record Linked<T>(InvoiceId Invoice, Node<T> Root) : IDomainEvent;
+            """);
+
+        output.ShouldNotContain("Stack overflow");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Linked`1 is applied by no aggregate");
+        output.ShouldNotContain("carries a value object");
+    }
+
+    [Fact]
+    public void Closed_types_of_a_recurring_generic_type_whose_optional_parameter_differs_in_nullability_are_checked_each()
+    {
+        // T? is nullable for the class InvoiceNumber, but is the plain struct for Payload: {} leaves Payload.Number null.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public readonly record struct Payload(InvoiceNumber Number);
+
+            public sealed record Node<T>(Node<List<T>>? Next, T? Value = default);
+
+            public sealed record InvoiceNoded(InvoiceId Invoice, Node<InvoiceNumber> First, Node<Payload> Second) : IDomainEvent;
+
+            public sealed class Noding : EventSourcedAggregate<InvoiceId>
+            {
+                private Noding()
+                {
+                }
+
+                private void Apply(InvoiceNoded noded) => Id = noded.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Node`1[Shop.Modules.Billing.Domain.Invoices.Payload].Value carries a value object through an optional constructor parameter");
+        output.ShouldNotContain("Node`1[Shop.Modules.Billing.Domain.Invoices.InvoiceNumber].Value carries");
+        exitCode.ShouldNotBe(0, output);
+    }
+
     private static (int ExitCode, string Output) ArchitectureTestsWith(string types)
     {
         using var project = new GeneratedProject("industrial-event-driven-mfe", Choices);
