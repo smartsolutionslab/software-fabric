@@ -88,7 +88,22 @@
             "claim.name": "department",
             "jsonType.label": "String",
             "access.token.claim": "true",
-            "id.token.claim": "false",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+{{~ end ~}}
+{{~ if roles ~}}
+        },
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "realm_access.roles",
+            "multivalued": "true",
+            "jsonType.label": "String",
+            "access.token.claim": "false",
+            "id.token.claim": "true",
             "userinfo.token.claim": "false"
           }
 {{~ end ~}}

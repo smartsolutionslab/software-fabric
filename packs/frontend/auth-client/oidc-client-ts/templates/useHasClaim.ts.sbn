@@ -1,0 +1,19 @@
+import { useAuth } from 'react-oidc-context';
+
+/**
+ * Whether the signed-in user's ID token has the claim, with the value when one is given (a list-valued claim needs to
+ * contain it). Hiding an element is a convenience, never protection: the backend policy decides.
+ */
+export function useHasClaim(type: string, value?: string): boolean {
+  const claim = useAuth().user?.profile[type];
+  if (claim === undefined || claim === null) {
+    return false;
+  }
+  if (value === undefined) {
+    return true;
+  }
+
+  // Compared as text, as the backend's RequireClaim does: email_verified true meets 'true'.
+  const values: unknown[] = Array.isArray(claim) ? claim : [claim];
+  return values.some((each) => String(each) === value);
+}
