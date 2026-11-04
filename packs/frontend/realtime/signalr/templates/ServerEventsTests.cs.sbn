@@ -2,19 +2,36 @@
 #error The signalr pack's integration tests assert with Shouldly only so far (docs/adr/0006 of the generator).
 {{~ end ~}}
 {{~ tenanted = project["backend.tenancy"] != "none"
-   signed_in = project["backend.auth"] != "none" ~}}
+   signed_in = project["backend.auth"] != "none"
+   keycloak = project["backend.auth"] == "keycloak" ~}}
 using System.Collections.Concurrent;
 {{~ if signed_in ~}}
 using System.Net;
 {{~ end ~}}
+{{~ if keycloak ~}}
+using System.Net.Http.Headers;
+{{~ end ~}}
 using System.Net.Http.Json;
+{{~ if keycloak ~}}
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Testing;
+{{~ end ~}}
 using Microsoft.AspNetCore.SignalR.Client;
+{{~ if keycloak ~}}
+using Microsoft.Extensions.DependencyInjection;
+{{~ end ~}}
 
 namespace {{ namespace }}.Integration.Tests;
 
 /// <summary>The host's event hub (/hubs/events) seen from a browser's side: what it receives, and who may connect.</summary>
 public class ServerEventsTests(AspireFixture aspire)
 {
+{{~ if keycloak ~}}
+    private const int ShortLifespan = 10;
+
+{{~ end ~}}
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(30);
 {{~ if tenanted ~}}
 
@@ -64,6 +81,20 @@ public class ServerEventsTests(AspireFixture aspire)
         refusal.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 {{~ end ~}}
+{{~ if keycloak ~}}
+
+    [Fact]
+    public async Task A_connection_is_closed_once_its_access_token_expires()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var caller = await ShortLivedCallerAsync("developer", cancellationToken);
+        await using var browser = await Browser.ConnectAsync(caller, cancellationToken);
+
+        var closed = await browser.ClosesWithinAsync(TimeSpan.FromMinutes(1), cancellationToken);
+
+        closed.ShouldBeTrue("a connection whose token expired must close, so that reconnecting checks the user and their tenant again");
+    }
+{{~ end ~}}
 
     /// <summary>
     /// Sends test events until the browser has received one, and returns its text: a connection joins its group only
@@ -84,10 +115,73 @@ public class ServerEventsTests(AspireFixture aspire)
         return text;
     }
 
+{{~ if keycloak ~}}
+    /// <summary>
+    /// A client calling the host as a realm user with a token that lives ShortLifespan seconds: the realm gets a copy of
+    /// the web client (its mappers included) whose tokens expire that soon, so other tests' tokens are untouched.
+    /// </summary>
+    private async Task<HttpClient> ShortLivedCallerAsync(string user, CancellationToken cancellationToken)
+    {
+        const string ShortLivedClient = "{{ name }}-short-lived";
+        using var identity = new HttpClient { BaseAddress = aspire.App.GetEndpoint("keycloak", "http") };
+        identity.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await AdminTokenAsync(identity, cancellationToken));
+
+        var clients = await identity.GetFromJsonAsync<JsonArray>(new Uri("/admin/realms/{{ name }}/clients?clientId={{ name }}-web", UriKind.Relative), cancellationToken);
+        var client = clients?.Single()?.AsObject() ?? throw new InvalidOperationException("The realm has no web client.");
+        client.Remove("id");
+        client["clientId"] = ShortLivedClient;
+        client["attributes"] = new JsonObject { ["access.token.lifespan"] = ShortLifespan.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+        foreach (var mapper in client["protocolMappers"]?.AsArray() ?? [])
+        {
+            mapper?.AsObject().Remove("id");
+        }
+
+        using var created = await identity.PostAsJsonAsync(new Uri("/admin/realms/{{ name }}/clients", UriKind.Relative), client, cancellationToken);
+        if (created.StatusCode != HttpStatusCode.Conflict)
+        {
+            created.EnsureSuccessStatusCode();
+        }
+
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = ShortLivedClient,
+            ["username"] = user,
+            ["password"] = user,
+        });
+        using var response = await identity.PostAsync(new Uri("/realms/{{ name }}/protocol/openid-connect/token", UriKind.Relative), form, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken)
+            ?? throw new InvalidOperationException("The realm returned no token.");
+
+        var caller = aspire.CreateHostClient();
+        caller.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+        return caller;
+    }
+
+    /// <summary>A token of the master realm's administrator; Aspire names it "admin" unless the AppHost passes a user name.</summary>
+    private async Task<string> AdminTokenAsync(HttpClient identity, CancellationToken cancellationToken)
+    {
+        var keycloak = aspire.App.Services.GetRequiredService<DistributedApplicationModel>().Resources.OfType<KeycloakResource>().Single();
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = "admin-cli",
+            ["username"] = keycloak.AdminUserNameParameter is { } name ? await name.GetValueAsync(cancellationToken) ?? string.Empty : "admin",
+            ["password"] = await keycloak.AdminPasswordParameter.GetValueAsync(cancellationToken) ?? string.Empty,
+        });
+        using var response = await identity.PostAsync(new Uri("/realms/master/protocol/openid-connect/token", UriKind.Relative), form, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken);
+        return token?.AccessToken ?? throw new InvalidOperationException("The master realm returned no token.");
+    }
+
+{{~ end ~}}
     /// <summary>A browser's connection to the hub, as the host's caller (and with its token, if it has one).</summary>
     private sealed class Browser : IAsyncDisposable
     {
         private readonly ConcurrentQueue<string> received = new();
+        private readonly TaskCompletionSource closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly HubConnection connection;
 
         private Browser(HttpClient caller)
@@ -98,6 +192,11 @@ public class ServerEventsTests(AspireFixture aspire)
                 .WithUrl(new Uri(host, "/hubs/events"), options => options.AccessTokenProvider = () => Task.FromResult(token))
                 .Build();
             connection.On<TestEventReceived>("TestEvent", testEvent => received.Enqueue(testEvent.Text));
+            connection.Closed += _ =>
+            {
+                closed.TrySetResult();
+                return Task.CompletedTask;
+            };
         }
 
         public IReadOnlyCollection<string> Received => received;
@@ -117,8 +216,26 @@ public class ServerEventsTests(AspireFixture aspire)
             }
         }
 
+        /// <summary>Whether the host closes the connection within the time given.</summary>
+        public async Task<bool> ClosesWithinAsync(TimeSpan time, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await closed.Task.WaitAsync(time, cancellationToken);
+                return true;
+            }
+            catch (TimeoutException)
+            {
+                return false;
+            }
+        }
+
         public ValueTask DisposeAsync() => connection.DisposeAsync();
     }
 
     private sealed record TestEventReceived(string Text);
+{{~ if keycloak ~}}
+
+    private sealed record Token([property: JsonPropertyName("access_token")] string AccessToken);
+{{~ end ~}}
 }

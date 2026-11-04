@@ -17,6 +17,7 @@ public sealed class ServerEventsEndToEndTests
         listExitCode.ShouldBe(0, listed);
         listed.ShouldContain("Shop.Integration.Tests.ServerEventsTests.A_test_event_reaches_the_browsers_of_the_senders_tenant_only");
         listed.ShouldContain("Shop.Integration.Tests.ServerEventsTests.An_anonymous_connection_is_refused");
+        listed.ShouldContain("Shop.Integration.Tests.ServerEventsTests.A_connection_is_closed_once_its_access_token_expires");
 
         var (integrationExitCode, integration) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
         integrationExitCode.ShouldBe(0, integration);

@@ -50,6 +50,16 @@ public sealed class ServerEventsTests
     }
 
     [Fact]
+    public void Signalr_with_tenancy_and_no_authentication_fails_the_build_naming_the_combination()
+    {
+        var files = Files(Profile, SignalR, "backend.auth=none");
+        const string Refusal = "#error frontend.realtime signalr with backend.tenancy column needs an identity provider";
+
+        files["src/Host/Realtime/EventsHub.cs"].ShouldStartWith(Refusal);
+        files["tests/Integration.Tests/ServerEventsTests.cs"].ShouldStartWith(Refusal);
+    }
+
+    [Fact]
     public void Every_profile_without_signalr_generates_no_server_events()
     {
         foreach (var profile in new[] { "saas-standard-react", "lean-crud", "saas-strict-react" })
