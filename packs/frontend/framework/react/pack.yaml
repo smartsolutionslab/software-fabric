@@ -22,6 +22,7 @@ declares-slots:
   - { slot: web.test-setup, description: "Statements of src/test-setup.ts, run before every Vitest file." }
   - { slot: web.lint-ignores, description: "Entries of eslint's ignores (generated files).", separator: ",\n" }
   - { slot: web.format-ignores, description: "Lines of web/app/.prettierignore: files a tool writes, not people (the generated client, openapi.json)." }
+  - { slot: web.typecheck-excludes, description: "Entries of tsconfig.json's exclude, quoted: files tsc checks only once something imports them (a generated client with no endpoints yet).", separator: ", " }
   - { slot: web.dependencies, description: "Entries of web/app's dependencies ('\"zod\": \"4.6.7\"').", separator: ",\n" }
   - { slot: web.dev-dependencies, description: "Entries of web/app's devDependencies.", separator: ",\n" }
   - { slot: web.vite-imports, description: "Import lines of vite.config.ts." }
