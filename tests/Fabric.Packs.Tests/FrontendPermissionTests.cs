@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Fabric.Core.Generation;
 
 namespace Fabric.Packs.Tests;
@@ -108,7 +109,9 @@ public sealed class FrontendPermissionTests
 
         var (testExitCode, testOutput) = Shell.Run(app, "pnpm", "test", "--reporter=verbose");
         testExitCode.ShouldBe(0, $"pnpm test:\n{testOutput}");
-        testOutput.ShouldContain($"✓ src/auth/RequirePermission.test.tsx > {permissionTest}", customMessage: testOutput);
+        // CI forces colour, which puts escape codes between the parts of a reported test's name.
+        var plainTestOutput = Regex.Replace(testOutput, @"\x1B\[[0-9;]*m", string.Empty);
+        plainTestOutput.ShouldContain($"✓ src/auth/RequirePermission.test.tsx > {permissionTest}", customMessage: testOutput);
 
         var (formatExitCode, formatOutput) = Shell.Run(app, "pnpm", "format:check");
         formatExitCode.ShouldBe(0, $"pnpm format:check:\n{formatOutput}");
