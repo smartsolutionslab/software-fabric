@@ -153,6 +153,20 @@ public sealed class McpServerTests
     }
 
     [Fact]
+    public void With_nullable_absence_and_minimal_results_the_generated_mcp_server_tests_pass()
+    {
+        // The BCL's guards: minimal's own Result does not compile with Ensure.That's (on main too), which is not this pack's.
+        using var project = NewProject(McpServer, Roles, "backend.absence=nullable", "backend.result-style=minimal", "backend.guards=bcl");
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Mcp.Server.Tests/Mcp.Server.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+        output.ShouldContain("succeeded: 10");
+    }
+
+    [Fact]
     public void Without_authentication_the_generated_mcp_server_tests_pass()
     {
         using var project = NewProject(McpServer, "backend.auth=none");
