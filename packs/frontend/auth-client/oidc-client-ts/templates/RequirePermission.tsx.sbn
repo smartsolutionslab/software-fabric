@@ -1,13 +1,53 @@
+{{~ roles = project["backend.authorization"] | array.contains "roles" ~}}
+{{~ claims = project["backend.authorization"] | array.contains "claims" ~}}
 import type { ReactNode } from 'react';
+{{~ if claims ~}}
+import { useHasClaim } from './useHasClaim';
+{{~ end ~}}
+{{~ if roles ~}}
+import { useHasRole } from './useHasRole';
+{{~ end ~}}
 
-export function RequirePermission({
-  fallback = null,
-}: {
-  role?: string;
-  claim?: string;
+{{~ if roles && claims ~}}
+// A role, a claim, or both; both together means the user needs both.
+type Requirement = { role: string; claim?: string; value?: string } | { role?: string; claim: string; value?: string };
+
+type RequirePermissionProps = Requirement & {
+{{~ else if roles ~}}
+type RequirePermissionProps = {
+  /** The realm role the user must hold. */
+  role: string;
+{{~ else ~}}
+type RequirePermissionProps = {
+  /** The claim the user's ID token must have. */
+  claim: string;
+  /** The value the claim must have; without one, any value will do. */
   value?: string;
+{{~ end ~}}
+  /** What to render instead; nothing by default. */
   fallback?: ReactNode;
   children: ReactNode;
-}) {
-  return <>{fallback}</>;
+};
+
+/**
+ * Renders its children only for a user whose ID token meets the requirement, else the fallback. Hiding an element is a
+ * convenience, never protection: the backend policy decides.
+ */
+{{~ if roles && claims ~}}
+export function RequirePermission({ role, claim, value, fallback = null, children }: RequirePermissionProps) {
+  const hasRole = useHasRole(role ?? '');
+  const hasClaim = useHasClaim(claim ?? '', value);
+  const allowed = (role === undefined || hasRole) && (claim === undefined || hasClaim);
+  return <>{allowed ? children : fallback}</>;
 }
+{{~ else if roles ~}}
+export function RequirePermission({ role, fallback = null, children }: RequirePermissionProps) {
+  const allowed = useHasRole(role);
+  return <>{allowed ? children : fallback}</>;
+}
+{{~ else ~}}
+export function RequirePermission({ claim, value, fallback = null, children }: RequirePermissionProps) {
+  const allowed = useHasClaim(claim, value);
+  return <>{allowed ? children : fallback}</>;
+}
+{{~ end ~}}

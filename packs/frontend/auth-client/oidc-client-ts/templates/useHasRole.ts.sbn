@@ -1,3 +1,18 @@
+{{~ if project["backend.auth"] != "keycloak" ~}}
+throw new Error('useHasRole reads Keycloak\'s realm_access claim only so far (docs/adr/0006 of the generator).');
+{{~ end ~}}
+import { useAuth } from 'react-oidc-context';
+
+/**
+ * Whether the signed-in user holds the realm role, as the ID token says (`realm_access.roles`). Hiding an element is a
+ * convenience, never protection: the backend policy decides.
+ */
 export function useHasRole(role: string): boolean {
-  return role === '';
+  const realmAccess = useAuth().user?.profile.realm_access;
+  if (typeof realmAccess !== 'object' || realmAccess === null || !('roles' in realmAccess)) {
+    return false;
+  }
+
+  const { roles } = realmAccess;
+  return Array.isArray(roles) && roles.includes(role);
 }
