@@ -1,0 +1,30 @@
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
+using OpenAI;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class OpenAIChatClient
+{
+    /// <summary>
+    /// Registers OpenAI's chat model, through the official <c>OpenAI</c> package and Microsoft's adapter
+    /// (<c>Microsoft.Extensions.AI.OpenAI</c>), as the project's <see cref="IChatClient"/>. The key and the model come from
+    /// the AppHost's parameters <c>openai-api-key</c> and <c>openai-model</c> (<c>OpenAI:ApiKey</c>, <c>OpenAI:Model</c>).
+    /// They are read when the client is first needed, and a missing one fails there, naming its parameter; registering
+    /// sends nothing.
+    /// </summary>
+    public static ChatClientBuilder AddOpenAIChatClient(this IServiceCollection services, IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        return services.AddModelChatClient(_ =>
+            new OpenAIClient(Required(configuration, "OpenAI:ApiKey", "openai-api-key"))
+                .GetChatClient(Required(configuration, "OpenAI:Model", "openai-model"))
+                .AsIChatClient());
+    }
+
+    private static string Required(IConfiguration configuration, string key, string parameter) =>
+        configuration[key] is { Length: > 0 } value
+            ? value
+            : throw new InvalidOperationException($"{key} is not set. The AppHost supplies it from its parameter '{parameter}': set that with dotnet user-secrets (Parameters:{parameter}) or in the deployment's secret store.");
+}

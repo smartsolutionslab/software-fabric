@@ -1,0 +1,4 @@
+// OpenAI's models through the OpenAI API: the key is a secret (dotnet user-secrets set Parameters:openai-api-key ...), the
+// model a parameter with a default (gpt-5 for harder questions, at a higher price).
+var openAIApiKey = builder.AddParameter("openai-api-key", secret: true);
+var openAIModel = builder.AddParameter("openai-model", "gpt-5-mini", publishValueAsDefault: true);

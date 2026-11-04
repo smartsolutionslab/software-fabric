@@ -1,0 +1,2 @@
+        // A key-shaped value OpenAI does not accept: the integration tests never call the model.
+        builder.Configuration["Parameters:openai-api-key"] = "not-a-real-key";
