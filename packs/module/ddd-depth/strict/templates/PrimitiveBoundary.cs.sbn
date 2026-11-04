@@ -9,6 +9,13 @@ namespace {{ namespace }}.Architecture.Tests;
 /// finds on the way, inside collections and arrays too. Queries and DTOs are not roots: they are the JSON boundary,
 /// where primitives belong.
 /// </summary>
+/// <remarks>
+/// Each closed type is walked once. A generic definition that can recur forever (<c>Node&lt;T&gt;</c> holding a
+/// <c>Node&lt;List&lt;T&gt;&gt;</c>), and every definition it builds from its own type parameters, would give the walk
+/// a new closed type at every step, so the walk checks such a definition's state once, with each type parameter
+/// standing for everything an argument for it was found to hold. That set only grows and is finite, so the walk ends,
+/// and it names everything a walk of the closed types would name, after the first closed type found to hold it.
+/// </remarks>
 public static class PrimitiveBoundary
 {
     /// <summary>
@@ -21,6 +28,17 @@ public static class PrimitiveBoundary
         typeof(decimal), typeof(string), typeof(object),
         typeof(Guid), typeof(DateTime), typeof(DateTimeOffset), typeof(DateOnly), typeof(TimeOnly), typeof(TimeSpan), typeof(Uri),
     ];
+
+    /// <summary>
+    /// How a type built from a pattern must relate to a given type for the walk to reach the given one: be it, or,
+    /// under the variance of an interface's type parameter, be one of its supertypes or subtypes.
+    /// </summary>
+    private enum Fit
+    {
+        Exact,
+        Wider,
+        Narrower,
+    }
 
     /// <param name="assemblies">The module's assemblies; only their types are walked into.</param>
     /// <param name="aggregateRoot">The full name of the aggregate roots' generic base type definition.</param>
@@ -37,202 +55,165 @@ public static class PrimitiveBoundary
         // checked even when it carries the marker.
         bool IsValueObject(Type type) => !IsRoot(type) && typeof(IValueObject).IsAssignableFrom(type);
 
-        HashSet<Type> roots = [.. types.Where(IsRoot)];
-
-        // Each pending type carries the closed generic types the walk is inside of when it reaches it.
-        Queue<(Type Type, Type[] Within)> pending = new(roots.Select(root => (root, Array.Empty<Type>())));
-        HashSet<Type> seen = [];
-        SortedSet<string> violations = new(StringComparer.Ordinal);
-        var held = HeldParameters(types, own, IsValueObject);
-
-        // A closed type larger than the nearest closed type of the same generic definition the walk is inside of is not
-        // entered: Node<T> holding a Node<List<T>> would otherwise construct a new type at every step. One the same size
-        // or smaller is entered as usual (Wrapper<Wrapper<Cargo>> reaches Wrapper<Cargo>, TypedId<Order> reaches
-        // TypedId<Customer>), so the walk stays what it was wherever it ended before. Of a type it does not enter, it
-        // still reaches what the arguments the definition holds as state bring in, and nothing a phantom tag names.
-        void EnqueueSubtypes(Type type, Type[] inside)
-        {
-            if (type.IsSealed)
-            {
-                return;
-            }
-
-            foreach (var subtype in types.Where(candidate => candidate != type && type.IsAssignableFrom(candidate)))
-            {
-                pending.Enqueue((subtype, inside));
-            }
-        }
-
-        void Reach(Type type, Type[] inside)
-        {
-            if (type.IsEnum || !own.Contains(type.IsGenericType ? type.GetGenericTypeDefinition() : type))
-            {
-                return;
-            }
-
-            if (!Expands(type, inside))
-            {
-                pending.Enqueue((type, inside));
-                return;
-            }
-
-            // Its subclasses are types the module declares, so there are finitely many, and the walk still enters them.
-            EnqueueSubtypes(type, inside);
-
-            var definition = type.GetGenericTypeDefinition();
-            var arguments = type.GetGenericArguments();
-            for (var position = 0; position < arguments.Length; position++)
-            {
-                if (held.Contains((definition, position)))
-                {
-                    foreach (var constituent in Constituents(arguments[position], IsValueObject, []).Where(constituent => !IsPrimitive(constituent)))
-                    {
-                        Reach(constituent, inside);
-                    }
-                }
-            }
-        }
-
-        while (pending.TryDequeue(out var next))
-        {
-            var (type, within) = next;
-            if (!seen.Add(type))
-            {
-                continue;
-            }
-
-            var inside = type.IsGenericType ? [.. within, type] : within;
-            var isValueObject = IsValueObject(type);
-            foreach (var (name, memberType) in State(type, own))
-            {
-                foreach (var constituent in Constituents(memberType, IsValueObject, []))
-                {
-                    if (IsPrimitive(constituent))
-                    {
-                        if (!isValueObject)
-                        {
-                            violations.Add($"{type.FullName}.{name} holds {constituent.Name}; introduce a value object (IValueObject<T>).");
-                        }
-                    }
-                    else
-                    {
-                        Reach(constituent, inside);
-                    }
-                }
-            }
-
-            EnqueueSubtypes(type, inside);
-        }
-
-        return [.. violations];
+        var walk = new Walk(types, own, IsValueObject);
+        return walk.From(types.Where(IsRoot));
     }
 
     /// <summary>
     /// The state a type shows: its public properties, less building-block state and computed answers, and its public
     /// instance fields, which hold state as surely as a property does even where an analyzer would refuse them.
     /// </summary>
-    private static IEnumerable<(string Name, Type Type)> State(Type type, HashSet<Type> own) =>
+    private static IEnumerable<(string Name, Type Type, MemberInfo Member)> State(Type type, HashSet<Type> own) =>
         type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(property => !IsBuildingBlockState(property, own) && !IsComputedAnswer(property))
-            .Select(property => (property.Name, property.PropertyType))
+            .Select(property => (property.Name, property.PropertyType, (MemberInfo)property))
             .Concat(type.GetFields(BindingFlags.Public | BindingFlags.Instance)
-                .Select(field => (field.Name, field.FieldType)));
-
-    /// <summary>Whether a closed generic type is larger than the nearest closed type of its definition on the path.</summary>
-    private static bool Expands(Type type, Type[] inside)
-    {
-        if (!type.IsGenericType)
-        {
-            return false;
-        }
-
-        var nearest = inside.LastOrDefault(outer => outer.GetGenericTypeDefinition() == type.GetGenericTypeDefinition());
-        return nearest is not null && Size(type) > Size(nearest);
-    }
-
-    /// <summary>How many types a type is built from: <c>Node&lt;List&lt;Waypoint&gt;&gt;</c> is three.</summary>
-    private static int Size(Type type) =>
-        1
-        + (type.HasElementType ? Size(type.GetElementType()!) : 0)
-        + (type.IsGenericType ? type.GetGenericArguments().Sum(Size) : 0);
+                .Select(field => (field.Name, field.FieldType, (MemberInfo)field)));
 
     /// <summary>
-    /// The type parameters of the module's own generic definitions whose argument the definition holds as state, as the
-    /// walk would reach it: <c>Wrapper&lt;T&gt;</c> holds its <c>T</c>, <c>TypedId&lt;TTag&gt;</c> does not hold its
-    /// tag, even where it holds a <c>TypedId&lt;Customer&gt;</c> or a <c>TypedId&lt;List&lt;TTag&gt;&gt;</c>. A
-    /// parameter is held when a state member's type holds it: as itself, in an array, as any argument of a type that is
-    /// not a value object (which the walk looks into), or as a held argument of one of the module's value objects.
+    /// The module's generic definitions that can recur forever, and every one of the module's generic definitions they
+    /// build from their own type parameters. A type parameter whose argument a definition passes on, inside a larger
+    /// type, to one of the module's generic types that leads back to it (<c>Node&lt;T&gt;</c> holding a
+    /// <c>Node&lt;List&lt;T&gt;&gt;</c>) grows the arguments at every turn; one passed on as itself (<c>Wrapper&lt;T&gt;</c> holding a
+    /// <c>Cell&lt;T&gt;</c>), or a closed type that does not use one (<c>Box&lt;List&lt;string&gt;&gt;</c>), does not.
+    /// Without such a cycle a definition has finitely many closed types to walk. The types are read as declared,
+    /// wherever a type parameter appears in them, so the answer may name a definition whose cycle the walk never takes;
+    /// that only means it walks that definition's state once rather than closed type by closed type.
     /// </summary>
-    private static HashSet<(Type Definition, int Position)> HeldParameters(List<Type> types, HashSet<Type> own, Func<Type, bool> isValueObject)
+    private static HashSet<Type> Recurring(List<Type> types, HashSet<Type> own)
     {
-        HashSet<(Type Definition, int Position)> held = [];
-        List<(Type Definition, Type Parameter)> parameters =
+        List<(Type From, int FromPosition, Type To, int ToPosition, bool Grows)> uses = [];
+        foreach (var definition in types.Where(type => type.IsGenericTypeDefinition))
+        {
+            foreach (var (_, memberType, _) in State(definition, own))
+            {
+                AddUses(definition, memberType, own, uses);
+            }
+        }
+
+        HashSet<Type> recurring =
         [
-            .. types.Where(type => type.IsGenericTypeDefinition)
-                .SelectMany(definition => definition.GetGenericArguments().Select(parameter => (definition, parameter))),
+            .. uses.Where(use => use.Grows && Leads(uses, (use.To, use.ToPosition), (use.From, use.FromPosition))).Select(use => use.From),
         ];
 
-        // Adding a parameter can make another one held, so the set grows until it stops changing.
         var changed = true;
         while (changed)
         {
             changed = false;
-            foreach (var (definition, parameter) in parameters)
+            foreach (var use in uses.Where(use => recurring.Contains(use.From)))
             {
-                if (!held.Contains((definition, parameter.GenericParameterPosition))
-                    && State(definition, own).Any(member => Holds(member.Type, parameter, held, own, isValueObject)))
-                {
-                    held.Add((definition, parameter.GenericParameterPosition));
-                    changed = true;
-                }
+                changed |= recurring.Add(use.To);
             }
         }
 
-        return held;
+        return recurring;
     }
 
-    private static bool Holds(Type type, Type parameter, HashSet<(Type Definition, int Position)> held, HashSet<Type> own, Func<Type, bool> isValueObject)
+    /// <summary>Each place a type passes one of a definition's type parameters to one of the module's generic types.</summary>
+    private static void AddUses(Type definition, Type type, HashSet<Type> own, List<(Type From, int FromPosition, Type To, int ToPosition, bool Grows)> uses)
     {
-        if (type == parameter)
-        {
-            return true;
-        }
-
         if (type.HasElementType)
         {
-            return Holds(type.GetElementType()!, parameter, held, own, isValueObject);
+            AddUses(definition, type.GetElementType()!, own, uses);
+            return;
         }
 
         if (!type.IsGenericType)
         {
-            return false;
+            return;
         }
 
-        var definition = type.GetGenericTypeDefinition();
+        var used = type.GetGenericTypeDefinition();
         var arguments = type.GetGenericArguments();
-        if (!isValueObject(type))
+        for (var position = 0; position < arguments.Length; position++)
         {
-            return arguments.Any(argument => Holds(argument, parameter, held, own, isValueObject));
+            if (own.Contains(used))
+            {
+                foreach (var parameter in Parameters(arguments[position]).Where(parameter => parameter.DeclaringType == definition))
+                {
+                    uses.Add((definition, parameter.GenericParameterPosition, used, position, arguments[position] != parameter));
+                }
+            }
+
+            AddUses(definition, arguments[position], own, uses);
+        }
+    }
+
+    private static IEnumerable<Type> Parameters(Type type) =>
+        type.IsGenericParameter ? [type]
+        : type.HasElementType ? Parameters(type.GetElementType()!)
+        : type.IsGenericType ? type.GetGenericArguments().SelectMany(Parameters)
+        : [];
+
+    /// <summary>Whether one type parameter's argument reaches another's through the uses.</summary>
+    private static bool Leads(List<(Type From, int FromPosition, Type To, int ToPosition, bool Grows)> uses, (Type, int) start, (Type, int) goal)
+    {
+        HashSet<(Type, int)> reached = [start];
+        Queue<(Type, int)> pending = new([start]);
+        while (pending.TryDequeue(out var current))
+        {
+            if (current == goal)
+            {
+                return true;
+            }
+
+            foreach (var use in uses.Where(use => (use.From, use.FromPosition) == current))
+            {
+                if (reached.Add((use.To, use.ToPosition)))
+                {
+                    pending.Enqueue((use.To, use.ToPosition));
+                }
+            }
         }
 
-        return own.Contains(definition)
-            && Enumerable.Range(0, arguments.Length)
-                .Any(position => held.Contains((definition, position)) && Holds(arguments[position], parameter, held, own, isValueObject));
+        return false;
+    }
+
+    /// <summary>A pattern with its type parameters replaced by the arguments of a closed type of the same definition.</summary>
+    private static Type Substitute(Type pattern, Type[] arguments)
+    {
+        if (pattern.IsGenericParameter)
+        {
+            return arguments[pattern.GenericParameterPosition];
+        }
+
+        if (!pattern.ContainsGenericParameters)
+        {
+            return pattern;
+        }
+
+        if (pattern.IsArray)
+        {
+            var element = Substitute(pattern.GetElementType()!, arguments);
+            return pattern.IsSZArray ? element.MakeArrayType() : element.MakeArrayType(pattern.GetArrayRank());
+        }
+
+        return pattern.GetGenericTypeDefinition().MakeGenericType([.. pattern.GetGenericArguments().Select(argument => Substitute(argument, arguments))]);
     }
 
     private static bool IsPrimitive(Type type) => type.IsPrimitive || MeaninglessBclTypes.Contains(type);
+
+    private static string Message(Type type, string member, Type primitive) =>
+        $"{type.FullName ?? type.ToString()}.{member} holds {primitive.Name}; introduce a value object (IValueObject<T>).";
 
     /// <summary>
     /// The type itself, its generic arguments and its array element, recursively, with <see cref="Nullable{T}"/>
     /// unwrapped: <c>IReadOnlyList&lt;string&gt;</c> holds a <c>string</c> as surely as a <c>string</c> property does.
     /// A value object ends the descent: <c>Positive&lt;int&gt;</c> is the value object, and the <c>int</c> is its own
-    /// backing value, which the walk checks, and exempts, when it reaches the value object's state.
+    /// backing value, which the walk checks, and exempts, when it reaches the value object's state. So does an enum:
+    /// <c>Palette&lt;int&gt;.Status</c> is a named set of values, not an <c>int</c>.
     /// </summary>
     private static IEnumerable<Type> Constituents(Type type, Func<Type, bool> isValueObject, HashSet<Type> visited)
     {
         var underlying = Nullable.GetUnderlyingType(type) ?? type;
         if (!visited.Add(underlying))
         {
+            yield break;
+        }
+
+        if (underlying.IsEnum)
+        {
+            yield return underlying;
             yield break;
         }
 
@@ -285,9 +266,11 @@ public static class PrimitiveBoundary
     /// not. Reflection cannot tell <c>Total =&gt; total</c> from a computed number as cheaply, so anything else
     /// get-only stays state.
     /// </summary>
-    private static bool IsComputedAnswer(PropertyInfo property) =>
-        property.PropertyType == typeof(bool)
-        && property.GetSetMethod(nonPublic: true) is null
+    private static bool IsComputedAnswer(PropertyInfo property) => property.PropertyType == typeof(bool) && Computes(property);
+
+    /// <summary>Whether a property has no setter and a getter that does more than return a field.</summary>
+    private static bool Computes(PropertyInfo property) =>
+        property.GetSetMethod(nonPublic: true) is null
         && !ReturnsAField(property.GetGetMethod(nonPublic: true)?.GetMethodBody()?.GetILAsByteArray() ?? []);
 
     /// <summary>
@@ -341,4 +324,386 @@ public static class PrimitiveBoundary
 
     private static bool IsCommand(Type type) =>
         !type.IsInterface && type.GetInterfaces().Any(contract => contract.Name is "ICommand" or "ICommand`1");
+
+    /// <summary>
+    /// A type the walk holds: a closed type (<see cref="Context"/> is null), or a type the state of a recurring
+    /// definition, <see cref="Context"/>, builds from its own type parameters (<c>Node&lt;List&lt;T&gt;&gt;</c>).
+    /// </summary>
+    private readonly record struct Held(Type Type, Type? Context);
+
+    /// <summary>
+    /// What a recurring definition was found used with: per type parameter, what an argument for it holds, each with
+    /// the first closed type of the definition found to hold it, and the arguments themselves, as closed types or as
+    /// patterns over another recurring definition's type parameters. What an argument holds is kept apart for when it
+    /// is the whole argument (<c>Answer&lt;bool&gt;</c>) and when it is inside it (<c>Answer&lt;List&lt;bool&gt;&gt;</c>):
+    /// a computed <c>T Value</c> is an answer only in the first.
+    /// </summary>
+    private sealed class Usage(Type first, int parameters)
+    {
+        public Type First { get; } = first;
+
+        public Dictionary<(Held Held, bool Whole), Type>[] Holds { get; } =
+            [.. Enumerable.Range(0, parameters).Select(_ => new Dictionary<(Held Held, bool Whole), Type>())];
+
+        public HashSet<Held>[] Arguments { get; } = [.. Enumerable.Range(0, parameters).Select(_ => new HashSet<Held>())];
+    }
+
+    /// <summary>One walk over a module's types.</summary>
+    private sealed class Walk(List<Type> types, HashSet<Type> own, Func<Type, bool> isValueObject)
+    {
+        private readonly HashSet<Type> recurring = Recurring(types, own);
+        private readonly Queue<Type> pending = new();
+        private readonly HashSet<Type> seen = [];
+        private readonly Dictionary<Type, Usage> usages = [];
+        private readonly HashSet<(Type Definition, string Member, Type Primitive)> named = [];
+        private readonly SortedSet<string> violations = new(StringComparer.Ordinal);
+        private int growth;
+
+        public IReadOnlyList<string> From(IEnumerable<Type> roots)
+        {
+            foreach (var root in roots)
+            {
+                Enqueue(root);
+            }
+
+            int before;
+            do
+            {
+                before = growth;
+                while (pending.TryDequeue(out var type))
+                {
+                    Enter(type);
+                }
+
+                foreach (var (definition, used) in usages.ToList())
+                {
+                    EnterRecurring(definition, used);
+                }
+
+                foreach (var candidate in types.Where(candidate => !candidate.IsGenericTypeDefinition && !seen.Contains(candidate) && Supertypes(candidate).Any(IsBuilt)))
+                {
+                    Enqueue(candidate);
+                }
+            }
+            while (growth != before);
+
+            return [.. violations];
+        }
+
+        private void Enqueue(Type type)
+        {
+            if (seen.Add(type))
+            {
+                pending.Enqueue(type);
+                growth++;
+            }
+        }
+
+        private void Enter(Type type)
+        {
+            var exempt = isValueObject(type);
+            foreach (var (name, memberType, _) in State(type, own))
+            {
+                foreach (var constituent in Constituents(memberType, isValueObject, []))
+                {
+                    if (IsPrimitive(constituent))
+                    {
+                        if (!exempt)
+                        {
+                            violations.Add(Message(type, name, constituent));
+                        }
+                    }
+                    else
+                    {
+                        Reach(constituent);
+                    }
+                }
+            }
+
+            EnqueueSubtypes(type);
+        }
+
+        private void EnqueueSubtypes(Type type)
+        {
+            if (type.IsSealed)
+            {
+                return;
+            }
+
+            foreach (var subtype in types.Where(candidate => candidate != type && type.IsAssignableFrom(candidate)))
+            {
+                Enqueue(subtype);
+            }
+        }
+
+        /// <summary>A closed type of the module's own is walked once; one of a recurring definition adds to its usages.</summary>
+        private void Reach(Type type)
+        {
+            var definition = type.IsGenericType ? type.GetGenericTypeDefinition() : type;
+            if (type.IsEnum || !own.Contains(definition))
+            {
+                return;
+            }
+
+            if (!recurring.Contains(definition))
+            {
+                Enqueue(type);
+                return;
+            }
+
+            if (seen.Add(type))
+            {
+                Use(definition, type.GetGenericArguments(), null, _ => type);
+                EnqueueSubtypes(type);
+            }
+        }
+
+        /// <summary>A type a recurring definition's state builds from its own type parameters.</summary>
+        private void Reach(Held built)
+        {
+            var (type, context) = built;
+            if (type.IsEnum || !type.IsGenericType || !own.Contains(type.GetGenericTypeDefinition()))
+            {
+                return;
+            }
+
+            var first = usages[context!].First;
+            Use(type.GetGenericTypeDefinition(), type.GetGenericArguments(), context, witness => Substitute(type, (witness ?? first).GetGenericArguments()));
+        }
+
+        /// <summary>
+        /// Adds what each argument holds to what the definition's type parameter was found to hold. The witness is the
+        /// closed type of the definition that holds it, from the closed type of the context that passed it on.
+        /// </summary>
+        private void Use(Type definition, Type[] arguments, Type? context, Func<Type?, Type> witness)
+        {
+            if (!usages.TryGetValue(definition, out var used))
+            {
+                used = new Usage(witness(null), arguments.Length);
+                usages.Add(definition, used);
+                growth++;
+            }
+
+            for (var position = 0; position < arguments.Length; position++)
+            {
+                if (used.Arguments[position].Add(new Held(arguments[position], context)))
+                {
+                    growth++;
+                }
+
+                foreach (var (held, whole, from) in Holds(arguments[position], context, true, []).ToList())
+                {
+                    if (!used.Holds[position].ContainsKey((held, whole)))
+                    {
+                        used.Holds[position].Add((held, whole), witness(from));
+                        growth++;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// A recurring definition's state, with each type parameter standing for everything its arguments were found
+        /// to hold. Each primitive is named once per member, after the first closed type found to hold it there. A
+        /// computed <c>T Value</c> is an answer where its <c>T</c> is a whole <c>bool</c>, as it is for a closed type.
+        /// </summary>
+        private void EnterRecurring(Type definition, Usage used)
+        {
+            var exempt = isValueObject(definition);
+            foreach (var (name, memberType, member) in State(definition, own))
+            {
+                var computed = member is PropertyInfo property && property.PropertyType.IsGenericParameter && Computes(property);
+                foreach (var (held, whole, from) in Holds(memberType, definition, true, []).ToList())
+                {
+                    if (held.Context is not null)
+                    {
+                        Reach(held);
+                    }
+                    else if (!IsPrimitive(held.Type))
+                    {
+                        Reach(held.Type);
+                    }
+                    else if (!exempt && !(computed && whole && held.Type == typeof(bool)) && named.Add((definition, name, held.Type)))
+                    {
+                        violations.Add(Message(from ?? used.First, name, held.Type));
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// <see cref="Constituents"/> over a type that may use a recurring definition's type parameters: a type
+        /// parameter of the context stands for everything its arguments were found to hold, each with the closed type
+        /// of the context that holds it. <paramref name="whole"/> says whether the type is the whole of what is looked
+        /// at, not inside a <see cref="Nullable{T}"/>, an array or another generic type.
+        /// </summary>
+        private IEnumerable<(Held Held, bool Whole, Type? From)> Holds(Type type, Type? context, bool whole, HashSet<Type> visited)
+        {
+            var underlying = Nullable.GetUnderlyingType(type) ?? type;
+            whole &= underlying == type;
+            if (!visited.Add(underlying))
+            {
+                yield break;
+            }
+
+            if (underlying.IsGenericParameter)
+            {
+                if (context is not null && underlying.DeclaringType == context)
+                {
+                    foreach (var ((held, wholeArgument), from) in usages[context].Holds[underlying.GenericParameterPosition])
+                    {
+                        yield return (held, whole && wholeArgument, from);
+                    }
+                }
+
+                yield break;
+            }
+
+            if (underlying.IsEnum)
+            {
+                yield return (new Held(underlying, null), whole, null);
+                yield break;
+            }
+
+            if (underlying.IsArray)
+            {
+                foreach (var constituent in Holds(underlying.GetElementType()!, context, false, visited))
+                {
+                    yield return constituent;
+                }
+
+                yield break;
+            }
+
+            if (underlying.IsGenericType && !isValueObject(underlying))
+            {
+                foreach (var argument in underlying.GetGenericArguments())
+                {
+                    foreach (var constituent in Holds(argument, context, false, visited))
+                    {
+                        yield return constituent;
+                    }
+                }
+            }
+
+            yield return (new Held(underlying, underlying.ContainsGenericParameters ? context : null), whole, null);
+        }
+
+        private static IEnumerable<Type> Supertypes(Type type)
+        {
+            for (var current = type.BaseType; current is not null; current = current.BaseType)
+            {
+                yield return current;
+            }
+
+            foreach (var contract in type.GetInterfaces())
+            {
+                yield return contract;
+            }
+        }
+
+        /// <summary>
+        /// Whether the walk builds a closed type of a recurring definition that a subclass the module declares is
+        /// assignable to, so that the subclass is walked. Each argument is one the definition was used with or built
+        /// from a pattern it was used with, or, for an interface's <c>out</c> or <c>in</c> type parameter, a supertype
+        /// or subtype of one (<c>SpecialNode : INode&lt;List&lt;Marker&gt;&gt;</c> is an
+        /// <c>INode&lt;IEnumerable&lt;Marker&gt;&gt;</c>). Each type parameter is matched on its own, so a subclass of a
+        /// combination of arguments never used together is walked too, and an <c>in</c> type parameter takes any
+        /// subtype a pattern may build.
+        /// </summary>
+        private bool IsBuilt(Type type)
+        {
+            if (!type.IsGenericType || type.ContainsGenericParameters || !usages.ContainsKey(type.GetGenericTypeDefinition()))
+            {
+                return false;
+            }
+
+            var definition = type.GetGenericTypeDefinition();
+            var parameters = definition.GetGenericArguments();
+            var arguments = type.GetGenericArguments();
+            return Enumerable.Range(0, arguments.Length)
+                .All(position => IsArgument(definition, position, arguments[position], Under(parameters[position], Fit.Wider), []));
+        }
+
+        /// <summary>How an argument must fit under a type parameter's variance, when the generic type must fit so.</summary>
+        private static Fit Under(Type parameter, Fit fit) =>
+            (parameter.GenericParameterAttributes & GenericParameterAttributes.VarianceMask) switch
+            {
+                GenericParameterAttributes.Covariant => fit,
+                GenericParameterAttributes.Contravariant => fit switch
+                {
+                    Fit.Wider => Fit.Narrower,
+                    Fit.Narrower => Fit.Wider,
+                    _ => Fit.Exact,
+                },
+                _ => Fit.Exact,
+            };
+
+        private bool IsArgument(Type definition, int position, Type argument, Fit fit, HashSet<(Type, int, Type, Fit)> trying)
+        {
+            if (!usages.TryGetValue(definition, out var used) || !trying.Add((definition, position, argument, fit)))
+            {
+                return false;
+            }
+
+            var matches = used.Arguments[position].Any(pattern => Matches(pattern.Type, argument, pattern.Context, fit, trying));
+            trying.Remove((definition, position, argument, fit));
+            return matches;
+        }
+
+        /// <summary>
+        /// Whether a type built from the pattern fits the type as asked. Variance does not apply to a value type, and a
+        /// pattern asked for a subtype is taken to build one.
+        /// </summary>
+        private bool Matches(Type pattern, Type type, Type? context, Fit fit, HashSet<(Type, int, Type, Fit)> trying)
+        {
+            if (type.IsValueType)
+            {
+                fit = Fit.Exact;
+            }
+
+            if (pattern.IsGenericParameter)
+            {
+                return context is not null && IsArgument(context, pattern.GenericParameterPosition, type, fit, trying);
+            }
+
+            if (!pattern.ContainsGenericParameters)
+            {
+                return fit switch
+                {
+                    Fit.Wider => !pattern.IsValueType && pattern.IsAssignableFrom(type),
+                    Fit.Narrower => !pattern.IsValueType && type.IsAssignableFrom(pattern),
+                    _ => pattern == type,
+                };
+            }
+
+            if (fit == Fit.Narrower)
+            {
+                return true;
+            }
+
+            if (pattern.IsArray)
+            {
+                return type.IsArray
+                    && pattern.IsSZArray == type.IsSZArray
+                    && pattern.GetArrayRank() == type.GetArrayRank()
+                    && Matches(pattern.GetElementType()!, type.GetElementType()!, context, fit, trying);
+            }
+
+            if (!pattern.IsGenericType)
+            {
+                return false;
+            }
+
+            var definition = pattern.GetGenericTypeDefinition();
+            var parameters = definition.GetGenericArguments();
+            var patterns = pattern.GetGenericArguments();
+            IEnumerable<Type> candidates = fit == Fit.Wider ? [type, .. Supertypes(type)] : [type];
+            return candidates.Any(candidate =>
+                candidate.IsGenericType
+                && candidate.GetGenericTypeDefinition() == definition
+                && Enumerable.Range(0, patterns.Length)
+                    .All(position => Matches(patterns[position], candidate.GetGenericArguments()[position], context, Under(parameters[position], fit), trying)));
+        }
+    }
 }

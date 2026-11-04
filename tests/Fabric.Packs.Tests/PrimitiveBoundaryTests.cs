@@ -549,6 +549,225 @@ public sealed partial class PrimitiveBoundaryTests
         }
         """;
 
+    private const string Crates = """
+        using Shop.BuildingBlocks.Domain;
+
+        namespace Shop.Modules.Billing.Domain.Crates;
+
+        internal sealed class Marker;
+
+        internal sealed record Box<T> : IValueObject<T>
+            where T : class
+        {
+            private Box(T value) => Value = value;
+
+            public T Value { get; }
+
+            public Cell<T>? State { get; }
+
+            public Box<List<string>>? Next { get; }
+
+            public static Box<T> From(T value)
+            {
+                Ensure.That(value).IsNotNull();
+                return new Box<T>(value);
+            }
+        }
+
+        internal sealed class Cell<T>
+            where T : class
+        {
+            public T? Value { get; }
+        }
+
+        internal sealed record Sleeve<T> : IValueObject<T>
+            where T : class
+        {
+            private Sleeve(T value) => Value = value;
+
+            public T Value { get; }
+
+            public Holder<T>? State { get; }
+
+            public Sleeve<Tuple<T, int>>? Next { get; }
+
+            public static Sleeve<T> From(T value)
+            {
+                Ensure.That(value).IsNotNull();
+                return new Sleeve<T>(value);
+            }
+        }
+
+        internal sealed class Holder<T>
+            where T : class
+        {
+            public T? Value { get; }
+        }
+
+        internal sealed class Crate : AggregateRoot<CrateId>
+        {
+            private Crate(CrateId id)
+                : base(id)
+            {
+            }
+
+            public Box<Marker>? Packing { get; }
+
+            public Sleeve<Marker>? Cover { get; }
+
+            public static Crate Pack() => new(CrateId.New());
+        }
+
+        internal sealed record CrateId : IValueObject<Guid>
+        {
+            private CrateId(Guid value) => Value = value;
+
+            public Guid Value { get; }
+
+            public static CrateId New() => new(Guid.CreateVersion7());
+
+            public static CrateId From(Guid value)
+            {
+                Ensure.That(value).IsNotEmpty();
+                return new CrateId(value);
+            }
+        }
+        """;
+
+    private const string Signals = """
+        using Shop.BuildingBlocks.Domain;
+
+        namespace Shop.Modules.Billing.Domain.Signals;
+
+        internal sealed class Marker;
+
+        internal interface INode<out T>
+        {
+            INode<IEnumerable<T>>? Next { get; }
+        }
+
+        internal sealed class SpecialNode : INode<List<Marker>>
+        {
+            public INode<IEnumerable<List<Marker>>>? Next => null;
+
+            public string Remark { get; } = string.Empty;
+        }
+
+        internal sealed class Palette<T>
+        {
+            internal enum Status
+            {
+                On,
+                Off,
+            }
+        }
+
+        internal sealed class Lamp<T>
+        {
+            public Lamp<List<T>>? Next { get; }
+
+            public Palette<T>.Status Status { get; }
+        }
+
+        internal sealed record Chain<T> : IValueObject<T>
+        {
+            private Chain(T value) => Value = value;
+
+            public T Value { get; }
+
+            public Chain<List<T>>? Next { get; }
+
+            public Answer<T>? Answer { get; }
+
+            public static Chain<T> From(T value) => new(value);
+        }
+
+        internal sealed class Answer<T>
+        {
+            private readonly T[] values = [];
+
+            public T Value => values.Length > 0 ? values[0] : default!;
+        }
+
+        internal sealed record Beacon<T> : IValueObject<T>
+        {
+            private Beacon(T value) => Value = value;
+
+            public T Value { get; }
+
+            public Beacon<Tuple<T, int>>? Next { get; }
+
+            public Shade<T>? Shade { get; }
+
+            public static Beacon<T> From(T value) => new(value);
+        }
+
+        internal sealed class Shade<T>
+        {
+            public Palette<T>.Status Level { get; }
+        }
+
+        internal class Gauge<T>
+        {
+            private readonly T[] values = [];
+
+            public T Value => values.Length > 0 ? values[0] : default!;
+        }
+
+        internal sealed class Knot<T, TNext> : Gauge<T>
+        {
+            public new readonly T Value = default!;
+
+            public Loop<T, TNext>? Next { get; }
+        }
+
+        internal sealed record Loop<T, TNext> : IValueObject<T>
+        {
+            private Loop(T value) => Value = value;
+
+            public T Value { get; }
+
+            public Knot<T, List<TNext>>? Inner { get; }
+
+            public static Loop<T, TNext> From(T value) => new(value);
+        }
+
+        internal sealed class Signal : AggregateRoot<SignalId>
+        {
+            private Signal(SignalId id)
+                : base(id)
+            {
+            }
+
+            public INode<Marker>? Start { get; }
+
+            public Lamp<Marker>? Lamp { get; }
+
+            public Chain<bool>? Checks { get; }
+
+            public Beacon<Marker>? Beacon { get; }
+
+            public Loop<bool, Marker>? Loop { get; }
+
+            public static Signal Raise() => new(SignalId.New());
+        }
+
+        internal sealed record SignalId : IValueObject<Guid>
+        {
+            private SignalId(Guid value) => Value = value;
+
+            public Guid Value { get; }
+
+            public static SignalId New() => new(Guid.CreateVersion7());
+
+            public static SignalId From(Guid value)
+            {
+                Ensure.That(value).IsNotEmpty();
+                return new SignalId(value);
+            }
+        }
+        """;
+
     [Fact]
     public void A_strict_module_passes_with_its_samples_and_fails_naming_each_primitive_an_aggregate_command_or_event_holds()
     {
@@ -667,6 +886,58 @@ public sealed partial class PrimitiveBoundaryTests
             ]),
             () => output.ShouldContain("].Label holds String"),
             () => output.ShouldNotContain("Manifest.Note holds"),
+            () => output.ShouldContain("failed: 1"));
+    }
+
+    [Fact]
+    public void State_built_from_a_larger_generic_types_arguments_is_walked_whether_or_not_the_growth_ends()
+    {
+        using var project = new GeneratedProject("saas-strict-react");
+        project.AddModule("billing");
+
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Crates", Crates);
+        project.Build();
+
+        var (ended, exitCode, output) = TestWithin(project, "tests/Architecture.Tests/Architecture.Tests.csproj", TimeSpan.FromMinutes(3));
+
+        List<string> named = [.. Violation().Matches(output).Select(match => match.Value).Distinct()];
+
+        // Box<List<string>> is one fixed type, so the graph is finite; Sleeve<Tuple<T, int>> grows without end.
+        output.ShouldSatisfyAllConditions(
+            () => ended.ShouldBeTrue($"The architecture tests did not end within 3 minutes.\n{output}"),
+            () => exitCode.ShouldNotBe(0, output),
+            () => output.ShouldMatch(@"Crates\.Cell`1\[\[System\.Collections\.Generic\.List`1\[\[System\.String,[^;]*\]\]\.Value holds String"),
+            () => output.ShouldMatch(@"Crates\.Holder`1\[\[System\.Tuple`2\[\[Shop\.Modules\.Billing\.Domain\.Crates\.Marker,[^;]*\],\[System\.Int32,[^;]*\]\]\.Value holds Int32"),
+            () => named.ShouldBeEmpty(),
+            () => output.ShouldContain("failed: 1"));
+    }
+
+    [Fact]
+    public void A_recurring_definition_keeps_the_enum_and_computed_answer_exemptions_and_reaches_a_covariant_subclass()
+    {
+        using var project = new GeneratedProject("saas-strict-react");
+        project.AddModule("billing");
+
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Signals", Signals);
+        project.Build();
+
+        var (ended, exitCode, output) = TestWithin(project, "tests/Architecture.Tests/Architecture.Tests.csproj", TimeSpan.FromMinutes(3));
+
+        List<string> named = [.. Violation().Matches(output).Select(match => match.Value).Distinct()];
+
+        // INode<IEnumerable<Marker>> is reached, and SpecialNode : INode<List<Marker>> is assignable to it. Answer<bool>.Value
+        // is a computed bool, but Answer<List<bool>>.Value, reached through Chain<List<bool>>, is not. Shade<Tuple<Marker, int>>
+        // holds an enum, not the int of its enclosing type's argument. Knot's field Value stores a bool that the computed
+        // property it hides does not.
+        output.ShouldSatisfyAllConditions(
+            () => ended.ShouldBeTrue($"The architecture tests did not end within 3 minutes.\n{output}"),
+            () => exitCode.ShouldNotBe(0, output),
+            () => named.ShouldBe(["Shop.Modules.Billing.Domain.Signals.SpecialNode.Remark holds String"]),
+            () => output.ShouldMatch(@"Signals\.Answer`1\[\[System\.Collections\.Generic\.List`1\[\[System\.Boolean,[^;]*\]\]\.Value holds Boolean"),
+            () => output.ShouldNotMatch(@"Signals\.Answer`1\[\[System\.Boolean,"),
+            () => output.ShouldNotContain("value__"),
+            () => output.ShouldNotMatch(@"Signals\.Shade`1\[[^;]*\.Level holds"),
+            () => output.ShouldMatch(@"Signals\.Knot`2\[\[System\.Boolean,[^;]*\]\]\.Value holds Boolean"),
             () => output.ShouldContain("failed: 1"));
     }
 
