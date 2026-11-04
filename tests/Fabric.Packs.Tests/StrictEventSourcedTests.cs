@@ -251,6 +251,18 @@ public sealed class StrictEventSourcedTests
 
             public sealed record InvoiceVoided(InvoiceId Invoice, string Reason) : IDomainEvent;
             """);
+        project.Write("src/Modules/Billing/Billing.Domain/Invoices/InvoiceNoted.cs", """
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record InvoiceNoted(InvoiceId Invoice) : IDomainEvent
+            {
+                public InvoiceNumber Number { get; init; } = default!;
+
+                public IReadOnlyList<LineCount> Counts { get; init; } = [];
+            }
+            """);
         project.Write("src/Modules/Billing/Billing.Domain/Invoices/Money.cs", """
             namespace Shop.Modules.Billing.Domain.Invoices;
 
@@ -287,6 +299,8 @@ public sealed class StrictEventSourcedTests
                 public string Note { get; set; } = "none";
 
                 private void Apply(InvoiceVoided voided) => Id = voided.Invoice;
+
+                private void Apply(InvoiceNoted noted) => Id = noted.Invoice;
             }
             """);
         project.Build();
@@ -300,6 +314,10 @@ public sealed class StrictEventSourcedTests
         output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Money is a value object over more than one value");
         output.ShouldNotContain("Domain.Invoices.Invoice.");
         output.ShouldNotContain("InvoiceNumber is a value object over");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceNoted.Number carries a value object outside its constructor");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceNoted.Counts carries a value object outside its constructor");
+        output.ShouldNotContain("InvoiceNoted.Invoice carries");
+        output.ShouldNotContain("InvoiceIssued.Number carries");
         output.ShouldNotContain("InvoiceNumber.Value holds");
     }
 
