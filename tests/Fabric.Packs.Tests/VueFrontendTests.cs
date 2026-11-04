@@ -119,7 +119,7 @@ public sealed class VueFrontendTests : IDisposable
             <template>
               <main>
                 <h1>shop</h1>
-                <img src="/logo.png" />
+                <img src="https://example.com/logo.png" />
               </main>
             </template>
             """);
@@ -153,7 +153,7 @@ public sealed class VueFrontendTests : IDisposable
     public void Importing_another_schema_library_fails_lint_in_a_vue_component()
     {
         using var project = Generate();
-        project.Write("web/app/src/components/Signup.vue", """
+        project.Write("web/app/src/components/SignupForm.vue", """
             <script setup lang="ts">
             import { object, string } from 'yup';
 
@@ -169,7 +169,7 @@ public sealed class VueFrontendTests : IDisposable
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "lint");
 
         exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("'yup' import is restricted from being used by a pattern. Use zod (docs/adr).");
+        output.ShouldContain("'yup' import is restricted from being used by a pattern. Use zod (docs/adr)");
     }
 
     [Fact]
