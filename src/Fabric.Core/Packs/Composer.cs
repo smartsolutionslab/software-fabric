@@ -163,7 +163,7 @@ public static partial class Composer
                 {
                     slot.Entries.Add(new SlotEntry(pack, contribution));
                 }
-                else
+                else if (!contribution.Optional)
                 {
                     errors.Add($"{pack.Option} contributes to slot '{contribution.Slot}', which no selected pack declares.");
                 }
