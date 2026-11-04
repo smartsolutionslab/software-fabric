@@ -1,0 +1,2 @@
+        // A key-shaped value Anthropic does not accept: the integration tests never call the model.
+        builder.Configuration["Parameters:anthropic-api-key"] = "not-a-real-key";

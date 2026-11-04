@@ -1,0 +1,38 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// Domain and Application talk to the model through <c>IChatClient</c> alone, so changing provider changes one
+/// registration and no use case. The rule reads what the compiled assemblies reference, so a provider type used
+/// anywhere in them is found, however it was imported.
+/// </summary>
+public sealed class ProviderSdksStayOutOfDomainAndApplication : IArchitectureRule
+{
+    private const string Abstractions = "Microsoft.Extensions.AI.Abstractions";
+
+    private static readonly string[] ModelClients = ["Microsoft.Extensions.AI", "Anthropic", "OpenAI", "Azure.AI.OpenAI", "OllamaSharp", "ModelContextProtocol"];
+
+    public string Description => "Domain and Application reference no model client or provider SDK; only Microsoft.Extensions.AI.Abstractions (IChatClient).";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var assembly in model.ModuleAssemblies.Where(IsDomainOrApplication))
+        {
+            foreach (var reference in assembly.GetReferencedAssemblies().Select(reference => reference.Name!).Where(IsModelClient).Order(StringComparer.Ordinal))
+            {
+                yield return $"{assembly.GetName().Name} references {reference}; Domain and Application use only {Abstractions} (IChatClient), registered in src/BuildingBlocks.";
+            }
+        }
+    }
+
+    private static bool IsDomainOrApplication(System.Reflection.Assembly assembly)
+    {
+        var name = assembly.GetName().Name!;
+        return name.EndsWith(".Domain", StringComparison.Ordinal) || name.EndsWith(".Application", StringComparison.Ordinal);
+    }
+
+    private static bool IsModelClient(string reference) =>
+        reference != Abstractions
+        && ModelClients.Any(client => reference == client || reference.StartsWith(client + ".", StringComparison.Ordinal));
+}
