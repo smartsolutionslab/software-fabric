@@ -32,7 +32,14 @@ jobs:
       - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
       - run: dotnet restore Fabric.slnx
       - run: dotnet build Fabric.slnx -c Release --no-restore
-      - run: dotnet test --solution Fabric.slnx -c Release --no-build
+      # Each test assembly writes an xUnit XML report: per-class and per-test times, kept as an artifact for a week.
+      - run: dotnet test --solution Fabric.slnx -c Release --no-build --results-directory "$RUNNER_TEMP/test-results" --report-xunit-xml
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-results
+          path: ${{ runner.temp }}/test-results
+          retention-days: 7
       - run: build/profiles.sh
 
   # Profile CI (ADR-0003, roadmap M1-09): every profile the real packs generate alone, listed by
