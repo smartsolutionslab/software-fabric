@@ -5,6 +5,8 @@ files:
   - { template: templates/McpToolScan.cs.sbn, target: src/BuildingBlocks/Mcp/McpToolScan.cs }
   - { template: templates/McpToolCatalog.cs.sbn, target: src/BuildingBlocks/Mcp/McpToolCatalog.cs }
   - { template: templates/RequestTool.cs.sbn, target: src/Host/Mcp/RequestTool.cs }
+  - { template: templates/OptionJsonConverter.cs.sbn, target: src/Host/Mcp/OptionJsonConverter.cs, when: 'project["backend.absence"] == "option"' }
+  - { template: templates/OptionJsonConverterFactory.cs.sbn, target: src/Host/Mcp/OptionJsonConverterFactory.cs, when: 'project["backend.absence"] == "option"' }
   - { template: templates/McpServerRegistration.cs.sbn, target: src/Host/Wiring/McpServerRegistration.cs }
   - { template: templates/McpServerEndpoint.cs.sbn, target: src/Host/Wiring/McpServerEndpoint.cs }
   - { template: templates/EveryMcpToolIsValid.cs.sbn, target: tests/Architecture.Tests/Rules/EveryMcpToolIsValid.cs }

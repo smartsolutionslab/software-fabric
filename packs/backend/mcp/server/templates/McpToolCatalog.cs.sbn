@@ -85,12 +85,22 @@ public static class McpToolCatalog
 {{~ end ~}}
         }
 
-        problems.AddRange(tools
+        problems.AddRange(Collisions(tools));
+        return new McpToolScan(tools, problems);
+    }
+
+    /// <summary>
+    /// Every name two or more of the tools share. Check the tools of all modules together, not only each module's: the
+    /// modules <c>billing</c> and <c>billing-find</c> both name a tool <c>billing_find_invoice</c>.
+    /// </summary>
+    public static IReadOnlyList<string> Collisions(IEnumerable<McpToolDefinition> tools)
+    {
+        {{ not_null "tools" }}
+
+        return [.. tools
             .GroupBy(tool => tool.Name, StringComparer.Ordinal)
             .Where(group => group.Count() > 1)
-            .Select(group => $"{string.Join(" and ", group.Select(tool => tool.Request.FullName))} would all be the MCP tool {group.Key}: rename all but one."));
-
-        return new McpToolScan(tools, problems);
+            .Select(group => $"{string.Join(" and ", group.Select(tool => tool.Request.FullName))} would all be the MCP tool {group.Key}: rename all but one.")];
     }
 {{~ if policies ~}}
 

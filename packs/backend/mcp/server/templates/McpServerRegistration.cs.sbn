@@ -25,15 +25,18 @@ public static class McpServerRegistration
 {{~ else ~}}
             .WithHttpTransport(options => options.Stateless = true);
 {{~ end ~}}
+        List<McpToolScan> scans = [];
         foreach (var module in modules)
         {
             var api = module.GetType().Assembly;
             var name = api.GetName().Name!;
             name = name[..name.LastIndexOf('.')];
-            services.AddMcpRequestTools(name[(name.LastIndexOf('.') + 1)..], ModuleAssemblies.Of(module, "Application"){{ if policies }}, api{{ end }});
+            scans.Add(McpToolCatalog.Scan(name[(name.LastIndexOf('.') + 1)..], ModuleAssemblies.Of(module, "Application"){{ if policies }}, api{{ end }}));
         }
 
-        return services;
+        // Each module's problems, and the names two modules share: one tool name must address one request.
+        List<McpToolDefinition> tools = [.. scans.SelectMany(scan => scan.Tools)];
+        return services.AddTools(new McpToolScan(tools, [.. scans.SelectMany(scan => scan.Problems).Concat(McpToolCatalog.Collisions(tools)).Distinct(StringComparer.Ordinal)]), "The modules mark");
     }
 
     /// <summary>Offers the requests one assembly marks, as <see cref="AddMcpServerTools"/> does for each module's.</summary>
@@ -45,10 +48,14 @@ public static class McpServerRegistration
     {
         {{ not_null "services" }}
 
-        var scan = McpToolCatalog.Scan(module, application{{ if policies }}, api{{ end }});
+        return services.AddTools(McpToolCatalog.Scan(module, application{{ if policies }}, api{{ end }}), $"The module {module} marks");
+    }
+
+    private static IServiceCollection AddTools(this IServiceCollection services, McpToolScan scan, string marking)
+    {
         if (scan.Problems.Count > 0)
         {
-            throw new InvalidOperationException($"The module {module} marks requests that cannot be MCP tools:{Environment.NewLine}{string.Join(Environment.NewLine, scan.Problems)}");
+            throw new InvalidOperationException($"{marking} requests that cannot be MCP tools:{Environment.NewLine}{string.Join(Environment.NewLine, scan.Problems)}");
         }
 
         foreach (var tool in scan.Tools)

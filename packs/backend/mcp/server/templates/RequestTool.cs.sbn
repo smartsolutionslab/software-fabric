@@ -26,11 +26,17 @@ namespace {{ namespace }}.Host.Mcp;
 /// </summary>
 public sealed class RequestTool : McpServerTool
 {
-    /// <summary>Web defaults, but a missing argument or a null where the record allows none is refused, not defaulted.</summary>
+    /// <summary>
+    /// Web defaults, but a missing argument or a null where the record allows none is refused, not defaulted{{ if option }};
+    /// an absent <see cref="Option{T}"/> is <c>null</c>, at the top of an answer or nested in it{{ end }}.
+    /// </summary>
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
         RespectRequiredConstructorParameters = true,
         RespectNullableAnnotations = true,
+{{~ if option ~}}
+        Converters = { new OptionJsonConverterFactory() },
+{{~ end ~}}
     };
 
     private readonly McpToolDefinition definition;

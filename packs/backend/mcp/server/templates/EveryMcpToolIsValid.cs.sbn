@@ -24,19 +24,23 @@ public sealed class EveryMcpToolIsValid : IArchitectureRule
     {
         {{ not_null "model" }}
 
+        List<McpToolDefinition> tools = [];
+        List<string> problems = [];
         foreach (var application in model.ModuleAssemblies.Where(assembly => assembly.GetName().Name!.EndsWith(ApplicationSuffix, StringComparison.Ordinal)))
         {
             var name = application.GetName().Name!;
             var module = name[ModulePrefix.Length..^ApplicationSuffix.Length];
 {{~ if policies ~}}
             var api = model.ModuleAssemblies.Single(assembly => assembly.GetName().Name == ModulePrefix + module + ApiSuffix);
-            foreach (var problem in McpToolCatalog.Scan(module, application, api).Problems)
+            var scan = McpToolCatalog.Scan(module, application, api);
 {{~ else ~}}
-            foreach (var problem in McpToolCatalog.Scan(module, application).Problems)
+            var scan = McpToolCatalog.Scan(module, application);
 {{~ end ~}}
-            {
-                yield return problem;
-            }
+            tools.AddRange(scan.Tools);
+            problems.AddRange(scan.Problems);
         }
+
+        // The host checks all modules' tools together, so the rule does too: two modules may produce the same name.
+        return problems.Concat(McpToolCatalog.Collisions(tools)).Distinct(StringComparer.Ordinal);
     }
 }
