@@ -7,7 +7,7 @@
 
 Being signed in is not enough for every endpoint: access can depend on the user's roles in the identity provider. Roles are checked in exactly one place, a module's authorization policies.
 
-**A module registers its own policies.** Its Api project has one `IModulePolicies` (`<Module>Policies`), found by assembly scan like `IModule`, which adds policies named `<module>.<permission>` (`billing.approve-invoices`), each requiring one or more roles with `RequireRole`. `AddModuleInfrastructure` registers them. An endpoint names a policy with `RequireAuthorization(BillingPolicies.ApproveInvoices)`; handlers never check roles themselves.
+**A module registers its own policies.** Its Api project has one `IModulePolicies` (`<Module>Policies`), found by assembly scan like `IModule`, which adds policies under the names its Application project declares in `<Module>PolicyNames`, `<module>.<permission>` (`billing.approve-invoices`), each requiring one or more roles with `RequireRole`. `AddModuleInfrastructure` registers them. An endpoint names a policy with `RequireAuthorization(BillingPolicyNames.ApproveInvoices)`; handlers never check roles themselves.
 
 **Keycloak's roles become role claims.** Keycloak puts realm roles in the token's `realm_access` and each client's roles in `resource_access`. `KeycloakRoleClaims` (an `IClaimsTransformation`) copies the realm roles and the roles of the API client `<name>-api` into `ClaimTypes.Role`, which `RequireRole` reads. Roles of other clients (Keycloak's own `account` client, say) are not meant for this API and are left out. The roles live in the identity provider, not in the application: there is no role table and no role-management screen.
 
@@ -31,6 +31,6 @@ Being signed in is not enough for every endpoint: access can depend on the user'
 
 ## Consequences
 
-- A permission is one line in the module's `<Module>Policies` and a constant beside it; changing who holds it is a change in the identity provider, not in code.
+- A permission is one line in the module's `<Module>Policies` and a constant in its `<Module>PolicyNames`; changing who holds it is a change in the identity provider, not in code.
 - A new module adds an endpoint (`/<module>/permissions/manage`), so the frontend's copy of the OpenAPI document is stale until the integration tests rewrite it and it is committed, as for any new endpoint.
 - Production needs the roles in the real realm and assigned to real users; the realm import is development only.

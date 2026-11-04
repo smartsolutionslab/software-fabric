@@ -2,6 +2,7 @@
 #error The sample endpoint of a module's policy is a minimal API only so far (docs/adr/0006 of the generator).
 {{~ end ~}}
 using {{ namespace }}.BuildingBlocks.Api;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -16,5 +17,5 @@ public sealed class CanManage : IEndpoint
 {
     public void Map(IEndpointRouteBuilder endpoints) =>
         endpoints.MapGet("/permissions/manage", () => TypedResults.Ok())
-            .RequireAuthorization({{ module.namespace }}Policies.Manage);
+            .RequireAuthorization({{ module.namespace }}PolicyNames.Manage);
 }

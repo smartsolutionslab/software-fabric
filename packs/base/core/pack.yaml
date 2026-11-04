@@ -69,6 +69,7 @@ files:
   - { template: templates/Modules/Api.csproj.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}.Api.csproj", per-module: true }
   - { template: templates/Modules/Module.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}Module.cs", per-module: true }
   - { template: templates/Modules/Policies.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}Policies.cs", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/Modules/PolicyNames.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/{{ module.namespace }}PolicyNames.cs", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/Modules/CanManage.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/CanManage.cs", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/Modules/Tests.csproj.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/{{ module.namespace }}.Tests.csproj", per-module: true }
   - { template: templates/Llm/ChatClientRegistration.cs.sbn, target: src/BuildingBlocks/Llm/Wiring/ChatClientRegistration.cs, when: 'project["backend.llm"] != "none"' }
