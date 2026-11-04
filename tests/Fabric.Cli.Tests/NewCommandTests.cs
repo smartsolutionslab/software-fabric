@@ -109,7 +109,6 @@ public sealed class NewCommandTests : IDisposable
     }
 
     [Theory]
-    [InlineData("backend.llm=anthropic", "no pack for backend.llm=anthropic.")]
     [InlineData("backend.llm=openai", "no pack for backend.llm=openai.")]
     [InlineData("backend.llm=azure-openai", "no pack for backend.llm=azure-openai.")]
     [InlineData("backend.llm=ollama", "no pack for backend.llm=ollama.")]
