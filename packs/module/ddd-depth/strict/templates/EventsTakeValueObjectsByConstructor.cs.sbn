@@ -30,7 +30,7 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
         {
             if (entered.Add(domainEvent))
             {
-                Hold(domainEvent, holders, entered);
+                Hold(domainEvent, holders, entered, []);
             }
         }
 
@@ -50,7 +50,7 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
 
         foreach (var property in holder.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
-            if (!CarriesValueObject(property.PropertyType, []))
+            if (!CarriesValueObject(property.PropertyType, [], [holder]))
             {
                 continue;
             }
@@ -67,20 +67,29 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
     }
 
     /// <summary>Adds the holder, and every domain type its public properties hold, to the types whose members are checked.</summary>
-    private static void Hold(Type holder, List<Type> holders, HashSet<Type> entered)
+    private static void Hold(Type holder, List<Type> holders, HashSet<Type> entered, List<Type> path)
     {
         holders.Add(holder);
+        path.Add(holder);
         foreach (var property in holder.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
-            Reach(property.PropertyType, holders, entered);
+            Reach(property.PropertyType, holders, entered, path);
         }
+
+        path.RemoveAt(path.Count - 1);
     }
 
-    private static void Reach(Type type, List<Type> holders, HashSet<Type> entered)
+    private static void Reach(Type type, List<Type> holders, HashSet<Type> entered, List<Type> path)
     {
+        // A value object is stored as its backing value: what its type arguments name (TypedId<Invoice>) is never read.
+        if (typeof(IValueObject).IsAssignableFrom(type))
+        {
+            return;
+        }
+
         if (type.IsArray)
         {
-            Reach(type.GetElementType()!, holders, entered);
+            Reach(type.GetElementType()!, holders, entered, path);
             return;
         }
 
@@ -88,13 +97,13 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
         {
             foreach (var argument in type.GetGenericArguments())
             {
-                Reach(argument, holders, entered);
+                Reach(argument, holders, entered, path);
             }
         }
 
-        if (Enters(type, entered))
+        if (Enters(type, entered, path))
         {
-            Hold(type, holders, entered);
+            Hold(type, holders, entered, path);
         }
     }
 
@@ -120,23 +129,62 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
     /// Whether the type is a value object, or holds one in a <see cref="Nullable{T}"/>, an array, a generic argument or a
     /// public property of a domain type.
     /// </summary>
-    private static bool CarriesValueObject(Type type, HashSet<Type> entered) =>
-        typeof(IValueObject).IsAssignableFrom(type)
-        || (type.IsArray && CarriesValueObject(type.GetElementType()!, entered))
-        || (type.IsGenericType && type.GetGenericArguments().Any(argument => CarriesValueObject(argument, entered)))
-        || (Enters(type, entered) && type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Any(property => CarriesValueObject(property.PropertyType, entered)));
+    private static bool CarriesValueObject(Type type, HashSet<Type> entered, List<Type> path)
+    {
+        if (typeof(IValueObject).IsAssignableFrom(type))
+        {
+            return true;
+        }
+
+        if (type.IsArray)
+        {
+            return CarriesValueObject(type.GetElementType()!, entered, path);
+        }
+
+        if (type.IsGenericType && type.GetGenericArguments().Any(argument => CarriesValueObject(argument, entered, path)))
+        {
+            return true;
+        }
+
+        if (!Enters(type, entered, path))
+        {
+            return false;
+        }
+
+        path.Add(type);
+        var carries = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Any(property => CarriesValueObject(property.PropertyType, entered, path));
+        path.RemoveAt(path.Count - 1);
+        return carries;
+    }
 
     /// <summary>
     /// Whether the walk looks into a domain type's members: a concrete type of this module's Domain that is not a value
-    /// object or an enum, once per walk. A generic one is looked into once per generic definition, as the first closed type
-    /// reached, so <c>Node&lt;T&gt;</c> holding a <c>Node&lt;List&lt;T&gt;&gt;</c> does not construct a new type at every
-    /// step; the arguments of every other closed type are still walked.
+    /// object or an enum, each closed type once per walk. A closed generic type larger than the nearest closed type of the
+    /// same generic definition the walk is already inside of is not entered, so <c>Node&lt;T&gt;</c> holding a
+    /// <c>Node&lt;List&lt;T&gt;&gt;</c> does not construct a new type at every step; its arguments are still walked.
     /// </summary>
-    private static bool Enters(Type type, HashSet<Type> entered) =>
+    private static bool Enters(Type type, HashSet<Type> entered, List<Type> path) =>
         !type.IsAbstract
         && !type.IsEnum
         && !type.IsGenericParameter
         && type.Assembly.GetName().Name == Domain
         && !typeof(IValueObject).IsAssignableFrom(type)
-        && entered.Add(type.IsGenericType ? type.GetGenericTypeDefinition() : type);
+        && !Expands(type, path)
+        && entered.Add(type);
+
+    private static bool Expands(Type type, List<Type> path)
+    {
+        if (!type.IsGenericType)
+        {
+            return false;
+        }
+
+        var definition = type.GetGenericTypeDefinition();
+        var nearest = path.LastOrDefault(outer => outer.IsGenericType && outer.GetGenericTypeDefinition() == definition);
+        return nearest is not null && Size(type) > Size(nearest);
+    }
+
+    /// <summary>How many types a closed type is built from: <c>Node&lt;List&lt;int&gt;&gt;</c> is three.</summary>
+    private static int Size(Type type) =>
+        1 + (type.IsArray ? Size(type.GetElementType()!) : type.IsGenericType ? type.GetGenericArguments().Sum(Size) : 0);
 }
