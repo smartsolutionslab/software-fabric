@@ -321,6 +321,81 @@ public sealed class StrictEventSourcedTests
         output.ShouldNotContain("InvoiceNumber.Value holds");
     }
 
+    [Fact]
+    public void An_event_whose_value_object_is_a_parameter_only_of_a_constructor_json_does_not_select_is_named()
+    {
+        // System.Text.Json prefers the public parameterless constructor, so {} leaves Number null without From.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record InvoiceDrafted : IDomainEvent
+            {
+                public InvoiceDrafted()
+                {
+                }
+
+                public InvoiceDrafted(InvoiceNumber number) => Number = number;
+
+                public InvoiceNumber Number { get; init; } = default!;
+            }
+
+            public sealed class Draft : EventSourcedAggregate<InvoiceId>
+            {
+                private Draft()
+                {
+                }
+
+                public InvoiceNumber Number { get; private set; } = default!;
+
+                private void Apply(InvoiceDrafted drafted) => Number = drafted.Number;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceDrafted.Number carries a value object outside its constructor");
+        output.ShouldNotContain("InvoiceIssued.Number carries");
+        exitCode.ShouldNotBe(0, output);
+    }
+
+    [Fact]
+    public void An_event_whose_value_object_that_is_not_nullable_is_an_optional_parameter_is_named()
+    {
+        // RespectRequiredConstructorParameters lets an optional parameter be omitted, so {} would read Number as null.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record InvoiceReissued(InvoiceId Invoice, InvoiceNumber Number = null!, InvoiceNumber? Previous = null) : IDomainEvent;
+
+            public sealed class Reissue : EventSourcedAggregate<InvoiceId>
+            {
+                private Reissue()
+                {
+                }
+
+                private void Apply(InvoiceReissued reissued) => Id = reissued.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.InvoiceReissued.Number carries a value object through an optional constructor parameter");
+        output.ShouldNotContain("InvoiceReissued.Previous");
+        output.ShouldNotContain("InvoiceReissued.Invoice");
+        exitCode.ShouldNotBe(0, output);
+    }
+
+    private static (int ExitCode, string Output) ArchitectureTestsWith(string types)
+    {
+        using var project = new GeneratedProject("industrial-event-driven-mfe", Choices);
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Invoices", Invoices);
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Invoices", types);
+        project.Build();
+
+        return project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+    }
+
     private static Dictionary<string, string> Database(Container postgres) => new()
     {
         ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}",
