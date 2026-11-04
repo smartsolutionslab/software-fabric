@@ -3,6 +3,10 @@ files:
   - { template: templates/oidcConfig.ts.sbn, target: web/app/src/auth/oidcConfig.ts }
   - { template: templates/accessToken.ts.sbn, target: web/app/src/auth/accessToken.ts }
   - { template: templates/SignedIn.tsx.sbn, target: web/app/src/auth/SignedIn.tsx }
+  - { template: templates/useHasRole.ts.sbn, target: web/app/src/auth/useHasRole.ts, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles")' }
+  - { template: templates/useHasClaim.ts.sbn, target: web/app/src/auth/useHasClaim.ts, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "claims")' }
+  - { template: templates/RequirePermission.tsx.sbn, target: web/app/src/auth/RequirePermission.tsx, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/RequirePermission.test.tsx.sbn, target: web/app/src/auth/RequirePermission.test.tsx, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/auth-provider.tsx.sbn, target: web/app/src/providers/auth.tsx }
   - { template: templates/sign-in.spec.ts.sbn, target: web/app/e2e/sign-in.spec.ts }
 slots:
@@ -16,4 +20,5 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
+  - { kind: unit-test, describes: "With backend.authorization roles or claims, RequirePermission and the useHasRole / useHasClaim hooks show an element to a user the ID token says holds the role or claim and hide it from one who does not (src/auth/RequirePermission.test.tsx).", file: templates/RequirePermission.test.tsx.sbn }
   - { kind: end-to-end-test, describes: "A realm user signs in through the identity provider and sees the application (e2e/sign-in.spec.ts, run against the running AppHost).", file: templates/sign-in.spec.ts.sbn }

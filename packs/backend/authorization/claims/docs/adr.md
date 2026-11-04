@@ -19,14 +19,14 @@ Being signed in is not enough for every endpoint: access can depend on informati
 
 | Claim | Source | Mapper | In |
 |---|---|---|---|
-| `department` | the user attribute `department`, declared in the realm's user profile (`components` → `org.keycloak.userprofile.UserProfileProvider`), editable by administrators only | `oidc-usermodel-attribute-mapper` named `department` on the client `<name>-web` | the access token only |
+| `department` | the user attribute `department`, declared in the realm's user profile (`components` → `org.keycloak.userprofile.UserProfileProvider`), editable by administrators only | `oidc-usermodel-attribute-mapper` named `department` on the client `<name>-web` | the access token, and the ID token so the frontend can hide what the user may not use (`useHasClaim`) |
 
 Keycloak's standard claims (`email`, `email_verified`, `preferred_username`, ...) reach the token through its default client scopes and can be required the same way, without a mapper.
 
 **How to add a claim.**
 
 1. Declare the attribute in the user profile: add an entry to the `attributes` list in `kc.user.profile.config` (a JSON document stored as a string), with `"edit": ["admin"]` unless users may set it themselves, in which case it must not decide access.
-2. Map it into the access token: add an `oidc-usermodel-attribute-mapper` to `<name>-web`'s `protocolMappers`, with `user.attribute` and `claim.name` set and `access.token.claim` `"true"`.
+2. Map it into the access token: add an `oidc-usermodel-attribute-mapper` to `<name>-web`'s `protocolMappers`, with `user.attribute` and `claim.name` set and `access.token.claim` `"true"` (and `id.token.claim` `"true"` if the frontend should see it).
 3. Give the local users a value under `attributes` (`"attributes": { "cost-center": ["4711"] }`).
 4. Require it in the module's `<Module>Policies` and test it as `<Module>ClaimTests` does.
 

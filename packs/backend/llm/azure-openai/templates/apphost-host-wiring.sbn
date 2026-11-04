@@ -1,0 +1,4 @@
+
+    .WithEnvironment("AzureOpenAI__Endpoint", azureOpenAIEndpoint)
+    .WithEnvironment("AzureOpenAI__Deployment", azureOpenAIDeployment)
+    .WithEnvironment("AzureOpenAI__ApiKey", azureOpenAIApiKey)

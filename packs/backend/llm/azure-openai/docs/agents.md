@@ -1,0 +1,7 @@
+## LLM: Azure OpenAI
+
+- The project calls models deployed in its own Azure OpenAI resource through the resource's OpenAI v1 endpoint (`<endpoint>/openai/v1/`), with Microsoft's `Microsoft.Extensions.AI.OpenAI` adapter over the official `OpenAI` package. Only `src/BuildingBlocks/Llm/Wiring/AzureOpenAIChatClient.cs` names them; every other piece of code takes `IChatClient`. Do not add `Azure.AI.OpenAI`.
+- The endpoint is the AppHost's parameter `azure-openai-endpoint` and the key its secret parameter `azure-openai-api-key`. Set them with `dotnet user-secrets set Parameters:<name> <value> --project src/AppHost` locally and in the deployment's secret store elsewhere; never write the key anywhere in the repository, a log or a test.
+- The deployment is the AppHost's parameter `azure-openai-deployment`, `gpt-5-mini` by default; it must name a deployment in the resource. A use case that needs more reasoning is a decision to change it there, to a `gpt-5` deployment, at a higher price per token; never hard-code a deployment name in a module.
+- The key is the only authentication. Managed identity is a separate decision; do not add `Azure.Identity` or a credential switch.
+- Need streaming, tools or structured output? Use `IChatClient`'s own (`GetStreamingResponseAsync`, `ChatOptions.Tools`, `GetResponseAsync<T>`), not the SDK's types.

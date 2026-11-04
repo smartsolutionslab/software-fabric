@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 namespace Fabric.Packs.Tests;
@@ -402,6 +403,152 @@ public sealed partial class PrimitiveBoundaryTests
         }
         """;
 
+    private const string Shipments = """
+        using Shop.BuildingBlocks.Domain;
+
+        namespace Shop.Modules.Billing.Domain.Shipments;
+
+        public enum ShipmentStatus
+        {
+            Packed,
+            Sent,
+        }
+
+        public sealed class Shipment : AggregateRoot<ShipmentId>
+        {
+            private readonly List<ShipmentStatus> history = [];
+
+            private Shipment(ShipmentId id)
+                : base(id) => Status = ShipmentStatus.Packed;
+
+            public ShipmentStatus Status { get; private set; }
+
+            public ShipmentStatus? Previous { get; private set; }
+
+            public IReadOnlyList<ShipmentStatus> History => history;
+
+            public DayOfWeek Dispatch { get; private set; }
+
+            public static Shipment Pack() => new(ShipmentId.New());
+        }
+
+        public sealed record ShipmentId : IValueObject<Guid>
+        {
+            private ShipmentId(Guid value) => Value = value;
+
+            public Guid Value { get; }
+
+            public static ShipmentId New() => new(Guid.CreateVersion7());
+
+            public static ShipmentId From(Guid value)
+            {
+                Ensure.That(value).IsNotEmpty();
+                return new ShipmentId(value);
+            }
+        }
+        """;
+
+    private const string Routes = """
+        using Shop.BuildingBlocks.Domain;
+
+        namespace Shop.Modules.Billing.Domain.Routes;
+
+        internal sealed class Waypoint;
+
+        internal class Node<T>
+        {
+            public Node<List<T>>? Next { get; }
+        }
+
+        internal sealed class SpecialNode : Node<List<Waypoint>>
+        {
+            public string Remark { get; } = string.Empty;
+        }
+
+        internal sealed record Wrapper<T> : IValueObject<T>
+            where T : class
+        {
+            private Wrapper(T value) => Value = value;
+
+            public T Value { get; }
+
+            public Wrapper<Link<T>>? Linked { get; }
+
+            public static Wrapper<T> From(T value)
+            {
+                Ensure.That(value).IsNotNull();
+                return new Wrapper<T>(value);
+            }
+        }
+
+        internal sealed class Cargo
+        {
+            public string Text { get; } = string.Empty;
+        }
+
+        internal sealed class Link<T>
+        {
+            public string Label { get; } = string.Empty;
+        }
+
+        internal sealed class Marker;
+
+        internal sealed class Manifest
+        {
+            public string Note { get; } = string.Empty;
+        }
+
+        internal sealed record Tag<TTag> : IValueObject<Guid>
+        {
+            private Tag(Guid value) => Value = value;
+
+            public Guid Value { get; }
+
+            public Tag<Manifest>? Related { get; }
+
+            public Tag<List<TTag>>? Next { get; }
+
+            public static Tag<TTag> From(Guid value)
+            {
+                Ensure.That(value).IsNotEmpty();
+                return new Tag<TTag>(value);
+            }
+        }
+
+        internal sealed class Route : AggregateRoot<RouteId>
+        {
+            private Route(RouteId id)
+                : base(id)
+            {
+            }
+
+            public Node<Waypoint>? Start { get; }
+
+            public Wrapper<Wrapper<Cargo>>? Load { get; }
+
+            public Tag<Marker>? Mark { get; }
+
+            public int Hops { get; }
+
+            public static Route Plan() => new(RouteId.New());
+        }
+
+        internal sealed record RouteId : IValueObject<Guid>
+        {
+            private RouteId(Guid value) => Value = value;
+
+            public Guid Value { get; }
+
+            public static RouteId New() => new(Guid.CreateVersion7());
+
+            public static RouteId From(Guid value)
+            {
+                Ensure.That(value).IsNotEmpty();
+                return new RouteId(value);
+            }
+        }
+        """;
+
     [Fact]
     public void A_strict_module_passes_with_its_samples_and_fails_naming_each_primitive_an_aggregate_command_or_event_holds()
     {
@@ -480,6 +627,81 @@ public sealed partial class PrimitiveBoundaryTests
             () => exitCode.ShouldNotBe(0, output),
             () => named.ShouldBe(["Shop.Modules.Billing.Domain.Orders.Order.Weights holds Int32"]),
             () => output.ShouldContain("failed: 1"));
+    }
+
+    [Fact]
+    public void An_aggregate_holding_an_enum_passes_the_gate()
+    {
+        using var project = new GeneratedProject("saas-strict-react");
+        project.AddModule("billing");
+
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Shipments", Shipments);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+    }
+
+    [Fact]
+    public void A_self_expanding_generic_type_ends_the_walk_without_hiding_what_it_holds_its_subclasses_or_following_a_phantom_tag()
+    {
+        using var project = new GeneratedProject("saas-strict-react");
+        project.AddModule("billing");
+
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Routes", Routes);
+        project.Build();
+
+        var (ended, exitCode, output) = TestWithin(project, "tests/Architecture.Tests/Architecture.Tests.csproj", TimeSpan.FromMinutes(3));
+
+        List<string> named = [.. Violation().Matches(output).Select(match => match.Value).Distinct()];
+
+        output.ShouldSatisfyAllConditions(
+            () => ended.ShouldBeTrue($"The architecture tests did not end within 3 minutes.\n{output}"),
+            () => exitCode.ShouldNotBe(0, output),
+            () => named.ShouldBe(
+            [
+                "Shop.Modules.Billing.Domain.Routes.Cargo.Text holds String",
+                "Shop.Modules.Billing.Domain.Routes.Route.Hops holds Int32",
+                "Shop.Modules.Billing.Domain.Routes.SpecialNode.Remark holds String",
+            ]),
+            () => output.ShouldContain("].Label holds String"),
+            () => output.ShouldNotContain("Manifest.Note holds"),
+            () => output.ShouldContain("failed: 1"));
+    }
+
+    /// <summary>
+    /// Runs one test project of the generated solution and stops it, with every process it started, once the limit
+    /// passes: a walk that never ends spins without ever reaching a cancellation point, so the platform's own
+    /// <c>--timeout</c> cannot end it.
+    /// </summary>
+    private static (bool Ended, int ExitCode, string Output) TestWithin(GeneratedProject project, string testProject, TimeSpan limit)
+    {
+        var start = new ProcessStartInfo("dotnet")
+        {
+            WorkingDirectory = project.ProjectDirectory,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in (string[])["test", "--project", testProject, "-c", "Release", "--no-build", "--no-ansi"])
+        {
+            start.ArgumentList.Add(argument);
+        }
+
+        start.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
+        start.Environment["DOTNET_NOLOGO"] = "1";
+
+        using var process = Process.Start(start) ?? throw new InvalidOperationException("dotnet did not start.");
+        var standardOutput = process.StandardOutput.ReadToEndAsync();
+        var standardError = process.StandardError.ReadToEndAsync();
+        var ended = process.WaitForExit(limit);
+        if (!ended)
+        {
+            process.Kill(entireProcessTree: true);
+        }
+
+        process.WaitForExit();
+        return (ended, ended ? process.ExitCode : -1, standardOutput.Result + standardError.Result);
     }
 
     [GeneratedRegex(@"Shop\.Modules\.\S+ holds \w+")]
