@@ -78,7 +78,8 @@
       "properties": {
         "slot": { "type": "string", "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$" },
         "template": { "type": "string" },
-        "order": { "description": "Tie-breaker inside the slot; lower renders first. Ties sort by option id.", "type": "integer", "default": 0 }
+        "order": { "description": "Tie-breaker inside the slot; lower renders first. Ties sort by option id.", "type": "integer", "default": 0 },
+        "optional": { "description": "Dropped when no selected pack declares the slot, instead of failing generation. A declared slot takes it like any other.", "type": "boolean", "default": false }
       }
     },
     "slotDeclaration": {

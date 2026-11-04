@@ -114,6 +114,12 @@ namespace, and a pack that puts one anywhere else fails the build.
 Cardinality `0+` unless stated. "Separator" is what joins contributions
 (new, see Generator changes); default is a newline.
 
+A contribution to a slot no selected pack declares is an error, unless
+it carries `optional: true` (added for #134): then it is dropped when the
+slot is undeclared and renders as usual when it is declared. That lets a
+pack fill a slot of a choice it can be combined with but does not need
+(docs/packs.md, ADR-0002).
+
 ### Agent setup and docs
 
 | Slot | File | Separator | Filled by (saas-standard-react) |

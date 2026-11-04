@@ -26,6 +26,10 @@ A pack contributes to the generated project in exactly two ways:
    `apphost.resources`, `frontend.app.bootstrap`. A slot has a cardinality
    (`zero-or-more`, `exactly-one`, `at-most-one`); contributions are
    ordered by `order`, then by option id, so output is deterministic.
+   A contribution to a slot no selected pack declares fails generation,
+   naming the pack and the slot. A contribution marked `optional: true`
+   is dropped instead, and only then; to a declared slot it counts like
+   any other.
 
 A pack never edits another pack's output. When a pack needs to influence
 something it does not own, the fix is a new slot, introduced in its own
