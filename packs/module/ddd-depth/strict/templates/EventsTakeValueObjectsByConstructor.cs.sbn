@@ -13,10 +13,12 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 /// <remarks>
 /// Each closed type is checked once. A generic definition that can recur forever (<c>Node&lt;T&gt;</c> holding a
 /// <c>Node&lt;Envelope&lt;T&gt;&gt;</c>), and every definition it builds from its own type parameters, would give the
-/// walk a new closed type at every step. Whether a closed type's member carries a value object depends only on which
-/// of the type arguments it reads carry one, so such a definition is checked once for each combination of those, on
-/// the first closed type found with it; of every later closed type with the same combination only the arguments it
-/// reads are walked. There are finitely many combinations, so the walk ends.
+/// walk a new closed type at every step. What a closed type's members reach depends only on which of the type
+/// arguments it reads carry a value object, so such a definition is checked once for each combination of those and of
+/// the violations it then shows (an optional <c>T?</c> is nullable for a class but not for a struct), on the first
+/// closed type found with it; of every later closed type with the same combination only the arguments it reads are
+/// walked. There are finitely many combinations, so the walk ends. A type parameter of an open generic event carries
+/// nothing.
 /// </remarks>
 public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : IArchitectureRule
 {
@@ -246,7 +248,7 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
         private readonly HashSet<Type> recurring;
         private readonly Dictionary<Type, Reading> readings;
         private readonly Dictionary<Type, bool> carrying = [];
-        private readonly Dictionary<(Type Definition, string Carrying), Type> firsts = [];
+        private readonly Dictionary<(Type Definition, string Shape), Type> firsts = [];
         private readonly HashSet<Type> visited = [];
         private readonly List<Type> holders = [];
 
@@ -272,11 +274,11 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
             foreach (var holder in holders)
             {
                 var once = holder.IsGenericType && recurring.Contains(holder.GetGenericTypeDefinition());
-                foreach (var (member, violation) in Violations(holder))
+                foreach (var (member, problem) in Violations(holder))
                 {
                     if (!once || named.Add((holder.GetGenericTypeDefinition(), member)))
                     {
-                        violations.Add(violation);
+                        violations.Add($"{holder}.{member} {problem}");
                     }
                 }
             }
@@ -284,7 +286,7 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
             return violations;
         }
 
-        private IEnumerable<(string Member, string Violation)> Violations(Type holder)
+        private IEnumerable<(string Member, string Problem)> Violations(Type holder)
         {
             // System.Text.Json matches a constructor parameter to a property by name, ignoring case.
             Dictionary<string, ParameterInfo> parameters = new(StringComparer.OrdinalIgnoreCase);
@@ -304,11 +306,11 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
 
                 if (!parameters.TryGetValue(property.Name, out var parameter))
                 {
-                    yield return (property.Name, $"{holder}.{property.Name} carries a value object outside its constructor; make it a parameter of the constructor System.Text.Json selects ([JsonConstructor], else the public parameterless one, else the only public one), so a stored event without it fails to read.");
+                    yield return (property.Name, "carries a value object outside its constructor; make it a parameter of the constructor System.Text.Json selects ([JsonConstructor], else the public parameterless one, else the only public one), so a stored event without it fails to read.");
                 }
                 else if (parameter.IsOptional && nullability.Create(parameter).ReadState != NullabilityState.Nullable)
                 {
-                    yield return (property.Name, $"{holder}.{property.Name} carries a value object through an optional constructor parameter; remove its default, or declare it nullable, so a stored event without it fails to read.");
+                    yield return (property.Name, "carries a value object through an optional constructor parameter; remove its default, or declare it nullable, so a stored event without it fails to read.");
                 }
             }
         }
@@ -368,19 +370,20 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
         }
 
         /// <summary>
-        /// The first closed type found of a recurring definition whose arguments it reads carry a value object where the
-        /// type's do; any other type stands for itself.
+        /// The first type found of a recurring definition whose arguments it reads carry a value object where the type's
+        /// do, and that shows the same violations; any other type stands for itself.
         /// </summary>
         private Type First(Type type)
         {
-            if (!type.IsGenericType || type.ContainsGenericParameters || !recurring.Contains(type.GetGenericTypeDefinition()))
+            if (!type.IsGenericType || type.IsGenericTypeDefinition || !recurring.Contains(type.GetGenericTypeDefinition()))
             {
                 return type;
             }
 
             var reading = readings[type.GetGenericTypeDefinition()];
             var arguments = type.GetGenericArguments();
-            var key = (type.GetGenericTypeDefinition(), string.Concat(arguments.Select((argument, position) => reading.Arguments[position] && Carries(argument) ? '1' : '0')));
+            var carries = string.Concat(arguments.Select((argument, position) => reading.Arguments[position] && Carries(argument) ? '1' : '0'));
+            var key = (type.GetGenericTypeDefinition(), carries + string.Concat(Violations(type).Select(violation => $"\n{violation.Member} {violation.Problem}")));
             if (!firsts.TryGetValue(key, out var first))
             {
                 first = type;

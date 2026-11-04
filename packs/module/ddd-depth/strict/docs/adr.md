@@ -77,7 +77,8 @@ Domain can recur forever: one that passes a type parameter on, inside a larger t
 builds from its own type parameters. Every other definition has finitely many closed types, and each is checked, so a
 larger closed type that does not grow (`Box<T>` holding the fixed `Box<List<InvoiceNumber>>`) is checked like any
 other. Whether a closed type's member carries a value object depends only on which of the type arguments it reads
-carry one, so a definition that recurs is checked once for each combination of those, on the first closed type found
+carry one, so a definition that recurs is checked once for each combination of those and of the violations it then
+shows (an optional `T? Value = default` is nullable for a class but not for a struct), on the first closed type found
 with it, and of every later closed type with the same combination only the arguments it reads are walked:
 `Node<Marker>` and `Node<Envelope<Marker>>` are checked, and `Node<Envelope<Marker>>.Value` is named. There are
 finitely many combinations, so the walk ends. One limit remains, for these definitions only: a member is named once,
