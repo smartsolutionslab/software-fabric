@@ -1,0 +1,46 @@
+{{~ policies = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+using {{ namespace }}.BuildingBlocks.Mcp;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// Every command or query marked [McpTool] is a tool the host can offer: the build fails on exactly what would stop the
+/// host at startup, because both ask <see cref="McpToolCatalog"/>. It cannot see whether a description is accurate,
+/// whether a request's arguments can be read from JSON, or whether a command is safe to put in a model's hands.
+/// </summary>
+public sealed class EveryMcpToolIsValid : IArchitectureRule
+{
+    private const string ModulePrefix = "{{ namespace }}.Modules.";
+
+    private const string ApplicationSuffix = ".Application";
+{{~ if policies ~}}
+
+    private const string ApiSuffix = ".Api";
+{{~ end ~}}
+
+    public string Description => "Every command or query marked [McpTool] has a description and exactly one handler{{ if policies }}, and names only a policy its own module registers{{ end }}.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        List<McpToolDefinition> tools = [];
+        List<string> problems = [];
+        foreach (var application in model.ModuleAssemblies.Where(assembly => assembly.GetName().Name!.EndsWith(ApplicationSuffix, StringComparison.Ordinal)))
+        {
+            var name = application.GetName().Name!;
+            var module = name[ModulePrefix.Length..^ApplicationSuffix.Length];
+{{~ if policies ~}}
+            var api = model.ModuleAssemblies.Single(assembly => assembly.GetName().Name == ModulePrefix + module + ApiSuffix);
+            var scan = McpToolCatalog.Scan(module, application, api);
+{{~ else ~}}
+            var scan = McpToolCatalog.Scan(module, application);
+{{~ end ~}}
+            tools.AddRange(scan.Tools);
+            problems.AddRange(scan.Problems);
+        }
+
+        // The host checks all modules' tools together, so the rule does too: two modules may produce the same name.
+        return problems.Concat(McpToolCatalog.Collisions(tools)).Distinct(StringComparer.Ordinal);
+    }
+}

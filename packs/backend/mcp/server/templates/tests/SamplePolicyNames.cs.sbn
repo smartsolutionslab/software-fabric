@@ -1,0 +1,7 @@
+namespace {{ namespace }}.Mcp.Server.Tests;
+
+/// <summary>The samples' policy names, as a module's <c>&lt;Module&gt;PolicyNames</c> declares its own.</summary>
+public static class SamplePolicyNames
+{
+    public const string Manage = "samples.manage";
+}

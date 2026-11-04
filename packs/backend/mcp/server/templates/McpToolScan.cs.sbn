@@ -1,0 +1,4 @@
+namespace {{ namespace }}.BuildingBlocks.Mcp;
+
+/// <summary>What <see cref="McpToolCatalog.Scan"/> found in one module: its tools, and each problem in words.</summary>
+public sealed record McpToolScan(IReadOnlyList<McpToolDefinition> Tools, IReadOnlyList<string> Problems);

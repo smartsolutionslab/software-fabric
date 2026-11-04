@@ -1,0 +1,141 @@
+{{~ option = project["backend.absence"] == "option" ~}}
+{{~ policies = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+using System.Reflection;
+using System.Text;
+using {{ namespace }}.BuildingBlocks.Messaging;
+{{~ if policies ~}}
+using {{ namespace }}.BuildingBlocks.Modules;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+{{~ end ~}}
+
+namespace {{ namespace }}.BuildingBlocks.Mcp;
+
+/// <summary>
+/// The one definition of a valid MCP tool. The host offers what <see cref="Scan"/> finds and refuses to start on a
+/// problem; the architecture rule EveryMcpToolIsValid fails the build on the same problems, so the two never disagree.
+/// </summary>
+public static class McpToolCatalog
+{
+    private static readonly Type[] Requests = [typeof(ICommand<>), typeof(IQuery<>)];
+
+    /// <summary>The tools a module's Application assembly marks with <see cref="McpToolAttribute"/>, and what is wrong with any of them.</summary>
+    /// <param name="module">The module's name, e.g. <c>Billing</c>; every tool's name starts with it.</param>
+    /// <param name="application">The assembly holding the module's commands, queries and handlers.</param>
+{{~ if policies ~}}
+    /// <param name="api">The assembly holding the module's <see cref="IModulePolicies"/>.</param>
+    public static McpToolScan Scan(string module, Assembly application, Assembly api)
+{{~ else ~}}
+    public static McpToolScan Scan(string module, Assembly application)
+{{~ end ~}}
+    {
+        {{ not_blank "module" }}
+        {{ not_null "application" }}
+{{~ if policies ~}}
+        {{ not_null "api" }}
+{{~ end ~}}
+
+        var types = application.GetTypes();
+{{~ if policies ~}}
+        var policies = Policies(api);
+{{~ end ~}}
+        List<McpToolDefinition> tools = [];
+        List<string> problems = [];
+        foreach (var type in types.Where(type => type.IsDefined(typeof(McpToolAttribute), inherit: false)).OrderBy(type => type.FullName, StringComparer.Ordinal))
+        {
+            var marker = type.GetCustomAttribute<McpToolAttribute>()!;
+            var contracts = type.GetInterfaces().Where(contract => contract.IsGenericType && Requests.Contains(contract.GetGenericTypeDefinition())).ToList();
+            if (type.IsAbstract || contracts.Count != 1)
+            {
+                problems.Add($"{type.FullName} is marked [McpTool] but is not a command or a query: mark the record that implements ICommand<T> or IQuery<T>.");
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(marker.Description))
+            {
+                problems.Add($"{type.FullName} is marked [McpTool] without a description: the model reads it to decide when to call the tool.");
+            }
+
+            var contract = contracts[0];
+            var result = contract.GetGenericArguments()[0];
+            var readsOnly = contract.GetGenericTypeDefinition() == typeof(IQuery<>);
+            var handler = (readsOnly ? typeof(IQueryHandler<,>) : typeof(ICommandHandler<,>)).MakeGenericType(type, result);
+            var handlers = types.Count(candidate => candidate is { IsClass: true, IsAbstract: false } && handler.IsAssignableFrom(candidate));
+            if (handlers != 1)
+            {
+                problems.Add($"{type.FullName} is marked [McpTool] but has {handlers} handlers in {application.GetName().Name}: a tool needs exactly one.");
+            }
+{{~ if policies ~}}
+
+            if (marker.Policy is { } policy && policies.GetPolicy(policy) is null)
+            {
+                problems.Add($"{type.FullName} is marked [McpTool] with the policy {policy}, which the module {module} does not register: name one of its own <module>.<permission> policies.");
+            }
+
+{{~ if option ~}}
+            var required = marker.Policy is { } named ? Option<string>.Some(named) : Option<string>.None;
+            tools.Add(new McpToolDefinition($"{SnakeCase(module)}_{SnakeCase(type.Name)}", marker.Description, type, result, readsOnly, required));
+{{~ else ~}}
+            tools.Add(new McpToolDefinition($"{SnakeCase(module)}_{SnakeCase(type.Name)}", marker.Description, type, result, readsOnly, marker.Policy));
+{{~ end ~}}
+{{~ else ~}}
+
+            tools.Add(new McpToolDefinition($"{SnakeCase(module)}_{SnakeCase(type.Name)}", marker.Description, type, result, readsOnly));
+{{~ end ~}}
+        }
+
+        problems.AddRange(Collisions(tools));
+        return new McpToolScan(tools, problems);
+    }
+
+    /// <summary>
+    /// Every name two or more of the tools share. Check the tools of all modules together, not only each module's: the
+    /// modules <c>billing</c> and <c>billing-find</c> both name a tool <c>billing_find_invoice</c>.
+    /// </summary>
+    public static IReadOnlyList<string> Collisions(IEnumerable<McpToolDefinition> tools)
+    {
+        {{ not_null "tools" }}
+
+        return [.. tools
+            .GroupBy(tool => tool.Name, StringComparer.Ordinal)
+            .Where(group => group.Count() > 1)
+            .Select(group => $"{string.Join(" and ", group.Select(tool => tool.Request.FullName))} would all be the MCP tool {group.Key}: rename all but one.")];
+    }
+{{~ if policies ~}}
+
+    /// <summary>The policies the module's own <see cref="IModulePolicies"/> register, and no other module's.</summary>
+    private static AuthorizationOptions Policies(Assembly api)
+    {
+        var services = new ServiceCollection();
+        var builder = new AuthorizationBuilder(services.AddAuthorizationCore());
+        foreach (var registration in api.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(IModulePolicies).IsAssignableFrom(type))
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .Select(type => (IModulePolicies)Activator.CreateInstance(type)!))
+        {
+            registration.AddPolicies(builder);
+        }
+
+        using var provider = services.BuildServiceProvider();
+        return provider.GetRequiredService<IOptions<AuthorizationOptions>>().Value;
+    }
+{{~ end ~}}
+
+    /// <summary><c>FindInvoice</c> becomes <c>find_invoice</c>.</summary>
+    private static string SnakeCase(string name)
+    {
+        var snake = new StringBuilder();
+        foreach (var character in name)
+        {
+            if (char.IsUpper(character) && snake.Length > 0)
+            {
+                snake.Append('_');
+            }
+
+            snake.Append(char.ToLowerInvariant(character));
+        }
+
+        return snake.ToString();
+    }
+}

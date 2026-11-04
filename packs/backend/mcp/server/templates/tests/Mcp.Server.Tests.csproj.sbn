@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The host's MCP endpoint, in process, through the SDK's own client; the samples here stand in for a module's requests. -->
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Mcp.Server.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Host/Host.csproj" />
+  </ItemGroup>
+
+</Project>

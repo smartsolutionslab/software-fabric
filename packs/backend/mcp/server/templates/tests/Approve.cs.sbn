@@ -1,0 +1,8 @@
+using {{ namespace }}.BuildingBlocks.Mcp;
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Mcp.Server.Tests;
+
+/// <summary>A marked command that needs the policy <c>samples.manage</c>, as a module's would name its own.</summary>
+[McpTool("Approves the request with the given number.", Policy = SamplePolicyNames.Manage)]
+public sealed record Approve(int Number) : ICommand<Result<Approved, ApiError>>;

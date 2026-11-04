@@ -7,7 +7,7 @@
 
 Being signed in is not enough for every endpoint: access can depend on information in the user's profile, carried as a claim in the token (a department, a verified e-mail address, a custom attribute). Claims are checked in exactly one place, a module's authorization policies.
 
-**A module registers its own policies.** Its Api project has one `IModulePolicies` (`<Module>Policies`), found by assembly scan like `IModule`, which adds policies named `<module>.<permission>` (`billing.approve-invoices`), each requiring a claim, or a claim with given values, with `RequireClaim("department", "finance")`. `AddModuleInfrastructure` registers them. An endpoint names a policy with `RequireAuthorization(BillingPolicies.ApproveInvoices)`; handlers never read claims to decide access.
+**A module registers its own policies.** Its Api project has one `IModulePolicies` (`<Module>Policies`), found by assembly scan like `IModule`, which adds policies under the names its Application project declares in `<Module>PolicyNames`, `<module>.<permission>` (`billing.approve-invoices`), each requiring a claim, or a claim with given values, with `RequireClaim("department", "finance")`. `AddModuleInfrastructure` registers them. An endpoint names a policy with `RequireAuthorization(BillingPolicyNames.ApproveInvoices)`; handlers never read claims to decide access.
 {{~ if roles ~}}
 
 **Roles and claims together.** One policy may require a role and a claim: `policy.RequireRole("approver").RequireClaim("department", "finance")` means "approver in finance". Every requirement must hold; a user with only one of them gets 403.

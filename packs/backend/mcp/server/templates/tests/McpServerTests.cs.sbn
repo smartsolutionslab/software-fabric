@@ -1,0 +1,176 @@
+{{~ auth = project["backend.auth"] != "none" ~}}
+{{~ policies = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+{{~ if auth ~}}
+using System.Net;
+{{~ end ~}}
+using System.Text.Json;
+{{~ if policies ~}}
+using Microsoft.Extensions.DependencyInjection;
+using ModelContextProtocol;
+{{~ end ~}}
+using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
+
+namespace {{ namespace }}.Mcp.Server.Tests;
+
+/// <summary>
+/// The host's MCP endpoint through the SDK's own client: a command or query is a tool only when marked [McpTool], and
+/// a call reaches its handler through the dispatcher{{ if auth }}; a caller who is not signed in{{ if policies }}, or lacks the tool's policy,{{ end }} is refused{{ end }}.
+/// </summary>
+public sealed class McpServerTests : IDisposable
+{
+{{~ if auth ~}}
+    private static readonly string[] NoPermissions = [];
+{{~ end ~}}
+{{~ if policies ~}}
+
+    private static readonly string[] Manage = ["manage"];
+{{~ end ~}}
+
+    private readonly McpHost host = new();
+
+    [Fact]
+    public async Task The_marked_query_is_listed_with_its_description_and_the_unmarked_one_is_not()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var client = await ConnectAsync(cancellationToken);
+
+        var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
+
+        tools.Select(tool => tool.Name).ShouldContain("samples_shout");
+        tools.Select(tool => tool.Name).ShouldNotContain("samples_whisper");
+        tools.Single(tool => tool.Name == "samples_shout").Description.ShouldBe("Answers with the text it was given, in capitals.");
+    }
+
+    [Fact]
+    public async Task A_tools_input_schema_is_its_request_records()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var client = await ConnectAsync(cancellationToken);
+
+        var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
+
+        var properties = tools.Single(tool => tool.Name == "samples_shout").JsonSchema.GetProperty("properties");
+        properties.EnumerateObject().Select(property => property.Name).ShouldBe(["text"]);
+        properties.GetProperty("text").GetProperty("type").GetString().ShouldBe("string");
+    }
+
+    [Fact]
+    public async Task Calling_the_marked_query_answers_with_its_handlers_result()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var client = await ConnectAsync(cancellationToken);
+
+        var result = await client.CallToolAsync("samples_shout", new Dictionary<string, object?> { ["text"] = "hello" }, cancellationToken: cancellationToken);
+
+        (result.IsError ?? false).ShouldBeFalse();
+        Text(result).ShouldBe("{\"text\":\"HELLO\"}");
+    }
+
+    [Fact]
+    public async Task A_failed_result_is_a_tool_error_starting_with_the_errors_code()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var client = await ConnectAsync(cancellationToken);
+
+        var result = await client.CallToolAsync("samples_shout", new Dictionary<string, object?> { ["text"] = string.Empty }, cancellationToken: cancellationToken);
+
+        (result.IsError ?? false).ShouldBeTrue();
+        Text(result).ShouldBe("samples.nothing-to-shout: There is nothing to shout.");
+    }
+
+    [Theory]
+    [InlineData("{\"text\":42}")]
+    [InlineData("{\"text\":null}")]
+    [InlineData("{}")]
+    public async Task Arguments_that_are_not_the_request_are_a_tool_error(string arguments)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var client = await ConnectAsync(cancellationToken);
+
+        var result = await client.CallToolAsync("samples_shout", JsonSerializer.Deserialize<Dictionary<string, object?>>(arguments), cancellationToken: cancellationToken);
+
+        (result.IsError ?? false).ShouldBeTrue();
+        Text(result).ShouldStartWith("The arguments are not a Shout:");
+    }
+{{~ if project["backend.absence"] == "option" ~}}
+
+    [Theory]
+    [InlineData("", "null")]
+    [InlineData("plain", "{\"text\":\"plain\",\"note\":null}")]
+    [InlineData("rare", "{\"text\":\"rare\",\"note\":\"noted\"}")]
+    public async Task An_absent_option_is_null_in_the_answer_at_the_top_and_nested(string text, string answer)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var client = await ConnectAsync(cancellationToken);
+
+        var result = await client.CallToolAsync("samples_lookup", new Dictionary<string, object?> { ["text"] = text }, cancellationToken: cancellationToken);
+
+        (result.IsError ?? false).ShouldBeFalse(Text(result));
+        Text(result).ShouldBe(answer);
+    }
+{{~ end ~}}
+{{~ if auth ~}}
+
+    [Fact]
+    public async Task An_anonymous_caller_is_refused()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        var refused = await Should.ThrowAsync<HttpRequestException>(() => host.ConnectAsync(null, NoPermissions, cancellationToken));
+
+        refused.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+{{~ else ~}}
+
+    [Fact]
+    public async Task Anyone_may_call_a_tool_without_signing_in()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var client = await host.ConnectAsync(cancellationToken);
+
+        var result = await client.CallToolAsync("samples_shout", new Dictionary<string, object?> { ["text"] = "hi" }, cancellationToken: cancellationToken);
+
+        Text(result).ShouldBe("{\"text\":\"HI\"}");
+    }
+{{~ end ~}}
+{{~ if policies ~}}
+
+    [Fact]
+    public async Task A_caller_without_the_tools_policy_neither_sees_nor_reaches_it()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var client = await host.ConnectAsync("visitor", NoPermissions, cancellationToken);
+
+        var tools = await client.ListToolsAsync(cancellationToken: cancellationToken);
+        var refused = await Should.ThrowAsync<McpException>(async () =>
+            await client.CallToolAsync("samples_approve", new Dictionary<string, object?> { ["number"] = 7 }, cancellationToken: cancellationToken));
+
+        tools.Select(tool => tool.Name).ShouldNotContain("samples_approve");
+        refused.Message.ShouldContain("Access forbidden");
+        host.Services.GetRequiredService<Approvals>().Numbers.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_caller_with_the_tools_policy_calls_it()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var client = await host.ConnectAsync("developer", Manage, cancellationToken);
+
+        var result = await client.CallToolAsync("samples_approve", new Dictionary<string, object?> { ["number"] = 7 }, cancellationToken: cancellationToken);
+
+        Text(result).ShouldBe("{\"number\":7}");
+        host.Services.GetRequiredService<Approvals>().Numbers.ShouldBe([7]);
+    }
+{{~ end ~}}
+
+    public void Dispose() => host.Dispose();
+
+    private static string Text(CallToolResult result) => result.Content.OfType<TextContentBlock>().Single().Text;
+
+{{~ if auth ~}}
+    private Task<McpClient> ConnectAsync(CancellationToken cancellationToken) => host.ConnectAsync("developer", NoPermissions, cancellationToken);
+{{~ else ~}}
+    private Task<McpClient> ConnectAsync(CancellationToken cancellationToken) => host.ConnectAsync(cancellationToken);
+{{~ end ~}}
+}

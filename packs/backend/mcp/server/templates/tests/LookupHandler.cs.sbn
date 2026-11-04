@@ -1,0 +1,24 @@
+{{~ typed = object.has_key(project, "backend.result-style") && project["backend.result-style"] == "typed-outcomes" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Mcp.Server.Tests;
+
+public sealed class LookupHandler : IQueryHandler<Lookup, Result<Option<Found>, ApiError>>
+{
+    public Task<Result<Option<Found>, ApiError>> HandleAsync(Lookup query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        var found = query.Text switch
+        {
+            "" => Option<Found>.None,
+            "plain" => Option<Found>.Some(new Found(query.Text, Option<string>.None)),
+            _ => Option<Found>.Some(new Found(query.Text, Option<string>.Some("noted"))),
+        };
+{{~ if typed ~}}
+        return Task.FromResult<Result<Option<Found>, ApiError>>(Success(found));
+{{~ else ~}}
+        return Task.FromResult(Result<Option<Found>, ApiError>.Success(found));
+{{~ end ~}}
+    }
+}

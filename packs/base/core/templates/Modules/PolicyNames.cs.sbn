@@ -1,0 +1,10 @@
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application;
+
+/// <summary>
+/// The names of the module's authorization policies, each <c>{{ module.name }}.&lt;permission&gt;</c>. They live here, in
+/// Application, so a request can name one; <c>{{ module.namespace }}Policies</c> in the Api project registers them.
+/// </summary>
+public static class {{ module.namespace }}PolicyNames
+{
+    public const string Manage = "{{ module.name }}.manage";
+}

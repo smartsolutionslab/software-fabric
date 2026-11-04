@@ -8,19 +8,21 @@
   end
 ~}}
 using {{ namespace }}.BuildingBlocks.Modules;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application;
 using Microsoft.AspNetCore.Authorization;
 
 namespace {{ namespace }}.Modules.{{ module.namespace }}.Api;
 
-/// <summary>The module's authorization policies, each named <c>{{ module.name }}.&lt;permission&gt;</c>; its endpoints name them.</summary>
+/// <summary>
+/// The module's authorization policies, registered under the names in <see cref="{{ module.namespace }}PolicyNames"/>; its
+/// endpoints name them.
+/// </summary>
 public sealed class {{ module.namespace }}Policies : IModulePolicies
 {
-    public const string Manage = "{{ module.name }}.manage";
-
     public void AddPolicies(AuthorizationBuilder policies)
     {
         {{ not_null "policies" }}
 
-        policies.AddPolicy(Manage, policy => policy.{{ requirements | array.join "." }});
+        policies.AddPolicy({{ module.namespace }}PolicyNames.Manage, policy => policy.{{ requirements | array.join "." }});
     }
 }
