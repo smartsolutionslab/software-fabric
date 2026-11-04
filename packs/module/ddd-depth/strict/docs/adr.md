@@ -54,8 +54,9 @@ strict module fails on each public setter of an aggregate root: strict is light 
 
 The walk visits each closed type once, and never enters a closed type of a generic definition it is already inside of:
 `Node<T>` holding a `Node<List<T>>` would otherwise construct a new type at every step and never end. The inner type's
-state is the definition's again, already checked, and the primitives its type arguments bring in are still named where
-they are reached. Persistence's value-object scan follows the same rule.
+state is the definition's again, already checked. What its type arguments bring in is still walked:
+`Wrapper<Wrapper<Cargo>>` still reaches `Cargo` through the inner `Wrapper<Cargo>` it does not enter. Persistence's
+value-object scan follows the same rule.
 
 ## Consequences
 
