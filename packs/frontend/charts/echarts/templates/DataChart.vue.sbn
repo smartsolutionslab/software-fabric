@@ -1,0 +1,21 @@
+<script setup lang="ts">
+// The whole of ECharts, every chart type and component, as echarts-for-react has it for React.
+import 'echarts';
+import type { EChartsOption } from 'echarts';
+import VChart from 'vue-echarts';
+
+interface ChartProps {
+  option: EChartsOption;
+  label: string;
+  height?: number;
+}
+
+/** An ECharts chart; label names it for screen readers. */
+const { option, label, height = 320 } = defineProps<ChartProps>();
+</script>
+
+<template>
+  <div role="img" :aria-label="label">
+    <VChart :option="option" :style="{ height: `${height}px` }" />
+  </div>
+</template>

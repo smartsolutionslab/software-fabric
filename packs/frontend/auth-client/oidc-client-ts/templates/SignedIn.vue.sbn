@@ -1,0 +1,25 @@
+<script setup lang="ts">
+import { watchEffect } from 'vue';
+import { useAuth } from '@/auth/useAuth';
+
+/** Renders its default slot for a signed-in user and sends everyone else to the identity provider. */
+const { user, isAuthenticated, isLoading, error, signinRedirect, signoutRedirect } = useAuth();
+
+watchEffect(() => {
+  if (!isAuthenticated.value && !isLoading.value && !error.value) {
+    void signinRedirect();
+  }
+});
+</script>
+
+<template>
+  <p v-if="error" role="alert">Sign-in failed: {{ "{{" }} error.message {{ "}}" }}</p>
+  <p v-else-if="!isAuthenticated">Signing in…</p>
+  <template v-else>
+    <div class="flex items-center justify-end gap-3 p-2 text-sm">
+      <span>Signed in as {{ "{{" }} user?.profile.preferred_username {{ "}}" }}</span>
+      <button type="button" @click="signoutRedirect()">Sign out</button>
+    </div>
+    <slot />
+  </template>
+</template>

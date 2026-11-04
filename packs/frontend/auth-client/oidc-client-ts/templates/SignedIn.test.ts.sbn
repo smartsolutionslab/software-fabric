@@ -1,0 +1,86 @@
+import { render, screen } from '@testing-library/vue';
+import { User } from 'oidc-client-ts';
+import { afterEach, expect, test, vi } from 'vitest';
+import SignedIn from './SignedIn.vue';
+import { type AuthClient, authKey, createAuth } from './useAuth';
+
+afterEach(() => {
+  window.history.replaceState({}, '', '/');
+});
+
+const developer = new User({
+  access_token: 'access-token',
+  token_type: 'Bearer',
+  profile: {
+    sub: 'developer-id',
+    iss: 'http://localhost:8080/realms/{{ name }}',
+    aud: '{{ name }}-web',
+    exp: 0,
+    iat: 0,
+    preferred_username: 'developer',
+  },
+  expires_at: Math.floor(Date.now() / 1000) + 300,
+});
+
+/** oidc-client-ts's UserManager as SignedIn sees it: a stored user (or none), a sign-in callback and the redirects. */
+function client(overrides: Partial<AuthClient> = {}): AuthClient {
+  return {
+    getUser: vi.fn<AuthClient['getUser']>(() => Promise.resolve(null)),
+    signinCallback: vi.fn<AuthClient['signinCallback']>(() => Promise.resolve(developer)),
+    signinRedirect: vi.fn<AuthClient['signinRedirect']>(() => Promise.resolve()),
+    signoutRedirect: vi.fn<AuthClient['signoutRedirect']>(() => Promise.resolve()),
+    events: { addUserLoaded: vi.fn(), addUserUnloaded: vi.fn() },
+    ...overrides,
+  };
+}
+
+function renderSignedIn(fake: AuthClient) {
+  return render(SignedIn, {
+    global: { provide: { [authKey]: createAuth(fake) } },
+    slots: { default: '<h1>{{ name }}</h1>' },
+  });
+}
+
+test('an anonymous visitor is sent to the identity provider', async () => {
+  const fake = client();
+
+  renderSignedIn(fake);
+
+  await vi.waitFor(() => expect(fake.signinRedirect).toHaveBeenCalledOnce());
+  expect(screen.getByText('Signing in…')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: '{{ name }}' })).not.toBeInTheDocument();
+});
+
+test('a signed-in user sees who they are and the application', async () => {
+  const fake = client({ getUser: vi.fn<AuthClient['getUser']>(() => Promise.resolve(developer)) });
+
+  renderSignedIn(fake);
+
+  expect(await screen.findByText('Signed in as developer')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '{{ name }}' })).toBeInTheDocument();
+  expect(fake.signinRedirect).not.toHaveBeenCalled();
+});
+
+test('coming back from the identity provider completes the sign-in and drops its parameters from the address', async () => {
+  window.history.replaceState({}, '', '/?code=the-code&state=the-state');
+  const fake = client();
+
+  renderSignedIn(fake);
+
+  expect(await screen.findByText('Signed in as developer')).toBeInTheDocument();
+  expect(fake.signinCallback).toHaveBeenCalledOnce();
+  expect(window.location.search).toBe('');
+  expect(fake.signinRedirect).not.toHaveBeenCalled();
+});
+
+test('a failed sign-in is shown, not retried', async () => {
+  window.history.replaceState({}, '', '/?error=access_denied&state=the-state');
+  const fake = client({
+    signinCallback: vi.fn<AuthClient['signinCallback']>(() => Promise.reject(new Error('access_denied'))),
+  });
+
+  renderSignedIn(fake);
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in failed: access_denied');
+  expect(fake.signinRedirect).not.toHaveBeenCalled();
+});

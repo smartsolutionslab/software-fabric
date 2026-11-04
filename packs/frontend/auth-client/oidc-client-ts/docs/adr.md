@@ -1,6 +1,26 @@
 {{~ authorization = object.has_key(project, "backend.authorization") ? project["backend.authorization"] : [] ~}}
 {{~ roles = authorization | array.contains "roles" ~}}
 {{~ claims = authorization | array.contains "claims" ~}}
+{{~ if project["frontend.framework"] == "vue" ~}}
+# Browser sign-in: oidc-client-ts
+
+**Status:** Accepted (generated)
+
+## Decision
+
+The browser signs in with the authorization-code flow and PKCE through `oidc-client-ts`'s `UserManager`, read through a small hand-written composable, `useAuth()` (`src/auth/useAuth.ts`). No Vue OIDC library: none is maintained, and the composable needs only the user, the sign-in state and the two redirects. The whole app sits behind `SignedIn.vue`: an anonymous visitor is sent to the identity provider. Every API call carries the user's access token, added in `src/api/baseApi.ts`.
+
+The identity provider's address arrives as `VITE_OIDC_AUTHORITY` (the AppHost sets it); the client id is the realm's `<project>-web` client.
+
+## Gates
+
+`src/auth/SignedIn.test.ts` checks, against a fake `UserManager`, that an anonymous visitor is sent to the identity provider, that the way back completes the sign-in and drops its parameters from the address, that a failed sign-in is shown and not retried, and that a signed-in user sees who they are and the app. `e2e/sign-in.spec.ts` signs a realm user in through the running AppHost.
+
+## Consequences
+
+- Tokens live in session storage: closing the tab signs the user out of the app, not out of the identity provider.
+- Components read the user with `useAuth()`; nothing else talks to the identity provider.
+{{~ else ~}}
 # Browser sign-in: oidc-client-ts
 
 **Status:** Accepted (generated)
@@ -25,3 +45,4 @@ Hiding is a convenience, never protection: the browser and its ID token are the 
 
 - Tokens live in session storage: closing the tab signs the user out of the app, not out of the identity provider.
 - Components read the user with `useAuth()`; nothing else talks to the identity provider.
+{{~ end ~}}

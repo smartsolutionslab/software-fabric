@@ -1,2 +1,7 @@
+{{~ if project["frontend.framework"] == "vue" ~}}
+    "echarts": "6.1.0",
+    "vue-echarts": "8.3.2"
+{{- else ~}}
     "echarts": "6.1.0",
     "echarts-for-react": "3.0.6"
+{{- end }}
