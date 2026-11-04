@@ -71,6 +71,13 @@ files:
   - { template: templates/Modules/Policies.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}Policies.cs", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/Modules/CanManage.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/CanManage.cs", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/Modules/Tests.csproj.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/{{ module.namespace }}.Tests.csproj", per-module: true }
+  - { template: templates/Llm/ChatClientRegistration.cs.sbn, target: src/BuildingBlocks/Llm/Wiring/ChatClientRegistration.cs, when: 'project["backend.llm"] != "none"' }
+  - { template: templates/Llm/FakeChatClient.cs.sbn, target: tests/Fakes/FakeChatClient.cs, when: 'project["backend.llm"] != "none"' }
+  - { template: templates/Llm/ProviderSdksStayOutOfDomainAndApplication.cs.sbn, target: tests/Architecture.Tests/Rules/ProviderSdksStayOutOfDomainAndApplication.cs, when: 'project["backend.llm"] != "none"' }
+  - { template: templates/Llm/NoApiKeyInSettings.cs.sbn, target: tests/Architecture.Tests/Rules/NoApiKeyInSettings.cs, when: 'project["backend.llm"] != "none"' }
+  - { template: templates/Llm/Modules/AskTheModel.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/AskTheModel/AskTheModel.cs", per-module: true, when: 'project["backend.llm"] != "none"' }
+  - { template: templates/Llm/Modules/AskTheModelHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/AskTheModel/AskTheModelHandler.cs", per-module: true, when: 'project["backend.llm"] != "none"' }
+  - { template: templates/Llm/Modules/AskTheModelTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Queries/AskTheModelTests.cs", per-module: true, when: 'project["backend.llm"] != "none"' }
 declares-slots:
   - { slot: agents.sections, description: "Every pack's agents-md; filled by the generator." }
   - { slot: agents.brief.architect, description: "Every pack's brief for the architect; filled by the generator." }
@@ -113,6 +120,8 @@ declares-slots:
   - { slot: ci.frontend-steps, description: "Steps of the frontend CI job, indented six spaces." }
   - { slot: dependabot.updates, description: "Entries of .github/dependabot.yml's updates list, indented two spaces: one per package ecosystem a pack adds (NuGet and GitHub Actions are the base's).", separator: "\n\n" }
   - { slot: ci.e2e-steps, description: "Steps of the e2e CI job after .NET and Aspire are set up: build, start the application, run the end-to-end tests. No contribution, no job." }
+slots:
+  - { slot: tests.module-host-services, template: templates/Llm/module-host-services.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
@@ -128,3 +137,5 @@ gates:
   - { kind: analyzer, describes: "One top-level type per file, named after the type (StyleCop SA1402, SA1649); nested types and generated migrations excepted.", file: templates/stylecop.json.sbn }
   - { kind: ci-step, describes: "build.proj builds every project with warnings as errors.", file: templates/ci.yml.sbn }
   - { kind: ci-step, describes: "Every project under src/ and tests/ is formatted as dotnet format would format it (whitespace and code style).", file: templates/format.sh.sbn }
+  - { kind: architecture-test, describes: "With a backend.llm provider: no module's Domain or Application references a model client or provider SDK, only Microsoft.Extensions.AI.Abstractions (IChatClient).", file: templates/Llm/ProviderSdksStayOutOfDomainAndApplication.cs.sbn }
+  - { kind: architecture-test, describes: "With a backend.llm provider: no appsettings*.json holds an API key, found by its name or a provider key's prefix; the violation names the file and the setting, never the value.", file: templates/Llm/NoApiKeyInSettings.cs.sbn }

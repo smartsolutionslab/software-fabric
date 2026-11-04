@@ -126,6 +126,15 @@ Not confirmed by these sources: which package gives Anthropic an
 Anthropic. The `anthropic` pack's issue settles it; the rule above (one
 `IChatClient`, registered in Infrastructure) holds whichever package it is.
 
+**Settled on 2026-11-03 (issue #77):** the official `Anthropic` package,
+published by Anthropic, gives Claude an `IChatClient`. Its NuGet package
+13.4.0 depends on `Microsoft.Extensions.AI.Abstractions` (>= 10.5.1) and
+ships the adapter `AsIChatClient` (namespace `Microsoft.Extensions.AI`),
+whose metadata names the provider `anthropic`; read from the package's own
+assembly and XML documentation. The repository owner chose it over the
+community `Anthropic.SDK`, consistent with "no third-party package" for
+MCP, and `claude-haiku-5-5` as the generated default model.
+
 ## Consequences
 
 - No profile changes its choices: every profile takes `backend.llm: none`
@@ -137,10 +146,16 @@ Anthropic. The `anthropic` pack's issue settles it; the rule above (one
   they do (the rule branching on `backend.mcp`, ADR-0006, or MCP code kept
   out of the modules) is settled in their issues, not by weakening the rule
   here.
-- `anthropic`, `openai`, `azure-openai`, `ollama`, `server` and `client` have
-  no packs yet, so they are `experimental` (ADR-0003), and `fabric new` fails
-  with `no pack for ...` for them. Each pack is its own issue, ships its agent
-  rules and a gate (ADR-0002), and becomes `supported` once the matrix builds
-  it.
+- `Microsoft.Extensions.AI` has one owner although two dimensions need it:
+  the base declares its version and the BuildingBlocks reference when a
+  provider is chosen or the MCP client is (owner's decision on #77,
+  2026-11-04), and neither the provider packs nor `backend.mcp.client`
+  declare it themselves.
+- `anthropic`, `openai`, `azure-openai`, `ollama`, `server` and `client` had
+  no packs when this was decided, so they are `experimental` (ADR-0003), and
+  `fabric new` fails with `no pack for ...` for an option still without one.
+  Each pack is its own issue, ships its agent rules and a gate (ADR-0002), and
+  becomes `supported` once the matrix builds it. `client` (#82) and
+  `anthropic` (#77) have packs and stay `experimental` until then.
 - `backend.llm.agents`, retrieval-augmented generation and evaluations are
   later decisions, each with its own ADR.
