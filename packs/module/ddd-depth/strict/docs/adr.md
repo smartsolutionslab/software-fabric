@@ -97,10 +97,16 @@ Two limits remain, both for these definitions only:
 - **One name per finding.** The walk names a member holding a primitive once, after the first closed type it found
   holding it there, not once per closed type: there are infinitely many.
 - **A subclass may be walked that is never reached.** The walk enters each subclass the module declares of a closed type
-  it reaches (`SpecialNode : Node<List<Waypoint>>`). For such a definition it tells whether a closed type is reached by
-  matching each type argument on its own, so a subclass of arguments the module never uses together is walked too: with
-  `Pair<Cargo, Marker>` and `Pair<Marker, Cargo>` reached, a subclass of `Pair<Cargo, Cargo>`. That can name a
-  primitive no aggregate reaches; it never hides one.
+  it reaches (`SpecialNode : Node<List<Waypoint>>`), or of an interface it reaches through the interface's variance
+  (`SpecialNode : INode<List<Marker>>` is an `INode<IEnumerable<Marker>>` when `T` is `out`). For such a definition it
+  tells whether a closed type is reached by matching each type argument on its own, so a subclass of arguments the
+  module never uses together is walked too: with `Pair<Cargo, Marker>` and `Pair<Marker, Cargo>` reached, a subclass of
+  `Pair<Cargo, Cargo>`. Under an `in` type parameter, an argument the definition builds from its own type parameters
+  is taken to match any type. Either way the walk can name a primitive no aggregate reaches; it never hides one.
+
+The exemptions hold there as they do for closed types: an enum is allowed, one nested in a generic type
+(`Palette<T>.Status`) included, and a computed `T Value` is an answer in `Answer<bool>` but state in
+`Answer<List<bool>>`.
 
 ## Consequences
 

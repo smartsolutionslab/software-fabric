@@ -29,6 +29,17 @@ public static class PrimitiveBoundary
         typeof(Guid), typeof(DateTime), typeof(DateTimeOffset), typeof(DateOnly), typeof(TimeOnly), typeof(TimeSpan), typeof(Uri),
     ];
 
+    /// <summary>
+    /// How a type built from a pattern must relate to a given type for the walk to reach the given one: be it, or,
+    /// under the variance of an interface's type parameter, be one of its supertypes or subtypes.
+    /// </summary>
+    private enum Fit
+    {
+        Exact,
+        Wider,
+        Narrower,
+    }
+
     /// <param name="assemblies">The module's assemblies; only their types are walked into.</param>
     /// <param name="aggregateRoot">The full name of the aggregate roots' generic base type definition.</param>
     /// <param name="domainEvent">The full name of the domain event interface.</param>
@@ -248,9 +259,11 @@ public static class PrimitiveBoundary
     /// not. Reflection cannot tell <c>Total =&gt; total</c> from a computed number as cheaply, so anything else
     /// get-only stays state.
     /// </summary>
-    private static bool IsComputedAnswer(PropertyInfo property) =>
-        property.PropertyType == typeof(bool)
-        && property.GetSetMethod(nonPublic: true) is null
+    private static bool IsComputedAnswer(PropertyInfo property) => property.PropertyType == typeof(bool) && Computes(property);
+
+    /// <summary>Whether a property has no setter and a getter that does more than return a field.</summary>
+    private static bool Computes(PropertyInfo property) =>
+        property.GetSetMethod(nonPublic: true) is null
         && !ReturnsAField(property.GetGetMethod(nonPublic: true)?.GetMethodBody()?.GetILAsByteArray() ?? []);
 
     /// <summary>
@@ -314,13 +327,16 @@ public static class PrimitiveBoundary
     /// <summary>
     /// What a recurring definition was found used with: per type parameter, what an argument for it holds, each with
     /// the first closed type of the definition found to hold it, and the arguments themselves, as closed types or as
-    /// patterns over another recurring definition's type parameters.
+    /// patterns over another recurring definition's type parameters. What an argument holds is kept apart for when it
+    /// is the whole argument (<c>Answer&lt;bool&gt;</c>) and when it is inside it (<c>Answer&lt;List&lt;bool&gt;&gt;</c>):
+    /// a computed <c>T Value</c> is an answer only in the first.
     /// </summary>
     private sealed class Usage(Type first, int parameters)
     {
         public Type First { get; } = first;
 
-        public Dictionary<Held, Type>[] Holds { get; } = [.. Enumerable.Range(0, parameters).Select(_ => new Dictionary<Held, Type>())];
+        public Dictionary<(Held Held, bool Whole), Type>[] Holds { get; } =
+            [.. Enumerable.Range(0, parameters).Select(_ => new Dictionary<(Held Held, bool Whole), Type>())];
 
         public HashSet<Held>[] Arguments { get; } = [.. Enumerable.Range(0, parameters).Select(_ => new HashSet<Held>())];
     }
@@ -439,7 +455,7 @@ public static class PrimitiveBoundary
         private void Reach(Held built)
         {
             var (type, context) = built;
-            if (!type.IsGenericType || !own.Contains(type.GetGenericTypeDefinition()))
+            if (type.IsEnum || !type.IsGenericType || !own.Contains(type.GetGenericTypeDefinition()))
             {
                 return;
             }
@@ -468,11 +484,11 @@ public static class PrimitiveBoundary
                     growth++;
                 }
 
-                foreach (var (held, from) in Holds(arguments[position], context, []).ToList())
+                foreach (var (held, whole, from) in Holds(arguments[position], context, true, []).ToList())
                 {
-                    if (!used.Holds[position].ContainsKey(held))
+                    if (!used.Holds[position].ContainsKey((held, whole)))
                     {
-                        used.Holds[position].Add(held, witness(from));
+                        used.Holds[position].Add((held, whole), witness(from));
                         growth++;
                     }
                 }
@@ -481,14 +497,21 @@ public static class PrimitiveBoundary
 
         /// <summary>
         /// A recurring definition's state, with each type parameter standing for everything its arguments were found
-        /// to hold. Each primitive is named once per member, after the first closed type found to hold it there.
+        /// to hold. Each primitive is named once per member, after the first closed type found to hold it there. A
+        /// computed <c>T Value</c> is an answer where its <c>T</c> is a whole <c>bool</c>, as it is for a closed type.
         /// </summary>
         private void EnterRecurring(Type definition, Usage used)
         {
             var exempt = isValueObject(definition);
+            HashSet<string> answers =
+            [
+                .. definition.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(property => property.PropertyType.IsGenericParameter && Computes(property))
+                    .Select(property => property.Name),
+            ];
             foreach (var (name, memberType) in State(definition, own))
             {
-                foreach (var (held, from) in Holds(memberType, definition, []).ToList())
+                foreach (var (held, whole, from) in Holds(memberType, definition, true, []).ToList())
                 {
                     if (held.Context is not null)
                     {
@@ -498,7 +521,7 @@ public static class PrimitiveBoundary
                     {
                         Reach(held.Type);
                     }
-                    else if (!exempt && named.Add((definition, name, held.Type)))
+                    else if (!exempt && !(whole && held.Type == typeof(bool) && answers.Contains(name)) && named.Add((definition, name, held.Type)))
                     {
                         violations.Add(Message(from ?? used.First, name, held.Type));
                     }
@@ -509,11 +532,13 @@ public static class PrimitiveBoundary
         /// <summary>
         /// <see cref="Constituents"/> over a type that may use a recurring definition's type parameters: a type
         /// parameter of the context stands for everything its arguments were found to hold, each with the closed type
-        /// of the context that holds it.
+        /// of the context that holds it. <paramref name="whole"/> says whether the type is the whole of what is looked
+        /// at, not inside a <see cref="Nullable{T}"/>, an array or another generic type.
         /// </summary>
-        private IEnumerable<(Held Held, Type? From)> Holds(Type type, Type? context, HashSet<Type> visited)
+        private IEnumerable<(Held Held, bool Whole, Type? From)> Holds(Type type, Type? context, bool whole, HashSet<Type> visited)
         {
             var underlying = Nullable.GetUnderlyingType(type) ?? type;
+            whole &= underlying == type;
             if (!visited.Add(underlying))
             {
                 yield break;
@@ -523,9 +548,9 @@ public static class PrimitiveBoundary
             {
                 if (context is not null && underlying.DeclaringType == context)
                 {
-                    foreach (var (held, from) in usages[context].Holds[underlying.GenericParameterPosition])
+                    foreach (var ((held, wholeArgument), from) in usages[context].Holds[underlying.GenericParameterPosition])
                     {
-                        yield return (held, from);
+                        yield return (held, whole && wholeArgument, from);
                     }
                 }
 
@@ -534,7 +559,7 @@ public static class PrimitiveBoundary
 
             if (underlying.IsArray)
             {
-                foreach (var constituent in Holds(underlying.GetElementType()!, context, visited))
+                foreach (var constituent in Holds(underlying.GetElementType()!, context, false, visited))
                 {
                     yield return constituent;
                 }
@@ -546,14 +571,14 @@ public static class PrimitiveBoundary
             {
                 foreach (var argument in underlying.GetGenericArguments())
                 {
-                    foreach (var constituent in Holds(argument, context, visited))
+                    foreach (var constituent in Holds(argument, context, false, visited))
                     {
                         yield return constituent;
                     }
                 }
             }
 
-            yield return (new Held(underlying, underlying.ContainsGenericParameters ? context : null), null);
+            yield return (new Held(underlying, underlying.ContainsGenericParameters ? context : null), whole, null);
         }
 
         private static IEnumerable<Type> Supertypes(Type type)
@@ -570,10 +595,13 @@ public static class PrimitiveBoundary
         }
 
         /// <summary>
-        /// Whether the walk builds a closed type of a recurring definition, so that a subclass the module declares of
-        /// it is walked: each of its arguments is one the definition was used with, or matches a pattern it was used
-        /// with. Each type parameter is matched on its own, so a subclass of a combination of arguments never used
-        /// together is walked too.
+        /// Whether the walk builds a closed type of a recurring definition that a subclass the module declares is
+        /// assignable to, so that the subclass is walked. Each argument is one the definition was used with or built
+        /// from a pattern it was used with, or, for an interface's <c>out</c> or <c>in</c> type parameter, a supertype
+        /// or subtype of one (<c>SpecialNode : INode&lt;List&lt;Marker&gt;&gt;</c> is an
+        /// <c>INode&lt;IEnumerable&lt;Marker&gt;&gt;</c>). Each type parameter is matched on its own, so a subclass of a
+        /// combination of arguments never used together is walked too, and an <c>in</c> type parameter takes any
+        /// subtype a pattern may build.
         /// </summary>
         private bool IsBuilt(Type type)
         {
@@ -582,32 +610,68 @@ public static class PrimitiveBoundary
                 return false;
             }
 
+            var definition = type.GetGenericTypeDefinition();
+            var parameters = definition.GetGenericArguments();
             var arguments = type.GetGenericArguments();
-            return Enumerable.Range(0, arguments.Length).All(position => IsArgument(type.GetGenericTypeDefinition(), position, arguments[position], []));
+            return Enumerable.Range(0, arguments.Length)
+                .All(position => IsArgument(definition, position, arguments[position], Under(parameters[position], Fit.Wider), []));
         }
 
-        private bool IsArgument(Type definition, int position, Type argument, HashSet<(Type, int, Type)> trying)
+        /// <summary>How an argument must fit under a type parameter's variance, when the generic type must fit so.</summary>
+        private static Fit Under(Type parameter, Fit fit) =>
+            (parameter.GenericParameterAttributes & GenericParameterAttributes.VarianceMask) switch
+            {
+                GenericParameterAttributes.Covariant => fit,
+                GenericParameterAttributes.Contravariant => fit switch
+                {
+                    Fit.Wider => Fit.Narrower,
+                    Fit.Narrower => Fit.Wider,
+                    _ => Fit.Exact,
+                },
+                _ => Fit.Exact,
+            };
+
+        private bool IsArgument(Type definition, int position, Type argument, Fit fit, HashSet<(Type, int, Type, Fit)> trying)
         {
-            if (!usages.TryGetValue(definition, out var used) || !trying.Add((definition, position, argument)))
+            if (!usages.TryGetValue(definition, out var used) || !trying.Add((definition, position, argument, fit)))
             {
                 return false;
             }
 
-            var matches = used.Arguments[position].Any(pattern => pattern.Context is null ? pattern.Type == argument : Matches(pattern.Type, argument, pattern.Context, trying));
-            trying.Remove((definition, position, argument));
+            var matches = used.Arguments[position].Any(pattern => Matches(pattern.Type, argument, pattern.Context, fit, trying));
+            trying.Remove((definition, position, argument, fit));
             return matches;
         }
 
-        private bool Matches(Type pattern, Type type, Type context, HashSet<(Type, int, Type)> trying)
+        /// <summary>
+        /// Whether a type built from the pattern fits the type as asked. Variance does not apply to a value type, and a
+        /// pattern asked for a subtype is taken to build one.
+        /// </summary>
+        private bool Matches(Type pattern, Type type, Type? context, Fit fit, HashSet<(Type, int, Type, Fit)> trying)
         {
+            if (type.IsValueType)
+            {
+                fit = Fit.Exact;
+            }
+
             if (pattern.IsGenericParameter)
             {
-                return IsArgument(context, pattern.GenericParameterPosition, type, trying);
+                return context is not null && IsArgument(context, pattern.GenericParameterPosition, type, fit, trying);
             }
 
             if (!pattern.ContainsGenericParameters)
             {
-                return pattern == type;
+                return fit switch
+                {
+                    Fit.Wider => !pattern.IsValueType && pattern.IsAssignableFrom(type),
+                    Fit.Narrower => !pattern.IsValueType && type.IsAssignableFrom(pattern),
+                    _ => pattern == type,
+                };
+            }
+
+            if (fit == Fit.Narrower)
+            {
+                return true;
             }
 
             if (pattern.IsArray)
@@ -615,13 +679,23 @@ public static class PrimitiveBoundary
                 return type.IsArray
                     && pattern.IsSZArray == type.IsSZArray
                     && pattern.GetArrayRank() == type.GetArrayRank()
-                    && Matches(pattern.GetElementType()!, type.GetElementType()!, context, trying);
+                    && Matches(pattern.GetElementType()!, type.GetElementType()!, context, fit, trying);
             }
 
-            return pattern.IsGenericType
-                && type.IsGenericType
-                && pattern.GetGenericTypeDefinition() == type.GetGenericTypeDefinition()
-                && pattern.GetGenericArguments().Zip(type.GetGenericArguments()).All(pair => Matches(pair.First, pair.Second, context, trying));
+            if (!pattern.IsGenericType)
+            {
+                return false;
+            }
+
+            var definition = pattern.GetGenericTypeDefinition();
+            var parameters = definition.GetGenericArguments();
+            var patterns = pattern.GetGenericArguments();
+            IEnumerable<Type> candidates = fit == Fit.Wider ? [type, .. Supertypes(type)] : [type];
+            return candidates.Any(candidate =>
+                candidate.IsGenericType
+                && candidate.GetGenericTypeDefinition() == definition
+                && Enumerable.Range(0, patterns.Length)
+                    .All(position => Matches(patterns[position], candidate.GetGenericArguments()[position], context, Under(parameters[position], fit), trying)));
         }
     }
 }
