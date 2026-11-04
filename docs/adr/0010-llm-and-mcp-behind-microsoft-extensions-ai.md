@@ -146,6 +146,11 @@ MCP, and `claude-haiku-5-5` as the generated default model.
   they do (the rule branching on `backend.mcp`, ADR-0006, or MCP code kept
   out of the modules) is settled in their issues, not by weakening the rule
   here.
+- `Microsoft.Extensions.AI` has one owner although two dimensions need it:
+  the base declares its version and the BuildingBlocks reference when a
+  provider is chosen or the MCP client is (owner's decision on #77,
+  2026-11-04), and neither the provider packs nor `backend.mcp.client`
+  declare it themselves.
 - `anthropic`, `openai`, `azure-openai`, `ollama`, `server` and `client` have
   no packs yet, so they are `experimental` (ADR-0003), and `fabric new` fails
   with `no pack for ...` for them. Each pack is its own issue, ships its agent
