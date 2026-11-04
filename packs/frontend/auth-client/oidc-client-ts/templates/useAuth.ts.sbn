@@ -15,6 +15,8 @@ export interface Auth {
   isAuthenticated: ComputedRef<boolean>;
   isLoading: ComputedRef<boolean>;
   error: ComputedRef<Error | null>;
+  /** The redirect under way, until the browser leaves for the identity provider. */
+  activeNavigator: ComputedRef<'signinRedirect' | 'signoutRedirect' | null>;
   signinRedirect: () => Promise<void>;
   signoutRedirect: () => Promise<void>;
 }
@@ -38,6 +40,7 @@ export function createAuth(client: AuthClient): Auth {
   const user = shallowRef<User | null>(null);
   const isLoading = shallowRef(true);
   const error = shallowRef<Error | null>(null);
+  const activeNavigator = shallowRef<'signinRedirect' | 'signoutRedirect' | null>(null);
 
   client.events.addUserLoaded((loaded) => {
     user.value = loaded;
@@ -53,11 +56,14 @@ export function createAuth(client: AuthClient): Auth {
     error.value = failure;
   });
 
-  // A redirect that cannot start (the identity provider unreachable, say) is shown, never left to reject unseen.
-  const redirect = async (to: () => Promise<void>) => {
+  // A redirect that cannot start (the identity provider unreachable, say) is shown, never left to reject unseen. While
+  // one is under way no other starts: signing out unloads the user before it leaves, which must not start a sign-in.
+  const redirect = async (navigator: 'signinRedirect' | 'signoutRedirect') => {
+    activeNavigator.value = navigator;
     try {
-      await to();
+      await client[navigator]();
     } catch (failure) {
+      activeNavigator.value = null;
       error.value = asError(failure);
     }
   };
@@ -84,8 +90,9 @@ export function createAuth(client: AuthClient): Auth {
     isAuthenticated: computed(() => user.value !== null && !user.value.expired),
     isLoading: computed(() => isLoading.value),
     error: computed(() => error.value),
-    signinRedirect: () => redirect(() => client.signinRedirect()),
-    signoutRedirect: () => redirect(() => client.signoutRedirect()),
+    activeNavigator: computed(() => activeNavigator.value),
+    signinRedirect: () => redirect('signinRedirect'),
+    signoutRedirect: () => redirect('signoutRedirect'),
   };
 }
 

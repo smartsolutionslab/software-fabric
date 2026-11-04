@@ -14,7 +14,7 @@ The identity provider's address arrives as `VITE_OIDC_AUTHORITY` (the AppHost se
 
 ## Gates
 
-`src/auth/SignedIn.test.ts` checks, against a fake `UserManager`, that an anonymous visitor is sent to the identity provider, that the way back completes the sign-in and drops its parameters from the address, that a failed sign-in, a failed silent renewal and a redirect that cannot start are shown (a failed sign-in is not retried), that an expired access token sends the user back to the identity provider, and that a signed-in user sees who they are and the app. `e2e/sign-in.spec.ts` signs a realm user in through the running AppHost.
+`src/auth/SignedIn.test.ts` checks, against a fake `UserManager`, that an anonymous visitor is sent to the identity provider, that the way back completes the sign-in and drops its parameters from the address, that a failed sign-in, a failed silent renewal and a redirect that cannot start are shown (a failed sign-in is not retried), that an expired access token sends the user back to the identity provider, that signing out starts no sign-in on its way out, and that a signed-in user sees who they are and the app. `e2e/sign-in.spec.ts` signs a realm user in through the running AppHost.
 
 ## Consequences
 
