@@ -135,6 +135,16 @@ assembly and XML documentation. The repository owner chose it over the
 community `Anthropic.SDK`, consistent with "no third-party package" for
 MCP, and `claude-haiku-5-5` as the generated default model.
 
+**Settled on 2026-11-04 (issue #78):** Microsoft's
+`Microsoft.Extensions.AI.OpenAI` gives OpenAI's models an `IChatClient`,
+through its adapter `AsIChatClient` over the official `OpenAI` package
+(published by OpenAI). Its NuGet package 10.11.0 depends on
+`Microsoft.Extensions.AI.Abstractions` 10.11.0, the version the base's
+`Microsoft.Extensions.AI` already brings, and on `OpenAI` 2.14.0, which
+comes in transitively and is not pinned; read from the packages' nuspecs.
+The repository owner chose it, and `gpt-5-mini` as the generated default
+model, with `gpt-5` the stronger alternative.
+
 ## Consequences
 
 - No profile changes its choices: every profile takes `backend.llm: none`
@@ -155,7 +165,8 @@ MCP, and `claude-haiku-5-5` as the generated default model.
   no packs when this was decided, so they are `experimental` (ADR-0003), and
   `fabric new` fails with `no pack for ...` for an option still without one.
   Each pack is its own issue, ships its agent rules and a gate (ADR-0002), and
-  becomes `supported` once the matrix builds it. `client` (#82) and
-  `anthropic` (#77) have packs and stay `experimental` until then.
+  becomes `supported` once the matrix builds it. `client` (#82),
+  `anthropic` (#77) and `openai` (#78) have packs and stay `experimental`
+  until then.
 - `backend.llm.agents`, retrieval-augmented generation and evaluations are
   later decisions, each with its own ADR.
