@@ -1,0 +1,105 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A role is checked in one place: the policy a module's <c>IModulePolicies</c> registers with <c>RequireRole</c>.
+/// Handlers, endpoints and services name the policy instead, so who may do what stays readable in one file per module
+/// and an endpoint cannot quietly decide for itself. Sources under <c>src/</c> are parsed, not grepped: a comment or a
+/// string that spells a role check is prose. <c>src/Host/KeycloakRoleClaims.cs</c>, which puts the token's roles into
+/// <c>ClaimTypes.Role</c> in the first place, is the one exception.
+/// </summary>
+public sealed class OnlyModulePoliciesCheckRoles : IArchitectureRule
+{
+    private const string RoleMapping = "src/Host/KeycloakRoleClaims.cs";
+
+    private const string Registration = "IModulePolicies";
+
+    public string Description => "Roles are checked only in a module's IModulePolicies (RequireRole); everything else names a policy.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var root = RepositoryRoot();
+        List<string> violations = [];
+        foreach (var path in Directory.EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
+            .Where(path => !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
+            .Where(path => path != RoleMapping)
+            .Order(StringComparer.Ordinal))
+        {
+            var source = CSharpSyntaxTree.ParseText(File.ReadAllText(Path.Combine(root, path))).GetRoot();
+            foreach (var (line, check) in RoleChecks(source))
+            {
+                violations.Add($"{path}:{line}: checks a role ({check}) outside a module's IModulePolicies. Register a policy <module>.<permission> that requires the role there, and name it with RequireAuthorization(...).");
+            }
+        }
+
+        return violations;
+    }
+
+    private static IEnumerable<(int Line, string Check)> RoleChecks(SyntaxNode source)
+    {
+        foreach (var node in source.DescendantNodes())
+        {
+            var check = node switch
+            {
+                InvocationExpressionSyntax invocation when CalledName(invocation) == "IsInRole" => "IsInRole",
+                InvocationExpressionSyntax invocation when CalledName(invocation) == "RequireRole" && !InModulePolicies(invocation) => "RequireRole",
+                MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Role" } access when RightmostName(access.Expression) == "ClaimTypes" => "ClaimTypes.Role",
+                AttributeArgumentSyntax { NameEquals.Name.Identifier.ValueText: "Roles" } => "Authorize Roles",
+                _ => null,
+            };
+            if (check is not null)
+            {
+                yield return (node.GetLocation().GetLineSpan().StartLinePosition.Line + 1, check);
+            }
+        }
+    }
+
+    /// <summary>A call by any spelling: <c>x.Name()</c>, <c>x?.Name()</c>, or the bare name.</summary>
+    private static string? CalledName(InvocationExpressionSyntax invocation) =>
+        invocation.Expression switch
+        {
+            MemberAccessExpressionSyntax access => access.Name.Identifier.ValueText,
+            MemberBindingExpressionSyntax binding => binding.Name.Identifier.ValueText,
+            SimpleNameSyntax simple => simple.Identifier.ValueText,
+            _ => null,
+        };
+
+    /// <summary><c>ClaimTypes</c> for <c>ClaimTypes</c> and for <c>System.Security.Claims.ClaimTypes</c>.</summary>
+    private static string? RightmostName(ExpressionSyntax expression) =>
+        expression switch
+        {
+            SimpleNameSyntax simple => simple.Identifier.ValueText,
+            MemberAccessExpressionSyntax access => access.Name.Identifier.ValueText,
+            _ => null,
+        };
+
+    private static bool InModulePolicies(SyntaxNode node) =>
+        node.Ancestors().OfType<TypeDeclarationSyntax>().Any(type =>
+            type.BaseList?.Types.Any(baseType => RightmostTypeName(baseType.Type) == Registration) == true);
+
+    private static string? RightmostTypeName(TypeSyntax type) =>
+        type switch
+        {
+            SimpleNameSyntax simple => simple.Identifier.ValueText,
+            QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
+            _ => null,
+        };
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+}

@@ -1,0 +1,14 @@
+option: backend.authorization.roles
+files:
+  - { template: templates/KeycloakRoleClaims.cs.sbn, target: src/Host/KeycloakRoleClaims.cs }
+  - { template: templates/RoleClaims.cs.sbn, target: src/Host/Wiring/RoleClaims.cs }
+  - { template: templates/OnlyModulePoliciesCheckRoles.cs.sbn, target: tests/Architecture.Tests/Rules/OnlyModulePoliciesCheckRoles.cs }
+  - { template: templates/RoleTests.cs.sbn, target: "tests/Integration.Tests/{{ module.namespace }}RoleTests.cs", per-module: true }
+slots:
+  - { slot: host.services, template: templates/host-services.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Roles are checked only where a module's IModulePolicies registers a policy (RequireRole): IsInRole, ClaimTypes.Role or [Authorize(Roles = ...)] anywhere under src/, or RequireRole outside an IModulePolicies, fails the build naming file and line.", file: templates/OnlyModulePoliciesCheckRoles.cs.sbn }
+  - { kind: unit-test, describes: "A module's sample policy <module>.manage: the integration tests give a user with the realm role manager 200, a signed-in user without it 403 and an anonymous caller 401, against the running stack.", file: templates/RoleTests.cs.sbn }

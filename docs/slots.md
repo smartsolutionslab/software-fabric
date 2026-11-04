@@ -114,6 +114,12 @@ namespace, and a pack that puts one anywhere else fails the build.
 Cardinality `0+` unless stated. "Separator" is what joins contributions
 (new, see Generator changes); default is a newline.
 
+A contribution to a slot no selected pack declares is an error, unless
+it carries `optional: true` (added for #134): then it is dropped when the
+slot is undeclared and renders as usual when it is declared. That lets a
+pack fill a slot of a choice it can be combined with but does not need
+(docs/packs.md, ADR-0002).
+
 ### Agent setup and docs
 
 | Slot | File | Separator | Filled by (saas-standard-react) |
@@ -186,6 +192,7 @@ is a defect in the second pack.
 | `web.test-setup` *(added in M1-07b)* | `web/app/src/test-setup.ts` | newline | accessibility (axe matchers) |
 | `web.lint-ignores` *(added in M1-07b)* | `web/app/eslint.config.js` | `,` + newline | rtk-query-codegen (the generated client) |
 | `web.format-ignores` *(added for #38)* | `web/app/.prettierignore` | newline | rtk-query-codegen, orval (the generated client, `openapi.json`) |
+| `web.typecheck-excludes` *(added for #126; declared by react)* | `web/app/tsconfig.json` (`exclude`, rendered only with a contribution) | `, ` | rtk-query-codegen (the generated client, without keycloak: its document starts with no paths) |
 | `web.store-imports`, `web.store-reducers`, `web.store-middleware` *(added in M1-07b; declared by redux-toolkit)* | `web/app/src/store.ts` | newline / `,` + newline / none | rtk-query-codegen |
 | `web.api-imports`, `web.api-headers` *(added in M1-07b; declared by every api-client pack)* | `web/app/src/api/baseApi.ts` | newline | oidc-client-ts (the bearer token) |
 | `web.vite-imports` *(added in M1-07)* | `web/app/vite.config.ts` | newline | tailwind |

@@ -3,8 +3,8 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 /** Sets what every request carries. */
 function prepareHeaders(headers: Headers) {
-{{ slots["web.api-headers"] }}
-  return headers;
+{{ if slots["web.api-headers"] != "" }}{{ slots["web.api-headers"] }}
+{{ end }}  return headers;
 }
 
 /** The API the generated endpoints (src/api/generated.ts) are injected into; /api reaches the host. */

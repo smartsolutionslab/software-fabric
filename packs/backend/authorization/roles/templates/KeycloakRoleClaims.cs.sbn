@@ -1,0 +1,59 @@
+{{~ if project["backend.auth"] != "keycloak" ~}}
+#error The roles pack reads Keycloak's realm and client roles (realm_access, resource_access) only so far; another identity provider puts roles elsewhere in its tokens (docs/adr/0006 of the generator).
+{{~ end ~}}
+using System.Security.Claims;
+using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
+
+namespace {{ namespace }}.Host;
+
+/// <summary>
+/// Keycloak puts the realm roles in the token's <c>realm_access</c> claim and each client's roles in
+/// <c>resource_access</c>; ASP.NET reads roles from <c>ClaimTypes.Role</c>. This copies the realm roles and the roles
+/// of the API client ({{ name }}-api) there, so a module's policies can <c>RequireRole</c>. Other clients' roles are
+/// not meant for this API and stay where they are.
+/// </summary>
+public sealed class KeycloakRoleClaims : IClaimsTransformation
+{
+    private const string ApiClient = "{{ name }}-api";
+
+    public Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
+    {
+        {{ not_null "principal" }}
+
+        if (principal.Identity is not ClaimsIdentity { IsAuthenticated: true } identity)
+        {
+            return Task.FromResult(principal);
+        }
+
+        // ASP.NET may transform the same principal more than once per request; a role already there is not added again.
+        var missing = Roles(identity.FindFirst("realm_access")?.Value, access => access)
+            .Concat(Roles(identity.FindFirst("resource_access")?.Value, access => access.TryGetProperty(ApiClient, out var client) ? client : default))
+            .Distinct(StringComparer.Ordinal)
+            .Where(role => !identity.HasClaim(ClaimTypes.Role, role))
+            .ToList();
+        if (missing.Count == 0)
+        {
+            return Task.FromResult(principal);
+        }
+
+        var transformed = principal.Clone();
+        ((ClaimsIdentity)transformed.Identity!).AddClaims(missing.Select(role => new Claim(ClaimTypes.Role, role)));
+        return Task.FromResult(transformed);
+    }
+
+    /// <summary>The <c>roles</c> array of the object <paramref name="select"/> picks from the claim's JSON, or none.</summary>
+    private static List<string> Roles(string? json, Func<JsonElement, JsonElement> select)
+    {
+        if (json is null)
+        {
+            return [];
+        }
+
+        using var document = JsonDocument.Parse(json);
+        var holder = select(document.RootElement);
+        return holder.ValueKind == JsonValueKind.Object && holder.TryGetProperty("roles", out var roles) && roles.ValueKind == JsonValueKind.Array
+            ? [.. roles.EnumerateArray().Select(role => role.GetString()).OfType<string>()]
+            : [];
+    }
+}
