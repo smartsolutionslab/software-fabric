@@ -38,6 +38,7 @@ Keycloak imports a realm only when it does not exist yet: remove the data volume
 
 ## Gates
 
+- `EveryPolicyIsRegisteredByOneModule` fails for a policy name two modules register, naming both, whether or not an endpoint or an MCP tool names it: whichever registration came last would silently decide what everything naming it requires. The host refuses to start on the same names, because both ask `ModulePolicyOwners` in BuildingBlocks.
 - `OnlyModulePoliciesCheckClaims` parses every source under `src/` and fails, naming file and line, for `HasClaim` anywhere except inside a claims transformation (`IClaimsTransformation`), and `RequireClaim` outside a type implementing `IModulePolicies`.
 - `EveryEndpointPolicyIsRegisteredByItsModule` fails for a module endpoint whose policy that module does not register, or which another module registers too, for claim policies as for any other.
 - The integration tests (`<Module>ClaimTests`) prove each module's sample policy against the running stack: {{ if roles }}`developer` (role and claim) 200; `clerk` (only the role), `analyst` (only the claim) and `visitor` (neither) 403{{ else }}`developer` and `analyst` 200; `clerk` (another department) and `visitor` (no department) 403; an anonymous caller 401{{ end }}.
@@ -49,6 +50,7 @@ Keycloak imports a realm only when it does not exist yet: remove the data volume
 - A claims transformation that adds claims from request input: it is exempt from the gate because it shapes the claims every policy reads.
 - Whether a user may edit the attribute behind a claim: that is the realm's user profile, not code.
 - Whether a policy is the right one for its endpoint, or strong enough.
+- A policy added without the builder's `AddPolicy` (through `policies.Services.Configure<AuthorizationOptions>(...)`, say): `ModulePolicyOwners` learns names only from `AddPolicy`, so it cannot see a name registered that way.
 
 ## Consequences
 

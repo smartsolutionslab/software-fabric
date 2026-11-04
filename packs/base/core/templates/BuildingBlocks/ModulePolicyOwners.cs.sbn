@@ -1,0 +1,90 @@
+using System.Reflection;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.BuildingBlocks.Modules;
+
+/// <summary>
+/// The one definition of who owns a policy name: the module whose <see cref="IModulePolicies"/> registers it, and no
+/// other. The host has one policy table, so a name two modules register means whichever registration came last, and
+/// everything that names it (an endpoint, an MCP tool) silently gets those requirements. The host refuses to start on
+/// such a name and the architecture rule EveryPolicyIsRegisteredByOneModule fails the build on it, both through this
+/// class, so the two never disagree.
+/// </summary>
+public sealed class ModulePolicyOwners
+{
+    private const string ModulePrefix = "{{ namespace }}.Modules.";
+
+    private const string ApiSuffix = ".Api";
+
+    private readonly Dictionary<string, string> owners = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Registers the policies of every <see cref="IModulePolicies"/> in a module's Api assembly into the services, and
+    /// returns one message for each name another module registered before.
+    /// </summary>
+    public IReadOnlyList<string> Register(Assembly api, IServiceCollection services)
+    {
+        {{ not_null "api" }}
+        {{ not_null "services" }}
+
+        var module = Module(api);
+        var policies = new NamedPolicies(services.AddAuthorizationCore());
+        foreach (var registration in api.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(IModulePolicies).IsAssignableFrom(type))
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .Select(type => (IModulePolicies)Activator.CreateInstance(type)!))
+        {
+            registration.AddPolicies(policies);
+        }
+
+        List<string> conflicts = [];
+        foreach (var name in policies.Names)
+        {
+            if (!owners.TryAdd(name, module) && owners[name] != module)
+            {
+                var (first, second) = string.CompareOrdinal(owners[name], module) < 0 ? (owners[name], module) : (module, owners[name]);
+                conflicts.Add($"The modules {first} and {second} both register the policy {name}: the host has one policy table, so one registration would silently replace the other. A module registers only its own <module>.<permission> policies.");
+            }
+        }
+
+        return conflicts;
+    }
+
+    /// <summary>Billing for <c>{{ namespace }}.Modules.Billing.Api</c>; the assembly's name for any other assembly.</summary>
+    private static string Module(Assembly api)
+    {
+        var name = api.GetName().Name!;
+        return name.StartsWith(ModulePrefix, StringComparison.Ordinal) && name.EndsWith(ApiSuffix, StringComparison.Ordinal)
+            ? name[ModulePrefix.Length..^ApiSuffix.Length]
+            : name;
+    }
+
+    /// <summary>Registers policies as <see cref="AuthorizationBuilder"/> does, and remembers their names.</summary>
+    private sealed class NamedPolicies(IServiceCollection services) : AuthorizationBuilder(services)
+    {
+        private readonly List<string> names = [];
+
+        public IReadOnlyList<string> Names => names;
+
+        public override AuthorizationBuilder AddPolicy(string name, AuthorizationPolicy policy)
+        {
+            Remember(name);
+            return base.AddPolicy(name, policy);
+        }
+
+        public override AuthorizationBuilder AddPolicy(string name, Action<AuthorizationPolicyBuilder> configurePolicy)
+        {
+            Remember(name);
+            return base.AddPolicy(name, configurePolicy);
+        }
+
+        private void Remember(string name)
+        {
+            if (!names.Contains(name, StringComparer.Ordinal))
+            {
+                names.Add(name);
+            }
+        }
+    }
+}
