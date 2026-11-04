@@ -68,7 +68,8 @@ System.Text.Json reads: public properties that are neither indexers nor `[JsonIg
 value object, which is stored as its backing value, so `TypedId<Invoice>` never makes it look into `Invoice`, and it
 reads a generic domain type through its members only, so `Reference<TTag>(InvoiceId Id)` used as `Reference<Invoice>`
 does not either; the arguments of a generic type from outside the Domain (`Nullable<T>`, `Option<T>`) are walked. It
-enters each closed type once, so a type that holds itself (`InvoiceChain? Next`) ends it, and `Envelope<Marker>` and
+enters each closed type once and reads each type's elements once, so a type that holds itself (`InvoiceChain? Next`)
+or a collection of itself (`RecursiveCollection : Collection<RecursiveCollection>`) ends it, and `Envelope<Marker>` and
 `Envelope<InvoiceNumber>` are checked each. It does not enter a closed type larger than the nearest closed type of the
 same generic definition it is already inside of (`Node<T>` holding a `Node<List<T>>`), and walks that type's arguments
 instead. Both settings hold

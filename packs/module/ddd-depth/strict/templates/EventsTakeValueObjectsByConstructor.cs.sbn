@@ -24,6 +24,7 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
 
         List<Type> holders = [];
         HashSet<Type> entered = [];
+        HashSet<Type> walked = [];
         foreach (var domainEvent in model.ModuleAssemblies
             .Where(assembly => assembly.GetName().Name == Domain)
             .SelectMany(assembly => assembly.GetTypes())
@@ -31,7 +32,7 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
         {
             if (entered.Add(domainEvent))
             {
-                Hold(domainEvent, holders, entered, []);
+                Hold(domainEvent, holders, entered, walked, []);
             }
         }
 
@@ -51,7 +52,7 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
 
         foreach (var property in Members(holder))
         {
-            if (!CarriesValueObject(property.PropertyType, [], [holder]))
+            if (!CarriesValueObject(property.PropertyType, [], [], [holder]))
             {
                 continue;
             }
@@ -68,19 +69,19 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
     }
 
     /// <summary>Adds the holder, and every domain type its public properties hold, to the types whose members are checked.</summary>
-    private static void Hold(Type holder, List<Type> holders, HashSet<Type> entered, List<Type> path)
+    private static void Hold(Type holder, List<Type> holders, HashSet<Type> entered, HashSet<Type> walked, List<Type> path)
     {
         holders.Add(holder);
         path.Add(holder);
         foreach (var property in Members(holder))
         {
-            Reach(property.PropertyType, holders, entered, path);
+            Reach(property.PropertyType, holders, entered, walked, path);
         }
 
         path.RemoveAt(path.Count - 1);
     }
 
-    private static void Reach(Type type, List<Type> holders, HashSet<Type> entered, List<Type> path)
+    private static void Reach(Type type, List<Type> holders, HashSet<Type> entered, HashSet<Type> walked, List<Type> path)
     {
         // A value object is stored as its backing value: what its type arguments name (TypedId<Invoice>) is never read.
         if (typeof(IValueObject).IsAssignableFrom(type))
@@ -88,14 +89,17 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
             return;
         }
 
-        foreach (var content in Contents(type, path))
+        if (FirstDescent(type, walked, path))
         {
-            Reach(content, holders, entered, path);
+            foreach (var content in Contents(type, path))
+            {
+                Reach(content, holders, entered, walked, path);
+            }
         }
 
         if (Enters(type, entered, path))
         {
-            Hold(type, holders, entered, path);
+            Hold(type, holders, entered, walked, path);
         }
     }
 
@@ -121,14 +125,14 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
     /// Whether the type is a value object, or holds one in its contents (<see cref="Contents"/>) or in a member of a domain
     /// type.
     /// </summary>
-    private static bool CarriesValueObject(Type type, HashSet<Type> entered, List<Type> path)
+    private static bool CarriesValueObject(Type type, HashSet<Type> entered, HashSet<Type> walked, List<Type> path)
     {
         if (typeof(IValueObject).IsAssignableFrom(type))
         {
             return true;
         }
 
-        if (Contents(type, path).Any(content => CarriesValueObject(content, entered, path)))
+        if (FirstDescent(type, walked, path) && Contents(type, path).Any(content => CarriesValueObject(content, entered, walked, path)))
         {
             return true;
         }
@@ -139,7 +143,7 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
         }
 
         path.Add(type);
-        var carries = Members(type).Any(property => CarriesValueObject(property.PropertyType, entered, path));
+        var carries = Members(type).Any(property => CarriesValueObject(property.PropertyType, entered, walked, path));
         path.RemoveAt(path.Count - 1);
         return carries;
     }
@@ -175,6 +179,14 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
 
         return type.IsGenericType && (!InDomain(type) || Expands(type, path)) ? type.GetGenericArguments() : [];
     }
+
+    /// <summary>
+    /// Whether the walk descends into the type's contents for the first time, so a collection of itself
+    /// (<c>RecursiveCollection : Collection&lt;RecursiveCollection&gt;</c>) ends it. The arguments of a closed type the walk
+    /// does not enter because it expands depend on the path, and are smaller than the type, so they are always walked.
+    /// </summary>
+    private static bool FirstDescent(Type type, HashSet<Type> walked, List<Type> path) =>
+        (type.IsGenericType && InDomain(type) && !IsCollection(type) && Expands(type, path)) || walked.Add(type);
 
     private static bool IsCollection(Type type) => type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(type);
 
