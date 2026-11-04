@@ -3,7 +3,10 @@ import { computed, type ComputedRef, inject, type InjectionKey, shallowRef } fro
 
 /** What the app needs of oidc-client-ts's UserManager; tests hand createAuth a fake of it. */
 export type AuthClient = Pick<UserManager, 'getUser' | 'signinCallback' | 'signinRedirect' | 'signoutRedirect'> & {
-  events: Pick<UserManager['events'], 'addUserLoaded' | 'addUserUnloaded'>;
+  events: Pick<
+    UserManager['events'],
+    'addUserLoaded' | 'addUserUnloaded' | 'addAccessTokenExpired' | 'addSilentRenewError'
+  >;
 };
 
 /** The signed-in user and the two ways out of and into the app; read it with useAuth(). */
@@ -24,9 +27,12 @@ function hasAuthParams(): boolean {
   return (parameters.has('code') || parameters.has('error')) && parameters.has('state');
 }
 
+const asError = (failure: unknown) => (failure instanceof Error ? failure : new Error(String(failure)));
+
 /**
  * Reads the stored user, or completes a sign-in when the identity provider has just answered, and follows the client
- * from then on (a silent renewal, a sign-out). Created once, by src/providers/auth.ts.
+ * from then on: a silent renewal, a sign-out, an access token that expired (the user must sign in again) and a renewal
+ * or redirect that failed (shown as the error). Created once, by src/providers/auth.ts.
  */
 export function createAuth(client: AuthClient): Auth {
   const user = shallowRef<User | null>(null);
@@ -39,6 +45,22 @@ export function createAuth(client: AuthClient): Auth {
   client.events.addUserUnloaded(() => {
     user.value = null;
   });
+  // User.expired follows the clock, which no computed sees; the expiry is an event instead.
+  client.events.addAccessTokenExpired(() => {
+    user.value = null;
+  });
+  client.events.addSilentRenewError((failure) => {
+    error.value = failure;
+  });
+
+  // A redirect that cannot start (the identity provider unreachable, say) is shown, never left to reject unseen.
+  const redirect = async (to: () => Promise<void>) => {
+    try {
+      await to();
+    } catch (failure) {
+      error.value = asError(failure);
+    }
+  };
 
   const load = async () => {
     try {
@@ -50,7 +72,7 @@ export function createAuth(client: AuthClient): Auth {
         user.value = await client.getUser();
       }
     } catch (failure) {
-      error.value = failure instanceof Error ? failure : new Error(String(failure));
+      error.value = asError(failure);
     } finally {
       isLoading.value = false;
     }
@@ -62,8 +84,8 @@ export function createAuth(client: AuthClient): Auth {
     isAuthenticated: computed(() => user.value !== null && !user.value.expired),
     isLoading: computed(() => isLoading.value),
     error: computed(() => error.value),
-    signinRedirect: () => client.signinRedirect(),
-    signoutRedirect: () => client.signoutRedirect(),
+    signinRedirect: () => redirect(() => client.signinRedirect()),
+    signoutRedirect: () => redirect(() => client.signoutRedirect()),
   };
 }
 
