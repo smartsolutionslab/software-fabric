@@ -32,7 +32,7 @@ public sealed class ServerEventsTests
 
         files["src/Host/Program.cs"].ShouldContain("builder.Services.AddServerEvents();");
         files["src/Host/Program.cs"].ShouldContain("app.MapServerEvents();");
-        files["src/Host/Wiring/ServerEventsEndpoints.cs"].ShouldContain("MapHub<EventsHub>(\"/hubs/events\")");
+        files["src/Host/Wiring/ServerEventsEndpoints.cs"].ShouldContain("MapHub<EventsHub>(\"/hubs/events\", options => options.CloseOnAuthenticationExpiration = true)");
         files["src/Host/Wiring/ServerEventsEndpoints.cs"].ShouldContain(".RequireAuthorization()");
         files["web/app/package.json"].ShouldContain("\"@microsoft/signalr\": \"10.0.11\"");
         files["web/app/src/realtime/connection.ts"].ShouldContain("accessTokenFactory");
