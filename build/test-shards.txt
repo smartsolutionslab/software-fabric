@@ -1,0 +1,10 @@
+# The test shards of ci.yml's tests job, one per line: the Fabric.Packs.Tests classes the shard runs, by full name.
+# build/test-shard.sh runs them, and the shard after the last line runs everything this file does not name. The
+# classes in the fixed-ports collection run one after another on a runner, so they are spread over the shards; the
+# build job prints each class's time, which is what to rebalance by. A new line needs a new shard in ci.yml's matrix.
+Fabric.Packs.Tests.LeanCrudBackendTests Fabric.Packs.Tests.PagingTests
+Fabric.Packs.Tests.StrictEventSourcedTests Fabric.Packs.Tests.ErrorHandlingTests Fabric.Packs.Tests.MailpitTests
+Fabric.Packs.Tests.EventDrivenBackendTests Fabric.Packs.Tests.AzureOpenAITests Fabric.Packs.Tests.PolicyOwnershipTests
+Fabric.Packs.Tests.SaasStandardReactTests Fabric.Packs.Tests.OpenAITests Fabric.Packs.Tests.SignInTests
+Fabric.Packs.Tests.ClaimAuthorizationTests Fabric.Packs.Tests.AnthropicTests Fabric.Packs.Tests.LeanCrudSignInTests Fabric.Packs.Tests.UniqueConstraintTests
+Fabric.Packs.Tests.McpServerTests Fabric.Packs.Tests.NoAuthenticationTests Fabric.Packs.Tests.McpClientTests
