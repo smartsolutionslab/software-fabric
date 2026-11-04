@@ -30,6 +30,7 @@ const users = {
 {{~ if claims ~}}
   analyst: {
     preferred_username: 'analyst',
+    email_verified: true,
     department: 'finance',
   },
   clerk: {
@@ -103,6 +104,11 @@ test('useHasClaim answers true for the analyst and false for the clerk', () => {
 
   signInAs('clerk');
   expect(renderHook(() => useHasClaim('department', 'finance')).result.current).toBe(false);
+});
+
+test('useHasClaim compares a value as text, as the backend does: email_verified true is "true"', () => {
+  signInAs('analyst');
+  expect(renderHook(() => useHasClaim('email_verified', 'true')).result.current).toBe(true);
 });
 
 test('an element that requires the finance department is shown to the analyst', () => {
