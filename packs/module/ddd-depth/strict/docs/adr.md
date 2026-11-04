@@ -28,7 +28,8 @@ a `Nullable<T>` counts too.
 
 **An enum is allowed**, the module's own or the BCL's, alone, nullable or in a collection: it is a named set of values,
 not a primitive held as state. The walk does not look into one, so the `value__` field the compiler gives every enum is
-never reported.
+never reported, nor, for an enum nested in a generic type, its enclosing type's arguments: `Palette<int>.Status` holds
+no `int`.
 
 **Exemptions.** A value object holds its own backing values (`InvoiceNumber.Value` is a `string`), a generic one too: a
 `Positive<int>` property holds a value object, not an `int`. An aggregate, command or domain event is never a value
@@ -104,9 +105,8 @@ Two limits remain, both for these definitions only:
   `Pair<Cargo, Cargo>`. Under an `in` type parameter, an argument the definition builds from its own type parameters
   is taken to match any type. Either way the walk can name a primitive no aggregate reaches; it never hides one.
 
-The exemptions hold there as they do for closed types: an enum is allowed, one nested in a generic type
-(`Palette<T>.Status`) included, and a computed `T Value` is an answer in `Answer<bool>` but state in
-`Answer<List<bool>>`.
+The exemptions hold there as they do for closed types: an enum is allowed, and a computed property `T Value` is an
+answer in `Answer<bool>` but state in `Answer<List<bool>>`; a field that hides it stays state.
 
 ## Consequences
 

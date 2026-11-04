@@ -63,12 +63,12 @@ public static class PrimitiveBoundary
     /// The state a type shows: its public properties, less building-block state and computed answers, and its public
     /// instance fields, which hold state as surely as a property does even where an analyzer would refuse them.
     /// </summary>
-    private static IEnumerable<(string Name, Type Type)> State(Type type, HashSet<Type> own) =>
+    private static IEnumerable<(string Name, Type Type, MemberInfo Member)> State(Type type, HashSet<Type> own) =>
         type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(property => !IsBuildingBlockState(property, own) && !IsComputedAnswer(property))
-            .Select(property => (property.Name, property.PropertyType))
+            .Select(property => (property.Name, property.PropertyType, (MemberInfo)property))
             .Concat(type.GetFields(BindingFlags.Public | BindingFlags.Instance)
-                .Select(field => (field.Name, field.FieldType)));
+                .Select(field => (field.Name, field.FieldType, (MemberInfo)field)));
 
     /// <summary>
     /// The module's generic definitions that can recur forever, and every one of the module's generic definitions they
@@ -85,7 +85,7 @@ public static class PrimitiveBoundary
         List<(Type From, int FromPosition, Type To, int ToPosition, bool Grows)> uses = [];
         foreach (var definition in types.Where(type => type.IsGenericTypeDefinition))
         {
-            foreach (var (_, memberType) in State(definition, own))
+            foreach (var (_, memberType, _) in State(definition, own))
             {
                 AddUses(definition, memberType, own, uses);
             }
@@ -200,13 +200,20 @@ public static class PrimitiveBoundary
     /// The type itself, its generic arguments and its array element, recursively, with <see cref="Nullable{T}"/>
     /// unwrapped: <c>IReadOnlyList&lt;string&gt;</c> holds a <c>string</c> as surely as a <c>string</c> property does.
     /// A value object ends the descent: <c>Positive&lt;int&gt;</c> is the value object, and the <c>int</c> is its own
-    /// backing value, which the walk checks, and exempts, when it reaches the value object's state.
+    /// backing value, which the walk checks, and exempts, when it reaches the value object's state. So does an enum:
+    /// <c>Palette&lt;int&gt;.Status</c> is a named set of values, not an <c>int</c>.
     /// </summary>
     private static IEnumerable<Type> Constituents(Type type, Func<Type, bool> isValueObject, HashSet<Type> visited)
     {
         var underlying = Nullable.GetUnderlyingType(type) ?? type;
         if (!visited.Add(underlying))
         {
+            yield break;
+        }
+
+        if (underlying.IsEnum)
+        {
+            yield return underlying;
             yield break;
         }
 
@@ -395,7 +402,7 @@ public static class PrimitiveBoundary
         private void Enter(Type type)
         {
             var exempt = isValueObject(type);
-            foreach (var (name, memberType) in State(type, own))
+            foreach (var (name, memberType, _) in State(type, own))
             {
                 foreach (var constituent in Constituents(memberType, isValueObject, []))
                 {
@@ -503,14 +510,9 @@ public static class PrimitiveBoundary
         private void EnterRecurring(Type definition, Usage used)
         {
             var exempt = isValueObject(definition);
-            HashSet<string> answers =
-            [
-                .. definition.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                    .Where(property => property.PropertyType.IsGenericParameter && Computes(property))
-                    .Select(property => property.Name),
-            ];
-            foreach (var (name, memberType) in State(definition, own))
+            foreach (var (name, memberType, member) in State(definition, own))
             {
+                var computed = member is PropertyInfo property && property.PropertyType.IsGenericParameter && Computes(property);
                 foreach (var (held, whole, from) in Holds(memberType, definition, true, []).ToList())
                 {
                     if (held.Context is not null)
@@ -521,7 +523,7 @@ public static class PrimitiveBoundary
                     {
                         Reach(held.Type);
                     }
-                    else if (!exempt && !(whole && held.Type == typeof(bool) && answers.Contains(name)) && named.Add((definition, name, held.Type)))
+                    else if (!exempt && !(computed && whole && held.Type == typeof(bool)) && named.Add((definition, name, held.Type)))
                     {
                         violations.Add(Message(from ?? used.First, name, held.Type));
                     }
@@ -554,6 +556,12 @@ public static class PrimitiveBoundary
                     }
                 }
 
+                yield break;
+            }
+
+            if (underlying.IsEnum)
+            {
+                yield return (new Held(underlying, null), whole, null);
                 yield break;
             }
 
