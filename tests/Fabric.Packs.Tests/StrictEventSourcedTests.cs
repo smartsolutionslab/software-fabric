@@ -151,6 +151,20 @@ public sealed class StrictEventSourcedTests
                 Should.Throw<GuardException>(() => Serializer().FromJson<InvoiceIssued>(stored));
             }
 
+            [Fact]
+            public void A_value_object_keys_a_dictionary_by_its_backing_value_and_passes_its_guards_when_read()
+            {
+                Dictionary<InvoiceNumber, LineCount> lines = new() { [InvoiceNumber.From("INV-1")] = LineCount.From(3) };
+
+                var json = Serializer().ToJson(lines);
+                using var stored = new MemoryStream(Encoding.UTF8.GetBytes(json));
+                using var blank = new MemoryStream(Encoding.UTF8.GetBytes("""{"  ":3}"""));
+
+                json.ShouldBe("""{"INV-1":3}""");
+                Serializer().FromJson<Dictionary<InvoiceNumber, LineCount>>(stored).ShouldBe(lines);
+                Should.Throw<GuardException>(() => Serializer().FromJson<Dictionary<InvoiceNumber, LineCount>>(blank));
+            }
+
             private static ISerializer Serializer()
             {
                 var options = new StoreOptions();
