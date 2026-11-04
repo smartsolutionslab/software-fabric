@@ -12,7 +12,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
+  # The solution's tests, in shards that run in parallel (#166). In one job they took 45-60 min, nearly all of it
+  # Fabric.Packs.Tests, whose Docker-backed classes share fixed ports and so run one after another on a runner; on
+  # separate runners they do not wait for each other. build/test-shards.txt says which classes each shard runs, from
+  # their measured times; the last shard runs everything the file does not name. The build job below fails unless
+  # every shard passed and every test method ran in one of them.
+  tests:
+    name: test-${{ matrix.shard }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -30,9 +40,45 @@ jobs:
       - run: npx --yes playwright@1.63.0 install --with-deps chromium
       # Generated AppHosts use the Aspire CLI bundle; set it up once instead of letting parallel builds race to do it.
       - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
-      - run: dotnet restore Fabric.slnx
-      - run: dotnet build Fabric.slnx -c Release --no-restore
-      - run: dotnet test --solution Fabric.slnx -c Release --no-build
+      - run: dotnet build Fabric.slnx -c Release
+      # Each test assembly writes an xUnit XML report: what ran, and per-class and per-test times.
+      - run: build/test-shard.sh "${{ matrix.shard }}" "$RUNNER_TEMP/test-results"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-results-${{ matrix.shard }}
+          path: ${{ runner.temp }}/test-results
+          retention-days: 7
+
+  # The required check. It waits for every shard, and is not skipped when one fails: a skipped required check would
+  # count as passing.
+  build:
+    needs: tests
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every test shard passed
+        if: needs.tests.result != 'success'
+        run: |
+          echo "::error title=tests::A test shard did not pass (${{ needs.tests.result }}); see the test-* jobs."
+          exit 1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+      - run: dotnet build Fabric.slnx -c Release
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: test-results-*
+          path: ${{ runner.temp }}/test-results
+      # Every test project's every method ran in some shard; prints the counts per project.
+      - run: |
+          assemblies=()
+          for project in tests/*/*.Tests.csproj; do
+            name="$(basename "$project" .csproj)"
+            assemblies+=("$(dirname "$project")/bin/Release/net10.0/$name.dll")
+          done
+          build/tests-all-ran.sh "$RUNNER_TEMP/test-results" "${assemblies[@]}"
       - run: build/profiles.sh
 
   # Profile CI (ADR-0003, roadmap M1-09): every profile the real packs generate alone, listed by
