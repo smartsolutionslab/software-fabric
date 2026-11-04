@@ -74,6 +74,38 @@ public sealed class McpServerTests
         }
         """;
 
+    private const string FindInvoiceInBilling = """
+        using Shop.BuildingBlocks.Mcp;
+        using Shop.BuildingBlocks.Messaging;
+
+        namespace Shop.Modules.Billing.Application.Queries.FindInvoice;
+
+        [McpTool("Finds an invoice.")]
+        public sealed record FindInvoice : IQuery<Result<int, ApiError>>;
+
+        public sealed class FindInvoiceHandler : IQueryHandler<FindInvoice, Result<int, ApiError>>
+        {
+            public Task<Result<int, ApiError>> HandleAsync(FindInvoice query, CancellationToken cancellationToken) =>
+                Task.FromResult<Result<int, ApiError>>(Success(0));
+        }
+        """;
+
+    private const string InvoiceInBillingFind = """
+        using Shop.BuildingBlocks.Mcp;
+        using Shop.BuildingBlocks.Messaging;
+
+        namespace Shop.Modules.BillingFind.Application.Queries.Invoice;
+
+        [McpTool("Finds an invoice, too.")]
+        public sealed record Invoice : IQuery<Result<int, ApiError>>;
+
+        public sealed class InvoiceHandler : IQueryHandler<Invoice, Result<int, ApiError>>
+        {
+            public Task<Result<int, ApiError>> HandleAsync(Invoice query, CancellationToken cancellationToken) =>
+                Task.FromResult<Result<int, ApiError>>(Success(0));
+        }
+        """;
+
     private const string MarkedWithAnotherModulesPolicy = """
         using Shop.BuildingBlocks.Mcp;
         using Shop.BuildingBlocks.Messaging;
@@ -145,7 +177,7 @@ public sealed class McpServerTests
         var (mcpExitCode, mcpOutput) = project.Test("tests/Mcp.Server.Tests/Mcp.Server.Tests.csproj");
         mcpExitCode.ShouldBe(0, mcpOutput);
         mcpOutput.ShouldContain("failed: 0");
-        mcpOutput.ShouldContain("succeeded: 10");
+        mcpOutput.ShouldContain("succeeded: 13");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
@@ -176,7 +208,7 @@ public sealed class McpServerTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 8");
+        output.ShouldContain("succeeded: 11");
     }
 
     [Fact]
@@ -231,6 +263,30 @@ public sealed class McpServerTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
+    }
+
+    [Fact]
+    public async Task Tool_names_that_collide_across_modules_fail_the_architecture_tests_and_stop_the_host_naming_both()
+    {
+        using var project = NewProject(McpServer);
+        project.AddModule("billing");
+        project.AddModule("billing-find");
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/FindInvoice", FindInvoiceInBilling);
+        project.WriteTypes("src/Modules/BillingFind/BillingFind.Application/Queries/Invoice", InvoiceInBillingFind);
+        project.Build();
+        const string Collision = "Shop.Modules.Billing.Application.Queries.FindInvoice.FindInvoice and Shop.Modules.BillingFind.Application.Queries.Invoice.Invoice would all be the MCP tool billing_find_invoice";
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain(Collision);
+
+        using var host = project.StartHost(new Dictionary<string, string>
+        {
+            ["ConnectionStrings__database"] = "Host=127.0.0.1;Port=1;Database=unused",
+            ["Authentication__Authority"] = "http://127.0.0.1:1/realms/unused",
+        });
+        var stopped = await Should.ThrowAsync<InvalidOperationException>(() => host.GetAsync("/alive"));
+        stopped.Message.ShouldContain(Collision);
     }
 
     /// <summary>The architecture tests' output for a lean-crud project with roles whose billing module holds the source.</summary>

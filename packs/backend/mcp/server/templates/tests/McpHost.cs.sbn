@@ -82,6 +82,9 @@ public sealed class McpHost : WebApplicationFactory<Program>
             services.AddSingleton<Approvals>()
                 .AddScoped<ICommandHandler<Approve, Result<Approved, ApiError>>, ApproveHandler>();
 {{~ end ~}}
+{{~ if project["backend.absence"] == "option" ~}}
+            services.AddScoped<IQueryHandler<Lookup, Result<Option<Found>, ApiError>>, LookupHandler>();
+{{~ end ~}}
             services.AddScoped<IQueryHandler<Shout, Result<Shouted, ApiError>>, ShoutHandler>()
                 .AddScoped<IQueryHandler<Whisper, Result<Shouted, ApiError>>, WhisperHandler>()
                 .AddMcpRequestTools("Samples", typeof(Shout).Assembly{{ if policies }}, typeof(SamplePolicies).Assembly{{ end }});

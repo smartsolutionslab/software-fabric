@@ -1,0 +1,8 @@
+using {{ namespace }}.BuildingBlocks.Mcp;
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Mcp.Server.Tests;
+
+/// <summary>A marked query that may find nothing, and whose answer may lack a note: absence, at the top and nested.</summary>
+[McpTool("Looks the text up; finds nothing for an empty text, and notes only a text that is not plain.")]
+public sealed record Lookup(string Text) : IQuery<Result<Option<Found>, ApiError>>;

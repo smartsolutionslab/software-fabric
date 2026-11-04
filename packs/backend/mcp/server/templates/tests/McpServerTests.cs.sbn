@@ -93,6 +93,23 @@ public sealed class McpServerTests : IDisposable
         (result.IsError ?? false).ShouldBeTrue();
         Text(result).ShouldStartWith("The arguments are not a Shout:");
     }
+{{~ if project["backend.absence"] == "option" ~}}
+
+    [Theory]
+    [InlineData("", "null")]
+    [InlineData("plain", "{\"text\":\"plain\",\"note\":null}")]
+    [InlineData("rare", "{\"text\":\"rare\",\"note\":\"noted\"}")]
+    public async Task An_absent_option_is_null_in_the_answer_at_the_top_and_nested(string text, string answer)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var client = await ConnectAsync(cancellationToken);
+
+        var result = await client.CallToolAsync("samples_lookup", new Dictionary<string, object?> { ["text"] = text }, cancellationToken: cancellationToken);
+
+        (result.IsError ?? false).ShouldBeFalse(Text(result));
+        Text(result).ShouldBe(answer);
+    }
+{{~ end ~}}
 {{~ if auth ~}}
 
     [Fact]
