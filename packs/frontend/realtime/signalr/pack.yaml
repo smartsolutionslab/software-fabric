@@ -28,7 +28,7 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: unit-test, describes: "Against the running application, a browser of the sender's tenant receives a server event and one of another tenant does not, and a connection without a token is refused unless backend.auth is none (tests/Integration.Tests/ServerEventsTests.cs).", file: templates/ServerEventsTests.cs.sbn }
+  - { kind: unit-test, describes: "Against the running application, a browser of the sender's tenant receives a server event and one of another tenant does not, a connection without a token is refused unless backend.auth is none, and with Keycloak one whose token expires is closed (tests/Integration.Tests/ServerEventsTests.cs).", file: templates/ServerEventsTests.cs.sbn }
   - { kind: unit-test, describes: "useServerEvent hands a component the events it subscribes to and unsubscribes when it unmounts (src/realtime/useServerEvent.test.tsx).", file: templates/useServerEvent.test.tsx.sbn }
-  - { kind: unit-test, describes: "ServerEvents tries a connection that failed to start again until it starts, and stops trying once unmounted (src/realtime/ServerEvents.test.tsx).", file: templates/ServerEvents.test.tsx.sbn }
+  - { kind: unit-test, describes: "ServerEvents starts a connection again when its first start fails or its reconnects run out, and stops once unmounted (src/realtime/ServerEvents.test.tsx).", file: templates/ServerEvents.test.tsx.sbn }
   - { kind: end-to-end-test, describes: "A signed-in browser's own connection receives a server event (e2e/server-events.spec.ts, run against the running AppHost).", file: templates/server-events.spec.ts.sbn }

@@ -21,7 +21,9 @@ public static class ServerEventsEndpoints
 {{~ if project["backend.auth"] == "none" ~}}
         app.MapHub<EventsHub>("/hubs/events");
 {{~ else ~}}
-        app.MapHub<EventsHub>("/hubs/events").RequireAuthorization();
+        // A connection outlives the token it started with; closing it then makes the browser reconnect with a fresh one,
+        // so the user and their tenant are checked again.
+        app.MapHub<EventsHub>("/hubs/events", options => options.CloseOnAuthenticationExpiration = true).RequireAuthorization();
 {{~ end ~}}
         if (app.Environment.IsDevelopment())
         {

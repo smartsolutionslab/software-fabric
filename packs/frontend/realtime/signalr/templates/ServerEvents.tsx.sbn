@@ -9,6 +9,7 @@ const retryDelay = (attempt: number) => Math.min(30_000, 1_000 * 2 ** attempt);
 export function ServerEvents({ children }: { children: ReactNode }) {
   const [connection] = useState(connectServerEvents);
   const lifecycle = useRef(Promise.resolve());
+  const stopping = useRef(0);
 
   useEffect(() => {
     let mounted = true;
@@ -25,11 +26,25 @@ export function ServerEvents({ children }: { children: ReactNode }) {
         });
     };
 
+    // Automatic reconnects give up after a few attempts; a connection closed for good starts over while mounted. A close
+    // that stop() causes (unmounting, StrictMode's second mount) is not one.
+    connection.onclose(() => {
+      if (mounted && stopping.current === 0) {
+        start(0);
+      }
+    });
     start(0);
     return () => {
       mounted = false;
       clearTimeout(retry);
-      lifecycle.current = lifecycle.current.then(() => connection.stop());
+      lifecycle.current = lifecycle.current
+        .then(() => {
+          stopping.current += 1;
+          return connection.stop();
+        })
+        .finally(() => {
+          stopping.current -= 1;
+        });
     };
   }, [connection]);
 
