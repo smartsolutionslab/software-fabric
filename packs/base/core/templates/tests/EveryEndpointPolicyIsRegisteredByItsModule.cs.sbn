@@ -1,0 +1,127 @@
+{{~ if project["backend.auth"] != "keycloak" ~}}
+#error The module policy rule starts the host through the references the keycloak pack gives the architecture tests; other identity providers are not built yet (docs/adr/0006 of the generator).
+{{~ end ~}}
+{{~ if project["backend.topology"] != "modular-monolith" ~}}
+#error The module policy rule starts the modular-monolith host only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Modules;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A module's endpoint names only policies its own <see cref="IModulePolicies"/> registers, and no other module
+/// registers the same name: the host has one policy table, so a policy two modules register is whichever came last.
+/// An endpoint belongs to the module whose Api assembly declares its handler. The host's endpoint table is read once
+/// in Development and once in Production; each module's policies are registered on their own and looked up by name.
+/// </summary>
+public sealed class EveryEndpointPolicyIsRegisteredByItsModule : IArchitectureRule
+{
+    private const string ModulePrefix = "{{ namespace }}.Modules.";
+
+    private const string ApiSuffix = ".Api";
+
+    public string Description => "Every policy a module's endpoint names is registered by that module's IModulePolicies, and by no other module.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var policies = model.ModuleAssemblies
+            .Where(assembly => Module(assembly) is not null)
+            .ToDictionary(assembly => Module(assembly)!, Policies, StringComparer.Ordinal);
+
+        return [.. Unregistered(Environments.Development, policies)
+            .Concat(Unregistered(Environments.Production, policies))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)];
+    }
+
+    private static List<string> Unregistered(string environment, Dictionary<string, AuthorizationOptions> policies)
+    {
+        using var host = new MappedHost(environment);
+        List<string> violations = [];
+        foreach (var endpoint in host.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>())
+        {
+            if (endpoint.Metadata.GetMetadata<MethodInfo>()?.DeclaringType?.Assembly is not { } assembly || Module(assembly) is not { } owner)
+            {
+                continue;
+            }
+
+            foreach (var policy in endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(data => data.Policy).OfType<string>())
+            {
+                if (!policies.TryGetValue(owner, out var own) || own.GetPolicy(policy) is null)
+                {
+                    violations.Add($"{Name(endpoint)} requires the policy {policy}, which the module {owner} does not register.");
+                }
+
+                violations.AddRange(policies
+                    .Where(other => other.Key != owner && other.Value.GetPolicy(policy) is not null)
+                    .Select(other => $"{Name(endpoint)} requires the policy {policy}, which the module {other.Key} registers too; name a module's policies <module>.<permission>."));
+            }
+        }
+
+        return violations;
+    }
+
+    /// <summary>Billing for <c>{{ namespace }}.Modules.Billing.Api</c>; null for any other assembly.</summary>
+    private static string? Module(Assembly assembly)
+    {
+        var name = assembly.GetName().Name!;
+        return name.StartsWith(ModulePrefix, StringComparison.Ordinal) && name.EndsWith(ApiSuffix, StringComparison.Ordinal)
+            ? name[ModulePrefix.Length..^ApiSuffix.Length]
+            : null;
+    }
+
+    /// <summary>The policies one module registers, and nothing else.</summary>
+    private static AuthorizationOptions Policies(Assembly api)
+    {
+        var services = new ServiceCollection();
+        var builder = new AuthorizationBuilder(services.AddAuthorizationCore());
+        foreach (var registration in api.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(IModulePolicies).IsAssignableFrom(type))
+            .Select(type => (IModulePolicies)Activator.CreateInstance(type)!))
+        {
+            registration.AddPolicies(builder);
+        }
+
+        using var provider = services.BuildServiceProvider();
+        return provider.GetRequiredService<IOptions<AuthorizationOptions>>().Value;
+    }
+
+    private static string Name(RouteEndpoint endpoint)
+    {
+        var methods = endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? [];
+        var route = "/" + endpoint.RoutePattern.RawText?.TrimStart('/');
+        return methods.Count == 0 ? route : $"{string.Join(',', methods)} {route}";
+    }
+
+    /// <summary>
+    /// The host with every endpoint mapped but nothing started: no hosted service runs, so the configuration Aspire
+    /// would provide only has to be present, never reachable.
+    /// </summary>
+    private sealed class MappedHost(string environment) : WebApplicationFactory<Program>
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment(environment);
+            builder.UseSetting("ConnectionStrings:database", "Host=localhost;Database=unused");
+{{~ if project["backend.bus.transport"] == "kafka" ~}}
+            builder.UseSetting("ConnectionStrings:messaging", "localhost:9092");
+{{~ else if project["backend.bus.transport"] != "none" ~}}
+            builder.UseSetting("ConnectionStrings:messaging", "amqp://localhost");
+{{~ end ~}}
+            builder.UseSetting("Authentication:Authority", "http://localhost/realms/unused");
+            builder.ConfigureServices(services => services.RemoveAll<IHostedService>());
+        }
+    }
+}

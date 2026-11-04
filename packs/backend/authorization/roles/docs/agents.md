@@ -1,0 +1,7 @@
+## Authorization: by role
+
+- Access by role goes through a policy, never a role check. A module's policies live in its Api project's `<Module>Policies : IModulePolicies`, named `<module>.<permission>` (`billing.approve-invoices`), each built with `RequireRole(...)`. `IsInRole`, `ClaimTypes.Role`, `[Authorize(Roles = ...)]`, or `RequireRole` anywhere else fails the architecture rule `OnlyModulePoliciesCheckRoles`.
+- To add a permission: add a constant and a policy to the module's `<Module>Policies` (`public const string ApproveInvoices = "billing.approve-invoices";` and `policies.AddPolicy(ApproveInvoices, policy => policy.RequireRole("accountant"));`), then name it on the endpoint with `.RequireAuthorization(BillingPolicies.ApproveInvoices)`. A new role goes into `src/AppHost/realms/realm.json` (`roles.realm`, and `realmRoles` of the local users who should hold it).
+- An endpoint names only its own module's policies; `EveryEndpointPolicyIsRegisteredByItsModule` fails for one its module does not register or another module registers too.
+- Every new endpoint that requires a policy gets an integration test with a user who holds it (200 or what it returns), one who does not (403) and no token (401), like `<Module>RoleTests`.
+- Local users: `developer` / `developer` holds the realm role `manager` (as does `developer-b` with tenancy); `visitor` / `visitor` has no roles. Each module's sample policy `<module>.manage` requires `manager`; `GET /<module>/permissions/manage` answers 200 for a holder and 403 for anyone else signed in.

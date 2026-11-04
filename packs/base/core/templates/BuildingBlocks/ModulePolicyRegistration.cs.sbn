@@ -1,0 +1,27 @@
+using {{ namespace }}.BuildingBlocks.Modules;
+using Microsoft.AspNetCore.Authorization;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class ModulePolicyRegistration
+{
+    /// <summary>Registers the policies of every <see cref="IModulePolicies"/> in the Api assembly of <typeparamref name="TModule"/>.</summary>
+    public static IServiceCollection AddModulePolicies<TModule>(this IServiceCollection services)
+        where TModule : IModule
+    {
+        {{ not_null "services" }}
+
+        // The core services only: the host adds the rest (policy evaluation needs its endpoints), and a module's own tests
+        // build its services without a host.
+        var policies = new AuthorizationBuilder(services.AddAuthorizationCore());
+        foreach (var registration in typeof(TModule).Assembly.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(IModulePolicies).IsAssignableFrom(type))
+            .OrderBy(type => type.FullName, StringComparer.Ordinal)
+            .Select(type => (IModulePolicies)Activator.CreateInstance(type)!))
+        {
+            registration.AddPolicies(policies);
+        }
+
+        return services;
+    }
+}

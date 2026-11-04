@@ -1,0 +1,12 @@
+using Microsoft.AspNetCore.Authorization;
+
+namespace {{ namespace }}.BuildingBlocks.Modules;
+
+/// <summary>
+/// A module's authorization policies, in its Api project, each named <c>&lt;module&gt;.&lt;permission&gt;</c>. Found by
+/// assembly scan like <see cref="IModule"/>; an endpoint of the module names one with <c>RequireAuthorization(...)</c>.
+/// </summary>
+public interface IModulePolicies
+{
+    void AddPolicies(AuthorizationBuilder policies);
+}

@@ -1,0 +1,49 @@
+{{~ if project["backend.test.integration"] != "aspire-fixture" ~}}
+#error The roles pack tests a module's sample policy through the aspire-fixture integration tests only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+{{~ func status(response, code)
+  if project["backend.test.assertions"] == "shouldly"
+    ret response + ".StatusCode.ShouldBe(HttpStatusCode." + code + ");"
+  else
+    ret response + ".StatusCode.Should().Be(HttpStatusCode." + code + ");"
+  end
+end ~}}
+using System.Net;
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>The {{ module.name }} module's sample policy {{ module.name }}.manage requires the realm role manager, which developer holds and visitor does not.</summary>
+public class {{ module.namespace }}RoleTests(AspireFixture aspire)
+{
+    private static readonly Uri ManagePermission = new("/{{ module.name }}/permissions/manage", UriKind.Relative);
+
+    [Fact]
+    public async Task A_user_with_the_manager_role_is_allowed()
+    {
+        using var client = await aspire.CreateHostClientAsync("developer");
+
+        using var response = await client.GetAsync(ManagePermission, TestContext.Current.CancellationToken);
+
+        {{ status "response" "OK" }}
+    }
+
+    [Fact]
+    public async Task A_signed_in_user_without_the_role_is_forbidden()
+    {
+        using var client = await aspire.CreateHostClientAsync("visitor");
+
+        using var response = await client.GetAsync(ManagePermission, TestContext.Current.CancellationToken);
+
+        {{ status "response" "Forbidden" }}
+    }
+
+    [Fact]
+    public async Task An_anonymous_caller_is_unauthorized()
+    {
+        using var client = aspire.CreateHostClient();
+
+        using var response = await client.GetAsync(ManagePermission, TestContext.Current.CancellationToken);
+
+        {{ status "response" "Unauthorized" }}
+    }
+}

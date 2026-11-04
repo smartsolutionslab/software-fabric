@@ -12,6 +12,9 @@ public static class ModuleInfrastructure
         {{ not_null "services" }}
         {{ not_null "configuration" }}
 {{ slots["modules.infrastructure"] }}
+{{~ if object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+        services.AddModulePolicies<TModule>();
+{{~ end ~}}
         return services;
     }
 }

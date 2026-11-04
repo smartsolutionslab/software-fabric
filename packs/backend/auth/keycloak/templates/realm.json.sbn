@@ -1,3 +1,4 @@
+{{~ roles = project["backend.authorization"] | array.contains "roles" ~}}
 {
   "realm": "{{ name }}",
   "enabled": true,
@@ -11,6 +12,13 @@
     "starttls": "false",
     "auth": "false"
   },
+{{~ if roles ~}}
+  "roles": {
+    "realm": [
+      { "name": "manager", "description": "Sample role: each module's sample policy <module>.manage requires it." }
+    ]
+  },
+{{~ end ~}}
 {{~ if project["backend.tenancy"] != "none" ~}}
   "groups": [
     { "name": "tenants", "subGroups": [ { "name": "tenant-a" }, { "name": "tenant-b" } ] }
@@ -67,7 +75,8 @@
       "emailVerified": true,
       "firstName": "Local",
       "lastName": "Developer",
-      "credentials": [{ "type": "password", "value": "developer", "temporary": false }]{{ if project["backend.tenancy"] != "none" }},
+      "credentials": [{ "type": "password", "value": "developer", "temporary": false }]{{ if roles }},
+      "realmRoles": ["manager"]{{ end }}{{ if project["backend.tenancy"] != "none" }},
       "groups": ["/tenants/tenant-a"]
     },
     {
@@ -77,8 +86,19 @@
       "emailVerified": true,
       "firstName": "Local",
       "lastName": "Developer B",
-      "credentials": [{ "type": "password", "value": "developer-b", "temporary": false }],
-      "groups": ["/tenants/tenant-b"]{{ end }}
+      "credentials": [{ "type": "password", "value": "developer-b", "temporary": false }]{{ if roles }},
+      "realmRoles": ["manager"]{{ end }},
+      "groups": ["/tenants/tenant-b"]{{ end }}{{ if roles }}
+    },
+    {
+      "username": "visitor",
+      "enabled": true,
+      "email": "visitor@example.com",
+      "emailVerified": true,
+      "firstName": "Local",
+      "lastName": "Visitor",
+      "credentials": [{ "type": "password", "value": "visitor", "temporary": false }]{{ if project["backend.tenancy"] != "none" }},
+      "groups": ["/tenants/tenant-a"]{{ end }}{{ end }}
     }
   ]
 }
