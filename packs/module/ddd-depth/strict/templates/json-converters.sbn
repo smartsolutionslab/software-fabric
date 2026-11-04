@@ -1,1 +1,3 @@
+            // A null for a value object that is not nullable fails instead of skipping From.
+            json.RespectNullableAnnotations = true;
             json.Converters.Add(new ValueObjectJsonConverterFactory());

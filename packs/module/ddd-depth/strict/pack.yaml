@@ -11,6 +11,7 @@ files:
   # Per module: the rule checks only the modules that chose strict, so another module may stay light.
   - { template: templates/HoldsNoPrimitives.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}HoldsNoPrimitives.cs", per-module: true }
   - { template: templates/AggregatesHaveNoPublicSetters.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}AggregatesHaveNoPublicSetters.cs", per-module: true }
+  - { template: templates/ValueObjectsHaveOneValue.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}ValueObjectsHaveOneValue.cs", per-module: true, when: 'module.values["module.style"] == "event-sourced"' }
   - { template: templates/SampleId.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/SampleId.cs", per-module: true }
   - { template: templates/SampleName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/SampleName.cs", per-module: true }
   - { template: templates/SampleIdTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleIdTests.cs", per-module: true }
@@ -25,3 +26,4 @@ adr: docs/adr.md
 gates:
   - { kind: architecture-test, describes: "No aggregate of a strict module, nor an entity or value object reachable from it, nor a command or domain event, holds state, in a public property or a public field, typed as a keyword type (string, int, bool, decimal, object, ...) or as Guid, DateTime, DateTimeOffset, DateOnly, TimeOnly, TimeSpan or Uri, collections and arrays included; a value object (IValueObject) that is not itself an aggregate, command or domain event is exempt for its own backing values, and a generic one (Positive<int>) is not looked into for them; private fields are out of scope, and a computed bool whose getter does more than return a field is not state.", file: templates/HoldsNoPrimitives.cs.sbn }
   - { kind: architecture-test, describes: "No aggregate root of a strict module exposes a public setter (light's rule, so strict is a superset of light).", file: templates/AggregatesHaveNoPublicSetters.cs.sbn }
+  - { kind: architecture-test, describes: "Every value object in the Domain of a strict event-sourced module implements IValueObject<T> for exactly one T: the event store writes a value object as its one backing value, so a value object over several values (Money) is refused for now.", file: templates/ValueObjectsHaveOneValue.cs.sbn }

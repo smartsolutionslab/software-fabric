@@ -44,7 +44,13 @@ property.
 System.Text.Json, and a converter registered with every module's store writes a value object as its backing value and
 reads it back through `From`, so no value object carries a `[JsonConverter]` attribute and a value read from the store
 passes the same guards as one a caller sends. An event-sourced aggregate's identity is a value object over a `Guid` that
-is also its `IAggregateId`.
+is also its `IAggregateId`. A JSON `null` for a value object that is not declared nullable fails to read
+(`RespectNullableAnnotations`), so it never skips `From`; one declared nullable (`InvoiceNumber?`) may be null.
+
+**Not yet in event-sourced modules: value objects over several values.** The converter writes a value object as its one
+backing value, so `Money` (an amount and a currency) cannot be stored in an event. An architecture rule per strict
+event-sourced module refuses a value object that is not an `IValueObject<T>` for exactly one `T`, until a JSON shape for
+several values is decided; then the rule can be lifted.
 {{~ end ~}}
 
 ## Enforced
