@@ -2,20 +2,12 @@ namespace Fabric.Packs.Tests;
 
 /// <summary>
 /// saas-standard-vue's web app from the real Vue packs: Vue with vue-router, Pinia and TanStack Query, an orval client generated for
-/// vue-query, zod and the axe check. The packs whose Vue branches come later (sign-in, table, chart: #159; forms, components,
-/// styling: #160) stand in.
+/// vue-query, zod, the axe check, and the Vue branches of the sign-in, table and chart packs (#159). The packs that come later
+/// (forms, components, styling: #160) stand in.
 /// </summary>
-public sealed class VueFrontendTests : IDisposable
+public sealed class VueFrontendTests
 {
     private const string Profile = "saas-standard-vue";
-
-    /// <summary>Real packs that do not render for Vue yet; their Vue branches are #159's.</summary>
-    private static readonly string[] NotYetForVue =
-    [
-        "frontend.auth-client.oidc-client-ts",
-        "frontend.data-grid.tanstack-table",
-        "frontend.charts.echarts",
-    ];
 
     /// <summary>A test a developer would write: a generated vue-query hook reaches the host through /api and its answer renders.</summary>
     private const string QueryHookTest = """
@@ -68,8 +60,6 @@ public sealed class VueFrontendTests : IDisposable
           expect(await screen.findByRole('heading', { name: 'Billing' })).toBeInTheDocument();
         });
         """;
-
-    private readonly StandIns standIns = new();
 
     [Fact]
     public void The_vue_web_app_installs_builds_lints_and_passes_its_tests()
@@ -184,10 +174,7 @@ public sealed class VueFrontendTests : IDisposable
         output.ShouldContain("The orval pack generates TanStack Query hooks for Vue with frontend.state pinia-tanstack-query only so far");
     }
 
-    public void Dispose() => standIns.Dispose();
-
-    private GeneratedProject Generate(params string[] overrides) =>
-        new(Profile, [.. NotYetForVue.Select(standIns.For)], overrides);
+    private static GeneratedProject Generate(params string[] overrides) => new(Profile, overrides);
 
     private static void RunWeb(GeneratedProject project, params string[] steps)
     {
