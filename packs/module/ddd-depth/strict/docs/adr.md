@@ -45,7 +45,14 @@ System.Text.Json, and a converter registered with every module's store writes a 
 reads it back through `From`, so no value object carries a `[JsonConverter]` attribute and a value read from the store
 passes the same guards as one a caller sends. An event-sourced aggregate's identity is a value object over a `Guid` that
 is also its `IAggregateId`. A JSON `null` for a value object that is not declared nullable fails to read
-(`RespectNullableAnnotations`), so it never skips `From`; one declared nullable (`InvoiceNumber?`) may be null.
+(`RespectNullableAnnotations`), so it never skips `From`; one declared nullable (`InvoiceNumber?`) may be null. A
+constructor member missing from the JSON fails to read too (`RespectRequiredConstructorParameters`). Both settings hold
+for every event and document in the store, read models included: a read model whose constructor later gains a
+parameter can no longer read the rows stored before it, so give the new parameter a default or rebuild the projection.
+
+**Known gap: a `null` element in a collection.** System.Text.Json applies neither nullable annotations nor converters to
+a collection's elements, so `IReadOnlyList<InvoiceNumber>` reads `[null]` as a list holding a null, without `From`.
+Stored events are written by the application, which never writes one; the gap is accepted, not enforced.
 
 **Not yet in event-sourced modules: value objects over several values.** The converter writes a value object as its one
 backing value, so `Money` (an amount and a currency) cannot be stored in an event. An architecture rule per strict
