@@ -5,6 +5,8 @@ files:
   - { template: templates/ModuleEventStore.cs.sbn, target: src/BuildingBlocks/EventStore/ModuleEventStore.cs }
   - { template: templates/ModuleAggregateStore.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/EventStore/{{ module.namespace }}AggregateStore.cs", per-module: true }
   - { template: templates/OnlyInfrastructureUsesMarten.cs.sbn, target: tests/Architecture.Tests/Rules/OnlyInfrastructureUsesMarten.cs }
+declares-slots:
+  - { slot: event-store.json-converters, description: "Statements on JsonSerializerOptions json, the System.Text.Json options every module's Marten store serialises its events and documents with, each indented twelve spaces: json.Converters.Add(new SomeConverter()). Rendered only with a contribution; a pack that is not always combined with Marten contributes with optional: true." }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
   - { slot: buildingblocks.packages, template: templates/buildingblocks-packages.sbn }

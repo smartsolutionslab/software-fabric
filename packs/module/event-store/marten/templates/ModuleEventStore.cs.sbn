@@ -86,7 +86,14 @@ public sealed class ModuleEventStore
         options.Connection(connectionString);
         options.DatabaseSchemaName = schema;
         options.Events.DatabaseSchemaName = schema;
+{{~ if slots["event-store.json-converters"] == "" ~}}
         options.UseSystemTextJsonForSerialization();
+{{~ else ~}}
+        options.UseSystemTextJsonForSerialization(configure: json =>
+        {
+{{ slots["event-store.json-converters"] }}
+        });
+{{~ end ~}}
         options.AutoCreateSchemaObjects = schemaChanges;
         options.Events.AddEventTypes(domainEvents);
         foreach (var projection in projections)
