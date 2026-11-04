@@ -1,0 +1,17 @@
+option: backend.llm.openai
+files:
+  - { template: templates/OpenAIChatClient.cs.sbn, target: src/BuildingBlocks/Llm/Wiring/OpenAIChatClient.cs }
+  - { template: templates/OpenAIIsTheProjectsModel.cs.sbn, target: tests/Architecture.Tests/Rules/OpenAIIsTheProjectsModel.cs }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-version.sbn }
+  - { slot: buildingblocks.packages, template: templates/buildingblocks-package.sbn }
+  - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 30 }
+  - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 30 }
+  - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: integration-tests.parameters, template: templates/integration-tests-parameters.sbn }
+  - { slot: readme.first-steps, template: templates/first-steps.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "The host's Program.cs calls AddOpenAIChatClient, which registers OpenAI as the project's IChatClient behind logging and OpenTelemetry, with the key and model the AppHost supplies; a missing key fails naming its parameter. No request is sent.", file: templates/OpenAIIsTheProjectsModel.cs.sbn }

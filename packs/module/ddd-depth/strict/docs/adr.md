@@ -26,6 +26,10 @@ fields; a private field is implementation.
 `DateTime`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `TimeSpan` and `Uri`. A primitive inside a collection, an array or
 a `Nullable<T>` counts too.
 
+**An enum is allowed**, the module's own or the BCL's, alone, nullable or in a collection: it is a named set of values,
+not a primitive held as state. The walk does not look into one, so the `value__` field the compiler gives every enum is
+never reported.
+
 **Exemptions.** A value object holds its own backing values (`InvoiceNumber.Value` is a `string`), a generic one too: a
 `Positive<int>` property holds a value object, not an `int`. An aggregate, command or domain event is never a value
 object for this purpose, even if it implements `IValueObject`. A computed `bool` without a setter
@@ -47,6 +51,14 @@ events go through Marten's JSON, which cannot build a value object through its p
 An architecture rule per strict module walks from its aggregates, commands and domain events, through public
 properties and public fields, and fails on each primitive it reaches, naming the type and member. A second rule per
 strict module fails on each public setter of an aggregate root: strict is light and more.
+
+The walk visits each closed type once, and does not enter a closed type larger than the nearest closed type of the same
+generic definition it is already inside of: `Node<T>` holding a `Node<List<T>>` would otherwise construct a new type at
+every step and never end. A closed type of the same size or smaller is entered as usual, so `Wrapper<Wrapper<Cargo>>`
+still reaches `Cargo`, and the walk is what it was wherever it ended before. Of a type it does not enter, it still
+reaches the subclasses the module declares of it (`SpecialNode : Node<List<Waypoint>>`) and what the arguments the
+definition holds as state bring in (`Wrapper<T>` holds its `T`), and nothing a phantom tag names: `TypedId<TTag>` holds
+a `Guid`, not its tag, so `TypedId<Customer>` never makes the walk look into `Customer`.
 
 ## Consequences
 

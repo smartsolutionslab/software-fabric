@@ -126,6 +126,40 @@ Not confirmed by these sources: which package gives Anthropic an
 Anthropic. The `anthropic` pack's issue settles it; the rule above (one
 `IChatClient`, registered in Infrastructure) holds whichever package it is.
 
+**Settled on 2026-11-03 (issue #77):** the official `Anthropic` package,
+published by Anthropic, gives Claude an `IChatClient`. Its NuGet package
+13.4.0 depends on `Microsoft.Extensions.AI.Abstractions` (>= 10.5.1) and
+ships the adapter `AsIChatClient` (namespace `Microsoft.Extensions.AI`),
+whose metadata names the provider `anthropic`; read from the package's own
+assembly and XML documentation. The repository owner chose it over the
+community `Anthropic.SDK`, consistent with "no third-party package" for
+MCP, and `claude-haiku-5-5` as the generated default model.
+
+**Settled on 2026-11-04 (issue #78):** Microsoft's
+`Microsoft.Extensions.AI.OpenAI` gives OpenAI's models an `IChatClient`,
+through its adapter `AsIChatClient` over the official `OpenAI` package
+(published by OpenAI). Its NuGet package 10.11.0 depends on
+`Microsoft.Extensions.AI.Abstractions` 10.11.0, the version the base's
+`Microsoft.Extensions.AI` already brings, and on `OpenAI` 2.14.0, which
+comes in transitively and is not pinned; read from the packages' nuspecs.
+The repository owner chose it, and `gpt-5-mini` as the generated default
+model, with `gpt-5` the stronger alternative.
+
+**Settled on 2026-11-04 (issue #79):** `azure-openai` uses the same
+`Microsoft.Extensions.AI.OpenAI` 10.11.0 as `openai`, calling the
+resource's OpenAI v1 endpoint (`<endpoint>/openai/v1/`) with the `OpenAI`
+package's `OpenAIClientOptions.Endpoint`, so it needs neither
+`Azure.AI.OpenAI` (stable 2.1.0 pins an old `OpenAI` 2.1.0; its current
+line is beta) nor the preview `Aspire.Azure.AI.OpenAI`. The endpoint is
+the Aspire parameter `azure-openai-endpoint` without a default and the
+deployment `azure-openai-deployment`, defaulting to `gpt-5-mini` with
+`gpt-5` the stronger alternative; the value must match a deployment in
+the user's own resource. The resource is not provisioned. The key is the
+secret parameter `azure-openai-api-key` and the only authentication:
+managed identity would be a runtime switch between two auth paths
+(ADR-0001), so it is a later option of its own. The repository owner
+accepted all four.
+
 ## Consequences
 
 - No profile changes its choices: every profile takes `backend.llm: none`
@@ -137,10 +171,17 @@ Anthropic. The `anthropic` pack's issue settles it; the rule above (one
   they do (the rule branching on `backend.mcp`, ADR-0006, or MCP code kept
   out of the modules) is settled in their issues, not by weakening the rule
   here.
-- `anthropic`, `openai`, `azure-openai`, `ollama`, `server` and `client` have
-  no packs yet, so they are `experimental` (ADR-0003), and `fabric new` fails
-  with `no pack for ...` for them. Each pack is its own issue, ships its agent
-  rules and a gate (ADR-0002), and becomes `supported` once the matrix builds
-  it.
+- `Microsoft.Extensions.AI` has one owner although two dimensions need it:
+  the base declares its version and the BuildingBlocks reference when a
+  provider is chosen or the MCP client is (owner's decision on #77,
+  2026-11-04), and neither the provider packs nor `backend.mcp.client`
+  declare it themselves.
+- `anthropic`, `openai`, `azure-openai`, `ollama`, `server` and `client` had
+  no packs when this was decided, so they are `experimental` (ADR-0003), and
+  `fabric new` fails with `no pack for ...` for an option still without one.
+  Each pack is its own issue, ships its agent rules and a gate (ADR-0002), and
+  becomes `supported` once the matrix builds it. `client` (#82),
+  `anthropic` (#77), `openai` (#78) and `azure-openai` (#79) have packs
+  and stay `experimental` until then.
 - `backend.llm.agents`, retrieval-augmented generation and evaluations are
   later decisions, each with its own ADR.

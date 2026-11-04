@@ -1,6 +1,12 @@
-{{~ if !(project["backend.authorization"] | array.contains "roles") ~}}
-#error The sample module policy requires a role; a sample for claims alone is not written yet (docs/adr/0006 of the generator).
-{{~ end ~}}
+{{~
+  requirements = []
+  if project["backend.authorization"] | array.contains "roles"
+    requirements = requirements | array.add "RequireRole(\"manager\")"
+  end
+  if project["backend.authorization"] | array.contains "claims"
+    requirements = requirements | array.add "RequireClaim(\"department\", \"finance\")"
+  end
+~}}
 using {{ namespace }}.BuildingBlocks.Modules;
 using Microsoft.AspNetCore.Authorization;
 
@@ -15,6 +21,6 @@ public sealed class {{ module.namespace }}Policies : IModulePolicies
     {
         {{ not_null "policies" }}
 
-        policies.AddPolicy(Manage, policy => policy.RequireRole("manager"));
+        policies.AddPolicy(Manage, policy => policy.{{ requirements | array.join "." }});
     }
 }
