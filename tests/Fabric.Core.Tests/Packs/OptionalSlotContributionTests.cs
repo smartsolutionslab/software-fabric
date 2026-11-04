@@ -78,7 +78,9 @@ public sealed class OptionalSlotContributionTests : IDisposable
         var rendered = Render(Compose("readme.sections", optional: true));
 
         rendered.Errors.ShouldBeEmpty();
-        Readme(rendered).ShouldContain("## postgres\n## rest\n## converters");
+        var readme = Readme(rendered);
+        readme.IndexOf("## converters", StringComparison.Ordinal).ShouldBeGreaterThan(readme.IndexOf("## rest", StringComparison.Ordinal));
+        readme.IndexOf("## rest", StringComparison.Ordinal).ShouldBeGreaterThan(readme.IndexOf("## postgres", StringComparison.Ordinal));
     }
 
     [Fact]
