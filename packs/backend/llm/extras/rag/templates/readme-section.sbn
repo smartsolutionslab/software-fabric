@@ -1,0 +1,16 @@
+## Retrieval
+
+A module indexes its own records as vectors and finds the ones nearest to a question, to hand them to the model. Its index is `ModuleVectorIndex<TContext>` with the module's own DbContext, in Infrastructure:
+
+```csharp
+public sealed class InvoiceSearch(ModuleVectorIndex<BillingDbContext> invoices)
+{
+    public Task IndexAsync(Invoice invoice, CancellationToken cancellationToken) =>
+        invoices.IndexAsync(invoice.Number, invoice.Description, cancellationToken);
+
+    public Task<IReadOnlyList<RetrievedPassage>> FindAsync(string question, CancellationToken cancellationToken) =>
+        invoices.SearchAsync(question, 5, cancellationToken);
+}
+```
+
+The vectors live in PostgreSQL with pgvector (the `pgvector/pgvector` image), in the module's schema, in the table `embeddings`, which the MigrationRunner creates. `tests/Rag.Tests` indexes and searches against the AppHost's database with `FakeEmbeddingGenerator`.

@@ -1,0 +1,83 @@
+{{~ if project["backend.test.framework"] != "xunit" || project["backend.test.integration"] != "aspire-fixture" ~}}
+#error The rag pack's tests start the AppHost's database for xUnit and the Aspire fixture only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Testing;
+
+[assembly: AssemblyFixture(typeof({{ namespace }}.Rag.Tests.AspireDatabase))]
+
+namespace {{ namespace }}.Rag.Tests;
+
+/// <summary>
+/// The AppHost's database alone, on an empty container, started once per test run: the pgvector image, migrated by the
+/// MigrationRunner as before the host starts, so every module's vector table exists. Nothing else runs: no host, no
+/// model.
+/// </summary>
+public sealed class AspireDatabase : IAsyncLifetime
+{
+    private const string MigrationRunner = "migrations";
+
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+
+    private DistributedApplication? app;
+
+    private string? connectionString;
+
+    public string ConnectionString => connectionString ?? throw new InvalidOperationException("The database has not started.");
+
+    public async ValueTask InitializeAsync()
+    {
+        using var timeout = new CancellationTokenSource(StartupTimeout);
+        var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AppHost>(timeout.Token);
+
+        var postgres = builder.Resources.OfType<PostgresServerResource>().Single();
+        HashSet<IResource> database =
+        [
+            postgres,
+            postgres.PasswordParameter,
+            .. builder.Resources.OfType<PostgresDatabaseResource>(),
+            .. builder.Resources.Where(resource => resource.Name == MigrationRunner),
+        ];
+        if (postgres.UserNameParameter is { } user)
+        {
+            database.Add(user);
+        }
+
+        foreach (var resource in builder.Resources.Where(resource => !database.Contains(resource)).ToList())
+        {
+            builder.Resources.Remove(resource);
+        }
+
+        // Tests start from an empty container: never a developer's data, never a password a volume remembers.
+        foreach (var resource in builder.Resources)
+        {
+            foreach (var volume in resource.Annotations.OfType<ContainerMountAnnotation>().Where(mount => mount.Type == ContainerMountType.Volume).ToList())
+            {
+                resource.Annotations.Remove(volume);
+            }
+        }
+
+        app = await builder.BuildAsync(timeout.Token);
+        await app.StartAsync(timeout.Token);
+        var finished = await app.ResourceNotifications.WaitForResourceAsync(
+            MigrationRunner,
+            resourceEvent => KnownResourceStates.TerminalStates.Contains(resourceEvent.Snapshot.State?.Text),
+            timeout.Token);
+        if (finished.Snapshot.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"The MigrationRunner ended {finished.Snapshot.State?.Text} with exit code {finished.Snapshot.ExitCode}.");
+        }
+
+        connectionString = await app.GetConnectionStringAsync("database", timeout.Token)
+            ?? throw new InvalidOperationException("The AppHost's database has no connection string.");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (app is not null)
+        {
+            await app.DisposeAsync();
+        }
+    }
+}
