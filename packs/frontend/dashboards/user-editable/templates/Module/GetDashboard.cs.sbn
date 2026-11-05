@@ -1,0 +1,6 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Application.DTOs;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Queries.GetDashboard;
+
+public sealed record GetDashboard(Guid Id) : IQuery<Result<DashboardDto, ApiError>>;

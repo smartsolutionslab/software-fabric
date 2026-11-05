@@ -121,7 +121,9 @@
   if tenancy
     users = users | array.add { name: "developer-b", last: "Developer B", roles: roles, department: developers_department, tenant: "tenant-b" }
   end
-  if roles || claims
+  # A second user of the first tenant: without roles or claims, the one dashboards show they are their owner's alone.
+  dashboards = object.has_key(project, "frontend.dashboards") && array.size(project["frontend.dashboards"]) > 0
+  if roles || claims || dashboards
     users = users | array.add { name: "visitor", last: "Visitor", roles: false, department: null, tenant: "tenant-a" }
   end
   if claims

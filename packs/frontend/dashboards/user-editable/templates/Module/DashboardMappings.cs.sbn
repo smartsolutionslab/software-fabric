@@ -1,0 +1,18 @@
+using {{ namespace }}.Modules.Dashboards.Domain;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.DTOs;
+
+public static class DashboardMappings
+{
+    public static DashboardDto ToDashboardDto(this Dashboard dashboard)
+    {
+        {{ not_null "dashboard" }}
+        return new DashboardDto(dashboard.Id, dashboard.Name, [.. dashboard.Widgets.Select(widget => widget.ToDto())]);
+    }
+
+    public static DashboardSummaryDto ToDashboardSummaryDto(this Dashboard dashboard)
+    {
+        {{ not_null "dashboard" }}
+        return new DashboardSummaryDto(dashboard.Id, dashboard.Name, dashboard.Widgets.Count);
+    }
+}

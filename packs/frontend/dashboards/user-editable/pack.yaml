@@ -1,0 +1,77 @@
+option: frontend.dashboards.user-editable
+modules:
+  dashboards: { module.style: crud, module.cqrs: logical }
+files:
+  - { template: templates/BuildingBlocks/IModuleWidgets.cs.sbn, target: src/BuildingBlocks/Dashboards/IModuleWidgets.cs }
+  - { template: templates/BuildingBlocks/WidgetCatalogBuilder.cs.sbn, target: src/BuildingBlocks/Dashboards/WidgetCatalogBuilder.cs }
+  - { template: templates/BuildingBlocks/WidgetDefinition.cs.sbn, target: src/BuildingBlocks/Dashboards/WidgetDefinition.cs }
+  - { template: templates/BuildingBlocks/WidgetKind.cs.sbn, target: src/BuildingBlocks/Dashboards/WidgetKind.cs }
+  - { template: templates/BuildingBlocks/ChartSeries.cs.sbn, target: src/BuildingBlocks/Dashboards/ChartSeries.cs }
+  - { template: templates/BuildingBlocks/ChartValues.cs.sbn, target: src/BuildingBlocks/Dashboards/ChartValues.cs }
+  - { template: templates/BuildingBlocks/WidgetTable.cs.sbn, target: src/BuildingBlocks/Dashboards/WidgetTable.cs }
+  - { template: templates/BuildingBlocks/WidgetData.cs.sbn, target: src/BuildingBlocks/Dashboards/WidgetData.cs }
+  - { template: templates/BuildingBlocks/WidgetCatalog.cs.sbn, target: src/BuildingBlocks/Dashboards/WidgetCatalog.cs }
+  - { template: templates/BuildingBlocks/WidgetScan.cs.sbn, target: src/BuildingBlocks/Dashboards/WidgetScan.cs }
+  - { template: templates/BuildingBlocks/IWidgetAccess.cs.sbn, target: src/BuildingBlocks/Dashboards/IWidgetAccess.cs }
+  - { template: templates/BuildingBlocks/WidgetAccess.cs.sbn, target: src/BuildingBlocks/Dashboards/WidgetAccess.cs }
+  - { template: templates/BuildingBlocks/ICurrentUser.cs.sbn, target: src/BuildingBlocks/Identity/ICurrentUser.cs }
+  - { template: templates/BuildingBlocks/HttpCurrentUser.cs.sbn, target: src/BuildingBlocks/Identity/HttpCurrentUser.cs }
+  - { template: templates/BuildingBlocks/DashboardWidgetsRegistration.cs.sbn, target: src/BuildingBlocks/Dashboards/Wiring/DashboardWidgetsRegistration.cs }
+  - { template: templates/BuildingBlocks/ModuleAdapterRegistration.cs.sbn, target: src/BuildingBlocks/Persistence/Wiring/ModuleAdapterRegistration.cs }
+  - { template: templates/Module/Dashboard.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboard.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/DashboardWidget.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/IDashboardStore.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/IDashboardStore.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardsWidgets.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DashboardsWidgets.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardsFailures.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DashboardsFailures.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/NotSignedIn.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/NotSignedIn.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/InvalidDashboardId.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidDashboardId.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/InvalidDashboardName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidDashboardName.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/TooManyWidgets.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/TooManyWidgets.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/InvalidWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidWidget.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/UnknownWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/UnknownWidget.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardNotFound.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DashboardNotFound.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/WidgetNotFound.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/WidgetNotFound.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardDto.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/DashboardDto.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardWidgetDto.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/DashboardWidgetDto.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardSummaryDto.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/DashboardSummaryDto.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/WidgetDescriptionDto.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/WidgetDescriptionDto.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardMappings.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/DashboardMappings.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardWidgetMappings.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/DashboardWidgetMappings.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/WidgetDefinitionMappings.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/WidgetDefinitionMappings.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/SaveDashboard.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Commands/SaveDashboard/SaveDashboard.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/WidgetPlacement.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Commands/SaveDashboard/WidgetPlacement.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/SaveDashboardHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Commands/SaveDashboard/SaveDashboardHandler.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/RemoveDashboard.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Commands/RemoveDashboard/RemoveDashboard.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/RemoveDashboardHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Commands/RemoveDashboard/RemoveDashboardHandler.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/ListDashboards.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/ListDashboards/ListDashboards.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/ListDashboardsHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/ListDashboards/ListDashboardsHandler.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/GetDashboard.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/GetDashboard/GetDashboard.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/GetDashboardHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/GetDashboard/GetDashboardHandler.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/CountWidgets.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/CountWidgets/CountWidgets.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/CountWidgetsHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/CountWidgets/CountWidgetsHandler.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/ListWidgets.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/ListWidgets/ListWidgets.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/ListWidgetsHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/ListWidgets/ListWidgetsHandler.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/RunWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/RunWidget/RunWidget.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/RunWidgetHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/RunWidget/RunWidgetHandler.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardConfiguration.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/Configurations/DashboardConfiguration.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardStore.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/DashboardStore.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardEndpoints.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/DashboardEndpoints.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/WidgetEndpoints.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/WidgetEndpoints.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/SaveDashboardRequest.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/SaveDashboardRequest.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/CreateDashboards.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Migrations/20261105000000_CreateDashboards.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/CreateDashboards.Designer.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Migrations/20261105000000_CreateDashboards.Designer.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardsDbContextModelSnapshot.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Migrations/DashboardsDbContextModelSnapshot.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/tests/EveryWidgetIsADeclaredModuleQuery.cs.sbn, target: tests/Architecture.Tests/Rules/EveryWidgetIsADeclaredModuleQuery.cs }
+  - { template: templates/tests/DashboardsTests.cs.sbn, target: tests/Integration.Tests/DashboardsTests.cs }
+slots:
+  - { slot: host.services, template: templates/host-services.sbn, order: 30 }
+  - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 50 }
+  - { slot: tests.module-host-services, template: templates/module-host-services.sbn }
+  - { slot: web.openapi-paths, template: templates/openapi-paths.sbn }
+  - { slot: web.openapi-schemas, template: templates/openapi-schemas.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Every widget a module declares in its IModuleWidgets runs a query of that module's Application project with exactly one handler, ids are unique, a widget's policy is one its module registers (with authorization choices), and no IModuleWidgets lives outside an Application project; the host refuses to start on the same problems, naming the widget.", file: templates/tests/EveryWidgetIsADeclaredModuleQuery.cs.sbn }
+  - { kind: end-to-end-test, describes: "Through Aspire: a user saves a dashboard and reloads it; another user of the tenant and a user of another tenant neither read, list, overwrite nor remove it; a widget the modules do not declare is refused when saving and when run.", file: templates/tests/DashboardsTests.cs.sbn }

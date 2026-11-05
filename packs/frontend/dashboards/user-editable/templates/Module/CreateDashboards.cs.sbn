@@ -1,0 +1,59 @@
+{{~ tenancy = project["backend.tenancy"] != "none" ~}}
+using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace {{ namespace }}.Modules.Dashboards.Infrastructure.Migrations
+{
+    /// <inheritdoc />
+    public partial class CreateDashboards : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.EnsureSchema(
+                name: "dashboards");
+
+            migrationBuilder.CreateTable(
+                name: "dashboards",
+                schema: "dashboards",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    owner = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+{{~ if tenancy ~}}
+                    TenantId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+{{~ end ~}}
+                    widgets = table.Column<string>(type: "jsonb", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_dashboards", x => x.id);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_dashboards_owner",
+                schema: "dashboards",
+                table: "dashboards",
+                column: "owner");
+
+{{~ if tenancy ~}}
+            migrationBuilder.CreateIndex(
+                name: "IX_dashboards_TenantId",
+                schema: "dashboards",
+                table: "dashboards",
+                column: "TenantId");
+{{~ end ~}}
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropTable(
+                name: "dashboards",
+                schema: "dashboards");
+        }
+    }
+}

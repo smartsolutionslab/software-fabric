@@ -1,0 +1,275 @@
+using System.Reflection;
+using System.Reflection.Emit;
+using {{ namespace }}.BuildingBlocks.Rag;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A module's vectors are its own: every <see cref="ModuleVectorIndex{TContext}"/> a module's type names, in a field,
+/// property, signature, local or method body, has that module's own DbContext as its context, never a generic
+/// parameter a caller could fill with another's; and no module passes another module's DbContext to a generic type or
+/// method, which could reach that module's vectors for it. Another module's records are reached through
+/// <c>src/Contracts</c>, never through its vector table.
+/// </summary>
+public sealed class ModulesSearchOnlyTheirOwnVectors : IArchitectureRule
+{
+    private const string ModulesPrefix = "{{ namespace }}.Modules.";
+
+    private const string ModuleDbContext = "{{ namespace }}.BuildingBlocks.Persistence.ModuleDbContext";
+
+    private const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+    /// <summary>Compared by name: the module assemblies are loaded from the test output, beside this one.</summary>
+    private static readonly string Index = typeof(ModuleVectorIndex<>).FullName!;
+
+    private static readonly Dictionary<short, OpCode> OpCodesByValue = typeof(OpCodes)
+        .GetFields(BindingFlags.Public | BindingFlags.Static)
+        .Select(field => (OpCode)field.GetValue(null)!)
+        .ToDictionary(code => code.Value);
+
+    public string Description => "A module uses ModuleVectorIndex<TContext> only with its own DbContext, never over a generic parameter, and passes no other module's DbContext to a generic type or method: no module searches another module's vectors.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        List<string> violations = [];
+        foreach (var assembly in model.ModuleAssemblies)
+        {
+            var module = ModuleOf(assembly);
+            foreach (var type in assembly.GetTypes().Where(type => !IsCompilerGenerated(type)))
+            {
+                violations.AddRange(UsesOf(type)
+                    .SelectMany(use => Findings(use, type, module))
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal));
+            }
+        }
+
+        return violations;
+    }
+
+    private static string? ModuleOf(Assembly assembly)
+    {
+        var name = assembly.GetName().Name ?? string.Empty;
+        if (!name.StartsWith(ModulesPrefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var rest = name[ModulesPrefix.Length..];
+        var dot = rest.IndexOf('.', StringComparison.Ordinal);
+        return dot < 0 ? rest : rest[..dot];
+    }
+
+    private static bool IsCompilerGenerated(Type type) =>
+        type.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), inherit: false) && type.DeclaringType is not null;
+
+    /// <summary>What the type names, its compiler-generated nested types (lambdas, async state machines) included.</summary>
+    private static IEnumerable<Use> UsesOf(Type type)
+    {
+        var types = new[] { type }.Concat(type.GetNestedTypes(Declared).Where(IsCompilerGenerated).SelectMany(Nested));
+        return types.SelectMany(UsesInside);
+    }
+
+    private static IEnumerable<Type> Nested(Type type) =>
+        new[] { type }.Concat(type.GetNestedTypes(Declared).SelectMany(Nested));
+
+    private static List<Use> UsesInside(Type type)
+    {
+        List<Type> named = [];
+        if (type.BaseType is { } baseType)
+        {
+            named.Add(baseType);
+        }
+
+        named.AddRange(type.GetInterfaces());
+        named.AddRange(type.GetFields(Declared).Select(field => field.FieldType));
+        named.AddRange(type.GetProperties(Declared).Select(property => property.PropertyType));
+        List<Use> uses = [];
+        foreach (var method in type.GetMethods(Declared).Cast<MethodBase>().Concat(type.GetConstructors(Declared)))
+        {
+            named.AddRange(method.GetParameters().Select(parameter => parameter.ParameterType));
+            if (method is MethodInfo info)
+            {
+                named.Add(info.ReturnType);
+            }
+
+            uses.AddRange(BodyOf(method));
+        }
+
+        uses.AddRange(named.Select(used => new Use(used, null)));
+        return uses;
+    }
+
+    /// <summary>What a method body names: its locals' types, and the types, fields and methods its instructions call, create or load.</summary>
+    private static List<Use> BodyOf(MethodBase method)
+    {
+        var body = method.GetMethodBody();
+        var il = body?.GetILAsByteArray();
+        if (body is null || il is null)
+        {
+            return [];
+        }
+
+        List<Use> uses = [.. body.LocalVariables.Select(local => new Use(local.LocalType, null))];
+        var typeArguments = method.DeclaringType?.IsGenericType == true ? method.DeclaringType.GetGenericArguments() : null;
+        var methodArguments = method.IsGenericMethod ? method.GetGenericArguments() : null;
+        var position = 0;
+        while (position < il.Length)
+        {
+            var value = (short)il[position++];
+            if (value == 0xFE && position < il.Length)
+            {
+                value = (short)(0xFE00 | il[position++]);
+            }
+
+            if (!OpCodesByValue.TryGetValue(value, out var code))
+            {
+                break;
+            }
+
+            if (code.OperandType is OperandType.InlineMethod or OperandType.InlineField or OperandType.InlineType or OperandType.InlineTok)
+            {
+                uses.AddRange(Resolve(method.Module, BitConverter.ToInt32(il, position), typeArguments, methodArguments));
+            }
+
+            position += OperandSize(code.OperandType, il, position);
+        }
+
+        return uses;
+    }
+
+    private static IEnumerable<Use> Resolve(Module module, int token, Type[]? typeArguments, Type[]? methodArguments)
+    {
+        MemberInfo? member;
+        try
+        {
+            member = module.ResolveMember(token, typeArguments, methodArguments);
+        }
+        catch (ArgumentException)
+        {
+            yield break;
+        }
+
+        switch (member)
+        {
+            case Type type:
+                yield return new Use(type, null);
+                break;
+            case FieldInfo field:
+                yield return new Use(field.FieldType, null);
+                if (field.DeclaringType is { } fieldOwner)
+                {
+                    yield return new Use(fieldOwner, null);
+                }
+
+                break;
+            case MethodBase called:
+                if (called.DeclaringType is { } methodOwner)
+                {
+                    yield return new Use(methodOwner, null);
+                }
+
+                if (called.IsGenericMethod)
+                {
+                    var through = $"{called.DeclaringType?.Name}.{called.Name}";
+                    foreach (var argument in called.GetGenericArguments())
+                    {
+                        yield return new Use(argument, through);
+                    }
+                }
+
+                if (called is MethodInfo info)
+                {
+                    yield return new Use(info.ReturnType, null);
+                }
+
+                break;
+        }
+    }
+
+    private static int OperandSize(OperandType operand, byte[] il, int position) => operand switch
+    {
+        OperandType.InlineNone => 0,
+        OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
+        OperandType.InlineVar => 2,
+        OperandType.InlineI8 or OperandType.InlineR => 8,
+        OperandType.InlineSwitch => 4 + (4 * BitConverter.ToInt32(il, position)),
+        _ => 4,
+    };
+
+    /// <summary>The violations of one use: an index over another module's DbContext or a generic parameter, or another module's DbContext as a generic argument.</summary>
+    private static IEnumerable<string> Findings(Use use, Type type, string? module)
+    {
+        var (used, through) = use;
+        var within = Within(used, type, module);
+        return through is null ? within : Passed(used, through, type, module).Concat(within);
+    }
+
+    /// <summary>The violations inside a named type: the generic instantiations it is, contains or is built from.</summary>
+    private static IEnumerable<string> Within(Type used, Type type, string? module)
+    {
+        if (used.HasElementType)
+        {
+            return Within(used.GetElementType()!, type, module);
+        }
+
+        if (!used.IsGenericType)
+        {
+            return [];
+        }
+
+        var arguments = used.GetGenericArguments();
+        var definition = used.GetGenericTypeDefinition();
+        List<string> findings = [];
+        if (definition.FullName == Index)
+        {
+            var context = arguments[0];
+            if (context.IsGenericParameter)
+            {
+                findings.Add($"{type.FullName} (module {module}) uses ModuleVectorIndex<{context.Name}> over a generic parameter, which a caller could fill with another module's DbContext. A module's index names its own DbContext.");
+            }
+            else if (OwnerOf(context) is { } owner && owner != module)
+            {
+                findings.Add($"{type.FullName} (module {module}) uses ModuleVectorIndex<{context.Name}>, module {owner}'s vectors. A module searches only its own vectors; reach another module's records through src/Contracts.");
+            }
+        }
+        else
+        {
+            var name = definition.Name.Split('`')[0];
+            findings.AddRange(arguments.SelectMany(argument => Passed(argument, name, type, module)));
+        }
+
+        findings.AddRange(arguments.Where(argument => !argument.IsGenericParameter).SelectMany(argument => Within(argument, type, module)));
+        return findings;
+    }
+
+    /// <summary>Another module's DbContext given as a type argument to the generic type or method named <paramref name="through"/>.</summary>
+    private static IEnumerable<string> Passed(Type argument, string through, Type type, string? module) =>
+        OwnerOf(argument) is { } owner && owner != module
+            ? [$"{type.FullName} (module {module}) passes {argument.Name}, module {owner}'s DbContext, to {through}, which could reach module {owner}'s vectors. A module searches only its own vectors; reach another module's records through src/Contracts."]
+            : [];
+
+    /// <summary>The module whose DbContext the type is; null for any other type.</summary>
+    private static string? OwnerOf(Type candidate)
+    {
+        if (candidate.IsGenericParameter)
+        {
+            return null;
+        }
+
+        for (var current = candidate.BaseType; current is not null; current = current.BaseType)
+        {
+            if (current.FullName == ModuleDbContext)
+            {
+                return ModuleOf(candidate.Assembly) ?? candidate.Assembly.GetName().Name;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>A type a module's type names; <c>Through</c> names the generic method it is a type argument of, when it is one.</summary>
+    private sealed record Use(Type Type, string? Through);
+}

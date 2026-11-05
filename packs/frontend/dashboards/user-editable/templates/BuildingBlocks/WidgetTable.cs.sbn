@@ -1,0 +1,6 @@
+using System.Text.Json;
+
+namespace {{ namespace }}.BuildingBlocks.Dashboards;
+
+/// <summary>A page of a table widget's rows, each as JSON with the row type's properties, and those properties' names.</summary>
+public sealed record WidgetTable(IReadOnlyList<string> Columns, IReadOnlyList<JsonElement> Rows, int TotalCount, int Page, int PageSize);
