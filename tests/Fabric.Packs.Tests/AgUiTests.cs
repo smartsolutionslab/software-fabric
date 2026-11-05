@@ -69,6 +69,77 @@ public sealed class AgUiTests
         }
         """;
 
+    /// <summary>
+    /// Runs the AG-UI SDK's own stream over updates that fail mid-stream, with the tracer <c>AddServiceDefaults()</c>
+    /// builds. The browser's RUN_ERROR says only that the run failed; the <c>agui.run</c> span is where the cause is.
+    /// The architecture tests reference the host, and through it the SDK, because keycloak's endpoint rule needs it.
+    /// </summary>
+    private const string AgentRunTraceTests = """
+        using System.Diagnostics;
+        using System.Text.Json;
+        using System.Text.Json.Serialization.Metadata;
+        using AGUI.Abstractions;
+        using AGUI.Server;
+        using Microsoft.Extensions.AI;
+        using Microsoft.Extensions.DependencyInjection;
+        using Microsoft.Extensions.Hosting;
+        using OpenTelemetry;
+        using OpenTelemetry.Trace;
+
+        namespace Shop.Architecture.Tests.Probes;
+
+        public sealed class AgentRunTraceTests
+        {
+            private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+            {
+                TypeInfoResolver = JsonTypeInfoResolver.Combine(AGUIJsonUtilities.DefaultTypeInfoResolver, AIJsonUtilities.DefaultOptions.TypeInfoResolver),
+            };
+
+            [Fact]
+            public async Task A_run_that_fails_mid_stream_tells_the_browser_only_that_it_failed_and_the_trace_why()
+            {
+                var builder = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(settings: null);
+                builder.AddServiceDefaults();
+                List<Activity> ended = [];
+                builder.Services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddProcessor(new EndedRuns(ended)));
+                using var provider = builder.Services.BuildServiceProvider();
+                provider.GetRequiredService<TracerProvider>();
+
+                var context = new RunAgentInput { ThreadId = "thread-1", RunId = "run-1" }.ToChatRequestContext(Json);
+                List<BaseEvent> events = [];
+                await foreach (var agUiEvent in FailingMidStream().AsAGUIEventStreamAsync(context, TestContext.Current.CancellationToken))
+                {
+                    events.Add(agUiEvent);
+                }
+
+                events.OfType<RunErrorEvent>().ShouldHaveSingleItem().Message.ShouldNotContain("The model stopped answering.");
+                var run = ended.ShouldHaveSingleItem();
+                run.GetTagItem("agui.run_id").ShouldBe("run-1");
+                run.GetTagItem("agui.run.outcome").ShouldBe("error");
+                run.Status.ShouldBe(ActivityStatusCode.Error);
+                run.StatusDescription.ShouldBe("The model stopped answering.");
+            }
+
+            private static async IAsyncEnumerable<ChatResponseUpdate> FailingMidStream()
+            {
+                yield return new ChatResponseUpdate(ChatRole.Assistant, "Counting the");
+                await Task.Yield();
+                throw new InvalidOperationException("The model stopped answering.");
+            }
+        }
+
+        internal sealed class EndedRuns(List<Activity> runs) : BaseProcessor<Activity>
+        {
+            public override void OnEnd(Activity data)
+            {
+                if (data.OperationName == "agui.run")
+                {
+                    runs.Add(data);
+                }
+            }
+        }
+        """;
+
     [Fact]
     public void A_project_with_an_agent_panel_generates_from_the_real_packs_alone()
     {
@@ -158,6 +229,14 @@ public sealed class AgUiTests
     }
 
     [Fact]
+    public void The_service_defaults_listen_to_the_ag_ui_run_spans()
+    {
+        var files = Files(Profile, Anthropic, AgentFramework, AgUi);
+
+        files["src/ServiceDefaults/Wiring/Extensions.cs"].ShouldContain(".AddSource(\"Experimental.AGUI.Server\")");
+    }
+
+    [Fact]
     public void No_profile_changes_because_none_has_agents()
     {
         foreach (var profile in Repository.Catalog.Profiles.Keys)
@@ -166,6 +245,7 @@ public sealed class AgUiTests
 
             files.Keys.ShouldNotContain(path => path.Contains("AgentUi", StringComparison.Ordinal) || path.Contains("Assistant", StringComparison.Ordinal), profile);
             files["src/AppHost/AppHost.cs"].ShouldNotContain("model-stand-in", customMessage: profile);
+            files["src/ServiceDefaults/Wiring/Extensions.cs"].ShouldNotContain("AGUI", customMessage: profile);
             files["fabric.yaml"].ShouldNotContain("assistant", customMessage: profile);
         }
     }
@@ -223,6 +303,23 @@ public sealed class AgUiTests
     }
 
     [Fact]
+    public void A_run_that_fails_mid_stream_is_traced_with_its_cause_through_the_service_defaults()
+    {
+        using var project = NewProject(Anthropic, AgentFramework, AgUi);
+        project.WriteTypes("tests/Architecture.Tests/Probes", AgentRunTraceTests);
+        project.Build();
+
+        var (exitCode, output) = project.DotNetCommand(
+            new Dictionary<string, string>(),
+            "test", "--project", "tests/Architecture.Tests/Architecture.Tests.csproj", "-c", "Release", "--no-build", "--no-ansi",
+            "--", "--filter-class", "Shop.Architecture.Tests.Probes.AgentRunTraceTests");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("succeeded: 1", customMessage: output);
+        output.ShouldContain("failed: 0", customMessage: output);
+    }
+
+    [Fact]
     public void The_integration_tests_stream_the_assistants_answer_in_several_chunks_and_run_its_tool_through_the_dispatcher()
     {
         using var project = NewProject(Anthropic, AgentFramework, AgUi);
@@ -230,10 +327,11 @@ public sealed class AgUiTests
 
         var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
 
+        // Before the exit code: the copy failing is a failed test too, and this names the cause.
+        output.ShouldNotContain("The_frontends_copy_of_the_openapi_document", customMessage: output);
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
         output.ShouldNotContain("skipped: 1");
-        output.ShouldNotContain("The frontends_copy_of_the_openapi_document");
     }
 
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
