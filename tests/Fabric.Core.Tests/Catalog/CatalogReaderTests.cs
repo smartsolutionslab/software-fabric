@@ -16,8 +16,8 @@ public class CatalogReaderTests
         var catalog = ReadRepositoryCatalog();
 
         catalog.Version.ShouldBe(1);
-        catalog.Dimensions.Count.ShouldBe(50);
-        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(137);
+        catalog.Dimensions.Count.ShouldBe(51);
+        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(139);
         catalog.Profiles.Keys.ShouldBe(
             ["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud", "saas-strict-react"],
             ignoreOrder: false);
@@ -123,6 +123,25 @@ public class CatalogReaderTests
     public void Every_agents_option_is_experimental_because_no_profile_calls_a_model(string option)
     {
         ReadRepositoryCatalog().Dimensions["backend.llm.agents"].Options[option].Tier.ShouldBe(SupportTier.Experimental);
+    }
+
+    [Fact]
+    public void Agent_ui_is_a_choice_only_for_a_project_with_agents_and_defaults_to_none()
+    {
+        var agentUi = ReadRepositoryCatalog().Dimensions["frontend.agent-ui"];
+
+        agentUi.ActiveWhen!.ToString().ShouldBe("backend.llm.agents == agent-framework");
+        agentUi.Multi.ShouldBeFalse();
+        agentUi.Default.ShouldBe(["none"]);
+        agentUi.Options.Keys.ShouldBe(["none", "ag-ui"]);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("ag-ui")]
+    public void Every_agent_ui_option_is_experimental_because_no_profile_has_agents(string option)
+    {
+        ReadRepositoryCatalog().Dimensions["frontend.agent-ui"].Options[option].Tier.ShouldBe(SupportTier.Experimental);
     }
 
     [Fact]

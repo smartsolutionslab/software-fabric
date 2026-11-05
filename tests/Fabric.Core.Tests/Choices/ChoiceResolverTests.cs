@@ -221,6 +221,44 @@ public class ChoiceResolverTests
     [InlineData("industrial-event-driven-mfe")]
     [InlineData("lean-crud")]
     [InlineData("saas-strict-react")]
+    public void No_profile_has_an_agent_ui_because_none_has_agents(string profile)
+    {
+        ResolveSuccessfully(profile).Project.ShouldNotContainKey("frontend.agent-ui");
+    }
+
+    [Fact]
+    public void A_project_with_agents_has_no_agent_ui_unless_it_chooses_one()
+    {
+        ResolveSuccessfully("lean-crud", "backend.llm=anthropic", "backend.llm.agents=agent-framework")
+            .Project["frontend.agent-ui"].ShouldBe(["none"]);
+    }
+
+    [Fact]
+    public void A_project_with_agents_can_choose_the_ag_ui_panel()
+    {
+        ResolveSuccessfully("lean-crud", "backend.llm=anthropic", "backend.llm.agents=agent-framework", "frontend.agent-ui=ag-ui")
+            .Project["frontend.agent-ui"].ShouldBe(["ag-ui"]);
+    }
+
+    [Fact]
+    public void A_project_that_calls_a_model_without_agents_has_no_agent_ui()
+    {
+        ResolveSuccessfully("lean-crud", "backend.llm=anthropic").Project.ShouldNotContainKey("frontend.agent-ui");
+    }
+
+    [Fact]
+    public void Rejects_an_agent_ui_without_agents_and_says_why()
+    {
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm=anthropic", "frontend.agent-ui=ag-ui").ShouldBe(
+            "frontend.agent-ui is set to ag-ui, but it only applies when backend.llm.agents == agent-framework, and backend.llm.agents is none.");
+    }
+
+    [Theory]
+    [InlineData("saas-standard-react")]
+    [InlineData("saas-standard-vue")]
+    [InlineData("industrial-event-driven-mfe")]
+    [InlineData("lean-crud")]
+    [InlineData("saas-strict-react")]
     public void No_profile_has_llm_extras_or_embeddings_because_none_calls_a_model(string profile)
     {
         var choices = ResolveSuccessfully(profile);
