@@ -1,0 +1,6 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Agents.Tests;
+
+/// <summary>A query, as a module's would be: the sample agent's tool <c>count_words</c>.</summary>
+public sealed record CountWords(string Text) : IQuery<Result<int, ApiError>>;

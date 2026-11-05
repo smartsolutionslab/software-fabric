@@ -1,0 +1,24 @@
+{{~ typed = object.has_key(project, "backend.result-style") && project["backend.result-style"] == "typed-outcomes" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Agents.Tests;
+
+/// <summary>
+/// Runs the agent on the question. The answer is the model's output: untrusted input, returned as text and never
+/// executed or put into SQL or markup.
+/// </summary>
+public sealed class AskAboutWordsHandler(IChatClient model, IDispatcher dispatcher) : IQueryHandler<AskAboutWords, Result<string, ApiError>>
+{
+    public async Task<Result<string, ApiError>> HandleAsync(AskAboutWords query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        var response = await WordsAgent.Create(model, dispatcher).RunAsync(query.Question, cancellationToken: cancellationToken);
+{{~ if typed ~}}
+        return Success(response.Text);
+{{~ else ~}}
+        return Result<string, ApiError>.Success(response.Text);
+{{~ end ~}}
+    }
+}

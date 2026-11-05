@@ -1,0 +1,24 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class NoAgentFramework : IArchitectureRule
+{
+    private const string AgentFramework = "Microsoft.Agents.AI";
+
+    public string Description => "No module references Microsoft Agent Framework: this project's use cases call the model directly, without agents.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var assembly in model.ModuleAssemblies)
+        {
+            foreach (var reference in assembly.GetReferencedAssemblies().Select(reference => reference.Name!).Where(IsAgentFramework).Order(StringComparer.Ordinal))
+            {
+                yield return $"{assembly.GetName().Name} references {reference}, but this project has no agents (backend.llm.agents: none).";
+            }
+        }
+    }
+
+    private static bool IsAgentFramework(string reference) =>
+        reference == AgentFramework || reference.StartsWith(AgentFramework + ".", StringComparison.Ordinal);
+}

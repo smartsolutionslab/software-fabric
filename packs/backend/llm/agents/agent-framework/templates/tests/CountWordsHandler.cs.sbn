@@ -1,0 +1,28 @@
+{{~ typed = object.has_key(project, "backend.result-style") && project["backend.result-style"] == "typed-outcomes" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Agents.Tests;
+
+public sealed class CountWordsHandler : IQueryHandler<CountWords, Result<int, ApiError>>
+{
+    public Task<Result<int, ApiError>> HandleAsync(CountWords query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        var words = query.Text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+        if (words == 0)
+        {
+{{~ if typed ~}}
+            return Task.FromResult<Result<int, ApiError>>(Failure<ApiError>(new NothingToCount()));
+{{~ else ~}}
+            return Task.FromResult(Result<int, ApiError>.Failure(new NothingToCount()));
+{{~ end ~}}
+        }
+
+{{~ if typed ~}}
+        return Task.FromResult<Result<int, ApiError>>(Success(words));
+{{~ else ~}}
+        return Task.FromResult(Result<int, ApiError>.Success(words));
+{{~ end ~}}
+    }
+}

@@ -1,0 +1,19 @@
+using {{ namespace }}.BuildingBlocks.Mcp;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.BuildingBlocks.Agents;
+
+/// <summary>
+/// The tools of the external MCP servers the AppHost declares, for an agent: give them to it next to the module's own
+/// use cases. What a server answers is untrusted input, for the agent as for any other caller.
+/// </summary>
+public interface IAgentMcpTools
+{
+    /// <summary>Every declared server's tools, named <c>&lt;server&gt;__&lt;tool&gt;</c>.</summary>
+    /// <param name="allow">
+    /// Checks each call before it runs: the arguments are the model's output, untrusted input. A call it refuses never
+    /// reaches the server, and the model is told so. There is no default; allowing every call is a decision.
+    /// </param>
+    /// <param name="cancellationToken">Cancels connecting to the servers and listing their tools.</param>
+    Task<IReadOnlyList<AITool>> ToolsAsync(Func<McpToolCall, bool> allow, CancellationToken cancellationToken);
+}

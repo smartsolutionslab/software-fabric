@@ -1,0 +1,8 @@
+option: backend.llm.agents.none
+files:
+  - { template: templates/NoAgentFramework.cs.sbn, target: tests/Architecture.Tests/Rules/NoAgentFramework.cs }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No module references Microsoft Agent Framework (Microsoft.Agents.AI*): the project's use cases call the model directly, without agents.", file: templates/NoAgentFramework.cs.sbn }

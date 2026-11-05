@@ -16,8 +16,8 @@ public class CatalogReaderTests
         var catalog = ReadRepositoryCatalog();
 
         catalog.Version.ShouldBe(1);
-        catalog.Dimensions.Count.ShouldBe(47);
-        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(131);
+        catalog.Dimensions.Count.ShouldBe(48);
+        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(133);
         catalog.Profiles.Keys.ShouldBe(
             ["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud", "saas-strict-react"],
             ignoreOrder: false);
@@ -105,6 +105,24 @@ public class CatalogReaderTests
     public void An_llm_or_mcp_option_without_a_pack_is_experimental(string dimension, string option)
     {
         ReadRepositoryCatalog().Dimensions[dimension].Options[option].Tier.ShouldBe(SupportTier.Experimental);
+    }
+
+    [Fact]
+    public void Agents_are_a_choice_only_for_a_project_that_calls_a_model_and_default_to_none()
+    {
+        var agents = ReadRepositoryCatalog().Dimensions["backend.llm.agents"];
+
+        agents.ActiveWhen!.ToString().ShouldBe("backend.llm != none");
+        agents.Default.ShouldBe(["none"]);
+        agents.Options.Keys.ShouldBe(["none", "agent-framework"]);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("agent-framework")]
+    public void Every_agents_option_is_experimental_because_no_profile_calls_a_model(string option)
+    {
+        ReadRepositoryCatalog().Dimensions["backend.llm.agents"].Options[option].Tier.ShouldBe(SupportTier.Experimental);
     }
 
     [Fact]

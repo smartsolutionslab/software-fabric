@@ -1,0 +1,74 @@
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Tests.Fakes;
+
+/// <summary>
+/// The model in an agent's tests: asked first, it calls the named tool with the given arguments if the request offers
+/// it; given the tool's result, it answers <c>The tool said: &lt;result&gt;</c>. It keeps the tools each request offered.
+/// No test calls a real model.
+/// </summary>
+public sealed class ToolCallingChatClient(string toolName, IReadOnlyDictionary<string, object?> arguments) : IChatClient
+{
+    private readonly List<IReadOnlyList<string>> offered = [];
+
+    /// <summary>The names of the tools each request offered, in the order the requests came.</summary>
+    public IReadOnlyList<IReadOnlyList<string>> Offered => offered;
+
+    public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        {{ not_null "messages" }}
+
+        IReadOnlyList<string> tools = [.. options?.Tools?.Select(tool => tool.Name) ?? []];
+        offered.Add(tools);
+
+        var result = messages.SelectMany(message => message.Contents).OfType<FunctionResultContent>().LastOrDefault();
+        if (result is not null)
+        {
+            return Answer($"The tool said: {Text(result.Result)}");
+        }
+
+        if (!tools.Contains(toolName))
+        {
+            return Answer($"No tool {toolName} was offered.");
+        }
+
+        var call = new FunctionCallContent("call-1", toolName, new Dictionary<string, object?>(arguments));
+        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, [call])));
+    }
+
+    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var response = await GetResponseAsync(messages, options, cancellationToken);
+        foreach (var update in response.ToChatResponseUpdates())
+        {
+            yield return update;
+        }
+    }
+
+    public object? GetService(Type serviceType, object? serviceKey = null)
+    {
+        {{ not_null "serviceType" }}
+
+        return serviceKey is null && serviceType.IsInstanceOfType(this) ? this : null;
+    }
+
+    public void Dispose()
+    {
+    }
+
+    private static Task<ChatResponse> Answer(string text) =>
+        Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, text)));
+
+    /// <summary>A text result as the text itself, any other JSON as written, anything else as its string.</summary>
+    private static string? Text(object? result) => result switch
+    {
+        JsonElement { ValueKind: JsonValueKind.String } text => text.GetString(),
+        JsonElement json => json.GetRawText(),
+        _ => result?.ToString(),
+    };
+}

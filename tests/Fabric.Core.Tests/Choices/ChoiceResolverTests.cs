@@ -174,6 +174,40 @@ public class ChoiceResolverTests
         ResolveSuccessfully("saas-standard-react", $"backend.llm={provider}").Project["backend.llm"].ShouldBe([provider]);
     }
 
+    [Theory]
+    [InlineData("saas-standard-react")]
+    [InlineData("saas-standard-vue")]
+    [InlineData("industrial-event-driven-mfe")]
+    [InlineData("lean-crud")]
+    [InlineData("saas-strict-react")]
+    public void No_profile_has_agents_because_none_calls_a_model(string profile)
+    {
+        ResolveSuccessfully(profile).Project.ShouldNotContainKey("backend.llm.agents");
+    }
+
+    [Fact]
+    public void A_project_that_calls_a_model_has_no_agents_unless_it_chooses_them()
+    {
+        ResolveSuccessfully("lean-crud", "backend.llm=anthropic").Project["backend.llm.agents"].ShouldBe(["none"]);
+    }
+
+    [Theory]
+    [InlineData("anthropic")]
+    [InlineData("openai")]
+    [InlineData("azure-openai")]
+    [InlineData("ollama")]
+    public void Agent_framework_takes_each_provider(string provider)
+    {
+        ResolveSuccessfully("lean-crud", $"backend.llm={provider}", "backend.llm.agents=agent-framework").Project["backend.llm.agents"].ShouldBe(["agent-framework"]);
+    }
+
+    [Fact]
+    public void Rejects_agents_without_a_model_and_says_why()
+    {
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm.agents=agent-framework").ShouldBe(
+            "backend.llm.agents is set to agent-framework, but it only applies when backend.llm != none, and backend.llm is none.");
+    }
+
     [Fact]
     public void Rejects_two_llm_providers_in_one_project()
     {

@@ -140,7 +140,7 @@ pack fill a slot of a choice it can be combined with but does not need
 | `dotnet.build-properties` | `Directory.Build.props` | packs adding analyzers or properties (result, red-first) |
 | `solution.projects` *(added in M1-02)* | `Solution.slnx` | packs owning a project: modular-monolith (Host), aspire-fixture (Integration.Tests), ensure-that, option and the result styles (their tests under `tests/Kernel/`) |
 | `modules.packages.domain` | `src/Modules/Directory.Build.props` | — (Domain stays dependency-free) |
-| `modules.packages.application` | 〃 | wolverine, mediator |
+| `modules.packages.application` | 〃 | wolverine, mediator, agent-framework (`Microsoft.Agents.AI`: an agent lives in Application, ADR-0011) |
 | `modules.packages.infrastructure` | 〃 | ef-core, postgres, wolverine |
 | `modules.packages.api` | 〃 | minimal-apis |
 | `buildingblocks.packages` | `src/BuildingBlocks/BuildingBlocks.csproj` | ef-core, wolverine, result |
@@ -150,7 +150,7 @@ pack fill a slot of a choice it can be combined with but does not need
 | `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak (the host and `Microsoft.AspNetCore.Mvc.Testing`, for its endpoint rule) |
 | `tests.assert-no-violations` *(added in M1-04, declared by the test-framework pack, exactly-one)* | `tests/Architecture.Tests/ArchitectureRulesTests.cs` | shouldly (`violations.ShouldBeEmpty(description);`) |
 | `tests.assert-does-not-throw` *(added in M1-04, declared by the test-framework pack, exactly-one)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs` | shouldly (`Should.NotThrow(buildContainer);`) |
-| `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides) |
+| `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides); agent-framework (`IDispatcher`, which a handler running an agent takes, and `IAgentMcpTools` with the MCP client) |
 | `integration-tests.parameters` *(added for #77, declared by aspire-fixture)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter) |
 
 **One package, one owner.** A `PackageVersion` is declared by exactly
