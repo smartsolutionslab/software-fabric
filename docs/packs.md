@@ -29,6 +29,7 @@ no catalog entry. The base declares the slots the other packs fill.
 | `agents` | `agents-md` (section for the project's AGENTS.md) and `briefs` per role. |
 | `adr` | The decision record the project receives. |
 | `gates` | At least one check that fails the project's build when the option's rule is broken. |
+| `modules` | Modules the pack brings, each with pinned module choices (below). |
 
 Every path is relative to the pack directory and must stay inside it.
 
@@ -69,6 +70,35 @@ files:
   share a target by giving it opposite conditions.
 - Template functions from `templates.functions` are not available in a
   condition; it reads the model, nothing else.
+
+## Modules a pack brings
+
+A base or project-scoped pack may bring modules (ADR-0005). Each key is a
+module name, each value the module-scoped choices it pins:
+
+```yaml
+modules:
+  dashboards: { module.style: crud, module.cqrs: logical }
+```
+
+- `fabric new` adds every module the selected packs bring, in name order, as
+  `fabric add-module <name> --set ...` would: the pins first, the project's
+  module defaults for the rest. They are recorded in `fabric.yaml` like any
+  module, so the module packs give each one the normal skeleton.
+- The declaring pack adds the module's own code as per-module files that
+  render for it only: `when: 'module.name == "dashboards"'`.
+- A pin the catalog does not allow (an unknown option, a project-scoped
+  dimension, an inactive one, a broken `requires` or `conflicts`) is a
+  generation error naming the pack. A project option's condition on a
+  module dimension is still checked against the module defaults, as
+  `fabric validate` and the catalog lint check it (they see no packs), so a
+  brought module cannot satisfy it. Two packs may bring the same module; a
+  dimension they pin differently (as a set, for a multi-select dimension) is
+  an error naming both.
+- `fabric add-module` refuses a name a selected pack brings.
+- A module-scoped pack may not bring a module: the modules decide which
+  module-scoped packs are selected, so such a pack would decide its own
+  selection. The loader rejects it.
 
 ## What a template sees
 

@@ -31,6 +31,10 @@ A pack contributes to the generated project in exactly two ways:
    is dropped instead, and only then; to a declared slot it counts like
    any other.
 
+Besides these, a base or project-scoped pack may bring a module with
+pinned choices (ADR-0005); the module's files still come from the packs
+through the two ways above.
+
 A pack never edits another pack's output. When a pack needs to influence
 something it does not own, the fix is a new slot, introduced in its own
 change.

@@ -94,7 +94,10 @@ public static class PackLoader
             raw.DeclaresSlots ?? [],
             new PackAgents(raw.Agents.AgentsMd, raw.Agents.Briefs ?? new Dictionary<string, string>()),
             raw.Adr,
-            raw.Gates);
+            raw.Gates)
+        {
+            Modules = Pins(raw.Modules),
+        };
 
         var problems = SemanticProblems(pack, directoryOption, catalog).ToList();
         problems.ForEach(report);
@@ -171,6 +174,12 @@ public static class PackLoader
             }
         }
 
+        if (pack.Modules.Count > 0 && catalog.Dimensions.TryGetValue(pack.Dimension, out var scoped) && scoped.Scope == DimensionScope.Module)
+        {
+            // The modules decide which module-scoped packs are selected, so such a pack cannot decide the modules.
+            yield return $"brings modules, but {pack.Dimension} is module-scoped; only a base or project-scoped pack may bring a module.";
+        }
+
         foreach (var path in ReferencedPaths(pack))
         {
             var fullPath = Path.GetFullPath(Path.Combine(pack.Directory, path));
@@ -194,6 +203,17 @@ public static class PackLoader
             .Concat(pack.Gates.Select(gate => gate.File).OfType<string>())
             .Distinct(StringComparer.Ordinal);
 
+    private static Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> Pins(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonElement>>? modules) =>
+        (modules ?? new Dictionary<string, IReadOnlyDictionary<string, JsonElement>>()).ToDictionary(
+            module => module.Key,
+            module => (IReadOnlyDictionary<string, IReadOnlyList<string>>)module.Value.ToDictionary(
+                pin => pin.Key,
+                pin => (IReadOnlyList<string>)(pin.Value.ValueKind == JsonValueKind.Array
+                    ? [.. pin.Value.EnumerateArray().Select(option => option.GetString()!)]
+                    : [pin.Value.GetString()!])),
+            StringComparer.Ordinal);
+
     private static JsonSchema LoadSchema()
     {
         using var stream = typeof(PackLoader).Assembly.GetManifestResourceStream("pack.schema.json")
@@ -207,6 +227,7 @@ public static class PackLoader
         IReadOnlyList<PackFile>? Files,
         IReadOnlyList<SlotContribution>? Slots,
         IReadOnlyList<SlotDeclaration>? DeclaresSlots,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, JsonElement>>? Modules,
         RawAgents Agents,
         string Adr,
         IReadOnlyList<PackGate> Gates);
