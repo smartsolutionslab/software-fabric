@@ -33,6 +33,7 @@ internal sealed class UseCaseFunction : AIFunction
         RespectNullableAnnotations = true,
 {{~ if option ~}}
         Converters = { new OptionJsonConverterFactory() },
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { OptionsAreRequired } },
 {{~ end ~}}
     };
 {{~ if option ~}}
@@ -40,7 +41,7 @@ internal sealed class UseCaseFunction : AIFunction
     /// <summary>The same options for the schema, which describe an <see cref="Option{T}"/> property as its value's type.</summary>
     private static readonly JsonSerializerOptions SchemaJson = new(Json)
     {
-        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { OptionsAsTheirValues } },
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { OptionsAreRequired, OptionsAsTheirValues } },
     };
 {{~ end ~}}
 
@@ -155,6 +156,23 @@ internal sealed class UseCaseFunction : AIFunction
         return JsonSerializer.SerializeToElement(schema);
     }
 
+    /// <summary>
+    /// An <see cref="Option{T}"/> argument must be present, <c>null</c> when absent, even when its constructor parameter
+    /// has a default: a model that leaves it out has not said it is absent.
+    /// </summary>
+    private static void OptionsAreRequired(JsonTypeInfo typeInfo)
+    {
+        if (typeInfo.Kind != JsonTypeInfoKind.Object)
+        {
+            return;
+        }
+
+        foreach (var property in typeInfo.Properties.Where(property => IsOption(property.PropertyType)))
+        {
+            property.IsRequired = true;
+        }
+    }
+
     /// <summary>Describes an <see cref="Option{T}"/> property as a property of its value's type, for the schema only.</summary>
     private static void OptionsAsTheirValues(JsonTypeInfo typeInfo)
     {
@@ -173,7 +191,7 @@ internal sealed class UseCaseFunction : AIFunction
 
             var value = typeInfo.CreateJsonPropertyInfo(property.PropertyType.GetGenericArguments()[0], property.Name);
             value.AttributeProvider = property.AttributeProvider;
-            value.IsRequired = property.IsRequired;
+            value.IsRequired = true;
             value.IsGetNullable = false;
             value.IsSetNullable = false;
             value.Get = _ => null;

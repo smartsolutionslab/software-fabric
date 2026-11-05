@@ -60,10 +60,12 @@ would do, and the option would stay `experimental` until a stable release.
     decision on #83, 2026-11-05). Its schema is
     `anyOf: [<T's schema>, {"type": "null"}]`, written in the same schema
     pass as the request so its `$ref`s stay valid, and the property is
-    listed as required: `null` means None. An omitted argument is refused
+    listed as required, even when its constructor parameter has a default:
+    `null` means None. An omitted argument is refused
     before dispatch, and the model is told which argument is missing.
   - **No `Option<T>` inside a collection or dictionary of a tool request**
-    (`Option<Filter>[]`, `Dictionary<string, Option<T>>`), by the same
+    (`Option<Filter>[]`, `Dictionary<string, Option<T>>`, or a class deriving
+    from `List<Option<int>>`), by the same
     decision: no schema describes it. `DispatcherTool.Problems` names the
     request and the property, `DispatcherTool.For` refuses such a request,
     and the architecture rule `EveryAgentToolRequestIsValid` fails the build

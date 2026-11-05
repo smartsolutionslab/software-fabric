@@ -63,7 +63,7 @@ public static class DispatcherTool
             yield break;
         }
 
-        foreach (var property in type.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance).OrderBy(property => property.MetadataToken))
+        foreach (var property in type.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance).Where(property => property.GetIndexParameters().Length == 0).OrderBy(property => property.MetadataToken))
         {
             var name = path.Length == 0 ? property.Name : $"{path}.{property.Name}";
             var propertyType = IsOption(property.PropertyType) ? property.PropertyType.GetGenericArguments()[0] : property.PropertyType;
@@ -88,7 +88,10 @@ public static class DispatcherTool
         }
     }
 
-    /// <summary>A collection's elements, or a dictionary's keys and values; nothing for any other type.</summary>
+    /// <summary>
+    /// A collection's elements, or a dictionary's keys and values, from the <c>IEnumerable&lt;T&gt;</c> the type implements,
+    /// itself or by inheritance (<c>class Amounts : List&lt;Option&lt;int&gt;&gt;</c>); nothing for any other type.
+    /// </summary>
     private static Type[] Parts(Type type)
     {
         if (type == typeof(string))
@@ -96,12 +99,12 @@ public static class DispatcherTool
             return [];
         }
 
-        if (type.IsArray)
-        {
-            return [type.GetElementType()!];
-        }
-
-        return typeof(System.Collections.IEnumerable).IsAssignableFrom(type) && type.IsGenericType ? type.GetGenericArguments() : [];
+        var enumerables = (type.IsInterface ? type.GetInterfaces().Prepend(type) : type.GetInterfaces())
+            .Where(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            .Select(contract => contract.GetGenericArguments()[0]);
+        return [.. enumerables
+            .SelectMany(element => element.IsGenericType && element.GetGenericTypeDefinition() == typeof(KeyValuePair<,>) ? element.GetGenericArguments() : [element])
+            .Distinct()];
     }
 
     private static bool HoldsOption(Type type) =>
