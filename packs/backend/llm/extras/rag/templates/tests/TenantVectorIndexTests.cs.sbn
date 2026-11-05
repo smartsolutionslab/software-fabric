@@ -1,0 +1,142 @@
+{{~ if project["backend.test.assertions"] != "shouldly" ~}}
+#error The rag pack's tests assert with Shouldly only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using {{ namespace }}.BuildingBlocks.Rag;
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using {{ namespace }}.Tests.Fakes;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Rag.Tests;
+
+/// <summary>
+/// A module's index under a tenant column: the tenant comes from the persistence layer's tenant source, here a
+/// <see cref="TenantScope"/> as in consumers and jobs, never from the caller, and each tenant finds only its own
+/// records. No test calls a real model.
+/// </summary>
+public sealed class TenantVectorIndexTests(AspireDatabase database) : IAsyncLifetime
+{
+    private const string TenantA = "tenant-a";
+
+    private const string TenantB = "tenant-b";
+
+    private readonly FakeEmbeddingGenerator generator = new(VectorTables.Dimensions);
+
+    private readonly HttpTenantContext tenants = new(new HttpContextAccessor());
+
+    private Npgsql.NpgsqlDataSource? dataSource;
+
+    private Npgsql.NpgsqlDataSource DataSource => dataSource ?? throw new InvalidOperationException("The data source has not been created.");
+
+    public async ValueTask InitializeAsync()
+    {
+        await VectorTables.CreateAsync(database.ConnectionString, [SampleTenantNotesDbContext.Schema, SampleTenantDraftsDbContext.Schema, SampleTenantShelfDbContext.Schema], TestContext.Current.CancellationToken);
+        dataSource = VectorTables.DataSource(database.ConnectionString);
+    }
+
+    [Fact]
+    public async Task Each_tenants_search_returns_only_the_records_it_indexed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var notes = new ModuleVectorIndex<SampleTenantNotesDbContext>(DataSource, generator, tenants);
+        using (TenantScope.Begin(TenantA))
+        {
+            await notes.IndexAsync("invoice-a", "unpaid invoice for office chairs", cancellationToken);
+            await notes.IndexAsync("note-a", "team lunch on friday", cancellationToken);
+        }
+
+        using (TenantScope.Begin(TenantB))
+        {
+            await notes.IndexAsync("invoice-b", "unpaid invoice for office chairs and desks", cancellationToken);
+        }
+
+        using (TenantScope.Begin(TenantA))
+        {
+            (await notes.SearchAsync("unpaid invoice for chairs", 10, cancellationToken)).Select(passage => passage.Key).ShouldBe(["invoice-a", "note-a"]);
+        }
+
+        using (TenantScope.Begin(TenantB))
+        {
+            (await notes.SearchAsync("unpaid invoice for chairs", 10, cancellationToken)).Select(passage => passage.Key).ShouldBe(["invoice-b"]);
+        }
+    }
+
+    [Fact]
+    public async Task A_key_both_tenants_index_keeps_a_record_for_each_and_removing_one_leaves_the_other()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var drafts = new ModuleVectorIndex<SampleTenantDraftsDbContext>(DataSource, generator, tenants);
+        using (TenantScope.Begin(TenantA))
+        {
+            await drafts.IndexAsync("draft-1", "tenant a drafts about chairs", cancellationToken);
+        }
+
+        using (TenantScope.Begin(TenantB))
+        {
+            await drafts.IndexAsync("draft-1", "tenant b drafts about desks", cancellationToken);
+        }
+
+        using (TenantScope.Begin(TenantA))
+        {
+            (await drafts.SearchAsync("drafts", 5, cancellationToken)).Select(passage => (passage.Key, passage.Text)).ShouldBe([("draft-1", "tenant a drafts about chairs")]);
+            await drafts.RemoveAsync("draft-1", cancellationToken);
+            (await drafts.SearchAsync("drafts", 5, cancellationToken)).ShouldBeEmpty();
+        }
+
+        using (TenantScope.Begin(TenantB))
+        {
+            (await drafts.SearchAsync("drafts", 5, cancellationToken)).Select(passage => (passage.Key, passage.Text)).ShouldBe([("draft-1", "tenant b drafts about desks")]);
+        }
+    }
+
+    [Fact]
+    public async Task A_tenant_finds_its_records_through_the_hnsw_index_when_the_scan_runs_out_among_other_tenants_nearer_records()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Another tenant's 5,000 records lie nearer than this tenant's, more than the HNSW scan visits before it stops
+        // (hnsw.max_scan_tuples, 20,000 by default, 100 here). No sequential or bitmap scan and no sort while another
+        // plan exists, so the HNSW index answers rather than the key's index.
+        var crowded = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off -c enable_bitmapscan=off -c enable_sort=off -c hnsw.max_scan_tuples=100" };
+        await using var indexed = VectorTables.DataSource(crowded.ConnectionString);
+        await using (var crowd = indexed.CreateCommand($"INSERT INTO {VectorTables.Table(SampleTenantShelfDbContext.Schema)} (tenant_id, key, content, embedding) SELECT 'tenant-crowd', 'book-' || number, 'book', $1 FROM generate_series(1, 5000) number"))
+        {
+            crowd.Parameters.Add(new Npgsql.NpgsqlParameter { Value = new Pgvector.Vector(await generator.GenerateVectorAsync("book", cancellationToken: cancellationToken)) });
+            await crowd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var shelf = new ModuleVectorIndex<SampleTenantShelfDbContext>(indexed, generator, tenants);
+        using (TenantScope.Begin("tenant-few"))
+        {
+            await shelf.IndexAsync("lunch", "team lunch on friday", cancellationToken);
+            await shelf.IndexAsync("book-shelf", "a shelf for the book", cancellationToken);
+
+            var passages = await shelf.SearchAsync("book", 5, cancellationToken);
+
+            passages.Select(passage => passage.Key).ShouldBe(["book-shelf", "lunch"]);
+        }
+    }
+
+    [Fact]
+    public async Task Without_a_tenant_a_search_finds_nothing_and_indexing_fails()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var notes = new ModuleVectorIndex<SampleTenantNotesDbContext>(DataSource, generator, tenants);
+        using (TenantScope.Begin("tenant-c"))
+        {
+            await notes.IndexAsync("note-c", "a record of tenant c", cancellationToken);
+        }
+
+        (await notes.SearchAsync("a record of tenant c", 5, cancellationToken)).ShouldBeEmpty();
+        await Should.ThrowAsync<InvalidOperationException>(() => notes.IndexAsync("note-none", "a record of no tenant", cancellationToken));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        generator.Dispose();
+        if (dataSource is not null)
+        {
+            await dataSource.DisposeAsync();
+        }
+    }
+}

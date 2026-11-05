@@ -1,8 +1,12 @@
-{{~ if project["backend.tenancy"] != "none" ~}}
-#error The rag pack keeps one vector table per module with no tenant column, so it supports backend.tenancy none only so far (docs/adr/0006 of the generator): with backend.tenancy {{ project["backend.tenancy"] }} a search would return every tenant's records.
+{{~ column = project["backend.tenancy"] == "column" ~}}
+{{~ if project["backend.tenancy"] != "none" && !column ~}}
+#error The rag pack keeps its vectors apart by a tenant column, so it supports backend.tenancy none and column only so far (docs/adr/0006 of the generator): with backend.tenancy {{ project["backend.tenancy"] }} a search would return every tenant's records.
 {{~ end ~}}
 using System.Globalization;
 using {{ namespace }}.BuildingBlocks.Persistence;
+{{~ if column ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
@@ -15,11 +19,17 @@ namespace {{ namespace }}.BuildingBlocks.Rag;
 /// <typeparamref name="TContext"/>, which the MigrationRunner creates. A record is indexed under its key with the text
 /// the embedding was made from, and a search returns the records nearest to a question by cosine distance. Every index
 /// and every search sends its text to the embeddings provider. A module uses this only with its own DbContext.
+{{~ if column ~}}
+/// Every record belongs to the current tenant, from <see cref="ITenantContext"/> as the module's DbContext reads it: a
+/// key is a key within that tenant, a search finds only its records, and without a tenant nothing is found, removed or
+/// indexed.
+{{~ end ~}}
 /// </summary>
 /// <typeparam name="TContext">The module's DbContext, whose <c>Schema</c> holds the table.</typeparam>
 public sealed class ModuleVectorIndex<TContext>(
     [FromKeyedServices(VectorTables.DataSourceKey)] NpgsqlDataSource dataSource,
-    IEmbeddingGenerator<string, Embedding<float>> generator)
+    IEmbeddingGenerator<string, Embedding<float>> generator{{ if column }},
+    ITenantContext tenants{{ end }})
     where TContext : ModuleDbContext
 {
     /// <summary>pgvector's bounds for hnsw.ef_search; its default is the lower one.</summary>
@@ -34,11 +44,21 @@ public sealed class ModuleVectorIndex<TContext>(
     {
         {{ not_blank "key" }}
         {{ not_blank "text" }}
+{{~ if column ~}}
+
+        var tenant = tenants.TenantId ?? throw new InvalidOperationException($"Cannot index '{key}' without a tenant.");
+        var embedding = await EmbedAsync(text, cancellationToken);
+        await using var command = dataSource.CreateCommand(
+            $"INSERT INTO {Table} (tenant_id, key, content, embedding) VALUES ($1, $2, $3, $4) " +
+            "ON CONFLICT (tenant_id, key) DO UPDATE SET content = excluded.content, embedding = excluded.embedding");
+        command.Parameters.Add(new NpgsqlParameter { Value = tenant });
+{{~ else ~}}
 
         var embedding = await EmbedAsync(text, cancellationToken);
         await using var command = dataSource.CreateCommand(
             $"INSERT INTO {Table} (key, content, embedding) VALUES ($1, $2, $3) " +
             "ON CONFLICT (key) DO UPDATE SET content = excluded.content, embedding = excluded.embedding");
+{{~ end ~}}
         command.Parameters.Add(new NpgsqlParameter { Value = key });
         command.Parameters.Add(new NpgsqlParameter { Value = text });
         command.Parameters.Add(new NpgsqlParameter { Value = embedding });
@@ -50,7 +70,17 @@ public sealed class ModuleVectorIndex<TContext>(
     {
         {{ not_blank "key" }}
 
+{{~ if column ~}}
+        if (tenants.TenantId is not { } tenant)
+        {
+            return;
+        }
+
+        await using var command = dataSource.CreateCommand($"DELETE FROM {Table} WHERE tenant_id = $1 AND key = $2");
+        command.Parameters.Add(new NpgsqlParameter { Value = tenant });
+{{~ else ~}}
         await using var command = dataSource.CreateCommand($"DELETE FROM {Table} WHERE key = $1");
+{{~ end ~}}
         command.Parameters.Add(new NpgsqlParameter { Value = key });
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -62,6 +92,13 @@ public sealed class ModuleVectorIndex<TContext>(
     public async Task<IReadOnlyList<RetrievedPassage>> SearchAsync(string query, int count, CancellationToken cancellationToken)
     {
         {{ not_blank "query" }}
+{{~ if column ~}}
+
+        if (tenants.TenantId is not { } tenant)
+        {
+            return [];
+        }
+{{~ end ~}}
 
         var embedding = await EmbedAsync(query, cancellationToken);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -76,16 +113,46 @@ public sealed class ModuleVectorIndex<TContext>(
         }
 
         List<RetrievedPassage> passages = [];
+{{~ if column ~}}
+        await using (var search = new NpgsqlCommand($"SELECT key, content, embedding <=> $1 FROM {Table} WHERE tenant_id = $3 ORDER BY embedding <=> $1 LIMIT $2", connection, transaction))
+{{~ else ~}}
         await using (var search = new NpgsqlCommand($"SELECT key, content, embedding <=> $1 FROM {Table} ORDER BY embedding <=> $1 LIMIT $2", connection, transaction))
+{{~ end ~}}
         {
             search.Parameters.Add(new NpgsqlParameter { Value = embedding });
             search.Parameters.Add(new NpgsqlParameter { Value = count });
+{{~ if column ~}}
+            search.Parameters.Add(new NpgsqlParameter { Value = tenant });
+{{~ end ~}}
             await using var reader = await search.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
                 passages.Add(new RetrievedPassage(reader.GetString(0), reader.GetString(1), reader.GetDouble(2)));
             }
         }
+{{~ if column ~}}
+
+        // The HNSW index holds every tenant's vectors and its scan stops after hnsw.max_scan_tuples, so where other
+        // tenants' records lie nearer it can come back short. Then the tenant's records are ranked exactly, read through
+        // the key's index (tenant_id leads it); the materialized set keeps the HNSW index out of that ranking.
+        if (passages.Count < count)
+        {
+            passages.Clear();
+            await using var exact = new NpgsqlCommand(
+                $"WITH tenant AS MATERIALIZED (SELECT key, content, embedding FROM {Table} WHERE tenant_id = $3) " +
+                "SELECT key, content, embedding <=> $1 FROM tenant ORDER BY embedding <=> $1, key LIMIT $2",
+                connection,
+                transaction);
+            exact.Parameters.Add(new NpgsqlParameter { Value = embedding });
+            exact.Parameters.Add(new NpgsqlParameter { Value = count });
+            exact.Parameters.Add(new NpgsqlParameter { Value = tenant });
+            await using var reader = await exact.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                passages.Add(new RetrievedPassage(reader.GetString(0), reader.GetString(1), reader.GetDouble(2)));
+            }
+        }
+{{~ end ~}}
 
         await transaction.CommitAsync(cancellationToken);
         return passages;
