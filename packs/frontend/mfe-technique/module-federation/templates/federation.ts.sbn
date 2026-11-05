@@ -1,14 +1,16 @@
 import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { federation } from '@module-federation/vite';
 
 type FederationOptions = Parameters<typeof federation>[0];
 
-// Every module's remote is a directory of web/modules, created by fabric add-module; there is no list to keep.
+// Every module's remote is a directory of web/modules with a package.json, created by fabric add-module; there is no
+// list to keep. src/AppHost/Wiring/Remotes.cs finds the same ones.
 const modules = fileURLToPath(new URL('../modules', import.meta.url));
 const remotes = existsSync(modules)
   ? readdirSync(modules, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
+      .filter((entry) => entry.isDirectory() && existsSync(join(modules, entry.name, 'package.json')))
       .map((entry) => entry.name)
       .sort()
   : [];
