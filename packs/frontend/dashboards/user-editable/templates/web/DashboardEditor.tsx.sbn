@@ -1,0 +1,66 @@
+import { useState } from 'react';
+import {
+  type DashboardSummaryDto,
+  useGetDashboardsByIdQuery,
+  useGetDashboardsQuery,
+  useGetDashboardsWidgetsQuery,
+  type WidgetDescriptionDto,
+} from '@/api/generated';
+import { Button } from '@/components/ui/button';
+import { DashboardCanvas, type DraftDashboard } from './DashboardCanvas';
+import { fromSaved } from './layout';
+import { uuidV7 } from './uuidV7';
+
+const firstHundred = { page: 1, pageSize: 100 };
+const noDashboards: DashboardSummaryDto[] = [];
+const noWidgets: WidgetDescriptionDto[] = [];
+
+interface Opened {
+  id: string;
+  isNew: boolean;
+}
+
+/** The signed-in user's dashboards: open one or start a new one, then edit and save it. */
+export function DashboardEditor() {
+  const { data: list, refetch } = useGetDashboardsQuery(firstHundred);
+  const { data: catalog } = useGetDashboardsWidgetsQuery(firstHundred);
+  const [opened, setOpened] = useState<Opened | undefined>();
+  const { data: saved } = useGetDashboardsByIdQuery(
+    { id: opened?.id ?? '' },
+    { skip: !opened || opened.isNew, refetchOnMountOrArgChange: true },
+  );
+
+  let draft: DraftDashboard | undefined;
+  if (opened?.isNew) {
+    draft = { id: opened.id, name: '', widgets: [] };
+  } else if (opened && saved?.id === opened.id) {
+    draft = { id: saved.id, name: saved.name, widgets: fromSaved(saved.widgets) };
+  }
+
+  return (
+    <main className="flex flex-col gap-4 p-4">
+      <h1 className="text-xl font-semibold">Dashboards</h1>
+      <nav aria-label="Your dashboards" className="flex flex-wrap items-center gap-2">
+        {(list?.items ?? noDashboards).map((dashboard) => (
+          <Button
+            key={dashboard.id}
+            variant="outline"
+            aria-pressed={opened?.id === dashboard.id}
+            onClick={() => setOpened({ id: dashboard.id, isNew: false })}
+          >
+            {dashboard.name}
+          </Button>
+        ))}
+        <Button onClick={() => setOpened({ id: uuidV7(), isNew: true })}>New dashboard</Button>
+      </nav>
+      {draft && (
+        <DashboardCanvas
+          key={draft.id}
+          dashboard={draft}
+          catalog={catalog?.items ?? noWidgets}
+          onSaved={() => void refetch()}
+        />
+      )}
+    </main>
+  );
+}

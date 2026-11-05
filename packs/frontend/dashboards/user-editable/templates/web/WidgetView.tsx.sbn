@@ -1,0 +1,65 @@
+import { useMemo } from 'react';
+import { useGetDashboardsWidgetsByIdQuery, type WidgetTable } from '@/api/generated';
+import { Chart } from '@/components/chart';
+import { DataTable } from '@/components/ui/data-table';
+import { columnsOf } from '@/components/ui/data-table-columns';
+import { chartOption, type ChartVisual } from './chartOption';
+
+type Row = Record<string, unknown>;
+
+const rows = columnsOf<Row>();
+const none: Row[] = [];
+
+/** The first page a table widget shows; a chart's query takes no page and ignores it. */
+const firstPage = { page: 1, pageSize: 20 };
+
+interface WidgetViewProps {
+  source: string;
+  visual: string;
+  title: string;
+  height: number;
+}
+
+/** A widget's data from GET /dashboards/widgets/{id}, run as the signed-in user, drawn as a chart or a table. */
+export function WidgetView({ source, visual, title, height }: WidgetViewProps) {
+  const { data, isError } = useGetDashboardsWidgetsByIdQuery({ id: source, ...firstPage });
+  const option = useMemo(
+    () => (data?.chart && visual !== 'table' ? chartOption(data.chart, visual as ChartVisual) : undefined),
+    [data, visual],
+  );
+
+  if (isError) {
+    return <p role="alert">This widget could not be loaded.</p>;
+  }
+
+  if (data?.table) {
+    return <WidgetRows table={data.table} />;
+  }
+
+  if (option) {
+    return <Chart option={option} label={title} height={height} />;
+  }
+
+  return <p>Loading…</p>;
+}
+
+function WidgetRows({ table }: { table: WidgetTable }) {
+  const columns = useMemo(
+    () =>
+      rows.columns(
+        table.columns.map((column) => rows.accessor((row) => display(row[column]), { id: column, header: column })),
+      ),
+    [table.columns],
+  );
+  const data = useMemo<Row[]>(() => (Array.isArray(table.rows) ? (table.rows as Row[]) : none), [table.rows]);
+
+  return <DataTable columns={columns} data={data} />;
+}
+
+function display(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return typeof value === 'object' ? JSON.stringify(value) : String(value);
+}

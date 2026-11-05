@@ -1,0 +1,170 @@
+{%{import { zodResolver } from '@hookform/resolvers/zod';
+import { useMemo, useState } from 'react';
+import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
+import { useForm, useWatch } from 'react-hook-form';
+import { z } from 'zod';
+import { usePutDashboardsByIdMutation, type WidgetDescriptionDto } from '@/api/generated';
+import { Button } from '@/components/ui/button';
+import { applyLayout, columns, nextPlacement, type Placement, toLayout } from './layout';
+import { uuidV7 } from './uuidV7';
+import { WidgetView } from './WidgetView';
+
+const rowHeight = 40;
+
+const visuals = {
+  Chart: [
+    { value: 'bar', label: 'Bar' },
+    { value: 'line', label: 'Line' },
+    { value: 'pie', label: 'Pie' },
+  ],
+  Table: [{ value: 'table', label: 'Table' }],
+} as const;
+
+const nameSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'A dashboard needs a name of 1 to 100 characters.')
+    .max(100, 'A dashboard needs a name of 1 to 100 characters.'),
+});
+
+const widgetSchema = z.object({
+  source: z.string().min(1, 'Choose a widget.'),
+  visual: z.string().min(1, 'Choose how to show it.'),
+});
+
+export interface DraftDashboard {
+  id: string;
+  name: string;
+  widgets: Placement[];
+}
+
+interface DashboardCanvasProps {
+  dashboard: DraftDashboard;
+  catalog: readonly WidgetDescriptionDto[];
+  onSaved: () => void;
+}
+
+/**
+ * One dashboard being edited: its name, the declared widgets on a 12-column grid that the user moves and resizes, and
+ * Save, which PUTs the whole dashboard to its id, so saving twice saves it once.
+ */
+export function DashboardCanvas({ dashboard, catalog, onSaved }: DashboardCanvasProps) {
+  const [placements, setPlacements] = useState<Placement[]>(dashboard.widgets);
+  const [outcome, setOutcome] = useState<'saved' | 'failed' | undefined>();
+  const [save, { isLoading: saving }] = usePutDashboardsByIdMutation();
+  const { width, containerRef } = useContainerWidth();
+  const titles = useMemo(() => new Map(catalog.map((widget) => [widget.id, widget])), [catalog]);
+
+  const naming = useForm({ resolver: zodResolver(nameSchema), defaultValues: { name: dashboard.name } });
+  const adding = useForm({ resolver: zodResolver(widgetSchema), defaultValues: { source: '', visual: '' } });
+  const chosen = titles.get(useWatch({ control: adding.control, name: 'source' }));
+
+  const add = adding.handleSubmit(({ source, visual }) => {
+    setPlacements((current) => [...current, nextPlacement(current, uuidV7(), source, visual)]);
+    setOutcome(undefined);
+    adding.reset();
+  });
+
+  const submit = naming.handleSubmit(async ({ name }) => {
+    try {
+      await save({ id: dashboard.id, saveDashboardRequest: { name, widgets: placements } }).unwrap();
+      setOutcome('saved');
+      onSaved();
+    } catch {
+      setOutcome('failed');
+    }
+  });
+
+  return (
+    <section aria-label="Dashboard" className="flex flex-col gap-4">
+      <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1 text-sm">
+          Dashboard name
+          <input className="rounded border px-2 py-1" {...naming.register('name')} />
+        </label>
+        <Button type="submit" disabled={saving}>
+          Save dashboard
+        </Button>
+        {naming.formState.errors.name && <p role="alert">{naming.formState.errors.name.message}</p>}
+        {outcome === 'saved' && <p role="status">Saved.</p>}
+        {outcome === 'failed' && <p role="alert">The dashboard could not be saved.</p>}
+      </form>
+
+      <form onSubmit={add} className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1 text-sm">
+          Widget
+          <select
+            className="rounded border px-2 py-1"
+            {...adding.register('source', {
+              onChange: (event: { target: { value: string } }) =>
+                adding.setValue('visual', visuals[titles.get(event.target.value)?.kind ?? 'Chart'][0].value),
+            })}
+          >
+            <option value="">Choose a widget</option>
+            {catalog.map((widget) => (
+              <option key={widget.id} value={widget.id}>
+                {widget.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Shown as
+          <select className="rounded border px-2 py-1" {...adding.register('visual')}>
+            {visuals[chosen?.kind ?? 'Chart'].map((visual) => (
+              <option key={visual.value} value={visual.value}>
+                {visual.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button type="submit" variant="secondary">
+          Add widget
+        </Button>
+        {adding.formState.errors.source && <p role="alert">{adding.formState.errors.source.message}</p>}
+      </form>
+
+      <div ref={containerRef}>
+        <ReactGridLayout
+          width={width}
+          layout={toLayout(placements)}
+          gridConfig={{ cols: columns, rowHeight }}
+          dragConfig={{ cancel: 'button, select, input, table' }}
+          onLayoutChange={(layout) => setPlacements((current) => applyLayout(current, layout))}
+        >
+          {placements.map((placement) => {
+            const title = titles.get(placement.source)?.title ?? placement.source;
+            return (
+              <div key={placement.key}>
+                <section aria-label={title} className="flex h-full flex-col overflow-hidden rounded border bg-card p-2">
+                  <header className="flex items-center justify-between gap-2">
+                    <h2 className="text-sm font-medium">{title}</h2>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Remove ${title}`}
+                      onClick={() => setPlacements((current) => current.filter((other) => other.key !== placement.key))}
+                    >
+                      Remove
+                    </Button>
+                  </header>
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    <WidgetView
+                      source={placement.source}
+                      visual={placement.visual}
+                      title={title}
+                      height={Math.max(120, placement.height * rowHeight - 60)}
+                    />
+                  </div>
+                </section>
+              </div>
+            );
+          })}
+        </ReactGridLayout>
+      </div>
+    </section>
+  );
+}
+}%}

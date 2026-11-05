@@ -110,8 +110,12 @@ project-wide choices.
 **The frontend** draws the grid with `react-grid-layout` (2.3.0, MIT; its
 serialisable `{i, x, y, w, h}` layout is what the module stores) and renders
 widgets with the existing ECharts and DataTable components; `grid-layout-plus`
-takes its place for Vue later. The page is the second part of #184, after this
-backend.
+takes its place for Vue later. The page is built for a React single-page app on
+RTK Query; with Vue, Orval or micro-frontends the module keeps the router's
+placeholder page until a later issue builds it there, and only the grid library
+is added as a dependency. The router pack renders the editor in the brought
+module's page, a generation-time branch on this choice (ADR-0006), since there
+are no per-module slots.
 
 ## Consequences
 

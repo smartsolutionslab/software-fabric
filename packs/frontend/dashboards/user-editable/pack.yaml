@@ -63,6 +63,12 @@ files:
   - { template: templates/Module/DashboardsDbContextModelSnapshot.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Migrations/DashboardsDbContextModelSnapshot.cs", per-module: true, when: 'module.name == "dashboards"' }
   - { template: templates/tests/EveryWidgetIsADeclaredModuleQuery.cs.sbn, target: tests/Architecture.Tests/Rules/EveryWidgetIsADeclaredModuleQuery.cs }
   - { template: templates/tests/DashboardsTests.cs.sbn, target: tests/Integration.Tests/DashboardsTests.cs }
+  - { template: templates/web/DashboardEditor.tsx.sbn, target: web/app/src/dashboards/DashboardEditor.tsx, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
+  - { template: templates/web/DashboardCanvas.tsx.sbn, target: web/app/src/dashboards/DashboardCanvas.tsx, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
+  - { template: templates/web/WidgetView.tsx.sbn, target: web/app/src/dashboards/WidgetView.tsx, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
+  - { template: templates/web/layout.ts.sbn, target: web/app/src/dashboards/layout.ts, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
+  - { template: templates/web/chartOption.ts.sbn, target: web/app/src/dashboards/chartOption.ts, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
+  - { template: templates/web/uuidV7.ts.sbn, target: web/app/src/dashboards/uuidV7.ts, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
   - { template: templates/web/DashboardEditor.test.tsx.sbn, target: web/app/src/dashboards/DashboardEditor.test.tsx, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
   - { template: templates/web/layout.test.ts.sbn, target: web/app/src/dashboards/layout.test.ts, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
   - { template: templates/web/chartOption.test.ts.sbn, target: web/app/src/dashboards/chartOption.test.ts, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
@@ -72,6 +78,8 @@ slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 30 }
   - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 50 }
   - { slot: tests.module-host-services, template: templates/module-host-services.sbn }
+  - { slot: web.dependencies, template: templates/web-dependency.sbn }
+  - { slot: web.styles, template: templates/web-styles.sbn }
   - { slot: web.openapi-paths, template: templates/openapi-paths.sbn }
   - { slot: web.openapi-schemas, template: templates/openapi-schemas.sbn }
 agents:
