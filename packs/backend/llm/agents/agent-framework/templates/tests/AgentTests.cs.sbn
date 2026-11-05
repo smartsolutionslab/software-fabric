@@ -72,14 +72,29 @@ public sealed class AgentTests
     [Fact]
     public async Task An_absent_answer_reaches_the_model_as_null()
     {
-        using var model = new ToolCallingChatClient("longest_word", new Dictionary<string, object?> { ["text"] = " " });
+        using var model = new ToolCallingChatClient("longest_word", new Dictionary<string, object?> { ["text"] = " ", ["atLeast"] = null });
         await using var services = Services(model);
         var dispatcher = services.GetRequiredService<RecordingDispatcher>();
 
         var answer = await dispatcher.QueryAsync(new AskAboutWords("Which word is the longest in ' '?"), TestContext.Current.CancellationToken);
 
         answer.Value.ShouldBe("The tool said: null");
-        dispatcher.Requests.ShouldContain(new LongestWord(" "));
+        dispatcher.Requests.ShouldContain(new LongestWord(" ", Option<int>.None));
+    }
+
+    [Fact]
+    public async Task An_optional_argument_is_offered_as_its_value_or_null_and_reaches_the_handler_when_given()
+    {
+        using var model = new ToolCallingChatClient("longest_word", new Dictionary<string, object?> { ["text"] = "a bb cccc", ["atLeast"] = 2 });
+        await using var services = Services(model);
+        var dispatcher = services.GetRequiredService<RecordingDispatcher>();
+        var schema = DispatcherTool.For<LongestWord>(dispatcher, "Finds the longest word.").JsonSchema.GetProperty("properties").GetProperty("atLeast");
+
+        var answer = await dispatcher.QueryAsync(new AskAboutWords("Which word of 'a bb cccc' is the longest?"), TestContext.Current.CancellationToken);
+
+        schema.GetProperty("type").EnumerateArray().Select(type => type.GetString()).ShouldBe(["integer", "null"], ignoreOrder: true);
+        answer.Value.ShouldBe("The tool said: \"cccc\"");
+        dispatcher.Requests.ShouldContain(new LongestWord("a bb cccc", Option<int>.Some(2)));
     }
 {{~ end ~}}
 
