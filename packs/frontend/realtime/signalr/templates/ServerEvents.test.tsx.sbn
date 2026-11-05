@@ -1,0 +1,83 @@
+import { render } from '@testing-library/react';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { ServerEvents } from './ServerEvents';
+
+const connection = vi.hoisted(() => ({
+  start: vi.fn<() => Promise<void>>(),
+  stop: vi.fn<() => Promise<void>>(),
+  on: vi.fn(),
+  off: vi.fn(),
+  onclose: vi.fn<(callback: (error?: Error) => void) => void>(),
+}));
+vi.mock('./connection', () => ({ connectServerEvents: () => connection }));
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  connection.start.mockReset();
+  connection.stop.mockReset().mockResolvedValue(undefined);
+  connection.onclose.mockReset();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+test('a connection that fails to start is tried again, and once started is left alone', async () => {
+  connection.start.mockRejectedValueOnce(new Error('negotiation failed')).mockResolvedValue(undefined);
+
+  render(
+    <ServerEvents>
+      <p>app</p>
+    </ServerEvents>,
+  );
+  await vi.advanceTimersByTimeAsync(120_000);
+
+  expect(connection.start).toHaveBeenCalledTimes(2);
+});
+
+test('a provider keeps trying while it is mounted and stops once it unmounts', async () => {
+  connection.start.mockRejectedValue(new Error('the host is down'));
+
+  const { unmount } = render(
+    <ServerEvents>
+      <p>app</p>
+    </ServerEvents>,
+  );
+  await vi.advanceTimersByTimeAsync(120_000);
+  const attempts = connection.start.mock.calls.length;
+  expect(attempts).toBeGreaterThan(1);
+
+  unmount();
+  await vi.advanceTimersByTimeAsync(120_000);
+
+  expect(connection.start).toHaveBeenCalledTimes(attempts);
+});
+
+test('a connection that closes for good, its reconnects used up, is started again until the provider unmounts', async () => {
+  connection.start.mockResolvedValue(undefined);
+  const { unmount } = render(
+    <ServerEvents>
+      <p>app</p>
+    </ServerEvents>,
+  );
+  await vi.advanceTimersByTimeAsync(0);
+  const closes = connection.onclose.mock.calls.map(([callback]) => callback);
+  expect(connection.start).toHaveBeenCalledTimes(1);
+
+  for (const close of closes) {
+    close(new Error('the host went away for longer than the reconnects last'));
+  }
+  await vi.advanceTimersByTimeAsync(120_000);
+
+  expect(connection.start).toHaveBeenCalledTimes(2);
+
+  unmount();
+  for (const close of closes) {
+    close();
+  }
+  await vi.advanceTimersByTimeAsync(120_000);
+
+  expect(connection.start).toHaveBeenCalledTimes(2);
+});

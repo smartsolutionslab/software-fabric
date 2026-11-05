@@ -1,0 +1,34 @@
+option: frontend.realtime.signalr
+files:
+  - { template: templates/IBrowserEvents.cs.sbn, target: src/BuildingBlocks/Realtime/IBrowserEvents.cs }
+  - { template: templates/EventsHub.cs.sbn, target: src/Host/Realtime/EventsHub.cs }
+  - { template: templates/HubBrowserEvents.cs.sbn, target: src/Host/Realtime/HubBrowserEvents.cs }
+  - { template: templates/TestEvent.cs.sbn, target: src/Host/Realtime/TestEvent.cs }
+  - { template: templates/ServerEventsRegistration.cs.sbn, target: src/Host/Wiring/ServerEventsRegistration.cs }
+  - { template: templates/ServerEventsEndpoints.cs.sbn, target: src/Host/Wiring/ServerEventsEndpoints.cs }
+  - { template: templates/ServerEventsTests.cs.sbn, target: tests/Integration.Tests/ServerEventsTests.cs }
+  - { template: templates/connection.ts.sbn, target: web/app/src/realtime/connection.ts }
+  - { template: templates/ServerEventsContext.ts.sbn, target: web/app/src/realtime/ServerEventsContext.ts }
+  - { template: templates/ServerEvents.tsx.sbn, target: web/app/src/realtime/ServerEvents.tsx }
+  - { template: templates/ServerEvents.test.tsx.sbn, target: web/app/src/realtime/ServerEvents.test.tsx }
+  - { template: templates/useServerEvent.ts.sbn, target: web/app/src/realtime/useServerEvent.ts }
+  - { template: templates/useServerEvent.test.tsx.sbn, target: web/app/src/realtime/useServerEvent.test.tsx }
+  - { template: templates/server-events-provider.tsx.sbn, target: web/app/src/providers/serverEvents.tsx }
+  - { template: templates/server-events.spec.ts.sbn, target: web/app/e2e/server-events.spec.ts }
+slots:
+  - { slot: host.services, template: templates/host-services.sbn, order: 30 }
+  - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 30 }
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: tests.packages, template: templates/tests-packages.sbn }
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.imports, template: templates/import.sbn, order: 3 }
+  - { slot: web.providers, template: templates/provider.sbn, order: 3 }
+  - { slot: web.vite-plugins, template: templates/vite-plugin.sbn, order: 30 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "Against the running application, a browser of the sender's tenant receives a server event and one of another tenant does not, a connection without a token is refused unless backend.auth is none, and with Keycloak one whose token expires is closed (tests/Integration.Tests/ServerEventsTests.cs).", file: templates/ServerEventsTests.cs.sbn }
+  - { kind: unit-test, describes: "useServerEvent hands a component the events it subscribes to and unsubscribes when it unmounts (src/realtime/useServerEvent.test.tsx).", file: templates/useServerEvent.test.tsx.sbn }
+  - { kind: unit-test, describes: "ServerEvents starts a connection again when its first start fails or its reconnects run out, and stops once unmounted (src/realtime/ServerEvents.test.tsx).", file: templates/ServerEvents.test.tsx.sbn }
+  - { kind: end-to-end-test, describes: "A signed-in browser's own connection receives a server event (e2e/server-events.spec.ts, run against the running AppHost).", file: templates/server-events.spec.ts.sbn }

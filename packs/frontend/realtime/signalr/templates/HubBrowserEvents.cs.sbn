@@ -1,0 +1,37 @@
+using {{ namespace }}.BuildingBlocks.Realtime;
+{{~ if project["backend.tenancy"] != "none" ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
+using Microsoft.AspNetCore.SignalR;
+
+namespace {{ namespace }}.Host.Realtime;
+
+{{~ if project["backend.tenancy"] == "none" ~}}
+/// <summary>Sends to every connected browser.</summary>
+public sealed class HubBrowserEvents(IHubContext<EventsHub> hub) : IBrowserEvents
+{
+    public Task SendAsync<TEvent>(TEvent browserEvent, CancellationToken cancellationToken)
+        where TEvent : class
+    {
+        {{ not_null "browserEvent" }}
+
+        return hub.Clients.All.SendAsync(typeof(TEvent).Name, browserEvent, cancellationToken);
+    }
+}
+{{~ else ~}}
+/// <summary>Sends to the browsers of the current tenant, the group <see cref="EventsHub"/> puts them in.</summary>
+public sealed class HubBrowserEvents(IHubContext<EventsHub> hub, ITenantContext tenant) : IBrowserEvents
+{
+    public Task SendAsync<TEvent>(TEvent browserEvent, CancellationToken cancellationToken)
+        where TEvent : class
+    {
+        {{ not_null "browserEvent" }}
+
+        var tenantId = tenant.TenantId
+            ?? throw new InvalidOperationException($"Cannot send {typeof(TEvent).Name} to the browsers without a tenant.");
+        return hub.Clients.Group(TenantGroup(tenantId)).SendAsync(typeof(TEvent).Name, browserEvent, cancellationToken);
+    }
+
+    internal static string TenantGroup(string tenantId) => $"tenant:{tenantId}";
+}
+{{~ end ~}}

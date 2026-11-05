@@ -1,0 +1,36 @@
+{{~ if project["backend.tenancy"] != "none" && project["backend.auth"] == "none" ~}}
+#error frontend.realtime signalr with backend.tenancy {{ project["backend.tenancy"] }} needs an identity provider: a browser's tenant comes from its user's token, and backend.auth none signs nobody in (docs/adr/0009 of the generator).
+{{~ end ~}}
+{{~ if project["backend.tenancy"] != "none" && project["backend.tenancy"] != "column" ~}}
+#error The signalr pack groups browsers by tenant for backend.tenancy column only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+{{~ if project["backend.tenancy"] == "none" ~}}
+using Microsoft.AspNetCore.SignalR;
+
+namespace {{ namespace }}.Host.Realtime;
+
+/// <summary>The browsers' push channel at /hubs/events. Browsers only listen; the host sends through <see cref="HubBrowserEvents"/>.</summary>
+public sealed class EventsHub : Hub;
+{{~ else ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using Microsoft.AspNetCore.SignalR;
+
+namespace {{ namespace }}.Host.Realtime;
+
+/// <summary>
+/// The browsers' push channel at /hubs/events. Browsers only listen; the host sends through
+/// <see cref="HubBrowserEvents"/>. A connection joins its user's tenant group, so it receives that tenant's events only.
+/// </summary>
+public sealed class EventsHub(ITenantContext tenant) : Hub
+{
+    public override async Task OnConnectedAsync()
+    {
+        if (tenant.TenantId is { } tenantId)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, HubBrowserEvents.TenantGroup(tenantId), Context.ConnectionAborted);
+        }
+
+        await base.OnConnectedAsync();
+    }
+}
+{{~ end ~}}

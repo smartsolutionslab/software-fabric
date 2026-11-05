@@ -1,0 +1,9 @@
+    // The event hub's WebSocket goes to the host as well; the /api entry forwards plain requests only.
+    {
+      name: 'server-events-proxy',
+      config: () => {
+        const target = process.env.services__host__http__0;
+        const rewrite = (path: string) => path.replace(/^\/api/, '');
+        return target ? { server: { proxy: { '/api/hubs': { target, changeOrigin: true, ws: true, rewrite } } } } : {};
+      },
+    }

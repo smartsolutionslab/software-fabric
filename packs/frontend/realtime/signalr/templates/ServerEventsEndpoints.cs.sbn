@@ -1,0 +1,43 @@
+using {{ namespace }}.BuildingBlocks.Realtime;
+using {{ namespace }}.Host.Realtime;
+
+namespace Microsoft.AspNetCore.Builder;
+
+public static class ServerEventsEndpoints
+{
+    /// <summary>
+{{~ if project["backend.auth"] == "none" ~}}
+    /// The browsers' hub, open to anyone (backend.auth: none), and in Development POST /hubs/events/test, which sends a
+    /// <see cref="TestEvent"/> to every browser.
+{{~ else ~}}
+    /// The browsers' hub, for signed-in users, and in Development POST /hubs/events/test, which sends a
+    /// <see cref="TestEvent"/> to the caller's browsers{{ if project["backend.tenancy"] != "none" }} and the rest of their tenant's{{ end }}.
+{{~ end ~}}
+    /// </summary>
+    public static WebApplication MapServerEvents(this WebApplication app)
+    {
+        {{ not_null "app" }}
+
+{{~ if project["backend.auth"] == "none" ~}}
+        app.MapHub<EventsHub>("/hubs/events");
+{{~ else ~}}
+        // A connection outlives the token it started with; closing it then makes the browser reconnect with a fresh one,
+        // so the user and their tenant are checked again.
+        app.MapHub<EventsHub>("/hubs/events", options => options.CloseOnAuthenticationExpiration = true).RequireAuthorization();
+{{~ end ~}}
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapPost("/hubs/events/test", async (TestEvent testEvent, IBrowserEvents browserEvents, CancellationToken cancellationToken) =>
+            {
+                await browserEvents.SendAsync(testEvent, cancellationToken);
+                return TypedResults.NoContent();
+            })
+{{~ if project["backend.auth"] != "none" ~}}
+                .RequireAuthorization()
+{{~ end ~}}
+                .ExcludeFromDescription();
+        }
+
+        return app;
+    }
+}

@@ -1,0 +1,4 @@
+namespace {{ namespace }}.Host.Realtime;
+
+/// <summary>What POST /hubs/events/test sends, in Development only, to show that the push channel works.</summary>
+public sealed record TestEvent(string Text);

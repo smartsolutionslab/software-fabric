@@ -1,0 +1,52 @@
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { connectServerEvents } from './connection';
+import { ServerEventsContext } from './ServerEventsContext';
+
+/** How long to wait before the next attempt to start: SignalR reconnects an established connection, never a first one. */
+const retryDelay = (attempt: number) => Math.min(30_000, 1_000 * 2 ** attempt);
+
+/** Holds one connection to the host's event hub while it is mounted; useServerEvent listens on it. */
+export function ServerEvents({ children }: { children: ReactNode }) {
+  const [connection] = useState(connectServerEvents);
+  const lifecycle = useRef(Promise.resolve());
+  const stopping = useRef(0);
+
+  useEffect(() => {
+    let mounted = true;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const start = (attempt: number) => {
+      // One after the other: StrictMode mounts twice, and a connection starts again only once it has stopped.
+      lifecycle.current = lifecycle.current
+        .then(() => (mounted ? connection.start() : undefined))
+        .catch((error: unknown) => {
+          console.warn('Server events are not connected yet; trying again.', error);
+          if (mounted) {
+            retry = setTimeout(() => start(attempt + 1), retryDelay(attempt));
+          }
+        });
+    };
+
+    // Automatic reconnects give up after a few attempts; a connection closed for good starts over while mounted. A close
+    // that stop() causes (unmounting, StrictMode's second mount) is not one.
+    connection.onclose(() => {
+      if (mounted && stopping.current === 0) {
+        start(0);
+      }
+    });
+    start(0);
+    return () => {
+      mounted = false;
+      clearTimeout(retry);
+      lifecycle.current = lifecycle.current
+        .then(() => {
+          stopping.current += 1;
+          return connection.stop();
+        })
+        .finally(() => {
+          stopping.current -= 1;
+        });
+    };
+  }, [connection]);
+
+  return <ServerEventsContext value={connection}>{children}</ServerEventsContext>;
+}
