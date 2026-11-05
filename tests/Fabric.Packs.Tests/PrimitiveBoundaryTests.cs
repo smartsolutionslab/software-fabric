@@ -812,9 +812,9 @@ public sealed partial class PrimitiveBoundaryTests
         public sealed class Pair<TKey, TValue>
             where TKey : notnull;
 
-        public interface IReader<out T>
+        public interface ISource<out T>
         {
-            T Read();
+            IEnumerable<T> Items { get; }
         }
 
         public sealed class NotNull<T>
@@ -1054,12 +1054,12 @@ public sealed partial class PrimitiveBoundaryTests
             () => exitCode.ShouldNotBe(0, output),
             () => named.ShouldBe(
             [
-                "Shop.Modules.Billing.Domain.Generics.IReader`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.ISource`1 does not constrain its type parameter T",
                 "Shop.Modules.Billing.Domain.Generics.NullableBase`1 does not constrain its type parameter T",
                 "Shop.Modules.Billing.Domain.Generics.NullableClass`1 does not constrain its type parameter T",
                 "Shop.Modules.Billing.Domain.Generics.NullableInterface`1 does not constrain its type parameter T",
-                "Shop.Modules.Billing.Domain.Generics.Oblivious`1 does not constrain its type parameter T",
                 "Shop.Modules.Billing.Domain.Generics.ObliviousClass`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.Oblivious`1 does not constrain its type parameter T",
                 "Shop.Modules.Billing.Domain.Generics.Outer`1+Inner`1 does not constrain its type parameter TInner",
                 "Shop.Modules.Billing.Domain.Generics.Pair`2 does not constrain its type parameter TValue",
                 "Shop.Modules.Billing.Domain.Generics.Unconstrained`1 does not constrain its type parameter T",
