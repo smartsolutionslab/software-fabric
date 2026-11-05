@@ -399,6 +399,8 @@ dimensions:
     role-slots:
       web.api-imports: { description: "Import lines of the API client's base module." }
       web.api-headers: { description: "Statements that set request headers (headers, a Headers object) before every call, indented as a function body (two spaces)." }
+      web.openapi-paths: { description: "Entries of the checked-in OpenAPI document's paths, after the host's own, as the running host serves them (indented four spaces), for endpoints a pack generates.", separator: ",\n" }
+      web.openapi-schemas: { description: "Entries of the checked-in OpenAPI document's components.schemas, one per contribution and indented six spaces, as the running host serves them; the document sorts them by name with the host's own.", separator: "\n\n" }
     note: "Always generated from the backend's OpenAPI document; CI fails when it is stale."
     options:
       rtk-query-codegen:
