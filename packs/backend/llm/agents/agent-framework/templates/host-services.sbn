@@ -1,0 +1,3 @@
+{{~ if array.contains project["backend.mcp"] "client" ~}}
+builder.Services.AddAgentMcpTools();
+{{~ end ~}}

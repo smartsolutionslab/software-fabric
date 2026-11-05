@@ -1,0 +1,15 @@
+using {{ namespace }}.BuildingBlocks.Mcp;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.BuildingBlocks.Agents;
+
+/// <summary>The MCP clients' tools, each call checked before it reaches its server, as the chat client's are.</summary>
+internal sealed class AgentMcpTools(McpClients clients) : IAgentMcpTools
+{
+    public Task<IReadOnlyList<AITool>> ToolsAsync(Func<McpToolCall, bool> allow, CancellationToken cancellationToken)
+    {
+        {{ not_null "allow" }}
+
+        return clients.ChatToolsAsync(allow, cancellationToken);
+    }
+}

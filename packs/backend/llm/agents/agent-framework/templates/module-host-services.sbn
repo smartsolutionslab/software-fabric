@@ -1,0 +1,5 @@
+        // The host provides the dispatcher, which a handler running an agent takes to send the agent's tool calls.
+        services.AddDispatcher();
+{{~ if array.contains project["backend.mcp"] "client" ~}}
+        services.AddMcpClients(configuration).AddAgentMcpTools();
+{{~ end ~}}

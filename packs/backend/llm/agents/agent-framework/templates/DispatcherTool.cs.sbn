@@ -1,0 +1,128 @@
+{{~ option = project["backend.absence"] == "option" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.BuildingBlocks.Agents;
+
+/// <summary>
+/// The one way a use case becomes an agent's tool: the tool is the command or query, and a call sends it through
+/// <see cref="IDispatcher"/>, exactly as an endpoint does. The architecture rule AgentToolsGoThroughTheDispatcher fails
+/// a module that makes a tool any other way, and EveryAgentToolRequestIsValid one whose request <see cref="Problems"/>
+/// refuses.
+/// </summary>
+public static class DispatcherTool
+{
+    private static readonly Type[] Requests = [typeof(ICommand<>), typeof(IQuery<>)];
+
+    /// <summary>
+    /// The command or query <typeparamref name="TRequest"/> as a tool named after it in snake case
+    /// (<c>FindInvoice</c> becomes <c>find_invoice</c>), with the record as its input schema.
+    /// </summary>
+    /// <param name="dispatcher">Sends each call's request to its handler.</param>
+    /// <param name="description">What the use case does, for the model: it reads this to decide when to call the tool.</param>
+    public static AIFunction For<TRequest>(IDispatcher dispatcher, string description)
+        where TRequest : class
+    {
+        {{ not_null "dispatcher" }}
+        {{ not_blank "description" }}
+
+        return new UseCaseFunction(typeof(TRequest), dispatcher, description);
+    }
+
+    /// <summary>
+    /// What keeps a type from becoming a tool, empty when nothing does: the one definition <see cref="For"/> and the
+    /// architecture rule share, so the build fails on what would fail when the agent is created.
+    /// </summary>
+    public static IReadOnlyList<string> Problems(Type request)
+    {
+        {{ not_null "request" }}
+
+        List<string> problems = [];
+        if (request.IsAbstract || Contracts(request).Count != 1)
+        {
+            problems.Add($"{request.FullName} is not a command or a query; an agent's tool is a record that implements ICommand<T> or IQuery<T>.");
+        }
+{{~ if option ~}}
+
+        problems.AddRange(OptionsInCollections(request, string.Empty, [])
+            .Select(property => $"{request.FullName} has an Option inside a collection or dictionary at {property}: a tool's schema describes an absent value only as a property of its own (required, null when absent), so make it one or leave the Option out."));
+{{~ end ~}}
+        return problems;
+    }
+
+    /// <summary>The <c>ICommand&lt;T&gt;</c> or <c>IQuery&lt;T&gt;</c> the type implements.</summary>
+    internal static IReadOnlyList<Type> Contracts(Type request) =>
+        [.. request.GetInterfaces().Where(contract => contract.IsGenericType && Requests.Contains(contract.GetGenericTypeDefinition()))];
+{{~ if option ~}}
+
+    /// <summary>The properties, by path (<c>Filter.Amounts</c>), whose type holds an Option as a collection's element or a dictionary's value.</summary>
+    private static IEnumerable<string> OptionsInCollections(Type type, string path, HashSet<Type> seen)
+    {
+        if (!seen.Add(type))
+        {
+            yield break;
+        }
+
+        foreach (var property in type.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance).Where(property => property.GetIndexParameters().Length == 0).OrderBy(property => property.MetadataToken))
+        {
+            var name = path.Length == 0 ? property.Name : $"{path}.{property.Name}";
+            var propertyType = IsOption(property.PropertyType) ? property.PropertyType.GetGenericArguments()[0] : property.PropertyType;
+            var parts = Parts(propertyType);
+            if (parts.Length > 0 && parts.Any(HoldsOption))
+            {
+                yield return name;
+                continue;
+            }
+
+            var described = parts.Length > 0 ? parts : [propertyType];
+            foreach (var inner in described)
+            {
+                if (IsOwn(inner))
+                {
+                    foreach (var nested in OptionsInCollections(inner, name, seen))
+                    {
+                        yield return nested;
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// A collection's elements, or a dictionary's keys and values, from the <c>IEnumerable&lt;T&gt;</c> the type implements,
+    /// itself or by inheritance (<c>class Amounts : List&lt;Option&lt;int&gt;&gt;</c>); nothing for any other type.
+    /// </summary>
+    private static Type[] Parts(Type type)
+    {
+        if (type == typeof(string))
+        {
+            return [];
+        }
+
+        var enumerables = (type.IsInterface ? type.GetInterfaces().Prepend(type) : type.GetInterfaces())
+            .Where(contract => contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            .Select(contract => contract.GetGenericArguments()[0]);
+        return [.. enumerables
+            .SelectMany(element => element.IsGenericType && element.GetGenericTypeDefinition() == typeof(KeyValuePair<,>) ? element.GetGenericArguments() : [element])
+            .Distinct()];
+    }
+
+    /// <summary>
+    /// Whether an Option is somewhere in the type: the type itself, a generic argument, or an element of a collection it
+    /// is, by its own <c>IEnumerable&lt;T&gt;</c> or an inherited one (<c>List&lt;AmountCollection&gt;</c>), at any depth.
+    /// </summary>
+    private static bool HoldsOption(Type type) => HoldsOption(type, []);
+
+    private static bool HoldsOption(Type type, HashSet<Type> seen) =>
+        seen.Add(type)
+        && (IsOption(type)
+            || (type.IsGenericType && type.GetGenericArguments().Any(argument => HoldsOption(argument, seen)))
+            || Parts(type).Any(element => HoldsOption(element, seen)));
+
+    private static bool IsOption(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Option<>);
+
+    /// <summary>A type of the project's own, whose properties a tool's schema describes too.</summary>
+    private static bool IsOwn(Type type) =>
+        !type.IsPrimitive && !type.IsEnum && type != typeof(string) && type.Namespace?.StartsWith("System", StringComparison.Ordinal) != true;
+{{~ end ~}}
+}
