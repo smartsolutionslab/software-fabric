@@ -25,6 +25,9 @@ export interface GridItem {
 export const columns = 12;
 export const tallest = 24;
 
+/** The lowest row a widget may start on; the host refuses a dashboard with a widget below it. */
+export const lowest = 1000;
+
 export const fromSaved = (widgets: readonly WidgetPlacement[]): Placement[] =>
   widgets.map(({ key, source, visual, x, y, width, height }) => ({
     key,
@@ -58,3 +61,11 @@ export function nextPlacement(
   const bottom = Math.max(0, ...placements.map((placement) => placement.y + placement.height));
   return { key, source, visual, x: 0, y: bottom, width: columns / 2, height: 4 };
 }
+
+/** Whether a new widget, which goes below everything on the grid, would still start at or above the lowest row. */
+export const hasRoom = (placements: readonly Placement[]): boolean =>
+  Math.max(0, ...placements.map((placement) => placement.y + placement.height)) <= lowest;
+
+/** Whether every widget starts at or above the lowest row, as the host requires. */
+export const withinReach = (placements: readonly Placement[]): boolean =>
+  placements.every((placement) => placement.y <= lowest);

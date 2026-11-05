@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { useGetDashboardsWidgetsQuery, usePutDashboardsByIdMutation, type WidgetDescriptionDto } from '@/api/generated';
 import { Button } from '@/components/ui/button';
 import { Failure } from './Failure';
-import { applyLayout, columns, nextPlacement, type Placement, toLayout } from './layout';
+import { applyLayout, columns, hasRoom, lowest, nextPlacement, type Placement, toLayout, withinReach } from './layout';
 import { Pager } from './Pager';
 import { uuidV7 } from './uuidV7';
 import { WidgetView } from './WidgetView';
@@ -74,7 +74,9 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   );
 
   const [saves, setSaves] = useState(0);
+  const [tooLow, setTooLow] = useState(false);
   const full = placements.length >= maximumWidgets;
+  const roomLeft = hasRoom(placements);
 
   const edited = () => {
     setRevision((current) => current + 1);
@@ -90,6 +92,12 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   const naming = useForm({ resolver: zodResolver(nameSchema), defaultValues: { name: dashboard.name } });
   const adding = useForm({ resolver: zodResolver(widgetSchema), defaultValues: { source: '', visual: '' } });
   const chosen = titles.get(useWatch({ control: adding.control, name: 'source' }));
+
+  // Another page of the picker lists other widgets: a choice from this one would be added with the next page's visual.
+  const pickerPage = (page: number) => {
+    setCatalogPage(page);
+    adding.reset();
+  };
 
   const add = adding.handleSubmit(({ source, visual }) => {
     const widget = titles.get(source);
@@ -156,17 +164,18 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
             ))}
           </select>
         </label>
-        <Button type="submit" variant="secondary" disabled={full}>
+        <Button type="submit" variant="secondary" disabled={full || !roomLeft}>
           Add widget
         </Button>
         {full && <p>A dashboard holds at most {maximumWidgets} widgets.</p>}
+        {!full && !roomLeft && <p>There is no room for another widget: a dashboard reaches down to row {lowest}.</p>}
         {adding.formState.errors.source && <p role="alert">{adding.formState.errors.source.message}</p>}
         <Pager
           label="widgets"
           page={catalogPage}
           pageSize={catalogPageSize}
           total={widgets.data?.totalCount ?? 0}
-          onPage={setCatalogPage}
+          onPage={pickerPage}
         />
       </form>
       {widgets.isError && (
@@ -177,6 +186,7 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
         />
       )}
 
+      {tooLow && <p role="alert">A widget cannot start below row {lowest}; it went back where it was.</p>}
       <div ref={containerRef}>
         <ReactGridLayout
           width={width}
@@ -185,9 +195,19 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
           dragConfig={{ cancel: 'button, select, input, table' }}
           onLayoutChange={(layout) => {
             const moved = applyLayout(placements, layout);
-            if (!samePlaces(moved, placements)) {
-              change(() => moved);
+            if (samePlaces(moved, placements)) {
+              return;
             }
+
+            // A widget moved or grown below the lowest row snaps back: the grid is drawn from the placements.
+            if (!withinReach(moved)) {
+              setTooLow(true);
+              setPlacements((current) => [...current]);
+              return;
+            }
+
+            setTooLow(false);
+            change(() => moved);
           }}
         >
           {placements.map((placement) => {
