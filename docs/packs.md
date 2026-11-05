@@ -89,11 +89,12 @@ modules:
   render for it only: `when: 'module.name == "dashboards"'`.
 - A pin the catalog does not allow (an unknown option, a project-scoped
   dimension, an inactive one, a broken `requires` or `conflicts`) is a
-  generation error naming the pack. Rules are checked with the brought
-  modules in place: a project option's condition on a module dimension holds
-  when the module defaults or any brought module satisfy it. Two packs may
-  bring the same module; a dimension they pin differently (as a set, for a
-  multi-select dimension) is an error naming both.
+  generation error naming the pack. A project option's condition on a
+  module dimension is still checked against the module defaults, as
+  `fabric validate` and the catalog lint check it (they see no packs), so a
+  brought module cannot satisfy it. Two packs may bring the same module; a
+  dimension they pin differently (as a set, for a multi-select dimension) is
+  an error naming both.
 - `fabric add-module` refuses a name a selected pack brings.
 - A module-scoped pack may not bring a module: the modules decide which
   module-scoped packs are selected, so such a pack would decide its own

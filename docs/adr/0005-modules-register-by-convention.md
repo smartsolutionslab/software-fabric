@@ -44,10 +44,11 @@ own, a dashboards module for example. Such a pack declares the module in
   recorded in `fabric.yaml` as any module, and the module packs give it the
   normal skeleton. The declaring pack adds the module's own code as
   per-module files with `when: module.name == "<name>"` (ADR-0006).
-- A pin the catalog does not allow is a generation error naming the pack;
-  the rules see the brought modules beside the module defaults. Two packs
-  that bring the same module and pin a dimension differently fail, naming
-  both.
+- A pin the catalog does not allow is a generation error naming the pack.
+  A project option's condition on a module dimension is checked against the
+  module defaults, as `fabric validate` checks it without packs, so a
+  brought module cannot satisfy it. Two packs that bring the same module and
+  pin a dimension differently fail, naming both.
 - `add-module` refuses a name a selected pack brings: that module's choices
   belong to the pack, and add-module would otherwise take the module defaults.
 - Only a base or project-scoped pack may bring a module. Which module-scoped

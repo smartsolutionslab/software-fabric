@@ -58,7 +58,7 @@ internal static class PackModules
                     {
                         declaration.Pins.Add(dimension, (pack.Option, options));
                     }
-                    else if (!earlier.Options.ToHashSet(StringComparer.Ordinal).SetEquals(options))
+                    else if (!SamePin(catalog, dimension, earlier.Options, options))
                     {
                         errors.Add(
                             $"module '{module}': {pack.Option} pins {dimension}={string.Join(",", options)}, " +
@@ -85,4 +85,10 @@ internal static class PackModules
 
         return (modules, errors);
     }
+
+    /// <summary>A multi-select dimension's options are a set; any other pin must match exactly, so a bad list is not hidden.</summary>
+    private static bool SamePin(CatalogModel catalog, string dimension, IReadOnlyList<string> earlier, IReadOnlyList<string> later) =>
+        catalog.Dimensions.TryGetValue(dimension, out var definition) && definition.Multi
+            ? earlier.ToHashSet(StringComparer.Ordinal).SetEquals(later)
+            : earlier.SequenceEqual(later, StringComparer.Ordinal);
 }

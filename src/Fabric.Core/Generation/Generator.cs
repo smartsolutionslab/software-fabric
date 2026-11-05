@@ -131,13 +131,15 @@ public static class Generator
             new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>());
 
         // Only base and project-scoped packs bring modules (PackLoader), so the modules cannot change which packs bring them.
-        var bringing = Composer.Select(catalog, packs, choices).Where(pack => pack.Modules.Count > 0).ToList();
-        IReadOnlyList<string> violations;
-        if (bringing.Count == 0)
+        // Checked as fabric validate and the catalog lint check it, without packs, so the three agree on every profile.
+        var violations = RuleEvaluator.Check(catalog, resolved);
+        if (violations.Count > 0)
         {
-            violations = RuleEvaluator.Check(catalog, resolved);
+            return Failure(violations);
         }
-        else
+
+        var bringing = Composer.Select(catalog, packs, choices).Where(pack => pack.Modules.Count > 0).ToList();
+        if (bringing.Count > 0)
         {
             var (modules, moduleErrors) = PackModules.Resolve(catalog, bringing, choices);
             if (moduleErrors.Count > 0)
@@ -146,12 +148,11 @@ public static class Generator
             }
 
             choices = choices with { Modules = modules };
-            violations = NameDeclarers(RuleEvaluator.Check(catalog, resolved, modules), PackModules.Declarers(bringing));
-        }
-
-        if (violations.Count > 0)
-        {
-            return Failure(violations);
+            var moduleViolations = RuleEvaluator.Check(catalog, resolved, modules);
+            if (moduleViolations.Count > 0)
+            {
+                return Failure(NameDeclarers(moduleViolations, PackModules.Declarers(bringing)));
+            }
         }
 
         var composition = Composer.Compose(catalog, packs, choices);
