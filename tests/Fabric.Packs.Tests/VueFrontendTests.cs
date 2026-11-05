@@ -2,8 +2,8 @@ namespace Fabric.Packs.Tests;
 
 /// <summary>
 /// saas-standard-vue's web app from the real Vue packs: Vue with vue-router, Pinia and TanStack Query, an orval client generated for
-/// vue-query, zod, the axe check, and the Vue branches of the sign-in, table and chart packs (#159). The packs that come later
-/// (forms, components, styling: #160) stand in.
+/// vue-query, zod, the axe check, the Vue branches of the sign-in, table and chart packs (#159), and vee-validate with Reka UI
+/// and Tailwind (#160).
 /// </summary>
 public sealed class VueFrontendTests
 {

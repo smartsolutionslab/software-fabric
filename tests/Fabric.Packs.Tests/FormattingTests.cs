@@ -13,16 +13,6 @@ public sealed class FormattingTests
     /// </summary>
     internal static readonly Dictionary<string, string[]> FrontendStandIns = new()
     {
-        ["saas-standard-vue"] =
-        [
-            "frontend.framework=react",
-            "frontend.state=redux-toolkit",
-            "frontend.api-client=rtk-query-codegen",
-            "frontend.routing=react-router",
-            "frontend.forms=react-hook-form",
-            "frontend.ui-library=shadcn",
-            "frontend.styling=tailwind",
-        ],
         ["industrial-event-driven-mfe"] = ["frontend.state=redux-toolkit", "frontend.api-client=rtk-query-codegen"],
     };
 

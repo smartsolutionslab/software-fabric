@@ -7,7 +7,7 @@ namespace Fabric.Packs.Tests;
 /// #159: the Vue branches of the shared sign-in, table and chart packs (ADR-0006). Sign-in is a hand-written
 /// <c>useAuth()</c> and <c>SignedIn.vue</c> over oidc-client-ts's <c>UserManager</c>, with no Vue OIDC dependency
 /// (owner decision: https://github.com/smartsolutionslab/software-fabric/issues/23#issuecomment-6641134974); tables are
-/// @tanstack/vue-table and charts vue-echarts. The packs #160 writes (forms, components, styling) stand in.
+/// @tanstack/vue-table and charts vue-echarts.
 /// </summary>
 public sealed partial class VueSharedPacksTests
 {
@@ -65,6 +65,31 @@ public sealed partial class VueSharedPacksTests
         </template>
         """;
 
+    /// <summary>
+    /// A chart follows its container's size, as the React wrapper's does: vue-echarts leaves autoresize off unless it is
+    /// asked. jsdom has no layout, so the test reads what DataChart asks of vue-echarts.
+    /// </summary>
+    private const string DataChartTest = """
+        import { render, screen } from '@testing-library/vue';
+        import { expect, test, vi } from 'vitest';
+        import { defineComponent, h } from 'vue';
+        import DataChart from '@/components/DataChart.vue';
+
+        vi.mock('vue-echarts', () => ({
+          default: defineComponent({
+            props: { option: { type: Object, required: true }, autoresize: { type: [Boolean, Object], default: false } },
+            setup: (props) => () => h('div', { 'data-testid': 'chart', 'data-autoresize': String(props.autoresize) }),
+          }),
+        }));
+
+        test('a chart resizes with its container', () => {
+          render(DataChart, { props: { option: {}, label: 'Notes per day' } });
+
+          expect(screen.getByRole('img', { name: 'Notes per day' })).toBeInTheDocument();
+          expect(screen.getByTestId('chart')).toHaveAttribute('data-autoresize', 'true');
+        });
+        """;
+
     [Fact]
     public void A_vue_project_signs_in_tabulates_and_charts_without_a_react_file_or_package()
     {
@@ -89,12 +114,13 @@ public sealed partial class VueSharedPacksTests
     }
 
     [Fact]
-    public void The_vue_sign_in_and_table_tests_pass_and_a_screen_with_a_table_and_a_chart_builds_lints_and_passes_its_test()
+    public void The_vue_sign_in_and_table_tests_pass_and_a_screen_with_a_table_and_a_resizing_chart_builds_lints_and_passes_its_tests()
     {
         using var project = new GeneratedProject(Profile);
         project.Write("web/app/src/pages/NotesTable.vue", NotesTable);
         project.Write("web/app/src/pages/NotesTable.test.ts", NotesTableTest);
         project.Write("web/app/src/pages/NotesChart.vue", NotesChart);
+        project.Write("web/app/src/pages/DataChart.test.ts", DataChartTest);
         var web = Path.Combine(project.ProjectDirectory, "web");
         var app = Path.Combine(web, "app");
         foreach (var step in new[] { "install", "build", "lint" })
@@ -118,6 +144,7 @@ public sealed partial class VueSharedPacksTests
         plain.ShouldContain("✓ src/auth/SignedIn.test.ts > signing out does not start a sign-in while the identity provider signs the user out", customMessage: testOutput);
         plain.ShouldContain("✓ src/components/ui/DataTable.test.ts > the table shows a header and one row per item", customMessage: testOutput);
         plain.ShouldContain("✓ src/pages/NotesTable.test.ts > the notes table has a header and a cell per note", customMessage: testOutput);
+        plain.ShouldContain("✓ src/pages/DataChart.test.ts > a chart resizes with its container", customMessage: testOutput);
     }
 
     [Fact]
