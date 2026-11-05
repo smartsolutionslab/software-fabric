@@ -1,0 +1,32 @@
+<script setup lang="ts" generic="TRow extends RowData">
+import { type ColumnDef, FlexRender, type RowData, useTable } from '@tanstack/vue-table';
+import { toRef } from 'vue';
+import { features, type Features } from './data-table-columns';
+
+/** A plain table over TanStack Table; keep columns stable (module scope). */
+const props = defineProps<{
+  columns: ColumnDef<Features, TRow, unknown>[];
+  data: TRow[];
+}>();
+
+const table = useTable({ features, columns: props.columns, data: toRef(() => props.data) });
+</script>
+
+<template>
+  <table class="w-full text-sm">
+    <thead>
+      <tr v-for="group in table.getHeaderGroups()" :key="group.id">
+        <th v-for="header in group.headers" :key="header.id" class="border-b p-2 text-left font-medium">
+          <FlexRender v-if="!header.isPlaceholder" :header="header" />
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="row in table.getRowModel().rows" :key="row.id">
+        <td v-for="cell in row.getAllCells()" :key="cell.id" class="border-b p-2">
+          <FlexRender :cell="cell" />
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</template>

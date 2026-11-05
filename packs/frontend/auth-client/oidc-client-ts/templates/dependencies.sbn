@@ -1,2 +1,6 @@
+{{~ if project["frontend.framework"] == "vue" ~}}
+    "oidc-client-ts": "3.5.0"
+{{- else ~}}
     "oidc-client-ts": "3.5.0",
     "react-oidc-context": "3.3.1"
+{{- end }}

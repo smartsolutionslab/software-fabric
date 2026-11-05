@@ -1,1 +1,1 @@
-    "@tanstack/react-table": "9.3.1"
+    "@tanstack/{{ project["frontend.framework"] == "vue" ? "vue" : "react" }}-table": "9.3.1"

@@ -1,0 +1,106 @@
+import type { User, UserManager } from 'oidc-client-ts';
+import { computed, type ComputedRef, inject, type InjectionKey, shallowRef } from 'vue';
+
+/** What the app needs of oidc-client-ts's UserManager; tests hand createAuth a fake of it. */
+export type AuthClient = Pick<UserManager, 'getUser' | 'signinCallback' | 'signinRedirect' | 'signoutRedirect'> & {
+  events: Pick<
+    UserManager['events'],
+    'addUserLoaded' | 'addUserUnloaded' | 'addAccessTokenExpired' | 'addSilentRenewError'
+  >;
+};
+
+/** The signed-in user and the two ways out of and into the app; read it with useAuth(). */
+export interface Auth {
+  user: ComputedRef<User | null>;
+  isAuthenticated: ComputedRef<boolean>;
+  isLoading: ComputedRef<boolean>;
+  error: ComputedRef<Error | null>;
+  /** The redirect under way, until the browser leaves for the identity provider. */
+  activeNavigator: ComputedRef<'signinRedirect' | 'signoutRedirect' | null>;
+  signinRedirect: () => Promise<void>;
+  signoutRedirect: () => Promise<void>;
+}
+
+export const authKey: InjectionKey<Auth> = Symbol('auth');
+
+/** Whether the address is the identity provider's answer: ?code=...&state=... or ?error=...&state=.... */
+function hasAuthParams(): boolean {
+  const parameters = new URLSearchParams(window.location.search);
+  return (parameters.has('code') || parameters.has('error')) && parameters.has('state');
+}
+
+const asError = (failure: unknown) => (failure instanceof Error ? failure : new Error(String(failure)));
+
+/**
+ * Reads the stored user, or completes a sign-in when the identity provider has just answered, and follows the client
+ * from then on: a silent renewal, a sign-out, an access token that expired (the user must sign in again) and a renewal
+ * or redirect that failed (shown as the error). Created once, by src/providers/auth.ts.
+ */
+export function createAuth(client: AuthClient): Auth {
+  const user = shallowRef<User | null>(null);
+  const isLoading = shallowRef(true);
+  const error = shallowRef<Error | null>(null);
+  const activeNavigator = shallowRef<'signinRedirect' | 'signoutRedirect' | null>(null);
+
+  client.events.addUserLoaded((loaded) => {
+    user.value = loaded;
+  });
+  client.events.addUserUnloaded(() => {
+    user.value = null;
+  });
+  // User.expired follows the clock, which no computed sees; the expiry is an event instead.
+  client.events.addAccessTokenExpired(() => {
+    user.value = null;
+  });
+  client.events.addSilentRenewError((failure) => {
+    error.value = failure;
+  });
+
+  // A redirect that cannot start (the identity provider unreachable, say) is shown, never left to reject unseen. While
+  // one is under way no other starts: signing out unloads the user before it leaves, which must not start a sign-in.
+  const redirect = async (navigator: 'signinRedirect' | 'signoutRedirect') => {
+    activeNavigator.value = navigator;
+    try {
+      await client[navigator]();
+    } catch (failure) {
+      activeNavigator.value = null;
+      error.value = asError(failure);
+    }
+  };
+
+  const load = async () => {
+    try {
+      if (hasAuthParams()) {
+        user.value = (await client.signinCallback()) ?? null;
+        // Drop ?code=...&state=... from the address once the sign-in has completed.
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else {
+        user.value = await client.getUser();
+      }
+    } catch (failure) {
+      error.value = asError(failure);
+    } finally {
+      isLoading.value = false;
+    }
+  };
+  void load();
+
+  return {
+    user: computed(() => user.value),
+    isAuthenticated: computed(() => user.value !== null && !user.value.expired),
+    isLoading: computed(() => isLoading.value),
+    error: computed(() => error.value),
+    activeNavigator: computed(() => activeNavigator.value),
+    signinRedirect: () => redirect('signinRedirect'),
+    signoutRedirect: () => redirect('signoutRedirect'),
+  };
+}
+
+/** The signed-in user and sign-in state; never parse tokens yourself. */
+export function useAuth(): Auth {
+  const auth = inject(authKey);
+  if (auth === undefined) {
+    throw new Error('useAuth() needs withAuth (src/providers/auth.ts) installed in the app.');
+  }
+  return auth;
+}

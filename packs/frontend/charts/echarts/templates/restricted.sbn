@@ -1,4 +1,11 @@
+{{~ if project["frontend.framework"] == "vue" ~}}
+            {
+              group: ['chart.js', 'vue-chartjs'],
+              message: 'Use DataChart from src/components/DataChart.vue (docs/adr).',
+            }
+{{- else ~}}
             {
               group: ['recharts', 'chart.js', 'react-chartjs-2'],
               message: 'Use Chart from src/components/chart (docs/adr).',
             }
+{{- end }}

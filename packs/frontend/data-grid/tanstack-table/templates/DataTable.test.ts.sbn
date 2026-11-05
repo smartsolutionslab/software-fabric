@@ -1,0 +1,20 @@
+import { render, screen } from '@testing-library/vue';
+import { expect, test } from 'vitest';
+import DataTable from './DataTable.vue';
+import { columnsOf } from './data-table-columns';
+
+interface Person {
+  name: string;
+}
+
+const people = columnsOf<Person>();
+const columns = people.columns([people.accessor('name', { header: 'Name' })]);
+const data: Person[] = [{ name: 'first' }, { name: 'second' }];
+
+test('the table shows a header and one row per item', () => {
+  // A generic component is rendered for one row type, as a template does it from its props.
+  render(DataTable<Person>, { props: { columns, data } });
+
+  expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
+  expect(screen.getAllByRole('row')).toHaveLength(3);
+});
