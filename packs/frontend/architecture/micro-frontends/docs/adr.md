@@ -19,7 +19,8 @@ The frontend is a **shell** and one **remote** per backend module.
   `modules/*` in `pnpm-workspace.yaml`, the AppHost through the directories of `web/modules`, the shell through the same
   directories when its configuration is read.
 - **Under Aspire** every remote is a Vite dev server of its own, `remote-<module>`. The shell receives each one's
-  address as `services__remote-<module>__http__0` and starts once they run (`src/AppHost/Wiring/Remotes.cs`).
+  address as `REMOTE_<MODULE>_URL` (`REMOTE_ORDER_HANDLING_URL` for `order-handling`) and starts once they run
+  (`src/AppHost/Wiring/Remotes.cs`).
 - **Built**, a remote is served from `/modules/<module>/` next to the shell; that is where the shell looks for it.
 - The shell never imports a remote; lint fails if it does. A remote reaches other modules only through the backend's
   API and events, never through another remote's code.

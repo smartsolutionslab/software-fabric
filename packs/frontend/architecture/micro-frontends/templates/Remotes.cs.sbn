@@ -31,8 +31,9 @@ public static class Remotes
     }
 
     /// <summary>
-    /// Gives the shell each remote's address, as <c>services__remote-&lt;module&gt;__http__0</c>, which its federation
-    /// configuration reads, and starts the shell once the remotes run.
+    /// Gives the shell each remote's address, as <c>REMOTE_&lt;MODULE&gt;_URL</c> (<c>order-handling</c>:
+    /// <c>REMOTE_ORDER_HANDLING_URL</c>), which its federation configuration reads, and starts the shell once the
+    /// remotes run.
     /// </summary>
     /// <typeparam name="T">The shell's resource type.</typeparam>
     /// <param name="shell">The shell, the web app the browser opens.</param>
@@ -45,7 +46,9 @@ public static class Remotes
         ArgumentNullException.ThrowIfNull(remotes);
         foreach (var remote in remotes)
         {
-            shell.WithReference(remote.GetEndpoint("http")).WaitFor(remote);
+            var module = remote.Resource.Name["remote-".Length..];
+            var variable = $"REMOTE_{module.ToUpperInvariant().Replace('-', '_')}_URL";
+            shell.WithEnvironment(variable, remote.GetEndpoint("http")).WaitFor(remote);
         }
 
         return shell;

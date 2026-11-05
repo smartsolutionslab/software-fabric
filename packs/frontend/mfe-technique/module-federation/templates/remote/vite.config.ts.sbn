@@ -19,7 +19,8 @@ export default defineConfig(({ command }) => ({
       shared: {
         react: { singleton: true },
         'react-dom': { singleton: true },
-        '@{{ name }}/ui': { singleton: true },
+        // A workspace package without a version: both sides build it from the same source.
+        '@{{ name }}/ui': { singleton: true, requiredVersion: false },
       },
       dts: false,
     }),

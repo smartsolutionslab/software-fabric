@@ -16,11 +16,11 @@ const remotes = existsSync(modules)
   : [];
 
 /**
- * Where the browser loads a remote from. Under Aspire, its own dev server (services__remote-<module>__http__0, from
+ * Where the browser loads a remote from. Under Aspire, its own dev server (REMOTE_<MODULE>_URL, from
  * src/AppHost/Wiring/Remotes.cs); built, /modules/<module>/ next to the shell, where a deployment serves its dist.
  */
 const entry = (module: string) =>
-  `${process.env[`services__remote-${module}__http__0`] ?? `/modules/${module}`}/remoteEntry.js`;
+  `${process.env[`REMOTE_${module.toUpperCase().replaceAll('-', '_')}_URL`] ?? `/modules/${module}`}/remoteEntry.js`;
 
 /** The shell's side of module federation: every remote, and what the shell shares with them as one instance. */
 export const shellFederation: FederationOptions = {
@@ -31,7 +31,8 @@ export const shellFederation: FederationOptions = {
   shared: {
     react: { singleton: true },
     'react-dom': { singleton: true },
-    '@{{ name }}/ui': { singleton: true },
+    // A workspace package without a version: both sides build it from the same source.
+    '@{{ name }}/ui': { singleton: true, requiredVersion: false },
   },
   // Remotes are loaded by name (src/remotes/Remote.tsx), so no type declarations are fetched from them.
   dts: false,
