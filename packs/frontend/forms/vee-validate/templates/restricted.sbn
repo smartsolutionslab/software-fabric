@@ -1,0 +1,4 @@
+            {
+              group: ['@formkit/*', '@tanstack/vue-form', '@vee-validate/zod'],
+              message: 'Use vee-validate with toTypedSchema from src/forms/toTypedSchema (docs/adr).',
+            }

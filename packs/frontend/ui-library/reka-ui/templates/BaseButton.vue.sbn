@@ -1,0 +1,38 @@
+<script setup lang="ts">
+import { cva, type VariantProps } from 'class-variance-authority';
+import { Primitive, type PrimitiveProps } from 'reka-ui';
+import type { HTMLAttributes } from 'vue';
+import { cn } from '@/lib/utils';
+
+const buttonVariants = cva(
+  'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50',
+  {
+    variants: {
+      variant: {
+        default: 'bg-slate-900 text-white hover:bg-slate-700',
+        outline: 'border border-slate-300 bg-white hover:bg-slate-100',
+        ghost: 'hover:bg-slate-100',
+      },
+      size: { default: 'h-9 px-4 py-2', sm: 'h-8 px-3', lg: 'h-10 px-6' },
+    },
+    defaultVariants: { variant: 'default', size: 'default' },
+  },
+);
+
+type ButtonVariants = VariantProps<typeof buttonVariants>;
+
+interface ButtonProps extends PrimitiveProps {
+  variant?: ButtonVariants['variant'];
+  size?: ButtonVariants['size'];
+  class?: HTMLAttributes['class'];
+}
+
+/** A button styled with Tailwind; as-child gives the look to its only child (a link, a router-link) instead. */
+const { as = 'button', asChild = false, variant, size, class: className } = defineProps<ButtonProps>();
+</script>
+
+<template>
+  <Primitive :as="as" :as-child="asChild" :class="cn(buttonVariants({ variant, size }), className)">
+    <slot />
+  </Primitive>
+</template>

@@ -16,6 +16,6 @@ const { option, label, height = 320 } = defineProps<ChartProps>();
 
 <template>
   <div role="img" :aria-label="label">
-    <VChart :option="option" :style="{ height: `${height}px` }" />
+    <VChart :option="option" autoresize :style="{ height: `${height}px` }" />
   </div>
 </template>

@@ -7,7 +7,7 @@ namespace Fabric.Packs.Tests;
 /// #159: the Vue branches of the shared sign-in, table and chart packs (ADR-0006). Sign-in is a hand-written
 /// <c>useAuth()</c> and <c>SignedIn.vue</c> over oidc-client-ts's <c>UserManager</c>, with no Vue OIDC dependency
 /// (owner decision: https://github.com/smartsolutionslab/software-fabric/issues/23#issuecomment-6641134974); tables are
-/// @tanstack/vue-table and charts vue-echarts. The packs #160 writes (forms, components, styling) stand in.
+/// @tanstack/vue-table and charts vue-echarts.
 /// </summary>
 public sealed partial class VueSharedPacksTests
 {
