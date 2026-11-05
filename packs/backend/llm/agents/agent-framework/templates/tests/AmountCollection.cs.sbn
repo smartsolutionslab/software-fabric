@@ -1,0 +1,4 @@
+namespace {{ namespace }}.Agents.Tests;
+
+/// <summary>A collection of absent values by inheritance: no tool can describe it.</summary>
+public sealed class AmountCollection : List<Option<int>>;

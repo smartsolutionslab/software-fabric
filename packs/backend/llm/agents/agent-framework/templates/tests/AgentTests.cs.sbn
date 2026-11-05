@@ -153,6 +153,29 @@ public sealed class AgentTests
     }
 
     [Fact]
+    public async Task An_optional_argument_with_a_constructor_default_is_still_required()
+    {
+        var dispatcher = new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider()));
+        var tool = DispatcherTool.For<Search>(dispatcher, "Searches.");
+
+        var answer = await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?> { ["text"] = "invoices" }), TestContext.Current.CancellationToken);
+
+        tool.JsonSchema.GetProperty("required").EnumerateArray().Select(name => name.GetString()).ShouldBe(["text", "limit"], ignoreOrder: true);
+        answer?.ToString().ShouldNotBeNull().ShouldStartWith("The arguments are not a Search");
+        dispatcher.Requests.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_request_with_a_collection_of_options_by_inheritance_cannot_become_a_tool()
+    {
+        var dispatcher = new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider()));
+
+        var refused = Should.Throw<InvalidOperationException>(() => DispatcherTool.For<Budget>(dispatcher, "Checks a budget."));
+
+        refused.Message.ShouldContain("Budget has an Option inside a collection or dictionary at Amounts");
+    }
+
+    [Fact]
     public void An_optional_enum_admits_its_names_and_null()
     {
         var dispatcher = new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider()));
