@@ -57,6 +57,60 @@ public class AddModuleTests
     }
 
     [Fact]
+    public void Keeps_the_projects_settings()
+    {
+        var addition = Add(Generated("everything"), "billing");
+
+        addition.Errors.ShouldBeEmpty();
+        addition.FabricYaml.ShouldNotBeNull().ShouldContain("settings:\n  backend.api-protocols.grpc.deadline-seconds: 30\n");
+    }
+
+    [Fact]
+    public void Keeps_a_setting_changed_in_fabric_yaml()
+    {
+        var project = Generated("everything");
+        var changed = project with
+        {
+            Choices = project.Choices with { Settings = new Dictionary<string, decimal> { ["backend.api-protocols.grpc.deadline-seconds"] = 12.5m } },
+        };
+
+        Add(changed, "billing").FabricYaml.ShouldNotBeNull().ShouldContain("  backend.api-protocols.grpc.deadline-seconds: 12.5\n");
+    }
+
+    [Fact]
+    public void Rejects_a_setting_in_fabric_yaml_outside_its_range()
+    {
+        var project = Generated("everything");
+        var changed = project with
+        {
+            Choices = project.Choices with { Settings = new Dictionary<string, decimal> { ["backend.api-protocols.grpc.deadline-seconds"] = 301m } },
+        };
+
+        Add(changed, "billing").Errors.ShouldBe(
+            ["fabric.yaml: backend.api-protocols.grpc.deadline-seconds is 301, but it must be between 1 and 300."]);
+    }
+
+    [Fact]
+    public void Rejects_a_setting_in_fabric_yaml_that_no_chosen_option_declares()
+    {
+        var project = Generated("minimal");
+        var changed = project with
+        {
+            Choices = project.Choices with { Settings = new Dictionary<string, decimal> { ["backend.api-protocols.grpc.deadline-seconds"] = 30m } },
+        };
+
+        Add(changed, "billing").Errors.ShouldBe(
+            ["fabric.yaml: backend.api-protocols.grpc.deadline-seconds is set to 30, but it only applies when backend.api-protocols has grpc, and backend.api-protocols is rest."]);
+    }
+
+    [Fact]
+    public void Rejects_a_setting_as_an_override_because_it_belongs_to_the_project()
+    {
+        Add(Generated("everything"), "billing", "backend.api-protocols.grpc.deadline-seconds=10").Errors.ShouldBe(
+            ["backend.api-protocols.grpc.deadline-seconds is a project setting; change it in fabric.yaml."]);
+    }
+
+    [Fact]
     public void Rejects_a_project_scoped_override()
     {
         Add(Generated("minimal"), "billing", "backend.database=sqlserver")

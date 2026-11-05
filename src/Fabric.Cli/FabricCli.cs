@@ -217,7 +217,8 @@ public static class FabricCli
 
     private static Option<string[]> SetOption() => new("--set")
     {
-        Description = "Override one dimension: --set dimension=option (comma-separated for multi-valued dimensions). Repeatable.",
+        Description = "Override one dimension: --set dimension=option (comma-separated for multi-valued dimensions), " +
+            "or set a chosen option's number: --set dimension.option.setting=number. Repeatable.",
         Arity = ArgumentArity.ZeroOrMore,
     };
 
