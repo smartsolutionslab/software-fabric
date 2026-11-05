@@ -13,7 +13,7 @@ namespace Fabric.Core.Rendering;
 
 /// <summary>
 /// Renders a composition with Scriban. Templates see <c>name</c>, <c>namespace</c>, <c>project</c>,
-/// <c>module_defaults</c>, <c>modules</c>, <c>module</c> (per-module files only) and <c>slots</c> (files only). Nothing from the clock or the machine is
+/// <c>module_defaults</c>, <c>modules</c>, <c>settings</c> (chosen options' numbers, by <c>dimension.option.setting</c>), <c>module</c> (per-module files only) and <c>slots</c> (files only). Nothing from the clock or the machine is
 /// available, unknown variables are errors, and output uses LF, so the same input always renders the same bytes.
 /// A file's <c>when</c> condition sees the same names as its template; the file is written only when it is <c>true</c>.
 /// </summary>
@@ -173,11 +173,23 @@ public static partial class Renderer
             ["project"] = Values(catalog, choices.Project),
             ["module_defaults"] = Values(catalog, choices.ModuleDefaults),
             ["modules"] = modules,
+            ["settings"] = Settings(choices.Settings),
         };
     }
 
     private static ScriptObject Module(CatalogModel catalog, string name, IReadOnlyDictionary<string, IReadOnlyList<string>> values) =>
         new() { ["name"] = name, ["namespace"] = Names.ToPascalCase(name), ["values"] = Values(catalog, values) };
+
+    private static ScriptObject Settings(IReadOnlyDictionary<string, decimal> settings)
+    {
+        var result = new ScriptObject();
+        foreach (var (key, value) in settings)
+        {
+            result[key] = value;
+        }
+
+        return result;
+    }
 
     /// <summary>Single-valued dimensions become strings, multi-valued ones lists.</summary>
     private static ScriptObject Values(CatalogModel catalog, IReadOnlyDictionary<string, IReadOnlyList<string>> values)

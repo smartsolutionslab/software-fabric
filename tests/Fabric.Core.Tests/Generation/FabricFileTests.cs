@@ -78,6 +78,66 @@ public class FabricFileTests
     }
 
     [Fact]
+    public void Writes_settings_after_the_project_choices_when_a_chosen_option_declares_them()
+    {
+        var choices = Choices with
+        {
+            Settings = new Dictionary<string, decimal> { ["backend.api-protocols.rest.page-size"] = 50m, ["backend.api-protocols.rest.ratio"] = 2.50m },
+        };
+
+        FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", choices).ShouldBe("""
+            # Written by fabric. These choices are fixed for this project (ADR-0001 of the generator).
+            fabric: 1
+            name: shop
+            profile: minimal
+            project:
+              backend.database: postgres
+              backend.api-protocols: [rest]
+            settings:
+              backend.api-protocols.rest.page-size: 50
+              backend.api-protocols.rest.ratio: 2.5
+            module-defaults:
+              module.style: ddd
+            modules:
+              billing:
+                module.style: crud
+
+            """);
+    }
+
+    [Fact]
+    public void Writes_no_settings_line_when_there_are_none()
+    {
+        FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices).ShouldNotContain("settings");
+    }
+
+    [Fact]
+    public void Reads_back_the_settings_it_wrote()
+    {
+        var choices = Choices with { Settings = new Dictionary<string, decimal> { ["backend.api-protocols.rest.ratio"] = 3.5m } };
+
+        var record = FabricFile.Read(new StringReader(FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", choices)), "fabric.yaml");
+
+        record.Choices.Settings.ShouldBe(new Dictionary<string, decimal> { ["backend.api-protocols.rest.ratio"] = 3.5m });
+    }
+
+    [Fact]
+    public void Reads_no_settings_from_a_file_without_them()
+    {
+        FabricFile.Read(new StringReader(FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices)), "fabric.yaml")
+            .Choices.Settings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Rejects_a_setting_that_is_not_a_number()
+    {
+        Should.Throw<FabricFileException>(() => FabricFile.Read(
+                new StringReader("fabric: 1\nname: shop\nproject: {}\nsettings:\n  x.y.o.threshold: high\nmodule-defaults: {}\nmodules: {}\n"),
+                "fabric.yaml"))
+            .Message.ShouldBe("fabric.yaml:5: invalid value 'high' for 'x.y.o.threshold' on 'settings'; expected a number.");
+    }
+
+    [Fact]
     public void Rejects_an_unknown_field()
     {
         Should.Throw<FabricFileException>(() => FabricFile.Read(new StringReader("fabric: 1\nname: shop\nproject: {}\nmodule-defaults: {}\nmodules: {}\ncolour: red\n"), "fabric.yaml"))

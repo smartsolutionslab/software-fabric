@@ -4,7 +4,8 @@ namespace Fabric.Core.Choices;
 
 /// <summary>
 /// Turns a profile plus <c>dimension=option</c> overrides into a complete choice set: explicit values first,
-/// then defaults for every dimension whose <c>active-when</c> holds. Rule checks (requires/conflicts) are not
+/// then defaults for every dimension whose <c>active-when</c> holds, then the settings of every chosen option
+/// (<c>dimension.option.setting=number</c>, or the setting's default). Rule checks (requires/conflicts) are not
 /// done here.
 /// </summary>
 public static class ChoiceResolver
@@ -22,11 +23,20 @@ public static class ChoiceResolver
             ApplyProfile(catalog, profile, explicitValues, errors);
         }
 
+        List<OptionSettings.Assignment> assignments = [];
         foreach (var setting in overrides)
         {
-            ApplyOverride(setting, explicitValues, errors);
+            if (OptionSettings.Find(catalog, setting) is { } assignment)
+            {
+                assignments.Add(assignment);
+            }
+            else
+            {
+                ApplyOverride(setting, explicitValues, errors);
+            }
         }
 
+        var settingValues = OptionSettings.Read(assignments, errors);
         if (errors.Count == 0)
         {
             Validate(catalog, explicitValues, errors);
@@ -46,6 +56,7 @@ public static class ChoiceResolver
 
         var values = Merge(explicitValues, defaults);
         CheckActivity(dimensions, explicitValues, values, errors);
+        var settings = errors.Count == 0 ? OptionSettings.Settle(catalog, values, assignments, settingValues, errors) : [];
         if (errors.Count > 0)
         {
             return Failure(errors);
@@ -61,7 +72,7 @@ public static class ChoiceResolver
             }
         }
 
-        return new ChoiceResolution(new ResolvedChoices(project, moduleDefaults), []);
+        return new ChoiceResolution(new ResolvedChoices(project, moduleDefaults) { Settings = settings }, []);
     }
 
     /// <summary>
@@ -78,7 +89,14 @@ public static class ChoiceResolver
         OrderedDictionary<string, IReadOnlyList<string>> explicitValues = [];
         foreach (var setting in overrides)
         {
-            ApplyOverride(setting, explicitValues, errors);
+            if (OptionSettings.Find(catalog, setting) is { } assignment)
+            {
+                errors.Add($"{assignment.Key} is a project setting; change it in fabric.yaml.");
+            }
+            else
+            {
+                ApplyOverride(setting, explicitValues, errors);
+            }
         }
 
         return ResolveModule(catalog, project, explicitValues, errors);
@@ -147,6 +165,15 @@ public static class ChoiceResolver
         }
 
         return new ModuleResolution(values, []);
+    }
+
+    /// <summary>The settings a project's <c>fabric.yaml</c> records, checked against the catalog and its own choices.</summary>
+    public static IReadOnlyList<string> CheckSettings(CatalogModel catalog, ProjectChoices project)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(project);
+
+        return OptionSettings.Check(catalog, project);
     }
 
     private static ChoiceResolution Failure(List<string> errors) => new(null, errors);

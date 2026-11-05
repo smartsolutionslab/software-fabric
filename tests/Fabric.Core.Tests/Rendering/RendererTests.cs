@@ -82,6 +82,18 @@ public sealed class RendererTests : IDisposable
     }
 
     [Fact]
+    public void Templates_see_the_projects_settings_by_key()
+    {
+        var pack = Pack("base.core", ("t.sbn", "deadline={{ settings[\"backend.api-protocols.grpc.deadline-seconds\"] }}"));
+        var choices = Choices with { Settings = new Dictionary<string, decimal> { ["backend.api-protocols.grpc.deadline-seconds"] = 2.5m } };
+
+        var rendered = Renderer.Render(Catalog, Compose([Composed(pack, "t.sbn", "out.txt")]), choices, "shop");
+
+        rendered.Errors.ShouldBeEmpty();
+        rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("deadline=2.5");
+    }
+
+    [Fact]
     public void A_multi_valued_dimension_renders_as_a_list()
     {
         RenderSingle("{{ project[\"backend.api-protocols\"] | array.join \",\" }}").Content.ShouldBe("rest,grpc");
