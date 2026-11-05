@@ -39,7 +39,7 @@ slots:
   - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 40 }
   - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 40 }
   - { slot: integration-tests.parameters, template: templates/integration-tests-parameters.sbn }
-  - { slot: e2e.apphost-environment, template: templates/e2e-apphost-environment.sbn, order: 90 }
+  - { slot: e2e.apphost-arguments, template: templates/e2e-apphost-arguments.sbn, order: 90 }
   - { slot: web.dependencies, template: templates/web-dependency.sbn }
   - { slot: web.restricted-imports, template: templates/web-restricted.sbn, order: 50 }
 agents:
