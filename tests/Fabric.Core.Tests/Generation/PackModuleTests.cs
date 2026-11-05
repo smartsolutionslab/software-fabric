@@ -34,9 +34,31 @@ public sealed class PackModuleTests : IDisposable
         return this;
     }
 
-    private IReadOnlyDictionary<string, PackManifest> Packs()
+    /// <summary>The fixture catalog with one replacement applied to its text.</summary>
+    private static CatalogModel Catalog(string oldText, string newText) => CatalogReader.Read(
+        new StringReader(File.ReadAllText(Path.Combine(Fixtures.MinimalRoot, "catalog.yaml")).Replace(oldText, newText, StringComparison.Ordinal)),
+        "catalog.yaml");
+
+    /// <summary>A pack that owns no file and fills no slot, for an option the test's catalog adds.</summary>
+    private void AddEmptyPack(string option)
     {
-        var loaded = PackLoader.Load(packsRoot, Fixtures.MinimalCatalog);
+        var directory = Path.Combine([packsRoot, .. option.Split('.')]);
+        Directory.CreateDirectory(Path.Combine(directory, "docs"));
+        File.WriteAllText(Path.Combine(directory, "docs", "agents.md"), string.Empty);
+        File.WriteAllText(Path.Combine(directory, "docs", "adr.md"), string.Empty);
+        File.WriteAllText(Path.Combine(directory, "pack.yaml"), $$"""
+            option: {{option}}
+            files: []
+            agents: { agents-md: docs/agents.md }
+            adr: docs/adr.md
+            gates:
+              - { kind: unit-test, describes: "Fixture gate." }
+            """);
+    }
+
+    private IReadOnlyDictionary<string, PackManifest> Packs(CatalogModel? catalog = null)
+    {
+        var loaded = PackLoader.Load(packsRoot, catalog ?? Fixtures.MinimalCatalog);
         loaded.Errors.ShouldBeEmpty();
         return loaded.Packs;
     }
@@ -197,6 +219,71 @@ public sealed class PackModuleTests : IDisposable
 
         Generator.New(catalog, Packs(), "shop", "minimal", []).Errors.ShouldBe([
             "backend.api-protocols.rest: module 'reports': module.style=crud requires backend.database == sqlserver, but backend.database is postgres.",
+        ]);
+    }
+
+    [Fact]
+    public void A_project_rule_on_modules_holds_when_a_brought_module_satisfies_it()
+    {
+        var catalog = Catalog("rest: { tier: supported }", """rest: { tier: supported, requires: ["module.style == crud"] }""");
+        Declare("backend.api-protocols.rest", "modules: { reports: { module.style: crud } }");
+
+        var generated = Generator.New(catalog, Packs(catalog), "shop", "minimal", []);
+
+        generated.Errors.ShouldBeEmpty();
+        FabricYaml(generated).ShouldEndWith("modules:\n  reports:\n    module.style: crud\n");
+    }
+
+    [Fact]
+    public void A_declaring_pack_may_fill_a_slot_of_a_pack_only_its_module_selects()
+    {
+        var crud = Path.Combine(packsRoot, "module", "style", "crud", "pack.yaml");
+        File.WriteAllText(crud, File.ReadAllText(crud) + "declares-slots:\n  - { slot: crud.notes, description: \"Notes.\" }\n");
+        var rest = Path.Combine(packsRoot, "backend", "api-protocols", "rest", "pack.yaml");
+        File.WriteAllText(rest, File.ReadAllText(rest).Replace(
+            "slots:\n",
+            "slots:\n  - { slot: crud.notes, template: templates/section.sbn }\n",
+            StringComparison.Ordinal));
+        Declare("backend.api-protocols.rest", "modules: { reports: { module.style: crud } }");
+
+        var generated = New("minimal");
+
+        generated.Errors.ShouldBeEmpty();
+        FabricYaml(generated).ShouldEndWith("modules:\n  reports:\n    module.style: crud\n");
+    }
+
+    [Fact]
+    public void Multi_select_pins_that_list_the_same_options_in_another_order_agree()
+    {
+        var catalog = Catalog("dimensions:\n", """
+            dimensions:
+              module.tags:
+                scope: module
+                multi: true
+                default: []
+                options:
+                  a: { tier: supported }
+                  b: { tier: supported }
+
+            """);
+        AddEmptyPack("module.tags.a");
+        AddEmptyPack("module.tags.b");
+        Declare("backend.api-protocols.rest", "modules: { reports: { module.tags: [a, b] } }");
+        Declare("backend.api-protocols.grpc", "modules: { reports: { module.tags: [b, a] } }");
+
+        var generated = Generator.New(catalog, Packs(catalog), "shop", "everything", []);
+
+        generated.Errors.ShouldBeEmpty();
+        FabricYaml(generated).ShouldContain("  reports:\n    module.tags: [a, b]\n");
+    }
+
+    [Fact]
+    public void A_pin_with_an_empty_option_is_an_error_naming_the_pack()
+    {
+        Declare("backend.api-protocols.rest", """modules: { reports: { module.style: [crud, ""] } }""");
+
+        New("minimal").Errors.ShouldBe([
+            "backend.api-protocols.rest: module 'reports': module.style takes one option, got 2: crud, .",
         ]);
     }
 
