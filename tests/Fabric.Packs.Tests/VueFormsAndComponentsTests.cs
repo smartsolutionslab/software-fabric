@@ -88,6 +88,25 @@ public sealed partial class VueFormsAndComponentsTests
         </template>
         """;
 
+    /// <summary>A component in the registry's shape that builds on Button, as sidebar's trigger does: ghost, icon-sized.</summary>
+    private const string CliSidebarTrigger = """
+        <script setup lang="ts">
+        import { PanelLeft } from '@lucide/vue';
+        import { Button } from '@/components/ui/button';
+
+        defineOptions({ name: 'UiSidebarTrigger' });
+
+        const emit = defineEmits<{ toggle: [] }>();
+        </script>
+
+        <template>
+          <Button data-sidebar="trigger" data-slot="sidebar-trigger" variant="ghost" size="icon" @click="emit('toggle')">
+            <PanelLeft />
+            <span class="sr-only">Toggle Sidebar</span>
+          </Button>
+        </template>
+        """;
+
     private const string SignUpFormTest = """
         import { render, screen, waitFor } from '@testing-library/vue';
         import userEvent from '@testing-library/user-event';
@@ -137,6 +156,14 @@ public sealed partial class VueFormsAndComponentsTests
         files.Keys.ShouldContain("web/app/src/components/ui/button/Button.test.ts");
         files.Keys.ShouldContain("web/app/src/lib/utils.ts");
         files.Keys.ShouldNotContain("web/app/src/components/ui/BaseButton.vue");
+        var buttonVariants = files["web/app/src/components/ui/button/index.ts"];
+        buttonVariants.ShouldContain("default: 'bg-primary text-primary-foreground");
+        buttonVariants.ShouldNotContain("slate");
+        foreach (var variant in new[] { "destructive:", "outline:", "secondary:", "ghost:", "link:", "sm:", "lg:", "icon:" })
+        {
+            buttonVariants.ShouldContain(variant);
+        }
+
         files.Keys.Where(path => path.EndsWith(".tsx", StringComparison.Ordinal)).ShouldBeEmpty();
 
         var components = files["web/app/components.json"];
@@ -200,6 +227,7 @@ public sealed partial class VueFormsAndComponentsTests
         project.Write("web/app/src/pages/SignUpForm.test.ts", SignUpFormTest);
         project.Write("web/app/src/components/ui/card/Card.vue", CliCard);
         project.Write("web/app/src/components/ui/dialog/DialogOverlay.vue", CliDialogOverlay);
+        project.Write("web/app/src/components/ui/sidebar/SidebarTrigger.vue", CliSidebarTrigger);
         var web = Path.Combine(project.ProjectDirectory, "web");
         var app = Path.Combine(web, "app");
         foreach (var step in new[] { "install", "build", "lint" })
@@ -214,6 +242,9 @@ public sealed partial class VueFormsAndComponentsTests
         var plain = Escapes().Replace(testOutput, string.Empty);
         plain.ShouldContain("✓ src/components/ui/button/Button.test.ts > a button is a button with the default look", customMessage: testOutput);
         plain.ShouldContain("✓ src/components/ui/button/Button.test.ts > with as-child the child takes the button's look and stays what it is", customMessage: testOutput);
+        plain.ShouldContain("✓ src/components/ui/button/Button.test.ts > the destructive variant takes the theme from bg-destructive", customMessage: testOutput);
+        plain.ShouldContain("✓ src/components/ui/button/Button.test.ts > the link variant takes the theme from text-primary", customMessage: testOutput);
+        plain.ShouldContain("✓ src/components/ui/button/Button.test.ts > the icon size is size-9", customMessage: testOutput);
         plain.ShouldContain("✓ src/forms/toTypedSchema.test.ts > a schema's messages reach the fields they belong to, nested and listed ones too", customMessage: testOutput);
         plain.ShouldContain("✓ src/forms/toTypedSchema.test.ts > valid values come back as the schema puts them out", customMessage: testOutput);
         plain.ShouldContain("✓ src/pages/SignUpForm.test.ts > an empty sign-up shows the schema messages next to its fields", customMessage: testOutput);
@@ -224,7 +255,7 @@ public sealed partial class VueFormsAndComponentsTests
         var stylesheets = Directory.GetFiles(Path.Combine(app, "dist", "assets"), "*.css");
         stylesheets.ShouldNotBeEmpty();
         var css = string.Concat(stylesheets.Select(File.ReadAllText));
-        css.ShouldContain(".bg-slate-900");
+        css.ShouldContain(".bg-primary{");
 
         // A component the shadcn-vue CLI adds finds the theme it names: the semantic colours and tw-animate-css.
         css.ShouldContain(".bg-card{");
