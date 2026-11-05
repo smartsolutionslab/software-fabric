@@ -684,6 +684,206 @@ public sealed class StrictEventSourcedTests
         exitCode.ShouldBe(0, output);
     }
 
+    [Fact]
+    public void A_member_a_recurring_generic_type_holds_through_its_substituted_argument_is_checked()
+    {
+        // Node<Marker> holds a Node<Envelope<Marker>>, whose Value carries an InvoiceNumber: {"Next":{}} leaves it null.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record Envelope<T>(InvoiceNumber Number);
+
+            public sealed record Node<T>(Node<Envelope<T>>? Next)
+            {
+                public T Value { get; init; } = default!;
+            }
+
+            public sealed record Marker;
+
+            public sealed record InvoiceLinked(InvoiceId Invoice, Node<Marker> Root) : IDomainEvent;
+
+            public sealed class Linking : EventSourcedAggregate<InvoiceId>
+            {
+                private Linking()
+                {
+                }
+
+                private void Apply(InvoiceLinked linked) => Id = linked.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Node`1[Shop.Modules.Billing.Domain.Invoices.Envelope`1[Shop.Modules.Billing.Domain.Invoices.Marker]].Value carries a value object outside its constructor");
+        output.ShouldNotContain("Node`1[Shop.Modules.Billing.Domain.Invoices.Marker].Value carries");
+        output.ShouldNotContain("InvoiceLinked.Root carries");
+        exitCode.ShouldNotBe(0, output);
+    }
+
+    [Fact]
+    public void A_larger_closed_type_of_a_generic_type_whose_graph_ends_is_checked()
+    {
+        // Box<Marker> holds the fixed Box<List<InvoiceNumber>>, which holds only itself: the graph ends, so it is walked.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record Box<T>(Box<List<InvoiceNumber>>? Next)
+            {
+                public T Value { get; init; } = default!;
+            }
+
+            public sealed record Marker;
+
+            public sealed record InvoiceBoxed(InvoiceId Invoice, Box<Marker> Box) : IDomainEvent;
+
+            public sealed class Boxing : EventSourcedAggregate<InvoiceId>
+            {
+                private Boxing()
+                {
+                }
+
+                private void Apply(InvoiceBoxed boxed) => Id = boxed.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Box`1[System.Collections.Generic.List`1[Shop.Modules.Billing.Domain.Invoices.InvoiceNumber]].Value carries a value object outside its constructor");
+        output.ShouldNotContain("Box`1[Shop.Modules.Billing.Domain.Invoices.Marker].Value carries");
+        output.ShouldNotContain("InvoiceBoxed.Box carries");
+        exitCode.ShouldNotBe(0, output);
+    }
+
+    [Fact]
+    public void A_member_a_recurring_generic_type_holds_through_a_collections_elements_is_checked()
+    {
+        // Growing<Marker> holds a Branch<Marker>, whose Inner holds a Branch<Envelope<Marker>>: its Value carries an
+        // InvoiceNumber. A collection's own elements cannot grow it (the runtime refuses a recursive generic definition),
+        // so the growth passes through a member.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using System.Collections.ObjectModel;
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed class Growing<T> : Collection<Branch<T>>;
+
+            public sealed record Branch<T>(Growing<Envelope<T>> Inner)
+            {
+                public T Value { get; init; } = default!;
+            }
+
+            public sealed record Envelope<T>(InvoiceNumber Number);
+
+            public sealed record Marker;
+
+            public sealed record InvoiceGrown(InvoiceId Invoice, Growing<Marker> Grown) : IDomainEvent;
+
+            public sealed class Growth : EventSourcedAggregate<InvoiceId>
+            {
+                private Growth()
+                {
+                }
+
+                private void Apply(InvoiceGrown grown) => Id = grown.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Branch`1[Shop.Modules.Billing.Domain.Invoices.Envelope`1[Shop.Modules.Billing.Domain.Invoices.Marker]].Value carries a value object outside its constructor");
+        output.ShouldNotContain("Branch`1[Shop.Modules.Billing.Domain.Invoices.Marker].Value carries");
+        output.ShouldNotContain("InvoiceGrown.Grown carries");
+        exitCode.ShouldNotBe(0, output);
+    }
+
+    [Fact]
+    public void The_walk_ends_on_a_recurring_generic_type_an_open_generic_event_holds()
+    {
+        // Linked<T> is walked as declared, so it holds Node<T>, which holds Node<List<T>>, and so on.
+        var (_, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record Node<T>(Node<List<T>>? Next);
+
+            public sealed record Linked<T>(InvoiceId Invoice, Node<T> Root) : IDomainEvent;
+            """);
+
+        output.ShouldNotContain("Stack overflow");
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Linked`1 is applied by no aggregate");
+        output.ShouldNotContain("carries a value object");
+    }
+
+    [Fact]
+    public void Closed_types_of_a_recurring_generic_type_whose_optional_parameter_differs_in_nullability_are_checked_each()
+    {
+        // T? is nullable for the class InvoiceNumber, but is the plain struct for Payload: {} leaves Payload.Number null.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public readonly record struct Payload(InvoiceNumber Number);
+
+            public sealed record Node<T>(Node<List<T>>? Next, T? Value = default);
+
+            public sealed record InvoiceNoded(InvoiceId Invoice, Node<InvoiceNumber> First, Node<Payload> Second) : IDomainEvent;
+
+            public sealed class Noding : EventSourcedAggregate<InvoiceId>
+            {
+                private Noding()
+                {
+                }
+
+                private void Apply(InvoiceNoded noded) => Id = noded.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Node`1[Shop.Modules.Billing.Domain.Invoices.Payload].Value carries a value object through an optional constructor parameter");
+        output.ShouldNotContain("Node`1[Shop.Modules.Billing.Domain.Invoices.InvoiceNumber].Value carries");
+        exitCode.ShouldNotBe(0, output);
+    }
+
+    [Fact]
+    public void Closed_types_a_recurring_generic_type_holds_whose_optional_parameter_differs_in_nullability_are_checked_each()
+    {
+        // Node<InvoiceNumber> and Node<Payload> show no violation, but their Envelope<Payload> does where Envelope<InvoiceNumber> does not.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using System.Text.Json.Serialization;
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public readonly record struct Payload
+            {
+                [JsonConstructor]
+                public Payload(InvoiceNumber number) => Number = number;
+
+                public InvoiceNumber Number { get; }
+            }
+
+            public sealed record Envelope<T>(T? Value = default);
+
+            public sealed record Node<T>(Node<List<T>>? Next, Envelope<T> Data);
+
+            public sealed record InvoiceNoded(InvoiceId Invoice, Node<InvoiceNumber> First, Node<Payload> Second) : IDomainEvent;
+
+            public sealed class Noding : EventSourcedAggregate<InvoiceId>
+            {
+                private Noding()
+                {
+                }
+
+                private void Apply(InvoiceNoded noded) => Id = noded.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Envelope`1[Shop.Modules.Billing.Domain.Invoices.Payload].Value carries a value object through an optional constructor parameter");
+        output.ShouldNotContain("Envelope`1[Shop.Modules.Billing.Domain.Invoices.InvoiceNumber].Value carries");
+        output.ShouldNotContain("Payload.Number carries");
+        exitCode.ShouldNotBe(0, output);
+    }
+
     private static (int ExitCode, string Output) ArchitectureTestsWith(string types)
     {
         using var project = new GeneratedProject("industrial-event-driven-mfe", Choices);
