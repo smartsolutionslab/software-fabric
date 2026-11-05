@@ -6,8 +6,8 @@ using Fabric.Core.Generation;
 namespace Fabric.Packs.Tests;
 
 /// <summary>
-/// Profile CI (ADR-0003) runs every profile whose packs all exist: build/complete-profiles.sh lists them for the
-/// workflow's matrix, and says which profiles it leaves out and why. build/profile-ci.sh takes overrides, so a pack
+/// Profile CI (ADR-0003) runs every profile in the catalog: build/complete-profiles.sh lists them for the workflow's
+/// matrix, and fails, naming the profile and the packs it lacks, when one cannot be generated from the real packs. build/profile-ci.sh takes overrides, so a pack
 /// can go through profile CI before its profile is complete.
 /// </summary>
 public sealed class ProfileCiTests
@@ -27,20 +27,19 @@ public sealed class ProfileCiTests
 
         exitCode.ShouldBe(0, output);
         Listed(output).ShouldBe(CompleteProfiles, output);
-        CompleteProfiles.ShouldContain("saas-standard-react");
-        CompleteProfiles.ShouldContain("lean-crud");
-        CompleteProfiles.ShouldContain("saas-strict-react");
-        CompleteProfiles.ShouldContain("saas-standard-vue");
+        CompleteProfiles.ShouldBe(CatalogProfiles, "every profile in the catalog is one profile CI runs.");
     }
 
     [Fact]
-    public void A_profile_left_out_is_named_with_the_packs_it_lacks()
+    public void A_profile_with_a_missing_pack_fails_profile_CI_naming_the_profile_and_the_pack()
     {
-        var (_, output) = Script.Value;
-        foreach (var profile in CatalogProfiles.Except(CompleteProfiles))
-        {
-            output.ShouldContain($"::notice title=profile CI::{profile} is not run, its packs are not all written: no pack for ", Case.Sensitive, output);
-        }
+        var (exitCode, output) = CompleteProfilesWithout(Path.Combine("frontend", "mfe-technique", "module-federation"));
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("::error title=profile CI::industrial-event-driven-mfe ", Case.Sensitive, output);
+        output.ShouldContain("no pack for frontend.mfe-technique=module-federation", Case.Sensitive, output);
+        output.ShouldNotContain("::notice", Case.Sensitive, output);
+        output.ShouldNotContain("profiles=", Case.Sensitive, output);
     }
 
     [Fact]
@@ -130,6 +129,45 @@ public sealed class ProfileCiTests
         finally
         {
             temporary.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Runs build/complete-profiles.sh from a copy of itself and the Release CLI in a temporary directory, with one
+    /// pack directory removed from the packs the copied CLI ships, so the script sees a profile whose packs are not
+    /// all written.
+    /// </summary>
+    private static (int ExitCode, string Output) CompleteProfilesWithout(string pack)
+    {
+        var copy = Directory.CreateTempSubdirectory("complete-profiles-test-");
+        try
+        {
+            var cli = Path.Combine("src", "Fabric.Cli", "bin", "Release", "net10.0");
+            Copy(Path.Combine(Repository.Root, "build", "complete-profiles.sh"), Path.Combine(copy.FullName, "build", "complete-profiles.sh"));
+            Copy(Path.Combine(Repository.Root, cli), Path.Combine(copy.FullName, cli));
+            var removed = Path.Combine(copy.FullName, cli, "packs", pack);
+            Directory.Exists(removed).ShouldBeTrue($"no pack directory {pack} to remove.");
+            Directory.Delete(removed, recursive: true);
+            return Shell.Run(copy.FullName, "bash", "build/complete-profiles.sh");
+        }
+        finally
+        {
+            copy.Delete(recursive: true);
+        }
+    }
+
+    private static void Copy(string source, string target)
+    {
+        if (File.Exists(source))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(source, target, overwrite: true);
+            return;
+        }
+
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            Copy(file, Path.Combine(target, Path.GetRelativePath(source, file)));
         }
     }
 
