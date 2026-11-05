@@ -256,6 +256,7 @@ public sealed partial class PrimitiveBoundaryTests
         namespace Shop.Modules.Billing.Domain.Orders;
 
         internal sealed record TypedId<TTag> : IValueObject<Guid>
+            where TTag : notnull
         {
             private TypedId(Guid value) => Value = value;
 
@@ -290,9 +291,11 @@ public sealed partial class PrimitiveBoundaryTests
 
         internal sealed class Shipment;
 
-        internal sealed class Line<TTag>(TypedId<TTag> id) : Entity<TypedId<TTag>>(id);
+        internal sealed class Line<TTag>(TypedId<TTag> id) : Entity<TypedId<TTag>>(id)
+            where TTag : notnull;
 
         internal sealed class Node<T>
+            where T : notnull
         {
             public Node<List<T>>? Next { get; }
         }
@@ -456,6 +459,7 @@ public sealed partial class PrimitiveBoundaryTests
         internal sealed class Waypoint;
 
         internal class Node<T>
+            where T : notnull
         {
             public Node<List<T>>? Next { get; }
         }
@@ -487,6 +491,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed class Link<T>
+            where T : notnull
         {
             public string Label { get; } = string.Empty;
         }
@@ -499,6 +504,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed record Tag<TTag> : IValueObject<Guid>
+            where TTag : notnull
         {
             private Tag(Guid value) => Value = value;
 
@@ -642,6 +648,7 @@ public sealed partial class PrimitiveBoundaryTests
         internal sealed class Marker;
 
         internal interface INode<out T>
+            where T : notnull
         {
             INode<IEnumerable<T>>? Next { get; }
         }
@@ -654,6 +661,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed class Palette<T>
+            where T : notnull
         {
             internal enum Status
             {
@@ -663,6 +671,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed class Lamp<T>
+            where T : notnull
         {
             public Lamp<List<T>>? Next { get; }
 
@@ -670,6 +679,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed record Chain<T> : IValueObject<T>
+            where T : notnull
         {
             private Chain(T value) => Value = value;
 
@@ -683,6 +693,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed class Answer<T>
+            where T : notnull
         {
             private readonly T[] values = [];
 
@@ -690,6 +701,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed record Beacon<T> : IValueObject<T>
+            where T : notnull
         {
             private Beacon(T value) => Value = value;
 
@@ -703,11 +715,13 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed class Shade<T>
+            where T : notnull
         {
             public Palette<T>.Status Level { get; }
         }
 
         internal class Gauge<T>
+            where T : notnull
         {
             private readonly T[] values = [];
 
@@ -715,6 +729,8 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed class Knot<T, TNext> : Gauge<T>
+            where T : notnull
+            where TNext : notnull
         {
             public new readonly T Value = default!;
 
@@ -722,6 +738,8 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed record Loop<T, TNext> : IValueObject<T>
+            where T : notnull
+            where TNext : notnull
         {
             private Loop(T value) => Value = value;
 
@@ -766,6 +784,81 @@ public sealed partial class PrimitiveBoundaryTests
                 return new SignalId(value);
             }
         }
+        """;
+
+    private const string Generics = """
+        using System.Numerics;
+
+        namespace Shop.Modules.Billing.Domain.Generics;
+
+        public interface IMarker
+        {
+            string Name { get; }
+        }
+
+        public class Base;
+
+        public sealed class Unconstrained<T>;
+
+        public sealed class NullableClass<T>
+            where T : class?;
+
+        public sealed class NullableInterface<T>
+            where T : IMarker?;
+
+        public sealed class NullableBase<T>
+            where T : Base?;
+
+        public sealed class Pair<TKey, TValue>
+            where TKey : notnull;
+
+        public interface ISource<out T>
+        {
+            IEnumerable<T> Items { get; }
+        }
+
+        public sealed class NotNull<T>
+            where T : notnull;
+
+        public sealed class Reference<T>
+            where T : class;
+
+        public sealed class Value<T>
+            where T : struct;
+
+        public sealed class Unmanaged<T>
+            where T : unmanaged;
+
+        public sealed class Marked<T>
+            where T : IMarker;
+
+        public sealed class Derived<T>
+            where T : Base;
+
+        public sealed class Numeric<T>
+            where T : INumber<T>;
+
+        public sealed class Outer<T>
+            where T : notnull
+        {
+            public sealed class Plain;
+
+            public sealed class Inner<TInner>;
+        }
+        """;
+
+    private const string ObliviousGenerics = """
+        #nullable disable
+
+        namespace Shop.Modules.Billing.Domain.Generics;
+
+        public sealed class Oblivious<T>;
+
+        public sealed class ObliviousClass<T>
+            where T : class;
+
+        public sealed class ObliviousNotNull<T>
+            where T : notnull;
         """;
 
     [Fact]
@@ -941,6 +1034,39 @@ public sealed partial class PrimitiveBoundaryTests
             () => output.ShouldContain("failed: 1"));
     }
 
+    [Fact]
+    public void Every_generic_type_of_a_strict_domain_constrains_its_type_parameters_to_exclude_null()
+    {
+        using var project = new GeneratedProject("saas-strict-react");
+        project.AddModule("billing");
+
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Generics", Generics);
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Generics", ObliviousGenerics);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        List<string> named = [.. UnconstrainedTypeParameter().Matches(output).Select(match => match.Value).Distinct().Order(StringComparer.Ordinal)];
+
+        // No aggregate, command or event reaches these types: the rule reads every generic definition of the Domain.
+        // Any constraint that excludes null satisfies it; class? and IMarker? do not, nor class where nullability is off.
+        output.ShouldSatisfyAllConditions(
+            () => exitCode.ShouldNotBe(0, output),
+            () => named.ShouldBe(
+            [
+                "Shop.Modules.Billing.Domain.Generics.ISource`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.NullableBase`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.NullableClass`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.NullableInterface`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.ObliviousClass`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.Oblivious`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.Outer`1+Inner`1 does not constrain its type parameter TInner",
+                "Shop.Modules.Billing.Domain.Generics.Pair`2 does not constrain its type parameter TValue",
+                "Shop.Modules.Billing.Domain.Generics.Unconstrained`1 does not constrain its type parameter T",
+            ]),
+            () => output.ShouldContain("failed: 1"));
+    }
+
     /// <summary>
     /// Runs one test project of the generated solution and stops it, with every process it started, once the limit
     /// passes: a walk that never ends spins without ever reaching a cancellation point, so the platform's own
@@ -977,4 +1103,7 @@ public sealed partial class PrimitiveBoundaryTests
 
     [GeneratedRegex(@"Shop\.Modules\.\S+ holds \w+")]
     private static partial Regex Violation();
+
+    [GeneratedRegex(@"Shop\.Modules\.\S+ does not constrain its type parameter \w+")]
+    private static partial Regex UnconstrainedTypeParameter();
 }
