@@ -12,6 +12,8 @@ import { uuidV7 } from './uuidV7';
 import { WidgetView } from './WidgetView';
 
 const rowHeight = 40;
+/** The host refuses a dashboard with more widgets than this. */
+const maximumWidgets = 50;
 const catalogPageSize = 100;
 const noWidgets: WidgetDescriptionDto[] = [];
 
@@ -54,7 +56,11 @@ interface DashboardCanvasProps {
  */
 export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   const [placements, setPlacements] = useState<Placement[]>(dashboard.widgets);
-  const [outcome, setOutcome] = useState<'saved' | 'failed' | undefined>();
+  // Counts the draft's changes; the notice says Saved only while the saved revision is still the current one, so a
+  // save that ends after a later edit does not call that edit saved.
+  const [revision, setRevision] = useState(0);
+  const [savedRevision, setSavedRevision] = useState<number | undefined>();
+  const [failed, setFailed] = useState(false);
   const [catalogPage, setCatalogPage] = useState(1);
   // The titles of widgets added from any page of the catalogue, which the current page may not list.
   const [addedTitles, setAddedTitles] = useState<ReadonlyMap<string, WidgetDescriptionDto>>(new Map());
@@ -67,10 +73,18 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
     [addedTitles, catalog],
   );
 
+  const [saves, setSaves] = useState(0);
+  const full = placements.length >= maximumWidgets;
+
+  const edited = () => {
+    setRevision((current) => current + 1);
+    setFailed(false);
+  };
+
   /** Every change to the draft: a notice that it was saved no longer holds. */
   const change = (next: (current: Placement[]) => Placement[]) => {
     setPlacements(next);
-    setOutcome(undefined);
+    edited();
   };
 
   const naming = useForm({ resolver: zodResolver(nameSchema), defaultValues: { name: dashboard.name } });
@@ -87,12 +101,15 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   });
 
   const submit = naming.handleSubmit(async ({ name }) => {
+    const submitted = revision;
     try {
       await save({ id: dashboard.id, saveDashboardRequest: { name, widgets: placements } }).unwrap();
-      setOutcome('saved');
+      setSavedRevision(submitted);
+      setFailed(false);
+      setSaves((count) => count + 1);
       onSaved();
     } catch {
-      setOutcome('failed');
+      setFailed(true);
     }
   });
 
@@ -101,17 +118,14 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
       <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1 text-sm">
           Dashboard name
-          <input
-            className="rounded border px-2 py-1"
-            {...naming.register('name', { onChange: () => setOutcome(undefined) })}
-          />
+          <input className="rounded border px-2 py-1" {...naming.register('name', { onChange: edited })} />
         </label>
         <Button type="submit" disabled={saving}>
           Save dashboard
         </Button>
         {naming.formState.errors.name && <p role="alert">{naming.formState.errors.name.message}</p>}
-        {outcome === 'saved' && <p role="status">Saved.</p>}
-        {outcome === 'failed' && <p role="alert">The dashboard could not be saved.</p>}
+        {savedRevision === revision && <p role="status">Saved.</p>}
+        {failed && <p role="alert">The dashboard could not be saved.</p>}
       </form>
 
       <form onSubmit={add} className="flex flex-wrap items-end gap-2">
@@ -142,9 +156,10 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
             ))}
           </select>
         </label>
-        <Button type="submit" variant="secondary">
+        <Button type="submit" variant="secondary" disabled={full}>
           Add widget
         </Button>
+        {full && <p>A dashboard holds at most {maximumWidgets} widgets.</p>}
         {adding.formState.errors.source && <p role="alert">{adding.formState.errors.source.message}</p>}
         <Pager
           label="widgets"
@@ -198,6 +213,7 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
                       visual={placement.visual}
                       title={title}
                       height={Math.max(120, placement.height * rowHeight - 60)}
+                      refresh={saves}
                     />
                   </div>
                 </section>
