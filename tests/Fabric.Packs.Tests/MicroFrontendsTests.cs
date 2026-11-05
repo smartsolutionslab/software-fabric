@@ -43,13 +43,15 @@ public sealed class MicroFrontendsTests
 
             """);
 
-        RunWeb(project, "install", "build", "lint");
+        RunWeb(project, "install", "build", "lint", "test");
 
         // The boundary gates' own tests, with Windows paths: a gate comparing separators would let every file through.
-        var (testExitCode, testOutput) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "test");
-        testExitCode.ShouldBe(0, $"pnpm test:\n{testOutput}");
-        testOutput.ShouldContain("src/remoteBoundary.test.ts");
-        testOutput.ShouldContain("src/boundary.test.ts");
+        foreach (var (package, test) in new[] { ("app", "src/remoteBoundary.test.ts"), ("modules/billing", "src/boundary.test.ts") })
+        {
+            var (testExitCode, testOutput) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", package), "pnpm", "exec", "vitest", "run", test);
+            testExitCode.ShouldBe(0, $"vitest run {test} in web/{package}:\n{testOutput}");
+            testOutput.ShouldContain("1 passed");
+        }
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "format:check");
         exitCode.ShouldBe(0, $"pnpm format:check:\n{output}");
