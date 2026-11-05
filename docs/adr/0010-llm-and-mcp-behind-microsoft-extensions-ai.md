@@ -207,5 +207,5 @@ assemblies; the repository owner accepted all of it.
   becomes `supported` once the matrix builds it. `client` (#82),
   `server` (#81), `anthropic` (#77), `openai` (#78), `azure-openai` (#79)
   and `ollama` (#80) have packs and stay `experimental` until then.
-- `backend.llm.agents` (ADR-0011, 2026-11-05), retrieval-augmented generation and evaluations are
-  later decisions, each with its own ADR.
+- `backend.llm.agents` (ADR-0011, 2026-11-05), retrieval-augmented generation (ADR-0012,
+  2026-11-05) and evaluations are later decisions, each with its own ADR.

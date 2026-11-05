@@ -21,6 +21,67 @@ public class CatalogLinterTests
     }
 
     [Fact]
+    public void Default_from_naming_an_unknown_dimension_is_reported()
+    {
+        Lint("""
+              x.y: { scope: project, default-from: a.b, options: { o: { tier: supported } } }
+            """).ShouldBe(["x.y: default-from names unknown dimension 'a.b'."]);
+    }
+
+    [Fact]
+    public void Default_from_naming_its_own_dimension_is_reported()
+    {
+        Lint("""
+              x.y: { scope: project, default-from: x.y, options: { o: { tier: supported } } }
+            """).ShouldBe(["x.y: default-from names its own dimension."]);
+    }
+
+    [Fact]
+    public void Default_from_naming_a_multi_valued_dimension_is_reported()
+    {
+        Lint("""
+              x.y: { scope: project, default-from: x.z, options: { o: { tier: supported } } }
+              x.z: { scope: project, multi: true, default: [o], options: { o: { tier: supported } } }
+            """).ShouldBe(["x.y: default-from names multi-valued x.z; it can follow only a single-valued dimension."]);
+    }
+
+    [Fact]
+    public void Default_from_on_a_multi_valued_dimension_is_reported()
+    {
+        Lint("""
+              x.y: { scope: project, multi: true, default-from: x.z, options: { o: { tier: supported } } }
+              x.z: { scope: project, default: o, options: { o: { tier: supported } } }
+            """).ShouldBe(["x.y: default-from is only for a single-valued dimension."]);
+    }
+
+    [Fact]
+    public void Default_from_beside_a_default_is_reported()
+    {
+        Lint("""
+              x.y: { scope: project, default: o, default-from: x.z, options: { o: { tier: supported } } }
+              x.z: { scope: project, default: o, options: { o: { tier: supported } } }
+            """).ShouldBe(["x.y: has both default and default-from; use one."]);
+    }
+
+    [Fact]
+    public void Default_from_a_dimension_sharing_no_option_is_reported()
+    {
+        Lint("""
+              x.y: { scope: project, default-from: x.z, options: { o: { tier: supported } } }
+              x.z: { scope: project, default: p, options: { p: { tier: supported } } }
+            """).ShouldBe(["x.y: default-from names x.z, which shares no option with it, so it never gives a default."]);
+    }
+
+    [Fact]
+    public void Default_from_a_dimension_sharing_an_option_is_consistent()
+    {
+        Lint("""
+              x.y: { scope: project, default-from: x.z, options: { o: { tier: supported } } }
+              x.z: { scope: project, default: o, options: { o: { tier: supported }, p: { tier: supported } } }
+            """).ShouldBeEmpty();
+    }
+
+    [Fact]
     public void A_condition_naming_an_unknown_dimension_is_reported()
     {
         Lint("""

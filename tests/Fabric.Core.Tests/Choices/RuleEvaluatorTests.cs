@@ -67,6 +67,22 @@ public class RuleEvaluatorTests
     }
 
     [Fact]
+    public void Rejects_rag_on_sql_server_in_one_sentence()
+    {
+        Violations("lean-crud", "backend.database=sqlserver", "backend.llm=openai", "backend.llm.extras=rag").ShouldBe(
+            ["backend.llm.extras=rag requires backend.database == postgres, but backend.database is sqlserver."]);
+    }
+
+    [Theory]
+    [InlineData("openai")]
+    [InlineData("azure-openai")]
+    [InlineData("ollama")]
+    public void Rag_on_postgres_satisfies_every_rule(string provider)
+    {
+        Violations("lean-crud", $"backend.llm={provider}", "backend.llm.extras=rag").ShouldBeEmpty();
+    }
+
+    [Fact]
     public void A_module_option_conflicting_with_a_project_option_is_reported()
     {
         Violations("saas-standard-react", "backend.topology=services", "module.communication=contract-interface")

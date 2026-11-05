@@ -106,6 +106,28 @@ public sealed class NewCommandTests : IDisposable
     }
 
     [Fact]
+    public void A_project_choosing_rag_writes_nothing_and_names_the_packs_it_still_lacks()
+    {
+        var run = CliRun.Of("new", Path.Combine(root, "rag"), "--profile", "lean-crud", "--set", "backend.llm=openai", "--set", "backend.llm.extras=rag", "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: no pack for backend.llm.extras=rag.");
+        run.Error.ShouldContain("error: no pack for backend.llm.embeddings=openai.");
+        Directory.Exists(Path.Combine(root, "rag")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_project_calling_a_model_without_extras_records_that_it_chose_none()
+    {
+        var run = CliRun.Of("new", Path.Combine(root, "model"), "--profile", "lean-crud", "--set", "backend.llm=openai", "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        var fabric = File.ReadAllText(Path.Combine(root, "model", "fabric.yaml"));
+        fabric.ShouldContain("backend.llm.extras: []");
+        fabric.ShouldNotContain("backend.llm.embeddings");
+    }
+
+    [Fact]
     public void The_name_option_wins_over_the_directory_name()
     {
         var run = New("Some_Directory", "--profile", "minimal", "--name", "shop");
