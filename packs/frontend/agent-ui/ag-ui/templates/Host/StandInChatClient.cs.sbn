@@ -1,0 +1,89 @@
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Host.Agents;
+
+/// <summary>
+/// The project's model while the agent panel is tested, in Development only: the AppHost's <c>model-stand-in</c>
+/// parameter switches it on, and only the tests set it. Asked first, it calls the
+/// first tool it is offered, giving every argument the tool requires the user's last message; given the tool's result,
+/// it answers <c>The tool said: &lt;result&gt;</c>, and offered no tool, it repeats the user's message. It streams each
+/// answer a word at a time, so the panel shows text arriving as a real model sends it. It never calls a model.
+/// </summary>
+public sealed class StandInChatClient : IChatClient
+{
+    public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+        await GetStreamingResponseAsync(messages, options, cancellationToken).ToChatResponseAsync(cancellationToken);
+
+    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        {{ not_null "messages" }}
+
+        List<ChatMessage> conversation = [.. messages];
+        var question = conversation.LastOrDefault(message => message.Role == ChatRole.User)?.Text ?? string.Empty;
+        var result = conversation.SelectMany(message => message.Contents).OfType<FunctionResultContent>().LastOrDefault();
+        if (result is null && options?.Tools?.OfType<AIFunctionDeclaration>().FirstOrDefault() is { } tool)
+        {
+            var call = new FunctionCallContent($"call-{Guid.CreateVersion7():N}", tool.Name, Arguments(tool, question));
+            yield return new ChatResponseUpdate(ChatRole.Assistant, [call]) { MessageId = Guid.CreateVersion7().ToString("N") };
+            yield break;
+        }
+
+        var answer = result is null ? question : $"The tool said: {Text(result.Result)}";
+        var messageId = Guid.CreateVersion7().ToString("N");
+        foreach (var chunk in Chunks(answer))
+        {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return new ChatResponseUpdate(ChatRole.Assistant, chunk) { MessageId = messageId };
+        }
+    }
+
+    public object? GetService(Type serviceType, object? serviceKey = null)
+    {
+        {{ not_null "serviceType" }}
+
+        return serviceKey is null && serviceType.IsInstanceOfType(this) ? this : null;
+    }
+
+    public void Dispose()
+    {
+    }
+
+    /// <summary>The question as every argument the tool's schema requires.</summary>
+    private static Dictionary<string, object?> Arguments(AIFunctionDeclaration tool, string question)
+    {
+        Dictionary<string, object?> arguments = [];
+        if (tool.JsonSchema.TryGetProperty("required", out var required) && required.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var name in required.EnumerateArray().Select(name => name.GetString()).OfType<string>())
+            {
+                arguments[name] = question;
+            }
+        }
+
+        return arguments;
+    }
+
+    /// <summary>The answer a word at a time, each word with the space after it.</summary>
+    private static IEnumerable<string> Chunks(string answer)
+    {
+        var words = answer.Split(' ');
+        for (var index = 0; index < words.Length; index++)
+        {
+            yield return index < words.Length - 1 ? words[index] + " " : words[index];
+        }
+    }
+
+    /// <summary>A text result as the text itself, any other JSON as written, anything else as its string.</summary>
+    private static string? Text(object? result) => result switch
+    {
+        JsonElement { ValueKind: JsonValueKind.String } text => text.GetString(),
+        JsonElement json => json.GetRawText(),
+        _ => result?.ToString(),
+    };
+}

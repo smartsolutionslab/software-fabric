@@ -1,0 +1,3 @@
+// The agent panel's stand-in model, for tests: only the tests set it to true, and the host takes it in Development only,
+// answering every agent with a stand-in instead of the provider's model.
+var modelStandIn = builder.AddParameter("model-stand-in", () => builder.Configuration["Parameters:model-stand-in"] ?? "false");

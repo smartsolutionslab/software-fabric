@@ -1,0 +1,1 @@
+builder.Services.AddAgentUi(builder.Configuration, builder.Environment);

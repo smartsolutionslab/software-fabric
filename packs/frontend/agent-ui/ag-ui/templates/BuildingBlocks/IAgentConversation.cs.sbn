@@ -1,0 +1,20 @@
+using System.Text.Json;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.BuildingBlocks.Agents;
+
+/// <summary>
+/// The query that runs a module's agent for the agent panel: one run of the conversation, answered with the agent's
+/// updates as they come. The host's <c>POST /agents/{name}</c> builds it from the browser's AG-UI input and sends it
+/// through <see cref="IDispatcher"/>; the query's handler runs the agent. Implement
+/// <see cref="IAgentConversation{TSelf}"/>, which names the agent.
+/// </summary>
+public interface IAgentConversation : IQuery<Result<IAsyncEnumerable<ChatResponseUpdate>, ApiError>>
+{
+    /// <summary>The conversation so far, as the browser sent it, without its system or developer messages.</summary>
+    IReadOnlyList<ChatMessage> Messages { get; }
+
+    /// <summary>The panel's shared state, untrusted input; null when the browser sent none.</summary>
+    JsonElement? State { get; }
+}
