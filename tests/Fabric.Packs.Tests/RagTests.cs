@@ -18,9 +18,10 @@ public sealed class RagTests
     private const string Image = ".WithImage(\"pgvector/pgvector\", \"0.8.7-pg18\")";
     private const string Store = "src/BuildingBlocks/Rag";
 
-    /// <summary>The notes module keeps a search over the billing module's vectors, in a field and in a method body.</summary>
+    /// <summary>The notes module keeps a search over the billing module's vectors: in a field, in a method body, and through a generic helper of its own.</summary>
     private const string NotesSearchingBillingsVectors = """
         using Microsoft.Extensions.DependencyInjection;
+        using Shop.BuildingBlocks.Persistence;
         using Shop.BuildingBlocks.Rag;
         using Shop.Modules.Billing.Infrastructure.Persistence;
 
@@ -34,6 +35,19 @@ public sealed class RagTests
         public static class BillingLookup
         {
             public static object Find(IServiceProvider services) => services.GetRequiredService<ModuleVectorIndex<BillingDbContext>>();
+        }
+
+        public static class AnyModuleSearch
+        {
+            public static Task<IReadOnlyList<RetrievedPassage>> FindAsync<TContext>(IServiceProvider services, string question, CancellationToken cancellationToken)
+                where TContext : ModuleDbContext =>
+                services.GetRequiredService<ModuleVectorIndex<TContext>>().SearchAsync(question, 5, cancellationToken);
+        }
+
+        public static class BillingThroughAHelper
+        {
+            public static Task<IReadOnlyList<RetrievedPassage>> FindAsync(IServiceProvider services, CancellationToken cancellationToken) =>
+                AnyModuleSearch.FindAsync<BillingDbContext>(services, "unpaid", cancellationToken);
         }
         """;
 
@@ -168,7 +182,7 @@ public sealed class RagTests
         var (ragExitCode, ragOutput) = project.Test("tests/Rag.Tests/Rag.Tests.csproj");
         ragExitCode.ShouldBe(0, ragOutput);
         ragOutput.ShouldContain("failed: 0");
-        ragOutput.ShouldContain("succeeded: 4");
+        ragOutput.ShouldContain("succeeded: 5");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
@@ -195,6 +209,8 @@ public sealed class RagTests
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("Shop.Modules.Notes.Infrastructure.BillingNotes (module Notes) uses ModuleVectorIndex<BillingDbContext>, module Billing's vectors.");
         output.ShouldContain("Shop.Modules.Notes.Infrastructure.BillingLookup (module Notes) uses ModuleVectorIndex<BillingDbContext>, module Billing's vectors.");
+        output.ShouldContain("Shop.Modules.Notes.Infrastructure.AnyModuleSearch (module Notes) uses ModuleVectorIndex<TContext> over a generic parameter");
+        output.ShouldContain("Shop.Modules.Notes.Infrastructure.BillingThroughAHelper (module Notes) passes BillingDbContext, module Billing's DbContext, to AnyModuleSearch.FindAsync");
     }
 
     private static string[] Overrides(string llm, string embeddings) =>

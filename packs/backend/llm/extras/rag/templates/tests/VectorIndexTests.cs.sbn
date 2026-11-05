@@ -20,7 +20,7 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        await VectorTables.CreateAsync(database.ConnectionString, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema], TestContext.Current.CancellationToken);
+        await VectorTables.CreateAsync(database.ConnectionString, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema], TestContext.Current.CancellationToken);
         dataSource = VectorTables.DataSource(database.ConnectionString);
     }
 
@@ -56,6 +56,24 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
         await drafts.RemoveAsync("draft-1", cancellationToken);
 
         (await drafts.SearchAsync("desks", 5, cancellationToken)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_search_the_hnsw_index_answers_returns_as_many_records_as_asked_beyond_its_default_breadth_of_40()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off" };
+        await using var indexed = VectorTables.DataSource(indexOnly.ConnectionString);
+        var shelf = new ModuleVectorIndex<SampleShelfDbContext>(indexed, generator);
+        for (var number = 0; number < 60; number++)
+        {
+            await shelf.IndexAsync($"book-{number}", $"book {number}", cancellationToken);
+        }
+
+        var passages = await shelf.SearchAsync("book", 50, cancellationToken);
+
+        passages.Count.ShouldBe(50);
+        passages.Select(passage => passage.Distance).ShouldBeInOrder();
     }
 
     public async ValueTask DisposeAsync()
