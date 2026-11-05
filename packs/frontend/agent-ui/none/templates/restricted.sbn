@@ -1,0 +1,4 @@
+            {
+              group: ['@ag-ui/*', '@copilotkit/*'],
+              message: 'This project has no agent panel (frontend.agent-ui: none); adding one is a project decision.',
+            }
