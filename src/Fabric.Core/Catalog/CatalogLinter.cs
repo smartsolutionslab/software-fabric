@@ -4,7 +4,7 @@ namespace Fabric.Core.Catalog;
 
 /// <summary>
 /// Checks that the catalog is consistent with itself: every condition names real dimensions and options with an
-/// operator that fits, every default is an option, and every profile resolves and satisfies every rule.
+/// operator that fits, every default is an option, every default-from can give one, and every profile resolves and satisfies every rule.
 /// </summary>
 public static class CatalogLinter
 {
@@ -45,6 +45,11 @@ public static class CatalogLinter
                 .Select(option => $"{dimension.Id}: default '{option}' is not an option."));
         }
 
+        if (dimension.DefaultFrom is { } defaultFrom)
+        {
+            CheckDefaultFrom(catalog, dimension, defaultFrom, problems);
+        }
+
         if (dimension.ActiveWhen is { } activeWhen)
         {
             var subject = $"{dimension.Id} active-when";
@@ -62,6 +67,36 @@ public static class CatalogLinter
             {
                 CheckCondition(catalog, $"{dimension.Id}={option.Id}", condition, problems);
             }
+        }
+    }
+
+    private static void CheckDefaultFrom(CatalogModel catalog, Dimension dimension, string defaultFrom, List<string> problems)
+    {
+        if (dimension.Default is not null)
+        {
+            problems.Add($"{dimension.Id}: has both default and default-from; use one.");
+        }
+
+        if (dimension.Multi)
+        {
+            problems.Add($"{dimension.Id}: default-from is only for a single-valued dimension.");
+        }
+
+        if (defaultFrom == dimension.Id)
+        {
+            problems.Add($"{dimension.Id}: default-from names its own dimension.");
+        }
+        else if (!catalog.Dimensions.TryGetValue(defaultFrom, out var followed))
+        {
+            problems.Add($"{dimension.Id}: default-from names unknown dimension '{defaultFrom}'.");
+        }
+        else if (followed.Multi)
+        {
+            problems.Add($"{dimension.Id}: default-from names multi-valued {followed.Id}; it can follow only a single-valued dimension.");
+        }
+        else if (!followed.Options.Keys.Any(dimension.Options.ContainsKey))
+        {
+            problems.Add($"{dimension.Id}: default-from names {followed.Id}, which shares no option with it, so it never gives a default.");
         }
     }
 
