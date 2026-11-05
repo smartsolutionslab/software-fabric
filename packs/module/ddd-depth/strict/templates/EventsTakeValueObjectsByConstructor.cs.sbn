@@ -395,9 +395,9 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
         /// <summary>
         /// What the checks of a type built from an argument depend on: whether it carries a value object, and whether it
         /// is a reference type, a value type that cannot be null, or a nullable value type. An optional <c>T?</c>
-        /// parameter is not nullable for a value type that cannot be null, and an optional <c>T</c> one under
-        /// <c>where T : notnull</c> is nullable for a nullable value type but not for a reference type. Both carry over to
-        /// every type built from it, so closed types whose read arguments have the same shapes show the same violations,
+        /// parameter is not nullable for a value type that cannot be null, and an optional <c>T</c> one of a definition
+        /// declared nullable-oblivious is nullable for a nullable value type but not for a reference type. Both carry over
+        /// to every type built from it, so closed types whose read arguments have the same shapes show the same violations,
         /// and so do the types they hold.
         /// </summary>
         private char Shape(Type argument) =>

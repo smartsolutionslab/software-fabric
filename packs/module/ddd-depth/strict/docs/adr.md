@@ -78,10 +78,11 @@ builds from its own type parameters. Every other definition has finitely many cl
 larger closed type that does not grow (`Box<T>` holding the fixed `Box<List<InvoiceNumber>>`) is checked like any
 other. What a closed type's members carry, and how the rule reads them, depends only on whether each type argument
 it reads carries a value object and whether it is a class, a struct or a nullable struct (an optional
-`T? Value = default` is nullable for a class but not for a struct, and under `where T : notnull` an optional
-`T Value = default!` is nullable for a nullable struct but not for a class), for the types it holds as much as for
-itself. So a definition that recurs is checked once for each combination of those, on the first closed type found
-with it, and of every later closed type with the same combination only the arguments it reads are walked:
+`T? Value = default` is nullable for a class but not for a struct, and in a definition declared nullable-oblivious
+(`#nullable disable`) an optional `T Value = default` is nullable for a nullable struct but not for a class), for the
+types it holds as much as for itself. So a definition that recurs is checked once for each combination of those, on
+the first closed type found with it, and of every later closed type with the same combination only the arguments it
+reads are walked:
 `Node<Marker>` and `Node<Envelope<Marker>>` are checked, and `Node<Envelope<Marker>>.Value` is named. There are
 finitely many combinations, so the walk ends. One limit remains, for these definitions only: a member is named once,
 after the first closed type found carrying a value object there, not once per closed type, since there are infinitely
