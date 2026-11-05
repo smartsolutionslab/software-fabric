@@ -5,6 +5,10 @@ namespace {{ namespace }}.Evals;
 /// <summary>Every score of a run, and the rule they are held to: each metric's mean over a use case's examples reaches the threshold.</summary>
 public sealed class EvalScores(IReadOnlyList<EvalScore> scores)
 {
+    private const double MinimumScore = 1;
+
+    private const double MaximumScore = 5;
+
     public IReadOnlyList<EvalScore> All => scores;
 
     /// <summary>Every score, one line each, in the order they were given.</summary>
@@ -25,6 +29,13 @@ public sealed class EvalScores(IReadOnlyList<EvalScore> scores)
             if (unscored.Count > 0)
             {
                 violations.Add($"{useCase}: {name} has no score for example {string.Join(", ", unscored)}; see the evaluator's diagnostics in the report.");
+                continue;
+            }
+
+            var invalid = metric.FirstOrDefault(score => score.Value is not { } value || !double.IsFinite(value) || value < MinimumScore || value > MaximumScore);
+            if (invalid is not null)
+            {
+                violations.Add($"{useCase}: {name} has an invalid score of {Format(invalid.Value)} for example {invalid.Example}; a score runs from 1 to 5.");
                 continue;
             }
 

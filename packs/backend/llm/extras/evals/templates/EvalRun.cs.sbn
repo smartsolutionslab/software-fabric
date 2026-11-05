@@ -37,7 +37,9 @@ public static class EvalRun
             throw new InvalidOperationException($"These use cases have no examples, so nothing would hold them to the threshold: {string.Join(", ", withoutExamples)}. Give each examples that cover what it is for.");
         }
 
-        var judgeConfiguration = new ChatConfiguration(judge);
+        // No sampling options: the evaluators ask for Temperature 0 and TopP 1, which some models refuse; every provider's
+        // defaults apply instead.
+        var judgeConfiguration = new ChatConfiguration(judge.AsBuilder().ConfigureOptions(WithoutSamplingOptions).Build());
         var withoutContext = Reporting(resultsDirectory, executionName, judgeConfiguration, new RelevanceEvaluator(), new AnsweredEvaluator());
         var withContext = Reporting(resultsDirectory, executionName, judgeConfiguration, new RelevanceEvaluator(), new GroundednessEvaluator(), new AnsweredEvaluator());
 
@@ -56,11 +58,27 @@ public static class EvalRun
                 var response = await useCase.Answer(model, current, cancellationToken);
                 var result = await scenario.EvaluateAsync([new ChatMessage(ChatRole.User, input)], response, context, cancellationToken);
 
-                scores.AddRange(result.Metrics.Values.Select(metric => new EvalScore(useCase.Name, example, metric.Name, (metric as NumericMetric)?.Value)));
+                foreach (var metric in result.Metrics.Values)
+                {
+                    var value = (metric as NumericMetric)?.Value;
+                    scores.Add(new EvalScore(useCase.Name, example, metric.Name, value));
+                    if (metric is NumericMetric { Value: { } number } numeric && !double.IsFinite(number))
+                    {
+                        // The results are JSON, which has no NaN or infinity: keep the score in the run, not in the file.
+                        numeric.Value = null;
+                        numeric.AddDiagnostics(EvaluationDiagnostic.Error($"The score {number.ToString(CultureInfo.InvariantCulture)} is not a finite number."));
+                    }
+                }
             }
         }
 
         return new EvalScores(scores);
+    }
+
+    private static void WithoutSamplingOptions(ChatOptions options)
+    {
+        options.Temperature = null;
+        options.TopP = null;
     }
 
     private static ReportingConfiguration Reporting(string resultsDirectory, string executionName, ChatConfiguration judge, params IEvaluator[] evaluators) =>
