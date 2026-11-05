@@ -1,4 +1,4 @@
-# ADR-0013: Evaluating LLM answers with evals, and option settings
+# ADR-0014: Evaluating LLM answers with evals, and option settings
 
 **Status:** Accepted
 **Date:** 2026-11-05

@@ -30,7 +30,7 @@ catalog agree.
 | `requires` | List of conditions, **all** of which must hold when this option is chosen. |
 | `conflicts` | List of conditions, **none** of which may hold when this option is chosen. |
 | `note` | Human text. Not interpreted. |
-| `settings` | Numbers the option needs besides being chosen, by id: each has `default`, `minimum` and `maximum` (and an optional `note`). Only on a project-scoped dimension; the id is lower-case letters, digits and hyphens; `minimum <= default <= maximum` (ADR-0013). |
+| `settings` | Numbers the option needs besides being chosen, by id: each has `default`, `minimum` and `maximum` (and an optional `note`). Only on a project-scoped dimension; the id is lower-case letters, digits and hyphens; `minimum <= default <= maximum` (ADR-0014). |
 
 ## Settings
 

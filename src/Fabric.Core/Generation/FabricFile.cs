@@ -10,7 +10,7 @@ namespace Fabric.Core.Generation;
 /// <summary>
 /// <c>fabric.yaml</c>: the record of what a generated project chose. Written once by <c>fabric new</c>, extended by
 /// <c>fabric add-module</c>, and read by agents and tools. Multi-valued dimensions are always lists. <c>settings</c>,
-/// the numbers chosen options declare (ADR-0013), appears only when there are any.
+/// the numbers chosen options declare (ADR-0014), appears only when there are any.
 /// </summary>
 public static partial class FabricFile
 {

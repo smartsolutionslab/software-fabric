@@ -3,7 +3,7 @@ using Fabric.Core.Catalog;
 namespace Fabric.Core.Choices;
 
 /// <summary>
-/// The settings chosen options declare (ADR-0013), keyed <c>&lt;dimension&gt;.&lt;option&gt;.&lt;setting&gt;</c>: read from
+/// The settings chosen options declare (ADR-0014), keyed <c>&lt;dimension&gt;.&lt;option&gt;.&lt;setting&gt;</c>: read from
 /// <c>--set</c>, settled to their defaults, and checked again when <c>fabric.yaml</c> is read back.
 /// </summary>
 internal static class OptionSettings

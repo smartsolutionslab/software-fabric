@@ -200,7 +200,7 @@ dimensions:
         requires: ["backend.database == postgres"]
       evals:
         tier: experimental
-        note: "evaluates the project's LLM use cases with Microsoft.Extensions.AI.Evaluation against its own provider, in a CI job that is off by default; ADR-0013"
+        note: "evaluates the project's LLM use cases with Microsoft.Extensions.AI.Evaluation against its own provider, in a CI job that is off by default; ADR-0014"
         settings:
           threshold: { default: 4, minimum: 1, maximum: 5, note: "the lowest mean score (1 to 5) per evaluator metric the eval job accepts" }
 
