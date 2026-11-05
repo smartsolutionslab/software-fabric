@@ -21,6 +21,40 @@ public class CatalogLinterTests
     }
 
     [Fact]
+    public void A_setting_default_outside_its_range_is_reported()
+    {
+        Lint("""
+              x.y: { scope: project, options: { o: { tier: supported, settings: { threshold: { default: 6, minimum: 1, maximum: 5 } } } } }
+            """).ShouldBe(["x.y=o: setting 'threshold' defaults to 6, outside its range 1 to 5."]);
+    }
+
+    [Fact]
+    public void A_setting_minimum_above_its_maximum_is_reported()
+    {
+        Lint("""
+              x.y: { scope: project, options: { o: { tier: supported, settings: { threshold: { default: 3, minimum: 5, maximum: 1 } } } } }
+            """).ShouldBe(["x.y=o: setting 'threshold' has minimum 5 above its maximum 1."]);
+    }
+
+    [Fact]
+    public void A_setting_on_a_module_scoped_dimension_is_reported()
+    {
+        Lint("""
+              x.y: { scope: module, default: o, options: { o: { tier: supported, settings: { threshold: { default: 3, minimum: 1, maximum: 5 } } } } }
+            """).ShouldBe(["x.y=o: setting 'threshold' is on a module-scoped dimension; settings are project-wide, so only project-scoped options declare them."]);
+    }
+
+    [Theory]
+    [InlineData("eval.threshold")]
+    [InlineData("Threshold")]
+    public void A_setting_id_that_is_not_lower_kebab_case_is_reported(string id)
+    {
+        Lint($$"""
+              x.y: { scope: project, options: { o: { tier: supported, settings: { "{{id}}": { default: 3, minimum: 1, maximum: 5 } } } } }
+            """).ShouldBe([$"x.y=o: setting '{id}' must be lower-case letters, digits and hyphens, starting with a letter."]);
+    }
+
+    [Fact]
     public void Default_from_naming_an_unknown_dimension_is_reported()
     {
         Lint("""

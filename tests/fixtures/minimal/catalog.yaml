@@ -23,7 +23,11 @@ dimensions:
     default: [rest]
     options:
       rest: { tier: supported }
-      grpc: { tier: supported, requires: ["backend.api-protocols has rest"] }
+      grpc:
+        tier: supported
+        requires: ["backend.api-protocols has rest"]
+        settings:
+          deadline-seconds: { default: 30, minimum: 1, maximum: 300 }
 
   module.style:
     scope: module

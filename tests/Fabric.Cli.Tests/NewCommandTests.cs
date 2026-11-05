@@ -128,6 +128,43 @@ public sealed class NewCommandTests : IDisposable
     }
 
     [Fact]
+    public void A_project_choosing_evals_writes_nothing_and_names_the_pack_it_still_lacks()
+    {
+        var run = CliRun.Of("new", Path.Combine(root, "evals"), "--profile", "lean-crud", "--set", "backend.llm=openai", "--set", "backend.llm.extras=evals", "--set", "backend.llm.extras.evals.threshold=3.5", "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldBe($"error: no pack for backend.llm.extras=evals.{Environment.NewLine}");
+        Directory.Exists(Path.Combine(root, "evals")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_threshold_outside_its_range_is_refused_before_anything_is_written()
+    {
+        var run = CliRun.Of("new", Path.Combine(root, "evals"), "--profile", "lean-crud", "--set", "backend.llm=openai", "--set", "backend.llm.extras=evals", "--set", "backend.llm.extras.evals.threshold=9", "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldBe($"error: backend.llm.extras.evals.threshold is 9, but it must be between 1 and 5.{Environment.NewLine}");
+        Directory.Exists(Path.Combine(root, "evals")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_setting_set_on_the_command_line_is_recorded_in_fabric_yaml()
+    {
+        var run = New("shop", "--profile", "everything", "--set", "backend.api-protocols.grpc.deadline-seconds=12.5");
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        Tree("shop")["fabric.yaml"].ShouldContain("settings:\n  backend.api-protocols.grpc.deadline-seconds: 12.5\nmodule-defaults:");
+    }
+
+    [Fact]
+    public void A_project_without_settings_has_no_settings_in_fabric_yaml()
+    {
+        New("shop", "--profile", "minimal").ExitCode.ShouldBe(0);
+
+        Tree("shop")["fabric.yaml"].ShouldNotContain("settings");
+    }
+
+    [Fact]
     public void The_name_option_wins_over_the_directory_name()
     {
         var run = New("Some_Directory", "--profile", "minimal", "--name", "shop");
