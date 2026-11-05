@@ -81,9 +81,9 @@ jobs:
           build/tests-all-ran.sh "$RUNNER_TEMP/test-results" "${assemblies[@]}"
       - run: build/profiles.sh
 
-  # Profile CI (ADR-0003, roadmap M1-09): every profile the real packs generate alone, listed by
-  # build/complete-profiles.sh so a profile is picked up when its last pack lands; the others get a notice naming
-  # the packs they lack.
+  # Profile CI (ADR-0003, roadmap M1-09, M2-06): every profile in the catalog, listed by build/complete-profiles.sh so
+  # a new profile is picked up without editing this file; a profile whose packs are not all written fails this job,
+  # naming the packs it lacks.
   profiles:
     runs-on: ubuntu-latest
     outputs:
