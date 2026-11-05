@@ -6,6 +6,7 @@ files:
   - { template: templates/EvalThreshold.cs.sbn, target: tests/Evals/EvalThreshold.cs }
   - { template: templates/EvalExample.cs.sbn, target: tests/Evals/EvalExample.cs }
   - { template: templates/EvalUseCase.cs.sbn, target: tests/Evals/EvalUseCase.cs }
+  - { template: templates/EvalPrompt.cs.sbn, target: tests/Evals/EvalPrompt.cs }
   - { template: templates/UseCases.cs.sbn, target: tests/Evals/UseCases.cs }
   - { template: templates/AnsweredEvaluator.cs.sbn, target: tests/Evals/AnsweredEvaluator.cs }
   - { template: templates/EvalScore.cs.sbn, target: tests/Evals/EvalScore.cs }

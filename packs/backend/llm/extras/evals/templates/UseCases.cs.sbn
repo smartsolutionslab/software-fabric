@@ -12,7 +12,7 @@ public static class UseCases
     [
         new(
             "ask-the-model",
-            (model, example, cancellationToken) => model.GetResponseAsync(Messages(example), cancellationToken: cancellationToken),
+            (model, example, cancellationToken) => model.GetResponseAsync(EvalPrompt.Messages(example), cancellationToken: cancellationToken),
             [
                 new("In one sentence: what does an invoice record?"),
                 new(
@@ -20,17 +20,4 @@ public static class UseCases
                     "Invoice 2026-001 was issued on 1 March 2026 for 1,200 EUR and is due 30 days after it was issued, on 31 March 2026."),
             ]),
     ];
-
-    /// <summary>The sample's request: the question, after the records to answer from when the example has them.</summary>
-    private static List<ChatMessage> Messages(EvalExample example)
-    {
-        List<ChatMessage> messages = [];
-        if (example.GroundingContext is { } context)
-        {
-            messages.Add(new ChatMessage(ChatRole.System, $"Answer from these records only:\n{context}"));
-        }
-
-        messages.Add(new ChatMessage(ChatRole.User, example.Input));
-        return messages;
-    }
 }

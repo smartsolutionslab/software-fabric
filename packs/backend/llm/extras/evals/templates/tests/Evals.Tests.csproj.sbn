@@ -1,23 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    The evals' gate: the eval code of tests/Evals, compiled here without the run against the real model, run with a
-    stand-in model and the fake judge. It calls no model, so the regular tests run it.
+    The evals' gate: the eval code of tests/Evals, referenced with everything that project references, run with a
+    stand-in model and the fake judge. It never runs tests/Evals' own test against the real model, and calls no model,
+    so the regular tests run it.
   -->
   <PropertyGroup>
     <RootNamespace>{{ namespace }}.Evals.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.AI.Evaluation" />
-    <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" />
-    <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Reporting" />
-    <PackageReference Include="YamlDotNet" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />
-    <Compile Include="../Evals/*.cs" Exclude="../Evals/UseCaseEvals.cs;../Evals/ProjectModel.cs" Link="Evals/%(Filename)%(Extension)" />
+    <ProjectReference Include="../Evals/Evals.csproj" />
     <Compile Include="../Fakes/*.cs" Link="Fakes/%(Filename)%(Extension)" />
   </ItemGroup>
 
