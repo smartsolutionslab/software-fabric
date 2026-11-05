@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { applyLayout, nextPlacement, toLayout } from './layout';
+import { applyLayout, hasRoom, lowest, nextPlacement, toLayout, withinReach } from './layout';
 
 const placed = [
   { key: 'a', source: 'dashboards.widget-counts', visual: 'bar', x: 0, y: 0, width: 6, height: 4 },
@@ -36,4 +36,19 @@ test('a new widget goes below everything already on the grid, half as wide', () 
     height: 4,
   });
   expect(nextPlacement([], 'c', 'dashboards.widget-counts', 'pie').y).toBe(0);
+});
+
+test('the host takes no widget that starts below row 1000, so a new one fits only while the grid ends above it', () => {
+  expect(lowest).toBe(1000);
+  const full = [{ ...placed[0], y: 984, height: 24 }];
+
+  expect(hasRoom(placed)).toBe(true);
+  expect(hasRoom([{ ...placed[0], y: 996, height: 4 }])).toBe(true);
+  expect(hasRoom(full)).toBe(false);
+});
+
+test('a layout is within reach only while every widget starts at row 1000 or above', () => {
+  expect(withinReach(placed)).toBe(true);
+  expect(withinReach([{ ...placed[0], y: 1000 }])).toBe(true);
+  expect(withinReach([placed[0], { ...placed[1], y: 1001 }])).toBe(false);
 });

@@ -331,3 +331,49 @@ test('a dashboard holds at most 50 widgets, and the editor says so before the ho
   expect(await screen.findByRole('button', { name: 'Add widget' })).toBeDisabled();
   expect(screen.getByText('A dashboard holds at most 50 widgets.')).toBeInTheDocument();
 });
+
+test('paging the widget picker clears the choice, so a widget of one page is never added as a visual of another', async () => {
+  const user = userEvent.setup();
+  answers.catalog = ({ page }) => ({
+    data: {
+      items:
+        page === 1
+          ? [{ id: 'module.rows', title: 'Rows', kind: 'Table' }]
+          : [{ id: 'module.trend', title: 'Trend', kind: 'Chart' }],
+      totalCount: 101,
+      page,
+      pageSize: 100,
+    },
+  });
+  render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  await user.selectOptions(screen.getByLabelText('Widget'), 'module.rows');
+
+  await user.click(screen.getByRole('button', { name: 'Next page of widgets' }));
+
+  expect(screen.getByLabelText('Widget')).toHaveValue('');
+  await user.selectOptions(screen.getByLabelText('Shown as'), 'line');
+  await user.click(screen.getByRole('button', { name: 'Add widget' }));
+  expect(await screen.findByText('Choose a widget.')).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Rows' })).not.toBeInTheDocument();
+});
+
+test('a dashboard that reaches row 1000 takes no further widget, and the editor says why', async () => {
+  const user = userEvent.setup();
+  answers.detail = () => ({
+    data: {
+      ...sales,
+      widgets: [
+        { key: 'tall', source: 'dashboards.widget-counts', visual: 'bar', x: 0, y: 984, width: 12, height: 24 },
+      ],
+    },
+  });
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  expect(await screen.findByRole('button', { name: 'Add widget' })).toBeDisabled();
+  expect(
+    screen.getByText('There is no room for another widget: a dashboard reaches down to row 1000.'),
+  ).toBeInTheDocument();
+});
