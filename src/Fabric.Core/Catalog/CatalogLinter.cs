@@ -1,4 +1,5 @@
 using Fabric.Core.Choices;
+using Fabric.Core.Generation;
 
 namespace Fabric.Core.Catalog;
 
@@ -67,6 +68,36 @@ public static class CatalogLinter
             {
                 CheckCondition(catalog, $"{dimension.Id}={option.Id}", condition, problems);
             }
+
+            foreach (var setting in option.Settings.Values)
+            {
+                CheckSetting(dimension, option, setting, problems);
+            }
+        }
+    }
+
+    /// <summary>A setting's key in fabric.yaml is <c>&lt;dimension&gt;.&lt;option&gt;.&lt;setting&gt;</c>, so its id holds no dot.</summary>
+    private static void CheckSetting(Dimension dimension, CatalogOption option, OptionSetting setting, List<string> problems)
+    {
+        var subject = $"{dimension.Id}={option.Id}: setting '{setting.Id}'";
+        if (!Names.IsValid(setting.Id))
+        {
+            problems.Add($"{subject} must be lower-case letters, digits and hyphens, starting with a letter.");
+        }
+
+        if (dimension.Scope != DimensionScope.Project)
+        {
+            problems.Add($"{subject} is on a module-scoped dimension; settings are project-wide, so only project-scoped options declare them.");
+        }
+
+        var (minimum, maximum) = (SettingNumber.Format(setting.Minimum), SettingNumber.Format(setting.Maximum));
+        if (setting.Minimum > setting.Maximum)
+        {
+            problems.Add($"{subject} has minimum {minimum} above its maximum {maximum}.");
+        }
+        else if (setting.Default < setting.Minimum || setting.Default > setting.Maximum)
+        {
+            problems.Add($"{subject} defaults to {SettingNumber.Format(setting.Default)}, outside its range {minimum} to {maximum}.");
         }
     }
 

@@ -52,6 +52,14 @@ internal sealed class YamlSource(string name, Func<string, Exception>? createExc
             : throw Error(node, $"invalid value '{value}' for '{field}' on {owner}; expected a whole number.");
     }
 
+    public decimal Number(YamlNode node, string field, string owner)
+    {
+        var value = Scalar(node, owner);
+        return SettingNumber.TryParse(value, out var number)
+            ? number
+            : throw Error(node, $"invalid value '{value}' for '{field}' on {owner}; expected a number.");
+    }
+
     public bool Boolean(YamlNode node, string field, string owner) =>
         Scalar(node, owner) switch
         {

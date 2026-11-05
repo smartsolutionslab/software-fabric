@@ -198,6 +198,11 @@ dimensions:
         tier: experimental
         note: "retrieval-augmented generation: a module indexes its own records with pgvector in its own schema and queries them by similarity"
         requires: ["backend.database == postgres"]
+      evals:
+        tier: experimental
+        note: "evaluates the project's LLM use cases with Microsoft.Extensions.AI.Evaluation against its own provider, in a CI job that is off by default; ADR-0013"
+        settings:
+          threshold: { default: 4, minimum: 1, maximum: 5, note: "the lowest mean score (1 to 5) per evaluator metric the eval job accepts" }
 
   backend.llm.embeddings:
     scope: project

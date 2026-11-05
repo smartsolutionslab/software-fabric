@@ -133,7 +133,7 @@ public class CatalogReaderTests
         extras.ActiveWhen!.ToString().ShouldBe("backend.llm != none");
         extras.Multi.ShouldBeTrue();
         extras.Default.ShouldBe([]);
-        extras.Options.Keys.ShouldBe(["rag"]);
+        extras.Options.Keys.ShouldBe(["rag", "evals"]);
     }
 
     [Fact]
