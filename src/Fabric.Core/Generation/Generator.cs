@@ -29,6 +29,14 @@ public static class Generator
             return AdditionFailure([$"module name '{name}' must be lower-case letters, digits and hyphens, starting with a letter."]);
         }
 
+        var before = Composer.Compose(catalog, packs, project.Choices);
+        if (PackModules.Declarers(before.Packs).TryGetValue(name, out var declarers))
+        {
+            return AdditionFailure([
+                $"module '{name}' is brought by {string.Join(", ", declarers)}; fabric new adds it with that pack's pinned choices, so add-module cannot add it.",
+            ]);
+        }
+
         if (project.Choices.Modules.ContainsKey(name))
         {
             return AdditionFailure([$"module '{name}' already exists."]);
@@ -55,7 +63,6 @@ public static class Generator
             return AdditionFailure(violations);
         }
 
-        var before = Composer.Compose(catalog, packs, project.Choices);
         var after = Composer.Compose(catalog, packs, choices);
         if (before.Errors.Count > 0 || after.Errors.Count > 0)
         {
@@ -130,6 +137,24 @@ public static class Generator
             new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>());
 
         var composition = Composer.Compose(catalog, packs, choices);
+        if (composition.Errors.Count == 0 && composition.Packs.Any(pack => pack.Modules.Count > 0))
+        {
+            var (modules, moduleErrors) = PackModules.Resolve(catalog, composition.Packs, choices);
+            if (moduleErrors.Count > 0)
+            {
+                return Failure(moduleErrors);
+            }
+
+            choices = choices with { Modules = modules };
+            var moduleViolations = RuleEvaluator.Check(catalog, choices.Project, choices.Modules);
+            if (moduleViolations.Count > 0)
+            {
+                return Failure(NameDeclarers(moduleViolations, PackModules.Declarers(composition.Packs)));
+            }
+
+            composition = Composer.Compose(catalog, packs, choices);
+        }
+
         List<string> compositionErrors = [
             .. composition.Errors,
             .. composition.Files
@@ -150,6 +175,13 @@ public static class Generator
         var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, name, profile, choices));
         return new GenerationResult([.. rendered.Files.Append(fabricFile).OrderBy(file => file.Path, StringComparer.Ordinal)], []);
     }
+
+    /// <summary>Puts the packs that bring a module in front of a rule violation reported for that module.</summary>
+    private static List<string> NameDeclarers(IReadOnlyList<string> violations, Dictionary<string, List<string>> declarers) =>
+        [.. violations.Select(violation => declarers
+            .Where(declared => violation.StartsWith($"module '{declared.Key}': ", StringComparison.Ordinal))
+            .Select(declared => $"{string.Join(", ", declared.Value)}: {violation}")
+            .FirstOrDefault(violation))];
 
     private static GenerationResult Failure(IReadOnlyList<string> errors) => new([], errors);
 }
