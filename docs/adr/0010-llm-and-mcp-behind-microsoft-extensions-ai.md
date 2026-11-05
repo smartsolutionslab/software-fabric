@@ -208,4 +208,4 @@ assemblies; the repository owner accepted all of it.
   `server` (#81), `anthropic` (#77), `openai` (#78), `azure-openai` (#79)
   and `ollama` (#80) have packs and stay `experimental` until then.
 - `backend.llm.agents` (ADR-0011, 2026-11-05), retrieval-augmented generation (ADR-0012,
-  2026-11-05) and evaluations are later decisions, each with its own ADR.
+  2026-11-05) and evaluations (ADR-0013, 2026-11-05) are later decisions, each with its own ADR.

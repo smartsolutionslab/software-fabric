@@ -30,6 +30,29 @@ catalog agree.
 | `requires` | List of conditions, **all** of which must hold when this option is chosen. |
 | `conflicts` | List of conditions, **none** of which may hold when this option is chosen. |
 | `note` | Human text. Not interpreted. |
+| `settings` | Numbers the option needs besides being chosen, by id: each has `default`, `minimum` and `maximum` (and an optional `note`). Only on a project-scoped dimension; the id is lower-case letters, digits and hyphens; `minimum <= default <= maximum` (ADR-0013). |
+
+## Settings
+
+A chosen option's settings are recorded in `fabric.yaml` under `settings`,
+keyed `<dimension>.<option>.<setting>`, after `project`:
+
+```yaml
+settings:
+  backend.llm.extras.evals.threshold: 4
+```
+
+- The map appears only when a chosen option declares a setting, so a project
+  without one has no `settings` line.
+- `fabric new --set <dimension>.<option>.<setting>=<number>` sets one; a
+  setting not set takes its `default`. A value outside its range, one that is
+  not a number, one the option does not declare, or one for an option that is
+  not chosen is an error naming the key.
+- A setting is a number, not a choice: the generated code may read it (the
+  evals job reads its threshold from `fabric.yaml` at run time), and a project
+  may change it there by hand. `fabric add-module` keeps the map and checks each
+  value against the catalog again; `--set` of a setting there is refused, since
+  it belongs to the project.
 
 ## Conditions
 
