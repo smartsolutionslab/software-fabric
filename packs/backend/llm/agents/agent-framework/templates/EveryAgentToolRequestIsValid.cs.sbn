@@ -1,0 +1,73 @@
+using System.Reflection;
+using System.Reflection.Emit;
+using {{ namespace }}.BuildingBlocks.Agents;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// Every request a module makes a tool of, with <see cref="DispatcherTool"/><c>.For&lt;TRequest&gt;</c>, is one the tool
+/// can take: the build fails on what <see cref="DispatcherTool.Problems"/> refuses, which is what would fail when the
+/// agent is created. The requests are found in the compiled code, lambdas and async methods included; a request made a
+/// tool by reflection is not.
+/// </summary>
+public sealed class EveryAgentToolRequestIsValid : IArchitectureRule
+{
+    private const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+    private static readonly Dictionary<short, OpCode> OpCodesByValue = typeof(OpCodes)
+        .GetFields(BindingFlags.Public | BindingFlags.Static)
+        .Select(field => (OpCode)field.GetValue(null)!)
+        .ToDictionary(code => code.Value);
+
+    public string Description => "Every command or query a module makes an agent's tool of is one DispatcherTool accepts: a command or query{{ if project["backend.absence"] == "option" }}, with no Option inside a collection or dictionary{{ end }}.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        return model.ModuleAssemblies
+            .SelectMany(assembly => assembly.GetTypes())
+            .SelectMany(type => type.GetMethods(Declared).Cast<MethodBase>().Concat(type.GetConstructors(Declared)))
+            .SelectMany(ToolRequests)
+            .Distinct()
+            .SelectMany(DispatcherTool.Problems)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal);
+    }
+
+    /// <summary>The <c>TRequest</c> of every <c>DispatcherTool.For&lt;TRequest&gt;</c> a method body calls.</summary>
+    private static IEnumerable<Type> ToolRequests(MethodBase method)
+    {
+        var il = method.GetMethodBody()?.GetILAsByteArray() ?? [];
+        var typeArguments = method.DeclaringType is { IsGenericType: true } declaring ? declaring.GetGenericArguments() : null;
+        var methodArguments = method is MethodInfo { IsGenericMethod: true } ? method.GetGenericArguments() : null;
+
+        var position = 0;
+        while (position < il.Length)
+        {
+            var twoBytes = il[position] == 0xFE;
+            var code = OpCodesByValue[twoBytes ? unchecked((short)(0xFE00 | il[position + 1])) : il[position]];
+            position += twoBytes ? 2 : 1;
+
+            if ((code == OpCodes.Call || code == OpCodes.Callvirt)
+                && method.Module.ResolveMember(BitConverter.ToInt32(il, position), typeArguments, methodArguments) is MethodInfo { IsGenericMethod: true } called
+                && called.DeclaringType == typeof(DispatcherTool)
+                && called.Name == nameof(DispatcherTool.For))
+            {
+                yield return called.GetGenericArguments()[0];
+            }
+
+            position += OperandSize(code, il, position);
+        }
+    }
+
+    private static int OperandSize(OpCode code, byte[] il, int position) => code.OperandType switch
+    {
+        OperandType.InlineNone => 0,
+        OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
+        OperandType.InlineVar => 2,
+        OperandType.InlineI8 or OperandType.InlineR => 8,
+        OperandType.InlineSwitch => 4 + (4 * BitConverter.ToInt32(il, position)),
+        _ => 4,
+    };
+}

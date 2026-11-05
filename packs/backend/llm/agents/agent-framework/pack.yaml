@@ -9,6 +9,7 @@ files:
   - { template: templates/AgentMcpToolsRegistration.cs.sbn, target: src/BuildingBlocks/Agents/Wiring/AgentMcpToolsRegistration.cs, when: 'array.contains project["backend.mcp"] "client"' }
   - { template: templates/AgentsLiveInApplication.cs.sbn, target: tests/Architecture.Tests/Rules/AgentsLiveInApplication.cs }
   - { template: templates/AgentToolsGoThroughTheDispatcher.cs.sbn, target: tests/Architecture.Tests/Rules/AgentToolsGoThroughTheDispatcher.cs }
+  - { template: templates/EveryAgentToolRequestIsValid.cs.sbn, target: tests/Architecture.Tests/Rules/EveryAgentToolRequestIsValid.cs }
   - { template: templates/tests/ToolCallingChatClient.cs.sbn, target: tests/Fakes/ToolCallingChatClient.cs }
   - { template: templates/tests/Agents.Tests.csproj.sbn, target: tests/Agents.Tests/Agents.Tests.csproj }
   - { template: templates/tests/WordsAgent.cs.sbn, target: tests/Agents.Tests/WordsAgent.cs }
@@ -42,4 +43,5 @@ adr: docs/adr.md
 gates:
   - { kind: architecture-test, describes: "Only a module's Application project references Microsoft Agent Framework (Microsoft.Agents.AI*): an agent defined, created or run in a module's Domain, Infrastructure or Api, or in the BuildingBlocks, fails the build naming the assembly.", file: templates/AgentsLiveInApplication.cs.sbn }
   - { kind: architecture-test, describes: "Every tool a module gives an agent is a command or query made with DispatcherTool.For, sent through IDispatcher: a module type deriving from AITool, or code that makes one another way (new, AIFunctionFactory.Create, an agent's AsAIFunction), fails the build naming the type.", file: templates/AgentToolsGoThroughTheDispatcher.cs.sbn }
+  - { kind: architecture-test, describes: "Every command or query a module makes an agent's tool of with DispatcherTool.For is one DispatcherTool.Problems accepts, the definition the tool itself checks: a command or query, and with Option absence no Option inside a collection or dictionary; otherwise the build fails naming the request and the property.", file: templates/EveryAgentToolRequestIsValid.cs.sbn }
   - { kind: unit-test, describes: "A query runs a sample agent against a stand-in model that asks for a tool call; the tool's query goes through the dispatcher to its handler and the agent answers with its result. Arguments that do not fit never reach the handler, a failed Result reaches the model as its error code, and with the MCP client an agent calls a declared server's tool.", file: templates/tests/AgentTests.cs.sbn }

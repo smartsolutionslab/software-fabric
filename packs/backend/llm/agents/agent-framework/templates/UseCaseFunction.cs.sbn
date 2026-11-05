@@ -23,8 +23,6 @@ namespace {{ namespace }}.BuildingBlocks.Agents;
 /// </summary>
 internal sealed class UseCaseFunction : AIFunction
 {
-    private static readonly Type[] Requests = [typeof(ICommand<>), typeof(IQuery<>)];
-
     /// <summary>
     /// Web defaults, but a missing argument or a null where the record allows none is refused, not defaulted{{ if option }};
     /// an absent <see cref="Option{T}"/> is <c>null</c>, in the arguments and in the answer{{ end }}.
@@ -53,11 +51,13 @@ internal sealed class UseCaseFunction : AIFunction
 
     public UseCaseFunction(Type request, IDispatcher dispatcher, string description)
     {
-        var contracts = request.GetInterfaces().Where(contract => contract.IsGenericType && Requests.Contains(contract.GetGenericTypeDefinition())).ToList();
-        if (request.IsAbstract || contracts.Count != 1)
+        var problems = DispatcherTool.Problems(request);
+        if (problems.Count > 0)
         {
-            throw new InvalidOperationException($"{request.FullName} is not a command or a query; an agent's tool is a record that implements ICommand<T> or IQuery<T>.");
+            throw new InvalidOperationException(string.Join(" ", problems));
         }
+
+        var contracts = DispatcherTool.Contracts(request);
 
         this.request = request;
         this.dispatcher = dispatcher;

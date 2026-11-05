@@ -56,6 +56,18 @@ would do, and the option would stay `experimental` until a stable release.
     to the model as its `ApiError`'s code. It needs only
     `Microsoft.Extensions.AI`'s abstractions, so the BuildingBlocks reference
     no agent framework.
+  - **An `Option<T>` argument is required and may be null** (owner's
+    decision on #83, 2026-11-05). Its schema is
+    `anyOf: [<T's schema>, {"type": "null"}]`, written in the same schema
+    pass as the request so its `$ref`s stay valid, and the property is
+    listed as required: `null` means None. An omitted argument is refused
+    before dispatch, and the model is told which argument is missing.
+  - **No `Option<T>` inside a collection or dictionary of a tool request**
+    (`Option<Filter>[]`, `Dictionary<string, Option<T>>`), by the same
+    decision: no schema describes it. `DispatcherTool.Problems` names the
+    request and the property, `DispatcherTool.For` refuses such a request,
+    and the architecture rule `EveryAgentToolRequestIsValid` fails the build
+    on it.
   - With `backend.mcp` containing `client`, the BuildingBlocks also gain
     `IAgentMcpTools`, the declared servers' tools for an agent, each call
     checked by the project's `allow` before it reaches the server, as
@@ -84,7 +96,10 @@ would do, and the option would stay `experimental` until a stable release.
      from `AITool`, `new` on one, or a call to a method returning one that the
      BuildingBlocks do not declare (`AIFunctionFactory.Create`, an agent's
      `AsAIFunction`), found in the compiled code, lambdas and async methods
-     included.
+     included. A call counts as making a tool only when the called method's
+     assembly is `Microsoft.Extensions.AI`'s abstractions or references
+     `Microsoft.Extensions.AI` (owner's decision on #83): a list's indexer or
+     LINQ's `Single` only hands over a tool already made.
   4. **Agents work together through use cases.** An agent that needs another
      calls the command or query that runs it, as a tool; that is the
      multi-agent path this option offers.
