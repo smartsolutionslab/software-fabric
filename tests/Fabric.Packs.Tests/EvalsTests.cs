@@ -19,6 +19,34 @@ public sealed partial class EvalsTests
     private const string Workflow = ".github/workflows/evals.yml";
     private const string ScheduledOnlyWhenOptedIn = "github.event_name != 'schedule' || vars.EVALS_SCHEDULED == 'true'";
 
+    private const string BillingUseCases = """
+        using Microsoft.Extensions.AI;
+        using Shop.Modules.Billing.Application.Queries.AskTheModel;
+
+        namespace Shop.Evals;
+
+        public static class BillingUseCases
+        {
+            public static EvalUseCase Ask { get; } = new(
+                "billing-ask-the-model",
+                async (model, example, cancellationToken) =>
+                {
+                    var answer = await new AskTheModelHandler(model).HandleAsync(new AskTheModel(example.Input), cancellationToken);
+                    return new ChatResponse(new ChatMessage(ChatRole.Assistant, answer.Value));
+                },
+                [new EvalExample("What does an invoice record?")]);
+        }
+        """;
+
+    private const string OnlyTheBillingUseCase = """
+        namespace Shop.Evals;
+
+        public static class UseCases
+        {
+            public static IReadOnlyList<EvalUseCase> All { get; } = [BillingUseCases.Ask];
+        }
+        """;
+
     public static TheoryData<string> Providers { get; } = ["anthropic", "openai", "azure-openai", "ollama"];
 
     [Theory]
@@ -163,7 +191,27 @@ public sealed partial class EvalsTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 15");
+        output.ShouldContain("succeeded: 17");
+    }
+
+    [Fact]
+    public void A_module_use_case_referenced_from_the_eval_project_alone_builds_and_passes_the_gate_without_grounded_examples()
+    {
+        using var project = NewProject("backend.llm=anthropic", Evals);
+        project.AddModule("billing");
+        var evalProject = Path.Combine(project.ProjectDirectory, EvalProject);
+        File.WriteAllText(evalProject, File.ReadAllText(evalProject).Replace(
+            "<ProjectReference Include=\"../../src/BuildingBlocks/BuildingBlocks.csproj\" />",
+            "<ProjectReference Include=\"../../src/BuildingBlocks/BuildingBlocks.csproj\" />\n    <ProjectReference Include=\"../../src/Modules/Billing/Billing.Application/Billing.Application.csproj\" />",
+            StringComparison.Ordinal));
+        project.WriteTypes("tests/Evals", BillingUseCases);
+        project.Write("tests/Evals/UseCases.cs", OnlyTheBillingUseCase);
+        project.Build();
+
+        var (exitCode, output) = project.Test(GateProject);
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
     }
 
     [Fact]
