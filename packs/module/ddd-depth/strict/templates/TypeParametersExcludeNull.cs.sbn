@@ -1,0 +1,156 @@
+using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
+using System.Reflection.PortableExecutable;
+using System.Runtime.CompilerServices;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// The {{ module.namespace }} module is strict: every type parameter of a generic type in its Domain is constrained to
+/// exclude null (<c>where T : notnull</c>, <c>class</c>, <c>struct</c>, <c>unmanaged</c>, or a base type or interface
+/// that is not nullable). Unconstrained, a <c>T</c> reads as nullable through reflection whatever its argument, so a
+/// rule cannot tell an <c>InvoiceNumber</c> from an <c>InvoiceNumber?</c> there (module.ddd-depth: strict, docs/adr).
+/// </summary>
+/// <remarks>
+/// It reads the compiler's nullable metadata as <see cref="NullabilityInfoContext"/> does: a type parameter's own
+/// annotation, else the nullable context of the type that declares it. A base type or an interface it is constrained
+/// to carries an annotation of its own, which reflection does not expose, so that one is read from the metadata.
+/// </remarks>
+public sealed class {{ module.namespace }}TypeParametersExcludeNull : IArchitectureRule
+{
+    private const string Domain = "{{ namespace }}.Modules.{{ module.namespace }}.Domain";
+    private const string NullableAttribute = "System.Runtime.CompilerServices.NullableAttribute";
+    private const string NullableContextAttribute = "System.Runtime.CompilerServices.NullableContextAttribute";
+
+    /// <summary>The compiler's annotation for a type that excludes null; 0 is oblivious, 2 is nullable.</summary>
+    private const byte NotAnnotated = 1;
+
+    public string Description =>
+        "The {{ module.namespace }} module is strict: every type parameter of a generic type in its Domain is constrained to exclude null.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        return model.ModuleAssemblies
+            .Where(assembly => assembly.GetName().Name == Domain)
+            .SelectMany(Violations);
+    }
+
+    private static List<string> Violations(Assembly assembly)
+    {
+        using var image = new PEReader(File.OpenRead(assembly.Location));
+        var metadata = image.GetMetadataReader();
+
+        return [.. assembly.GetTypes()
+            .Where(type => type.IsGenericTypeDefinition && !type.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false))
+            .SelectMany(type => DeclaredTypeParameters(type)
+                .Where(parameter => !ExcludesNull(parameter, metadata))
+                .Select(parameter => $"{type.FullName} does not constrain its type parameter {parameter.Name} to exclude null; add where {parameter.Name} : notnull (or class, struct, unmanaged, or a base type or interface that is not nullable), so the rules read a value object it stands for as not nullable."))];
+    }
+
+    /// <summary>A nested type repeats the type parameters of the types around it first; only the rest are its own.</summary>
+    private static IEnumerable<Type> DeclaredTypeParameters(Type type) =>
+        type.GetGenericArguments().Skip(type.DeclaringType?.GetGenericArguments().Length ?? 0);
+
+    private static bool ExcludesNull(Type parameter, MetadataReader metadata)
+    {
+        // struct and unmanaged.
+        if (parameter.GenericParameterAttributes.HasFlag(GenericParameterAttributes.NotNullableValueTypeConstraint))
+        {
+            return true;
+        }
+
+        // notnull, and class where nullability is enabled; class? and no constraint there are nullable, and anything
+        // where it is disabled is oblivious.
+        var context = Context(parameter.DeclaringType);
+        if ((Annotation(parameter.GetCustomAttributesData()) ?? context) == NotAnnotated)
+        {
+            return true;
+        }
+
+        var definition = metadata.GetGenericParameter((GenericParameterHandle)MetadataTokens.EntityHandle(parameter.MetadataToken));
+        return definition.GetConstraints()
+            .Select(metadata.GetGenericParameterConstraint)
+            .Any(constraint => (Annotation(metadata, constraint.GetCustomAttributes()) ?? context) == NotAnnotated);
+    }
+
+    /// <summary>The nullable context of a type, or of the nearest type around it that has one; oblivious without.</summary>
+    private static byte Context(Type? type)
+    {
+        for (; type is not null; type = type.DeclaringType)
+        {
+            var context = type.GetCustomAttributesData().FirstOrDefault(attribute => attribute.AttributeType.FullName == NullableContextAttribute);
+            if (context is not null)
+            {
+                return (byte)context.ConstructorArguments[0].Value!;
+            }
+        }
+
+        return 0;
+    }
+
+    /// <summary>The top-level annotation of a NullableAttribute, which takes either one byte or one per type in a signature.</summary>
+    private static byte? Annotation(IEnumerable<CustomAttributeData> attributes) =>
+        attributes
+            .Where(attribute => attribute.AttributeType.FullName == NullableAttribute)
+            .Select(attribute => attribute.ConstructorArguments[0].Value switch
+            {
+                byte flag => flag,
+                IReadOnlyCollection<CustomAttributeTypedArgument> flags => (byte?)flags.First().Value,
+                _ => null,
+            })
+            .FirstOrDefault();
+
+    private static byte? Annotation(MetadataReader metadata, CustomAttributeHandleCollection attributes)
+    {
+        foreach (var handle in attributes)
+        {
+            var attribute = metadata.GetCustomAttribute(handle);
+            var (name, signature) = Constructor(metadata, attribute.Constructor);
+            if (name != NullableAttribute)
+            {
+                continue;
+            }
+
+            var parameters = metadata.GetBlobReader(signature);
+            parameters.ReadSignatureHeader();
+            parameters.ReadCompressedInteger();
+            parameters.ReadSignatureTypeCode();
+            var array = parameters.ReadSignatureTypeCode() == SignatureTypeCode.SZArray;
+
+            // A custom attribute's value starts with the prolog 0x0001; an array argument, with its length.
+            var value = metadata.GetBlobReader(attribute.Value);
+            value.ReadUInt16();
+            if (array && value.ReadInt32() < 1)
+            {
+                return null;
+            }
+
+            return value.ReadByte();
+        }
+
+        return null;
+    }
+
+    /// <summary>The full name of the attribute a constructor belongs to, and the constructor's signature.</summary>
+    private static (string Name, BlobHandle Signature) Constructor(MetadataReader metadata, EntityHandle constructor)
+    {
+        if (constructor.Kind == HandleKind.MethodDefinition)
+        {
+            var method = metadata.GetMethodDefinition((MethodDefinitionHandle)constructor);
+            var type = metadata.GetTypeDefinition(method.GetDeclaringType());
+            return ($"{metadata.GetString(type.Namespace)}.{metadata.GetString(type.Name)}", method.Signature);
+        }
+
+        var reference = metadata.GetMemberReference((MemberReferenceHandle)constructor);
+        if (reference.Parent.Kind != HandleKind.TypeReference)
+        {
+            return (string.Empty, reference.Signature);
+        }
+
+        var parent = metadata.GetTypeReference((TypeReferenceHandle)reference.Parent);
+        return ($"{metadata.GetString(parent.Namespace)}.{metadata.GetString(parent.Name)}", reference.Signature);
+    }
+}
