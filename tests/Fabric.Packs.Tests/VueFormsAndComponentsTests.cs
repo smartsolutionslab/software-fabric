@@ -28,7 +28,10 @@ public sealed partial class VueFormsAndComponentsTests
 
         const emit = defineEmits<{ submitted: [values: z.infer<typeof signUpSchema>] }>();
 
-        const { defineField, errors, handleSubmit } = useForm({ validationSchema: toTypedSchema(signUpSchema) });
+        const { defineField, errors, handleSubmit } = useForm({
+          validationSchema: toTypedSchema(signUpSchema),
+          initialValues: { name: '', email: '' },
+        });
         const [name, nameAttributes] = defineField('name');
         const [email, emailAttributes] = defineField('email');
 
