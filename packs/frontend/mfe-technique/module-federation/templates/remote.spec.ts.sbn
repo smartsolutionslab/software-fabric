@@ -55,10 +55,7 @@ test("{{ module.name }}'s page loads again once its remote is back, without a re
   await expect(page.getByRole('heading', { name: '{{ module.namespace }}' })).toBeVisible();
 });
 
-test("{{ module.name }}'s page loads again once a module of its remote is back, without a reload", async ({
-  page,
-  baseURL,
-}) => {
+test("{{ module.name }}'s page loads again once its failed module is back", async ({ page, baseURL }) => {
   // The remote's entry loads, but the module of its page fails, as when the server stops between the two requests.
   const shell = new URL(baseURL ?? 'http://localhost:5173').origin;
   let down = true;

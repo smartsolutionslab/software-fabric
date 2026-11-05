@@ -5,6 +5,7 @@ import { federation } from '@module-federation/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 import { remoteBoundary } from './boundary.js';
+import { retryGenerations } from './retry.js';
 
 // The {{ module.name }} module's remote: the shell loads ./Page from its remoteEntry.js at run time (docs/adr).
 // Under Aspire its own dev server serves it; built, a deployment serves dist under /modules/{{ module.name }}/.
@@ -14,6 +15,8 @@ export default defineConfig(({ command }) => ({
     react(),
     // A remote bundles only its own files and packages: other remotes and the shell are loaded at run time (docs/adr).
     remoteBoundary(),
+    // The shell's retry after a failed load fetches every module of the remote again (retry.ts, docs/adr).
+    retryGenerations(),
     federation({
       name: '{{ module.name }}',
       filename: 'remoteEntry.js',
