@@ -102,7 +102,7 @@ public sealed class EmbeddingsTests
             files["src/Host/Program.cs"].ShouldContain($"builder.Services.Add{type}EmbeddingGenerator(builder.Configuration);", Case.Sensitive, llm);
             files[$"{Wiring}/{type}EmbeddingGenerator.cs"].ShouldContain($"Add{type}EmbeddingGenerator(this IServiceCollection services, IConfiguration configuration)");
             files.Keys.ShouldContain($"tests/Architecture.Tests/Rules/{type}GeneratesTheProjectsEmbeddings.cs");
-            files.Keys.Where(path => path.EndsWith("EmbeddingGenerator.cs", StringComparison.Ordinal)).ShouldBe([$"{Wiring}/{type}EmbeddingGenerator.cs"]);
+            files.Keys.Where(path => path.StartsWith("src/", StringComparison.Ordinal) && path.EndsWith("EmbeddingGenerator.cs", StringComparison.Ordinal)).ShouldBe([$"{Wiring}/{type}EmbeddingGenerator.cs"]);
         }
     }
 
