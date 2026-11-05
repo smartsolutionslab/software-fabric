@@ -1,0 +1,54 @@
+{{~ if project["backend.auth"] != "keycloak" && project["backend.auth"] != "none" ~}}
+throw new Error('This test knows Keycloak\'s login page only so far (docs/adr/0006 of the generator).');
+{{~ end ~}}
+import { expect, test, type Page } from '@playwright/test';
+
+/** Sends a message from the panel and returns the AG-UI events the host streamed back for it. */
+async function say(page: Page, message: string) {
+  const answered = page.waitForResponse((response) => response.url().endsWith('/api/agents/assistant'));
+  await page.getByRole('textbox', { name: 'Message' }).fill(message);
+  await page.getByRole('button', { name: 'Send' }).click();
+  const response = await answered;
+
+  expect(response.status()).toBe(200);
+  expect(response.headers()['content-type']).toContain('text/event-stream');
+{{~ if project["backend.auth"] == "keycloak" ~}}
+  expect(response.request().headers()['authorization']).toMatch(/^Bearer .+/);
+{{~ end ~}}
+  const stream = await response.text();
+  return stream
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => (JSON.parse(line.slice('data:'.length)) as { type: string }).type);
+}
+
+// The AppHost runs with the stand-in model (e2e.sh sets model-stand-in): it calls the assistant's first tool,
+// count_words, with the message, and answers from the tool's result a word at a time.
+test('the assistant answers in the panel, streaming its text after its tool ran through the dispatcher, turn after turn', async ({ page }) => {
+  await page.goto('/');
+{{~ if project["backend.auth"] == "keycloak" ~}}
+  await page.getByLabel('Username or email').fill('developer');
+  await page.getByLabel('Password', { exact: true }).fill('developer');
+  await page.getByRole('button', { name: 'Sign In' }).click();
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+{{~ end ~}}
+
+  await page.getByRole('link', { name: 'Assistant' }).click();
+  await expect(page.getByRole('heading', { name: 'Assistant' })).toBeVisible();
+  const messages = page.getByRole('list', { name: 'Messages' });
+  const toolCalls = messages.getByRole('listitem').filter({ hasText: 'count_words' });
+
+  const first = await say(page, 'one two three');
+
+  expect(first.filter((type) => type === 'TEXT_MESSAGE_CONTENT').length).toBeGreaterThan(1);
+  expect(first).toContain('TOOL_CALL_RESULT');
+  await expect(toolCalls.first()).toContainText('Result: 3');
+  await expect(messages).toContainText('The tool said: 3');
+
+  // A second turn is a new question: the tool runs again for it rather than the first answer coming back.
+  await say(page, 'four five');
+
+  await expect(toolCalls).toHaveCount(2);
+  await expect(toolCalls.nth(1)).toContainText('Result: 2');
+  await expect(messages).toContainText('The tool said: 2');
+});

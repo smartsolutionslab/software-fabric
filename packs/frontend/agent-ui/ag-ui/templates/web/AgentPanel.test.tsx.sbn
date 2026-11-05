@@ -1,0 +1,190 @@
+{{~ signed_in = object.has_key(project, "frontend.auth-client") ~}}
+{{~ axe = array.contains(project["frontend.test.extras"], "accessibility") ~}}
+import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+{{~ if axe ~}}
+import { axe } from 'vitest-axe';
+{{~ end ~}}
+{{~ if signed_in ~}}
+import { oidcConfig } from '@/auth/oidcConfig';
+{{~ end ~}}
+import { AgentPanel } from './AgentPanel';
+
+// The host's side of a run, as POST /agents/{name} streams it: AG-UI events, one server-sent event each. The test sends
+// them a few at a time, so it can look at the panel while the answer is still arriving.
+function eventStream() {
+  const encoder = new TextEncoder();
+  let stream: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      stream = controller;
+    },
+  });
+  return {
+    response: new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }),
+    send: (...events: object[]) => {
+      events.forEach((event) => stream?.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`)));
+    },
+    close: () => stream?.close(),
+  };
+}
+
+const started = (runId: string) => ({ type: 'RUN_STARTED', threadId: 'thread-1', runId });
+const finished = (runId: string) => ({ type: 'RUN_FINISHED', threadId: 'thread-1', runId });
+const toolCall = (id: string, text: string, result: string) => [
+  { type: 'TOOL_CALL_START', toolCallId: id, toolCallName: 'count_words', parentMessageId: `${id}-message` },
+  { type: 'TOOL_CALL_ARGS', toolCallId: id, delta: JSON.stringify({ text }) },
+  { type: 'TOOL_CALL_END', toolCallId: id },
+  { type: 'TOOL_CALL_RESULT', messageId: `${id}-result`, toolCallId: id, content: result, role: 'tool' },
+];
+const text = (messageId: string, ...deltas: string[]) => [
+  { type: 'TEXT_MESSAGE_START', messageId, role: 'assistant' },
+  ...deltas.map((delta) => ({ type: 'TEXT_MESSAGE_CONTENT', messageId, delta })),
+  { type: 'TEXT_MESSAGE_END', messageId },
+];
+
+const fetchMock = vi.fn<typeof fetch>();
+
+beforeEach(() => {
+  vi.stubGlobal('fetch', fetchMock);
+{{~ if signed_in ~}}
+  sessionStorage.setItem(
+    `oidc.user:${oidcConfig.authority}:${oidcConfig.client_id}`,
+    JSON.stringify({ access_token: 'token-of-developer', token_type: 'Bearer', profile: { sub: 'developer' } }),
+  );
+{{~ end ~}}
+});
+
+// Vitest runs without globals, so Testing Library cannot register its own cleanup.
+afterEach(() => {
+  cleanup();
+  fetchMock.mockReset();
+  vi.unstubAllGlobals();
+{{~ if signed_in ~}}
+  sessionStorage.clear();
+{{~ end ~}}
+});
+
+/** The JSON body of the n-th request the panel sent. */
+function sent(call: number): { messages: { role: string; content?: unknown }[] } {
+  const init = fetchMock.mock.calls[call]?.[1];
+  return JSON.parse(String(init?.body)) as { messages: { role: string; content?: unknown }[] };
+}
+
+async function say(message: string) {
+  await userEvent.type(screen.getByRole('textbox', { name: 'Message' }), message);
+  await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+}
+
+test('the answer appears while it streams, after the tool call the agent made and its result', async () => {
+  const run = eventStream();
+  fetchMock.mockResolvedValueOnce(run.response);
+  render(<AgentPanel agent="assistant" />);
+
+  await say('one two three');
+  run.send(started('run-1'), ...toolCall('call-1', 'one two three', '3'), ...text('answer-1', 'The ', 'tool ').slice(0, 3));
+
+  const messages = screen.getByRole('list', { name: 'Messages' });
+  expect(await within(messages).findByText('The tool')).toBeInTheDocument();
+  expect(within(messages).getByText('one two three')).toBeInTheDocument();
+  expect(within(messages).getByText('count_words').closest('li')).toHaveTextContent('Result: 3');
+  expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+  expect(screen.getByRole('status')).toHaveTextContent('Answering');
+
+  run.send({ type: 'TEXT_MESSAGE_CONTENT', messageId: 'answer-1', delta: 'said: ' }, { type: 'TEXT_MESSAGE_CONTENT', messageId: 'answer-1', delta: '3' });
+  run.send({ type: 'TEXT_MESSAGE_END', messageId: 'answer-1' }, finished('run-1'));
+  run.close();
+
+  expect(await within(messages).findByText('The tool said: 3')).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Send' })).toBeEnabled();
+  expect(screen.getByRole('status')).toHaveTextContent('');
+  expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
+});
+
+test('the run goes to the agent through /api{{ if signed_in }} with the signed-in user\'s token{{ end }}', async () => {
+  const run = eventStream();
+  fetchMock.mockResolvedValueOnce(run.response);
+  render(<AgentPanel agent="assistant" />);
+
+  await say('one two three');
+  run.send(started('run-1'), ...text('answer-1', 'Hello'), finished('run-1'));
+  run.close();
+
+  expect(await screen.findByText('Hello')).toBeInTheDocument();
+  const [url, init] = fetchMock.mock.calls[0] ?? [];
+  expect(url).toBe('/api/agents/assistant');
+  expect(init?.method).toBe('POST');
+{{~ if signed_in ~}}
+  expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer token-of-developer');
+{{~ else ~}}
+  expect(new Headers(init?.headers).get('Authorization')).toBeNull();
+{{~ end ~}}
+  expect(sent(0).messages).toEqual([expect.objectContaining({ role: 'user', content: 'one two three' })]);
+});
+
+test('a second message goes with the whole conversation, and its answer follows the first', async () => {
+  const first = eventStream();
+  const second = eventStream();
+  fetchMock.mockResolvedValueOnce(first.response).mockResolvedValueOnce(second.response);
+  render(<AgentPanel agent="assistant" />);
+
+  await say('one two three');
+  first.send(started('run-1'), ...toolCall('call-1', 'one two three', '3'), ...text('answer-1', 'The tool said: 3'), finished('run-1'));
+  first.close();
+  expect(await screen.findByText('The tool said: 3')).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Send' })).toBeEnabled();
+
+  await say('four five');
+  second.send(started('run-2'), ...toolCall('call-2', 'four five', '2'), ...text('answer-2', 'The tool said: 2'), finished('run-2'));
+  second.close();
+
+  expect(await screen.findByText('The tool said: 2')).toBeInTheDocument();
+  const conversation = sent(1).messages;
+  expect(conversation[0]).toEqual(expect.objectContaining({ role: 'user', content: 'one two three' }));
+  expect(conversation).toContainEqual(expect.objectContaining({ role: 'tool', content: '3' }));
+  expect(conversation.at(-1)).toEqual(expect.objectContaining({ role: 'user', content: 'four five' }));
+  const items = within(screen.getByRole('list', { name: 'Messages' })).getAllByRole('listitem');
+  expect(items.map((item) => item.textContent)).toEqual([
+    expect.stringContaining('one two three'),
+    expect.stringContaining('Result: 3'),
+    expect.stringContaining('The tool said: 3'),
+    expect.stringContaining('four five'),
+    expect.stringContaining('Result: 2'),
+    expect.stringContaining('The tool said: 2'),
+  ]);
+});
+
+test('a run the host refuses is shown as an alert, and the panel can send again', async () => {
+  fetchMock.mockResolvedValueOnce(new Response('{"title":"Not found"}', { status: 404 }));
+  render(<AgentPanel agent="nobody" />);
+
+  await say('hello');
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(/.+/);
+  expect(await screen.findByRole('button', { name: 'Send' })).toBeEnabled();
+});
+
+test('an empty message is not sent', async () => {
+  render(<AgentPanel agent="assistant" />);
+
+  await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Write a message first.');
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+{{~ if axe ~}}
+
+test('the panel with a conversation has no accessibility violations axe can find', async () => {
+  const run = eventStream();
+  fetchMock.mockResolvedValueOnce(run.response);
+  const { container } = render(<AgentPanel agent="assistant" />);
+
+  await say('one two three');
+  run.send(started('run-1'), ...toolCall('call-1', 'one two three', '3'), ...text('answer-1', 'The tool said: 3'), finished('run-1'));
+  run.close();
+  expect(await screen.findByText('The tool said: 3')).toBeInTheDocument();
+
+  expect(await axe(container)).toHaveNoViolations();
+});
+{{~ end ~}}

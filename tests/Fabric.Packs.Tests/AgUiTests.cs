@@ -19,6 +19,10 @@ public sealed class AgUiTests
     private const string Rule = "tests/Architecture.Tests/Rules/AgentUiGoesThroughAQuery.cs";
     private const string Endpoints = "src/Host/Wiring/AgentUiEndpoints.cs";
     private const string Assistant = "src/Modules/Assistant/Assistant.Application";
+    private const string Panel = "web/app/src/agents/AgentPanel.tsx";
+    private const string Client = "web/app/src/agents/connectAgent.ts";
+    private const string PanelEndToEndTest = "web/app/e2e/agent-panel.spec.ts";
+    private const string EndToEndScript = ".github/scripts/e2e.sh";
 
     private const string ApiStreamingAnAgent = """
         <Project Sdk="Microsoft.NET.Sdk">
@@ -165,9 +169,110 @@ public sealed class AgUiTests
             var files = Files(profile);
 
             files.Keys.ShouldNotContain(path => path.Contains("AgentUi", StringComparison.Ordinal) || path.Contains("Assistant", StringComparison.Ordinal), profile);
+            files.Keys.ShouldNotContain(path => path.StartsWith("web/app/src/agents/", StringComparison.Ordinal) || path.Contains("agent-panel", StringComparison.Ordinal), profile);
             files["src/AppHost/AppHost.cs"].ShouldNotContain("model-stand-in", customMessage: profile);
+            files[EndToEndScript].ShouldNotContain("model-stand-in", customMessage: profile);
             files["fabric.yaml"].ShouldNotContain("assistant", customMessage: profile);
         }
+    }
+
+    [Fact]
+    public void The_assistants_page_is_the_agent_panel_on_the_ag_ui_client_built_from_the_projects_shadcn_components()
+    {
+        var files = Files(Profile, Anthropic, AgentFramework, AgUi);
+
+        files["web/app/package.json"].ShouldContain("\"@ag-ui/client\": \"1.0.3\"");
+        files["web/app/src/modules/assistant/AssistantPage.tsx"].ShouldContain("<AgentPanel agent=\"assistant\" />");
+        files[Panel].ShouldContain("from '@/components/ui/button'");
+        files[Panel].ShouldContain("zodResolver(");
+        files[Client].ShouldContain("new HttpAgent(");
+        files[Client].ShouldContain("url: `/api/agents/${name}`");
+        files.Keys.ShouldContain("web/app/src/agents/AgentPanel.test.tsx");
+        files.Keys.ShouldContain(PanelEndToEndTest);
+        files["AGENTS.md"].ShouldContain("AgentPanel");
+    }
+
+    [Fact]
+    public void The_panels_client_sends_the_signed_in_users_token_as_the_api_client_does_and_none_without_authentication()
+    {
+        Files(Profile, Anthropic, AgentFramework, AgUi)[Client].ShouldContain("headers.set('Authorization', `Bearer ${token}`);");
+
+        var open = Files(Profile, Anthropic, AgentFramework, AgUi, "backend.auth=none");
+
+        open[Client].ShouldNotContain("Authorization");
+        open[Client].ShouldNotContain("accessToken");
+        open[PanelEndToEndTest].ShouldNotContain("Sign In");
+    }
+
+    [Fact]
+    public void Importing_copilotkit_fails_the_web_apps_lint_with_the_agent_panel()
+    {
+        var files = Files(Profile, Anthropic, AgentFramework, AgUi);
+
+        files["web/app/eslint.config.js"].ShouldContain("{ group: ['@copilotkit/*'], message: 'Talk to the agents through the AgentPanel in src/agents, on @ag-ui/client (docs/adr).' }");
+        files["web/app/eslint.config.js"].ShouldNotContain("'@ag-ui/*'");
+    }
+
+    [Fact]
+    public void The_end_to_end_script_starts_the_apphost_with_the_stand_in_model()
+    {
+        var files = Files(Profile, Anthropic, AgentFramework, AgUi);
+
+        files[EndToEndScript].ShouldContain("env 'Parameters__model-stand-in=true' dotnet run --project src/AppHost --launch-profile http < /dev/null > \"$log\" 2>&1 &");
+        Files("saas-standard-vue", Anthropic, AgentFramework, AgUi)[EndToEndScript].ShouldContain("env 'Parameters__model-stand-in=true' dotnet run");
+    }
+
+    [Fact]
+    public void The_panel_checks_accessibility_with_axe_only_where_the_project_has_the_accessibility_tests()
+    {
+        Files(Profile, Anthropic, AgentFramework, AgUi)["web/app/src/agents/AgentPanel.test.tsx"].ShouldContain("from 'vitest-axe'");
+
+        var without = Files(Profile, Anthropic, AgentFramework, AgUi, "frontend.test.extras=");
+
+        without["web/app/package.json"].ShouldNotContain("vitest-axe");
+        without["web/app/src/agents/AgentPanel.test.tsx"].ShouldNotContain("axe");
+    }
+
+    [Fact]
+    public void Where_the_panel_is_not_built_yet_the_web_apps_tests_fail_saying_so()
+    {
+        foreach (var (profile, overrides, says) in new[]
+        {
+            ("saas-standard-vue", new[] { Anthropic, AgentFramework, AgUi }, "frontend.framework is vue"),
+            ("industrial-event-driven-mfe", [Anthropic, AgentFramework, AgUi], "frontend.architecture is micro-frontends"),
+        })
+        {
+            var files = Files(profile, overrides);
+
+            files.Keys.ShouldNotContain(Panel, profile);
+            files.Keys.ShouldNotContain(PanelEndToEndTest, profile);
+            files["web/app/src/agents/AgentPanel.test.ts"].ShouldStartWith("throw new Error('The ag-ui pack builds the agent panel for a React single-page app only so far", customMessage: profile);
+            files["web/app/src/agents/AgentPanel.test.ts"].ShouldContain(says, customMessage: profile);
+        }
+
+        Files(Profile, Anthropic, AgentFramework, AgUi).Keys.ShouldNotContain("web/app/src/agents/AgentPanel.test.ts");
+    }
+
+    [Fact]
+    public void The_web_app_builds_lints_and_passes_its_tests_and_the_end_to_end_test_talks_to_the_assistant_twice_through_the_panel()
+    {
+        using var project = NewProject(Anthropic, AgentFramework, AgUi);
+        project.Build();
+
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        foreach (var step in new[] { "install", "build", "lint", "test" })
+        {
+            var (exitCode, output) = Shell.Run(web, "pnpm", step);
+            exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
+        }
+
+        var (formatExitCode, format) = Shell.Run(Path.Combine(web, "app"), "pnpm", "format:check");
+        formatExitCode.ShouldBe(0, format);
+
+        // The generated CI's own end-to-end step: the sign-in test and the panel's, against the AppHost with the stand-in model.
+        var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
+        e2eExitCode.ShouldBe(0, e2eOutput);
+        e2eOutput.ShouldContain("2 passed");
     }
 
     [Fact]
