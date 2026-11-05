@@ -35,6 +35,14 @@ public sealed class MicroFrontendsTests
         project.AddModule("billing");
         project.AddModule("order-handling");
 
+        // A utility only a remote names: the shell's Tailwind styles the remotes (docs/adr), so its build emits it.
+        project.Write("web/modules/billing/src/Notice.tsx", """
+            export function Notice() {
+              return <p className="decoration-wavy">Due</p>;
+            }
+
+            """);
+
         RunWeb(project, "install", "build", "lint", "test");
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "format:check");
@@ -49,6 +57,9 @@ public sealed class MicroFrontendsTests
         var shell = string.Concat(Directory.GetFiles(Path.Combine(project.ProjectDirectory, "web", "app", "dist"), "*.js", SearchOption.AllDirectories).Select(File.ReadAllText));
         shell.ShouldContain("/modules/billing/remoteEntry.js");
         shell.ShouldContain("/modules/order-handling/remoteEntry.js");
+
+        var styles = string.Concat(Directory.GetFiles(Path.Combine(project.ProjectDirectory, "web", "app", "dist"), "*.css", SearchOption.AllDirectories).Select(File.ReadAllText));
+        styles.ShouldContain(".decoration-wavy{");
 
         // The module's own screens are in its remote, not bundled into the shell.
         var remote = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "modules", "billing", "src", "BillingPage.tsx"));
@@ -88,6 +99,40 @@ public sealed class MicroFrontendsTests
         var (formatExitCode, formatOutput) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "modules", "billing"), "pnpm", "lint");
         formatExitCode.ShouldNotBe(0, formatOutput);
         formatOutput.ShouldContain("src/unformatted.ts");
+    }
+
+    [Fact]
+    public void The_shell_bundling_a_remotes_file_or_a_remote_bundling_another_remotes_file_fails_the_build_whatever_the_import_path()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.AddModule("order-handling");
+        RunWeb(project, "install");
+
+        // Relative paths, which no import pattern can tell from the shell's own src/modules: the build checks the files.
+        project.Write("web/app/src/pages/Home.tsx", """
+            import BillingPage from '../../../modules/billing/src/BillingPage';
+
+            export function Home() {
+              return <BillingPage />;
+            }
+            """);
+        var (shellExitCode, shellOutput) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "build");
+        shellExitCode.ShouldNotBe(0, shellOutput);
+        shellOutput.ShouldContain("modules/billing/src/BillingPage.tsx");
+        shellOutput.ShouldContain("The shell loads a module's screens from its remote at run time; it never bundles them");
+
+        project.Write("web/modules/billing/src/BillingPage.tsx", """
+            import OrderHandlingPage from '../../order-handling/src/OrderHandlingPage';
+
+            export default function BillingPage() {
+              return <OrderHandlingPage />;
+            }
+            """);
+        var (remoteExitCode, remoteOutput) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "modules", "billing"), "pnpm", "build");
+        remoteExitCode.ShouldNotBe(0, remoteOutput);
+        remoteOutput.ShouldContain("modules/order-handling/src/OrderHandlingPage.tsx");
+        remoteOutput.ShouldContain("A remote bundles only its own files and packages");
     }
 
     [Fact]

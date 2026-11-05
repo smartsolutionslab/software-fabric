@@ -22,3 +22,18 @@ test('a remote that cannot be loaded leaves the shell running and says so', asyn
 
   expect(await screen.findByRole('alert')).toHaveTextContent('shipping could not be loaded.');
 });
+
+test('a remote that failed to load is loaded again the next time its page is shown', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  vi.mocked(loadRemote)
+    .mockRejectedValueOnce(new Error('remoteEntry.js did not load'))
+    .mockResolvedValueOnce({ default: () => <h1>Stock</h1> });
+
+  const { unmount } = render(<Remote module="stock" />);
+  expect(await screen.findByText('stock could not be loaded.')).toBeInTheDocument();
+  unmount();
+
+  render(<Remote module="stock" />);
+
+  expect(await screen.findByRole('heading', { name: 'Stock' })).toBeInTheDocument();
+});
