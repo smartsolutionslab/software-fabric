@@ -187,6 +187,28 @@ dimensions:
       none:            { tier: experimental, note: "use cases call the model directly; no agent framework" }
       agent-framework: { tier: experimental, note: "Microsoft Agent Framework (Microsoft.Agents.AI)" }
 
+  backend.llm.extras:
+    scope: project
+    multi: true
+    active-when: "backend.llm != none"
+    default: []
+    note: "Empty: the project calls the model and adds nothing around it. ADR-0012."
+    options:
+      rag:
+        tier: experimental
+        note: "retrieval-augmented generation: a module indexes its own records with pgvector in its own schema and queries them by similarity"
+        requires: ["backend.database == postgres"]
+
+  backend.llm.embeddings:
+    scope: project
+    active-when: "backend.llm.extras has rag"
+    default-from: backend.llm
+    note: "The provider of the embedding generator, behind Microsoft.Extensions.AI's IEmbeddingGenerator. Defaults to backend.llm when that provider has embeddings; anthropic has none, so it is chosen explicitly there. ADR-0012."
+    options:
+      openai:       { tier: experimental }
+      azure-openai: { tier: experimental }
+      ollama:       { tier: experimental, note: "a local model server" }
+
   backend.mcp:
     scope: project
     multi: true

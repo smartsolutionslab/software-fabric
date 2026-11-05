@@ -38,7 +38,7 @@ public static class ChoiceResolver
         }
 
         var dimensions = catalog.Dimensions.Values.ToList();
-        var defaults = SettleDefaults(dimensions, explicitValues, dimension => dimension.Default, errors);
+        var defaults = SettleDefaults(dimensions, explicitValues, DefaultOf, errors);
         if (errors.Count > 0)
         {
             return Failure(errors);
@@ -99,7 +99,7 @@ public static class ChoiceResolver
         var defaults = SettleDefaults(
             moduleDimensions,
             fixedValues,
-            dimension => project.ModuleDefaults.TryGetValue(dimension.Id, out var value) ? value : dimension.Default,
+            (dimension, current) => project.ModuleDefaults.TryGetValue(dimension.Id, out var value) ? value : DefaultOf(dimension, current),
             errors);
         var view = Merge(fixedValues, defaults);
         if (errors.Count == 0)
@@ -200,12 +200,13 @@ public static class ChoiceResolver
     }
 
     /// <summary>
-    /// Defaults can switch other dimensions on or off, so they are recomputed until the set stops changing.
+    /// Defaults can switch other dimensions on or off, and a default-from can follow another default, so they are
+    /// recomputed until neither the set nor a value changes.
     /// </summary>
     private static Dictionary<string, IReadOnlyList<string>> SettleDefaults(
         List<Dimension> dimensions,
         IReadOnlyDictionary<string, IReadOnlyList<string>> fixedValues,
-        Func<Dimension, IReadOnlyList<string>?> defaultOf,
+        Func<Dimension, IReadOnlyDictionary<string, IReadOnlyList<string>>, IReadOnlyList<string>?> defaultOf,
         List<string> errors)
     {
         Dictionary<string, IReadOnlyList<string>> defaults = [];
@@ -215,13 +216,13 @@ public static class ChoiceResolver
             Dictionary<string, IReadOnlyList<string>> next = [];
             foreach (var dimension in dimensions)
             {
-                if (!fixedValues.ContainsKey(dimension.Id) && defaultOf(dimension) is { } value && IsActive(dimension, view))
+                if (!fixedValues.ContainsKey(dimension.Id) && defaultOf(dimension, view) is { } value && IsActive(dimension, view))
                 {
                     next.Add(dimension.Id, value);
                 }
             }
 
-            if (next.Keys.ToHashSet().SetEquals(defaults.Keys))
+            if (next.Count == defaults.Count && next.All(entry => defaults.TryGetValue(entry.Key, out var previous) && previous.SequenceEqual(entry.Value)))
             {
                 return next;
             }
@@ -233,27 +234,52 @@ public static class ChoiceResolver
         return defaults;
     }
 
+    /// <summary>
+    /// The catalog default, or with <c>default-from</c> the followed dimension's value when it is one of this
+    /// dimension's options; otherwise none.
+    /// </summary>
+    private static IReadOnlyList<string>? DefaultOf(Dimension dimension, IReadOnlyDictionary<string, IReadOnlyList<string>> values) =>
+        dimension.DefaultFrom is { } followed
+            ? values.TryGetValue(followed, out var chosen) && chosen is [var option] && dimension.Options.ContainsKey(option) ? chosen : null
+            : dimension.Default;
+
+    /// <remarks>
+    /// A dimension that is active only because of a value set where it does not apply reports nothing itself: the
+    /// misplaced value is the one error, not every dimension it switches on.
+    /// </remarks>
     private static void CheckActivity(
         IReadOnlyList<Dimension> dimensions,
         OrderedDictionary<string, IReadOnlyList<string>> explicitValues,
         Dictionary<string, IReadOnlyList<string>> values,
         List<string> errors)
     {
+        var misplaced = dimensions
+            .Where(dimension => explicitValues.ContainsKey(dimension.Id) && !IsActive(dimension, values))
+            .Select(dimension => dimension.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
         foreach (var dimension in dimensions)
         {
-            var active = IsActive(dimension, values);
-            if (!active && explicitValues.TryGetValue(dimension.Id, out var chosen))
+            if (misplaced.Contains(dimension.Id))
             {
                 errors.Add(
-                    $"{dimension.Id} is set to {string.Join(", ", chosen)}, but it only applies when {dimension.ActiveWhen}, " +
+                    $"{dimension.Id} is set to {string.Join(", ", explicitValues[dimension.Id])}, but it only applies when {dimension.ActiveWhen}, " +
                     $"and {ConditionEvaluator.DescribeActual(dimension.ActiveWhen!, values)}.");
             }
-            else if (active && !values.ContainsKey(dimension.Id))
+            else if (IsActive(dimension, values) && !values.ContainsKey(dimension.Id) && !misplaced.Contains(dimension.ActiveWhen?.Dimension ?? string.Empty))
             {
-                errors.Add($"{dimension.Id} has no value and no default; set it with {dimension.Id}=<option>.");
+                errors.Add(dimension.DefaultFrom is { } followed
+                    ? $"{dimension.Id} has no value: its default follows {followed}, and {DescribeFollowed(dimension, followed, values)}; " +
+                      $"set it with {dimension.Id}=<option>."
+                    : $"{dimension.Id} has no value and no default; set it with {dimension.Id}=<option>.");
             }
         }
     }
+
+    private static string DescribeFollowed(Dimension dimension, string followed, Dictionary<string, IReadOnlyList<string>> values) =>
+        values.TryGetValue(followed, out var chosen)
+            ? $"{string.Join(", ", chosen)} is not one of its options ({string.Join(", ", dimension.Options.Keys)})"
+            : $"{followed} is not set";
 
     private static bool IsActive(Dimension dimension, IReadOnlyDictionary<string, IReadOnlyList<string>> values) =>
         dimension.ActiveWhen is null || ConditionEvaluator.Holds(dimension.ActiveWhen, values);
