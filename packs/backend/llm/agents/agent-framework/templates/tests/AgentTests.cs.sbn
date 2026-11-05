@@ -176,6 +176,16 @@ public sealed class AgentTests
     }
 
     [Fact]
+    public void A_request_with_a_list_of_inherited_collections_of_options_cannot_become_a_tool()
+    {
+        var dispatcher = new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider()));
+
+        var refused = Should.Throw<InvalidOperationException>(() => DispatcherTool.For<Ledger>(dispatcher, "Totals a ledger."));
+
+        refused.Message.ShouldContain("Ledger has an Option inside a collection or dictionary at Batches");
+    }
+
+    [Fact]
     public void An_optional_enum_admits_its_names_and_null()
     {
         var dispatcher = new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider()));
