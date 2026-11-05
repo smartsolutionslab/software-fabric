@@ -887,11 +887,13 @@ public sealed class StrictEventSourcedTests
     [Fact]
     public void A_closed_type_of_a_recurring_generic_type_over_a_class_is_not_taken_for_one_over_a_nullable_struct()
     {
-        // T Value is NotNull for a class but nullable for Payload?, under T : notnull. Node<Payload?> is found first and
-        // shows no violation; Node<List<Payload?>> and Node<InvoiceNumber> after it do: {} leaves their Value null.
+        // Declared nullable-oblivious, T Value is nullable for Payload? but not for a class. Node<Payload?> is found first
+        // and shows no violation; Node<List<Payload?>> and Node<InvoiceNumber> after it do: {} leaves their Value null.
         var (exitCode, output) = ArchitectureTestsWith("""
             using System.Text.Json.Serialization;
             using Shop.BuildingBlocks.EventSourcing;
+
+            #nullable disable
 
             namespace Shop.Modules.Billing.Domain.Invoices;
 
@@ -903,10 +905,8 @@ public sealed class StrictEventSourcedTests
                 public InvoiceNumber Number { get; }
             }
 
-            public sealed record Node<T>(Node<List<T>>? Next, T Value = default!)
-                where T : notnull;
+            public sealed record Node<T>(Node<List<T>> Next, T Value = default);
 
-            #pragma warning disable CS8714
             public sealed record InvoiceNoded(InvoiceId Invoice, Node<Payload?> First, Node<InvoiceNumber> Second) : IDomainEvent;
 
             public sealed class Noding : EventSourcedAggregate<InvoiceId>
