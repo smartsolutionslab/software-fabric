@@ -1,0 +1,4 @@
+namespace {{ namespace }}.Evals;
+
+/// <summary>One metric's score for one example: null when the evaluator gave no number, a judge's unreadable answer, say.</summary>
+public sealed record EvalScore(string UseCase, string Example, string Metric, double? Value);

@@ -1,0 +1,7 @@
+namespace {{ namespace }}.Evals;
+
+/// <summary>
+/// One input of a use case. <paramref name="GroundingContext"/> is what the answer must stay true to, the records a
+/// <c>rag</c> use case retrieves, say; with it the example is also judged for groundedness.
+/// </summary>
+public sealed record EvalExample(string Input, string? GroundingContext = null);

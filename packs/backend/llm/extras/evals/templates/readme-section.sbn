@@ -1,0 +1,8 @@
+## Evals
+
+`tests/Evals` scores the project's LLM use cases with the project's own model, judged by that model: relevance for every example, groundedness for those with context, and the project's own checks. Each metric's mean over a use case's examples must reach `settings.backend.llm.extras.evals.threshold` in `fabric.yaml`. A run calls the real model and costs money, so the regular tests never run it; `.github/workflows/evals.yml` does, by hand or weekly when the repository variable `EVALS_SCHEDULED` is `true`, and uploads the report.
+
+```bash
+dotnet test --project tests/Evals/Evals.csproj
+dotnet tool restore && dotnet aieval report --path TestResults/evals --output TestResults/evals/report.html
+```
