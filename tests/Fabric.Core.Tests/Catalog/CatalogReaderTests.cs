@@ -108,6 +108,24 @@ public class CatalogReaderTests
     }
 
     [Fact]
+    public void Agents_are_a_choice_only_for_a_project_that_calls_a_model_and_default_to_none()
+    {
+        var agents = ReadRepositoryCatalog().Dimensions["backend.llm.agents"];
+
+        agents.ActiveWhen!.ToString().ShouldBe("backend.llm != none");
+        agents.Default.ShouldBe(["none"]);
+        agents.Options.Keys.ShouldBe(["none", "agent-framework"]);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("agent-framework")]
+    public void Every_agents_option_is_experimental_because_no_profile_calls_a_model(string option)
+    {
+        ReadRepositoryCatalog().Dimensions["backend.llm.agents"].Options[option].Tier.ShouldBe(SupportTier.Experimental);
+    }
+
+    [Fact]
     public void No_llm_is_supported_because_every_profile_generates_it()
     {
         ReadRepositoryCatalog().Dimensions["backend.llm"].Options["none"].Tier.ShouldBe(SupportTier.Supported);
