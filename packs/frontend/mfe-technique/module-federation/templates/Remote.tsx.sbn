@@ -14,7 +14,8 @@ const failures = new Map<string, number>();
  * module import for good, and the runtime its failed entry, so only a new address loads it once its server is back.
  */
 function retry(module: string, attempt: number) {
-  const remote = getInstance()?.options.remotes.find((candidate) => candidate.name === module);
+  // The vite plugin registers each remote under an internal name, with the module's name as its alias.
+  const remote = getInstance()?.options.remotes.find((candidate) => (candidate.alias ?? candidate.name) === module);
   if (!remote || !('entry' in remote)) {
     return;
   }
