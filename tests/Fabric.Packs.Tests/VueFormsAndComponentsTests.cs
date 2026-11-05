@@ -52,6 +52,42 @@ public sealed partial class VueFormsAndComponentsTests
         </template>
         """;
 
+    /// <summary>Components as shadcn-vue's CLI adds them: they style with the theme's variables and tw-animate-css.</summary>
+    private const string CliCard = """
+        <script setup lang="ts">
+        import type { HTMLAttributes } from 'vue';
+        import { cn } from '@/lib/utils';
+
+        defineOptions({ name: 'UiCard' });
+
+        const { class: className } = defineProps<{ class?: HTMLAttributes['class'] }>();
+        </script>
+
+        <template>
+          <div
+            data-slot="card"
+            :class="cn('flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm', className)"
+          >
+            <slot />
+          </div>
+        </template>
+        """;
+
+    private const string CliDialogOverlay = """
+        <script setup lang="ts">
+        import { DialogOverlay } from 'reka-ui';
+
+        defineOptions({ name: 'UiDialogOverlay' });
+        </script>
+
+        <template>
+          <DialogOverlay
+            data-slot="dialog-overlay"
+            class="fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
+          />
+        </template>
+        """;
+
     private const string SignUpFormTest = """
         import { render, screen, waitFor } from '@testing-library/vue';
         import userEvent from '@testing-library/user-event';
@@ -118,7 +154,12 @@ public sealed partial class VueFormsAndComponentsTests
         package.ShouldNotContain("primevue");
         package.ShouldNotContain("@vee-validate/zod");
         package.ShouldNotContain("react");
-        files["web/app/src/index.css"].ShouldContain("@import 'tailwindcss';");
+        package.ShouldContain("\"tw-animate-css\": \"1.4.0\"");
+        var styles = files["web/app/src/index.css"];
+        styles.ShouldContain("@import 'tailwindcss';");
+        styles.ShouldContain("@import 'tw-animate-css';");
+        styles.ShouldContain("@theme inline {");
+        styles.ShouldContain("--color-card: var(--card);");
         files["web/app/vite.config.ts"].ShouldContain("tailwindcss()");
 
         var agents = files["AGENTS.md"];
@@ -145,6 +186,8 @@ public sealed partial class VueFormsAndComponentsTests
         files.Keys.ShouldNotContain("web/app/src/components/ui/button/Button.vue");
         files["web/app/package.json"].ShouldContain("\"reka-ui\": \"2.11.0\"");
         files["web/app/package.json"].ShouldNotContain("@lucide/vue");
+        files["web/app/package.json"].ShouldNotContain("tw-animate-css");
+        files["web/app/src/index.css"].ShouldNotContain("@theme inline");
         files["AGENTS.md"].ShouldContain("## UI components: Reka UI");
         files["AGENTS.md"].ShouldNotContain("shadcn");
     }
@@ -155,6 +198,8 @@ public sealed partial class VueFormsAndComponentsTests
         using var project = new GeneratedProject(Profile);
         project.Write("web/app/src/pages/SignUpForm.vue", SignUpForm);
         project.Write("web/app/src/pages/SignUpForm.test.ts", SignUpFormTest);
+        project.Write("web/app/src/components/ui/card/Card.vue", CliCard);
+        project.Write("web/app/src/components/ui/dialog/DialogOverlay.vue", CliDialogOverlay);
         var web = Path.Combine(project.ProjectDirectory, "web");
         var app = Path.Combine(web, "app");
         foreach (var step in new[] { "install", "build", "lint" })
@@ -178,7 +223,16 @@ public sealed partial class VueFormsAndComponentsTests
         // Tailwind compiled the utilities the components use into the stylesheet the build ships.
         var stylesheets = Directory.GetFiles(Path.Combine(app, "dist", "assets"), "*.css");
         stylesheets.ShouldNotBeEmpty();
-        string.Concat(stylesheets.Select(File.ReadAllText)).ShouldContain(".bg-slate-900");
+        var css = string.Concat(stylesheets.Select(File.ReadAllText));
+        css.ShouldContain(".bg-slate-900");
+
+        // A component the shadcn-vue CLI adds finds the theme it names: the semantic colours and tw-animate-css.
+        css.ShouldContain(".bg-card{");
+        css.ShouldContain(".text-card-foreground{");
+        css.ShouldContain("--card:");
+        css.ShouldContain("--card-foreground:");
+        css.ShouldContain("@keyframes enter");
+        css.ShouldContain("animate-in");
     }
 
     [Fact]
