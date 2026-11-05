@@ -1,0 +1,2 @@
+        // The host provides the widget catalogue, the current user and the dispatcher a widget runs its query through.
+        services.AddDashboardWidgets([]).AddDispatcher();

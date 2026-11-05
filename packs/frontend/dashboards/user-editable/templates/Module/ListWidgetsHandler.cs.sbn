@@ -1,0 +1,40 @@
+{{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+{{~ func ok(type, value)
+  if typed
+    ret "Success(" + value + ")"
+  end
+  ret "Result<" + type + ", ApiError>.Success(" + value + ")"
+end ~}}
+{{~ func fail(type, error)
+  if typed
+    ret "Failure(" + error + ")"
+  end
+  ret "Result<" + type + ", ApiError>.Failure(" + error + ")"
+end ~}}
+using {{ namespace }}.BuildingBlocks.Dashboards;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Application.DTOs;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Queries.ListWidgets;
+
+public sealed class ListWidgetsHandler(WidgetCatalog catalog, IWidgetAccess access)
+    : IQueryHandler<ListWidgets, Result<PagedResult<WidgetDescriptionDto>, ApiError>>
+{
+    public async Task<Result<PagedResult<WidgetDescriptionDto>, ApiError>> HandleAsync(ListWidgets query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        List<WidgetDefinition> visible = [];
+        foreach (var widget in catalog.Widgets)
+        {
+            if (await access.AllowsAsync(widget, cancellationToken))
+            {
+                visible.Add(widget);
+            }
+        }
+
+        List<WidgetDescriptionDto> items = [.. visible.Skip(query.Page.Skip(query.PageSize)).Take(query.PageSize.Value).Select(widget => widget.ToDto())];
+        return {{ ok "PagedResult<WidgetDescriptionDto>" "new PagedResult<WidgetDescriptionDto>(items, visible.Count, query.Page.Value, query.PageSize.Value)" }};
+    }
+}

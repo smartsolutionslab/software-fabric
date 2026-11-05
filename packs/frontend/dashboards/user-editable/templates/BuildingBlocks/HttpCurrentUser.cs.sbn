@@ -1,0 +1,15 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
+
+namespace {{ namespace }}.BuildingBlocks.Identity;
+
+/// <summary>
+/// The token's <c>sub</c>: the identity provider's id for the user, which never changes, where a user name may. The JWT
+/// handler maps it to <see cref="ClaimTypes.NameIdentifier"/> unless told not to, so both are read.
+/// </summary>
+public sealed class HttpCurrentUser(IHttpContextAccessor accessor) : ICurrentUser
+{
+    public string? Subject =>
+        accessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+        ?? accessor.HttpContext?.User.FindFirst("sub")?.Value;
+}

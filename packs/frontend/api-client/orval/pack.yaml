@@ -8,6 +8,8 @@ files:
 declares-slots:
   - { slot: web.api-imports, description: "Import lines of src/api/baseApi.ts. Every api-client pack declares it." }
   - { slot: web.api-headers, description: "Statements in apiFetch, before every call, with the request's Headers headers in scope. Every api-client pack declares it." }
+  - { slot: web.openapi-paths, description: "Entries of web/app/openapi.json's paths after the host's own, indented four spaces. Every api-client pack declares it.", separator: ",\n" }
+  - { slot: web.openapi-schemas, description: "Entries of web/app/openapi.json's components.schemas, one per contribution, indented six spaces; sorted by name with the host's own. Every api-client pack declares it.", separator: "\n\n" }
 slots:
   - { slot: web.dev-dependencies, template: templates/dev-dependency.sbn }
   - { slot: web.scripts, template: templates/scripts.sbn }
