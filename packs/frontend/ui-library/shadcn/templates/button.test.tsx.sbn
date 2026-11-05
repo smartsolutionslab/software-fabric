@@ -1,6 +1,9 @@
-import { render, screen } from '@testing-library/react';
-import { expect, test } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, expect, test } from 'vitest';
 import { Button } from './button';
+
+// Vitest runs without globals, so Testing Library cannot register its own cleanup; each test renders one button.
+afterEach(cleanup);
 
 test("a button is a button in the theme's primary colours", () => {
   render(<Button>Save</Button>);
