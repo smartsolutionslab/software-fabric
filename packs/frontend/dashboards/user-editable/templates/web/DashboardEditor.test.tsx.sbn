@@ -1,7 +1,9 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+{{~ if array.contains project["frontend.test.extras"] "accessibility" ~}}
 import { axe } from 'vitest-axe';
+{{~ end ~}}
 import type {
   DashboardDto,
   PagedResultOfDashboardSummaryDto,
@@ -12,6 +14,7 @@ import { DashboardEditor } from './DashboardEditor';
 
 const save = vi.fn();
 const refetch = vi.fn();
+const refetchWidget = vi.fn();
 
 const sales: DashboardDto = {
   id: '01960000-0000-7000-8000-000000000001',
@@ -85,7 +88,7 @@ vi.mock('@/api/generated', () => ({
   useGetDashboardsWidgetsQuery: (arg: PageArg) => ({ ...answers.catalog(arg), refetch }),
   useGetDashboardsWidgetsByIdQuery: (arg: PageArg & { id: string }) => ({
     ...answers.widget(arg),
-    refetch,
+    refetch: refetchWidget,
   }),
   usePutDashboardsByIdMutation: () => [save, { isLoading: false }],
 }));
@@ -102,6 +105,7 @@ beforeEach(() => {
   save.mockReset();
   save.mockReturnValue({ unwrap: () => Promise.resolve(sales.id) });
   refetch.mockReset();
+  refetchWidget.mockReset();
 });
 
 test('a user opens a dashboard, adds a widget, removes one, renames it and saves', async () => {
@@ -156,6 +160,7 @@ test('a new dashboard gets a fresh time-ordered id and needs a name before it is
   expect(id).not.toBe(sales.id);
 });
 
+{{~ if array.contains project["frontend.test.extras"] "accessibility" ~}}
 test('the editor with a dashboard open has no accessibility violations axe can find', async () => {
   const user = userEvent.setup();
   const { container } = render(<DashboardEditor />);
@@ -165,6 +170,7 @@ test('the editor with a dashboard open has no accessibility violations axe can f
   expect(await axe(container)).toHaveNoViolations();
 });
 
+{{~ end ~}}
 test('reopening a dashboard waits for its saved state instead of editing the copy it had before', async () => {
   const user = userEvent.setup();
   render(<DashboardEditor />);
@@ -262,4 +268,66 @@ test('any change after saving takes the saved notice away', async () => {
   expect(await screen.findByRole('status')).toHaveTextContent('Saved.');
   await user.type(screen.getByLabelText('Dashboard name'), ' 2');
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+test('a failed refresh of a dashboard opened before does not open the copy it had', async () => {
+  const user = userEvent.setup();
+  answers.detail = () => ({ data: sales, isError: true });
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  expect(screen.getByText('This dashboard could not be loaded.')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Dashboard name')).not.toBeInTheDocument();
+});
+
+test('edits made while a save is under way are not reported as saved', async () => {
+  const user = userEvent.setup();
+  let finish: (id: string) => void = () => undefined;
+  save.mockReturnValue({ unwrap: () => new Promise<string>((resolve) => (finish = resolve)) });
+  render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+  await user.click(await screen.findByRole('button', { name: 'Save dashboard' }));
+
+  await user.click(screen.getByRole('button', { name: 'Remove Widgets per dashboard' }));
+  finish(sales.id);
+
+  await waitFor(() => expect(refetch).toHaveBeenCalled());
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+test('saving refreshes the widgets on the dashboard, whose data may be what was just saved', async () => {
+  const user = userEvent.setup();
+  render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+  await screen.findByRole('img', { name: 'Widgets per dashboard' });
+  refetchWidget.mockClear();
+
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() => expect(refetchWidget).toHaveBeenCalled());
+});
+
+test('a dashboard holds at most 50 widgets, and the editor says so before the host would refuse it', async () => {
+  const user = userEvent.setup();
+  answers.detail = () => ({
+    data: {
+      ...sales,
+      widgets: Array.from({ length: 50 }, (_, index) => ({
+        key: `w${index}`,
+        source: 'dashboards.widget-counts',
+        visual: 'bar',
+        x: 0,
+        y: index * 4,
+        width: 6,
+        height: 4,
+      })),
+    },
+  });
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  expect(await screen.findByRole('button', { name: 'Add widget' })).toBeDisabled();
+  expect(screen.getByText('A dashboard holds at most 50 widgets.')).toBeInTheDocument();
 });

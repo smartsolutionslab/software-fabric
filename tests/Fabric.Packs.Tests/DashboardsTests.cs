@@ -200,6 +200,17 @@ public sealed class DashboardsTests
     }
 
     [Fact]
+    public void The_page_checks_accessibility_with_axe_only_where_the_project_has_the_accessibility_tests()
+    {
+        Files(Profile, Dashboards)["web/app/src/dashboards/DashboardEditor.test.tsx"].ShouldContain("from 'vitest-axe'");
+
+        var without = Files(Profile, Dashboards, "frontend.test.extras=");
+
+        without["web/app/package.json"].ShouldNotContain("vitest-axe");
+        without["web/app/src/dashboards/DashboardEditor.test.tsx"].ShouldNotContain("axe");
+    }
+
+    [Fact]
     public void Where_the_page_is_not_built_yet_the_module_keeps_the_routers_placeholder_page()
     {
         foreach (var (profile, overrides) in new[]
