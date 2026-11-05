@@ -1,0 +1,42 @@
+{{~ if project["frontend.validation"] != "zod" ~}}
+throw new Error('The vee-validate pack adapts zod schemas only so far; frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+{{~ end ~}}
+import type { TypedSchema } from 'vee-validate';
+import type { z } from 'zod';
+
+/**
+ * Lets vee-validate validate a form with a zod schema: each message goes to the field its issue names, and a valid
+ * form hands over what the schema puts out (trimmed, coerced, defaulted), typed as its output.
+ */
+export function toTypedSchema<TSchema extends z.ZodType>(
+  schema: TSchema,
+): TypedSchema<z.input<TSchema>, z.output<TSchema>> {
+  return {
+    __type: 'VVTypedSchema',
+    async parse(values) {
+      const result = await schema.safeParseAsync(values);
+      if (result.success) {
+        return { value: result.data, errors: [] };
+      }
+
+      const messages = new Map<string, string[]>();
+      for (const issue of result.error.issues) {
+        const path = fieldPath(issue.path);
+        messages.set(path, [...(messages.get(path) ?? []), issue.message]);
+      }
+
+      return { errors: [...messages].map(([path, errors]) => ({ path, errors })) };
+    },
+  };
+}
+
+/** The field a zod issue path names, in vee-validate's form: keys joined by dots, indexes in brackets (lines[1].quantity). */
+function fieldPath(path: readonly PropertyKey[]): string {
+  return path.reduce<string>((joined, segment) => {
+    if (typeof segment === 'number') {
+      return `${joined}[${segment}]`;
+    }
+
+    return joined === '' ? String(segment) : `${joined}.${String(segment)}`;
+  }, '');
+}

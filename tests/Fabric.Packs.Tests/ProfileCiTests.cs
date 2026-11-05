@@ -30,6 +30,7 @@ public sealed class ProfileCiTests
         CompleteProfiles.ShouldContain("saas-standard-react");
         CompleteProfiles.ShouldContain("lean-crud");
         CompleteProfiles.ShouldContain("saas-strict-react");
+        CompleteProfiles.ShouldContain("saas-standard-vue");
     }
 
     [Fact]
