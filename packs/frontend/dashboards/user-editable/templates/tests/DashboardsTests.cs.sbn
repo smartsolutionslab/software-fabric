@@ -115,6 +115,24 @@ public class DashboardsTests(AspireFixture aspire)
         run.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    [Theory]
+    [InlineData(int.MaxValue, 1)]
+    [InlineData(11, int.MaxValue)]
+    [InlineData(-1, 6)]
+    [InlineData(7, 6)]
+    public async Task A_widget_outside_the_grids_twelve_columns_is_refused(int x, int width)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var id = Guid.CreateVersion7();
+        using var developer = await aspire.CreateHostClientAsync("developer");
+        var dashboard = new { name = "Off the grid", widgets = new[] { new { key = "w0", source = Chart, visual = "bar", x, y = 0, width, height = 4 } } };
+
+        var saved = await developer.PutAsJsonAsync(Path(id), dashboard, cancellationToken);
+
+        saved.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await saved.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["code"]!.GetValue<string>().ShouldBe("dashboards.invalid-widget");
+    }
+
     [Fact]
     public async Task The_declared_widgets_are_listed_and_run_as_the_caller()
     {

@@ -71,6 +71,17 @@ public sealed class DashboardsTests
         }
         """;
 
+    private const string RevenueWidgetInTheBuildingBlocks = """
+        namespace Shop.BuildingBlocks.Dashboards;
+
+        public sealed class SharedWidgets : IModuleWidgets
+        {
+            public void Declare(WidgetCatalogBuilder widgets)
+            {
+            }
+        }
+        """;
+
     private const string ManagedRevenueWidget = """
         using Shop.BuildingBlocks.Dashboards;
         using Shop.BuildingBlocks.Messaging;
@@ -239,6 +250,14 @@ public sealed class DashboardsTests
         var output = ArchitectureFailure(Profile, "src/Modules/Billing/Billing.Api/Revenue", RevenueWidgetInTheApi, Dashboards);
 
         output.ShouldContain("Shop.Modules.Billing.Api.Revenue.BillingWidgets declares widgets in Shop.Modules.Billing.Api: a module declares its widgets, and their queries, in its Application project.");
+    }
+
+    [Fact]
+    public void Widgets_declared_in_the_building_blocks_fail_the_architecture_tests_naming_them()
+    {
+        var output = ArchitectureFailure(Profile, "src/BuildingBlocks/Dashboards", RevenueWidgetInTheBuildingBlocks, Dashboards);
+
+        output.ShouldContain("Shop.BuildingBlocks.Dashboards.SharedWidgets declares widgets in BuildingBlocks: a module declares its widgets, and their queries, in its Application project.");
     }
 
     [Fact]
