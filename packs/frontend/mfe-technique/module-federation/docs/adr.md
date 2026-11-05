@@ -17,10 +17,12 @@ and work in development without building every remote first.
 - **The shell** (`web/app/federation.ts`) declares every directory of `web/modules` as a remote, at the address the
   AppHost gives it, `/modules/<module>/` when built. `src/remotes/Remote.tsx` loads a module's `./Page` with
   `loadRemote` from `@module-federation/runtime` once, shows it, and shows that the module is unavailable when its
-  remote cannot be loaded.
+  remote cannot be loaded. The next time that page is opened it registers the remote again under a new address for its
+  `remoteEntry.js` (`?retry=<n>`): the browser keeps a failed module import for good, so only a new address loads the
+  remote once its server is back, without reloading the shell.
 - **Shared as singletons** by both sides: `react`, `react-dom` and `@{{ name }}/ui`. A remote gets them from the shell.
 - No type declarations are exchanged (`dts: false`): a remote is loaded by name, and its page takes no props.
-- Each remote's `lint` runs ESLint and Prettier, its `build` type-checks it and builds `dist/remoteEntry.js`, and its
+- Each remote's `lint` runs ESLint, with the shell's library bans and test rules, and Prettier, its `build` type-checks it and builds `dist/remoteEntry.js`, and its
   tests run with Vitest.
 
 ## Consequences

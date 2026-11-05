@@ -3,7 +3,11 @@ import { render, screen } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 import { Remote } from './Remote';
 
-vi.mock('@module-federation/runtime', () => ({ loadRemote: vi.fn() }));
+vi.mock('@module-federation/runtime', () => ({
+  getInstance: () => null,
+  loadRemote: vi.fn(),
+  registerRemotes: vi.fn(),
+}));
 
 test("a module's page is the page its remote exposes", async () => {
   vi.mocked(loadRemote).mockResolvedValue({ default: () => <h1>Billing</h1> });

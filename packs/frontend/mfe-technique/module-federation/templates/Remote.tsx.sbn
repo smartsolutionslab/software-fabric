@@ -1,4 +1,4 @@
-import { loadRemote } from '@module-federation/runtime';
+import { getInstance, loadRemote, registerRemotes } from '@module-federation/runtime';
 import { Component, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 
 /** What every module's remote exposes as ./Page: the module's screens, as one component. */
@@ -7,15 +7,36 @@ interface RemoteModule {
 }
 
 const pages = new Map<string, Promise<ComponentType>>();
+const failures = new Map<string, number>();
+
+/**
+ * Registers a remote that failed to load again under a new address for its remoteEntry.js. The browser keeps a failed
+ * module import for good, and the runtime its failed entry, so only a new address loads it once its server is back.
+ */
+function retry(module: string, attempt: number) {
+  const remote = getInstance()?.options.remotes.find((candidate) => candidate.name === module);
+  if (!remote || !('entry' in remote)) {
+    return;
+  }
+
+  const entry = new URL(remote.entry, window.location.href);
+  entry.searchParams.set('retry', String(attempt));
+  registerRemotes([{ ...remote, entry: entry.href }], { force: true });
+}
 
 /**
  * Loads a module's page from its remote once; every later mount gets the same component. A load that failed is
- * forgotten, so the next mount tries again once the remote is back.
+ * forgotten, so the next mount tries again, at a new address, once the remote is back.
  */
 function pageOf(module: string): Promise<ComponentType> {
   const known = pages.get(module);
   if (known) {
     return known;
+  }
+
+  const failed = failures.get(module) ?? 0;
+  if (failed > 0) {
+    retry(module, failed);
   }
 
   const page = loadRemote<RemoteModule>(`${module}/Page`).then((loaded) => {
@@ -26,7 +47,13 @@ function pageOf(module: string): Promise<ComponentType> {
     return loaded.default;
   });
   pages.set(module, page);
-  page.catch(() => pages.delete(module));
+  page.then(
+    () => failures.delete(module),
+    () => {
+      pages.delete(module);
+      failures.set(module, failed + 1);
+    },
+  );
   return page;
 }
 
