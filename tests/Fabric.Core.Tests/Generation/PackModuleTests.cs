@@ -223,15 +223,25 @@ public sealed class PackModuleTests : IDisposable
     }
 
     [Fact]
-    public void A_project_rule_on_modules_holds_when_a_brought_module_satisfies_it()
+    public void A_project_rule_on_modules_is_checked_against_the_module_defaults_as_validate_checks_it()
     {
         var catalog = Catalog("rest: { tier: supported }", """rest: { tier: supported, requires: ["module.style == crud"] }""");
         Declare("backend.api-protocols.rest", "modules: { reports: { module.style: crud } }");
 
-        var generated = Generator.New(catalog, Packs(catalog), "shop", "minimal", []);
+        Generator.New(catalog, Packs(catalog), "shop", "minimal", []).Errors.ShouldBe([
+            "backend.api-protocols=rest requires module.style == crud, but no module satisfies it.",
+        ]);
+    }
 
-        generated.Errors.ShouldBeEmpty();
-        FabricYaml(generated).ShouldEndWith("modules:\n  reports:\n    module.style: crud\n");
+    [Fact]
+    public void A_single_select_pin_with_two_options_conflicts_even_when_they_repeat_the_other_pin()
+    {
+        Declare("backend.api-protocols.rest", "modules: { reports: { module.style: crud } }");
+        Declare("backend.api-protocols.grpc", "modules: { reports: { module.style: [crud, crud] } }");
+
+        New("everything").Errors.ShouldBe([
+            "module 'reports': backend.api-protocols.grpc pins module.style=crud,crud, but backend.api-protocols.rest pins module.style=crud.",
+        ]);
     }
 
     [Fact]
