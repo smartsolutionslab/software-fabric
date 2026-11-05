@@ -122,16 +122,16 @@ public sealed partial class EvalsTests
     }
 
     [Theory]
-    [InlineData("anthropic", "\"anthropic-model\", \"claude-haiku-5-5\"")]
-    [InlineData("openai", "\"openai-model\", \"gpt-5-mini\"")]
-    [InlineData("azure-openai", "\"azure-openai-deployment\", \"gpt-5-mini\"")]
-    [InlineData("ollama", "\"ollama-model\", \"llama3.2:1b\"")]
-    public void The_eval_project_defaults_to_the_model_the_apphost_defaults_to(string provider, string parameterAndModel)
+    [InlineData("anthropic", "\"anthropic-model\", \"claude-haiku-5-5\"", "\"anthropic-model\", \"claude-haiku-5-5\"")]
+    [InlineData("openai", "\"openai-model\", \"gpt-5-mini\"", "\"openai-model\", \"gpt-5-mini\"")]
+    [InlineData("azure-openai", "\"azure-openai-deployment\", \"gpt-5-mini\"", "\"azure-openai-deployment\", \"gpt-5-mini\"")]
+    [InlineData("ollama", "\"ollama-model\", \"llama3.2:1b\"", "\"Ollama:Model\", \"llama3.2:1b\"")]
+    public void The_eval_project_defaults_to_the_model_the_apphost_defaults_to(string provider, string appHostDefault, string evalDefault)
     {
         var files = Files($"backend.llm={provider}", Evals);
 
-        files["src/AppHost/AppHost.cs"].ShouldContain(parameterAndModel);
-        files["tests/Evals/ProjectModel.cs"].ShouldContain(parameterAndModel);
+        files["src/AppHost/AppHost.cs"].ShouldContain(appHostDefault);
+        files["tests/Evals/ProjectModel.cs"].ShouldContain(evalDefault);
     }
 
     [Fact]
