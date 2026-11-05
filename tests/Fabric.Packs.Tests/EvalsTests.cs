@@ -163,7 +163,7 @@ public sealed partial class EvalsTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 7");
+        output.ShouldContain("succeeded: 15");
     }
 
     [Fact]

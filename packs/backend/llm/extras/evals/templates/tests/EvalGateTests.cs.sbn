@@ -15,6 +15,9 @@ public sealed class EvalGateTests : IDisposable
 {
     private const double Threshold = 4;
 
+    /// <summary>The stand-in model's answer: it knows nothing it was not given, so it names no due date.</summary>
+    private const string Answer = "An invoice records what was sold, to whom and for how much.";
+
     private readonly DirectoryInfo results = Directory.CreateTempSubdirectory("evals-");
 
     [Fact]
@@ -88,6 +91,48 @@ public sealed class EvalGateTests : IDisposable
         Should.Throw<InvalidOperationException>(() => EvalThreshold.Read(fabricYaml)).Message.ShouldContain("settings.backend.llm.extras.evals.threshold");
     }
 
+    [Fact]
+    public async Task The_answering_model_is_given_the_grounding_context_of_an_example_that_has_one()
+    {
+        using var model = new FakeChatClient(Answer);
+        using var judge = new FakeJudge(5);
+
+        await EvalRun.RunAsync(UseCases.All, model, judge, results.FullName, "gate", TestContext.Current.CancellationToken);
+
+        var contexts = UseCases.All.SelectMany(useCase => useCase.Examples).Select(example => example.GroundingContext).OfType<string>().ToList();
+        contexts.ShouldNotBeEmpty();
+        foreach (var context in contexts)
+        {
+            model.Requests.ShouldContain(request => request.Any(message => message.Text.Contains(context, StringComparison.Ordinal)), context);
+        }
+    }
+
+    [Theory]
+    [InlineData("NaN")]
+    [InlineData("Infinity")]
+    [InlineData("-Infinity")]
+    [InlineData("0.9")]
+    [InlineData("5.1")]
+    public void A_threshold_that_is_not_a_finite_number_from_1_to_5_fails_naming_the_key(string value)
+    {
+        var fabricYaml = Write($"fabric: 1\nname: sample\nproject: {{}}\nsettings:\n  backend.llm.extras.evals.threshold: {value}\nmodule-defaults: {{}}\nmodules: {{}}\n");
+
+        var message = Should.Throw<InvalidOperationException>(() => EvalThreshold.Read(fabricYaml)).Message;
+
+        message.ShouldContain("settings.backend.llm.extras.evals.threshold");
+        message.ShouldContain("from 1 to 5");
+    }
+
+    [Theory]
+    [InlineData("1", 1)]
+    [InlineData("5", 5)]
+    public void A_threshold_at_either_end_of_the_range_is_accepted(string value, double threshold)
+    {
+        var fabricYaml = Write($"fabric: 1\nname: sample\nproject: {{}}\nsettings:\n  backend.llm.extras.evals.threshold: {value}\nmodule-defaults: {{}}\nmodules: {{}}\n");
+
+        EvalThreshold.Read(fabricYaml).ShouldBe(threshold);
+    }
+
     public void Dispose() => results.Delete(recursive: true);
 
     private static int Count(EvalScores scores, string useCase, string metric) =>
@@ -95,7 +140,7 @@ public sealed class EvalGateTests : IDisposable
 
     private async Task<EvalScores> RunAsync(int judgeScore)
     {
-        using var model = new FakeChatClient("An invoice records what was sold, to whom, for how much and when it is due: 31 March 2026.");
+        using var model = new FakeChatClient(Answer);
         using var judge = new FakeJudge(judgeScore);
         return await EvalRun.RunAsync(UseCases.All, model, judge, results.FullName, "gate", TestContext.Current.CancellationToken);
     }
