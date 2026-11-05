@@ -1,4 +1,5 @@
 {{~ signed_in = project["backend.auth"] != "none" ~}}
+{{~ panel = project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa" ~}}
 # Agent UI: AG-UI
 
 **Status:** Accepted (generated)
@@ -11,13 +12,20 @@ A module offers an agent by implementing `IAgentConversation<TSelf>` (`src/Build
 
 The `assistant` module is the sample: `AssistantAgent` counts words with the module's own `CountWords` query as its tool, and `TalkToTheAssistant` runs it.
 
-Tests never call a model. In Development, the AppHost parameter `model-stand-in` set to `true` makes the host answer every agent with `StandInChatClient` (`src/Host/Agents`), which calls the first tool it is offered and streams its answer a word at a time. Only the integration tests set the parameter; it is `false` otherwise, and the host ignores it outside Development.
+{{ if panel }}The web app's agent panel, `AgentPanel` (`web/app/src/agents`), is the `assistant` module's page. It talks to the endpoint with `@ag-ui/client`'s `HttpAgent` through `/api`, like every other call, {{ if signed_in }}with the signed-in user's access token in the `Authorization` header, read for every run as the API client reads it, {{ end }}and sends the whole conversation each time. It shows the user's messages, each tool call with its arguments and result, and the agent's text while it streams in, all as plain text; it is built from the project's shadcn/ui components and React Hook Form. CopilotKit is not used: its client brings a GraphQL runtime, a licence verifier and telemetry the panel does not need.{{ else }}The agent panel is built for a React single-page app only so far; here (`frontend.framework: {{ project["frontend.framework"] }}`, `frontend.architecture: {{ project["frontend.architecture"] }}`) `web/app/src/agents/AgentPanel.test.ts` fails the web app's tests saying so, until the generator builds it for this combination.{{ end }}
+
+Tests never call a model. In Development, the AppHost parameter `model-stand-in` set to `true` makes the host answer every agent with `StandInChatClient` (`src/Host/Agents`), which calls the first tool it is offered for the latest message and streams its answer a word at a time. Only the integration tests and the end-to-end script (`.github/scripts/e2e.sh`) set the parameter; it is `false` otherwise, and the host ignores it outside Development.
 
 ## Gates
 
 - `AgentUiGoesThroughAQuery` (architecture tests): no module and not the BuildingBlocks reference the AG-UI SDK (`AGUI.*`), the host references no Agent Framework package, and nothing references Agent Framework's AG-UI hosting (`Microsoft.Agents.AI.Hosting.AGUI*`), whose endpoint runs an agent itself.
-- `tests/Integration.Tests/AgentUiTests.cs`, against the running application: the assistant's answer arrives in more than one `TEXT_MESSAGE_CONTENT` event after a `count_words` tool call whose result its handler computed{{ if signed_in }}; an anonymous caller is refused{{ end }}; an agent no module registers is not found.
+- `tests/Integration.Tests/AgentUiTests.cs`, against the running application: the assistant's answer arrives in more than one `TEXT_MESSAGE_CONTENT` event after a `count_words` tool call whose result its handler computed{{ if signed_in }}; an anonymous caller is refused{{ end }}; a second turn calls the tool again for its own message; an agent no module registers is not found.
 - `tests/Modules/Assistant.Tests/Queries/TalkToTheAssistantTests.cs`: the assistant's query streams a tool call through the dispatcher and the answer built from its result.
+{{~ if panel ~}}
+- Lint: importing CopilotKit (`@copilotkit/*`) fails.
+- `web/app/src/agents/AgentPanel.test.tsx`: the panel shows the answer while it streams, after the tool call and its result, sends the whole conversation{{ if signed_in }} with the user's token{{ end }}, and shows a refused run as an alert{{ if array.contains(project["frontend.test.extras"], "accessibility") }}; axe finds no violations{{ end }}.
+- `web/app/e2e/agent-panel.spec.ts`, against the AppHost with the stand-in model: two messages from the assistant's page, each answered in several streamed chunks after a `count_words` call whose result the panel shows.
+{{~ end ~}}
 
 ## Consequences
 

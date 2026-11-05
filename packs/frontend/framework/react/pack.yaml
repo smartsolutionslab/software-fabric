@@ -16,6 +16,7 @@ files:
   - { template: templates/gitignore.sbn, target: web/app/.gitignore }
   - { template: templates/e2e.sh.sbn, target: ".github/scripts/e2e.sh" }
 declares-slots:
+  - { slot: e2e.apphost-environment, description: "Environment variables .github/scripts/e2e.sh starts the AppHost with, each 'Name=value' quoted for the shell: settings only the end-to-end tests give, such as a test-only AppHost parameter (Parameters__<name>).", separator: " " }
   - { slot: web.scripts, description: "Entries of web/app's scripts ('\"codegen\": \"...\"').", separator: ",\n" }
   - { slot: web.prepare, description: "Commands run before dev, build and test (code generators), joined with ' && '.", separator: " && " }
   - { slot: web.env, description: "Members of ImportMetaEnv: the VITE_ variables the app reads." }

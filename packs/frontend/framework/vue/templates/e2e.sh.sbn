@@ -13,7 +13,10 @@ log="$(mktemp)"
 
 # No input: a background process group that reads its terminal is stopped.
 # Plain `dotnet run`: Aspire's CLI, which it hands the AppHost to, starts the Debug build whatever -c says.
-dotnet run --project src/AppHost --launch-profile http < /dev/null > "$log" 2>&1 &
+{{~ if slots["e2e.apphost-environment"] != "" ~}}
+# Settings only the tests give the AppHost, as configuration from the environment: Parameters__<name> is Parameters:<name>.
+{{~ end ~}}
+{{ if slots["e2e.apphost-environment"] != "" }}env {{ slots["e2e.apphost-environment"] }} {{ end }}dotnet run --project src/AppHost --launch-profile http < /dev/null > "$log" 2>&1 &
 apphost=$!
 
 stop() {
