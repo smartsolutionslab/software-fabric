@@ -26,6 +26,17 @@ public static class EvalRun
         {{ not_null "model" }}
         {{ not_null "judge" }}
 
+        if (useCases.Count == 0)
+        {
+            throw new InvalidOperationException("There are no use cases to evaluate: list them in UseCases.All, each with examples.");
+        }
+
+        var withoutExamples = useCases.Where(useCase => useCase.Examples.Count == 0).Select(useCase => $"'{useCase.Name}'").ToList();
+        if (withoutExamples.Count > 0)
+        {
+            throw new InvalidOperationException($"These use cases have no examples, so nothing would hold them to the threshold: {string.Join(", ", withoutExamples)}. Give each examples that cover what it is for.");
+        }
+
         var judgeConfiguration = new ChatConfiguration(judge);
         var withoutContext = Reporting(resultsDirectory, executionName, judgeConfiguration, new RelevanceEvaluator(), new AnsweredEvaluator());
         var withContext = Reporting(resultsDirectory, executionName, judgeConfiguration, new RelevanceEvaluator(), new GroundednessEvaluator(), new AnsweredEvaluator());
