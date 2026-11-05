@@ -130,9 +130,10 @@ none is a new choice of option.
   as `Agents:ModelStandIn` and, in Development only, replaces the provider's
   `IChatClient` with the stand-in, which calls the first tool it is offered
   with the user's message and streams its answer a word at a time. The
-  `AspireFixture` sets it (`integration-tests.parameters`). `e2e.sh` has no
-  slot for it yet; the React panel's end-to-end test (#203) adds that, since
-  it is the first end-to-end test that needs it.
+  `AspireFixture` sets it (`integration-tests.parameters`), and `e2e.sh`
+  through the slot the React panel added for it (below). Only a tool result
+  after the latest user message counts, so every turn of a conversation calls
+  the tool again (#203).
 - **The gate** `AgentUiGoesThroughAQuery` reads the compiled assemblies: the
   modules and the BuildingBlocks reference no `AGUI.*`, the host (which the
   architecture tests already reference for their endpoint rules) references
@@ -145,6 +146,38 @@ none is a new choice of option.
   through the running host.
 - The backend generates the same for React and Vue; the Vue panel's templates
   (#183) are where the pack branches on the framework.
+
+**As built for the React panel (#203).** These follow from the decisions
+above too.
+
+- **The panel** is `AgentPanel` in `web/app/src/agents`, with `useAgent` (the
+  conversation, kept by `@ag-ui/client`'s `HttpAgent`, so every run sends all
+  of it) and `connectAgent` (the `HttpAgent` for `/api/agents/{name}`). Its
+  `fetch` adds the signed-in user's token for every run, read as the API
+  client reads it (`@/auth/accessToken`); without `backend.auth` it adds
+  none. It shows the user's messages, each tool call with its arguments and
+  result, and the answer while it streams, all as text. It is built from
+  the shadcn `Button` and a textarea styled with the theme, in a React Hook
+  Form with a zod schema, as the project's other forms are.
+- **Where it shows.** The `assistant` module's page renders it. That page
+  is the router pack's, one per module, and there are no per-module slots,
+  so `react-router`'s page template branches on this choice (ADR-0006), as
+  it does for the dashboards module.
+- **Where it is not built yet.** It is built for a React single-page app
+  on shadcn/ui, React Hook Form and zod. With Vue (#183) or micro-frontends
+  the web app gets `src/agents/AgentPanel.test.ts`, which fails its tests
+  saying so; with another UI, forms or validation library, the panel's
+  module fails the build saying so.
+- **`e2e.sh`** has a slot, `e2e.apphost-environment`, declared by the React
+  and Vue packs (each owns its copy of the script): environment variables
+  the script starts the AppHost with. The pack fills it with
+  `Parameters__model-stand-in=true`, which the AppHost reads as
+  `Parameters:model-stand-in`. Empty, the script is unchanged.
+- **Lint** refuses `@copilotkit/*` in the web app.
+- **Its tests.** `AgentPanel.test.tsx` feeds the panel a server-sent event
+  stream the test writes, and checks axe where the project has the
+  accessibility tests. `e2e/agent-panel.spec.ts` sends two messages through
+  the panel against the AppHost with the stand-in model.
 
 **Delivered in three steps** (owner's decision on #182): first this
 dimension, this ADR and the `none` pack; then the `ag-ui` pack's backend; then
