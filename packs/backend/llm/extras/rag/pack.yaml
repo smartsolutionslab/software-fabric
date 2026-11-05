@@ -1,0 +1,28 @@
+option: backend.llm.extras.rag
+files:
+  - { template: templates/ModuleVectorIndex.cs.sbn, target: src/BuildingBlocks/Rag/ModuleVectorIndex.cs }
+  - { template: templates/RetrievedPassage.cs.sbn, target: src/BuildingBlocks/Rag/RetrievedPassage.cs }
+  - { template: templates/VectorTables.cs.sbn, target: src/BuildingBlocks/Rag/VectorTables.cs }
+  - { template: templates/VectorIndexRegistration.cs.sbn, target: src/BuildingBlocks/Rag/Wiring/VectorIndexRegistration.cs }
+  - { template: templates/ModulesSearchOnlyTheirOwnVectors.cs.sbn, target: tests/Architecture.Tests/Rules/ModulesSearchOnlyTheirOwnVectors.cs }
+  - { template: templates/tests/FakeEmbeddingGenerator.cs.sbn, target: tests/Fakes/FakeEmbeddingGenerator.cs }
+  - { template: templates/tests/Rag.Tests.csproj.sbn, target: tests/Rag.Tests/Rag.Tests.csproj }
+  - { template: templates/tests/AspireDatabase.cs.sbn, target: tests/Rag.Tests/AspireDatabase.cs }
+  - { template: templates/tests/SampleNotesDbContext.cs.sbn, target: tests/Rag.Tests/SampleNotesDbContext.cs }
+  - { template: templates/tests/SampleDraftsDbContext.cs.sbn, target: tests/Rag.Tests/SampleDraftsDbContext.cs }
+  - { template: templates/tests/VectorIndexTests.cs.sbn, target: tests/Rag.Tests/VectorIndexTests.cs }
+  - { template: templates/tests/VectorTablesTests.cs.sbn, target: tests/Rag.Tests/VectorTablesTests.cs }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-version.sbn }
+  - { slot: buildingblocks.packages, template: templates/buildingblocks-package.sbn }
+  - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: migration-runner.steps, template: templates/migration-runner-step.sbn }
+  - { slot: tests.module-host-services, template: templates/module-host-services.sbn }
+  - { slot: solution.projects, template: templates/solution-projects.sbn }
+  - { slot: readme.sections, template: templates/readme-section.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "A module's types use ModuleVectorIndex<TContext> only with that module's own DbContext, in a signature, field, local or method body: one that names another module's DbContext fails the build, naming the type and both modules.", file: templates/ModulesSearchOnlyTheirOwnVectors.cs.sbn }
+  - { kind: unit-test, describes: "Against the AppHost's database (pgvector image) after the MigrationRunner: every module's schema has its embeddings table of the model's size with an HNSW cosine index, creating them again keeps their records, a search with FakeEmbeddingGenerator returns the nearest records first, and indexing a key again replaces it.", file: templates/tests/VectorIndexTests.cs.sbn }

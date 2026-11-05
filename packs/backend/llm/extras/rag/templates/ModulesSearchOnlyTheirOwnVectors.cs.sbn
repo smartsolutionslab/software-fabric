@@ -1,0 +1,218 @@
+using System.Reflection;
+using System.Reflection.Emit;
+using {{ namespace }}.BuildingBlocks.Rag;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A module's vectors are its own: every <see cref="ModuleVectorIndex{TContext}"/> a module's type names, in a field,
+/// property, signature, local or method body, has that module's own DbContext as its context. Another module's records
+/// are reached through <c>src/Contracts</c>, never through its vector table.
+/// </summary>
+public sealed class ModulesSearchOnlyTheirOwnVectors : IArchitectureRule
+{
+    private const string ModulesPrefix = "{{ namespace }}.Modules.";
+
+    /// <summary>Compared by name: the module assemblies are loaded from the test output, beside this one.</summary>
+    private static readonly string Index = typeof(ModuleVectorIndex<>).FullName!;
+
+    private const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+    private static readonly Dictionary<short, OpCode> OpCodesByValue = typeof(OpCodes)
+        .GetFields(BindingFlags.Public | BindingFlags.Static)
+        .Select(field => (OpCode)field.GetValue(null)!)
+        .ToDictionary(code => code.Value);
+
+    public string Description => "A module uses ModuleVectorIndex<TContext> only with its own DbContext: no module searches another module's vectors.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        List<string> violations = [];
+        foreach (var assembly in model.ModuleAssemblies)
+        {
+            var module = ModuleOf(assembly);
+            foreach (var type in assembly.GetTypes().Where(type => !IsCompilerGenerated(type)))
+            {
+                foreach (var context in ContextsUsedBy(type).Distinct().OrderBy(context => context.FullName, StringComparer.Ordinal))
+                {
+                    var owner = ModuleOf(context.Assembly);
+                    if (owner != module)
+                    {
+                        violations.Add($"{type.FullName} (module {module}) uses ModuleVectorIndex<{context.Name}>, module {owner ?? context.Assembly.GetName().Name}'s vectors. A module searches only its own vectors; reach another module's records through src/Contracts.");
+                    }
+                }
+            }
+        }
+
+        return violations;
+    }
+
+    private static string? ModuleOf(Assembly assembly)
+    {
+        var name = assembly.GetName().Name ?? string.Empty;
+        if (!name.StartsWith(ModulesPrefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var rest = name[ModulesPrefix.Length..];
+        var dot = rest.IndexOf('.', StringComparison.Ordinal);
+        return dot < 0 ? rest : rest[..dot];
+    }
+
+    private static bool IsCompilerGenerated(Type type) =>
+        type.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), inherit: false) && type.DeclaringType is not null;
+
+    /// <summary>The contexts of every vector index the type names, its compiler-generated nested types (lambdas, async state machines) included.</summary>
+    private static IEnumerable<Type> ContextsUsedBy(Type type)
+    {
+        var types = new[] { type }.Concat(type.GetNestedTypes(Declared).Where(IsCompilerGenerated).SelectMany(Nested));
+        return types.SelectMany(TypesNamedBy).SelectMany(Contexts);
+    }
+
+    private static IEnumerable<Type> Nested(Type type) =>
+        new[] { type }.Concat(type.GetNestedTypes(Declared).SelectMany(Nested));
+
+    private static List<Type> TypesNamedBy(Type type)
+    {
+        List<Type> named = [];
+        if (type.BaseType is { } baseType)
+        {
+            named.Add(baseType);
+        }
+
+        named.AddRange(type.GetInterfaces());
+        named.AddRange(type.GetFields(Declared).Select(field => field.FieldType));
+        named.AddRange(type.GetProperties(Declared).Select(property => property.PropertyType));
+        foreach (var method in type.GetMethods(Declared).Cast<MethodBase>().Concat(type.GetConstructors(Declared)))
+        {
+            named.AddRange(method.GetParameters().Select(parameter => parameter.ParameterType));
+            if (method is MethodInfo info)
+            {
+                named.Add(info.ReturnType);
+            }
+
+            named.AddRange(BodyOf(method));
+        }
+
+        return named;
+    }
+
+    /// <summary>The types of a method body's locals, and those its instructions name: the types, fields and methods they call, create or load.</summary>
+    private static List<Type> BodyOf(MethodBase method)
+    {
+        var body = method.GetMethodBody();
+        var il = body?.GetILAsByteArray();
+        if (body is null || il is null)
+        {
+            return [];
+        }
+
+        List<Type> named = [.. body.LocalVariables.Select(local => local.LocalType)];
+        var typeArguments = method.DeclaringType?.IsGenericType == true ? method.DeclaringType.GetGenericArguments() : null;
+        var methodArguments = method.IsGenericMethod ? method.GetGenericArguments() : null;
+        var position = 0;
+        while (position < il.Length)
+        {
+            var value = (short)il[position++];
+            if (value == 0xFE && position < il.Length)
+            {
+                value = (short)(0xFE00 | il[position++]);
+            }
+
+            if (!OpCodesByValue.TryGetValue(value, out var code))
+            {
+                break;
+            }
+
+            if (code.OperandType is OperandType.InlineMethod or OperandType.InlineField or OperandType.InlineType or OperandType.InlineTok)
+            {
+                named.AddRange(Resolve(method.Module, BitConverter.ToInt32(il, position), typeArguments, methodArguments));
+            }
+
+            position += OperandSize(code.OperandType, il, position);
+        }
+
+        return named;
+    }
+
+    private static IEnumerable<Type> Resolve(Module module, int token, Type[]? typeArguments, Type[]? methodArguments)
+    {
+        MemberInfo? member;
+        try
+        {
+            member = module.ResolveMember(token, typeArguments, methodArguments);
+        }
+        catch (ArgumentException)
+        {
+            yield break;
+        }
+
+        switch (member)
+        {
+            case Type type:
+                yield return type;
+                break;
+            case FieldInfo field:
+                yield return field.FieldType;
+                if (field.DeclaringType is { } fieldOwner)
+                {
+                    yield return fieldOwner;
+                }
+
+                break;
+            case MethodBase called:
+                if (called.DeclaringType is { } methodOwner)
+                {
+                    yield return methodOwner;
+                }
+
+                if (called.IsGenericMethod)
+                {
+                    foreach (var argument in called.GetGenericArguments())
+                    {
+                        yield return argument;
+                    }
+                }
+
+                if (called is MethodInfo info)
+                {
+                    yield return info.ReturnType;
+                }
+
+                break;
+        }
+    }
+
+    private static int OperandSize(OperandType operand, byte[] il, int position) => operand switch
+    {
+        OperandType.InlineNone => 0,
+        OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
+        OperandType.InlineVar => 2,
+        OperandType.InlineI8 or OperandType.InlineR => 8,
+        OperandType.InlineSwitch => 4 + (4 * BitConverter.ToInt32(il, position)),
+        _ => 4,
+    };
+
+    /// <summary>The context type arguments of every vector index the type is, contains or is built from.</summary>
+    private static IEnumerable<Type> Contexts(Type type)
+    {
+        if (type.HasElementType)
+        {
+            return Contexts(type.GetElementType()!);
+        }
+
+        if (!type.IsGenericType)
+        {
+            return [];
+        }
+
+        var arguments = type.GetGenericArguments();
+        IEnumerable<Type> own = type.GetGenericTypeDefinition().FullName == Index && !arguments[0].IsGenericParameter
+            ? [arguments[0]]
+            : [];
+        return own.Concat(arguments.Where(argument => !argument.IsGenericParameter).SelectMany(Contexts));
+    }
+}
