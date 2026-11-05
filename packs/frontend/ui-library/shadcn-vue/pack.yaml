@@ -16,4 +16,4 @@ adr: docs/adr.md
 gates:
   - { kind: lint-rule, describes: "Importing another Vue component library (PrimeVue, Vuetify, Quasar, Element Plus, Ant Design Vue, Naive UI, Headless UI, Radix Vue) fails lint.", file: templates/restricted.sbn }
   - { kind: ci-step, describes: "src/index.css defines the theme components.json names (cssVariables, slate) and applies its border, ring, background and foreground with @apply, so a theme that lacks them fails the build: Tailwind refuses an unknown utility in @apply.", file: templates/styles.sbn }
-  - { kind: unit-test, describes: "Button renders a button, and with as-child gives its child the button's look instead (src/components/ui/button/Button.test.ts).", file: templates/Button.test.ts.sbn }
+  - { kind: unit-test, describes: "Button renders a button in the theme's colours, has the registry's variants and sizes, and with as-child gives its child the button's look instead (src/components/ui/button/Button.test.ts).", file: templates/Button.test.ts.sbn }
