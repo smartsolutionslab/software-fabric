@@ -25,6 +25,7 @@ files:
   - { template: templates/tests/MatchPair.cs.sbn, target: tests/Agents.Tests/MatchPair.cs, when: 'project["backend.absence"] == "option"' }
   - { template: templates/tests/Status.cs.sbn, target: tests/Agents.Tests/Status.cs, when: 'project["backend.absence"] == "option"' }
   - { template: templates/tests/FindByStatus.cs.sbn, target: tests/Agents.Tests/FindByStatus.cs, when: 'project["backend.absence"] == "option"' }
+  - { template: templates/tests/Tally.cs.sbn, target: tests/Agents.Tests/Tally.cs, when: 'project["backend.absence"] == "option"' }
   - { template: templates/tests/RecordingDispatcher.cs.sbn, target: tests/Agents.Tests/RecordingDispatcher.cs }
   - { template: templates/tests/AgentTests.cs.sbn, target: tests/Agents.Tests/AgentTests.cs }
   - { template: templates/tests/AgentMcpToolTests.cs.sbn, target: tests/Agents.Tests/AgentMcpToolTests.cs, when: 'array.contains project["backend.mcp"] "client"' }

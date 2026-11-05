@@ -143,6 +143,16 @@ public sealed class AgentTests
     }
 
     [Fact]
+    public void A_request_with_an_option_inside_a_collection_cannot_become_a_tool()
+    {
+        var dispatcher = new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider()));
+
+        var refused = Should.Throw<InvalidOperationException>(() => DispatcherTool.For<Tally>(dispatcher, "Tallies the counts."));
+
+        refused.Message.ShouldContain("Tally has an Option inside a collection or dictionary at Counts");
+    }
+
+    [Fact]
     public void An_optional_enum_admits_its_names_and_null()
     {
         var dispatcher = new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider()));

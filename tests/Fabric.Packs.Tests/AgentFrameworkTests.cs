@@ -90,6 +90,29 @@ public sealed class AgentFrameworkTests
         }
         """;
 
+    private const string ToolWithOptionsInCollections = """
+        using Shop.BuildingBlocks.Agents;
+        using Shop.BuildingBlocks.Messaging;
+        using Microsoft.Agents.AI;
+        using Microsoft.Extensions.AI;
+
+        namespace Shop.Modules.Billing.Application.Agents;
+
+        public sealed record FilterInvoices(IReadOnlyList<Option<int>> Amounts, IReadOnlyDictionary<string, Option<string>> Notes) : IQuery<Result<int, ApiError>>;
+
+        public sealed class FilterInvoicesHandler : IQueryHandler<FilterInvoices, Result<int, ApiError>>
+        {
+            public Task<Result<int, ApiError>> HandleAsync(FilterInvoices query, CancellationToken cancellationToken) =>
+                Task.FromResult<Result<int, ApiError>>(Success(0));
+        }
+
+        public static class FilterAgent
+        {
+            public static AIAgent Create(IChatClient model, IDispatcher dispatcher) =>
+                model.AsAIAgent(instructions: "Filter the invoices.", tools: [DispatcherTool.For<FilterInvoices>(dispatcher, "Filters the invoices.")]);
+        }
+        """;
+
     private const string AgentWithoutTheChoice = """
         using Microsoft.Agents.AI;
         using Microsoft.Extensions.AI;
@@ -176,7 +199,7 @@ public sealed class AgentFrameworkTests
         var (agentsExitCode, agentsOutput) = project.Test("tests/Agents.Tests/Agents.Tests.csproj");
         agentsExitCode.ShouldBe(0, agentsOutput);
         agentsOutput.ShouldContain("failed: 0");
-        agentsOutput.ShouldContain("succeeded: 11");
+        agentsOutput.ShouldContain("succeeded: 12");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
@@ -196,7 +219,7 @@ public sealed class AgentFrameworkTests
         var (agentsExitCode, agentsOutput) = project.Test("tests/Agents.Tests/Agents.Tests.csproj");
         agentsExitCode.ShouldBe(0, agentsOutput);
         agentsOutput.ShouldContain("failed: 0");
-        agentsOutput.ShouldContain("succeeded: 12");
+        agentsOutput.ShouldContain("succeeded: 13");
 
         var (mcpExitCode, mcpOutput) = project.Test("tests/Mcp.Tests/Mcp.Tests.csproj");
         mcpExitCode.ShouldBe(0, mcpOutput);
@@ -245,6 +268,15 @@ public sealed class AgentFrameworkTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
+    }
+
+    [Fact]
+    public void A_tool_request_with_an_option_inside_a_collection_or_dictionary_fails_the_architecture_tests_naming_the_request_and_the_property()
+    {
+        var output = ArchitectureFailure("src/Modules/Billing/Billing.Application/Agents", ToolWithOptionsInCollections);
+
+        output.ShouldContain("Shop.Modules.Billing.Application.Agents.FilterInvoices has an Option inside a collection or dictionary at Amounts");
+        output.ShouldContain("Shop.Modules.Billing.Application.Agents.FilterInvoices has an Option inside a collection or dictionary at Notes");
     }
 
     [Fact]
