@@ -44,9 +44,10 @@ jobs:
         with:
           global-json-file: global.json
 {{~ if provider == "ollama" ~}}
+      # The service may still be starting: retry until the server answers, then wait for the whole pull.
       - name: Pull the model
         run: |
-          curl --fail --silent --show-error http://localhost:11434/api/pull -d "{\"model\": \"$Ollama__Model\", \"stream\": false}"
+          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused http://localhost:11434/api/pull -d "{\"model\": \"$Ollama__Model\", \"stream\": false}"
 {{~ end ~}}
       - run: dotnet build tests/Evals/Evals.csproj -c Release
       - name: Evaluate

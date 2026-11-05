@@ -40,7 +40,7 @@ public sealed class EvalGateTests : IDisposable
     }
 
     [Fact]
-    public async Task Every_example_is_judged_for_relevance_and_only_one_with_context_for_groundedness()
+    public async Task Every_example_is_judged_for_relevance_and_only_those_with_context_for_groundedness()
     {
         var scores = await RunAsync(judgeScore: 5);
 
