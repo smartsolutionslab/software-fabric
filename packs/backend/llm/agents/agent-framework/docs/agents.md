@@ -2,7 +2,7 @@
 ## LLM agents: Microsoft Agent Framework
 
 - An agent is defined in a module's Application project, under `Agents/`: a static class whose `Create(IChatClient model, IDispatcher dispatcher)` returns `model.AsAIAgent(instructions: ..., name: ..., tools: [...])`. Never create or run an agent in Domain, Infrastructure, Api or BuildingBlocks; an architecture rule fails the build.
-- A command or query runs the agent: its handler takes `IChatClient` and `IDispatcher`, creates the agent and returns `Success(response.Text)`. An endpoint sends that request through `IDispatcher`; it never runs an agent.
+- A command or query runs the agent: its handler takes `IChatClient` and `IDispatcher`, creates the agent, runs it and returns its answer's text as a successful `Result`. An endpoint sends that request through `IDispatcher`; it never runs an agent.
 - A tool is one of the module's commands or queries: `DispatcherTool.For<FindInvoice>(dispatcher, "what it does, for the model")`. Never `AIFunctionFactory.Create`, an `AITool` of your own or an agent's `AsAIFunction`; an architecture rule fails the build.
 - Give a tool only to a use case a model may call with arguments of its own choosing. Its handler validates them as it would a request body.
 - To let agents work together, give one agent the command or query that runs the other, as a tool.
