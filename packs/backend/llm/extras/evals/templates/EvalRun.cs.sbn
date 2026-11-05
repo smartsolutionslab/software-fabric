@@ -1,0 +1,56 @@
+using System.Globalization;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.AI.Evaluation;
+using Microsoft.Extensions.AI.Evaluation.Quality;
+using Microsoft.Extensions.AI.Evaluation.Reporting;
+using Microsoft.Extensions.AI.Evaluation.Reporting.Storage;
+
+namespace {{ namespace }}.Evals;
+
+/// <summary>
+/// Runs the use cases: the model answers every example, and every answer is scored for relevance, for groundedness
+/// where the example supplies context, and by the project's own checks. The judge scores the judged metrics. Every
+/// result is written to the results directory under the execution's name, for <c>dotnet aieval report</c>.
+/// </summary>
+public static class EvalRun
+{
+    public static async Task<EvalScores> RunAsync(
+        IReadOnlyList<EvalUseCase> useCases,
+        IChatClient model,
+        IChatClient judge,
+        string resultsDirectory,
+        string executionName,
+        CancellationToken cancellationToken)
+    {
+        {{ not_null "useCases" }}
+        {{ not_null "model" }}
+        {{ not_null "judge" }}
+
+        var judgeConfiguration = new ChatConfiguration(judge);
+        var withoutContext = Reporting(resultsDirectory, executionName, judgeConfiguration, new RelevanceEvaluator(), new AnsweredEvaluator());
+        var withContext = Reporting(resultsDirectory, executionName, judgeConfiguration, new RelevanceEvaluator(), new GroundednessEvaluator(), new AnsweredEvaluator());
+
+        List<EvalScore> scores = [];
+        foreach (var useCase in useCases)
+        {
+            for (var index = 0; index < useCase.Examples.Count; index++)
+            {
+                var (input, groundingContext) = useCase.Examples[index];
+                var example = (index + 1).ToString(CultureInfo.InvariantCulture);
+                EvaluationContext[] context = groundingContext is null ? [] : [new GroundednessEvaluatorContext(groundingContext)];
+
+                await using var scenario = await (groundingContext is null ? withoutContext : withContext)
+                    .CreateScenarioRunAsync(useCase.Name, example, cancellationToken: cancellationToken);
+                var response = await useCase.Answer(model, input, cancellationToken);
+                var result = await scenario.EvaluateAsync([new ChatMessage(ChatRole.User, input)], response, context, cancellationToken);
+
+                scores.AddRange(result.Metrics.Values.Select(metric => new EvalScore(useCase.Name, example, metric.Name, (metric as NumericMetric)?.Value)));
+            }
+        }
+
+        return new EvalScores(scores);
+    }
+
+    private static ReportingConfiguration Reporting(string resultsDirectory, string executionName, ChatConfiguration judge, params IEvaluator[] evaluators) =>
+        DiskBasedReportingConfiguration.Create(resultsDirectory, evaluators, judge, enableResponseCaching: false, executionName: executionName);
+}

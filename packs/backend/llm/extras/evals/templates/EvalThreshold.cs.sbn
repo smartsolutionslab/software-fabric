@@ -1,0 +1,47 @@
+using System.Globalization;
+using YamlDotNet.Core;
+using YamlDotNet.RepresentationModel;
+
+namespace {{ namespace }}.Evals;
+
+/// <summary>
+/// The lowest mean score, from 1 to 5, each evaluator metric must reach over a use case's examples. It lives in
+/// <c>fabric.yaml</c> alone and is read when the evals run, so changing it there needs no regeneration.
+/// </summary>
+public static class EvalThreshold
+{
+    public const string Key = "backend.llm.extras.evals.threshold";
+
+    /// <summary>The threshold in the repository's <c>fabric.yaml</c>.</summary>
+    public static double Read() => Read(EvalPaths.FabricYaml);
+
+    /// <summary>The threshold in the <c>fabric.yaml</c> at the path; fails naming the key when it is missing or not a number.</summary>
+    public static double Read(string fabricYaml)
+    {
+        {{ not_null "fabricYaml" }}
+
+        var stream = new YamlStream();
+        try
+        {
+            using var reader = new StreamReader(fabricYaml);
+            stream.Load(reader);
+        }
+        catch (YamlException exception)
+        {
+            throw new InvalidOperationException($"{fabricYaml} is not valid YAML: {exception.Message}", exception);
+        }
+
+        var value = stream.Documents.Count > 0
+            && stream.Documents[0].RootNode is YamlMappingNode root
+            && root.Children.TryGetValue(new YamlScalarNode("settings"), out var settings)
+            && settings is YamlMappingNode map
+            && map.Children.TryGetValue(new YamlScalarNode(Key), out var setting)
+            && setting is YamlScalarNode { Value: { } text }
+                ? text
+                : throw new InvalidOperationException($"{fabricYaml} has no settings.{Key}: the lowest mean score (1 to 5) the evals accept. Add it under settings:, as fabric new writes it.");
+
+        return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var threshold)
+            ? threshold
+            : throw new InvalidOperationException($"{fabricYaml}: settings.{Key} is '{value}', not a number.");
+    }
+}

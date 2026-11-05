@@ -1,0 +1,10 @@
+{{~ provider = project["backend.llm"] ~}}
+{{~ if provider == "anthropic" ~}}
+- For the evals workflow, add the repository secret `ANTHROPIC_API_KEY`. Set the repository variable `EVALS_SCHEDULED` to `true` to run the evals weekly; they are off by default, and every run costs money.
+{{~ else if provider == "openai" ~}}
+- For the evals workflow, add the repository secret `OPENAI_API_KEY`. Set the repository variable `EVALS_SCHEDULED` to `true` to run the evals weekly; they are off by default, and every run costs money.
+{{~ else if provider == "azure-openai" ~}}
+- For the evals workflow, add the repository secret `AZURE_OPENAI_API_KEY` and the repository variable `AZURE_OPENAI_ENDPOINT`. Set the repository variable `EVALS_SCHEDULED` to `true` to run the evals weekly; they are off by default, and every run costs money.
+{{~ else ~}}
+- The evals workflow runs its own Ollama server and needs no secret. Set the repository variable `EVALS_SCHEDULED` to `true` to run the evals weekly; they are off by default.
+{{~ end ~}}

@@ -1,0 +1,23 @@
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Evals;
+
+/// <summary>
+/// The use cases the evals score, each with its examples. The sample stands in for a module's: add a module's use case
+/// by referencing its Application project and answering through its handler, with inputs that cover what it is for.
+/// </summary>
+public static class UseCases
+{
+    public static IReadOnlyList<EvalUseCase> All { get; } =
+    [
+        new(
+            "ask-the-model",
+            (model, input, cancellationToken) => model.GetResponseAsync(input, cancellationToken: cancellationToken),
+            [
+                new("In one sentence: what does an invoice record?"),
+                new(
+                    "When is invoice 2026-001 due?",
+                    "Invoice 2026-001 was issued on 1 March 2026 for 1,200 EUR and is due 30 days after it was issued, on 31 March 2026."),
+            ]),
+    ];
+}

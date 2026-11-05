@@ -1,0 +1,44 @@
+using System.Globalization;
+
+namespace {{ namespace }}.Evals;
+
+/// <summary>Every score of a run, and the rule they are held to: each metric's mean over a use case's examples reaches the threshold.</summary>
+public sealed class EvalScores(IReadOnlyList<EvalScore> scores)
+{
+    public IReadOnlyList<EvalScore> All => scores;
+
+    /// <summary>Every score, one line each, in the order they were given.</summary>
+    public IReadOnlyList<string> Report() =>
+        [.. scores.Select(score => $"{score.UseCase} #{score.Example} {score.Metric}: {Format(score.Value)}")];
+
+    /// <summary>
+    /// What fails the threshold, one line per use case and metric: a mean below it, or an example without a score. The
+    /// mean decides, not the lowest score, so one noisy judgement among good ones does not fail the run.
+    /// </summary>
+    public IReadOnlyList<string> BelowThreshold(double threshold)
+    {
+        List<string> violations = [];
+        foreach (var metric in scores.GroupBy(score => (score.UseCase, score.Metric)))
+        {
+            var (useCase, name) = metric.Key;
+            var unscored = metric.Where(score => score.Value is null).Select(score => score.Example).ToList();
+            if (unscored.Count > 0)
+            {
+                violations.Add($"{useCase}: {name} has no score for example {string.Join(", ", unscored)}; see the evaluator's diagnostics in the report.");
+                continue;
+            }
+
+            var values = metric.Select(score => score.Value!.Value).ToList();
+            var mean = values.Average();
+            if (mean < threshold)
+            {
+                violations.Add($"{useCase}: {name} has a mean of {Format(mean)} over {values.Count} examples, below the threshold of {Format(threshold)} (scores: {string.Join(", ", values.Select(value => Format(value)))}).");
+            }
+        }
+
+        return violations;
+    }
+
+    private static string Format(double? value) =>
+        value is { } number ? number.ToString("0.##", CultureInfo.InvariantCulture) : "no score";
+}

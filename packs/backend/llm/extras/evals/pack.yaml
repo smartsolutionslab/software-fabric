@@ -1,0 +1,30 @@
+option: backend.llm.extras.evals
+files:
+  - { template: templates/Evals.csproj.sbn, target: tests/Evals/Evals.csproj }
+  - { template: templates/ProjectModel.cs.sbn, target: tests/Evals/ProjectModel.cs }
+  - { template: templates/EvalPaths.cs.sbn, target: tests/Evals/EvalPaths.cs }
+  - { template: templates/EvalThreshold.cs.sbn, target: tests/Evals/EvalThreshold.cs }
+  - { template: templates/EvalExample.cs.sbn, target: tests/Evals/EvalExample.cs }
+  - { template: templates/EvalUseCase.cs.sbn, target: tests/Evals/EvalUseCase.cs }
+  - { template: templates/UseCases.cs.sbn, target: tests/Evals/UseCases.cs }
+  - { template: templates/AnsweredEvaluator.cs.sbn, target: tests/Evals/AnsweredEvaluator.cs }
+  - { template: templates/EvalScore.cs.sbn, target: tests/Evals/EvalScore.cs }
+  - { template: templates/EvalScores.cs.sbn, target: tests/Evals/EvalScores.cs }
+  - { template: templates/EvalRun.cs.sbn, target: tests/Evals/EvalRun.cs }
+  - { template: templates/UseCaseEvals.cs.sbn, target: tests/Evals/UseCaseEvals.cs }
+  - { template: templates/evals.yml.sbn, target: .github/workflows/evals.yml }
+  - { template: templates/tests/FakeJudge.cs.sbn, target: tests/Fakes/FakeJudge.cs }
+  - { template: templates/tests/Evals.Tests.csproj.sbn, target: tests/Evals.Tests/Evals.Tests.csproj }
+  - { template: templates/tests/EvalGateTests.cs.sbn, target: tests/Evals.Tests/EvalGateTests.cs }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-version.sbn }
+  - { slot: dotnet.tools, template: templates/dotnet-tool.sbn }
+  - { slot: solution.projects, template: templates/solution-projects.sbn }
+  - { slot: readme.first-steps, template: templates/first-steps.sbn }
+  - { slot: readme.sections, template: templates/readme-section.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "tests/Evals.Tests runs the eval code over the project's use cases with a stand-in model and the fake judge FakeJudge: with high scores the run passes and writes its results for the report; with a mean below the threshold it fails, naming the use case, the metric, the mean and the threshold. It also checks that Groundedness is scored only where an example supplies context, that the mean decides rather than the lowest score, and that the threshold is read from fabric.yaml. No model is called.", file: templates/tests/EvalGateTests.cs.sbn }
+  - { kind: ci-step, describes: "The evals workflow runs tests/Evals against the project's own model, by hand or weekly when the repository variable EVALS_SCHEDULED is true, and fails when a metric's mean over a use case's examples is below the threshold in fabric.yaml; the report is uploaded either way.", file: templates/evals.yml.sbn }

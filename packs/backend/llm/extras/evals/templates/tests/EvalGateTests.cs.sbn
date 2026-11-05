@@ -1,0 +1,109 @@
+{{~ if project["backend.test.framework"] != "xunit" || project["backend.test.assertions"] != "shouldly" ~}}
+#error The evals' tests are written for xUnit and Shouldly only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using {{ namespace }}.Tests.Fakes;
+using Microsoft.Extensions.AI.Evaluation.Quality;
+
+namespace {{ namespace }}.Evals.Tests;
+
+/// <summary>
+/// The evals' gate: the eval code over the project's use cases, with a stand-in model and the fake judge. A run with
+/// high scores passes and writes its results; a mean below the threshold fails, naming what fell short. No test
+/// calls a model.
+/// </summary>
+public sealed class EvalGateTests : IDisposable
+{
+    private const double Threshold = 4;
+
+    private readonly DirectoryInfo results = Directory.CreateTempSubdirectory("evals-");
+
+    [Fact]
+    public async Task High_scores_pass_and_the_run_writes_its_results_for_the_report()
+    {
+        var scores = await RunAsync(judgeScore: 5);
+
+        scores.BelowThreshold(Threshold).ShouldBeEmpty();
+        scores.All.ShouldNotBeEmpty();
+        Directory.EnumerateFiles(results.FullName, "*.json", SearchOption.AllDirectories).ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_mean_below_the_threshold_fails_naming_the_use_case_the_metric_the_mean_and_the_threshold()
+    {
+        var scores = await RunAsync(judgeScore: 2);
+
+        var violations = scores.BelowThreshold(Threshold);
+
+        violations.ShouldContain(violation => violation.StartsWith($"{UseCases.All[0].Name}: {RelevanceEvaluator.RelevanceMetricName} has a mean of 2 over ", StringComparison.Ordinal)
+            && violation.Contains("below the threshold of 4", StringComparison.Ordinal));
+        violations.ShouldNotContain(violation => violation.Contains(AnsweredEvaluator.AnsweredMetricName, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Every_example_is_judged_for_relevance_and_only_one_with_context_for_groundedness()
+    {
+        var scores = await RunAsync(judgeScore: 5);
+
+        foreach (var useCase in UseCases.All)
+        {
+            var examples = useCase.Examples.Count;
+            var grounded = useCase.Examples.Count(example => example.GroundingContext is not null);
+            Count(scores, useCase.Name, RelevanceEvaluator.RelevanceMetricName).ShouldBe(examples, useCase.Name);
+            Count(scores, useCase.Name, GroundednessEvaluator.GroundednessMetricName).ShouldBe(grounded, useCase.Name);
+            Count(scores, useCase.Name, AnsweredEvaluator.AnsweredMetricName).ShouldBe(examples, useCase.Name);
+        }
+    }
+
+    [Fact]
+    public void The_mean_decides_so_one_low_score_among_high_ones_still_passes()
+    {
+        var scores = new EvalScores([new("sample", "1", "Relevance", 5), new("sample", "2", "Relevance", 3)]);
+
+        scores.BelowThreshold(4).ShouldBeEmpty();
+        scores.BelowThreshold(4.5).ShouldBe(["sample: Relevance has a mean of 4 over 2 examples, below the threshold of 4.5 (scores: 5, 3)."]);
+    }
+
+    [Fact]
+    public void An_example_without_a_score_fails_naming_it()
+    {
+        var scores = new EvalScores([new("sample", "1", "Relevance", 5), new("sample", "2", "Relevance", null)]);
+
+        scores.BelowThreshold(1).ShouldBe(["sample: Relevance has no score for example 2; see the evaluator's diagnostics in the report."]);
+    }
+
+    [Fact]
+    public void The_threshold_is_read_from_fabric_yaml()
+    {
+        var fabricYaml = Write("fabric: 1\nname: sample\nproject: {}\nsettings:\n  backend.llm.extras.evals.threshold: 3.5\nmodule-defaults: {}\nmodules: {}\n");
+
+        EvalThreshold.Read(fabricYaml).ShouldBe(3.5);
+        EvalThreshold.Read().ShouldBeInRange(1, 5);
+    }
+
+    [Fact]
+    public void A_fabric_yaml_without_the_threshold_fails_naming_the_key()
+    {
+        var fabricYaml = Write("fabric: 1\nname: sample\nproject: {}\nmodule-defaults: {}\nmodules: {}\n");
+
+        Should.Throw<InvalidOperationException>(() => EvalThreshold.Read(fabricYaml)).Message.ShouldContain("settings.backend.llm.extras.evals.threshold");
+    }
+
+    public void Dispose() => results.Delete(recursive: true);
+
+    private static int Count(EvalScores scores, string useCase, string metric) =>
+        scores.All.Count(score => score.UseCase == useCase && score.Metric == metric);
+
+    private async Task<EvalScores> RunAsync(int judgeScore)
+    {
+        using var model = new FakeChatClient("An invoice records what was sold, to whom, for how much and when it is due: 31 March 2026.");
+        using var judge = new FakeJudge(judgeScore);
+        return await EvalRun.RunAsync(UseCases.All, model, judge, results.FullName, "gate", TestContext.Current.CancellationToken);
+    }
+
+    private string Write(string content)
+    {
+        var path = Path.Combine(results.FullName, "fabric.yaml");
+        File.WriteAllText(path, content);
+        return path;
+    }
+}
