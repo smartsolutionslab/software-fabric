@@ -19,4 +19,11 @@ public sealed record PackManifest(
     public string OptionName => Option[(Option.LastIndexOf('.') + 1)..];
 
     public bool IsBase => Dimension == BaseDimension;
+
+    /// <summary>
+    /// Modules this pack brings, each with its pinned module-scoped choices (ADR-0005). <c>fabric new</c> adds them as
+    /// <c>add-module</c> would; only a base or project-scoped pack may bring one.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> Modules { get; init; } =
+        new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>();
 }

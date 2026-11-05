@@ -27,6 +27,22 @@
       "type": "array",
       "items": { "$ref": "#/$defs/slotDeclaration" }
     },
+    "modules": {
+      "description": "Modules this pack brings (ADR-0005): fabric new adds each one as add-module would, with these choices pinned and the rest from the module defaults. Only a base or project-scoped pack may bring a module.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9-]*$" },
+      "additionalProperties": {
+        "description": "Module-scoped choices pinned for this module, as <dimension>: <option> or a list for a multi-select dimension.",
+        "type": "object",
+        "propertyNames": { "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$" },
+        "additionalProperties": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        }
+      }
+    },
     "agents": {
       "description": "Rules for agents working in a generated project that chose this option.",
       "type": "object",
