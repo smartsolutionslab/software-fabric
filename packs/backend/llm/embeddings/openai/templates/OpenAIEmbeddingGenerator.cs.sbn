@@ -1,0 +1,33 @@
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
+using OpenAI;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class OpenAIEmbeddingGenerator
+{
+    /// <summary>
+    /// Registers OpenAI's embedding model, through the official <c>OpenAI</c> package and Microsoft's adapter
+    /// (<c>Microsoft.Extensions.AI.OpenAI</c>), as the project's <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/>,
+    /// with logging and OpenTelemetry around it. The key and the model come from the AppHost's parameters
+    /// <c>openai-api-key</c> and <c>openai-embedding-model</c> (<c>OpenAI:ApiKey</c>, <c>OpenAI:EmbeddingModel</c>).
+    /// They are read when the generator is first needed, and a missing one fails there, naming its parameter;
+    /// registering sends nothing.
+    /// </summary>
+    public static EmbeddingGeneratorBuilder<string, Embedding<float>> AddOpenAIEmbeddingGenerator(this IServiceCollection services, IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        return services.AddEmbeddingGenerator(_ =>
+                new OpenAIClient(Required(configuration, "OpenAI:ApiKey", "openai-api-key"))
+                    .GetEmbeddingClient(Required(configuration, "OpenAI:EmbeddingModel", "openai-embedding-model"))
+                    .AsIEmbeddingGenerator())
+            .UseLogging()
+            .UseOpenTelemetry();
+    }
+
+    private static string Required(IConfiguration configuration, string key, string parameter) =>
+        configuration[key] is { Length: > 0 } value
+            ? value
+            : throw new InvalidOperationException($"{key} is not set. The AppHost supplies it from its parameter '{parameter}': set that with dotnet user-secrets (Parameters:{parameter}) or in the deployment's secret store.");
+}

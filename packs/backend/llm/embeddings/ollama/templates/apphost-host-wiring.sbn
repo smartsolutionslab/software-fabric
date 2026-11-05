@@ -1,0 +1,4 @@
+{{ if project["backend.llm"] != "ollama" }}
+    .WithEnvironment("Ollama__Endpoint", ollama.Resource.PrimaryEndpoint){{ end }}
+    .WithEnvironment("Ollama__EmbeddingModel", ollamaEmbeddingModel.Resource.ModelName)
+    .WaitFor(ollamaEmbeddingModel)

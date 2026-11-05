@@ -1,0 +1,3 @@
+{{ if project["backend.llm"] != "openai" }}
+    .WithEnvironment("OpenAI__ApiKey", openAIApiKey){{ end }}
+    .WithEnvironment("OpenAI__EmbeddingModel", openAIEmbeddingModel)

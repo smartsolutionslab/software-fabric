@@ -1,0 +1,4 @@
+{{ if project["backend.llm"] != "azure-openai" }}
+    .WithEnvironment("AzureOpenAI__Endpoint", azureOpenAIEndpoint)
+    .WithEnvironment("AzureOpenAI__ApiKey", azureOpenAIApiKey){{ end }}
+    .WithEnvironment("AzureOpenAI__EmbeddingDeployment", azureOpenAIEmbeddingDeployment)

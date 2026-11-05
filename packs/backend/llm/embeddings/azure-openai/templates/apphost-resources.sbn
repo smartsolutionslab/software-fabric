@@ -1,0 +1,10 @@
+{{ if project["backend.llm"] != "azure-openai" ~}}
+// Embeddings from your own Azure OpenAI resource, through its OpenAI v1 endpoint; nothing is provisioned. The endpoint
+// (https://<resource>.openai.azure.com) has no default, and the key is a secret (dotnet user-secrets set
+// Parameters:azure-openai-api-key ...).
+var azureOpenAIEndpoint = builder.AddParameter("azure-openai-endpoint");
+var azureOpenAIApiKey = builder.AddParameter("azure-openai-api-key", secret: true);
+{{ end ~}}
+// The embedding deployment must name one in that resource: text-embedding-3-small (1536 dimensions) by default. A model
+// of another size needs vector tables of that size.
+var azureOpenAIEmbeddingDeployment = builder.AddParameter("azure-openai-embedding-deployment", "text-embedding-3-small", publishValueAsDefault: true);
