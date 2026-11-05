@@ -168,11 +168,18 @@ above too.
   the web app gets `src/agents/AgentPanel.test.ts`, which fails its tests
   saying so; with another UI, forms or validation library, the panel's
   module fails the build saying so.
-- **`e2e.sh`** has a slot, `e2e.apphost-environment`, declared by the React
-  and Vue packs (each owns its copy of the script): environment variables
-  the script starts the AppHost with. The pack fills it with
-  `Parameters__model-stand-in=true`, which the AppHost reads as
-  `Parameters:model-stand-in`. Empty, the script is unchanged.
+- **`e2e.sh`** has a slot, `e2e.apphost-arguments`, declared by the React
+  and Vue packs (each owns its copy of the script): arguments the script
+  starts the AppHost with, after `--`. The pack fills it with
+  `--Parameters:model-stand-in=true`. Arguments rather than environment
+  variables: Aspire's CLI, which `dotnet run` hands the AppHost to, does not
+  pass on a variable whose name has a hyphen, as every `Parameters__<name>`
+  does (Aspire 13.6.4, checked). Empty, the script is unchanged. The model
+  providers with a key (Anthropic, OpenAI, Azure OpenAI) fill it too,
+  optionally, with the key-shaped values they give the `AspireFixture`:
+  without them the AppHost waits for its secret parameter and never starts
+  the host. Embedding providers and Ollama do not yet; a project's
+  end-to-end tests with those wait for them the same way.
 - **Lint** refuses `@copilotkit/*` in the web app.
 - **Its tests.** `AgentPanel.test.tsx` feeds the panel a server-sent event
   stream the test writes, and checks axe where the project has the
