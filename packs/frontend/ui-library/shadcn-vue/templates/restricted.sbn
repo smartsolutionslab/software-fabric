@@ -1,0 +1,13 @@
+            {
+              group: [
+                'primevue',
+                'vuetify',
+                'quasar',
+                'element-plus',
+                'ant-design-vue',
+                'naive-ui',
+                '@headlessui/vue',
+                'radix-vue',
+              ],
+              message: 'Use the shadcn-vue components in src/components/ui (docs/adr).',
+            }
