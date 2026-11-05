@@ -1,0 +1,22 @@
+import type { Plugin } from 'vite';
+import { expect, test } from 'vitest';
+import { remoteBoundary } from '../remoteBoundary';
+
+/** Calls the plugin's load hook as Vite would, with an error that throws. */
+const load = (plugin: Plugin, id: string) => () => {
+  const hook = plugin.load;
+  const handler = typeof hook === 'function' ? hook : hook?.handler;
+  const context = {
+    error: (message: string) => {
+      throw new Error(message);
+    },
+  };
+  return handler?.call(context as never, id);
+};
+
+test("a remote's file is refused whatever the platform's path separator", () => {
+  const plugin = remoteBoundary('C:\\shop\\web\\modules\\');
+
+  expect(load(plugin, 'C:/shop/web/modules/billing/src/BillingPage.tsx')).toThrow('belongs to a remote');
+  expect(load(plugin, 'C:/shop/web/app/src/App.tsx')()).toBeNull();
+});

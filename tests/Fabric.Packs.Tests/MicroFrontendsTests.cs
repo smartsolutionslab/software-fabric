@@ -43,7 +43,13 @@ public sealed class MicroFrontendsTests
 
             """);
 
-        RunWeb(project, "install", "build", "lint", "test");
+        RunWeb(project, "install", "build", "lint");
+
+        // The boundary gates' own tests, with Windows paths: a gate comparing separators would let every file through.
+        var (testExitCode, testOutput) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "test");
+        testExitCode.ShouldBe(0, $"pnpm test:\n{testOutput}");
+        testOutput.ShouldContain("src/remoteBoundary.test.ts");
+        testOutput.ShouldContain("src/boundary.test.ts");
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "format:check");
         exitCode.ShouldBe(0, $"pnpm format:check:\n{output}");
@@ -67,7 +73,7 @@ public sealed class MicroFrontendsTests
     }
 
     [Fact]
-    public void The_shell_importing_a_remote_a_remote_importing_another_framework_or_a_banned_library_and_an_unformatted_remote_fail_lint()
+    public void The_shell_importing_a_remote_a_remote_importing_another_framework_or_a_banned_library_a_counted_test_and_an_unformatted_remote_fail_lint()
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
@@ -95,6 +101,22 @@ public sealed class MicroFrontendsTests
 
             export const parts = [Link, object];
             """);
+        // A test that waits for a count rather than a condition: React's rule, where the module's tests now live.
+        project.Write("web/modules/billing/src/counted.test.ts", """
+            import { expect, test } from 'vitest';
+
+            test('a literal count of timer yields', async () => {
+              let ready = false;
+              setTimeout(() => {
+                ready = true;
+              }, 0);
+              for (let i = 0; i < 10; i += 1) {
+                await new Promise((resolve) => setTimeout(resolve, 0));
+              }
+              expect(ready).toBe(true);
+            });
+
+            """);
         project.Write("web/modules/billing/src/unformatted.ts", "export const greeting = \"hello\"\n");
 
         var (shellExitCode, shellOutput) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "lint");
@@ -110,8 +132,10 @@ public sealed class MicroFrontendsTests
         remoteOutput.ShouldContain("'react-router-dom' import is restricted");
         remoteOutput.ShouldContain("'yup' import is restricted");
         remoteOutput.ShouldContain("Every remote is written with the shell's framework, react");
+        remoteOutput.ShouldContain("counted.test.ts");
+        remoteOutput.ShouldContain("A fixed count of timer yields is not a bound on work that advances in another phase of the event loop");
 
-        foreach (var file in new[] { "mixed.ts", "subpath.ts", "libraries.ts" })
+        foreach (var file in new[] { "mixed.ts", "subpath.ts", "libraries.ts", "counted.test.ts" })
         {
             File.Delete(Path.Combine(project.ProjectDirectory, "web", "modules", "billing", "src", file));
         }

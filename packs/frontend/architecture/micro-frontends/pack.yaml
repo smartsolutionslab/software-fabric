@@ -2,6 +2,7 @@ option: frontend.architecture.micro-frontends
 files:
   - { template: templates/Remotes.cs.sbn, target: src/AppHost/Wiring/Remotes.cs }
   - { template: templates/remoteBoundary.ts.sbn, target: web/app/remoteBoundary.ts }
+  - { template: templates/remoteBoundary.test.ts.sbn, target: web/app/src/remoteBoundary.test.ts }
 slots:
   - { slot: web.workspace-packages, template: templates/workspace-packages.sbn }
   - { slot: web.styles, template: templates/styles.sbn, order: 30 }

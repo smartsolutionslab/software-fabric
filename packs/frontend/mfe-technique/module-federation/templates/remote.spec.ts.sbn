@@ -26,3 +26,31 @@ test("{{ module.name }}'s page comes from its own remote", async ({ page }) => {
   const shell = new URL(page.url()).origin;
   expect(entries.some((origin) => origin !== shell)).toBe(true);
 });
+
+test("{{ module.name }}'s page loads again once its remote is back, without a reload", async ({ page, baseURL }) => {
+  // The remote's server is down: the browser's request for its remoteEntry.js fails, as when it is stopped.
+  const shell = new URL(baseURL ?? 'http://localhost:5173').origin;
+  let down = true;
+  await page.route(
+    (url) => url.pathname.endsWith('/remoteEntry.js') && url.origin !== shell,
+    (route) => (down ? route.abort('connectionrefused') : route.continue()),
+  );
+
+  await page.goto('/');
+{{~ if project["backend.auth"] == "keycloak" ~}}
+  await page.getByLabel('Username or email').fill('developer');
+  await page.getByLabel('Password', { exact: true }).fill('developer');
+  await page.getByRole('button', { name: 'Sign In' }).click();
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+{{~ end ~}}
+
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+  await expect(page.getByRole('alert')).toHaveText('{{ module.name }} could not be loaded.');
+
+  // Back up: leaving the page and opening it again loads the remote, in the same document.
+  down = false;
+  await page.getByRole('link', { name: 'Home' }).click();
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+
+  await expect(page.getByRole('heading', { name: '{{ module.namespace }}' })).toBeVisible();
+});

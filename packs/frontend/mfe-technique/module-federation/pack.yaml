@@ -14,6 +14,7 @@ files:
   - { template: templates/remote/test-setup.ts.sbn, target: "web/modules/{{ module.name }}/src/test-setup.ts", per-module: true }
   - { template: templates/remote/Page.tsx.sbn, target: "web/modules/{{ module.name }}/src/{{ module.namespace }}Page.tsx", per-module: true }
   - { template: templates/remote/Page.test.tsx.sbn, target: "web/modules/{{ module.name }}/src/{{ module.namespace }}Page.test.tsx", per-module: true }
+  - { template: templates/remote/boundary.test.ts.sbn, target: "web/modules/{{ module.name }}/src/boundary.test.ts", per-module: true }
 declares-slots:
   - { slot: web.remote-restricted-imports, description: "Entries of every remote's no-restricted-imports patterns ({ group: [...], message: '...' }), indented twelve spaces as Prettier prints them.", separator: ",\n" }
 slots:
