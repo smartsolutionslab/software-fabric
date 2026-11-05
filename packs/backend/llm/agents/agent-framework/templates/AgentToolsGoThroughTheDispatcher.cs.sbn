@@ -11,14 +11,19 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 /// call as to an endpoint's. A module that makes a tool any other way is found: a type of its own that derives from
 /// <see cref="AITool"/>, a constructor of one called with <c>new</c>, or a method returning one that the BuildingBlocks
 /// do not declare (<c>AIFunctionFactory.Create</c>, an agent's <c>AsAIFunction</c>), including in lambdas, closures and
-/// async state machines. It cannot see a tool made by reflection, or what a tool made with
+/// async state machines. Only code that knows Microsoft.Extensions.AI makes tools: a method of an assembly that does not
+/// reference it, such as a list's indexer or LINQ's <c>Single</c>, only hands over a tool that was already made. It cannot see a tool made by reflection, or what a tool made with
 /// <see cref="DispatcherTool"/> is described as.
 /// </summary>
 public sealed class AgentToolsGoThroughTheDispatcher : IArchitectureRule
 {
     private const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
 
+    private const string ModelClients = "Microsoft.Extensions.AI";
+
     private static readonly Assembly BuildingBlocks = typeof(DispatcherTool).Assembly;
+
+    private static readonly Assembly Abstractions = typeof(AITool).Assembly;
 
     private static readonly Dictionary<short, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
@@ -75,7 +80,7 @@ public sealed class AgentToolsGoThroughTheDispatcher : IArchitectureRule
                 {
                     yield return $"new {constructor.DeclaringType!.Name}(...)";
                 }
-                else if (member is MethodInfo called && typeof(AITool).IsAssignableFrom(called.ReturnType) && called.DeclaringType?.Assembly != BuildingBlocks)
+                else if (member is MethodInfo called && typeof(AITool).IsAssignableFrom(called.ReturnType) && called.DeclaringType is { } callee && callee.Assembly != BuildingBlocks && KnowsTools(callee.Assembly))
                 {
                     yield return $"{called.DeclaringType?.Name}.{called.Name}";
                 }
@@ -84,6 +89,14 @@ public sealed class AgentToolsGoThroughTheDispatcher : IArchitectureRule
             position += OperandSize(code, il, position);
         }
     }
+
+    /// <summary>
+    /// Whether an assembly can make a tool: Microsoft.Extensions.AI's abstractions themselves, or an assembly that
+    /// references Microsoft.Extensions.AI (a module, Agent Framework). The BCL's collections and LINQ cannot.
+    /// </summary>
+    private static bool KnowsTools(Assembly assembly) =>
+        assembly == Abstractions
+        || assembly.GetReferencedAssemblies().Any(reference => reference.Name == ModelClients || reference.Name!.StartsWith(ModelClients + ".", StringComparison.Ordinal));
 
     private static int OperandSize(OpCode code, byte[] il, int position) => code.OperandType switch
     {
