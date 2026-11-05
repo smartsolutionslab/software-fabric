@@ -1,0 +1,84 @@
+{{~ if project["backend.auth"] != "keycloak" && project["backend.auth"] != "none" ~}}
+throw new Error('This test knows Keycloak\'s login page only so far (docs/adr/0006 of the generator).');
+{{~ end ~}}
+import { expect, test } from '@playwright/test';
+
+test("{{ module.name }}'s page comes from its own remote", async ({ page }) => {
+  const entries: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().endsWith('/remoteEntry.js')) {
+      entries.push(new URL(request.url()).origin);
+    }
+  });
+
+  await page.goto('/');
+{{~ if project["backend.auth"] == "keycloak" ~}}
+  await page.getByLabel('Username or email').fill('developer');
+  await page.getByLabel('Password', { exact: true }).fill('developer');
+  await page.getByRole('button', { name: 'Sign In' }).click();
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+{{~ end ~}}
+
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+
+  await expect(page.getByRole('heading', { name: '{{ module.namespace }}' })).toBeVisible();
+  // Loaded from the remote's own dev server, not bundled into the shell.
+  const shell = new URL(page.url()).origin;
+  expect(entries.some((origin) => origin !== shell)).toBe(true);
+});
+
+test("{{ module.name }}'s page loads again once its remote is back, without a reload", async ({ page, baseURL }) => {
+  // The remote's server is down: the browser's request for its remoteEntry.js fails, as when it is stopped.
+  const shell = new URL(baseURL ?? 'http://localhost:5173').origin;
+  let down = true;
+  await page.route(
+    (url) => url.pathname.endsWith('/remoteEntry.js') && url.origin !== shell,
+    (route) => (down ? route.abort('connectionrefused') : route.continue()),
+  );
+
+  await page.goto('/');
+{{~ if project["backend.auth"] == "keycloak" ~}}
+  await page.getByLabel('Username or email').fill('developer');
+  await page.getByLabel('Password', { exact: true }).fill('developer');
+  await page.getByRole('button', { name: 'Sign In' }).click();
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+{{~ end ~}}
+
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+  await expect(page.getByRole('alert')).toHaveText('{{ module.name }} could not be loaded.');
+
+  // Back up: leaving the page and opening it again loads the remote, in the same document.
+  down = false;
+  await page.getByRole('link', { name: 'Home' }).click();
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+
+  await expect(page.getByRole('heading', { name: '{{ module.namespace }}' })).toBeVisible();
+});
+
+test("{{ module.name }}'s page loads again once its failed module is back", async ({ page, baseURL }) => {
+  // The remote's entry loads, but the module of its page fails, as when the server stops between the two requests.
+  const shell = new URL(baseURL ?? 'http://localhost:5173').origin;
+  let down = true;
+  await page.route(
+    (url) => url.pathname.includes('/src/{{ module.namespace }}Page.tsx') && url.origin !== shell,
+    (route) => (down ? route.abort('connectionrefused') : route.continue()),
+  );
+
+  await page.goto('/');
+{{~ if project["backend.auth"] == "keycloak" ~}}
+  await page.getByLabel('Username or email').fill('developer');
+  await page.getByLabel('Password', { exact: true }).fill('developer');
+  await page.getByRole('button', { name: 'Sign In' }).click();
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+{{~ end ~}}
+
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+  await expect(page.getByRole('alert')).toHaveText('{{ module.name }} could not be loaded.');
+
+  // Back up: leaving the page and opening it again loads the remote's modules, in the same document.
+  down = false;
+  await page.getByRole('link', { name: 'Home' }).click();
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+
+  await expect(page.getByRole('heading', { name: '{{ module.namespace }}' })).toBeVisible();
+});

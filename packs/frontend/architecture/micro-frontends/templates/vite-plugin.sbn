@@ -1,0 +1,2 @@
+    // The shell never bundles a remote's files, whatever path imports them (remoteBoundary.ts, docs/adr).
+    remoteBoundary()

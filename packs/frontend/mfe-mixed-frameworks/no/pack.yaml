@@ -1,0 +1,9 @@
+option: frontend.mfe-mixed-frameworks.no
+files: []
+slots:
+  - { slot: web.remote-restricted-imports, template: templates/restricted.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "A remote importing another UI framework than the shell's (vue, react, svelte, @angular, solid-js, preact) fails its lint.", file: templates/restricted.sbn }

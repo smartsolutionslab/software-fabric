@@ -1,0 +1,109 @@
+import { getInstance, loadRemote, registerRemotes } from '@module-federation/runtime';
+import { Component, useEffect, useState, type ComponentType, type ReactNode } from 'react';
+
+/** What every module's remote exposes as ./Page: the module's screens, as one component. */
+interface RemoteModule {
+  default: ComponentType;
+}
+
+const pages = new Map<string, Promise<ComponentType>>();
+const failures = new Map<string, number>();
+
+/**
+ * Registers a remote that failed to load again under a new address for its remoteEntry.js. The browser keeps a failed
+ * module import for good, and the runtime its failed entry, so only a new address loads it once its server is back.
+ */
+function retry(module: string, attempt: number) {
+  // The vite plugin registers each remote under an internal name, with the module's name as its alias.
+  const remote = getInstance()?.options.remotes.find((candidate) => (candidate.alias ?? candidate.name) === module);
+  if (!remote || !('entry' in remote)) {
+    return;
+  }
+
+  const entry = new URL(remote.entry, window.location.href);
+  entry.searchParams.set('retry', String(attempt));
+  registerRemotes([{ ...remote, entry: entry.href }], { force: true });
+}
+
+/**
+ * Loads a module's page from its remote once; every later mount gets the same component. A load that failed is
+ * forgotten, so the next mount tries again, at a new address, once the remote is back.
+ */
+function pageOf(module: string): Promise<ComponentType> {
+  const known = pages.get(module);
+  if (known) {
+    return known;
+  }
+
+  const failed = failures.get(module) ?? 0;
+  if (failed > 0) {
+    retry(module, failed);
+  }
+
+  const page = loadRemote<RemoteModule>(`${module}/Page`).then((loaded) => {
+    if (!loaded) {
+      throw new Error(`The remote ${module} exposes no ./Page.`);
+    }
+
+    return loaded.default;
+  });
+  pages.set(module, page);
+  page.then(
+    () => failures.delete(module),
+    () => {
+      pages.delete(module);
+      failures.set(module, failed + 1);
+    },
+  );
+  return page;
+}
+
+/** Keeps the shell running when a remote's page fails to render: only that module's page says so. */
+class Unavailable extends Component<{ module: string; children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  override render() {
+    return this.state.failed ? <Failed module={this.props.module} /> : this.props.children;
+  }
+}
+
+function Failed({ module }: { module: string }) {
+  return <p role="alert">{module} could not be loaded.</p>;
+}
+
+type Loaded = { module: string; page: ComponentType } | { module: string; failed: true };
+
+/** A module's page, loaded at run time from the module's own remote, web/modules/<module> (docs/adr). */
+export function Remote({ module }: { module: string }) {
+  const [loaded, setLoaded] = useState<Loaded>();
+
+  useEffect(() => {
+    let mounted = true;
+    pageOf(module).then(
+      (page) => mounted && setLoaded({ module, page }),
+      () => mounted && setLoaded({ module, failed: true }),
+    );
+    return () => {
+      mounted = false;
+    };
+  }, [module]);
+
+  if (loaded?.module !== module) {
+    return <p>Loading {module}…</p>;
+  }
+
+  if ('failed' in loaded) {
+    return <Failed module={module} />;
+  }
+
+  const Page = loaded.page;
+  return (
+    <Unavailable module={module}>
+      <Page />
+    </Unavailable>
+  );
+}

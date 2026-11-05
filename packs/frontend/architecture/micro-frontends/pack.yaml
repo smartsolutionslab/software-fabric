@@ -1,0 +1,20 @@
+option: frontend.architecture.micro-frontends
+files:
+  - { template: templates/Remotes.cs.sbn, target: src/AppHost/Wiring/Remotes.cs }
+  - { template: templates/remoteBoundary.ts.sbn, target: web/app/remoteBoundary.ts }
+  - { template: templates/remoteBoundary.test.ts.sbn, target: web/app/src/remoteBoundary.test.ts }
+slots:
+  - { slot: web.workspace-packages, template: templates/workspace-packages.sbn }
+  - { slot: web.styles, template: templates/styles.sbn, order: 30 }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 30 }
+  - { slot: web.vite-imports, template: templates/vite-import.sbn, order: 35 }
+  - { slot: web.vite-plugins, template: templates/vite-plugin.sbn, order: 35 }
+  - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 50 }
+  - { slot: apphost.web-wiring, template: templates/apphost-web-wiring.sbn, order: 50 }
+  - { slot: readme.sections, template: templates/readme.sbn, order: 22 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "The shell importing a remote's package (@<project>/module-*) fails lint: it loads a module's screens at run time, never at build time.", file: templates/restricted.sbn }
+  - { kind: ci-step, describes: "A remote's file loaded into the shell by any import path, relative ones included, fails the shell's build, dev server and tests (remoteBoundary.ts).", file: templates/remoteBoundary.ts.sbn }

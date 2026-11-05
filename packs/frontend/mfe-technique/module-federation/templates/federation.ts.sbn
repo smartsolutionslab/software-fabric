@@ -1,0 +1,39 @@
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { federation } from '@module-federation/vite';
+
+type FederationOptions = Parameters<typeof federation>[0];
+
+// Every module's remote is a directory of web/modules with a package.json, created by fabric add-module; there is no
+// list to keep. src/AppHost/Wiring/Remotes.cs finds the same ones.
+const modules = fileURLToPath(new URL('../modules', import.meta.url));
+const remotes = existsSync(modules)
+  ? readdirSync(modules, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && existsSync(join(modules, entry.name, 'package.json')))
+      .map((entry) => entry.name)
+      .sort()
+  : [];
+
+/**
+ * Where the browser loads a remote from. Under Aspire, its own dev server (REMOTE_<MODULE>_URL, from
+ * src/AppHost/Wiring/Remotes.cs); built, /modules/<module>/ next to the shell, where a deployment serves its dist.
+ */
+const entry = (module: string) =>
+  `${process.env[`REMOTE_${module.toUpperCase().replaceAll('-', '_')}_URL`] ?? `/modules/${module}`}/remoteEntry.js`;
+
+/** The shell's side of module federation: every remote, and what the shell shares with them as one instance. */
+export const shellFederation: FederationOptions = {
+  name: 'shell',
+  remotes: Object.fromEntries(
+    remotes.map((module) => [module, { type: 'module', name: module, entry: entry(module) }]),
+  ),
+  shared: {
+    react: { singleton: true },
+    'react-dom': { singleton: true },
+    // A workspace package without a version: both sides build it from the same source.
+    '@{{ name }}/ui': { singleton: true, requiredVersion: false },
+  },
+  // Remotes are loaded by name (src/remotes/Remote.tsx), so no type declarations are fetched from them.
+  dts: false,
+};

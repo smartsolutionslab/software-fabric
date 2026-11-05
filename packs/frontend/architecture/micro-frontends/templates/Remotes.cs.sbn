@@ -1,0 +1,56 @@
+using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.JavaScript;
+
+namespace Aspire.Hosting;
+
+/// <summary>
+/// Each module's micro-frontend (its remote) is a directory of web/modules, created by <c>fabric add-module</c>. Every
+/// one found runs as its own Vite dev server, so a module added later needs no line here.
+/// </summary>
+public static class Remotes
+{
+    /// <summary>Adds a Vite app named <c>remote-&lt;module&gt;</c> for each directory of web/modules, in name order.</summary>
+    /// <param name="builder">The application's builder.</param>
+    /// <returns>The remotes, for the shell to reference.</returns>
+    public static IReadOnlyList<IResourceBuilder<ViteAppResource>> AddRemotes(this IDistributedApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        var modules = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "web", "modules"));
+        if (!Directory.Exists(modules))
+        {
+            return [];
+        }
+
+        return [.. Directory.GetDirectories(modules)
+            .Where(directory => File.Exists(Path.Combine(directory, "package.json")))
+            .Order(StringComparer.Ordinal)
+            .Select(directory => builder.AddViteApp($"remote-{Path.GetFileName(directory)}", directory)
+
+                // One workspace, installed once: by the shell's installer, or by `pnpm install` in web/.
+                .WithPnpm(install: false))];
+    }
+
+    /// <summary>
+    /// Gives the shell each remote's address, as <c>REMOTE_&lt;MODULE&gt;_URL</c> (<c>order-handling</c>:
+    /// <c>REMOTE_ORDER_HANDLING_URL</c>), which its federation configuration reads, and starts the shell once the
+    /// remotes run.
+    /// </summary>
+    /// <typeparam name="T">The shell's resource type.</typeparam>
+    /// <param name="shell">The shell, the web app the browser opens.</param>
+    /// <param name="remotes">The remotes <see cref="AddRemotes"/> added.</param>
+    /// <returns>The shell.</returns>
+    public static IResourceBuilder<T> WithRemotes<T>(this IResourceBuilder<T> shell, IReadOnlyList<IResourceBuilder<ViteAppResource>> remotes)
+        where T : IResourceWithEnvironment, IResourceWithWaitSupport
+    {
+        ArgumentNullException.ThrowIfNull(shell);
+        ArgumentNullException.ThrowIfNull(remotes);
+        foreach (var remote in remotes)
+        {
+            var module = remote.Resource.Name["remote-".Length..];
+            var variable = $"REMOTE_{module.ToUpperInvariant().Replace('-', '_')}_URL";
+            shell.WithEnvironment(variable, remote.GetEndpoint("http")).WaitFor(remote);
+        }
+
+        return shell;
+    }
+}

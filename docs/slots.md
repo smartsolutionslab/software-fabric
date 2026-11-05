@@ -46,6 +46,7 @@ tests/
 web/
   package.json  pnpm-workspace.yaml   frontend.workspace.pnpm-workspaces
   app/                          frontend.framework.react
+  modules/<module>/             frontend.mfe-technique.module-federation (per module: the module's remote; micro-frontends only)
 .github/workflows/ci.yml        base; steps by slot
 .github/dependabot.yml          base; an entry per package ecosystem by slot
 ```
@@ -162,11 +163,11 @@ is a defect in the second pack.
 |---|---|---|---|
 | `apphost.packages` | `src/AppHost/AppHost.csproj` | 0+ | postgres, rabbitmq, keycloak, react |
 | `apphost.project-references` *(added in M1-02)* | `src/AppHost/AppHost.csproj` | 0+ | backend.topology (the host project) |
-| `apphost.resources` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak, react (Vite app) |
+| `apphost.resources` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak, react (Vite app), micro-frontends (a Vite app per directory of `web/modules`, `builder.AddRemotes()`) |
 | `apphost.host` | `src/AppHost/Program.cs` | **exactly-one** | backend.topology (adds the host project) |
 | `apphost.host-wiring` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak (`.WithReference(...).WaitFor(...)`) |
 | `apphost.web` *(added in M1-07)* | `src/AppHost/Program.cs` | at-most-one | react (`AddViteApp("web", "../../web/app").WithPnpm()`) |
-| `apphost.web-wiring` *(added in M1-07)* | `src/AppHost/Program.cs` | 0+ | keycloak, the host (`.WithReference(...)`) |
+| `apphost.web-wiring` *(added in M1-07)* | `src/AppHost/Program.cs` | 0+ | keycloak, the host (`.WithReference(...)`), micro-frontends (`.WithRemotes(remotes)`: each remote's address) |
 | `host.packages` | `src/Host/Host.csproj` | 0+ | keycloak, wolverine, ef-core |
 | `host.services` | `src/Host/Program.cs` | 0+ | keycloak, wolverine (with `modules` in scope), result (problem details, the guard exception handler), tenancy, ef-core (the unique-constraint exception handler) |
 | `host.middleware` | `src/Host/Program.cs` | 0+ | result (`UseExceptionHandler`, first), keycloak, tenancy |
@@ -186,7 +187,7 @@ is a defect in the second pack.
 
 | Slot | File | Separator | Filled by |
 |---|---|---|---|
-| `web.workspace-packages` *(added in M1-07)* | `web/pnpm-workspace.yaml` | newline | spa (`  - app`), design-system tokens-and-components (`packages/tokens`, `packages/ui`) |
+| `web.workspace-packages` *(added in M1-07)* | `web/pnpm-workspace.yaml` | newline | spa (`  - app`), micro-frontends (`app`, `modules/*`), design-system tokens-and-components (`packages/tokens`, `packages/ui`) |
 | `web.dependencies` | `web/app/package.json` | `,` + newline | react, redux, rtk, router, rhf, zod, tailwind, shadcn, tanstack-table, echarts, oidc |
 | `web.dev-dependencies` | 〃 | `,` + newline | vitest, testing-library, playwright, axe, rtk codegen |
 | `web.scripts` | 〃 | `,` + newline | rtk-query-codegen (`codegen`) |
@@ -199,11 +200,12 @@ is a defect in the second pack.
 | `web.store-imports`, `web.store-reducers`, `web.store-middleware` *(added in M1-07b; declared by redux-toolkit)* | `web/app/src/store.ts` | newline / `,` + newline / none | rtk-query-codegen |
 | `web.api-imports`, `web.api-headers` *(added in M1-07b; declared by every api-client pack)* | `web/app/src/api/baseApi.ts` | newline | oidc-client-ts (the bearer token) |
 | `web.vite-imports` *(added in M1-07)* | `web/app/vite.config.ts` | newline | tailwind |
-| `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind |
+| `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`) |
 | `web.imports` | `web/app/src/main.tsx` | newline | redux, router, oidc |
 | `web.providers` | `web/app/src/main.tsx` | `,` + newline | redux, oidc, router — wrappers composed in order |
-| `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn, design-system tokens-and-components (the tokens' Tailwind theme, `@source` for the ui package) |
-| `web.restricted-imports` *(added in M1-07)* | `web/app/eslint.config.js` | `,` + newline | router, shadcn, react-hook-form, zod — each bans its alternatives |
+| `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn, design-system tokens-and-components (the tokens' Tailwind theme, `@source` for the ui package), micro-frontends (`@source` for the remotes) |
+| `web.restricted-imports` *(added in M1-07)* | `web/app/eslint.config.js` | `,` + newline | router, shadcn, react-hook-form, zod — each bans its alternatives; micro-frontends (the shell imports no remote) |
+| `web.remote-restricted-imports` *(added for #156; declared by module-federation)* | `web/modules/<module>/eslint.config.js` | `,` + newline | mfe-mixed-frameworks no (bans every UI framework but the shell's) |
 
 ### CI
 
@@ -239,3 +241,10 @@ is a defect in the second pack.
 `multi-app` and `micro-frontends` (M2) the app layout belongs to the
 architecture pack and the framework pack must contribute into it. That
 recut is M2's first task, not a reason to design for it now.
+
+*As built for `micro-frontends` (#156):* no recut was needed. `web/app` stays the
+framework pack's and becomes the shell; each module's remote is a package of its
+own, `web/modules/<module>`, owned per module by the technique pack. The one
+file whose content changes is the shell's page for a module, which mounts the
+remote instead of holding the screens: `react-router` branches on the
+architecture there (ADR-0006).

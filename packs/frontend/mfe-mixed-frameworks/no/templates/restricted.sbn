@@ -1,0 +1,12 @@
+{{~ frameworks = ["react", "react-dom", "vue", "@vue/*", "svelte", "@angular/*", "solid-js", "preact"] ~}}
+{{~ chosen = project["frontend.framework"] ~}}
+{{~ others = [] ~}}
+{{~ for framework in frameworks ~}}
+{{~ if framework != chosen && framework != chosen + "-dom" && framework != "@" + chosen + "/*" ~}}
+{{~ others = array.add others ("'" + framework + "'") ~}}
+{{~ end ~}}
+{{~ end ~}}
+            {
+              group: [{{ array.join others ", " }}],
+              message: "Every remote is written with the shell's framework, {{ chosen }} (docs/adr).",
+            }

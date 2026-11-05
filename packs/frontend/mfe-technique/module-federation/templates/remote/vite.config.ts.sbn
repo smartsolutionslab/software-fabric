@@ -1,0 +1,36 @@
+{{~ if project["frontend.framework"] != "react" || project["frontend.design-system"] != "tokens-and-components" ~}}
+throw new Error('The module-federation pack builds React remotes on the tokens-and-components design system only so far; frontend.framework is {{ project["frontend.framework"] }}, frontend.design-system is {{ project["frontend.design-system"] }} (docs/adr/0006 of the generator).');
+{{~ end ~}}
+import { federation } from '@module-federation/vite';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vitest/config';
+import { remoteBoundary } from './boundary.js';
+import { retryGenerations } from './retry.js';
+
+// The {{ module.name }} module's remote: the shell loads ./Page from its remoteEntry.js at run time (docs/adr).
+// Under Aspire its own dev server serves it; built, a deployment serves dist under /modules/{{ module.name }}/.
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/modules/{{ module.name }}/' : '/',
+  plugins: [
+    react(),
+    // A remote bundles only its own files and packages: other remotes and the shell are loaded at run time (docs/adr).
+    remoteBoundary(),
+    // The shell's retry after a failed load fetches every module of the remote again (retry.ts, docs/adr).
+    retryGenerations(),
+    federation({
+      name: '{{ module.name }}',
+      filename: 'remoteEntry.js',
+      exposes: { './Page': './src/{{ module.namespace }}Page.tsx' },
+      // One instance of each, the shell's (web/app/federation.ts shares the same).
+      shared: {
+        react: { singleton: true },
+        'react-dom': { singleton: true },
+        // A workspace package without a version: both sides build it from the same source.
+        '@{{ name }}/ui': { singleton: true, requiredVersion: false },
+      },
+      dts: false,
+    }),
+  ],
+  build: { target: 'esnext' },
+  test: { environment: 'jsdom', include: ['src/**/*.test.{ts,tsx}'], setupFiles: ['./src/test-setup.ts'] },
+}));

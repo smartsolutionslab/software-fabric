@@ -1,0 +1,29 @@
+import { fileURLToPath } from 'node:url';
+import { normalizePath, type Plugin } from 'vite';
+
+/** A file's path as Vite writes module ids, forward slashes on every platform, so paths compare on Windows too. */
+const asModuleId = (path: string) => normalizePath(path.replaceAll('\\', '/'));
+
+/**
+ * Fails the remote's build, dev server and tests when a file of the shell or of another remote is loaded into it,
+ * whatever path imported it: other remotes and the shell are loaded at run time, never bundled (docs/adr).
+ */
+export function remoteBoundary(
+  own = fileURLToPath(new URL('./', import.meta.url)),
+  web = fileURLToPath(new URL('../../', import.meta.url)),
+): Plugin {
+  const ownRoot = asModuleId(own);
+  const others = [`${asModuleId(web)}app/`, `${asModuleId(web)}modules/`];
+  return {
+    name: 'remote-boundary',
+    enforce: 'pre',
+    load(id) {
+      const file = asModuleId(id);
+      if (!file.startsWith(ownRoot) && others.some((root) => file.startsWith(root))) {
+        this.error(`A remote bundles only its own files and packages; ${id} is another remote's or the shell's.`);
+      }
+
+      return null;
+    },
+  };
+}

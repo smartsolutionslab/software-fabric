@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>{{ module.name }}</title>
+  </head>
+  <body>
+    <!-- Vite's build starts from this page; the shell loads the remote through remoteEntry.js. -->
+  </body>
+</html>

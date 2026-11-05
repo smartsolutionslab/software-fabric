@@ -1,0 +1,29 @@
+import type { EnvironmentModuleNode, Plugin } from 'vite';
+
+/**
+ * Makes the shell's retry of this remote load every module again. After a failed load the shell asks for
+ * remoteEntry.js?retry=<n> (src/remotes/Remote.tsx). A browser keeps a module that failed to import for good, so a new
+ * entry alone would import the same failed modules again. On such a request every module of the remote is marked as
+ * updated, as Vite marks a hot update: the modules served next import each other with a new ?t= timestamp, a new
+ * address the browser fetches.
+ */
+export function retryGenerations(): Plugin {
+  return {
+    name: 'retry-generations',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((request, _response, next) => {
+        if (/\/remoteEntry\.js\?(?:.*&)?retry=/.test(request.url ?? '')) {
+          const graph = server.environments.client.moduleGraph;
+          const timestamp = Date.now();
+          const seen = new Set<EnvironmentModuleNode>();
+          for (const module of graph.idToModuleMap.values()) {
+            graph.invalidateModule(module, seen, timestamp, true);
+          }
+        }
+
+        next();
+      });
+    },
+  };
+}
