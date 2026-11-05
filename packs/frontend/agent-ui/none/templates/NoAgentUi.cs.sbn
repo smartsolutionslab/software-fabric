@@ -1,0 +1,33 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// The project has no agent panel, so no module speaks AG-UI: an endpoint streaming an agent to the browser would be
+/// the panel's backend without the choice that brings its rules. The rule reads what the compiled module assemblies
+/// reference; it cannot see the host.
+/// </summary>
+public sealed class NoAgentUi : IArchitectureRule
+{
+    private const string Sdk = "AGUI";
+
+    private const string AgentFrameworkHosting = "Microsoft.Agents.AI.Hosting.AGUI";
+
+    public string Description => "No module references the AG-UI .NET SDK or Agent Framework's AG-UI hosting: this project has no agent panel.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var assembly in model.ModuleAssemblies)
+        {
+            foreach (var reference in assembly.GetReferencedAssemblies().Select(reference => reference.Name!).Where(IsAgentUi).Order(StringComparer.Ordinal))
+            {
+                yield return $"{assembly.GetName().Name} references {reference}, but this project has no agent panel (frontend.agent-ui: none).";
+            }
+        }
+    }
+
+    private static bool IsAgentUi(string reference) =>
+        reference.StartsWith(Sdk + ".", StringComparison.Ordinal)
+        || reference == AgentFrameworkHosting
+        || reference.StartsWith(AgentFrameworkHosting + ".", StringComparison.Ordinal);
+}

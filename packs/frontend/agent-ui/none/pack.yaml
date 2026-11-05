@@ -1,0 +1,11 @@
+option: frontend.agent-ui.none
+files:
+  - { template: templates/NoAgentUi.cs.sbn, target: tests/Architecture.Tests/Rules/NoAgentUi.cs }
+slots:
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 50 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing an AG-UI or CopilotKit client (@ag-ui/*, @copilotkit/*) fails lint: the project has no agent panel.", file: templates/restricted.sbn }
+  - { kind: architecture-test, describes: "No module references the AG-UI .NET SDK (AGUI.*) or Agent Framework's AG-UI hosting (Microsoft.Agents.AI.Hosting.AGUI*): an AG-UI endpoint in a module fails the build naming the assembly.", file: templates/NoAgentUi.cs.sbn }
