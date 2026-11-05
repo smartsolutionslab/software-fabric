@@ -93,7 +93,7 @@ public sealed class AgentTests
         var answer = await dispatcher.QueryAsync(new AskAboutWords("Which word of 'a bb cccc' is the longest?"), TestContext.Current.CancellationToken);
 
         schema.GetProperty("type").EnumerateArray().Select(type => type.GetString()).ShouldBe(["integer", "null"], ignoreOrder: true);
-        answer.Value.ShouldBe("The tool said: \"cccc\"");
+        answer.Value.ShouldBe("The tool said: cccc");
         dispatcher.Requests.ShouldContain(new LongestWord("a bb cccc", Option<int>.Some(2)));
     }
 {{~ end ~}}

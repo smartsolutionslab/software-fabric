@@ -4,6 +4,9 @@
 {{~ option = project["backend.absence"] == "option" ~}}
 using System.Text;
 using System.Text.Json;
+{{~ if option ~}}
+using System.Text.Json.Nodes;
+{{~ end ~}}
 using {{ namespace }}.BuildingBlocks.Messaging;
 using Microsoft.Extensions.AI;
 
@@ -30,6 +33,11 @@ internal sealed class UseCaseFunction : AIFunction
         Converters = { new OptionJsonConverterFactory() },
 {{~ end ~}}
     };
+{{~ if option ~}}
+
+    /// <summary>An <see cref="Option{T}"/> is offered as its value's schema or null: the converter is opaque to schema generation.</summary>
+    private static readonly AIJsonSchemaCreateOptions Schemas = new() { TransformSchemaNode = ValueOrNull };
+{{~ end ~}}
 
     private readonly Type request;
     private readonly Type result;
@@ -50,7 +58,7 @@ internal sealed class UseCaseFunction : AIFunction
         readsOnly = contracts[0].GetGenericTypeDefinition() == typeof(IQuery<>);
         Name = SnakeCase(request.Name);
         Description = description;
-        JsonSchema = AIJsonUtilities.CreateJsonSchema(request, serializerOptions: Json);
+        JsonSchema = AIJsonUtilities.CreateJsonSchema(request, serializerOptions: Json{{ if option }}, inferenceOptions: Schemas{{ end }});
     }
 
     public override string Name { get; }
@@ -109,6 +117,27 @@ internal sealed class UseCaseFunction : AIFunction
             : $"Failed: {JsonSerializer.Serialize(error, error.GetType(), Json)}";
     }
 
+{{~ if option ~}}
+    /// <summary>The schema of an <see cref="Option{T}"/>: its value's, or null (<c>{"type": ["integer", "null"]}</c>).</summary>
+    private static JsonNode ValueOrNull(AIJsonSchemaCreateContext context, JsonNode schema)
+    {
+        var type = context.TypeInfo.Type;
+        if (!type.IsGenericType || type.GetGenericTypeDefinition() != typeof(Option<>))
+        {
+            return schema;
+        }
+
+        var value = JsonSerializer.SerializeToNode(AIJsonUtilities.CreateJsonSchema(type.GetGenericArguments()[0], serializerOptions: Json, inferenceOptions: Schemas))!;
+        if (value is JsonObject valueSchema && valueSchema["type"] is JsonValue single && single.GetValueKind() == JsonValueKind.String)
+        {
+            valueSchema["type"] = new JsonArray(single.GetValue<string>(), "null");
+            return valueSchema;
+        }
+
+        return new JsonObject { ["anyOf"] = new JsonArray(value, new JsonObject { ["type"] = "null" }) };
+    }
+
+{{~ end ~}}
     /// <summary><c>FindInvoice</c> becomes <c>find_invoice</c>.</summary>
     private static string SnakeCase(string name)
     {
