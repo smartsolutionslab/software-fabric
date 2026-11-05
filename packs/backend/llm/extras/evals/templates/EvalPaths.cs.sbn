@@ -1,0 +1,22 @@
+namespace {{ namespace }}.Evals;
+
+/// <summary>Where the evals find <c>fabric.yaml</c> and write their results: from the repository root, found above the build output.</summary>
+public static class EvalPaths
+{
+    /// <summary>The repository's <c>fabric.yaml</c>, which holds the threshold.</summary>
+    public static string FabricYaml => Path.Combine(RepositoryRoot(), "fabric.yaml");
+
+    /// <summary>The results of every run, read by <c>dotnet aieval report</c>; under TestResults/, which git ignores.</summary>
+    public static string Results => Path.Combine(RepositoryRoot(), "TestResults", "evals");
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "fabric.yaml")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("fabric.yaml not found above the eval project's output directory.");
+    }
+}
