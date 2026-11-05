@@ -884,6 +884,47 @@ public sealed class StrictEventSourcedTests
         exitCode.ShouldNotBe(0, output);
     }
 
+    [Fact]
+    public void A_closed_type_of_a_recurring_generic_type_over_a_class_is_not_taken_for_one_over_a_nullable_struct()
+    {
+        // Declared nullable-oblivious, T Value is nullable for Payload? but not for a class. Node<Payload?> is found first
+        // and shows no violation; Node<List<Payload?>> and Node<InvoiceNumber> after it do: {} leaves their Value null.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using System.Text.Json.Serialization;
+            using Shop.BuildingBlocks.EventSourcing;
+
+            #nullable disable
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public readonly record struct Payload
+            {
+                [JsonConstructor]
+                public Payload(InvoiceNumber number) => Number = number;
+
+                public InvoiceNumber Number { get; }
+            }
+
+            public sealed record Node<T>(Node<List<T>> Next, T Value = default);
+
+            public sealed record InvoiceNoded(InvoiceId Invoice, Node<Payload?> First, Node<InvoiceNumber> Second) : IDomainEvent;
+
+            public sealed class Noding : EventSourcedAggregate<InvoiceId>
+            {
+                private Noding()
+                {
+                }
+
+                private void Apply(InvoiceNoded noded) => Id = noded.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Node`1[System.Collections.Generic.List`1[System.Nullable`1[Shop.Modules.Billing.Domain.Invoices.Payload]]].Value carries a value object through an optional constructor parameter");
+        output.ShouldNotContain("Node`1[System.Nullable`1[Shop.Modules.Billing.Domain.Invoices.Payload]].Value carries");
+        output.ShouldNotContain("Payload.Number carries");
+        exitCode.ShouldNotBe(0, output);
+    }
+
     private static (int ExitCode, string Output) ArchitectureTestsWith(string types)
     {
         using var project = new GeneratedProject("industrial-event-driven-mfe", Choices);
