@@ -221,9 +221,10 @@ public sealed class AgUiTests
         var files = Files(Profile, Anthropic, AgentFramework, AgUi);
 
         // The provider's key too, as the AspireFixture gives it: without a value the AppHost waits for its secret parameter
-        // and never starts the host.
-        files[EndToEndScript].ShouldContain("env 'Parameters__anthropic-api-key=not-a-real-key' 'Parameters__model-stand-in=true' dotnet run --project src/AppHost --launch-profile http < /dev/null > \"$log\" 2>&1 &");
-        Files("saas-standard-vue", Anthropic, AgentFramework, AgUi)[EndToEndScript].ShouldContain("'Parameters__model-stand-in=true' dotnet run");
+        // and never starts the host. Arguments, not environment variables: Aspire's CLI, which `dotnet run` hands the
+        // AppHost to, does not pass on a variable whose name has a hyphen.
+        files[EndToEndScript].ShouldContain("dotnet run --project src/AppHost --launch-profile http -- --Parameters:anthropic-api-key=not-a-real-key --Parameters:model-stand-in=true < /dev/null > \"$log\" 2>&1 &");
+        Files("saas-standard-vue", Anthropic, AgentFramework, AgUi)[EndToEndScript].ShouldContain("--Parameters:model-stand-in=true < /dev/null");
     }
 
     [Fact]
@@ -231,15 +232,15 @@ public sealed class AgUiTests
     {
         foreach (var (provider, values) in new[]
         {
-            ("backend.llm=openai", "env 'Parameters__openai-api-key=not-a-real-key' 'Parameters__model-stand-in=true' dotnet run"),
-            ("backend.llm=azure-openai", "env 'Parameters__azure-openai-endpoint=https://not-a-real-resource.openai.azure.com' 'Parameters__azure-openai-api-key=not-a-real-key' 'Parameters__model-stand-in=true' dotnet run"),
+            ("backend.llm=openai", "-- --Parameters:openai-api-key=not-a-real-key --Parameters:model-stand-in=true < /dev/null"),
+            ("backend.llm=azure-openai", "-- --Parameters:azure-openai-endpoint=https://not-a-real-resource.openai.azure.com --Parameters:azure-openai-api-key=not-a-real-key --Parameters:model-stand-in=true < /dev/null"),
         })
         {
             Files(Profile, provider, AgentFramework, AgUi)[EndToEndScript].ShouldContain(values, customMessage: provider);
         }
 
         // Without the agent panel the script gives the AppHost the provider's key alone.
-        Files(Profile, Anthropic)[EndToEndScript].ShouldContain("env 'Parameters__anthropic-api-key=not-a-real-key' dotnet run --project src/AppHost");
+        Files(Profile, Anthropic)[EndToEndScript].ShouldContain("--launch-profile http -- --Parameters:anthropic-api-key=not-a-real-key < /dev/null");
     }
 
     [Fact]
