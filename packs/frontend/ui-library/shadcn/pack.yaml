@@ -6,9 +6,13 @@ files:
   - { template: templates/button.test.tsx.sbn, target: web/app/src/components/ui/button.test.tsx }
 slots:
   - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.dev-dependencies, template: templates/dev-dependencies.sbn }
+  - { slot: web.styles, template: templates/styles.sbn, order: 15 }
   - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 20 }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
   - { kind: lint-rule, describes: "Importing another component library (MUI, Ant Design, Mantine, Chakra) fails lint.", file: templates/restricted.sbn }
+  - { kind: ci-step, describes: "src/index.css defines the theme components.json names (cssVariables, slate) and applies its border, ring, background and foreground with @apply, so a theme that lacks them fails the build: Tailwind refuses an unknown utility in @apply.", file: templates/styles.sbn }
+  - { kind: unit-test, describes: "Button renders a button in the theme's colours, has the registry's variants and sizes, and with asChild gives its child the button's look instead (src/components/ui/button.test.tsx).", file: templates/button.test.tsx.sbn }
