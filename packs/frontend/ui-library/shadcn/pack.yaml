@@ -3,6 +3,7 @@ files:
   - { template: templates/components.json.sbn, target: web/app/components.json }
   - { template: templates/utils.ts.sbn, target: web/app/src/lib/utils.ts }
   - { template: templates/button.tsx.sbn, target: web/app/src/components/ui/button.tsx }
+  - { template: templates/button.test.tsx.sbn, target: web/app/src/components/ui/button.test.tsx }
 slots:
   - { slot: web.dependencies, template: templates/dependencies.sbn }
   - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 20 }
