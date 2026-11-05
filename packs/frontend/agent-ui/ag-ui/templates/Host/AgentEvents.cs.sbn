@@ -1,0 +1,21 @@
+using AGUI.Abstractions;
+using AGUI.Formatting;
+using Microsoft.AspNetCore.Http.Features;
+
+namespace {{ namespace }}.Host.Agents;
+
+/// <summary>AG-UI events as server-sent events, each written as soon as the agent produces it.</summary>
+public sealed class AgentEvents(IAsyncEnumerable<BaseEvent> events) : IResult
+{
+    private static readonly SseEventStreamFormatter Formatter = new();
+
+    public async Task ExecuteAsync(HttpContext httpContext)
+    {
+        {{ not_null "httpContext" }}
+
+        httpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+        httpContext.Response.ContentType = Formatter.MediaType;
+        httpContext.Response.Headers.CacheControl = "no-cache";
+        await Formatter.WriteAsync(events, httpContext.Response.Body, httpContext.RequestAborted);
+    }
+}

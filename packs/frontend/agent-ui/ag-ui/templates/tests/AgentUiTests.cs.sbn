@@ -1,0 +1,101 @@
+{{~ if project["backend.test.assertions"] != "shouldly" ~}}
+#error The ag-ui pack's integration tests assert with Shouldly only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+{{~ signed_in = project["backend.auth"] != "none" ~}}
+using System.Net;
+using System.Text;
+using System.Text.Json.Nodes;
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>
+/// The agent panel's endpoint, POST /agents/{name}, against the running application: the assistant's answer arrives as
+/// AG-UI events, its text in several chunks, after a tool call its query ran through the dispatcher. The host answers
+/// with its stand-in model, which the fixture switches on; no test calls a model.
+/// </summary>
+public class AgentUiTests(AspireFixture aspire)
+{
+    private const string Run = """
+        {
+          "threadId": "thread-1",
+          "runId": "run-1",
+          "state": {},
+          "messages": [{ "id": "message-1", "role": "user", "content": "one two three" }],
+          "tools": [],
+          "context": [],
+          "forwardedProps": {}
+        }
+        """;
+
+    [Fact]
+    public async Task The_assistants_answer_streams_in_several_chunks_after_its_tool_ran_through_the_dispatcher()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+{{~ if signed_in ~}}
+        using var caller = await aspire.CreateHostClientAsync("developer");
+{{~ else ~}}
+        using var caller = aspire.CreateHostClient();
+{{~ end ~}}
+
+        using var response = await PostAsync(caller, "/agents/assistant", cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(cancellationToken));
+        response.Content.Headers.ContentType?.MediaType.ShouldBe("text/event-stream");
+        var events = Events(await response.Content.ReadAsStringAsync(cancellationToken));
+        Types(events).First().ShouldBe("RUN_STARTED");
+        Types(events).Last().ShouldBe("RUN_FINISHED");
+
+        // The stand-in model asks for the first tool it is offered, count_words, with the user's message; the dispatcher
+        // sends the tool's query to its handler, which counts three words.
+        events.Single(agUiEvent => Type(agUiEvent) == "TOOL_CALL_START")["toolCallName"]!.GetValue<string>().ShouldBe("count_words");
+        events.Single(agUiEvent => Type(agUiEvent) == "TOOL_CALL_RESULT")["content"]!.GetValue<string>().ShouldBe("3");
+
+        List<string> chunks = [.. events.Where(agUiEvent => Type(agUiEvent) == "TEXT_MESSAGE_CONTENT").Select(agUiEvent => agUiEvent["delta"]!.GetValue<string>())];
+        chunks.Count.ShouldBeGreaterThan(1);
+        string.Concat(chunks).ShouldBe("The tool said: 3");
+    }
+{{~ if signed_in ~}}
+
+    [Fact]
+    public async Task An_anonymous_caller_is_refused()
+    {
+        using var anonymous = aspire.CreateHostClient();
+
+        using var response = await PostAsync(anonymous, "/agents/assistant", TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+{{~ end ~}}
+
+    [Fact]
+    public async Task An_agent_no_module_registers_is_not_found()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+{{~ if signed_in ~}}
+        using var caller = await aspire.CreateHostClientAsync("developer");
+{{~ else ~}}
+        using var caller = aspire.CreateHostClient();
+{{~ end ~}}
+
+        using var response = await PostAsync(caller, "/agents/nobody", cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await response.Content.ReadAsStringAsync(cancellationToken)).ShouldContain("agents.not-found");
+    }
+
+    private static async Task<HttpResponseMessage> PostAsync(HttpClient caller, string path, CancellationToken cancellationToken)
+    {
+        using var content = new StringContent(Run, Encoding.UTF8, "application/json");
+        return await caller.PostAsync(new Uri(path, UriKind.Relative), content, cancellationToken);
+    }
+
+    /// <summary>The events of a server-sent event stream, one per <c>data:</c> line.</summary>
+    private static List<JsonObject> Events(string stream) =>
+        [.. stream.Split('\n')
+            .Where(line => line.StartsWith("data:", StringComparison.Ordinal))
+            .Select(line => JsonNode.Parse(line["data:".Length..])!.AsObject())];
+
+    private static IEnumerable<string> Types(IEnumerable<JsonObject> events) => events.Select(Type);
+
+    private static string Type(JsonObject agUiEvent) => agUiEvent["type"]!.GetValue<string>();
+}

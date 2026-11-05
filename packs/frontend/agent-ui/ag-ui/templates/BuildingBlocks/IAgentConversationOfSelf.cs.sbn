@@ -1,0 +1,19 @@
+using System.Text.Json;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.BuildingBlocks.Agents;
+
+/// <summary>
+/// An <see cref="IAgentConversation"/> that names its agent. Its module registers it by that name when the module adds
+/// its services, so the host finds it without a line per module.
+/// </summary>
+/// <typeparam name="TSelf">The query itself.</typeparam>
+public interface IAgentConversation<TSelf> : IAgentConversation
+    where TSelf : IAgentConversation<TSelf>
+{
+    /// <summary>The name the browser posts to, <c>POST /agents/{AgentName}</c>: lower kebab-case, one module's alone.</summary>
+    static abstract string AgentName { get; }
+
+    /// <summary>The query for one run of the conversation.</summary>
+    static abstract TSelf Start(IReadOnlyList<ChatMessage> messages, JsonElement? state);
+}

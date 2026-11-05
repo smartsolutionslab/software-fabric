@@ -1,0 +1,2 @@
+        // The agents answer through the host's stand-in model (Development only): the integration tests never call a model.
+        builder.Configuration["Parameters:model-stand-in"] = "true";

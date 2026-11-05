@@ -1,0 +1,21 @@
+using {{ namespace }}.BuildingBlocks.Agents;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Assistant.Application.Queries.CountWords;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Modules.Assistant.Application.Agents;
+
+/// <summary>
+/// The sample agent of the agent panel: instructions for the model, and this module's own use cases as its tools, each
+/// sent through the dispatcher. Give it the use cases a user should reach by talking to it.
+/// </summary>
+public static class AssistantAgent
+{
+    public static AIAgent Create(IChatClient model, IDispatcher dispatcher) =>
+        model.AsAIAgent(
+            instructions: "You help with the words of a text. Use the tools for every count; never guess one.",
+            name: "assistant",
+            description: "Answers questions about the words of a text.",
+            tools: [DispatcherTool.For<CountWords>(dispatcher, "Counts the words of a text.")]);
+}
