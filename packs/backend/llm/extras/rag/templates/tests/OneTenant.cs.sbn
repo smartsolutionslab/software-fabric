@@ -1,0 +1,9 @@
+using {{ namespace }}.BuildingBlocks.Tenancy;
+
+namespace {{ namespace }}.Rag.Tests;
+
+/// <summary>The tenant source fixed to one tenant, for the tests that are not about tenants.</summary>
+public sealed class OneTenant(string tenantId) : ITenantContext
+{
+    public string? TenantId => tenantId;
+}

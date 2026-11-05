@@ -1,6 +1,7 @@
 {{~ if project["backend.test.assertions"] != "shouldly" ~}}
 #error The rag pack's tests assert with Shouldly only so far (docs/adr/0006 of the generator).
 {{~ end ~}}
+{{~ column = project["backend.tenancy"] == "column" ~}}
 using System.Reflection;
 using {{ namespace }}.BuildingBlocks.Persistence;
 using {{ namespace }}.BuildingBlocks.Rag;
@@ -8,7 +9,11 @@ using Npgsql;
 
 namespace {{ namespace }}.Rag.Tests;
 
+{{~ if column ~}}
+/// <summary>The vector tables the MigrationRunner made: one per module schema, of the embeddings model's size, with an HNSW cosine index and a tenant column its key includes.</summary>
+{{~ else ~}}
 /// <summary>The vector tables the MigrationRunner made: one per module schema, of the embeddings model's size, with an HNSW cosine index.</summary>
+{{~ end ~}}
 public sealed class VectorTablesTests(AspireDatabase database)
 {
     [Fact]
@@ -37,7 +42,7 @@ public sealed class VectorTablesTests(AspireDatabase database)
         var cancellationToken = TestContext.Current.CancellationToken;
         const string Schema = "rag_tests_again";
         await VectorTables.CreateAsync(database.ConnectionString, [Schema], cancellationToken);
-        await ExecuteAsync($"INSERT INTO {VectorTables.Table(Schema)} (key, content, embedding) VALUES ('kept', 'kept', array_fill(1, ARRAY[{VectorTables.Dimensions}])::vector)");
+        await ExecuteAsync($"INSERT INTO {VectorTables.Table(Schema)} ({{ if column }}tenant_id, {{ end }}key, content, embedding) VALUES ({{ if column }}'tenant-a', {{ end }}'kept', 'kept', array_fill(1, ARRAY[{VectorTables.Dimensions}])::vector)");
 
         await VectorTables.CreateAsync(database.ConnectionString, [Schema], cancellationToken);
 
@@ -59,6 +64,19 @@ public sealed class VectorTablesTests(AspireDatabase database)
         {
             problems.Add($"{schema}.embeddings has no HNSW cosine index: '{index}'.");
         }
+{{~ if column ~}}
+
+        var tenant = await ScalarAsync($"SELECT format_type(atttypid, atttypmod) || CASE WHEN attnotnull THEN ' not null' ELSE '' END FROM pg_attribute WHERE attrelid = to_regclass('{VectorTables.Table(schema).Replace("'", "''", StringComparison.Ordinal)}') AND attname = 'tenant_id'");
+        if (tenant != "text not null")
+        {
+            problems.Add($"{schema}.embeddings has no tenant_id column of text not null but '{tenant}'.");
+        }
+
+        if (index?.Contains("USING btree (tenant_id, key)", StringComparison.Ordinal) != true)
+        {
+            problems.Add($"{schema}.embeddings has no index on (tenant_id, key): '{index}'.");
+        }
+{{~ end ~}}
 
         return problems;
     }

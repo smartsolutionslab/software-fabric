@@ -1,6 +1,10 @@
 {{~ if project["backend.test.assertions"] != "shouldly" ~}}
 #error The rag pack's tests assert with Shouldly only so far (docs/adr/0006 of the generator).
 {{~ end ~}}
+{{~ tenant_argument = ""
+if project["backend.tenancy"] == "column"
+  tenant_argument = ", tenant"
+end ~}}
 using {{ namespace }}.BuildingBlocks.Rag;
 using {{ namespace }}.Tests.Fakes;
 
@@ -13,6 +17,10 @@ namespace {{ namespace }}.Rag.Tests;
 public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
 {
     private readonly FakeEmbeddingGenerator generator = new(VectorTables.Dimensions);
+{{~ if project["backend.tenancy"] == "column" ~}}
+
+    private readonly OneTenant tenant = new("tenant-a");
+{{~ end ~}}
 
     private Npgsql.NpgsqlDataSource? dataSource;
 
@@ -28,7 +36,7 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
     public async Task A_search_returns_the_nearest_records_first_with_their_text()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var notes = new ModuleVectorIndex<SampleNotesDbContext>(DataSource, generator);
+        var notes = new ModuleVectorIndex<SampleNotesDbContext>(DataSource, generator{{ tenant_argument }});
         await notes.IndexAsync("note-3", "team lunch on friday", cancellationToken);
         await notes.IndexAsync("invoice-1", "unpaid invoice for office chairs", cancellationToken);
         await notes.IndexAsync("invoice-2", "paid invoice for office desks", cancellationToken);
@@ -45,7 +53,7 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
     public async Task Indexing_a_key_again_replaces_its_record_and_removing_it_leaves_none()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var drafts = new ModuleVectorIndex<SampleDraftsDbContext>(DataSource, generator);
+        var drafts = new ModuleVectorIndex<SampleDraftsDbContext>(DataSource, generator{{ tenant_argument }});
         await drafts.IndexAsync("draft-1", "first draft about chairs", cancellationToken);
 
         await drafts.IndexAsync("draft-1", "second draft about desks", cancellationToken);
@@ -64,7 +72,7 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
         var cancellationToken = TestContext.Current.CancellationToken;
         var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off" };
         await using var indexed = VectorTables.DataSource(indexOnly.ConnectionString);
-        var shelf = new ModuleVectorIndex<SampleShelfDbContext>(indexed, generator);
+        var shelf = new ModuleVectorIndex<SampleShelfDbContext>(indexed, generator{{ tenant_argument }});
         for (var number = 0; number < 60; number++)
         {
             await shelf.IndexAsync($"book-{number}", $"book {number}", cancellationToken);
