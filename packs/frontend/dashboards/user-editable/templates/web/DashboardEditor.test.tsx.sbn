@@ -360,12 +360,19 @@ test('paging the widget picker clears the choice, so a widget of one page is nev
 
 test('a dashboard that reaches row 1000 takes no further widget, and the editor says why', async () => {
   const user = userEvent.setup();
+  // 42 full-width widgets 24 rows high: the last starts at row 984 and ends at 1008, so a 43rd would start below 1000.
   answers.detail = () => ({
     data: {
       ...sales,
-      widgets: [
-        { key: 'tall', source: 'dashboards.widget-counts', visual: 'bar', x: 0, y: 984, width: 12, height: 24 },
-      ],
+      widgets: Array.from({ length: 42 }, (_, index) => ({
+        key: `tall${index}`,
+        source: 'dashboards.widget-counts',
+        visual: 'bar',
+        x: 0,
+        y: index * 24,
+        width: 12,
+        height: 24,
+      })),
     },
   });
   render(<DashboardEditor />);
