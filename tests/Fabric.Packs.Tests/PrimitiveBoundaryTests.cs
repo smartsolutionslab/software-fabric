@@ -256,6 +256,7 @@ public sealed partial class PrimitiveBoundaryTests
         namespace Shop.Modules.Billing.Domain.Orders;
 
         internal sealed record TypedId<TTag> : IValueObject<Guid>
+            where TTag : notnull
         {
             private TypedId(Guid value) => Value = value;
 
@@ -290,9 +291,11 @@ public sealed partial class PrimitiveBoundaryTests
 
         internal sealed class Shipment;
 
-        internal sealed class Line<TTag>(TypedId<TTag> id) : Entity<TypedId<TTag>>(id);
+        internal sealed class Line<TTag>(TypedId<TTag> id) : Entity<TypedId<TTag>>(id)
+            where TTag : notnull;
 
         internal sealed class Node<T>
+            where T : notnull
         {
             public Node<List<T>>? Next { get; }
         }
@@ -456,6 +459,7 @@ public sealed partial class PrimitiveBoundaryTests
         internal sealed class Waypoint;
 
         internal class Node<T>
+            where T : notnull
         {
             public Node<List<T>>? Next { get; }
         }
@@ -487,6 +491,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed class Link<T>
+            where T : notnull
         {
             public string Label { get; } = string.Empty;
         }
@@ -499,6 +504,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed record Tag<TTag> : IValueObject<Guid>
+            where TTag : notnull
         {
             private Tag(Guid value) => Value = value;
 
@@ -642,6 +648,7 @@ public sealed partial class PrimitiveBoundaryTests
         internal sealed class Marker;
 
         internal interface INode<out T>
+            where T : notnull
         {
             INode<IEnumerable<T>>? Next { get; }
         }
@@ -654,6 +661,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed class Palette<T>
+            where T : notnull
         {
             internal enum Status
             {
@@ -663,6 +671,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed class Lamp<T>
+            where T : notnull
         {
             public Lamp<List<T>>? Next { get; }
 
@@ -670,6 +679,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed record Chain<T> : IValueObject<T>
+            where T : notnull
         {
             private Chain(T value) => Value = value;
 
@@ -683,6 +693,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed class Answer<T>
+            where T : notnull
         {
             private readonly T[] values = [];
 
@@ -690,6 +701,7 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed record Beacon<T> : IValueObject<T>
+            where T : notnull
         {
             private Beacon(T value) => Value = value;
 
@@ -703,11 +715,13 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed class Shade<T>
+            where T : notnull
         {
             public Palette<T>.Status Level { get; }
         }
 
         internal class Gauge<T>
+            where T : notnull
         {
             private readonly T[] values = [];
 
@@ -715,6 +729,8 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed class Knot<T, TNext> : Gauge<T>
+            where T : notnull
+            where TNext : notnull
         {
             public new readonly T Value = default!;
 
@@ -722,6 +738,8 @@ public sealed partial class PrimitiveBoundaryTests
         }
 
         internal sealed record Loop<T, TNext> : IValueObject<T>
+            where T : notnull
+            where TNext : notnull
         {
             private Loop(T value) => Value = value;
 

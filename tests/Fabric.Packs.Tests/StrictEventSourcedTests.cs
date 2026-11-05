@@ -496,6 +496,7 @@ public sealed class StrictEventSourcedTests
             namespace Shop.Modules.Billing.Domain.Invoices;
 
             internal sealed record TypedId<TTag> : IValueObject<Guid>
+                where TTag : notnull
             {
                 private TypedId(Guid value) => Value = value;
 
@@ -535,6 +536,7 @@ public sealed class StrictEventSourcedTests
             namespace Shop.Modules.Billing.Domain.Invoices;
 
             public sealed record Envelope<T>
+                where T : notnull
             {
                 public T Value { get; init; } = default!;
             }
@@ -636,7 +638,8 @@ public sealed class StrictEventSourcedTests
 
             namespace Shop.Modules.Billing.Domain.Invoices;
 
-            public sealed record Reference<TTag>(InvoiceId Id);
+            public sealed record Reference<TTag>(InvoiceId Id)
+                where TTag : notnull;
 
             public sealed record InvoiceReferenced(InvoiceId Invoice, Reference<Invoice> Source) : IDomainEvent;
 
@@ -693,9 +696,11 @@ public sealed class StrictEventSourcedTests
 
             namespace Shop.Modules.Billing.Domain.Invoices;
 
-            public sealed record Envelope<T>(InvoiceNumber Number);
+            public sealed record Envelope<T>(InvoiceNumber Number)
+                where T : notnull;
 
             public sealed record Node<T>(Node<Envelope<T>>? Next)
+                where T : notnull
             {
                 public T Value { get; init; } = default!;
             }
@@ -730,6 +735,7 @@ public sealed class StrictEventSourcedTests
             namespace Shop.Modules.Billing.Domain.Invoices;
 
             public sealed record Box<T>(Box<List<InvoiceNumber>>? Next)
+                where T : notnull
             {
                 public T Value { get; init; } = default!;
             }
@@ -766,14 +772,17 @@ public sealed class StrictEventSourcedTests
 
             namespace Shop.Modules.Billing.Domain.Invoices;
 
-            public sealed class Growing<T> : Collection<Branch<T>>;
+            public sealed class Growing<T> : Collection<Branch<T>>
+                where T : notnull;
 
             public sealed record Branch<T>(Growing<Envelope<T>> Inner)
+                where T : notnull
             {
                 public T Value { get; init; } = default!;
             }
 
-            public sealed record Envelope<T>(InvoiceNumber Number);
+            public sealed record Envelope<T>(InvoiceNumber Number)
+                where T : notnull;
 
             public sealed record Marker;
 
@@ -804,9 +813,11 @@ public sealed class StrictEventSourcedTests
 
             namespace Shop.Modules.Billing.Domain.Invoices;
 
-            public sealed record Node<T>(Node<List<T>>? Next);
+            public sealed record Node<T>(Node<List<T>>? Next)
+                where T : notnull;
 
-            public sealed record Linked<T>(InvoiceId Invoice, Node<T> Root) : IDomainEvent;
+            public sealed record Linked<T>(InvoiceId Invoice, Node<T> Root) : IDomainEvent
+                where T : notnull;
             """);
 
         output.ShouldNotContain("Stack overflow");
@@ -825,7 +836,8 @@ public sealed class StrictEventSourcedTests
 
             public readonly record struct Payload(InvoiceNumber Number);
 
-            public sealed record Node<T>(Node<List<T>>? Next, T? Value = default);
+            public sealed record Node<T>(Node<List<T>>? Next, T? Value = default)
+                where T : notnull;
 
             public sealed record InvoiceNoded(InvoiceId Invoice, Node<InvoiceNumber> First, Node<Payload> Second) : IDomainEvent;
 
@@ -862,9 +874,11 @@ public sealed class StrictEventSourcedTests
                 public InvoiceNumber Number { get; }
             }
 
-            public sealed record Envelope<T>(T? Value = default);
+            public sealed record Envelope<T>(T? Value = default)
+                where T : notnull;
 
-            public sealed record Node<T>(Node<List<T>>? Next, Envelope<T> Data);
+            public sealed record Node<T>(Node<List<T>>? Next, Envelope<T> Data)
+                where T : notnull;
 
             public sealed record InvoiceNoded(InvoiceId Invoice, Node<InvoiceNumber> First, Node<Payload> Second) : IDomainEvent;
 
@@ -905,7 +919,8 @@ public sealed class StrictEventSourcedTests
                 public InvoiceNumber Number { get; }
             }
 
-            public sealed record Node<T>(Node<List<T>> Next, T Value = default);
+            public sealed record Node<T>(Node<List<T>> Next, T Value = default)
+                where T : notnull;
 
             public sealed record InvoiceNoded(InvoiceId Invoice, Node<Payload?> First, Node<InvoiceNumber> Second) : IDomainEvent;
 
