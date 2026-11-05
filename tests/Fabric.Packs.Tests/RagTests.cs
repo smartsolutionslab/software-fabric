@@ -243,7 +243,7 @@ public sealed class RagTests
         var (ragExitCode, ragOutput) = project.Test("tests/Rag.Tests/Rag.Tests.csproj");
         ragExitCode.ShouldBe(0, ragOutput);
         ragOutput.ShouldContain("failed: 0");
-        ragOutput.ShouldContain("succeeded: 8");
+        ragOutput.ShouldContain("succeeded: 9");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
