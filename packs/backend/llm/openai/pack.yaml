@@ -9,6 +9,8 @@ slots:
   - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 30 }
   - { slot: host.services, template: templates/host-services.sbn }
   - { slot: integration-tests.parameters, template: templates/integration-tests-parameters.sbn }
+  # The end-to-end script's AppHost waits for this parameter as the fixture's would; a project without a web app has no script.
+  - { slot: e2e.apphost-environment, template: templates/e2e-apphost-environment.sbn, optional: true }
   - { slot: readme.first-steps, template: templates/first-steps.sbn }
 agents:
   agents-md: docs/agents.md
