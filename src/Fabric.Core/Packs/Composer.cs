@@ -39,6 +39,16 @@ public static partial class Composer
         return new Composition(selected, files, slots, errors, separators);
     }
 
+    /// <summary>The packs a choice set selects, in composition order; an option without a pack is left out here and reported by <see cref="Compose"/>.</summary>
+    public static IReadOnlyList<PackManifest> Select(CatalogModel catalog, IReadOnlyDictionary<string, PackManifest> packs, ProjectChoices choices)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(packs);
+        ArgumentNullException.ThrowIfNull(choices);
+
+        return Select(catalog, packs, choices, []);
+    }
+
     /// <summary>Base packs first, then one pack per chosen option in catalog order.</summary>
     private static List<PackManifest> Select(
         CatalogModel catalog,
