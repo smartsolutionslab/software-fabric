@@ -67,7 +67,7 @@ public sealed class MicroFrontendsTests
     }
 
     [Fact]
-    public void The_shell_importing_a_remote_a_remote_importing_another_framework_and_an_unformatted_remote_fail_lint()
+    public void The_shell_importing_a_remote_a_remote_importing_another_framework_or_a_banned_library_and_an_unformatted_remote_fail_lint()
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
@@ -83,6 +83,18 @@ public sealed class MicroFrontendsTests
 
             export const count = ref(0);
             """);
+        // A framework's subpath, and the libraries the shell's choices ban: a remote holds the module's screens now.
+        project.Write("web/modules/billing/src/subpath.ts", """
+            import { useState } from 'preact/hooks';
+
+            export const useCount = () => useState(0);
+            """);
+        project.Write("web/modules/billing/src/libraries.ts", """
+            import { Link } from 'react-router-dom';
+            import { object } from 'yup';
+
+            export const parts = [Link, object];
+            """);
         project.Write("web/modules/billing/src/unformatted.ts", "export const greeting = \"hello\"\n");
 
         var (shellExitCode, shellOutput) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "lint");
@@ -93,9 +105,17 @@ public sealed class MicroFrontendsTests
         var (remoteExitCode, remoteOutput) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "modules", "billing"), "pnpm", "lint");
         remoteExitCode.ShouldNotBe(0, remoteOutput);
         remoteOutput.ShouldContain("mixed.ts");
+        remoteOutput.ShouldContain("subpath.ts");
+        remoteOutput.ShouldContain("'preact/hooks' import is restricted");
+        remoteOutput.ShouldContain("'react-router-dom' import is restricted");
+        remoteOutput.ShouldContain("'yup' import is restricted");
         remoteOutput.ShouldContain("Every remote is written with the shell's framework, react");
 
-        File.Delete(Path.Combine(project.ProjectDirectory, "web", "modules", "billing", "src", "mixed.ts"));
+        foreach (var file in new[] { "mixed.ts", "subpath.ts", "libraries.ts" })
+        {
+            File.Delete(Path.Combine(project.ProjectDirectory, "web", "modules", "billing", "src", file));
+        }
+
         var (formatExitCode, formatOutput) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "modules", "billing"), "pnpm", "lint");
         formatExitCode.ShouldNotBe(0, formatOutput);
         formatOutput.ShouldContain("src/unformatted.ts");
