@@ -8,7 +8,10 @@ interface RemoteModule {
 
 const pages = new Map<string, Promise<ComponentType>>();
 
-/** Loads a module's page from its remote once; every later mount gets the same component. */
+/**
+ * Loads a module's page from its remote once; every later mount gets the same component. A load that failed is
+ * forgotten, so the next mount tries again once the remote is back.
+ */
 function pageOf(module: string): Promise<ComponentType> {
   const known = pages.get(module);
   if (known) {
@@ -23,6 +26,7 @@ function pageOf(module: string): Promise<ComponentType> {
     return loaded.default;
   });
   pages.set(module, page);
+  page.catch(() => pages.delete(module));
   return page;
 }
 

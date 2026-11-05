@@ -1,6 +1,7 @@
 {{~ if project["frontend.framework"] != "react" || project["frontend.design-system"] != "tokens-and-components" ~}}
 throw new Error('The module-federation pack builds React remotes on the tokens-and-components design system only so far; frontend.framework is {{ project["frontend.framework"] }}, frontend.design-system is {{ project["frontend.design-system"] }} (docs/adr/0006 of the generator).');
 {{~ end ~}}
+import { fileURLToPath } from 'node:url';
 import { federation } from '@module-federation/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
@@ -11,6 +12,20 @@ export default defineConfig(({ command }) => ({
   base: command === 'build' ? '/modules/{{ module.name }}/' : '/',
   plugins: [
     react(),
+    // A remote bundles only its own files and packages: other remotes and the shell are loaded at run time (docs/adr).
+    {
+      name: 'remote-boundary',
+      enforce: 'pre',
+      load(id) {
+        const web = fileURLToPath(new URL('../../', import.meta.url));
+        const own = fileURLToPath(new URL('./', import.meta.url));
+        if (!id.startsWith(own) && [`${web}app/`, `${web}modules/`].some((root) => id.startsWith(root))) {
+          this.error(`A remote bundles only its own files and packages; ${id} is another remote's or the shell's.`);
+        }
+
+        return null;
+      },
+    },
     federation({
       name: '{{ module.name }}',
       filename: 'remoteEntry.js',

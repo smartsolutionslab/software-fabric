@@ -22,9 +22,12 @@ The frontend is a **shell** and one **remote** per backend module.
   address as `REMOTE_<MODULE>_URL` (`REMOTE_ORDER_HANDLING_URL` for `order-handling`) and starts once they run
   (`src/AppHost/Wiring/Remotes.cs`).
 - **Built**, a remote is served from `/modules/<module>/` next to the shell; that is where the shell looks for it.
-- The shell never imports a remote; lint fails if it does. A remote reaches other modules only through the backend's
-  API and events, never through another remote's code.
-- The shell's Tailwind reads the remotes' sources (`@source '../../modules'`), so a remote's utilities are styled.
+- The shell never imports a remote: lint fails on a remote's package name, and the shell's build, dev server and tests
+  fail when any import path, relative ones included, loads a remote's file (`web/app/remoteBoundary.ts`). A remote
+  reaches other modules only through the backend's API and events, never through another remote's code.
+- The shell's Tailwind reads the remotes' sources (`@source '../../modules'`), so a remote's utilities are styled. A
+  remote ships no stylesheet of its own: a utility no file used before appears only once the shell is built again, so
+  a remote that starts using one is deployed together with a new build of the shell.
 
 ## Consequences
 
