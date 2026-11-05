@@ -68,6 +68,28 @@ public sealed class AgentFrameworkTests
         }
         """;
 
+    private const string AgentSelectingMcpTools = """
+        using Shop.BuildingBlocks.Agents;
+        using Shop.BuildingBlocks.Mcp;
+        using Microsoft.Agents.AI;
+        using Microsoft.Extensions.AI;
+
+        namespace Shop.Modules.Billing.Application.Agents;
+
+        public static class DocsAgent
+        {
+            public static async Task<AIAgent> CreateAsync(IChatClient model, IAgentMcpTools mcpTools, CancellationToken cancellationToken)
+            {
+                var tools = await mcpTools.ToolsAsync(AllowSearch, cancellationToken);
+                var first = tools[0];
+                var search = tools.Single(tool => tool.Name == "docs__search");
+                return model.AsAIAgent(instructions: "Answer from the docs.", tools: [first, search]);
+            }
+
+            private static bool AllowSearch(McpToolCall call) => call.Tool == "search";
+        }
+        """;
+
     private const string AgentWithoutTheChoice = """
         using Microsoft.Agents.AI;
         using Microsoft.Extensions.AI;
@@ -209,6 +231,20 @@ public sealed class AgentFrameworkTests
         var output = ArchitectureFailure("src/Modules/Billing/Billing.Application/Agents", ToolBypassingTheDispatcher);
 
         output.ShouldContain("Shop.Modules.Billing.Application.Agents.ShortcutAgent makes a tool with AIFunctionFactory.Create, not DispatcherTool.For");
+    }
+
+    [Fact]
+    public void An_agent_selecting_mcp_tools_by_index_and_by_single_passes_the_architecture_rules()
+    {
+        using var project = NewProject(Anthropic, AgentFramework, "backend.mcp=client");
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Agents", AgentSelectingMcpTools);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
     }
 
     [Fact]
