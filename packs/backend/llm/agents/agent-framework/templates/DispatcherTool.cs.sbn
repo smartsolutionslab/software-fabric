@@ -107,8 +107,17 @@ public static class DispatcherTool
             .Distinct()];
     }
 
-    private static bool HoldsOption(Type type) =>
-        IsOption(type) || (type.IsArray && HoldsOption(type.GetElementType()!)) || (type.IsGenericType && type.GetGenericArguments().Any(HoldsOption));
+    /// <summary>
+    /// Whether an Option is somewhere in the type: the type itself, a generic argument, or an element of a collection it
+    /// is, by its own <c>IEnumerable&lt;T&gt;</c> or an inherited one (<c>List&lt;AmountCollection&gt;</c>), at any depth.
+    /// </summary>
+    private static bool HoldsOption(Type type) => HoldsOption(type, []);
+
+    private static bool HoldsOption(Type type, HashSet<Type> seen) =>
+        seen.Add(type)
+        && (IsOption(type)
+            || (type.IsGenericType && type.GetGenericArguments().Any(argument => HoldsOption(argument, seen)))
+            || Parts(type).Any(element => HoldsOption(element, seen)));
 
     private static bool IsOption(Type type) => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Option<>);
 
