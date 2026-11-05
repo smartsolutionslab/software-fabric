@@ -12,6 +12,10 @@ public static class EvalThreshold
 {
     public const string Key = "backend.llm.extras.evals.threshold";
 
+    private const double Minimum = 1;
+
+    private const double Maximum = 5;
+
     /// <summary>The threshold in the repository's <c>fabric.yaml</c>.</summary>
     public static double Read() => Read(EvalPaths.FabricYaml);
 
@@ -41,7 +45,9 @@ public static class EvalThreshold
                 : throw new InvalidOperationException($"{fabricYaml} has no settings.{Key}: the lowest mean score (1 to 5) the evals accept. Add it under settings:, as fabric new writes it.");
 
         return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var threshold)
-            ? threshold
-            : throw new InvalidOperationException($"{fabricYaml}: settings.{Key} is '{value}', not a number.");
+            && double.IsFinite(threshold)
+            && threshold is >= Minimum and <= Maximum
+                ? threshold
+                : throw new InvalidOperationException($"{fabricYaml}: settings.{Key} is '{value}', but it must be a number from 1 to 5.");
     }
 }

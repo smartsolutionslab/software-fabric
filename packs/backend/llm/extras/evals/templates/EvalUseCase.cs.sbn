@@ -2,5 +2,9 @@ using Microsoft.Extensions.AI;
 
 namespace {{ namespace }}.Evals;
 
-/// <summary>A use case that asks the model something: its name in the report, how it answers an input, and its examples.</summary>
-public sealed record EvalUseCase(string Name, Func<IChatClient, string, CancellationToken, Task<ChatResponse>> Answer, IReadOnlyList<EvalExample> Examples);
+/// <summary>
+/// A use case that asks the model something: its name in the report, how it answers an example, and its examples. An
+/// answer is given what the use case would have when it runs: an example's grounding context stands in for the records
+/// a use case that retrieves nothing itself would be handed.
+/// </summary>
+public sealed record EvalUseCase(string Name, Func<IChatClient, EvalExample, CancellationToken, Task<ChatResponse>> Answer, IReadOnlyList<EvalExample> Examples);

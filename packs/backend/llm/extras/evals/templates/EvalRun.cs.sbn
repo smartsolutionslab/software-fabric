@@ -35,13 +35,14 @@ public static class EvalRun
         {
             for (var index = 0; index < useCase.Examples.Count; index++)
             {
-                var (input, groundingContext) = useCase.Examples[index];
+                var current = useCase.Examples[index];
+                var (input, groundingContext) = current;
                 var example = (index + 1).ToString(CultureInfo.InvariantCulture);
                 EvaluationContext[] context = groundingContext is null ? [] : [new GroundednessEvaluatorContext(groundingContext)];
 
                 await using var scenario = await (groundingContext is null ? withoutContext : withContext)
                     .CreateScenarioRunAsync(useCase.Name, example, cancellationToken: cancellationToken);
-                var response = await useCase.Answer(model, input, cancellationToken);
+                var response = await useCase.Answer(model, current, cancellationToken);
                 var result = await scenario.EvaluateAsync([new ChatMessage(ChatRole.User, input)], response, context, cancellationToken);
 
                 scores.AddRange(result.Metrics.Values.Select(metric => new EvalScore(useCase.Name, example, metric.Name, (metric as NumericMetric)?.Value)));
