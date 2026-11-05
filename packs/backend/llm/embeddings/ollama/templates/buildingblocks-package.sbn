@@ -1,0 +1,2 @@
+{{ if project["backend.llm"] != "ollama" ~}}
+    <PackageReference Include="OllamaSharp" />{{ end }}

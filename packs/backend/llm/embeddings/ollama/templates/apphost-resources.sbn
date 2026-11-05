@@ -1,0 +1,9 @@
+{{ if project["backend.llm"] != "ollama" ~}}
+// A local model server for embeddings: Ollama in a container (the image the package pins), its models in a data volume,
+// so a model is pulled once per machine on the first start. No key.
+var ollama = builder.AddOllama("ollama")
+    .WithDataVolume();
+{{ end ~}}
+// The embedding model, pulled at start: nomic-embed-text (768 dimensions, about 274 MB). A model of another size needs
+// vector tables of that size.
+var ollamaEmbeddingModel = ollama.AddModel("ollama-embedding-model", "nomic-embed-text");

@@ -1,0 +1,3 @@
+{{ if project["backend.llm"] == "ollama" ~}}
+- The first start of the AppHost also pulls the embedding model `nomic-embed-text` (about 274 MB) into the Ollama data volume, and the host waits until it is there.{{ else ~}}
+- Start the AppHost with Docker running: the first start pulls the Ollama image and the embedding model `nomic-embed-text` (about 274 MB) into a data volume, and the host waits until the model is there. There is no key to set.{{ end }}

@@ -1,0 +1,7 @@
+{{ if project["backend.llm"] != "openai" ~}}
+// OpenAI's embeddings through the OpenAI API: the key is a secret (dotnet user-secrets set Parameters:openai-api-key ...).
+var openAIApiKey = builder.AddParameter("openai-api-key", secret: true);
+{{ end ~}}
+// The embedding model: text-embedding-3-small (1536 dimensions). text-embedding-3-large (3072) is stronger, at a higher
+// price; a model of another size needs vector tables of that size.
+var openAIEmbeddingModel = builder.AddParameter("openai-embedding-model", "text-embedding-3-small", publishValueAsDefault: true);

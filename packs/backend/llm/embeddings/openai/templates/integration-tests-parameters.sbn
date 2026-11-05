@@ -1,0 +1,4 @@
+{{ if project["backend.llm"] == "openai" ~}}
+        // Embeddings use the chat model's openai-api-key, given its value above.{{ else ~}}
+        // A key-shaped value OpenAI does not accept: the integration tests never call the embedding model.
+        builder.Configuration["Parameters:openai-api-key"] = "not-a-real-key";{{ end }}

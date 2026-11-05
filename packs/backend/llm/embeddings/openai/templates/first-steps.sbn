@@ -1,0 +1,3 @@
+{{ if project["backend.llm"] == "openai" ~}}
+- Embeddings use the same OpenAI key, `openai-api-key`, and the model `text-embedding-3-small`, the AppHost's parameter `openai-embedding-model`.{{ else ~}}
+- Give the AppHost your OpenAI API key for embeddings, which stays out of the repository: `dotnet user-secrets set Parameters:openai-api-key <key> --project src/AppHost`. Without it the host cannot embed text; the tests never need it.{{ end }}

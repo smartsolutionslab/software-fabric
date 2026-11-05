@@ -1,0 +1,1 @@
+builder.Services.AddAzureOpenAIEmbeddingGenerator(builder.Configuration);

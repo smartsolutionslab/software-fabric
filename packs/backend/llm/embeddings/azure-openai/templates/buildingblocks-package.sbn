@@ -1,0 +1,2 @@
+{{ if project["backend.llm"] != "openai" && project["backend.llm"] != "azure-openai" ~}}
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />{{ end }}

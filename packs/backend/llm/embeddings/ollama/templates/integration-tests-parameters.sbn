@@ -1,0 +1,15 @@
+        // Ollama would pull its image and the embedding model on start, and the integration tests never call the model:
+        // drop both resources, and the host's wait on them, and give the host an endpoint nothing listens on instead.
+        string[] embeddingServer = ["ollama", "ollama-embedding-model"];
+        foreach (var resource in builder.Resources.Where(resource => embeddingServer.Contains(resource.Name)).ToList())
+        {
+            builder.Resources.Remove(resource);
+        }
+
+        var embeddingHost = builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "host");
+        foreach (var wait in embeddingHost.Annotations.OfType<WaitAnnotation>().Where(wait => embeddingServer.Contains(wait.Resource.Name)).ToList())
+        {
+            embeddingHost.Annotations.Remove(wait);
+        }
+
+        builder.CreateResourceBuilder(embeddingHost).WithEnvironment("Ollama__Endpoint", "http://localhost:9");
