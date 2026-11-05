@@ -1,0 +1,40 @@
+using {{ namespace }}.BuildingBlocks.Agents;
+using {{ namespace }}.Host.Agents;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class AgentUiRegistration
+{
+    /// <summary>
+    /// The agents the modules registered by name, for <c>POST /agents/{name}</c>; a name two queries share, or one that
+    /// is not lower kebab-case, stops the host, naming them. In Development, with <c>Agents:ModelStandIn</c> true (the
+    /// AppHost's <c>model-stand-in</c> parameter, which only the tests set), the project's model is
+    /// <see cref="StandInChatClient"/> instead of the provider's.
+    /// </summary>
+    public static IServiceCollection AddAgentUi(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+    {
+        {{ not_null "services" }}
+        {{ not_null "configuration" }}
+        {{ not_null "environment" }}
+
+        List<AgentConversation> registered = [.. services
+            .Where(service => service.ServiceType == typeof(AgentConversation) && service.ImplementationInstance is AgentConversation)
+            .Select(service => (AgentConversation)service.ImplementationInstance!)];
+        var conversations = AgentConversations.From(registered);
+        if (conversations.Problems.Count > 0)
+        {
+            throw new InvalidOperationException("The modules' agents cannot be reached at POST /agents/{name}:" + Environment.NewLine + string.Join(Environment.NewLine, conversations.Problems));
+        }
+
+        services.AddSingleton(conversations);
+        if (environment.IsDevelopment() && configuration.GetValue<bool>("Agents:ModelStandIn"))
+        {
+            services.RemoveAll<IChatClient>();
+            services.AddModelChatClient(_ => new StandInChatClient());
+        }
+
+        return services;
+    }
+}

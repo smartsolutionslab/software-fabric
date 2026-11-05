@@ -150,11 +150,50 @@ public sealed class RagTests
     }
 
     [Fact]
-    public void Rag_with_a_tenant_column_fails_the_build_instead_of_sharing_vectors_between_tenants()
+    public void Rag_with_a_tenant_column_keeps_each_record_under_its_tenant_and_keys_it_per_tenant()
     {
-        var store = Files(Profile, "backend.llm=openai", Rag, "backend.tenancy=column")[$"{Store}/ModuleVectorIndex.cs"];
+        var files = Files(Profile, "backend.llm=openai", Rag, "backend.tenancy=column");
 
-        store.ShouldStartWith("#error The rag pack keeps one vector table per module with no tenant column, so it supports backend.tenancy none only so far");
+        var tables = files[$"{Store}/VectorTables.cs"];
+        tables.ShouldContain("(tenant_id text not null, key text not null, content text not null, embedding vector({Dimensions}) not null, primary key (tenant_id, key))");
+        tables.ShouldContain("USING hnsw (embedding vector_cosine_ops)");
+        var store = files[$"{Store}/ModuleVectorIndex.cs"];
+        store.ShouldNotContain("#error");
+        store.ShouldContain("ITenantContext tenants");
+        store.ShouldContain("ON CONFLICT (tenant_id, key)");
+        store.ShouldContain("DELETE FROM {Table} WHERE tenant_id = $1 AND key = $2");
+        store.ShouldContain("WHERE tenant_id = $3 ORDER BY embedding <=> $1");
+        store.ShouldNotContain("string tenant", Case.Sensitive, "a caller never passes the tenant");
+        files[$"{Store}/Wiring/VectorIndexRegistration.cs"].ShouldContain(".AddScoped(typeof(ModuleVectorIndex<>))");
+        files["AGENTS.md"].ShouldContain("TenantScope.Begin");
+        files.Keys.ShouldContain("tests/Rag.Tests/TenantVectorIndexTests.cs");
+    }
+
+    [Fact]
+    public void Rag_without_tenancy_keeps_one_record_per_key_and_no_tenant()
+    {
+        var files = RagFiles("openai", "openai");
+
+        files[$"{Store}/VectorTables.cs"].ShouldContain("(key text primary key, content text not null, embedding vector({Dimensions}) not null)");
+        files.Where(file => file.Key.StartsWith(Store, StringComparison.Ordinal) || file.Key.StartsWith("tests/Rag.Tests/", StringComparison.Ordinal))
+            .ShouldAllBe(file => !file.Value.Contains("tenant", StringComparison.OrdinalIgnoreCase));
+        files[$"{Store}/Wiring/VectorIndexRegistration.cs"].ShouldContain(".AddSingleton(typeof(ModuleVectorIndex<>))");
+    }
+
+    [Theory]
+    [InlineData("schema-per-tenant")]
+    [InlineData("database-per-tenant")]
+    public void Rag_with_another_tenancy_fails_the_build_instead_of_sharing_vectors_between_tenants(string tenancy)
+    {
+        using var standIns = new StandIns();
+        string[] overrides = ["backend.llm=openai", Rag, $"backend.tenancy={tenancy}"];
+        var packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, Profile, overrides);
+
+        var generated = Generator.New(Repository.Catalog, packs, "shop", Profile, overrides);
+
+        generated.Errors.ShouldBeEmpty();
+        var store = generated.Files.Single(file => file.Path == $"{Store}/ModuleVectorIndex.cs").Content;
+        store.ShouldStartWith($"#error The rag pack keeps its vectors apart by a tenant column, so it supports backend.tenancy none and column only so far (docs/adr/0006 of the generator): with backend.tenancy {tenancy} a search would return every tenant's records.");
     }
 
     [Fact]
@@ -183,6 +222,28 @@ public sealed class RagTests
         ragExitCode.ShouldBe(0, ragOutput);
         ragOutput.ShouldContain("failed: 0");
         ragOutput.ShouldContain("succeeded: 5");
+
+        var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        architectureExitCode.ShouldBe(0, architectureOutput);
+        architectureOutput.ShouldContain("failed: 0");
+
+        var (moduleExitCode, moduleOutput) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj");
+        moduleExitCode.ShouldBe(0, moduleOutput);
+        moduleOutput.ShouldContain("failed: 0");
+    }
+
+    [Fact]
+    public void The_generated_rag_tests_under_a_tenant_column_return_each_tenant_only_its_own_records()
+    {
+        using var project = NewProject("openai", "openai", "backend.tenancy=column");
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Infrastructure", BillingSearchingItsOwnVectors);
+        project.Build();
+
+        var (ragExitCode, ragOutput) = project.Test("tests/Rag.Tests/Rag.Tests.csproj");
+        ragExitCode.ShouldBe(0, ragOutput);
+        ragOutput.ShouldContain("failed: 0");
+        ragOutput.ShouldContain("succeeded: 9");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
@@ -227,9 +288,9 @@ public sealed class RagTests
     }
 
     /// <summary>A lean-crud project with rag; fails while any of its options is generated by a stand-in.</summary>
-    private static GeneratedProject NewProject(string llm, string embeddings)
+    private static GeneratedProject NewProject(string llm, string embeddings, params string[] more)
     {
-        var project = new GeneratedProject(Profile, Overrides(llm, embeddings));
+        var project = new GeneratedProject(Profile, [.. Overrides(llm, embeddings), .. more]);
         var standIns = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs", "adr"))
             .Where(file => File.ReadAllText(file).Contains("This option's pack is not written yet.", StringComparison.Ordinal))
             .Select(Path.GetFileName)

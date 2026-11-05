@@ -1,0 +1,41 @@
+option: frontend.agent-ui.ag-ui
+modules:
+  assistant: { module.style: crud, module.cqrs: logical }
+files:
+  - { template: templates/BuildingBlocks/IAgentConversation.cs.sbn, target: src/BuildingBlocks/Agents/IAgentConversation.cs }
+  - { template: templates/BuildingBlocks/IAgentConversationOfSelf.cs.sbn, target: "src/BuildingBlocks/Agents/IAgentConversation{TSelf}.cs" }
+  - { template: templates/BuildingBlocks/AgentConversation.cs.sbn, target: src/BuildingBlocks/Agents/AgentConversation.cs }
+  - { template: templates/BuildingBlocks/AgentConversationRegistration.cs.sbn, target: src/BuildingBlocks/Agents/Wiring/AgentConversationRegistration.cs }
+  - { template: templates/Host/AgentUiRegistration.cs.sbn, target: src/Host/Wiring/AgentUiRegistration.cs }
+  - { template: templates/Host/AgentUiEndpoints.cs.sbn, target: src/Host/Wiring/AgentUiEndpoints.cs }
+  - { template: templates/Host/AgentConversations.cs.sbn, target: src/Host/Agents/AgentConversations.cs }
+  - { template: templates/Host/AgentRuns.cs.sbn, target: src/Host/Agents/AgentRuns.cs }
+  - { template: templates/Host/AgentEvents.cs.sbn, target: src/Host/Agents/AgentEvents.cs }
+  - { template: templates/Host/StandInChatClient.cs.sbn, target: src/Host/Agents/StandInChatClient.cs }
+  - { template: templates/Module/AssistantAgent.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Agents/AssistantAgent.cs", per-module: true, when: 'module.name == "assistant"' }
+  - { template: templates/Module/TalkToTheAssistant.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/TalkToTheAssistant/TalkToTheAssistant.cs", per-module: true, when: 'module.name == "assistant"' }
+  - { template: templates/Module/TalkToTheAssistantHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/TalkToTheAssistant/TalkToTheAssistantHandler.cs", per-module: true, when: 'module.name == "assistant"' }
+  - { template: templates/Module/CountWords.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/CountWords/CountWords.cs", per-module: true, when: 'module.name == "assistant"' }
+  - { template: templates/Module/CountWordsHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/CountWords/CountWordsHandler.cs", per-module: true, when: 'module.name == "assistant"' }
+  - { template: templates/Module/AssistantFailures.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/AssistantFailures.cs", per-module: true, when: 'module.name == "assistant"' }
+  - { template: templates/Module/NothingToCount.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/NothingToCount.cs", per-module: true, when: 'module.name == "assistant"' }
+  - { template: templates/tests/TalkToTheAssistantTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Queries/TalkToTheAssistantTests.cs", per-module: true, when: 'module.name == "assistant"' }
+  - { template: templates/tests/AgentUiGoesThroughAQuery.cs.sbn, target: tests/Architecture.Tests/Rules/AgentUiGoesThroughAQuery.cs }
+  - { template: templates/tests/AgentUiTests.cs.sbn, target: tests/Integration.Tests/AgentUiTests.cs }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: host.packages, template: templates/host-packages.sbn }
+  # After the provider's chat client, which the stand-in model replaces in tests.
+  - { slot: host.services, template: templates/host-services.sbn, order: 40 }
+  - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 40 }
+  - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 60 }
+  - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 40 }
+  - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 40 }
+  - { slot: integration-tests.parameters, template: templates/integration-tests-parameters.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Only the host speaks AG-UI, and it runs no agent: a module or the BuildingBlocks referencing the AG-UI SDK (AGUI.*), the host referencing Agent Framework (Microsoft.Agents.AI*), or anything referencing Agent Framework's AG-UI hosting fails the build naming the assembly.", file: templates/tests/AgentUiGoesThroughAQuery.cs.sbn }
+  - { kind: end-to-end-test, describes: "Through Aspire, POST /agents/assistant streams the assistant's answer in more than one TEXT_MESSAGE_CONTENT event after a count_words tool call whose query ran through the dispatcher; an anonymous caller is refused unless backend.auth is none; an unknown agent is not found.", file: templates/tests/AgentUiTests.cs.sbn }
+  - { kind: unit-test, describes: "The assistant's query, run through the dispatcher with a stand-in model that asks for a tool call, streams the call, its result and the answer built from it (tests/Modules/Assistant.Tests).", file: templates/tests/TalkToTheAssistantTests.cs.sbn }

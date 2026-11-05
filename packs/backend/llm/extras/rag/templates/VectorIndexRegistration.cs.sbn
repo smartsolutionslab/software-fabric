@@ -12,6 +12,9 @@ public static class VectorIndexRegistration
     /// Registers <see cref="ModuleVectorIndex{TContext}"/> for every module, over a data source of the connection
     /// string <c>database</c> that knows the <c>vector</c> type. The connection string is read when an index is first
     /// needed; registering connects to nothing.
+{{~ if project["backend.tenancy"] == "column" ~}}
+    /// An index is scoped, as the tenant source it reads is.
+{{~ end ~}}
     /// </summary>
     public static IServiceCollection AddModuleVectorIndexes(this IServiceCollection services, IConfiguration configuration)
     {
@@ -19,7 +22,11 @@ public static class VectorIndexRegistration
 
         return services
             .AddKeyedSingleton(VectorTables.DataSourceKey, (_, _) => VectorTables.DataSource(ConnectionString(configuration)))
+{{~ if project["backend.tenancy"] == "column" ~}}
+            .AddScoped(typeof(ModuleVectorIndex<>));
+{{~ else ~}}
             .AddSingleton(typeof(ModuleVectorIndex<>));
+{{~ end ~}}
     }
 
     /// <summary>

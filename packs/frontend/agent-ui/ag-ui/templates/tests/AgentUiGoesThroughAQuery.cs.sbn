@@ -1,0 +1,58 @@
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Modules;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// The agent panel's one endpoint is the host's <c>POST /agents/{name}</c>, which sends the named agent's
+/// <c>IAgentConversation</c> query through the dispatcher; the query's handler, in a module's Application project, runs
+/// the agent. So only the host speaks AG-UI, the host runs no agent itself, and nothing maps an agent with Agent
+/// Framework's AG-UI hosting, whose endpoint runs the agent directly. The rule reads what the compiled assemblies
+/// reference: an endpoint streaming an agent anywhere else fails it, naming its assembly.
+/// </summary>
+public sealed class AgentUiGoesThroughAQuery : IArchitectureRule
+{
+    private const string Sdk = "AGUI";
+
+    private const string AgentFramework = "Microsoft.Agents.AI";
+
+    private const string AgentFrameworkHosting = "Microsoft.Agents.AI.Hosting.AGUI";
+
+    private const string Endpoint = "POST /agents/{name}";
+
+    public string Description => "Only the host speaks AG-UI, and it runs no agent: POST /agents/{name} sends the agent's IAgentConversation query through the dispatcher.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var host = typeof(Program).Assembly;
+        List<Assembly> others = [.. model.ModuleAssemblies, typeof(IModule).Assembly];
+        foreach (var assembly in others)
+        {
+            foreach (var reference in References(assembly).Where(reference => Is(reference, Sdk)))
+            {
+                yield return $"{assembly.GetName().Name} references {reference}, but only the host speaks AG-UI: a module exposes its agent as an IAgentConversation query, which {Endpoint} sends through the dispatcher.";
+            }
+        }
+
+        foreach (var reference in References(host).Where(reference => Is(reference, AgentFramework) && !Is(reference, AgentFrameworkHosting)))
+        {
+            yield return $"{host.GetName().Name} references {reference}, but the host runs no agent: it sends the agent's IAgentConversation query through the dispatcher, and the query's handler runs the agent.";
+        }
+
+        foreach (var assembly in others.Prepend(host))
+        {
+            foreach (var reference in References(assembly).Where(reference => Is(reference, AgentFrameworkHosting)))
+            {
+                yield return $"{assembly.GetName().Name} references {reference}, Agent Framework's AG-UI hosting, whose endpoint runs an agent itself; the host's {Endpoint} sends the agent's query through the dispatcher instead.";
+            }
+        }
+    }
+
+    private static IEnumerable<string> References(Assembly assembly) =>
+        assembly.GetReferencedAssemblies().Select(reference => reference.Name!).Order(StringComparer.Ordinal);
+
+    private static bool Is(string reference, string package) =>
+        reference == package || reference.StartsWith(package + ".", StringComparison.Ordinal);
+}

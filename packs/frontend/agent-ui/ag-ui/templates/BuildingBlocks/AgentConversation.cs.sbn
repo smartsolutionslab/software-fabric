@@ -1,0 +1,7 @@
+using System.Text.Json;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.BuildingBlocks.Agents;
+
+/// <summary>A module's agent as the host's <c>POST /agents/{name}</c> finds it: its name, its query, and how to start one run.</summary>
+public sealed record AgentConversation(string AgentName, Type Query, Func<IReadOnlyList<ChatMessage>, JsonElement?, IAgentConversation> Start);

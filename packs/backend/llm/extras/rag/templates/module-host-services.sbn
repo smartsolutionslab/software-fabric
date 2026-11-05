@@ -1,3 +1,6 @@
-        // The host registers every module's vector index and the project's IEmbeddingGenerator; a module's test stands in for the generator and never calls a real model.
+        // The host registers every module's vector index{{ if project["backend.tenancy"] == "column" }}, the tenant source it reads{{ end }} and the project's IEmbeddingGenerator; a module's test stands in for the generator and never calls a real model.
         services.AddModuleVectorIndexes(configuration);
+{{~ if project["backend.tenancy"] == "column" ~}}
+        services.AddTenancy();
+{{~ end ~}}
         services.AddSingleton<Microsoft.Extensions.AI.IEmbeddingGenerator<string, Microsoft.Extensions.AI.Embedding<float>>>(_ => new {{ namespace }}.Tests.Fakes.FakeEmbeddingGenerator({{ namespace }}.BuildingBlocks.Rag.VectorTables.Dimensions));

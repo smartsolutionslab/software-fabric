@@ -1,0 +1,23 @@
+using {{ namespace }}.Host.Agents;
+
+namespace Microsoft.AspNetCore.Builder;
+
+public static class AgentUiEndpoints
+{
+    /// <summary>
+    /// <c>POST /agents/{name}</c>, the agent panel's one endpoint{{ if project["backend.auth"] == "none" }}, open to anyone (backend.auth: none){{ else }}, for signed-in users{{ end }}: it reads the AG-UI
+    /// input, sends the named agent's query through the dispatcher and streams the agent's updates back as AG-UI events.
+    /// The panel speaks AG-UI rather than the OpenAPI document's REST, so the endpoint is not described there.
+    /// </summary>
+    public static WebApplication MapAgentUi(this WebApplication app)
+    {
+        {{ not_null "app" }}
+
+        app.MapPost("/agents/{name}", AgentRuns.RunAsync)
+{{~ if project["backend.auth"] != "none" ~}}
+            .RequireAuthorization()
+{{~ end ~}}
+            .ExcludeFromDescription();
+        return app;
+    }
+}

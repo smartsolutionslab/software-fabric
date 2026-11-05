@@ -1,0 +1,66 @@
+using System.Net;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
+using AGUI.Abstractions;
+using AGUI.Server;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Host.Agents;
+
+/// <summary>
+/// One run of an agent for the agent panel. The endpoint only translates: AG-UI's input becomes the agent's query, sent
+/// through the dispatcher like any other request, and the query's updates become AG-UI events. It never runs an agent.
+/// </summary>
+public static class AgentRuns
+{
+    /// <summary>AG-UI's own types, and what Microsoft.Extensions.AI puts into an update (a tool call's arguments, its result).</summary>
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        TypeInfoResolver = JsonTypeInfoResolver.Combine(AGUIJsonUtilities.DefaultTypeInfoResolver, AIJsonUtilities.DefaultOptions.TypeInfoResolver),
+    };
+
+    public static async Task<IResult> RunAsync(string name, HttpRequest request, AgentConversations conversations, IDispatcher dispatcher, CancellationToken cancellationToken)
+    {
+        {{ not_null "request" }}
+        {{ not_null "conversations" }}
+        {{ not_null "dispatcher" }}
+
+        if (conversations.Find(name) is not { } conversation)
+        {
+            return Problem("agents.not-found", $"There is no agent named '{name}'.", HttpStatusCode.NotFound);
+        }
+
+        RunAgentInput? input;
+        try
+        {
+            input = await JsonSerializer.DeserializeAsync<RunAgentInput>(request.Body, Json, cancellationToken);
+        }
+        catch (JsonException exception)
+        {
+            return Problem("agents.invalid-input", $"The body is not an AG-UI run: {exception.Message}", HttpStatusCode.BadRequest);
+        }
+
+        if (input is null)
+        {
+            return Problem("agents.invalid-input", "The body is not an AG-UI run.", HttpStatusCode.BadRequest);
+        }
+
+        // The agent's own instructions are its module's: the browser's system and developer messages are not passed on,
+        // and neither are the tools it declares, so the model reaches data only through the module's use cases.
+        var context = input.ToChatRequestContext(Json);
+        List<ChatMessage> messages = [.. context.Messages.Where(message => message.Role != ChatRole.System && message.Role.Value != "developer")];
+        var result = await dispatcher.QueryAsync(conversation.Start(messages, input.State), cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return Problem(result.Error.Code, result.Error.Message, result.Error.Status);
+        }
+
+        return new AgentEvents(result.Value.AsAGUIEventStreamAsync(context, cancellationToken));
+    }
+
+    /// <summary>The problem details every other endpoint answers an <c>ApiError</c> with: its status, its message and its code.</summary>
+    private static ProblemHttpResult Problem(string code, string message, HttpStatusCode status) =>
+        TypedResults.Problem(title: message, statusCode: (int)status, extensions: new Dictionary<string, object?> { ["code"] = code });
+}

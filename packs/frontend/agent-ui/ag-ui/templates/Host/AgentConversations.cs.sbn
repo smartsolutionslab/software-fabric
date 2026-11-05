@@ -1,0 +1,46 @@
+using System.Text.RegularExpressions;
+using {{ namespace }}.BuildingBlocks.Agents;
+
+namespace {{ namespace }}.Host.Agents;
+
+/// <summary>The agents <c>POST /agents/{name}</c> reaches, by name, and what keeps one from being reached.</summary>
+public sealed partial class AgentConversations
+{
+    private readonly Dictionary<string, AgentConversation> byName;
+
+    private AgentConversations(Dictionary<string, AgentConversation> byName, IReadOnlyList<string> problems)
+    {
+        this.byName = byName;
+        Problems = problems;
+    }
+
+    /// <summary>Each name two queries share, and each name that is not lower kebab-case, in words; empty when none.</summary>
+    public IReadOnlyList<string> Problems { get; }
+
+    public static AgentConversations From(IReadOnlyList<AgentConversation> registered)
+    {
+        {{ not_null "registered" }}
+
+        List<string> problems = [];
+        Dictionary<string, AgentConversation> byName = new(StringComparer.Ordinal);
+        foreach (var conversation in registered)
+        {
+            if (!KebabCase().IsMatch(conversation.AgentName))
+            {
+                problems.Add($"{conversation.Query.FullName} names its agent '{conversation.AgentName}'; an agent's name is lower kebab-case.");
+            }
+            else if (!byName.TryAdd(conversation.AgentName, conversation))
+            {
+                problems.Add($"{conversation.Query.FullName} and {byName[conversation.AgentName].Query.FullName} both name their agent '{conversation.AgentName}'; each agent's name is its own.");
+            }
+        }
+
+        return new AgentConversations(byName, problems);
+    }
+
+    /// <summary>The agent of that name, or null when no module registers one.</summary>
+    public AgentConversation? Find(string agentName) => byName.GetValueOrDefault(agentName);
+
+    [GeneratedRegex("^[a-z][a-z0-9]*(-[a-z0-9]+)*$")]
+    private static partial Regex KebabCase();
+}

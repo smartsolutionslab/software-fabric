@@ -93,8 +93,58 @@ owner on 2026-11-05. Each recommendation was accepted
 
 - **Both options are `experimental`** (ADR-0003). No profile has agents, so
   the dimension is in neither the profile run nor the pairwise matrix.
-  `ag-ui` has no pack yet, and `fabric new` fails with `no pack for ...` until
-  it has one.
+
+**As built for the backend (#202).** These follow from the decisions above;
+none is a new choice of option.
+
+- **The query.** `IAgentConversation`, in the BuildingBlocks, is
+  `IQuery<Result<IAsyncEnumerable<ChatResponseUpdate>, ApiError>>` carrying the
+  run's `Messages` and its `State` (`JsonElement?`, null when the browser sent
+  none). A module's query implements `IAgentConversation<TSelf>`, whose static
+  `AgentName` is the `{name}` of `POST /agents/{name}` and whose static
+  `Start(messages, state)` builds one run, so the compiler checks both.
+- **Registered by name in the module's `IModule`.** The ag-ui pack fills
+  `modules.infrastructure` with `AddModuleAgentConversations<TModule>()`,
+  which the module's `IModule.AddServices` calls: every
+  `IAgentConversation<TSelf>` in its Application project is registered under
+  its name. No shared file lists the agents (ADR-0005). The host refuses to
+  start on a name two queries share, or one that is not lower kebab-case,
+  naming the queries.
+- **What the endpoint passes on.** The run's messages, through the SDK's
+  `ToChatRequestContext`, without the browser's system and developer
+  messages: an agent's instructions are its module's. Tools the browser
+  declares are not given to the agent, so the model reaches data only through
+  the module's use cases. `state` is passed through unread. A failed `Result`
+  is answered with the same problem details as any endpoint; success with
+  `text/event-stream`, written by `AGUI.Formatting`'s
+  `SseEventStreamFormatter`. The endpoint is left out of the OpenAPI
+  document: the panel's client speaks AG-UI, not the generated REST client.
+- **The JSON the SDK needs.** The SDK's type resolver alone cannot write an
+  update's tool-call arguments and results, so the host combines it with
+  `Microsoft.Extensions.AI`'s (`AIJsonUtilities.DefaultOptions`).
+- **The stand-in model** is `src/Host/Agents/StandInChatClient.cs`. The
+  AppHost's parameter is `builder.AddParameter("model-stand-in", ...)` with a
+  value read from configuration (`Parameters:model-stand-in`, `false` when
+  absent): a parameter given a fixed value ignores configuration (Aspire
+  13.6.4, checked), so the fixture could not switch it on. The host reads it
+  as `Agents:ModelStandIn` and, in Development only, replaces the provider's
+  `IChatClient` with the stand-in, which calls the first tool it is offered
+  with the user's message and streams its answer a word at a time. The
+  `AspireFixture` sets it (`integration-tests.parameters`). `e2e.sh` has no
+  slot for it yet; the React panel's end-to-end test (#203) adds that, since
+  it is the first end-to-end test that needs it.
+- **The gate** `AgentUiGoesThroughAQuery` reads the compiled assemblies: the
+  modules and the BuildingBlocks reference no `AGUI.*`, the host (which the
+  architecture tests already reference for their endpoint rules) references
+  no `Microsoft.Agents.AI*`, and nothing references
+  `Microsoft.Agents.AI.Hosting.AGUI*`. It replaces `none`'s `NoAgentUi`.
+- **The sample agent** is the `assistant` module's `AssistantAgent`, with the
+  module's own `CountWords` query as its tool and `TalkToTheAssistant` as the
+  query that runs it; `tests/Modules/Assistant.Tests` runs it through the
+  dispatcher with `ToolCallingChatClient`, and `tests/Integration.Tests`
+  through the running host.
+- The backend generates the same for React and Vue; the Vue panel's templates
+  (#183) are where the pack branches on the framework.
 
 **Delivered in three steps** (owner's decision on #182): first this
 dimension, this ADR and the `none` pack; then the `ag-ui` pack's backend; then

@@ -1,0 +1,37 @@
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Agents;
+using {{ namespace }}.BuildingBlocks.Modules;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class AgentConversationRegistration
+{
+    /// <summary>
+    /// Registers every <see cref="IAgentConversation{TSelf}"/> in the module's Application project by its agent's name,
+    /// for the host's <c>POST /agents/{name}</c>. The host refuses to start on a name two queries share.
+    /// </summary>
+    public static IServiceCollection AddModuleAgentConversations<TModule>(this IServiceCollection services)
+        where TModule : IModule
+    {
+        {{ not_null "services" }}
+
+        var conversations = ModuleAssemblies.Of<TModule>("Application").GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && type.GetInterfaces().Any(contract => NamesItself(contract, type)))
+            .OrderBy(type => type.FullName, StringComparer.Ordinal);
+        foreach (var conversation in conversations)
+        {
+            var describe = typeof(AgentConversationRegistration).GetMethod(nameof(Describe), BindingFlags.NonPublic | BindingFlags.Static)!.MakeGenericMethod(conversation);
+            services.AddSingleton((AgentConversation)describe.Invoke(null, null)!);
+        }
+
+        return services;
+    }
+
+    /// <summary>Whether the interface is <see cref="IAgentConversation{TSelf}"/> of the type itself.</summary>
+    private static bool NamesItself(Type contract, Type type) =>
+        contract.IsGenericType && contract.GetGenericTypeDefinition() == typeof(IAgentConversation<>) && contract.GetGenericArguments()[0] == type;
+
+    private static AgentConversation Describe<TConversation>()
+        where TConversation : IAgentConversation<TConversation> =>
+        new(TConversation.AgentName, typeof(TConversation), (messages, state) => TConversation.Start(messages, state));
+}
