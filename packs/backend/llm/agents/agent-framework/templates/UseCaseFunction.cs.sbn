@@ -1,0 +1,128 @@
+{{~ if !object.has_key(project, "backend.result-style") ~}}
+#error A use case's tool answers with its handler's Result; backend.errors without one has no branch here yet (docs/adr/0006 of the generator).
+{{~ end ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+using System.Text;
+using System.Text.Json;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.BuildingBlocks.Agents;
+
+/// <summary>
+/// A command or query as a function the model may call. The arguments are the model's output, untrusted input: they
+/// become the request record or the model is told they do not fit, and the handler validates them as it would a request
+/// body. The function holds no logic of its own.
+/// </summary>
+internal sealed class UseCaseFunction : AIFunction
+{
+    private static readonly Type[] Requests = [typeof(ICommand<>), typeof(IQuery<>)];
+
+    /// <summary>
+    /// Web defaults, but a missing argument or a null where the record allows none is refused, not defaulted{{ if option }};
+    /// an absent <see cref="Option{T}"/> is <c>null</c>, in the arguments and in the answer{{ end }}.
+    /// </summary>
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        RespectRequiredConstructorParameters = true,
+        RespectNullableAnnotations = true,
+{{~ if option ~}}
+        Converters = { new OptionJsonConverterFactory() },
+{{~ end ~}}
+    };
+
+    private readonly Type request;
+    private readonly Type result;
+    private readonly bool readsOnly;
+    private readonly IDispatcher dispatcher;
+
+    public UseCaseFunction(Type request, IDispatcher dispatcher, string description)
+    {
+        var contracts = request.GetInterfaces().Where(contract => contract.IsGenericType && Requests.Contains(contract.GetGenericTypeDefinition())).ToList();
+        if (request.IsAbstract || contracts.Count != 1)
+        {
+            throw new InvalidOperationException($"{request.FullName} is not a command or a query; an agent's tool is a record that implements ICommand<T> or IQuery<T>.");
+        }
+
+        this.request = request;
+        this.dispatcher = dispatcher;
+        result = contracts[0].GetGenericArguments()[0];
+        readsOnly = contracts[0].GetGenericTypeDefinition() == typeof(IQuery<>);
+        Name = SnakeCase(request.Name);
+        Description = description;
+        JsonSchema = AIJsonUtilities.CreateJsonSchema(request, serializerOptions: Json);
+    }
+
+    public override string Name { get; }
+
+    public override string Description { get; }
+
+    public override JsonElement JsonSchema { get; }
+
+    public override JsonSerializerOptions JsonSerializerOptions => Json;
+
+    protected override async ValueTask<object?> InvokeCoreAsync(AIFunctionArguments arguments, CancellationToken cancellationToken)
+    {
+        {{ not_null "arguments" }}
+
+        object? message;
+        try
+        {
+            message = JsonSerializer.SerializeToElement(new Dictionary<string, object?>(arguments), Json).Deserialize(request, Json);
+        }
+        catch (JsonException exception)
+        {
+            return $"The arguments are not a {request.Name}: {exception.Message}";
+        }
+
+        if (message is null)
+        {
+            return $"The arguments are not a {request.Name}.";
+        }
+
+        var dispatch = typeof(IDispatcher)
+            .GetMethod(readsOnly ? nameof(IDispatcher.QueryAsync) : nameof(IDispatcher.SendAsync))!
+            .MakeGenericMethod(result);
+        var handled = (Task)dispatch.Invoke(dispatcher, [message, cancellationToken])!;
+        await handled;
+        return Answer(handled.GetType().GetProperty(nameof(Task<object>.Result))!.GetValue(handled)!);
+    }
+
+    /// <summary>A Result's value as JSON, or its ApiError as text starting with the error's code.</summary>
+    private static object Answer(object outcome)
+    {
+        var type = outcome.GetType();
+        if (!type.IsGenericType || type.GetGenericTypeDefinition() != typeof(Result<,>))
+        {
+            return JsonSerializer.SerializeToElement(outcome, type, Json);
+        }
+
+        if ((bool)type.GetProperty(nameof(Result<object, object>.IsSuccess))!.GetValue(outcome)!)
+        {
+            var value = type.GetProperty(nameof(Result<object, object>.Value))!.GetValue(outcome);
+            return JsonSerializer.SerializeToElement(value, type.GetGenericArguments()[0], Json);
+        }
+
+        var error = type.GetProperty(nameof(Result<object, object>.Error))!.GetValue(outcome)!;
+        return error is ApiError apiError
+            ? $"Failed: {apiError.Code}: {apiError.Message}"
+            : $"Failed: {JsonSerializer.Serialize(error, error.GetType(), Json)}";
+    }
+
+    /// <summary><c>FindInvoice</c> becomes <c>find_invoice</c>.</summary>
+    private static string SnakeCase(string name)
+    {
+        var snake = new StringBuilder();
+        foreach (var character in name)
+        {
+            if (char.IsUpper(character) && snake.Length > 0)
+            {
+                snake.Append('_');
+            }
+
+            snake.Append(char.ToLowerInvariant(character));
+        }
+
+        return snake.ToString();
+    }
+}

@@ -1,0 +1,42 @@
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Agents;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// An agent lives in a module's Application project and a command or query runs it, so an endpoint, a consumer or
+/// infrastructure code reaches it only through <c>IDispatcher</c>. The rule reads what the compiled assemblies
+/// reference: an agent created or run anywhere else in a module, or in the BuildingBlocks, needs Microsoft Agent
+/// Framework there and is found, however it was written. It cannot see the host, which references no module's
+/// Application code directly, nor which command or query runs an agent.
+/// </summary>
+public sealed class AgentsLiveInApplication : IArchitectureRule
+{
+    private const string AgentFramework = "Microsoft.Agents.AI";
+
+    private const string ApplicationSuffix = ".Application";
+
+    public string Description => "Only a module's Application project references Microsoft Agent Framework: an agent lives there and a command or query runs it.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var outsideApplication = model.ModuleAssemblies
+            .Where(assembly => !assembly.GetName().Name!.EndsWith(ApplicationSuffix, StringComparison.Ordinal))
+            .Append(typeof(DispatcherTool).Assembly);
+        foreach (var assembly in outsideApplication)
+        {
+            foreach (var reference in References(assembly).Where(IsAgentFramework).Order(StringComparer.Ordinal))
+            {
+                yield return $"{assembly.GetName().Name} references {reference}, but an agent lives in a module's Application project and a command or query runs it, never an endpoint or infrastructure code.";
+            }
+        }
+    }
+
+    private static IEnumerable<string> References(Assembly assembly) =>
+        assembly.GetReferencedAssemblies().Select(reference => reference.Name!);
+
+    private static bool IsAgentFramework(string reference) =>
+        reference == AgentFramework || reference.StartsWith(AgentFramework + ".", StringComparison.Ordinal);
+}

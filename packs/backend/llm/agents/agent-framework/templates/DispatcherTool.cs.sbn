@@ -22,6 +22,6 @@ public static class DispatcherTool
         {{ not_null "dispatcher" }}
         {{ not_blank "description" }}
 
-        throw new NotImplementedException($"{typeof(TRequest).Name} does not become a tool yet.");
+        return new UseCaseFunction(typeof(TRequest), dispatcher, description);
     }
 }
