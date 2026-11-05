@@ -1,0 +1,98 @@
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// The host's <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/> is the Ollama server's, with the endpoint and
+/// embedding model the AppHost supplies, behind the logging and OpenTelemetry every model call gets; and a host started
+/// without the endpoint says where it comes from. The generator is resolved and inspected, never called, so no Ollama
+/// server is needed. The host's <c>Program.cs</c> is parsed, not run, to find the registration: tests stand in for the
+/// generator, so without it code that takes one would pass its tests and fail in the host.
+/// </summary>
+public sealed class OllamaGeneratesTheProjectsEmbeddings : IArchitectureRule
+{
+    private const string Model = "nomic-embed-text";
+
+    /// <summary>An endpoint nothing listens on: the generator is never called.</summary>
+    private const string Endpoint = "http://localhost:9/";
+
+    private const string Registration = "AddOllamaEmbeddingGenerator";
+
+    private const string HostProgram = "src/Host/Program.cs";
+
+    public string Description => "The host calls AddOllamaEmbeddingGenerator, which registers the Ollama server's embedding model behind logging and OpenTelemetry, with the AppHost's endpoint and model; a missing endpoint fails naming its AppHost resource.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        List<string> violations = [];
+        if (!HostRegistersTheGenerator())
+        {
+            violations.Add($"{HostProgram} never calls {Registration}: the host has no IEmbeddingGenerator, and code that takes one fails to resolve.");
+        }
+
+        using (var services = Services(new() { ["Ollama:Endpoint"] = Endpoint, ["Ollama:EmbeddingModel"] = Model }))
+        {
+            var generator = services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
+            var metadata = generator.GetService<EmbeddingGeneratorMetadata>();
+            if (metadata is not { ProviderName: "ollama", DefaultModelId: Model } || metadata.ProviderUri?.ToString() != Endpoint)
+            {
+                violations.Add($"The registered IEmbeddingGenerator is '{metadata?.ProviderName} {metadata?.DefaultModelId}' at '{metadata?.ProviderUri}', not 'ollama {Model}' at '{Endpoint}' from Ollama:EmbeddingModel and Ollama:Endpoint.");
+            }
+
+            if (generator.GetService<LoggingEmbeddingGenerator<string, Embedding<float>>>() is null
+                || generator.GetService<OpenTelemetryEmbeddingGenerator<string, Embedding<float>>>() is null)
+            {
+                violations.Add("The registered IEmbeddingGenerator is not wrapped with UseLogging and UseOpenTelemetry.");
+            }
+        }
+
+        using (var services = Services(new() { ["Ollama:EmbeddingModel"] = Model }))
+        {
+            try
+            {
+                services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
+                violations.Add("Without Ollama:Endpoint the IEmbeddingGenerator still resolved; it must fail, naming the AppHost resource 'ollama'.");
+            }
+            catch (InvalidOperationException exception) when (exception.Message.Contains("'ollama'", StringComparison.Ordinal))
+            {
+            }
+        }
+
+        return violations;
+    }
+
+    private static bool HostRegistersTheGenerator()
+    {
+        var program = Path.Combine(RepositoryRoot(), HostProgram);
+        return File.Exists(program)
+            && CSharpSyntaxTree.ParseText(File.ReadAllText(program)).GetRoot().DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(call => call.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: Registration });
+    }
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+
+    private static ServiceProvider Services(Dictionary<string, string?> settings)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        var services = new ServiceCollection().AddLogging();
+        services.AddOllamaEmbeddingGenerator(configuration);
+        return services.BuildServiceProvider();
+    }
+}

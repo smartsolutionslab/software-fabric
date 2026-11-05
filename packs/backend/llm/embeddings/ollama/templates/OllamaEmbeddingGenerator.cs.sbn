@@ -1,0 +1,33 @@
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
+using OllamaSharp;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class OllamaEmbeddingGenerator
+{
+    /// <summary>
+    /// Registers a local embedding model, served by Ollama, as the project's
+    /// <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/>, with logging and OpenTelemetry around it, through the
+    /// <c>OllamaSharp</c> package, whose client is an <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/> itself. The
+    /// endpoint and the model come from the AppHost's resources <c>ollama</c> and <c>ollama-embedding-model</c>
+    /// (<c>Ollama:Endpoint</c>, <c>Ollama:EmbeddingModel</c>). They are read when the generator is first needed, and a
+    /// missing one fails there, naming its source; registering sends nothing.
+    /// </summary>
+    public static EmbeddingGeneratorBuilder<string, Embedding<float>> AddOllamaEmbeddingGenerator(this IServiceCollection services, IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        return services.AddEmbeddingGenerator<string, Embedding<float>>(_ =>
+                new OllamaApiClient(
+                    new Uri(Required(configuration, "Ollama:Endpoint", "ollama")),
+                    Required(configuration, "Ollama:EmbeddingModel", "ollama-embedding-model")))
+            .UseLogging()
+            .UseOpenTelemetry();
+    }
+
+    private static string Required(IConfiguration configuration, string key, string resource) =>
+        configuration[key] is { Length: > 0 } value
+            ? value
+            : throw new InvalidOperationException($"{key} is not set. The AppHost supplies it from its resource '{resource}'; a host started without the AppHost needs it in its own configuration.");
+}
