@@ -29,7 +29,8 @@ public sealed class CountWidgetsHandler(IDashboardStore dashboards, ICurrentUser
             return {{ fail "ChartSeries" "DashboardsFailures.NotSignedIn()" }};
         }
 
-        var page = await dashboards.ListAsync(owner, Page.First, PageSize.Default, cancellationToken);
-        return {{ ok "ChartSeries" "new ChartSeries([.. page.Items.Select(dashboard => dashboard.Name)], [new ChartValues(\"Widgets\", [.. page.Items.Select(dashboard => (decimal)dashboard.Widgets.Count)])])" }};
+        // All of them: a chart's query takes no page, so a chart that showed only the first would hide the rest for good.
+        var owned = await dashboards.AllAsync(owner, cancellationToken);
+        return {{ ok "ChartSeries" "new ChartSeries([.. owned.Select(dashboard => dashboard.Name)], [new ChartValues(\"Widgets\", [.. owned.Select(dashboard => (decimal)dashboard.Widgets.Count)])])" }};
     }
 }

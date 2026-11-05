@@ -39,6 +39,13 @@ public sealed class DashboardStore(DashboardsDbContext context) : IDashboardStor
         return new PagedResult<Dashboard>(items, total, page.Value, pageSize.Value);
     }
 
+    public async Task<IReadOnlyList<Dashboard>> AllAsync(string owner, CancellationToken cancellationToken) =>
+        await context.Set<Dashboard>().AsNoTracking()
+            .Where(dashboard => dashboard.Owner == owner)
+            .OrderBy(dashboard => dashboard.Name)
+            .ThenBy(dashboard => dashboard.Id)
+            .ToListAsync(cancellationToken);
+
     public void Add(Dashboard dashboard) => context.Add(dashboard);
 
     public void Remove(Dashboard dashboard) => context.Remove(dashboard);
