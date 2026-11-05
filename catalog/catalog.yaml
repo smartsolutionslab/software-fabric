@@ -547,6 +547,15 @@ dimensions:
       signalr: { tier: experimental }
       sse:     { tier: experimental }
 
+  frontend.agent-ui:
+    scope: project
+    active-when: "backend.llm.agents == agent-framework"
+    default: none
+    note: "How users talk to the backend's agents. AG-UI over the host's POST /agents/{name}, which runs an agent's query through the dispatcher. ADR-0013."
+    options:
+      none:  { tier: experimental, note: "no agent panel; agents are reached through the project's own endpoints" }
+      ag-ui: { tier: experimental, note: "an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host" }
+
   frontend.auth-client:
     scope: project
     active-when: "backend.auth != none"
