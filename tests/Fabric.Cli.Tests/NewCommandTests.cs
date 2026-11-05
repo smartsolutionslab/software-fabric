@@ -128,13 +128,14 @@ public sealed class NewCommandTests : IDisposable
     }
 
     [Fact]
-    public void A_project_choosing_evals_writes_nothing_and_names_the_pack_it_still_lacks()
+    public void A_project_choosing_evals_records_the_threshold_it_set_and_gets_the_eval_project()
     {
         var run = CliRun.Of("new", Path.Combine(root, "evals"), "--profile", "lean-crud", "--set", "backend.llm=openai", "--set", "backend.llm.extras=evals", "--set", "backend.llm.extras.evals.threshold=3.5", "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
 
-        run.ExitCode.ShouldBe(1);
-        run.Error.ShouldBe($"error: no pack for backend.llm.extras=evals.{Environment.NewLine}");
-        Directory.Exists(Path.Combine(root, "evals")).ShouldBeFalse();
+        run.ExitCode.ShouldBe(0, run.Error);
+        File.ReadAllText(Path.Combine(root, "evals", "fabric.yaml")).ShouldContain("settings:\n  backend.llm.extras.evals.threshold: 3.5\n");
+        File.Exists(Path.Combine(root, "evals", "tests", "Evals", "Evals.csproj")).ShouldBeTrue();
+        File.Exists(Path.Combine(root, "evals", ".github", "workflows", "evals.yml")).ShouldBeTrue();
     }
 
     [Fact]
