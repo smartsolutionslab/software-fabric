@@ -16,8 +16,8 @@ public class CatalogReaderTests
         var catalog = ReadRepositoryCatalog();
 
         catalog.Version.ShouldBe(1);
-        catalog.Dimensions.Count.ShouldBe(47);
-        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(131);
+        catalog.Dimensions.Count.ShouldBe(48);
+        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(133);
         catalog.Profiles.Keys.ShouldBe(
             ["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud", "saas-strict-react"],
             ignoreOrder: false);
