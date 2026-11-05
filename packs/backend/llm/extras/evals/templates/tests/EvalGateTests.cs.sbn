@@ -119,6 +119,32 @@ public sealed class EvalGateTests : IDisposable
     }
 
     [Fact]
+    public async Task A_use_case_without_examples_fails_before_anything_is_evaluated_naming_it()
+    {
+        var answered = new EvalUseCase("answered", (model, example, cancellationToken) => model.GetResponseAsync(EvalPrompt.Messages(example), cancellationToken: cancellationToken), [new("What does an invoice record?")]);
+        var empty = new EvalUseCase("without-examples", (model, example, cancellationToken) => model.GetResponseAsync(EvalPrompt.Messages(example), cancellationToken: cancellationToken), []);
+        using var model = new FakeChatClient(Answer);
+        using var judge = new FakeJudge(5);
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(() => EvalRun.RunAsync([answered, empty], model, judge, results.FullName, "gate", TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain("'without-examples'");
+        model.Requests.ShouldBeEmpty();
+        judge.Requests.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task No_use_cases_at_all_fails_before_anything_is_evaluated()
+    {
+        using var model = new FakeChatClient(Answer);
+        using var judge = new FakeJudge(5);
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(() => EvalRun.RunAsync([], model, judge, results.FullName, "gate", TestContext.Current.CancellationToken));
+
+        exception.Message.ShouldContain("no use cases");
+    }
+
+    [Fact]
     public void The_prompt_keeps_the_instruction_in_the_system_message_and_gives_the_records_as_delimited_data_in_a_user_message()
     {
         var messages = EvalPrompt.Messages(new EvalExample("When is invoice 7 due?", Records));
