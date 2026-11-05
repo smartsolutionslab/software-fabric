@@ -101,6 +101,20 @@ public sealed class AgentTests
     }
 
     [Fact]
+    public async Task An_omitted_optional_argument_is_refused_before_dispatch_and_the_model_is_told()
+    {
+        using var model = new ToolCallingChatClient("longest_word", new Dictionary<string, object?> { ["text"] = "a bb cccc" });
+        await using var services = Services(model);
+        var dispatcher = services.GetRequiredService<RecordingDispatcher>();
+
+        var answer = await dispatcher.QueryAsync(new AskAboutWords("Which word of 'a bb cccc' is the longest?"), TestContext.Current.CancellationToken);
+
+        answer.Value.ShouldStartWith("The tool said: The arguments are not a LongestWord");
+        answer.Value.ShouldContain("atLeast");
+        dispatcher.Requests.ShouldNotContain(request => request is LongestWord);
+    }
+
+    [Fact]
     public void A_request_that_contains_itself_as_an_option_is_offered_with_a_schema_that_ends()
     {
         var dispatcher = new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider()));
