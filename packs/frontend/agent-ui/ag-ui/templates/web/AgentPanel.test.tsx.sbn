@@ -83,7 +83,11 @@ test('the answer appears while it streams, after the tool call the agent made an
   render(<AgentPanel agent="assistant" />);
 
   await say('one two three');
-  run.send(started('run-1'), ...toolCall('call-1', 'one two three', '3'), ...text('answer-1', 'The ', 'tool ').slice(0, 3));
+  run.send(
+    started('run-1'),
+    ...toolCall('call-1', 'one two three', '3'),
+    ...text('answer-1', 'The ', 'tool ').slice(0, 3),
+  );
 
   const messages = screen.getByRole('list', { name: 'Messages' });
   expect(await within(messages).findByText('The tool')).toBeInTheDocument();
@@ -92,7 +96,10 @@ test('the answer appears while it streams, after the tool call the agent made an
   expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
   expect(screen.getByRole('status')).toHaveTextContent('Answering');
 
-  run.send({ type: 'TEXT_MESSAGE_CONTENT', messageId: 'answer-1', delta: 'said: ' }, { type: 'TEXT_MESSAGE_CONTENT', messageId: 'answer-1', delta: '3' });
+  run.send(
+    { type: 'TEXT_MESSAGE_CONTENT', messageId: 'answer-1', delta: 'said: ' },
+    { type: 'TEXT_MESSAGE_CONTENT', messageId: 'answer-1', delta: '3' },
+  );
   run.send({ type: 'TEXT_MESSAGE_END', messageId: 'answer-1' }, finished('run-1'));
   run.close();
 
@@ -102,7 +109,7 @@ test('the answer appears while it streams, after the tool call the agent made an
   expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
 });
 
-test('the run goes to the agent through /api{{ if signed_in }} with the signed-in user\'s token{{ end }}', async () => {
+test({{ if signed_in }}"the run goes to the agent through /api with the signed-in user's token"{{ else }}'the run goes to the agent through /api'{{ end }}, async () => {
   const run = eventStream();
   fetchMock.mockResolvedValueOnce(run.response);
   render(<AgentPanel agent="assistant" />);
@@ -130,13 +137,23 @@ test('a second message goes with the whole conversation, and its answer follows 
   render(<AgentPanel agent="assistant" />);
 
   await say('one two three');
-  first.send(started('run-1'), ...toolCall('call-1', 'one two three', '3'), ...text('answer-1', 'The tool said: 3'), finished('run-1'));
+  first.send(
+    started('run-1'),
+    ...toolCall('call-1', 'one two three', '3'),
+    ...text('answer-1', 'The tool said: 3'),
+    finished('run-1'),
+  );
   first.close();
   expect(await screen.findByText('The tool said: 3')).toBeInTheDocument();
   expect(await screen.findByRole('button', { name: 'Send' })).toBeEnabled();
 
   await say('four five');
-  second.send(started('run-2'), ...toolCall('call-2', 'four five', '2'), ...text('answer-2', 'The tool said: 2'), finished('run-2'));
+  second.send(
+    started('run-2'),
+    ...toolCall('call-2', 'four five', '2'),
+    ...text('answer-2', 'The tool said: 2'),
+    finished('run-2'),
+  );
   second.close();
 
   expect(await screen.findByText('The tool said: 2')).toBeInTheDocument();
@@ -181,7 +198,12 @@ test('the panel with a conversation has no accessibility violations axe can find
   const { container } = render(<AgentPanel agent="assistant" />);
 
   await say('one two three');
-  run.send(started('run-1'), ...toolCall('call-1', 'one two three', '3'), ...text('answer-1', 'The tool said: 3'), finished('run-1'));
+  run.send(
+    started('run-1'),
+    ...toolCall('call-1', 'one two three', '3'),
+    ...text('answer-1', 'The tool said: 3'),
+    finished('run-1'),
+  );
   run.close();
   expect(await screen.findByText('The tool said: 3')).toBeInTheDocument();
 

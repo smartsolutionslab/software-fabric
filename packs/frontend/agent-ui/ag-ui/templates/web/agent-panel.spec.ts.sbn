@@ -24,7 +24,9 @@ async function say(page: Page, message: string) {
 
 // The AppHost runs with the stand-in model (e2e.sh sets model-stand-in): it calls the assistant's first tool,
 // count_words, with the message, and answers from the tool's result a word at a time.
-test('the assistant answers in the panel, streaming its text after its tool ran through the dispatcher, turn after turn', async ({ page }) => {
+test('the assistant answers in the panel, streaming its text after its tool ran through the dispatcher, turn after turn', async ({
+  page,
+}) => {
   await page.goto('/');
 {{~ if project["backend.auth"] == "keycloak" ~}}
   await page.getByLabel('Username or email').fill('developer');
