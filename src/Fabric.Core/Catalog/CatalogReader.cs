@@ -101,6 +101,7 @@ public static class CatalogReader
             fields.Optional("multi") is { } multi && source.Boolean(multi, "multi", owner),
             fields.Optional("active-when") is { } activeWhen ? source.Condition(activeWhen, owner) : null,
             fields.Optional("default") is { } defaultNode ? source.ScalarOrList(defaultNode, owner) : null,
+            null,
             fields.Optional("note") is { } note ? source.Scalar(note, owner) : null,
             options,
             roleSlots);

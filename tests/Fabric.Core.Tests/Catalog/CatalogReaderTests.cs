@@ -126,6 +126,53 @@ public class CatalogReaderTests
     }
 
     [Fact]
+    public void Extras_are_a_choice_only_for_a_project_that_calls_a_model_and_none_is_chosen_by_default()
+    {
+        var extras = ReadRepositoryCatalog().Dimensions["backend.llm.extras"];
+
+        extras.ActiveWhen!.ToString().ShouldBe("backend.llm != none");
+        extras.Multi.ShouldBeTrue();
+        extras.Default.ShouldBe([]);
+        extras.Options.Keys.ShouldBe(["rag"]);
+    }
+
+    [Fact]
+    public void Rag_requires_postgres()
+    {
+        ReadRepositoryCatalog().Dimensions["backend.llm.extras"].Options["rag"].Requires
+            .Select(condition => condition.ToString())
+            .ShouldBe(["backend.database == postgres"]);
+    }
+
+    [Fact]
+    public void Embeddings_are_a_choice_only_with_rag_and_their_default_follows_the_llm_provider()
+    {
+        var embeddings = ReadRepositoryCatalog().Dimensions["backend.llm.embeddings"];
+
+        embeddings.ActiveWhen!.ToString().ShouldBe("backend.llm.extras has rag");
+        embeddings.Multi.ShouldBeFalse();
+        embeddings.Default.ShouldBeNull();
+        embeddings.DefaultFrom.ShouldBe("backend.llm");
+        embeddings.Options.Keys.ShouldBe(["openai", "azure-openai", "ollama"]);
+    }
+
+    [Theory]
+    [InlineData("backend.llm.extras", "rag")]
+    [InlineData("backend.llm.embeddings", "openai")]
+    [InlineData("backend.llm.embeddings", "azure-openai")]
+    [InlineData("backend.llm.embeddings", "ollama")]
+    public void Every_rag_option_is_experimental_because_it_has_no_pack_yet(string dimension, string option)
+    {
+        ReadRepositoryCatalog().Dimensions[dimension].Options[option].Tier.ShouldBe(SupportTier.Experimental);
+    }
+
+    [Fact]
+    public void A_dimension_without_default_from_follows_nothing()
+    {
+        ReadRepositoryCatalog().Dimensions["backend.llm"].DefaultFrom.ShouldBeNull();
+    }
+
+    [Fact]
     public void No_llm_is_supported_because_every_profile_generates_it()
     {
         ReadRepositoryCatalog().Dimensions["backend.llm"].Options["none"].Tier.ShouldBe(SupportTier.Supported);
