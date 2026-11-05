@@ -1,0 +1,21 @@
+{{~ typed = object.has_key(project, "backend.result-style") && project["backend.result-style"] == "typed-outcomes" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Agents.Tests;
+
+public sealed class LongestWordHandler : IQueryHandler<LongestWord, Result<Option<string>, ApiError>>
+{
+    public Task<Result<Option<string>, ApiError>> HandleAsync(LongestWord query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        var atLeast = query.AtLeast.GetOrDefault(0);
+        var longest = query.Text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Where(word => word.Length >= atLeast).MaxBy(word => word.Length);
+        var found = longest is null ? Option<string>.None : Option<string>.Some(longest);
+{{~ if typed ~}}
+        return Task.FromResult<Result<Option<string>, ApiError>>(Success(found));
+{{~ else ~}}
+        return Task.FromResult(Result<Option<string>, ApiError>.Success(found));
+{{~ end ~}}
+    }
+}

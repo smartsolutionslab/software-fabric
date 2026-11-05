@@ -29,6 +29,14 @@ public static class Generator
             return AdditionFailure([$"module name '{name}' must be lower-case letters, digits and hyphens, starting with a letter."]);
         }
 
+        var before = Composer.Compose(catalog, packs, project.Choices);
+        if (PackModules.Declarers(before.Packs).TryGetValue(name, out var declarers))
+        {
+            return AdditionFailure([
+                $"module '{name}' is brought by {string.Join(", ", declarers)}; fabric new adds it with that pack's pinned choices, so add-module cannot add it.",
+            ]);
+        }
+
         if (project.Choices.Modules.ContainsKey(name))
         {
             return AdditionFailure([$"module '{name}' already exists."]);
@@ -55,7 +63,6 @@ public static class Generator
             return AdditionFailure(violations);
         }
 
-        var before = Composer.Compose(catalog, packs, project.Choices);
         var after = Composer.Compose(catalog, packs, choices);
         if (before.Errors.Count > 0 || after.Errors.Count > 0)
         {
@@ -118,16 +125,35 @@ public static class Generator
             return Failure(resolution.Errors);
         }
 
+        var choices = new ProjectChoices(
+            resolved.Project,
+            resolved.ModuleDefaults,
+            new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>());
+
+        // Only base and project-scoped packs bring modules (PackLoader), so the modules cannot change which packs bring them.
+        // Checked as fabric validate and the catalog lint check it, without packs, so the three agree on every profile.
         var violations = RuleEvaluator.Check(catalog, resolved);
         if (violations.Count > 0)
         {
             return Failure(violations);
         }
 
-        var choices = new ProjectChoices(
-            resolved.Project,
-            resolved.ModuleDefaults,
-            new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>());
+        var bringing = Composer.Select(catalog, packs, choices).Where(pack => pack.Modules.Count > 0).ToList();
+        if (bringing.Count > 0)
+        {
+            var (modules, moduleErrors) = PackModules.Resolve(catalog, bringing, choices);
+            if (moduleErrors.Count > 0)
+            {
+                return Failure(moduleErrors);
+            }
+
+            choices = choices with { Modules = modules };
+            var moduleViolations = RuleEvaluator.Check(catalog, resolved, modules);
+            if (moduleViolations.Count > 0)
+            {
+                return Failure(NameDeclarers(moduleViolations, PackModules.Declarers(bringing)));
+            }
+        }
 
         var composition = Composer.Compose(catalog, packs, choices);
         List<string> compositionErrors = [
@@ -150,6 +176,13 @@ public static class Generator
         var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, name, profile, choices));
         return new GenerationResult([.. rendered.Files.Append(fabricFile).OrderBy(file => file.Path, StringComparer.Ordinal)], []);
     }
+
+    /// <summary>Puts the packs that bring a module in front of a rule violation reported for that module.</summary>
+    private static List<string> NameDeclarers(IReadOnlyList<string> violations, Dictionary<string, List<string>> declarers) =>
+        [.. violations.Select(violation => declarers
+            .Where(declared => violation.StartsWith($"module '{declared.Key}': ", StringComparison.Ordinal))
+            .Select(declared => $"{string.Join(", ", declared.Value)}: {violation}")
+            .FirstOrDefault(violation))];
 
     private static GenerationResult Failure(IReadOnlyList<string> errors) => new([], errors);
 }

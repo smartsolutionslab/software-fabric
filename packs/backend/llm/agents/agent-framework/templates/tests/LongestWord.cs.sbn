@@ -1,0 +1,6 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Agents.Tests;
+
+/// <summary>A query that may find nothing, with an argument the model may leave out: the sample agent's tool <c>longest_word</c>.</summary>
+public sealed record LongestWord(string Text, Option<int> AtLeast) : IQuery<Result<Option<string>, ApiError>>;

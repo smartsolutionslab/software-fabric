@@ -11,4 +11,11 @@
     <Project Path="tests/Kernel/Paging.Tests/Paging.Tests.csproj" />
   </Folder>
 {{ slots["solution.projects"] }}
+{{~ for module in modules ~}}
+  <Project Path="src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/{{ module.namespace }}.Domain.csproj" />
+  <Project Path="src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/{{ module.namespace }}.Application.csproj" />
+  <Project Path="src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/{{ module.namespace }}.Infrastructure.csproj" />
+  <Project Path="src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}.Api.csproj" />
+  <Project Path="tests/Modules/{{ module.namespace }}.Tests/{{ module.namespace }}.Tests.csproj" />
+{{~ end ~}}
 </Solution>

@@ -174,11 +174,119 @@ public class ChoiceResolverTests
         ResolveSuccessfully("saas-standard-react", $"backend.llm={provider}").Project["backend.llm"].ShouldBe([provider]);
     }
 
+    [Theory]
+    [InlineData("saas-standard-react")]
+    [InlineData("saas-standard-vue")]
+    [InlineData("industrial-event-driven-mfe")]
+    [InlineData("lean-crud")]
+    [InlineData("saas-strict-react")]
+    public void No_profile_has_agents_because_none_calls_a_model(string profile)
+    {
+        ResolveSuccessfully(profile).Project.ShouldNotContainKey("backend.llm.agents");
+    }
+
+    [Fact]
+    public void A_project_that_calls_a_model_has_no_agents_unless_it_chooses_them()
+    {
+        ResolveSuccessfully("lean-crud", "backend.llm=anthropic").Project["backend.llm.agents"].ShouldBe(["none"]);
+    }
+
+    [Theory]
+    [InlineData("anthropic")]
+    [InlineData("openai")]
+    [InlineData("azure-openai")]
+    [InlineData("ollama")]
+    public void Agent_framework_takes_each_provider(string provider)
+    {
+        ResolveSuccessfully("lean-crud", $"backend.llm={provider}", "backend.llm.agents=agent-framework").Project["backend.llm.agents"].ShouldBe(["agent-framework"]);
+    }
+
+    [Fact]
+    public void Rejects_agents_without_a_model_and_says_why()
+    {
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm.agents=agent-framework").ShouldBe(
+            "backend.llm.agents is set to agent-framework, but it only applies when backend.llm != none, and backend.llm is none.");
+    }
+
     [Fact]
     public void Rejects_two_llm_providers_in_one_project()
     {
         SingleError(RepositoryCatalog, "saas-standard-react", "backend.llm=anthropic,openai").ShouldBe(
             "backend.llm takes one option, got 2: anthropic, openai.");
+    }
+
+    [Theory]
+    [InlineData("saas-standard-react")]
+    [InlineData("saas-standard-vue")]
+    [InlineData("industrial-event-driven-mfe")]
+    [InlineData("lean-crud")]
+    [InlineData("saas-strict-react")]
+    public void No_profile_has_llm_extras_or_embeddings_because_none_calls_a_model(string profile)
+    {
+        var choices = ResolveSuccessfully(profile);
+
+        choices.Project.ShouldNotContainKey("backend.llm.extras");
+        choices.Project.ShouldNotContainKey("backend.llm.embeddings");
+    }
+
+    [Fact]
+    public void A_project_that_calls_a_model_has_no_extras_and_no_embeddings_unless_it_chooses_rag()
+    {
+        var choices = ResolveSuccessfully("lean-crud", "backend.llm=openai");
+
+        choices.Project["backend.llm.extras"].ShouldBeEmpty();
+        choices.Project.ShouldNotContainKey("backend.llm.embeddings");
+    }
+
+    [Theory]
+    [InlineData("openai")]
+    [InlineData("azure-openai")]
+    [InlineData("ollama")]
+    public void Embeddings_default_to_the_llm_provider_when_it_has_embeddings(string provider)
+    {
+        var choices = ResolveSuccessfully("lean-crud", $"backend.llm={provider}", "backend.llm.extras=rag");
+
+        choices.Project["backend.llm.extras"].ShouldBe(["rag"]);
+        choices.Project["backend.llm.embeddings"].ShouldBe([provider]);
+    }
+
+    [Fact]
+    public void Chosen_embeddings_win_over_the_llm_provider()
+    {
+        ResolveSuccessfully("lean-crud", "backend.llm=openai", "backend.llm.extras=rag", "backend.llm.embeddings=ollama")
+            .Project["backend.llm.embeddings"].ShouldBe(["ollama"]);
+    }
+
+    [Theory]
+    [InlineData("openai")]
+    [InlineData("azure-openai")]
+    [InlineData("ollama")]
+    public void Anthropic_takes_each_embeddings_provider_chosen_explicitly(string embeddings)
+    {
+        ResolveSuccessfully("lean-crud", "backend.llm=anthropic", "backend.llm.extras=rag", $"backend.llm.embeddings={embeddings}")
+            .Project["backend.llm.embeddings"].ShouldBe([embeddings]);
+    }
+
+    [Fact]
+    public void Rejects_rag_with_anthropic_without_embeddings_and_says_why()
+    {
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm=anthropic", "backend.llm.extras=rag").ShouldBe(
+            "backend.llm.embeddings has no value: its default follows backend.llm, and anthropic is not one of its options " +
+            "(openai, azure-openai, ollama); set it with backend.llm.embeddings=<option>.");
+    }
+
+    [Fact]
+    public void Rejects_extras_without_a_model_and_says_why()
+    {
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm.extras=rag").ShouldBe(
+            "backend.llm.extras is set to rag, but it only applies when backend.llm != none, and backend.llm is none.");
+    }
+
+    [Fact]
+    public void Rejects_embeddings_without_rag_and_says_why()
+    {
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm=openai", "backend.llm.embeddings=openai").ShouldBe(
+            "backend.llm.embeddings is set to openai, but it only applies when backend.llm.extras has rag, and backend.llm.extras is empty.");
     }
 
     [Theory]
@@ -262,6 +370,53 @@ public class ChoiceResolverTests
             """);
 
         SingleError(catalog, null).ShouldBe("x.y has no value and no default; set it with x.y=<option>.");
+    }
+
+    [Fact]
+    public void A_default_from_takes_the_followed_dimensions_default()
+    {
+        var catalog = Catalog("""
+            version: 1
+            dimensions:
+              b.b: { scope: project, default-from: a.a, options: { p: { tier: supported }, q: { tier: supported } } }
+              a.a: { scope: project, default: q, options: { p: { tier: supported }, q: { tier: supported } } }
+            """);
+
+        var resolution = ChoiceResolver.Resolve(catalog, null, []);
+
+        resolution.Errors.ShouldBeEmpty();
+        resolution.Choices.ShouldNotBeNull().Project["b.b"].ShouldBe(["q"]);
+    }
+
+    [Fact]
+    public void A_default_from_follows_a_chosen_value()
+    {
+        var catalog = Catalog("""
+            version: 1
+            dimensions:
+              b.b: { scope: project, default-from: a.a, options: { p: { tier: supported }, q: { tier: supported } } }
+              a.a: { scope: project, default: q, options: { p: { tier: supported }, q: { tier: supported } } }
+            """);
+
+        var resolution = ChoiceResolver.Resolve(catalog, null, ["a.a=p"]);
+
+        resolution.Errors.ShouldBeEmpty();
+        resolution.Choices.ShouldNotBeNull().Project["b.b"].ShouldBe(["p"]);
+    }
+
+    [Fact]
+    public void A_default_from_an_inactive_dimension_gives_no_default_and_says_so()
+    {
+        var catalog = Catalog("""
+            version: 1
+            dimensions:
+              b.b: { scope: project, default-from: a.a, options: { p: { tier: supported } } }
+              a.a: { scope: project, active-when: "c.c == on", default: p, options: { p: { tier: supported } } }
+              c.c: { scope: project, default: "off", options: { "on": { tier: supported }, "off": { tier: supported } } }
+            """);
+
+        SingleError(catalog, null).ShouldBe(
+            "b.b has no value: its default follows a.a, and a.a is not set; set it with b.b=<option>.");
     }
 
     [Fact]

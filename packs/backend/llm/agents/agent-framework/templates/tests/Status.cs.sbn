@@ -1,0 +1,10 @@
+using System.Text.Json.Serialization;
+
+namespace {{ namespace }}.Agents.Tests;
+
+[JsonConverter(typeof(JsonStringEnumConverter<Status>))]
+public enum Status
+{
+    Open,
+    Closed,
+}

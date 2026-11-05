@@ -1,0 +1,11 @@
+using {{ namespace }}.BuildingBlocks.Agents;
+using {{ namespace }}.BuildingBlocks.Mcp;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class AgentMcpToolsRegistration
+{
+    /// <summary>Registers <see cref="IAgentMcpTools"/> over the clients <c>AddMcpClients</c> creates.</summary>
+    public static IServiceCollection AddAgentMcpTools(this IServiceCollection services) =>
+        services.AddSingleton<IAgentMcpTools>(provider => new AgentMcpTools(provider.GetRequiredService<McpClients>()));
+}

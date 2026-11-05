@@ -1,0 +1,44 @@
+using {{ namespace }}.BuildingBlocks.Agents;
+using {{ namespace }}.BuildingBlocks.Mcp;
+using {{ namespace }}.Mcp.TestServer;
+using {{ namespace }}.Tests.Fakes;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Agents.Tests;
+
+/// <summary>
+/// An agent given a declared MCP server's tools calls one and answers with what it said; a tiny server the test starts
+/// stands in for an external one. The token is a stand-in, not a credential.
+/// </summary>
+public sealed class AgentMcpToolTests
+{
+    private const string Token = "stand-in-token";
+
+    [Fact]
+    public async Task An_agent_given_a_declared_servers_tools_calls_one_and_answers_with_its_result()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var server = await EchoServer.StartHttpAsync(Token, "echo", cancellationToken);
+        var declared = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Mcp:Servers:echo-server:Url"] = $"{server.Urls.Single()}/mcp",
+                ["Mcp:Servers:echo-server:BearerToken"] = Token,
+            })
+            .Build();
+        await using var services = new ServiceCollection().AddLogging().AddMcpClients(declared).AddAgentMcpTools().BuildServiceProvider();
+        using var model = new ToolCallingChatClient("echo-server__echo", new Dictionary<string, object?> { ["text"] = "hello" });
+        var tools = await services.GetRequiredService<IAgentMcpTools>().ToolsAsync(AllowEveryCall, cancellationToken);
+
+        var response = await model.AsAIAgent(instructions: "Echo what you are asked to.", tools: [.. tools]).RunAsync("Say hello through the echo tool.", cancellationToken: cancellationToken);
+
+        model.Offered[0].ShouldContain("echo-server__echo");
+        response.Text.ShouldStartWith("The tool said:");
+        response.Text.ShouldContain("echo: hello");
+    }
+
+    /// <summary>The check a test passes when the call itself is not under test; a project checks the arguments.</summary>
+    private static bool AllowEveryCall(McpToolCall call) => true;
+}

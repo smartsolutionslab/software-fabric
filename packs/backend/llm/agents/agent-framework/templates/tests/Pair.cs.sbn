@@ -1,0 +1,4 @@
+namespace {{ namespace }}.Agents.Tests;
+
+/// <summary>Two properties of the same record type: a schema writes the second as a reference to the first.</summary>
+public sealed record Pair(Item First, Item Second);

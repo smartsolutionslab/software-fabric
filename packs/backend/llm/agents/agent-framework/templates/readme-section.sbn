@@ -1,0 +1,16 @@
+## Agents
+
+An agent lives in a module's Application project and a command or query runs it; its tools are the module's own commands and queries, sent through `IDispatcher`:
+
+```csharp
+public static class BillingAgent
+{
+    public static AIAgent Create(IChatClient model, IDispatcher dispatcher) =>
+        model.AsAIAgent(
+            instructions: "Answer questions about invoices. Look every invoice up; never guess.",
+            name: "billing",
+            tools: [DispatcherTool.For<FindInvoice>(dispatcher, "Finds an invoice by its number.")]);
+}
+```
+
+`tests/Agents.Tests` runs a sample agent through a query with a stand-in model that asks for a tool call.

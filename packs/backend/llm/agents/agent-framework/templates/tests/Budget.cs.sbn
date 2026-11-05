@@ -1,0 +1,5 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Agents.Tests;
+
+public sealed record Budget(AmountCollection Amounts) : IQuery<Result<int, ApiError>>;

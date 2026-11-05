@@ -19,6 +19,7 @@ catalog agree.
 | `multi: true` | Several options may be chosen at once (a set, not a single value). |
 | `active-when` | The dimension exists only when this condition holds. When it does not, the dimension **must not** be set; when it does, it **must** be set (or take its `default`). |
 | `default` | Value used when the dimension is active and not chosen. |
+| `default-from` | Another single-valued dimension whose value is the default when it is also one of this dimension's options (`default-from: backend.llm`: the embeddings provider is the LLM provider when that provider has embeddings). When it is not, the dimension has no default, and an active one must be set; the error names the followed dimension and its value. Only on a single-valued dimension, never beside `default`, and the followed dimension must share at least one option with it (ADR-0012). |
 | `options` | Map of option id → option. |
 
 ## Options
@@ -56,5 +57,7 @@ A condition is a single string:
 ## Profiles
 
 A profile is a partial choice. `extends` copies another profile first.
-Anything a profile does not set takes the dimension's `default`; a
-dimension that is active, has no default and is not set is an error.
+Anything a profile does not set takes the dimension's `default` (or its
+`default-from`); a dimension that is active, has no default and is not set
+is an error. A value set where its dimension does not apply is reported on
+its own: the dimensions it would switch on report nothing missing.
