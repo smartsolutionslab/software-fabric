@@ -81,6 +81,34 @@ public static class ChoiceResolver
             ApplyOverride(setting, explicitValues, errors);
         }
 
+        return ResolveModule(catalog, project, explicitValues, errors);
+    }
+
+    /// <summary>Resolves one new module from choices already split into options, as a pack pins them.</summary>
+    public static ModuleResolution ResolveModule(
+        CatalogModel catalog,
+        ProjectChoices project,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> pinned)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(pinned);
+
+        OrderedDictionary<string, IReadOnlyList<string>> explicitValues = [];
+        foreach (var (dimension, options) in pinned)
+        {
+            explicitValues.Add(dimension, options);
+        }
+
+        return ResolveModule(catalog, project, explicitValues, []);
+    }
+
+    private static ModuleResolution ResolveModule(
+        CatalogModel catalog,
+        ProjectChoices project,
+        OrderedDictionary<string, IReadOnlyList<string>> explicitValues,
+        List<string> errors)
+    {
         if (errors.Count == 0)
         {
             Validate(catalog, explicitValues, errors);

@@ -17,6 +17,18 @@ public static class RuleEvaluator
         return Check(catalog, choices.Project, [("module defaults", choices.ModuleDefaults)]);
     }
 
+    /// <summary>Checks a freshly resolved choice set whose packs bring modules: the module defaults and those modules.</summary>
+    public static IReadOnlyList<string> Check(
+        CatalogModel catalog,
+        ResolvedChoices choices,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> modules)
+    {
+        ArgumentNullException.ThrowIfNull(choices);
+        ArgumentNullException.ThrowIfNull(modules);
+
+        return Check(catalog, choices.Project, [("module defaults", choices.ModuleDefaults), .. modules.Select(module => ($"module '{module.Key}'", module.Value))]);
+    }
+
     public static IReadOnlyList<string> Check(
         CatalogModel catalog,
         IReadOnlyDictionary<string, IReadOnlyList<string>> project,

@@ -58,7 +58,7 @@ internal static class PackModules
                     {
                         declaration.Pins.Add(dimension, (pack.Option, options));
                     }
-                    else if (!earlier.Options.SequenceEqual(options, StringComparer.Ordinal))
+                    else if (!earlier.Options.ToHashSet(StringComparer.Ordinal).SetEquals(options))
                     {
                         errors.Add(
                             $"module '{module}': {pack.Option} pins {dimension}={string.Join(",", options)}, " +
@@ -71,8 +71,8 @@ internal static class PackModules
         OrderedDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> modules = [];
         foreach (var (module, (packs, pins)) in declared.OrderBy(entry => entry.Key, StringComparer.Ordinal))
         {
-            var overrides = pins.Select(pin => $"{pin.Key}={string.Join(",", pin.Value.Options)}").ToList();
-            var resolution = ChoiceResolver.ResolveModule(catalog, choices, overrides);
+            var pinned = pins.ToDictionary(pin => pin.Key, pin => pin.Value.Options, StringComparer.Ordinal);
+            var resolution = ChoiceResolver.ResolveModule(catalog, choices, pinned);
             if (resolution.Values is { } values)
             {
                 modules.Add(module, values);

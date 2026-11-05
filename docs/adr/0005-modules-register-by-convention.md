@@ -45,8 +45,9 @@ own, a dashboards module for example. Such a pack declares the module in
   normal skeleton. The declaring pack adds the module's own code as
   per-module files with `when: module.name == "<name>"` (ADR-0006).
 - A pin the catalog does not allow is a generation error naming the pack;
-  two packs that bring the same module and pin a dimension differently fail,
-  naming both.
+  the rules see the brought modules beside the module defaults. Two packs
+  that bring the same module and pin a dimension differently fail, naming
+  both.
 - `add-module` refuses a name a selected pack brings: that module's choices
   belong to the pack, and add-module would otherwise take the module defaults.
 - Only a base or project-scoped pack may bring a module. Which module-scoped

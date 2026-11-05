@@ -125,36 +125,36 @@ public static class Generator
             return Failure(resolution.Errors);
         }
 
-        var violations = RuleEvaluator.Check(catalog, resolved);
-        if (violations.Count > 0)
-        {
-            return Failure(violations);
-        }
-
         var choices = new ProjectChoices(
             resolved.Project,
             resolved.ModuleDefaults,
             new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>());
 
-        var composition = Composer.Compose(catalog, packs, choices);
-        if (composition.Errors.Count == 0 && composition.Packs.Any(pack => pack.Modules.Count > 0))
+        // Only base and project-scoped packs bring modules (PackLoader), so the modules cannot change which packs bring them.
+        var bringing = Composer.Select(catalog, packs, choices).Where(pack => pack.Modules.Count > 0).ToList();
+        IReadOnlyList<string> violations;
+        if (bringing.Count == 0)
         {
-            var (modules, moduleErrors) = PackModules.Resolve(catalog, composition.Packs, choices);
+            violations = RuleEvaluator.Check(catalog, resolved);
+        }
+        else
+        {
+            var (modules, moduleErrors) = PackModules.Resolve(catalog, bringing, choices);
             if (moduleErrors.Count > 0)
             {
                 return Failure(moduleErrors);
             }
 
             choices = choices with { Modules = modules };
-            var moduleViolations = RuleEvaluator.Check(catalog, choices.Project, choices.Modules);
-            if (moduleViolations.Count > 0)
-            {
-                return Failure(NameDeclarers(moduleViolations, PackModules.Declarers(composition.Packs)));
-            }
-
-            composition = Composer.Compose(catalog, packs, choices);
+            violations = NameDeclarers(RuleEvaluator.Check(catalog, resolved, modules), PackModules.Declarers(bringing));
         }
 
+        if (violations.Count > 0)
+        {
+            return Failure(violations);
+        }
+
+        var composition = Composer.Compose(catalog, packs, choices);
         List<string> compositionErrors = [
             .. composition.Errors,
             .. composition.Files
