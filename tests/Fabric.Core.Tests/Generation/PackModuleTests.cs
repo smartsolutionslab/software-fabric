@@ -1,3 +1,4 @@
+using Fabric.Core.Catalog;
 using Fabric.Core.Choices;
 using Fabric.Core.Generation;
 using Fabric.Core.Packs;
@@ -181,6 +182,21 @@ public sealed class PackModuleTests : IDisposable
 
         New("minimal").Errors.ShouldBe([
             "backend.api-protocols.rest: module 'reports': backend.database is project-scoped; it was fixed when the project was generated.",
+        ]);
+    }
+
+    [Fact]
+    public void A_pinned_option_a_catalog_rule_forbids_is_an_error_naming_the_pack()
+    {
+        var catalogText = File.ReadAllText(Path.Combine(Fixtures.MinimalRoot, "catalog.yaml")).Replace(
+            "crud: { tier: supported }",
+            """crud: { tier: supported, requires: ["backend.database == sqlserver"] }""",
+            StringComparison.Ordinal);
+        var catalog = CatalogReader.Read(new StringReader(catalogText), "catalog.yaml");
+        Declare("backend.api-protocols.rest", "modules: { reports: { module.style: crud } }");
+
+        Generator.New(catalog, Packs(), "shop", "minimal", []).Errors.ShouldBe([
+            "backend.api-protocols.rest: module 'reports': module.style=crud requires backend.database == sqlserver, but backend.database is postgres.",
         ]);
     }
 
