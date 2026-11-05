@@ -145,6 +145,47 @@ public sealed class EvalGateTests : IDisposable
     }
 
     [Fact]
+    public async Task The_judge_is_asked_without_temperature_or_top_p_so_every_model_takes_its_defaults()
+    {
+        using var model = new FakeChatClient(Answer);
+        using var judge = new FakeJudge(5);
+
+        await EvalRun.RunAsync([Fixture()], model, judge, results.FullName, "gate", TestContext.Current.CancellationToken);
+
+        judge.Options.ShouldNotBeEmpty();
+        judge.Options.ShouldAllBe(options => options == null || (options.Temperature == null && options.TopP == null));
+    }
+
+    [Theory]
+    [InlineData("NaN")]
+    [InlineData("Infinity")]
+    [InlineData("0")]
+    [InlineData("7")]
+    [InlineData("high")]
+    public async Task A_malformed_judgement_fails_naming_the_example_and_the_metric(string judgement)
+    {
+        using var model = new FakeChatClient(Answer);
+        using var judge = new FakeJudge(judgement);
+
+        var scores = await EvalRun.RunAsync([Fixture()], model, judge, results.FullName, "gate", TestContext.Current.CancellationToken);
+
+        scores.BelowThreshold(1).ShouldContain(violation => violation.StartsWith($"fixture: {RelevanceEvaluator.RelevanceMetricName} has ", StringComparison.Ordinal) && violation.Contains("example 1", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(double.NaN, "NaN")]
+    [InlineData(double.PositiveInfinity, "Infinity")]
+    [InlineData(double.NegativeInfinity, "-Infinity")]
+    [InlineData(0.5, "0.5")]
+    [InlineData(5.5, "5.5")]
+    public void A_score_that_is_not_finite_or_outside_1_to_5_fails_before_the_mean_naming_the_example_and_the_metric(double invalid, string shown)
+    {
+        var scores = new EvalScores([new("sample", "1", "Relevance", 5), new("sample", "2", "Relevance", invalid), new("sample", "3", "Relevance", 5)]);
+
+        scores.BelowThreshold(1).ShouldBe([$"sample: Relevance has an invalid score of {shown} for example 2; a score runs from 1 to 5."]);
+    }
+
+    [Fact]
     public void The_prompt_keeps_the_instruction_in_the_system_message_and_gives_the_records_as_delimited_data_in_a_user_message()
     {
         var messages = EvalPrompt.Messages(new EvalExample("When is invoice 7 due?", Records));
@@ -189,6 +230,9 @@ public sealed class EvalGateTests : IDisposable
     }
 
     public void Dispose() => results.Delete(recursive: true);
+
+    private static EvalUseCase Fixture() =>
+        new("fixture", (model, example, cancellationToken) => model.GetResponseAsync(EvalPrompt.Messages(example), cancellationToken: cancellationToken), [new("What does an invoice record?")]);
 
     private static int Count(EvalScores scores, string useCase, string metric) =>
         scores.All.Count(score => score.UseCase == useCase && score.Metric == metric);

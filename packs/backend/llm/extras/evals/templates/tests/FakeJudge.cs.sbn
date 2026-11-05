@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.AI;
 
@@ -6,18 +7,30 @@ namespace {{ namespace }}.Tests.Fakes;
 /// <summary>
 /// The judge in the evals' own tests: answers every request in the format the quality evaluators read
 /// (<c>&lt;S0&gt;</c> its reasoning, <c>&lt;S1&gt;</c> its explanation, <c>&lt;S2&gt;</c> its score), always with the score
-/// it was given, and keeps what it was asked. No test calls a real model, the judge included.
+/// it was given, and keeps what it was asked and with which options. The score is text, so a test can give it one a
+/// real judge might get wrong (<c>NaN</c>, <c>7</c>). No test calls a real model, the judge included.
 /// </summary>
-public sealed class FakeJudge(int score) : IChatClient
+public sealed class FakeJudge(string score) : IChatClient
 {
     private readonly List<IReadOnlyList<ChatMessage>> requests = [];
+
+    private readonly List<ChatOptions?> options = [];
+
+    public FakeJudge(int score)
+        : this(score.ToString(CultureInfo.InvariantCulture))
+    {
+    }
 
     /// <summary>The messages of every request, in the order they came.</summary>
     public IReadOnlyList<IReadOnlyList<ChatMessage>> Requests => requests;
 
+    /// <summary>The options of every request, in the order they came.</summary>
+    public IReadOnlyList<ChatOptions?> Options => options;
+
     public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         requests.Add([.. messages]);
+        this.options.Add(options);
         var judgement = $"<S0>A stand-in judge does not reason.</S0><S1>A fixed score.</S1><S2>{score}</S2>";
         return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, judgement)) { ModelId = Metadata.DefaultModelId });
     }

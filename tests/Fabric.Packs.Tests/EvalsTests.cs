@@ -191,7 +191,7 @@ public sealed partial class EvalsTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 19");
+        output.ShouldContain("succeeded: 30");
     }
 
     [Fact]
