@@ -111,14 +111,36 @@ public static class CatalogReader
     private static CatalogOption ReadOption(YamlSource source, string qualifiedId, string id, YamlNode node)
     {
         var owner = $"option '{qualifiedId}'";
-        var fields = source.Fields(source.Mapping(node, owner), owner, "tier", "requires", "conflicts", "note");
+        var fields = source.Fields(source.Mapping(node, owner), owner, "tier", "requires", "conflicts", "note", "settings");
 
         return new CatalogOption(
             id,
             source.Enum<SupportTier>(fields.Required("tier"), "tier", owner),
             fields.Optional("requires") is { } requires ? source.Conditions(requires, owner) : [],
             fields.Optional("conflicts") is { } conflicts ? source.Conditions(conflicts, owner) : [],
-            fields.Optional("note") is { } note ? source.Scalar(note, owner) : null);
+            fields.Optional("note") is { } note ? source.Scalar(note, owner) : null)
+        {
+            Settings = fields.Optional("settings") is { } settings ? ReadSettings(source, owner, settings) : new OrderedDictionary<string, OptionSetting>(),
+        };
+    }
+
+    private static OrderedDictionary<string, OptionSetting> ReadSettings(YamlSource source, string optionOwner, YamlNode node)
+    {
+        OrderedDictionary<string, OptionSetting> settings = [];
+        foreach (var (key, value) in source.Mapping(node, $"'settings' of {optionOwner}").Children)
+        {
+            var id = source.Scalar(key, $"a setting of {optionOwner}");
+            var owner = $"setting '{id}' of {optionOwner}";
+            var fields = source.Fields(source.Mapping(value, owner), owner, "default", "minimum", "maximum", "note");
+            settings.Add(id, new OptionSetting(
+                id,
+                source.Number(fields.Required("default"), "default", owner),
+                source.Number(fields.Required("minimum"), "minimum", owner),
+                source.Number(fields.Required("maximum"), "maximum", owner),
+                fields.Optional("note") is { } note ? source.Scalar(note, owner) : null));
+        }
+
+        return settings;
     }
 
     private static OrderedDictionary<string, Profile> ReadProfiles(YamlSource source, YamlNode node)

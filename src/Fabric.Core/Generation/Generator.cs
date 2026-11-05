@@ -42,6 +42,12 @@ public static class Generator
             return AdditionFailure([$"module '{name}' already exists."]);
         }
 
+        var settingErrors = ChoiceResolver.CheckSettings(catalog, project.Choices);
+        if (settingErrors.Count > 0)
+        {
+            return AdditionFailure([.. settingErrors.Select(error => $"{FabricFile.FileName}: {error}")]);
+        }
+
         var resolution = ChoiceResolver.ResolveModule(catalog, project.Choices, overrides);
         if (resolution.Values is not { } values)
         {
@@ -128,7 +134,10 @@ public static class Generator
         var choices = new ProjectChoices(
             resolved.Project,
             resolved.ModuleDefaults,
-            new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>());
+            new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>())
+        {
+            Settings = resolved.Settings,
+        };
 
         // Only base and project-scoped packs bring modules (PackLoader), so the modules cannot change which packs bring them.
         // Checked as fabric validate and the catalog lint check it, without packs, so the three agree on every profile.

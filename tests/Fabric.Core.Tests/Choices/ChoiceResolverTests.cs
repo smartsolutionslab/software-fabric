@@ -327,6 +327,78 @@ public class ChoiceResolverTests
             "backend.llm.embeddings is set to openai, but it only applies when backend.llm.extras has rag, and backend.llm.extras is empty.");
     }
 
+    [Fact]
+    public void Evals_brings_its_threshold_at_the_default()
+    {
+        ResolveSuccessfully("lean-crud", "backend.llm=openai", "backend.llm.extras=evals")
+            .Settings.ShouldBe(new Dictionary<string, decimal> { ["backend.llm.extras.evals.threshold"] = 4m });
+    }
+
+    [Fact]
+    public void Evals_takes_a_threshold_set_with_set()
+    {
+        ResolveSuccessfully("lean-crud", "backend.llm=openai", "backend.llm.extras=rag,evals", "backend.llm.extras.evals.threshold=3.5")
+            .Settings["backend.llm.extras.evals.threshold"].ShouldBe(3.5m);
+    }
+
+    [Theory]
+    [InlineData("saas-standard-react")]
+    [InlineData("lean-crud")]
+    public void A_project_without_an_option_that_declares_settings_has_none(string profile)
+    {
+        ResolveSuccessfully(profile).Settings.ShouldBeEmpty();
+        ResolveSuccessfully(profile, "backend.llm=openai", "backend.llm.extras=rag").Settings.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("0.5")]
+    [InlineData("6")]
+    public void Rejects_a_threshold_outside_its_range_and_says_which(string value)
+    {
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm=openai", "backend.llm.extras=evals", $"backend.llm.extras.evals.threshold={value}").ShouldBe(
+            $"backend.llm.extras.evals.threshold is {value}, but it must be between 1 and 5.");
+    }
+
+    [Theory]
+    [InlineData("high")]
+    [InlineData("3,4")]
+    [InlineData("")]
+    public void Rejects_a_threshold_that_is_not_a_number(string value)
+    {
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm=openai", "backend.llm.extras=evals", $"backend.llm.extras.evals.threshold={value}").ShouldBe(
+            $"backend.llm.extras.evals.threshold must be a number between 1 and 5, got '{value}'.");
+    }
+
+    [Fact]
+    public void Rejects_a_threshold_without_evals_and_says_why()
+    {
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm=openai", "backend.llm.extras.evals.threshold=3").ShouldBe(
+            "backend.llm.extras.evals.threshold is set to 3, but it only applies when backend.llm.extras has evals, and backend.llm.extras is empty.");
+    }
+
+    [Fact]
+    public void Rejects_a_threshold_without_a_model_and_says_why()
+    {
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm.extras.evals.threshold=3").ShouldBe(
+            "backend.llm.extras.evals.threshold is set to 3, but it only applies when backend.llm.extras has evals, and backend.llm.extras is not set.");
+    }
+
+    [Fact]
+    public void Rejects_a_setting_the_option_does_not_declare_and_names_those_it_does()
+    {
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm=openai", "backend.llm.extras=evals", "backend.llm.extras.evals.treshold=3").ShouldBe(
+            "unknown setting 'treshold' of backend.llm.extras=evals; its settings: threshold.");
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm=openai", "backend.llm.extras=rag", "backend.llm.extras.rag.threshold=3").ShouldBe(
+            "unknown setting 'threshold' of backend.llm.extras=rag; it has no settings.");
+    }
+
+    [Fact]
+    public void A_key_that_is_neither_a_dimension_nor_a_setting_is_an_unknown_dimension()
+    {
+        SingleError(RepositoryCatalog, "lean-crud", "backend.llm.extra.evals.threshold=3").ShouldBe(
+            "unknown dimension 'backend.llm.extra.evals.threshold'.");
+    }
+
     [Theory]
     [InlineData("backend.mcp=", new string[0])]
     [InlineData("backend.mcp=server", new[] { "server" })]
