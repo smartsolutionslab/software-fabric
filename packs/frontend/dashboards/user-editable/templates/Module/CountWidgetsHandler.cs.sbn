@@ -1,0 +1,36 @@
+{{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+{{~ func ok(type, value)
+  if typed
+    ret "Success(" + value + ")"
+  end
+  ret "Result<" + type + ", ApiError>.Success(" + value + ")"
+end ~}}
+{{~ func fail(type, error)
+  if typed
+    ret "Failure(" + error + ")"
+  end
+  ret "Result<" + type + ", ApiError>.Failure(" + error + ")"
+end ~}}
+using {{ namespace }}.BuildingBlocks.Dashboards;
+using {{ namespace }}.BuildingBlocks.Identity;
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Queries.CountWidgets;
+
+public sealed class CountWidgetsHandler(IDashboardStore dashboards, ICurrentUser user) : IQueryHandler<CountWidgets, Result<ChartSeries, ApiError>>
+{
+    public async Task<Result<ChartSeries, ApiError>> HandleAsync(CountWidgets query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        if (user.Subject is not { } owner)
+        {
+            return {{ fail "ChartSeries" "DashboardsFailures.NotSignedIn()" }};
+        }
+
+        // All of them: a chart's query takes no page, so a chart that showed only the first would hide the rest for good.
+        var owned = await dashboards.AllAsync(owner, cancellationToken);
+        return {{ ok "ChartSeries" "new ChartSeries([.. owned.Select(dashboard => dashboard.Name)], [new ChartValues(\"Widgets\", [.. owned.Select(dashboard => (decimal)dashboard.Widgets.Count)])])" }};
+    }
+}

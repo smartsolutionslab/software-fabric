@@ -1,0 +1,14 @@
+namespace {{ namespace }}.Modules.Dashboards.Domain;
+
+/// <summary>One user's arrangement of widgets, saved in their tenant. Only its owner reads, changes or removes it.</summary>
+public sealed class Dashboard
+{
+    public Guid Id { get; set; }
+
+    /// <summary>The identity provider's subject of the user it belongs to.</summary>
+    public string Owner { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    public ICollection<DashboardWidget> Widgets { get; } = [];
+}

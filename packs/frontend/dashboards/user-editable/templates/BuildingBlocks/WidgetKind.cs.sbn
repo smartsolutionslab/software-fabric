@@ -1,0 +1,11 @@
+using System.Text.Json.Serialization;
+
+namespace {{ namespace }}.BuildingBlocks.Dashboards;
+
+/// <summary>What a widget's query answers: a <see cref="ChartSeries"/> or a page of rows.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<WidgetKind>))]
+public enum WidgetKind
+{
+    Chart,
+    Table,
+}

@@ -1,0 +1,102 @@
+{{~ option = project["backend.absence"] == "option" ~}}
+{{~ policies = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+using System.Text.Json;
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.BuildingBlocks.Dashboards;
+
+/// <summary>
+/// What a module's <see cref="IModuleWidgets"/> fills: each widget names its key, its title and how to build its query.
+/// The query's type says what it answers, so a widget that does not answer a chart or a page of rows does not compile.
+/// </summary>
+public sealed class WidgetCatalogBuilder
+{
+    private readonly List<WidgetDefinition> widgets = [];
+
+    /// <param name="module">The module's name in kebab case, e.g. <c>billing</c>; every widget's id starts with it.</param>
+    public WidgetCatalogBuilder(string module)
+    {
+        {{ not_blank "module" }}
+        Module = module;
+    }
+
+    public string Module { get; }
+
+    public IReadOnlyList<WidgetDefinition> Widgets => widgets;
+
+    /// <summary>A chart: the query takes no arguments, so neither a user nor a model chooses what it reads.</summary>
+{{~ if policies ~}}
+    /// <param name="policy">One of the module's own policies the caller must satisfy, if any beyond being signed in.</param>
+    public WidgetCatalogBuilder Chart<TQuery>(string key, string title, Func<TQuery> query, string? policy = null)
+{{~ else ~}}
+    public WidgetCatalogBuilder Chart<TQuery>(string key, string title, Func<TQuery> query)
+{{~ end ~}}
+        where TQuery : IQuery<Result<ChartSeries, ApiError>>
+    {
+        {{ not_blank "key" }}
+        {{ not_blank "title" }}
+        {{ not_null "query" }}
+
+        widgets.Add(new WidgetDefinition(
+            $"{Module}.{key}",
+            title,
+            WidgetKind.Chart,
+            typeof(TQuery),
+            typeof(Result<ChartSeries, ApiError>),
+{{~ if policies ~}}
+            {{ if option }}Required(policy){{ else }}policy{{ end }},
+{{~ end ~}}
+            async (dispatcher, _, _, cancellationToken) =>
+            {
+                var answer = await dispatcher.QueryAsync<Result<ChartSeries, ApiError>>(query(), cancellationToken);
+                return answer.Match(
+                    chart => Result<WidgetData, ApiError>.Success(new WidgetData(WidgetKind.Chart, chart, null)),
+                    Result<WidgetData, ApiError>.Failure);
+            }));
+        return this;
+    }
+
+    /// <summary>A table: the query takes the page to read and nothing else, and answers that page of rows.</summary>
+{{~ if policies ~}}
+    /// <param name="policy">One of the module's own policies the caller must satisfy, if any beyond being signed in.</param>
+    public WidgetCatalogBuilder Table<TQuery, TRow>(string key, string title, Func<Page, PageSize, TQuery> query, string? policy = null)
+{{~ else ~}}
+    public WidgetCatalogBuilder Table<TQuery, TRow>(string key, string title, Func<Page, PageSize, TQuery> query)
+{{~ end ~}}
+        where TQuery : IQuery<Result<PagedResult<TRow>, ApiError>>
+    {
+        {{ not_blank "key" }}
+        {{ not_blank "title" }}
+        {{ not_null "query" }}
+
+        // The names the rows are serialized with, so a [JsonPropertyName] or [JsonIgnore] on the row type holds for both.
+        List<string> columns = [.. JsonSerializerOptions.Web.GetTypeInfo(typeof(TRow)).Properties
+            .Where(property => property.Get is not null)
+            .Select(property => property.Name)];
+        widgets.Add(new WidgetDefinition(
+            $"{Module}.{key}",
+            title,
+            WidgetKind.Table,
+            typeof(TQuery),
+            typeof(Result<PagedResult<TRow>, ApiError>),
+{{~ if policies ~}}
+            {{ if option }}Required(policy){{ else }}policy{{ end }},
+{{~ end ~}}
+            async (dispatcher, page, pageSize, cancellationToken) =>
+            {
+                var answer = await dispatcher.QueryAsync<Result<PagedResult<TRow>, ApiError>>(query(page, pageSize), cancellationToken);
+                return answer.Match(
+                    rows => Result<WidgetData, ApiError>.Success(new WidgetData(
+                        WidgetKind.Table,
+                        null,
+                        new WidgetTable(columns, [.. rows.Items.Select(row => JsonSerializer.SerializeToElement(row, JsonSerializerOptions.Web))], rows.TotalCount, rows.Page, rows.PageSize))),
+                    Result<WidgetData, ApiError>.Failure);
+            }));
+        return this;
+    }
+{{~ if policies && option ~}}
+
+    private static Option<string> Required(string? policy) =>
+        policy is null ? Option<string>.None : Option<string>.Some(policy);
+{{~ end ~}}
+}

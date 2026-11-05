@@ -1,0 +1,76 @@
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Tests.Fakes;
+
+/// <summary>
+/// The embeddings model in tests: every word of a text, split at white space and compared without case, adds one to
+/// the dimension its hash picks, and the vector is scaled to length one. Texts that share words are near in cosine
+/// distance, and the same text always has the same vector. No test calls a real model.
+/// </summary>
+public sealed class FakeEmbeddingGenerator(int dimensions) : IEmbeddingGenerator<string, Embedding<float>>
+{
+    private readonly EmbeddingGeneratorMetadata metadata = new("fake", defaultModelId: "fake-embeddings", defaultModelDimensions: dimensions);
+
+    public Task<GeneratedEmbeddings<Embedding<float>>> GenerateAsync(
+        IEnumerable<string> values,
+        EmbeddingGenerationOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        {{ not_null "values" }}
+
+        return Task.FromResult(new GeneratedEmbeddings<Embedding<float>>(values.Select(value => new Embedding<float>(Embed(value)))));
+    }
+
+    public object? GetService(Type serviceType, object? serviceKey = null)
+    {
+        {{ not_null "serviceType" }}
+
+        if (serviceKey is not null)
+        {
+            return null;
+        }
+
+        if (serviceType == typeof(EmbeddingGeneratorMetadata))
+        {
+            return metadata;
+        }
+
+        return serviceType.IsInstanceOfType(this) ? this : null;
+    }
+
+    public void Dispose()
+    {
+    }
+
+    /// <summary>FNV-1a over the word's characters: the same on every run and machine, unlike string.GetHashCode.</summary>
+    private static uint Hash(string word)
+    {
+        var hash = 2166136261u;
+        foreach (var character in word)
+        {
+            hash = (hash ^ character) * 16777619u;
+        }
+
+        return hash;
+    }
+
+    private float[] Embed(string text)
+    {
+        var vector = new float[dimensions];
+        foreach (var word in text.ToUpperInvariant().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            vector[Hash(word) % (uint)dimensions] += 1;
+        }
+
+        var length = MathF.Sqrt(vector.Sum(component => component * component));
+        if (length > 0)
+        {
+            for (var index = 0; index < vector.Length; index++)
+            {
+                vector[index] /= length;
+            }
+        }
+
+        return vector;
+    }
+}

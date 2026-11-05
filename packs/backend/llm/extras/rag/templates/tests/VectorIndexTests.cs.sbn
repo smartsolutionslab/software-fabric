@@ -1,0 +1,87 @@
+{{~ if project["backend.test.assertions"] != "shouldly" ~}}
+#error The rag pack's tests assert with Shouldly only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using {{ namespace }}.BuildingBlocks.Rag;
+using {{ namespace }}.Tests.Fakes;
+
+namespace {{ namespace }}.Rag.Tests;
+
+/// <summary>
+/// A module's index in the AppHost's database: records indexed with a stand-in embeddings model come back from a
+/// search nearest first. No test calls a real model.
+/// </summary>
+public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
+{
+    private readonly FakeEmbeddingGenerator generator = new(VectorTables.Dimensions);
+
+    private Npgsql.NpgsqlDataSource? dataSource;
+
+    private Npgsql.NpgsqlDataSource DataSource => dataSource ?? throw new InvalidOperationException("The data source has not been created.");
+
+    public async ValueTask InitializeAsync()
+    {
+        await VectorTables.CreateAsync(database.ConnectionString, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema], TestContext.Current.CancellationToken);
+        dataSource = VectorTables.DataSource(database.ConnectionString);
+    }
+
+    [Fact]
+    public async Task A_search_returns_the_nearest_records_first_with_their_text()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var notes = new ModuleVectorIndex<SampleNotesDbContext>(DataSource, generator);
+        await notes.IndexAsync("note-3", "team lunch on friday", cancellationToken);
+        await notes.IndexAsync("invoice-1", "unpaid invoice for office chairs", cancellationToken);
+        await notes.IndexAsync("invoice-2", "paid invoice for office desks", cancellationToken);
+
+        var passages = await notes.SearchAsync("unpaid invoice for chairs", 3, cancellationToken);
+
+        passages.Select(passage => passage.Key).ShouldBe(["invoice-1", "invoice-2", "note-3"]);
+        passages[0].Text.ShouldBe("unpaid invoice for office chairs");
+        passages.Select(passage => passage.Distance).ShouldBeInOrder();
+        (await notes.SearchAsync("unpaid invoice for chairs", 1, cancellationToken)).Select(passage => passage.Key).ShouldBe(["invoice-1"]);
+    }
+
+    [Fact]
+    public async Task Indexing_a_key_again_replaces_its_record_and_removing_it_leaves_none()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var drafts = new ModuleVectorIndex<SampleDraftsDbContext>(DataSource, generator);
+        await drafts.IndexAsync("draft-1", "first draft about chairs", cancellationToken);
+
+        await drafts.IndexAsync("draft-1", "second draft about desks", cancellationToken);
+
+        var replaced = await drafts.SearchAsync("desks", 5, cancellationToken);
+        replaced.Select(passage => (passage.Key, passage.Text)).ShouldBe([("draft-1", "second draft about desks")]);
+
+        await drafts.RemoveAsync("draft-1", cancellationToken);
+
+        (await drafts.SearchAsync("desks", 5, cancellationToken)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_search_the_hnsw_index_answers_returns_as_many_records_as_asked_beyond_its_default_breadth_of_40()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off" };
+        await using var indexed = VectorTables.DataSource(indexOnly.ConnectionString);
+        var shelf = new ModuleVectorIndex<SampleShelfDbContext>(indexed, generator);
+        for (var number = 0; number < 60; number++)
+        {
+            await shelf.IndexAsync($"book-{number}", $"book {number}", cancellationToken);
+        }
+
+        var passages = await shelf.SearchAsync("book", 50, cancellationToken);
+
+        passages.Count.ShouldBe(50);
+        passages.Select(passage => passage.Distance).ShouldBeInOrder();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        generator.Dispose();
+        if (dataSource is not null)
+        {
+            await dataSource.DisposeAsync();
+        }
+    }
+}

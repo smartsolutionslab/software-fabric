@@ -1,0 +1,12 @@
+namespace {{ namespace }}.BuildingBlocks.Dashboards;
+
+/// <summary>
+/// The queries of one module that may become widgets on a dashboard, and nothing else: one implementation per module, in
+/// its Application project, found by assembly scan like <c>IModule</c>. A dashboard can show only what a module declares.
+/// </summary>
+public interface IModuleWidgets
+{
+#pragma warning disable CA1716 // Declare is a keyword in Visual Basic only; a module declares its widgets, and says so.
+    void Declare(WidgetCatalogBuilder widgets);
+#pragma warning restore CA1716
+}

@@ -1,0 +1,33 @@
+using {{ namespace }}.BuildingBlocks.Modules;
+using {{ namespace }}.BuildingBlocks.Persistence;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class ModuleAdapterRegistration
+{
+    /// <summary>
+    /// Registers each class in the module's Infrastructure project whose constructor takes the module's DbContext (a store
+    /// over its tables) as the module's Application interfaces it implements, so a handler depends on the interface and
+    /// never on EF Core.
+    /// </summary>
+    public static IServiceCollection AddModuleAdapters<TModule>(this IServiceCollection services)
+        where TModule : IModule
+    {
+        {{ not_null "services" }}
+
+        var application = ModuleAssemblies.Of<TModule>("Application");
+        var adapters = ModuleAssemblies.Of<TModule>("Infrastructure").GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false }
+                && type.GetConstructors().Any(constructor => constructor.GetParameters().Any(parameter => typeof(ModuleDbContext).IsAssignableFrom(parameter.ParameterType))))
+            .OrderBy(type => type.FullName, StringComparer.Ordinal);
+        foreach (var adapter in adapters)
+        {
+            foreach (var contract in adapter.GetInterfaces().Where(contract => contract.Assembly == application))
+            {
+                services.AddScoped(contract, adapter);
+            }
+        }
+
+        return services;
+    }
+}

@@ -53,11 +53,18 @@
           }
         }
       }
-    }{{ end }}
+    }{{ end }}{{ if slots["web.openapi-paths"] != "" }},
+{{ slots["web.openapi-paths"] }}{{ end }}
   },
   "components": {
     "schemas": {
-{{ if project["backend.tenancy"] != "none" }}      "CurrentTenant": {
+{{~
+  # The host's schemas and every contributed one, sorted by name as the host serves them.
+  schemas = []
+  if project["backend.tenancy"] != "none"
+    capture tenant_schema
+~}}
+      "CurrentTenant": {
         "required": [
           "tenantId"
         ],
@@ -70,8 +77,14 @@
             ]
           }
         }
-      },
-{{ end }}      "CurrentUser": {
+      }
+{{~
+    end
+    schemas = schemas | array.add (tenant_schema | string.rstrip)
+  end
+  capture user_schema
+~}}
+      "CurrentUser": {
         "required": [
           "name"
         ],
@@ -85,6 +98,16 @@
           }
         }
       }
+{{~
+  end
+  schemas = schemas | array.add (user_schema | string.rstrip)
+  if slots["web.openapi-schemas"] != ""
+    for contributed in slots["web.openapi-schemas"] | string.split "\n\n"
+      schemas = schemas | array.add (contributed | string.rstrip)
+    end
+  end
+~}}
+{{ schemas | array.sort | array.join ",\n" }}
     }
   },
   "tags": [
