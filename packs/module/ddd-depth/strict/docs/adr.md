@@ -38,6 +38,17 @@ object for this purpose, even if it implements `IValueObject`. A computed `bool`
 (`IsArchived => archived`), which is stored state. No other get-only property is exempt, because reflection cannot tell
 a computed number from stored state.
 
+**Generic types exclude null.** Every type parameter of a generic type in a strict module's Domain is constrained to
+exclude null: `where T : notnull`, or `class`, `struct`, `unmanaged`, or a base type or interface that is not nullable
+(`where T : INumber<T>`). This holds for every generic type the Domain declares, classes, records, structs, interfaces,
+delegates and nested types alike, whether or not an aggregate, command or event reaches it, so that a change to one
+type never makes the build fail on another that nobody touched. Unconstrained, a `T` reads as nullable through
+reflection whatever its argument, so a rule cannot tell `Node<InvoiceNumber>` from `Node<InvoiceNumber?>`; constrained,
+a `T` reads as not nullable and a `T?` as nullable, as written. `class?`, a nullable base type or interface (`IMarker?`)
+and no constraint are not enough, nor is `class` or a base type where nullability is disabled (`#nullable disable`),
+which reads as neither; `notnull`, `struct` and `unmanaged` hold there too. A member that may be absent is declared
+`T?` in the definition, since `Node<InvoiceNumber?>` breaks the constraint.
+
 **Persistence.** EF Core maps every `IValueObject<T>` of a module's Domain to its backing value by convention
 (`ConfigureConventions` in `ModuleDbContext`) and reads it back through `From`, so entity configurations never convert
 one by hand. A generic value object (`TypedId<TTag>`) is mapped as each closed type the Domain's properties and fields
@@ -58,7 +69,8 @@ checks the constructor System.Text.Json actually selects (the one marked `[JsonC
 parameterless one, else the only public one), not every public constructor: beside a public parameterless constructor,
 a constructor taking `InvoiceNumber` is never called when an event is read. It also refuses an optional parameter for a
 value object that is not declared nullable (`InvoiceNumber Number = null!`), since an omitted optional parameter takes
-its default instead of failing; `InvoiceNumber? Previous = null` stays allowed. The rule looks into the domain types an
+its default instead of failing; `InvoiceNumber? Previous = null` stays allowed. Because a generic type's parameters exclude null (above), an optional `T Value = default!` reads as
+not nullable over a value object, so a `Node<InvoiceNumber>` that takes its `InvoiceNumber` that way is named too. The rule looks into the domain types an
 event holds too, at any depth (alone, nullable, in a collection or an array), and checks their public properties the
 same way: an event taking `InvoiceDetails Details` by constructor still reads `"Details":{}`, so `InvoiceDetails` takes
 its `InvoiceNumber` by constructor as well, and a property holding a domain type that carries a value object (an
@@ -105,7 +117,9 @@ several values is decided; then the rule can be lifted.
 
 An architecture rule per strict module walks from its aggregates, commands and domain events, through public
 properties and public fields, and fails on each primitive it reaches, naming the type and member. A second rule per
-strict module fails on each public setter of an aggregate root: strict is light and more.
+strict module fails on each public setter of an aggregate root: strict is light and more. A third fails on each type parameter of a generic
+type in the Domain that is not constrained to exclude null, naming the definition and the parameter
+(``Node`1 does not constrain its type parameter T``).
 
 The walk visits each closed type once. Before it starts, it decides from the module's generic definitions which ones can
 recur forever: a definition that passes one of its type parameters on, inside a larger type, to a type that leads back
