@@ -17,6 +17,10 @@ namespace {{ namespace }}.BuildingBlocks.Rag;
 
 /// <summary>
 /// The vector tables: one <c>embeddings</c> table in each module's schema, with an HNSW index for cosine distance.
+{{~ if project["backend.tenancy"] == "column" ~}}
+/// Each record belongs to a tenant: <c>tenant_id</c> leads the primary key, so a key is unique within a tenant and
+/// the key's index also finds one tenant's records.
+{{~ end ~}}
 /// The MigrationRunner creates them after the modules' migrations; the host never creates or alters them.
 /// </summary>
 public static class VectorTables
@@ -71,7 +75,11 @@ public static class VectorTables
         {
             var table = Table(schema);
             await ExecuteAsync(connection, $"CREATE SCHEMA IF NOT EXISTS {Quote(schema)}", cancellationToken);
+{{~ if project["backend.tenancy"] == "column" ~}}
+            await ExecuteAsync(connection, $"CREATE TABLE IF NOT EXISTS {table} (tenant_id text not null, key text not null, content text not null, embedding vector({Dimensions}) not null, primary key (tenant_id, key))", cancellationToken);
+{{~ else ~}}
             await ExecuteAsync(connection, $"CREATE TABLE IF NOT EXISTS {table} (key text primary key, content text not null, embedding vector({Dimensions}) not null)", cancellationToken);
+{{~ end ~}}
             await ExecuteAsync(connection, $"CREATE INDEX IF NOT EXISTS embeddings_embedding_hnsw ON {table} USING hnsw (embedding vector_cosine_ops)", cancellationToken);
         }
 
