@@ -5,20 +5,21 @@ namespace Fabric.Packs.Tests;
 
 /// <summary>
 /// #160: saas-standard-vue's last packs. Forms are vee-validate 4.15.1 with the pack's own zod-4 <c>toTypedSchema</c>;
-/// components are Reka UI, headless, styled with Tailwind, in place of PrimeVue (owner decision:
-/// https://github.com/smartsolutionslab/software-fabric/issues/23#issuecomment-6641134974). With them the profile is
-/// generated from the real packs alone.
+/// components are shadcn-vue (#177): Reka UI's primitives styled with Tailwind, in shadcn-vue's layout, as
+/// saas-standard-react uses shadcn. Reka UI alone stays the headless option, as radix-headless is React's. With them the
+/// profile is generated from the real packs alone.
 /// </summary>
 public sealed partial class VueFormsAndComponentsTests
 {
     private const string Profile = "saas-standard-vue";
+    private const string RekaUi = "frontend.ui-library=reka-ui";
 
     /// <summary>A form a developer would write: a zod schema validates it, Tailwind styles it, the button is the project's.</summary>
     private const string SignUpForm = """
         <script setup lang="ts">
         import { useForm } from 'vee-validate';
         import { z } from 'zod';
-        import BaseButton from '@/components/ui/BaseButton.vue';
+        import { Button } from '@/components/ui/button';
         import { toTypedSchema } from '@/forms/toTypedSchema';
 
         const signUpSchema = z.object({
@@ -46,8 +47,63 @@ public sealed partial class VueFormsAndComponentsTests
             <label for="email">Email</label>
             <input id="email" v-model="email" v-bind="emailAttributes" class="rounded border px-2" />
             <p v-if="errors.email" role="alert">{{ errors.email }}</p>
-            <BaseButton type="submit">Sign up</BaseButton>
+            <Button type="submit">Sign up</Button>
           </form>
+        </template>
+        """;
+
+    /// <summary>Components as shadcn-vue's CLI adds them: they style with the theme's variables and tw-animate-css.</summary>
+    private const string CliCard = """
+        <script setup lang="ts">
+        import type { HTMLAttributes } from 'vue';
+        import { cn } from '@/lib/utils';
+
+        defineOptions({ name: 'UiCard' });
+
+        const { class: className } = defineProps<{ class?: HTMLAttributes['class'] }>();
+        </script>
+
+        <template>
+          <div
+            data-slot="card"
+            :class="cn('flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm', className)"
+          >
+            <slot />
+          </div>
+        </template>
+        """;
+
+    private const string CliDialogOverlay = """
+        <script setup lang="ts">
+        import { DialogOverlay } from 'reka-ui';
+
+        defineOptions({ name: 'UiDialogOverlay' });
+        </script>
+
+        <template>
+          <DialogOverlay
+            data-slot="dialog-overlay"
+            class="fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0"
+          />
+        </template>
+        """;
+
+    /// <summary>A component in the registry's shape that builds on Button, as sidebar's trigger does: ghost, icon-sized.</summary>
+    private const string CliSidebarTrigger = """
+        <script setup lang="ts">
+        import { PanelLeft } from '@lucide/vue';
+        import { Button } from '@/components/ui/button';
+
+        defineOptions({ name: 'UiSidebarTrigger' });
+
+        const emit = defineEmits<{ toggle: [] }>();
+        </script>
+
+        <template>
+          <Button data-sidebar="trigger" data-slot="sidebar-trigger" variant="ghost" size="icon" @click="emit('toggle')">
+            <PanelLeft />
+            <span class="sr-only">Toggle Sidebar</span>
+          </Button>
         </template>
         """;
 
@@ -94,26 +150,73 @@ public sealed partial class VueFormsAndComponentsTests
 
         files.Keys.ShouldContain("web/app/src/forms/toTypedSchema.ts");
         files.Keys.ShouldContain("web/app/src/forms/toTypedSchema.test.ts");
-        files.Keys.ShouldContain("web/app/src/components/ui/BaseButton.vue");
+        files.Keys.ShouldContain("web/app/components.json");
+        files.Keys.ShouldContain("web/app/src/components/ui/button/Button.vue");
+        files.Keys.ShouldContain("web/app/src/components/ui/button/index.ts");
+        files.Keys.ShouldContain("web/app/src/components/ui/button/Button.test.ts");
         files.Keys.ShouldContain("web/app/src/lib/utils.ts");
+        files.Keys.ShouldNotContain("web/app/src/components/ui/BaseButton.vue");
+        var buttonVariants = files["web/app/src/components/ui/button/index.ts"];
+        buttonVariants.ShouldContain("default: 'bg-primary text-primary-foreground");
+        buttonVariants.ShouldNotContain("slate");
+        foreach (var variant in new[] { "destructive:", "outline:", "secondary:", "ghost:", "link:", "sm:", "lg:", "icon:" })
+        {
+            buttonVariants.ShouldContain(variant);
+        }
+
         files.Keys.Where(path => path.EndsWith(".tsx", StringComparison.Ordinal)).ShouldBeEmpty();
+
+        var components = files["web/app/components.json"];
+        components.ShouldContain("\"$schema\": \"https://shadcn-vue.com/schema.json\"");
+        components.ShouldContain("\"typescript\": true");
+        components.ShouldContain("\"css\": \"src/index.css\"");
+        components.ShouldContain("\"ui\": \"@/components/ui\"");
+        components.ShouldNotContain("\"tsx\"");
 
         var package = files["web/app/package.json"];
         package.ShouldContain("\"vee-validate\": \"4.15.1\"");
         package.ShouldContain("\"reka-ui\": \"2.11.0\"");
+        package.ShouldContain("\"@lucide/vue\": \"1.65.0\"");
         package.ShouldContain("\"tailwindcss\": \"4.3.3\"");
         package.ShouldNotContain("primevue");
         package.ShouldNotContain("@vee-validate/zod");
         package.ShouldNotContain("react");
-        files["web/app/src/index.css"].ShouldContain("@import 'tailwindcss';");
+        package.ShouldContain("\"tw-animate-css\": \"1.4.0\"");
+        var styles = files["web/app/src/index.css"];
+        styles.ShouldContain("@import 'tailwindcss';");
+        styles.ShouldContain("@import 'tw-animate-css';");
+        styles.ShouldContain("@theme inline {");
+        styles.ShouldContain("--color-card: var(--card);");
         files["web/app/vite.config.ts"].ShouldContain("tailwindcss()");
 
         var agents = files["AGENTS.md"];
         agents.ShouldContain("## Forms: vee-validate");
-        agents.ShouldContain("## UI components: Reka UI");
+        agents.ShouldContain("## UI components: shadcn-vue");
+        agents.ShouldContain("pnpm dlx shadcn-vue@2.9.0 add <name>");
         agents.ShouldContain("Style with utility classes in `class`");
         agents.ShouldNotContain("className");
-        agents.ShouldNotContain("shadcn");
+        agents.ShouldNotContain("shadcn@");
+        agents.ShouldNotContain("## UI components: Reka UI");
+    }
+
+    [Fact]
+    public void Reka_ui_stays_the_headless_option_and_generates_without_shadcn_vue()
+    {
+        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", Profile, [RekaUi]);
+        generated.Errors.ShouldBeEmpty();
+        var files = generated.Files.ToDictionary(file => file.Path, file => file.Content);
+
+        files.Keys.ShouldContain("web/app/src/components/ui/BaseButton.vue");
+        files.Keys.ShouldContain("web/app/src/components/ui/BaseButton.test.ts");
+        files.Keys.ShouldContain("web/app/src/lib/utils.ts");
+        files.Keys.ShouldNotContain("web/app/components.json");
+        files.Keys.ShouldNotContain("web/app/src/components/ui/button/Button.vue");
+        files["web/app/package.json"].ShouldContain("\"reka-ui\": \"2.11.0\"");
+        files["web/app/package.json"].ShouldNotContain("@lucide/vue");
+        files["web/app/package.json"].ShouldNotContain("tw-animate-css");
+        files["web/app/src/index.css"].ShouldNotContain("@theme inline");
+        files["AGENTS.md"].ShouldContain("## UI components: Reka UI");
+        files["AGENTS.md"].ShouldNotContain("shadcn");
     }
 
     [Fact]
@@ -122,6 +225,9 @@ public sealed partial class VueFormsAndComponentsTests
         using var project = new GeneratedProject(Profile);
         project.Write("web/app/src/pages/SignUpForm.vue", SignUpForm);
         project.Write("web/app/src/pages/SignUpForm.test.ts", SignUpFormTest);
+        project.Write("web/app/src/components/ui/card/Card.vue", CliCard);
+        project.Write("web/app/src/components/ui/dialog/DialogOverlay.vue", CliDialogOverlay);
+        project.Write("web/app/src/components/ui/sidebar/SidebarTrigger.vue", CliSidebarTrigger);
         var web = Path.Combine(project.ProjectDirectory, "web");
         var app = Path.Combine(web, "app");
         foreach (var step in new[] { "install", "build", "lint" })
@@ -134,6 +240,11 @@ public sealed partial class VueFormsAndComponentsTests
 
         testExitCode.ShouldBe(0, $"pnpm test:\n{testOutput}");
         var plain = Escapes().Replace(testOutput, string.Empty);
+        plain.ShouldContain("✓ src/components/ui/button/Button.test.ts > a button is a button with the default look", customMessage: testOutput);
+        plain.ShouldContain("✓ src/components/ui/button/Button.test.ts > with as-child the child takes the button's look and stays what it is", customMessage: testOutput);
+        plain.ShouldContain("✓ src/components/ui/button/Button.test.ts > the destructive variant takes the theme from bg-destructive", customMessage: testOutput);
+        plain.ShouldContain("✓ src/components/ui/button/Button.test.ts > the link variant takes the theme from text-primary", customMessage: testOutput);
+        plain.ShouldContain("✓ src/components/ui/button/Button.test.ts > the icon size is size-9", customMessage: testOutput);
         plain.ShouldContain("✓ src/forms/toTypedSchema.test.ts > a schema's messages reach the fields they belong to, nested and listed ones too", customMessage: testOutput);
         plain.ShouldContain("✓ src/forms/toTypedSchema.test.ts > valid values come back as the schema puts them out", customMessage: testOutput);
         plain.ShouldContain("✓ src/pages/SignUpForm.test.ts > an empty sign-up shows the schema messages next to its fields", customMessage: testOutput);
@@ -143,7 +254,16 @@ public sealed partial class VueFormsAndComponentsTests
         // Tailwind compiled the utilities the components use into the stylesheet the build ships.
         var stylesheets = Directory.GetFiles(Path.Combine(app, "dist", "assets"), "*.css");
         stylesheets.ShouldNotBeEmpty();
-        string.Concat(stylesheets.Select(File.ReadAllText)).ShouldContain(".bg-slate-900");
+        var css = string.Concat(stylesheets.Select(File.ReadAllText));
+        css.ShouldContain(".bg-primary{");
+
+        // A component the shadcn-vue CLI adds finds the theme it names: the semantic colours and tw-animate-css.
+        css.ShouldContain(".bg-card{");
+        css.ShouldContain(".text-card-foreground{");
+        css.ShouldContain("--card:");
+        css.ShouldContain("--card-foreground:");
+        css.ShouldContain("@keyframes enter");
+        css.ShouldContain("animate-in");
     }
 
     [Fact]
@@ -168,9 +288,39 @@ public sealed partial class VueFormsAndComponentsTests
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("'@vee-validate/zod' import is restricted from being used by a pattern. Use vee-validate with toTypedSchema from src/forms/toTypedSchema (docs/adr)");
         output.ShouldContain("'@formkit/vue' import is restricted from being used by a pattern. Use vee-validate with toTypedSchema from src/forms/toTypedSchema (docs/adr)");
-        output.ShouldContain("'primevue/button' import is restricted from being used by a pattern. Use Reka UI and the components in src/components/ui (docs/adr)");
-        output.ShouldContain("'vuetify' import is restricted from being used by a pattern. Use Reka UI and the components in src/components/ui (docs/adr)");
-        output.ShouldContain("'element-plus' import is restricted from being used by a pattern. Use Reka UI and the components in src/components/ui (docs/adr)");
+        output.ShouldContain("'primevue/button' import is restricted from being used by a pattern. Use the shadcn-vue components in src/components/ui (docs/adr)");
+        output.ShouldContain("'vuetify' import is restricted from being used by a pattern. Use the shadcn-vue components in src/components/ui (docs/adr)");
+        output.ShouldContain("'element-plus' import is restricted from being used by a pattern. Use the shadcn-vue components in src/components/ui (docs/adr)");
+    }
+
+    [Fact]
+    public void Reka_ui_on_its_own_builds_lints_passes_its_tests_and_refuses_other_component_libraries()
+    {
+        using var project = new GeneratedProject(Profile, RekaUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var app = Path.Combine(web, "app");
+        foreach (var step in new[] { "install", "build" })
+        {
+            var (stepExitCode, stepOutput) = Shell.Run(web, "pnpm", step);
+            stepExitCode.ShouldBe(0, $"pnpm {step}:\n{stepOutput}");
+        }
+
+        var (testExitCode, testOutput) = Shell.Run(app, "pnpm", "test", "--reporter=verbose");
+        project.Write("web/app/src/pages/OtherLibraries.ts", """
+            import Button from 'primevue/button';
+            import { createVuetify } from 'vuetify';
+
+            export const others = [Button, createVuetify];
+            """);
+        var (lintExitCode, lintOutput) = Shell.Run(web, "pnpm", "lint");
+
+        testExitCode.ShouldBe(0, $"pnpm test:\n{testOutput}");
+        var plain = Escapes().Replace(testOutput, string.Empty);
+        plain.ShouldContain("✓ src/components/ui/BaseButton.test.ts > a button is a button with the default look", customMessage: testOutput);
+        plain.ShouldContain("✓ src/components/ui/BaseButton.test.ts > with as-child the child takes the button's look and stays what it is", customMessage: testOutput);
+        lintExitCode.ShouldNotBe(0, lintOutput);
+        lintOutput.ShouldContain("'primevue/button' import is restricted from being used by a pattern. Use Reka UI and the components in src/components/ui (docs/adr)");
+        lintOutput.ShouldContain("'vuetify' import is restricted from being used by a pattern. Use Reka UI and the components in src/components/ui (docs/adr)");
     }
 
     [GeneratedRegex(@"\x1B\[[0-9;]*m")]
