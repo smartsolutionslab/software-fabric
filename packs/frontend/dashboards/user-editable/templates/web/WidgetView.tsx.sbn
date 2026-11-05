@@ -1,17 +1,18 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useGetDashboardsWidgetsByIdQuery, type WidgetTable } from '@/api/generated';
 import { Chart } from '@/components/chart';
 import { DataTable } from '@/components/ui/data-table';
 import { columnsOf } from '@/components/ui/data-table-columns';
 import { chartOption, type ChartVisual } from './chartOption';
+import { Pager } from './Pager';
 
 type Row = Record<string, unknown>;
 
 const rows = columnsOf<Row>();
 const none: Row[] = [];
 
-/** The first page a table widget shows; a chart's query takes no page and ignores it. */
-const firstPage = { page: 1, pageSize: 20 };
+/** How many rows a table widget shows at once; a chart's query takes no page and ignores it. */
+const pageSize = 20;
 
 interface WidgetViewProps {
   source: string;
@@ -22,7 +23,8 @@ interface WidgetViewProps {
 
 /** A widget's data from GET /dashboards/widgets/{id}, run as the signed-in user, drawn as a chart or a table. */
 export function WidgetView({ source, visual, title, height }: WidgetViewProps) {
-  const { data, isError } = useGetDashboardsWidgetsByIdQuery({ id: source, ...firstPage });
+  const [page, setPage] = useState(1);
+  const { data, isError } = useGetDashboardsWidgetsByIdQuery({ id: source, page, pageSize });
   const option = useMemo(
     () => (data?.chart && visual !== 'table' ? chartOption(data.chart, visual as ChartVisual) : undefined),
     [data, visual],
@@ -33,7 +35,12 @@ export function WidgetView({ source, visual, title, height }: WidgetViewProps) {
   }
 
   if (data?.table) {
-    return <WidgetRows table={data.table} />;
+    return (
+      <>
+        <WidgetRows table={data.table} />
+        <Pager label={title} page={page} pageSize={pageSize} total={data.table.totalCount} onPage={setPage} />
+      </>
+    );
   }
 
   if (option) {

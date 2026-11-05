@@ -3,13 +3,17 @@ import { useMemo, useState } from 'react';
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
-import { usePutDashboardsByIdMutation, type WidgetDescriptionDto } from '@/api/generated';
+import { useGetDashboardsWidgetsQuery, usePutDashboardsByIdMutation, type WidgetDescriptionDto } from '@/api/generated';
 import { Button } from '@/components/ui/button';
+import { Failure } from './Failure';
 import { applyLayout, columns, nextPlacement, type Placement, toLayout } from './layout';
+import { Pager } from './Pager';
 import { uuidV7 } from './uuidV7';
 import { WidgetView } from './WidgetView';
 
 const rowHeight = 40;
+const catalogPageSize = 100;
+const noWidgets: WidgetDescriptionDto[] = [];
 
 const visuals = {
   Chart: [
@@ -41,7 +45,6 @@ export interface DraftDashboard {
 
 interface DashboardCanvasProps {
   dashboard: DraftDashboard;
-  catalog: readonly WidgetDescriptionDto[];
   onSaved: () => void;
 }
 
@@ -49,20 +52,37 @@ interface DashboardCanvasProps {
  * One dashboard being edited: its name, the declared widgets on a 12-column grid that the user moves and resizes, and
  * Save, which PUTs the whole dashboard to its id, so saving twice saves it once.
  */
-export function DashboardCanvas({ dashboard, catalog, onSaved }: DashboardCanvasProps) {
+export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   const [placements, setPlacements] = useState<Placement[]>(dashboard.widgets);
   const [outcome, setOutcome] = useState<'saved' | 'failed' | undefined>();
+  const [catalogPage, setCatalogPage] = useState(1);
+  // The titles of widgets added from any page of the catalogue, which the current page may not list.
+  const [addedTitles, setAddedTitles] = useState<ReadonlyMap<string, WidgetDescriptionDto>>(new Map());
+  const widgets = useGetDashboardsWidgetsQuery({ page: catalogPage, pageSize: catalogPageSize });
   const [save, { isLoading: saving }] = usePutDashboardsByIdMutation();
   const { width, containerRef } = useContainerWidth();
-  const titles = useMemo(() => new Map(catalog.map((widget) => [widget.id, widget])), [catalog]);
+  const catalog = widgets.data?.items ?? noWidgets;
+  const titles = useMemo(
+    () => new Map([...addedTitles, ...catalog.map((widget) => [widget.id, widget] as const)]),
+    [addedTitles, catalog],
+  );
+
+  /** Every change to the draft: a notice that it was saved no longer holds. */
+  const change = (next: (current: Placement[]) => Placement[]) => {
+    setPlacements(next);
+    setOutcome(undefined);
+  };
 
   const naming = useForm({ resolver: zodResolver(nameSchema), defaultValues: { name: dashboard.name } });
   const adding = useForm({ resolver: zodResolver(widgetSchema), defaultValues: { source: '', visual: '' } });
   const chosen = titles.get(useWatch({ control: adding.control, name: 'source' }));
 
   const add = adding.handleSubmit(({ source, visual }) => {
-    setPlacements((current) => [...current, nextPlacement(current, uuidV7(), source, visual)]);
-    setOutcome(undefined);
+    const widget = titles.get(source);
+    if (widget) {
+      setAddedTitles((known) => new Map(known).set(source, widget));
+    }
+    change((current) => [...current, nextPlacement(current, uuidV7(), source, visual)]);
     adding.reset();
   });
 
@@ -81,7 +101,10 @@ export function DashboardCanvas({ dashboard, catalog, onSaved }: DashboardCanvas
       <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1 text-sm">
           Dashboard name
-          <input className="rounded border px-2 py-1" {...naming.register('name')} />
+          <input
+            className="rounded border px-2 py-1"
+            {...naming.register('name', { onChange: () => setOutcome(undefined) })}
+          />
         </label>
         <Button type="submit" disabled={saving}>
           Save dashboard
@@ -123,7 +146,21 @@ export function DashboardCanvas({ dashboard, catalog, onSaved }: DashboardCanvas
           Add widget
         </Button>
         {adding.formState.errors.source && <p role="alert">{adding.formState.errors.source.message}</p>}
+        <Pager
+          label="widgets"
+          page={catalogPage}
+          pageSize={catalogPageSize}
+          total={widgets.data?.totalCount ?? 0}
+          onPage={setCatalogPage}
+        />
       </form>
+      {widgets.isError && (
+        <Failure
+          message="The widgets could not be loaded."
+          retry="Try loading the widgets again"
+          onRetry={widgets.refetch}
+        />
+      )}
 
       <div ref={containerRef}>
         <ReactGridLayout
@@ -131,7 +168,12 @@ export function DashboardCanvas({ dashboard, catalog, onSaved }: DashboardCanvas
           layout={toLayout(placements)}
           gridConfig={{ cols: columns, rowHeight }}
           dragConfig={{ cancel: 'button, select, input, table' }}
-          onLayoutChange={(layout) => setPlacements((current) => applyLayout(current, layout))}
+          onLayoutChange={(layout) => {
+            const moved = applyLayout(placements, layout);
+            if (!samePlaces(moved, placements)) {
+              change(() => moved);
+            }
+          }}
         >
           {placements.map((placement) => {
             const title = titles.get(placement.source)?.title ?? placement.source;
@@ -145,7 +187,7 @@ export function DashboardCanvas({ dashboard, catalog, onSaved }: DashboardCanvas
                       variant="ghost"
                       size="sm"
                       aria-label={`Remove ${title}`}
-                      onClick={() => setPlacements((current) => current.filter((other) => other.key !== placement.key))}
+                      onClick={() => change((current) => current.filter((other) => other.key !== placement.key))}
                     >
                       Remove
                     </Button>
@@ -165,6 +207,23 @@ export function DashboardCanvas({ dashboard, catalog, onSaved }: DashboardCanvas
         </ReactGridLayout>
       </div>
     </section>
+  );
+}
+
+/** Whether the grid only re-reported the places the widgets already have, as it does after every render. */
+function samePlaces(left: readonly Placement[], right: readonly Placement[]) {
+  return (
+    left.length === right.length &&
+    left.every((placement, index) => {
+      const other = right[index];
+      return (
+        other !== undefined &&
+        placement.x === other.x &&
+        placement.y === other.y &&
+        placement.width === other.width &&
+        placement.height === other.height
+      );
+    })
   );
 }
 }%}

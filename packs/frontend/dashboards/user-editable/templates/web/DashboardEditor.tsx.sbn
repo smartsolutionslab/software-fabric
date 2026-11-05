@@ -1,19 +1,14 @@
 import { useState } from 'react';
-import {
-  type DashboardSummaryDto,
-  useGetDashboardsByIdQuery,
-  useGetDashboardsQuery,
-  useGetDashboardsWidgetsQuery,
-  type WidgetDescriptionDto,
-} from '@/api/generated';
+import { type DashboardSummaryDto, useGetDashboardsByIdQuery, useGetDashboardsQuery } from '@/api/generated';
 import { Button } from '@/components/ui/button';
 import { DashboardCanvas, type DraftDashboard } from './DashboardCanvas';
+import { Failure } from './Failure';
 import { fromSaved } from './layout';
+import { Pager } from './Pager';
 import { uuidV7 } from './uuidV7';
 
-const firstHundred = { page: 1, pageSize: 100 };
+const pageSize = 100;
 const noDashboards: DashboardSummaryDto[] = [];
-const noWidgets: WidgetDescriptionDto[] = [];
 
 interface Opened {
   id: string;
@@ -22,45 +17,62 @@ interface Opened {
 
 /** The signed-in user's dashboards: open one or start a new one, then edit and save it. */
 export function DashboardEditor() {
-  const { data: list, refetch } = useGetDashboardsQuery(firstHundred);
-  const { data: catalog } = useGetDashboardsWidgetsQuery(firstHundred);
+  const [page, setPage] = useState(1);
+  const dashboards = useGetDashboardsQuery({ page, pageSize });
   const [opened, setOpened] = useState<Opened | undefined>();
-  const { data: saved } = useGetDashboardsByIdQuery(
+  const detail = useGetDashboardsByIdQuery(
     { id: opened?.id ?? '' },
     { skip: !opened || opened.isNew, refetchOnMountOrArgChange: true },
   );
 
+  // A dashboard opened again is edited from what the host answers now, never from the copy cached before a save.
   let draft: DraftDashboard | undefined;
   if (opened?.isNew) {
     draft = { id: opened.id, name: '', widgets: [] };
-  } else if (opened && saved?.id === opened.id) {
-    draft = { id: saved.id, name: saved.name, widgets: fromSaved(saved.widgets) };
+  } else if (opened && !detail.isFetching && detail.data?.id === opened.id) {
+    draft = { id: detail.data.id, name: detail.data.name, widgets: fromSaved(detail.data.widgets) };
   }
 
   return (
     <main className="flex flex-col gap-4 p-4">
       <h1 className="text-xl font-semibold">Dashboards</h1>
       <nav aria-label="Your dashboards" className="flex flex-wrap items-center gap-2">
-        {(list?.items ?? noDashboards).map((dashboard) => (
-          <Button
-            key={dashboard.id}
-            variant="outline"
-            aria-pressed={opened?.id === dashboard.id}
-            onClick={() => setOpened({ id: dashboard.id, isNew: false })}
-          >
-            {dashboard.name}
-          </Button>
-        ))}
+        {dashboards.isError ? (
+          <Failure
+            message="Your dashboards could not be loaded."
+            retry="Try loading your dashboards again"
+            onRetry={dashboards.refetch}
+          />
+        ) : (
+          (dashboards.data?.items ?? noDashboards).map((dashboard) => (
+            <Button
+              key={dashboard.id}
+              variant="outline"
+              aria-pressed={opened?.id === dashboard.id}
+              onClick={() => setOpened({ id: dashboard.id, isNew: false })}
+            >
+              {dashboard.name}
+            </Button>
+          ))
+        )}
         <Button onClick={() => setOpened({ id: uuidV7(), isNew: true })}>New dashboard</Button>
+        <Pager
+          label="your dashboards"
+          page={page}
+          pageSize={pageSize}
+          total={dashboards.data?.totalCount ?? 0}
+          onPage={setPage}
+        />
       </nav>
-      {draft && (
-        <DashboardCanvas
-          key={draft.id}
-          dashboard={draft}
-          catalog={catalog?.items ?? noWidgets}
-          onSaved={() => void refetch()}
+      {opened && !opened.isNew && detail.isError && (
+        <Failure
+          message="This dashboard could not be loaded."
+          retry="Try loading the dashboard again"
+          onRetry={detail.refetch}
         />
       )}
+      {opened && !opened.isNew && !detail.isError && !draft && <p>Loading the dashboard…</p>}
+      {draft && <DashboardCanvas key={draft.id} dashboard={draft} onSaved={() => void dashboards.refetch()} />}
     </main>
   );
 }
