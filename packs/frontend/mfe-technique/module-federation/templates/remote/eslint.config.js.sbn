@@ -22,6 +22,9 @@ export default tseslint.config(
               message:
                 "A remote never imports another module's remote; modules talk through the API and events (docs/adr).",
             },
+{{- if slots["web.restricted-imports"] != "" }}
+            // The libraries the project chose, as in the shell: each bans its alternatives.
+{{ slots["web.restricted-imports"] }},{{ end }}
 {{- if slots["web.remote-restricted-imports"] != "" }}
 {{ slots["web.remote-restricted-imports"] }},{{ end }}
           ],
