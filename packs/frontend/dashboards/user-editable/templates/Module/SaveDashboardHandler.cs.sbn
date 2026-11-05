@@ -120,7 +120,10 @@ public sealed class SaveDashboardHandler(IDashboardStore dashboards, WidgetCatal
                 return DashboardsFailures.InvalidWidget(placement.Key, widget.Kind == WidgetKind.Chart ? "shows a chart: bar, line or pie." : "shows a table: table.");
             }
 
-            if (placement.X < 0 || placement.Y < 0 || placement.Y > 1000 || placement.Width < 1 || placement.Height < 1 || placement.Height > 24 || placement.X + placement.Width > Columns)
+            // Each bound on its own, never a sum: X + Width would wrap around for values near int.MaxValue.
+            var outside = placement.X < 0 || placement.Width < 1 || placement.Width > Columns || placement.X > Columns - placement.Width
+                || placement.Y < 0 || placement.Y > 1000 || placement.Height < 1 || placement.Height > 24;
+            if (outside)
             {
                 return DashboardsFailures.InvalidWidget(placement.Key, $"must lie within the grid's {Columns} columns, at most 24 rows high.");
             }

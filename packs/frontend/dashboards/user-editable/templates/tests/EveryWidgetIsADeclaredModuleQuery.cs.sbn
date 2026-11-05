@@ -24,7 +24,8 @@ public sealed class EveryWidgetIsADeclaredModuleQuery : IArchitectureRule
     {
         {{ not_null "model" }}
 
-        List<string> problems = [];
+        // The building blocks too: a declaration there would belong to no module and be offered by none.
+        List<string> problems = [.. WidgetCatalog.Misplaced(typeof(IModuleWidgets).Assembly)];
         foreach (var assembly in model.ModuleAssemblies)
         {
             problems.AddRange(WidgetCatalog.Misplaced(assembly));

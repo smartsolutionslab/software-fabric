@@ -16,7 +16,7 @@ public static class DashboardWidgetsRegistration
         {{ not_null "services" }}
         {{ not_null "modules" }}
 
-        List<WidgetScan> scans = [];
+        List<WidgetScan> scans = [new WidgetScan([], WidgetCatalog.Misplaced(typeof(IModuleWidgets).Assembly))];
         foreach (var module in modules)
         {
             var api = module.GetType().Assembly;
