@@ -220,8 +220,26 @@ public sealed class AgUiTests
     {
         var files = Files(Profile, Anthropic, AgentFramework, AgUi);
 
-        files[EndToEndScript].ShouldContain("env 'Parameters__model-stand-in=true' dotnet run --project src/AppHost --launch-profile http < /dev/null > \"$log\" 2>&1 &");
-        Files("saas-standard-vue", Anthropic, AgentFramework, AgUi)[EndToEndScript].ShouldContain("env 'Parameters__model-stand-in=true' dotnet run");
+        // The provider's key too, as the AspireFixture gives it: without a value the AppHost waits for its secret parameter
+        // and never starts the host.
+        files[EndToEndScript].ShouldContain("env 'Parameters__anthropic-api-key=not-a-real-key' 'Parameters__model-stand-in=true' dotnet run --project src/AppHost --launch-profile http < /dev/null > \"$log\" 2>&1 &");
+        Files("saas-standard-vue", Anthropic, AgentFramework, AgUi)[EndToEndScript].ShouldContain("'Parameters__model-stand-in=true' dotnet run");
+    }
+
+    [Fact]
+    public void The_end_to_end_script_gives_the_apphost_the_key_shaped_values_the_aspire_fixture_gives_the_model_provider()
+    {
+        foreach (var (provider, values) in new[]
+        {
+            ("backend.llm=openai", "env 'Parameters__openai-api-key=not-a-real-key' 'Parameters__model-stand-in=true' dotnet run"),
+            ("backend.llm=azure-openai", "env 'Parameters__azure-openai-endpoint=https://not-a-real-resource.openai.azure.com' 'Parameters__azure-openai-api-key=not-a-real-key' 'Parameters__model-stand-in=true' dotnet run"),
+        })
+        {
+            Files(Profile, provider, AgentFramework, AgUi)[EndToEndScript].ShouldContain(values, customMessage: provider);
+        }
+
+        // Without the agent panel the script gives the AppHost the provider's key alone.
+        Files(Profile, Anthropic)[EndToEndScript].ShouldContain("env 'Parameters__anthropic-api-key=not-a-real-key' dotnet run --project src/AppHost");
     }
 
     [Fact]
