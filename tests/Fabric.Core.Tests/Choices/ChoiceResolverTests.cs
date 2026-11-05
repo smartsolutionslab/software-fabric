@@ -80,6 +80,16 @@ public class ChoiceResolverTests
     }
 
     [Fact]
+    public void The_vue_profile_forms_with_vee_validate_and_composes_reka_ui_styled_with_tailwind()
+    {
+        var choices = ResolveSuccessfully("saas-standard-vue");
+
+        choices.Project["frontend.forms"].ShouldBe(["vee-validate"]);
+        choices.Project["frontend.ui-library"].ShouldBe(["reka-ui"]);
+        choices.Project["frontend.styling"].ShouldBe(["tailwind"]);
+    }
+
+    [Fact]
     public void Overrides_win_over_the_profile_and_activate_dependent_dimensions()
     {
         var choices = ResolveSuccessfully("lean-crud", "backend.bus.transport=kafka");

@@ -81,6 +81,8 @@ public class CatalogReaderTests
         uiLibraries["shadcn"].Tier.ShouldBe(SupportTier.Supported);
         uiLibraries["shadcn"].Requires.Select(condition => condition.ToString()).ShouldBe(["frontend.framework == react", "frontend.styling == tailwind"]);
         uiLibraries["mui"].Conflicts.Select(condition => condition.ToString()).ShouldBe(["frontend.styling == tailwind"]);
+        uiLibraries["reka-ui"].Requires.Select(condition => condition.ToString()).ShouldBe(["frontend.framework == vue", "frontend.styling == tailwind"]);
+        uiLibraries.ShouldNotContainKey("primevue");
         catalog.Dimensions["module.event-store"].Options["kurrentdb"].Tier.ShouldBe(SupportTier.Experimental);
     }
 

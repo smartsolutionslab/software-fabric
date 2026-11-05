@@ -1,0 +1,20 @@
+import { render, screen } from '@testing-library/vue';
+import { expect, test } from 'vitest';
+import { h } from 'vue';
+import BaseButton from './BaseButton.vue';
+
+test('a button is a button with the default look', () => {
+  render(BaseButton, { slots: { default: 'Save' } });
+
+  expect(screen.getByRole('button', { name: 'Save' })).toHaveClass('bg-slate-900');
+});
+
+test("with as-child the child takes the button's look and stays what it is", () => {
+  render(BaseButton, {
+    props: { asChild: true, variant: 'outline' },
+    slots: { default: () => h('a', { href: '/billing' }, 'Billing') },
+  });
+
+  expect(screen.getByRole('link', { name: 'Billing' })).toHaveClass('border-slate-300');
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+});
