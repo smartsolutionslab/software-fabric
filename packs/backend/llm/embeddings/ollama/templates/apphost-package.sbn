@@ -1,0 +1,2 @@
+{{ if project["backend.llm"] != "ollama" ~}}
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />{{ end }}

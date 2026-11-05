@@ -7,4 +7,8 @@ namespace Fabric.Core.Choices;
 public sealed record ProjectChoices(
     IReadOnlyDictionary<string, IReadOnlyList<string>> Project,
     IReadOnlyDictionary<string, IReadOnlyList<string>> ModuleDefaults,
-    IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> Modules);
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> Modules)
+{
+    /// <summary>The chosen options' settings, keyed <c>&lt;dimension&gt;.&lt;option&gt;.&lt;setting&gt;</c>; empty when no chosen option declares one.</summary>
+    public IReadOnlyDictionary<string, decimal> Settings { get; init; } = new Dictionary<string, decimal>();
+}

@@ -9,7 +9,8 @@ namespace Fabric.Core.Generation;
 
 /// <summary>
 /// <c>fabric.yaml</c>: the record of what a generated project chose. Written once by <c>fabric new</c>, extended by
-/// <c>fabric add-module</c>, and read by agents and tools. Multi-valued dimensions are always lists.
+/// <c>fabric add-module</c>, and read by agents and tools. Multi-valued dimensions are always lists. <c>settings</c>,
+/// the numbers chosen options declare (ADR-0014), appears only when there are any.
 /// </summary>
 public static partial class FabricFile
 {
@@ -33,6 +34,15 @@ public static partial class FabricFile
         }
 
         AppendValues(text, catalog, "project", choices.Project, indent: string.Empty);
+        if (choices.Settings.Count > 0)
+        {
+            text.Append("settings:\n");
+            foreach (var (key, value) in choices.Settings)
+            {
+                text.Append("  ").Append(key).Append(": ").Append(SettingNumber.Format(value)).Append('\n');
+            }
+        }
+
         AppendValues(text, catalog, "module-defaults", choices.ModuleDefaults, indent: string.Empty);
 
         if (choices.Modules.Count == 0)
@@ -73,7 +83,7 @@ public static partial class FabricFile
 
         var source = new YamlSource(sourceName, message => new FabricFileException(message));
         var root = source.Mapping(stream.Documents[0].RootNode, FileName);
-        var fields = source.Fields(root, FileName, "fabric", "name", "profile", "project", "module-defaults", "modules");
+        var fields = source.Fields(root, FileName, "fabric", "name", "profile", "project", "settings", "module-defaults", "modules");
 
         var versionNode = fields.Required("fabric");
         var version = source.Integer(versionNode, "fabric", FileName);
@@ -89,13 +99,26 @@ public static partial class FabricFile
             modules.Add(moduleName, ReadValues(source, value, $"module '{moduleName}'"));
         }
 
+        OrderedDictionary<string, decimal> settings = [];
+        if (fields.Optional("settings") is { } settingsNode)
+        {
+            foreach (var (key, value) in source.Mapping(settingsNode, "'settings'").Children)
+            {
+                var setting = source.Scalar(key, "'settings'");
+                settings.Add(setting, source.Number(value, setting, "'settings'"));
+            }
+        }
+
         return new FabricRecord(
             source.Scalar(fields.Required("name"), FileName),
             fields.Optional("profile") is { } profile ? source.Scalar(profile, FileName) : null,
             new ProjectChoices(
                 ReadValues(source, fields.Required("project"), "'project'"),
                 ReadValues(source, fields.Required("module-defaults"), "'module-defaults'"),
-                modules));
+                modules)
+            {
+                Settings = settings,
+            });
     }
 
     private static void AppendValues(

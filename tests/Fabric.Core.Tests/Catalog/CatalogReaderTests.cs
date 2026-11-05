@@ -17,7 +17,7 @@ public class CatalogReaderTests
 
         catalog.Version.ShouldBe(1);
         catalog.Dimensions.Count.ShouldBe(51);
-        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(139);
+        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(140);
         catalog.Profiles.Keys.ShouldBe(
             ["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud", "saas-strict-react"],
             ignoreOrder: false);
@@ -133,7 +133,7 @@ public class CatalogReaderTests
         extras.ActiveWhen!.ToString().ShouldBe("backend.llm != none");
         extras.Multi.ShouldBeTrue();
         extras.Default.ShouldBe([]);
-        extras.Options.Keys.ShouldBe(["rag"]);
+        extras.Options.Keys.ShouldBe(["rag", "evals"]);
     }
 
     [Fact]
@@ -164,6 +164,64 @@ public class CatalogReaderTests
     public void Every_rag_option_is_experimental_because_it_has_no_pack_yet(string dimension, string option)
     {
         ReadRepositoryCatalog().Dimensions[dimension].Options[option].Tier.ShouldBe(SupportTier.Experimental);
+    }
+
+    [Fact]
+    public void Evals_is_an_extra_with_a_threshold_from_one_to_five_that_defaults_to_four()
+    {
+        var evals = ReadRepositoryCatalog().Dimensions["backend.llm.extras"].Options["evals"];
+
+        evals.Tier.ShouldBe(SupportTier.Experimental);
+        evals.Requires.ShouldBeEmpty();
+        var threshold = evals.Settings.ShouldHaveSingleItem().Value;
+        threshold.Id.ShouldBe("threshold");
+        threshold.Default.ShouldBe(4m);
+        threshold.Minimum.ShouldBe(1m);
+        threshold.Maximum.ShouldBe(5m);
+    }
+
+    [Fact]
+    public void Reads_the_settings_an_option_declares()
+    {
+        var catalog = Read("""
+            version: 1
+            dimensions:
+              x.y:
+                scope: project
+                options:
+                  o:
+                    tier: supported
+                    settings:
+                      threshold: { default: 3.5, minimum: 1, maximum: 5, note: "lowest mean score" }
+                      runs: { default: 2, minimum: 1, maximum: 10 }
+                  p: { tier: supported }
+            """);
+
+        var options = catalog.Dimensions["x.y"].Options;
+        options["o"].Settings.Keys.ShouldBe(["threshold", "runs"], ignoreOrder: false);
+        options["o"].Settings["threshold"].ShouldBe(new OptionSetting("threshold", 3.5m, 1m, 5m, "lowest mean score"));
+        options["o"].Settings["runs"].Note.ShouldBeNull();
+        options["p"].Settings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Rejects_a_setting_that_is_not_a_number()
+    {
+        Should.Throw<CatalogException>(() => Read("""
+            version: 1
+            dimensions:
+              x.y: { scope: project, options: { o: { tier: supported, settings: { threshold: { default: high, minimum: 1, maximum: 5 } } } } }
+            """)).Message.ShouldBe("test.yaml:3: invalid value 'high' for 'default' on setting 'threshold' of option 'x.y.o'; expected a number.");
+    }
+
+    [Fact]
+    public void Rejects_a_setting_without_a_range()
+    {
+        Should.Throw<CatalogException>(() => Read("""
+            version: 1
+            dimensions:
+              x.y: { scope: project, options: { o: { tier: supported, settings: { threshold: { default: 4 } } } } }
+            """)).Message.ShouldBe("test.yaml:3: missing field 'minimum' on setting 'threshold' of option 'x.y.o'.");
     }
 
     [Fact]

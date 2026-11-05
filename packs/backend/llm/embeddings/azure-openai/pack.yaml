@@ -1,0 +1,17 @@
+option: backend.llm.embeddings.azure-openai
+files:
+  - { template: templates/AzureOpenAIEmbeddingGenerator.cs.sbn, target: src/BuildingBlocks/Llm/Wiring/AzureOpenAIEmbeddingGenerator.cs }
+  - { template: templates/AzureOpenAIGeneratesTheProjectsEmbeddings.cs.sbn, target: tests/Architecture.Tests/Rules/AzureOpenAIGeneratesTheProjectsEmbeddings.cs }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-version.sbn }
+  - { slot: buildingblocks.packages, template: templates/buildingblocks-package.sbn }
+  - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 31 }
+  - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 31 }
+  - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: integration-tests.parameters, template: templates/integration-tests-parameters.sbn, order: 1 }
+  - { slot: readme.first-steps, template: templates/first-steps.sbn, order: 1 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "The host's Program.cs calls AddAzureOpenAIEmbeddingGenerator, which registers the Azure OpenAI embedding deployment as the project's IEmbeddingGenerator<string, Embedding<float>> behind logging and OpenTelemetry, against <endpoint>/openai/v1/ with the endpoint, deployment and key the AppHost supplies; a missing endpoint or key fails naming its parameter. No request is sent.", file: templates/AzureOpenAIGeneratesTheProjectsEmbeddings.cs.sbn }
