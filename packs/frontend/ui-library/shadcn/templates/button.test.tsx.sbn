@@ -1,0 +1,45 @@
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, expect, test } from 'vitest';
+import { Button } from './button';
+
+// Vitest runs without globals, so Testing Library cannot register its own cleanup; each test renders one button.
+afterEach(cleanup);
+
+test("a button is a button in the theme's primary colours", () => {
+  render(<Button>Save</Button>);
+
+  expect(screen.getByRole('button', { name: 'Save' })).toHaveClass('bg-primary', 'text-primary-foreground');
+});
+
+test("with asChild the child takes the button's look and stays what it is", () => {
+  render(
+    <Button asChild variant="outline">
+      <a href="/billing">Billing</a>
+    </Button>,
+  );
+
+  expect(screen.getByRole('link', { name: 'Billing' })).toHaveClass('border', 'bg-background');
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+});
+
+test.each([
+  ['destructive', 'bg-destructive'],
+  ['outline', 'bg-background'],
+  ['secondary', 'bg-secondary'],
+  ['ghost', 'hover:bg-accent'],
+  ['link', 'text-primary'],
+] as const)('the %s variant takes the theme from %s', (variant, look) => {
+  render(<Button variant={variant}>Go</Button>);
+
+  expect(screen.getByRole('button', { name: 'Go' })).toHaveClass(look);
+});
+
+test.each([
+  ['sm', 'h-8'],
+  ['lg', 'h-10'],
+  ['icon', 'size-9'],
+] as const)('the %s size is %s', (size, look) => {
+  render(<Button size={size} aria-label="Go" />);
+
+  expect(screen.getByRole('button', { name: 'Go' })).toHaveClass(look);
+});
