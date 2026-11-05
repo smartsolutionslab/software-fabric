@@ -309,7 +309,10 @@ public sealed class DashboardsTests
 
         var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
 
+        // The host refuses to start on the same problems, so a rule that starts it would report them too; the widget
+        // rule must report them itself.
         exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("failed Shop.Architecture.Tests.ArchitectureRulesTests.Rule_holds(rule: \"EveryWidgetIsADeclaredModuleQuery\")", customMessage: output);
         return output;
     }
 
