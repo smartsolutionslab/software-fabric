@@ -1,0 +1,109 @@
+{{~ if project["backend.test.framework"] != "xunit" || project["backend.test.assertions"] != "shouldly" ~}}
+#error The sample agent's tests are written for xUnit and Shouldly only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+using {{ namespace }}.BuildingBlocks.Agents;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Tests.Fakes;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Agents.Tests;
+
+/// <summary>
+/// A query runs the sample agent; the stand-in model asks for a tool call, the tool's query goes through the
+/// dispatcher to its handler, and the agent answers with what the tool said. No test calls a real model.
+/// </summary>
+public sealed class AgentTests
+{
+    [Fact]
+    public async Task A_query_runs_the_agent_whose_tool_call_goes_through_the_dispatcher_and_the_agent_answers_with_its_result()
+    {
+        using var model = new ToolCallingChatClient("count_words", new Dictionary<string, object?> { ["text"] = "one two three" });
+        await using var services = Services(model);
+        var dispatcher = services.GetRequiredService<RecordingDispatcher>();
+
+        var answer = await dispatcher.QueryAsync(new AskAboutWords("How many words are in 'one two three'?"), TestContext.Current.CancellationToken);
+
+        answer.IsSuccess.ShouldBeTrue();
+        answer.Value.ShouldBe("The tool said: 3");
+        dispatcher.Requests.ShouldBe([new AskAboutWords("How many words are in 'one two three'?"), new CountWords("one two three")]);
+        model.Offered[0].ShouldContain("count_words");
+    }
+
+    [Fact]
+    public void A_use_case_is_offered_under_its_name_with_its_record_as_the_input_schema()
+    {
+        var tool = DispatcherTool.For<CountWords>(new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider())), "Counts the words of a text.");
+
+        tool.Name.ShouldBe("count_words");
+        tool.Description.ShouldBe("Counts the words of a text.");
+        var properties = tool.JsonSchema.GetProperty("properties");
+        properties.EnumerateObject().Select(property => property.Name).ShouldBe(["text"]);
+        properties.GetProperty("text").GetProperty("type").GetString().ShouldBe("string");
+    }
+
+    [Fact]
+    public async Task A_failed_result_reaches_the_model_as_its_error_code()
+    {
+        using var model = new ToolCallingChatClient("count_words", new Dictionary<string, object?> { ["text"] = " " });
+        await using var services = Services(model);
+        var dispatcher = services.GetRequiredService<RecordingDispatcher>();
+
+        var answer = await dispatcher.QueryAsync(new AskAboutWords("How many words are in ' '?"), TestContext.Current.CancellationToken);
+
+        answer.Value.ShouldStartWith("The tool said: Failed: samples.nothing-to-count");
+    }
+
+    [Fact]
+    public async Task Arguments_that_do_not_fit_the_request_never_reach_its_handler_and_the_model_is_told()
+    {
+        using var model = new ToolCallingChatClient("count_words", new Dictionary<string, object?> { ["words"] = 3 });
+        await using var services = Services(model);
+        var dispatcher = services.GetRequiredService<RecordingDispatcher>();
+
+        var answer = await dispatcher.QueryAsync(new AskAboutWords("How many words?"), TestContext.Current.CancellationToken);
+
+        answer.Value.ShouldStartWith("The tool said: The arguments are not a CountWords");
+        dispatcher.Requests.ShouldNotContain(request => request is CountWords);
+    }
+{{~ if option ~}}
+
+    [Fact]
+    public async Task An_absent_answer_reaches_the_model_as_null()
+    {
+        using var model = new ToolCallingChatClient("longest_word", new Dictionary<string, object?> { ["text"] = " " });
+        await using var services = Services(model);
+        var dispatcher = services.GetRequiredService<RecordingDispatcher>();
+
+        var answer = await dispatcher.QueryAsync(new AskAboutWords("Which word is the longest in ' '?"), TestContext.Current.CancellationToken);
+
+        answer.Value.ShouldBe("The tool said: null");
+        dispatcher.Requests.ShouldContain(new LongestWord(" "));
+    }
+{{~ end ~}}
+
+    [Fact]
+    public void Only_a_command_or_a_query_becomes_a_tool()
+    {
+        var dispatcher = new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider()));
+
+        var refused = Should.Throw<InvalidOperationException>(() => DispatcherTool.For<NothingToCount>(dispatcher, "Not a use case."));
+
+        refused.Message.ShouldContain("is not a command or a query");
+    }
+
+    /// <summary>What the host provides, with the stand-in model and a dispatcher that keeps what it sends.</summary>
+    private static ServiceProvider Services(IChatClient model) =>
+        new ServiceCollection()
+            .AddSingleton(model)
+            .AddScoped<Dispatcher>()
+            .AddScoped<RecordingDispatcher>(provider => new RecordingDispatcher(provider.GetRequiredService<Dispatcher>()))
+            .AddScoped<IDispatcher>(provider => provider.GetRequiredService<RecordingDispatcher>())
+            .AddScoped<IQueryHandler<AskAboutWords, Result<string, ApiError>>, AskAboutWordsHandler>()
+            .AddScoped<IQueryHandler<CountWords, Result<int, ApiError>>, CountWordsHandler>()
+{{~ if option ~}}
+            .AddScoped<IQueryHandler<LongestWord, Result<Option<string>, ApiError>>, LongestWordHandler>()
+{{~ end ~}}
+            .BuildServiceProvider();
+}

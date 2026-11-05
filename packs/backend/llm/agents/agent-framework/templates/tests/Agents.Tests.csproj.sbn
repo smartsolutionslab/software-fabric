@@ -1,0 +1,21 @@
+{{~ client = array.contains project["backend.mcp"] "client" ~}}
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A sample agent, run by a query through the dispatcher, with a query of its own as its tool: they stand in for a module's. -->
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Agents.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />
+{{~ if client ~}}
+    <ProjectReference Include="../Mcp.TestServer/Mcp.TestServer.csproj" />
+{{~ end ~}}
+    <Compile Include="../Fakes/*.cs" Link="Fakes/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

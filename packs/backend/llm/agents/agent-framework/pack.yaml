@@ -1,0 +1,31 @@
+option: backend.llm.agents.agent-framework
+files:
+  - { template: templates/DispatcherTool.cs.sbn, target: src/BuildingBlocks/Agents/DispatcherTool.cs }
+  - { template: templates/IAgentMcpTools.cs.sbn, target: src/BuildingBlocks/Agents/IAgentMcpTools.cs, when: 'array.contains project["backend.mcp"] "client"' }
+  - { template: templates/AgentMcpTools.cs.sbn, target: src/BuildingBlocks/Agents/AgentMcpTools.cs, when: 'array.contains project["backend.mcp"] "client"' }
+  - { template: templates/AgentMcpToolsRegistration.cs.sbn, target: src/BuildingBlocks/Agents/Wiring/AgentMcpToolsRegistration.cs, when: 'array.contains project["backend.mcp"] "client"' }
+  - { template: templates/tests/ToolCallingChatClient.cs.sbn, target: tests/Fakes/ToolCallingChatClient.cs }
+  - { template: templates/tests/Agents.Tests.csproj.sbn, target: tests/Agents.Tests/Agents.Tests.csproj }
+  - { template: templates/tests/WordsAgent.cs.sbn, target: tests/Agents.Tests/WordsAgent.cs }
+  - { template: templates/tests/AskAboutWords.cs.sbn, target: tests/Agents.Tests/AskAboutWords.cs }
+  - { template: templates/tests/AskAboutWordsHandler.cs.sbn, target: tests/Agents.Tests/AskAboutWordsHandler.cs }
+  - { template: templates/tests/CountWords.cs.sbn, target: tests/Agents.Tests/CountWords.cs }
+  - { template: templates/tests/CountWordsHandler.cs.sbn, target: tests/Agents.Tests/CountWordsHandler.cs }
+  - { template: templates/tests/NothingToCount.cs.sbn, target: tests/Agents.Tests/NothingToCount.cs }
+  - { template: templates/tests/LongestWord.cs.sbn, target: tests/Agents.Tests/LongestWord.cs, when: 'project["backend.absence"] == "option"' }
+  - { template: templates/tests/LongestWordHandler.cs.sbn, target: tests/Agents.Tests/LongestWordHandler.cs, when: 'project["backend.absence"] == "option"' }
+  - { template: templates/tests/RecordingDispatcher.cs.sbn, target: tests/Agents.Tests/RecordingDispatcher.cs }
+  - { template: templates/tests/AgentTests.cs.sbn, target: tests/Agents.Tests/AgentTests.cs }
+  - { template: templates/tests/AgentMcpToolTests.cs.sbn, target: tests/Agents.Tests/AgentMcpToolTests.cs, when: 'array.contains project["backend.mcp"] "client"' }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-version.sbn }
+  - { slot: modules.packages.application, template: templates/application-package.sbn }
+  - { slot: host.services, template: templates/host-services.sbn, order: 30 }
+  - { slot: tests.module-host-services, template: templates/module-host-services.sbn }
+  - { slot: solution.projects, template: templates/solution-projects.sbn }
+  - { slot: readme.sections, template: templates/readme-section.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "A query runs a sample agent against a stand-in model that asks for a tool call; the tool's query goes through the dispatcher to its handler and the agent answers with its result. Arguments that do not fit never reach the handler, a failed Result reaches the model as its error code, and with the MCP client an agent calls a declared server's tool.", file: templates/tests/AgentTests.cs.sbn }

@@ -1,0 +1,27 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.BuildingBlocks.Agents;
+
+/// <summary>
+/// The one way a use case becomes an agent's tool: the tool is the command or query, and a call sends it through
+/// <see cref="IDispatcher"/>, exactly as an endpoint does. The architecture rule AgentToolsGoThroughTheDispatcher fails
+/// a module that makes a tool any other way.
+/// </summary>
+public static class DispatcherTool
+{
+    /// <summary>
+    /// The command or query <typeparamref name="TRequest"/> as a tool named after it in snake case
+    /// (<c>FindInvoice</c> becomes <c>find_invoice</c>), with the record as its input schema.
+    /// </summary>
+    /// <param name="dispatcher">Sends each call's request to its handler.</param>
+    /// <param name="description">What the use case does, for the model: it reads this to decide when to call the tool.</param>
+    public static AIFunction For<TRequest>(IDispatcher dispatcher, string description)
+        where TRequest : class
+    {
+        {{ not_null "dispatcher" }}
+        {{ not_blank "description" }}
+
+        throw new NotImplementedException($"{typeof(TRequest).Name} does not become a tool yet.");
+    }
+}
