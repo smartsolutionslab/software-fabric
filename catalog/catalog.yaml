@@ -518,6 +518,22 @@ dimensions:
         requires: ["frontend.framework == react"]
       chartjs: { tier: experimental }
 
+  frontend.dashboards:
+    scope: project
+    multi: true
+    active-when: "backend.auth != none"
+    default: []
+    note: "Empty: no dashboards. A dashboard is saved per user and tenant, and shows only the widgets the modules declare. ADR-0015."
+    options:
+      user-editable:
+        tier: experimental
+        note: "users arrange, resize and save widgets on dashboards of their own"
+        requires: ["backend.errors == result", "backend.data-access == ef-core", "backend.database == postgres"]
+      generative:
+        tier: experimental
+        note: "an agent creates or changes widgets on request, from the same declared widgets (#185)"
+        requires: ["frontend.dashboards has user-editable", "backend.llm.agents == agent-framework"]
+
   frontend.realtime:
     scope: project
     default: none
