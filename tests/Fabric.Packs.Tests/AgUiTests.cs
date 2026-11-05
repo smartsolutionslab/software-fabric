@@ -209,7 +209,9 @@ public sealed class AgUiTests
     {
         var files = Files(Profile, Anthropic, AgentFramework, AgUi);
 
-        files["web/app/eslint.config.js"].ShouldContain("{ group: ['@copilotkit/*'], message: 'Talk to the agents through the AgentPanel in src/agents, on @ag-ui/client (docs/adr).' }");
+        // Prettier wraps the entry (printWidth 120), so its group and message are on lines of their own.
+        files["web/app/eslint.config.js"].ShouldContain("group: ['@copilotkit/*'],");
+        files["web/app/eslint.config.js"].ShouldContain("message: 'Talk to the agents through the AgentPanel in src/agents, on @ag-ui/client (docs/adr).',");
         files["web/app/eslint.config.js"].ShouldNotContain("'@ag-ui/*'");
     }
 
