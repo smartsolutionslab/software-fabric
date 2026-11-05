@@ -1,0 +1,11 @@
+{{~ policies = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+## Dashboards: user-editable
+
+- Users save dashboards of their own in the `dashboards` module, which the dashboards choice brings (`fabric add-module` refuses that name). A dashboard is its owner's alone{{ if project["backend.tenancy"] != "none" }}, inside their tenant{{ end }}: every read filters by the owner from `ICurrentUser`, never by an id alone.
+- A dashboard shows only widgets a module declares. To offer one, implement `IModuleWidgets` (`{{ namespace }}.BuildingBlocks.Dashboards`) once in the module's Application project and declare each widget there: `.Chart("monthly-revenue", "Monthly revenue", () => new MonthlyRevenue())` for a query answering `Result<ChartSeries, ApiError>`, `.Table<OpenInvoices, OpenInvoiceRow>("open-invoices", "Open invoices", (page, pageSize) => new OpenInvoices(page, pageSize))` for one answering `Result<PagedResult<OpenInvoiceRow>, ApiError>`. `Modules/Dashboards/Dashboards.Application/DashboardsWidgets.cs` shows the shape.
+- A widget's query takes no arguments but the page; never let a dashboard, a request or a model choose what it reads. Never add an endpoint or a handler that runs a query named by the caller: `GET /dashboards/widgets/{id}` is the only way a widget runs, and it runs only declared ones.
+{{~ if policies ~}}
+- A widget runs through the dispatcher, not through the endpoint that guards the same query, so a widget whose data needs a permission names its module's policy: `.Chart(..., () => new MonthlyRevenue(), BillingPolicyNames.Manage)`. A caller without it neither sees nor runs the widget.
+{{~ end ~}}
+- A widget whose query is not one of its module's Application queries with exactly one handler, a repeated id{{ if policies }}, a policy its module does not register{{ end }}, or an `IModuleWidgets` outside an Application project fails the architecture rule `EveryWidgetIsADeclaredModuleQuery` and stops the host.
+- Saving is `PUT /dashboards/{id}` with an id the client chose (`Guid.CreateVersion7()` in .NET, a v7 UUID in the browser), removing is `DELETE`; both can be retried. Never add a `POST` that creates a dashboard.

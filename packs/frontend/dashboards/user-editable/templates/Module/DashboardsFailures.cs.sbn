@@ -1,0 +1,21 @@
+namespace {{ namespace }}.Modules.Dashboards.Application;
+
+/// <summary>Everything a dashboards use case refuses, each with its own code.</summary>
+public static class DashboardsFailures
+{
+    public static ApiError NotSignedIn() => new NotSignedIn();
+
+    public static ApiError InvalidId() => new InvalidDashboardId();
+
+    public static ApiError InvalidName(int maximum) => new InvalidDashboardName(maximum);
+
+    public static ApiError TooManyWidgets(int maximum) => new TooManyWidgets(maximum);
+
+    public static ApiError InvalidWidget(string key, string reason) => new InvalidWidget(key, reason);
+
+    public static ApiError UnknownWidget(string source) => new UnknownWidget(source);
+
+    public static ApiError NotFound(Guid id) => new DashboardNotFound(id);
+
+    public static ApiError WidgetNotFound(string id) => new WidgetNotFound(id);
+}

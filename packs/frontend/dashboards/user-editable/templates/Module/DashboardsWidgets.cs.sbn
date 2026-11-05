@@ -1,0 +1,22 @@
+using {{ namespace }}.BuildingBlocks.Dashboards;
+using {{ namespace }}.Modules.Dashboards.Application.DTOs;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.CountWidgets;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.ListDashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Application;
+
+/// <summary>
+/// The widgets this module offers, as an example of the shape: every module declares its own in one class like this,
+/// and a dashboard can show nothing else.
+/// </summary>
+public sealed class DashboardsWidgets : IModuleWidgets
+{
+    public void Declare(WidgetCatalogBuilder widgets)
+    {
+        {{ not_null "widgets" }}
+
+        widgets
+            .Table<ListDashboards, DashboardSummaryDto>("my-dashboards", "My dashboards", (page, pageSize) => new ListDashboards(page, pageSize))
+            .Chart("widget-counts", "Widgets per dashboard", () => new CountWidgets());
+    }
+}

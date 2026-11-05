@@ -1,0 +1,7 @@
+using {{ namespace }}.BuildingBlocks.Dashboards;
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Queries.CountWidgets;
+
+/// <summary>How many widgets each of the caller's first dashboards holds: the sample chart widget.</summary>
+public sealed record CountWidgets : IQuery<Result<ChartSeries, ApiError>>;

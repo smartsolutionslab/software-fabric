@@ -1,0 +1,23 @@
+{{~ option = project["backend.absence"] == "option" ~}}
+using {{ namespace }}.Modules.Dashboards.Domain;
+
+namespace {{ namespace }}.Modules.Dashboards.Application;
+
+/// <summary>The dashboards table, one owner's rows at a time; implemented in the module's Infrastructure project.</summary>
+public interface IDashboardStore
+{
+    /// <summary>The owner's dashboard, tracked so that <see cref="SaveAsync"/> saves what a command changes.</summary>
+    Task<{{ if option }}Option<Dashboard>{{ else }}Dashboard?{{ end }}> FindAsync(Guid id, string owner, CancellationToken cancellationToken);
+
+    /// <summary>The owner's dashboard as it is stored, for a query: nothing that changes it is saved.</summary>
+    Task<{{ if option }}Option<Dashboard>{{ else }}Dashboard?{{ end }}> ReadAsync(Guid id, string owner, CancellationToken cancellationToken);
+
+    /// <summary>One page of the owner's dashboards, by name, for a query.</summary>
+    Task<PagedResult<Dashboard>> ListAsync(string owner, Page page, PageSize pageSize, CancellationToken cancellationToken);
+
+    void Add(Dashboard dashboard);
+
+    void Remove(Dashboard dashboard);
+
+    Task SaveAsync(CancellationToken cancellationToken);
+}

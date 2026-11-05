@@ -5,7 +5,7 @@ using Fabric.Core.Generation;
 namespace Fabric.Packs.Tests;
 
 /// <summary>
-/// <c>frontend.dashboards: [user-editable]</c> (ADR-0014): users arrange and save widgets on dashboards of their own,
+/// <c>frontend.dashboards: [user-editable]</c> (ADR-0015): users arrange and save widgets on dashboards of their own,
 /// per user and tenant. The pack brings a <c>dashboards</c> module (CRUD, logical CQRS) that stores them; every module
 /// declares the queries that may become widgets in one typed <c>IModuleWidgets</c> list, and nothing else is reachable
 /// from a dashboard. A widget's query runs through the dispatcher as the calling user.

@@ -1,0 +1,23 @@
+using {{ namespace }}.BuildingBlocks.Api;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.ListWidgets;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.RunWidget;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+
+namespace {{ namespace }}.Modules.Dashboards.Api.Endpoints;
+
+/// <summary>The widgets the modules declare that the caller may see, and running one of them as the caller.</summary>
+public sealed class WidgetEndpoints : IEndpoint
+{
+    public void Map(IEndpointRouteBuilder endpoints)
+    {
+        {{ not_null "endpoints" }}
+
+        endpoints.MapGet("/widgets", async (Page page, PageSize pageSize, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+            (await dispatcher.QueryAsync(new ListWidgets(page, pageSize), cancellationToken)).ToHttpResult());
+        endpoints.MapGet("/widgets/{id}", async (string id, Page page, PageSize pageSize, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+            (await dispatcher.QueryAsync(new RunWidget(id, page, pageSize), cancellationToken)).ToHttpResult());
+    }
+}

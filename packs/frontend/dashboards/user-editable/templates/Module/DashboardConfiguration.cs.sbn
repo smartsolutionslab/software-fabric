@@ -1,0 +1,32 @@
+using {{ namespace }}.Modules.Dashboards.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace {{ namespace }}.Modules.Dashboards.Infrastructure.Persistence.Configurations;
+
+/// <summary>One row per dashboard; its widgets are one JSON document, saved and read with it.</summary>
+public sealed class DashboardConfiguration : IEntityTypeConfiguration<Dashboard>
+{
+    public void Configure(EntityTypeBuilder<Dashboard> builder)
+    {
+        {{ not_null "builder" }}
+
+        builder.ToTable("dashboards");
+        builder.HasKey(dashboard => dashboard.Id);
+        builder.Property(dashboard => dashboard.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(dashboard => dashboard.Owner).HasColumnName("owner").HasMaxLength(255).IsRequired();
+        builder.Property(dashboard => dashboard.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
+        builder.HasIndex(dashboard => dashboard.Owner);
+        builder.OwnsMany(dashboard => dashboard.Widgets, widgets =>
+        {
+            widgets.ToJson("widgets");
+            widgets.Property(widget => widget.Key).HasJsonPropertyName("key");
+            widgets.Property(widget => widget.Source).HasJsonPropertyName("source");
+            widgets.Property(widget => widget.Visual).HasJsonPropertyName("visual");
+            widgets.Property(widget => widget.X).HasJsonPropertyName("x");
+            widgets.Property(widget => widget.Y).HasJsonPropertyName("y");
+            widgets.Property(widget => widget.Width).HasJsonPropertyName("width");
+            widgets.Property(widget => widget.Height).HasJsonPropertyName("height");
+        });
+    }
+}

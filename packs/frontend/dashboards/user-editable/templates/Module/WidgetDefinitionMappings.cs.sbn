@@ -1,0 +1,12 @@
+using {{ namespace }}.BuildingBlocks.Dashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.DTOs;
+
+public static class WidgetDefinitionMappings
+{
+    public static WidgetDescriptionDto ToDto(this WidgetDefinition widget)
+    {
+        {{ not_null "widget" }}
+        return new WidgetDescriptionDto(widget.Id, widget.Title, widget.Kind);
+    }
+}

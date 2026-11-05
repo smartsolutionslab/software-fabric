@@ -1,0 +1,6 @@
+namespace {{ namespace }}.BuildingBlocks.Dashboards;
+
+/// <summary>What a chart widget's query answers: the categories along one axis and a named series of values for each.</summary>
+/// <param name="Categories">The labels the values belong to, e.g. the months.</param>
+/// <param name="Series">One entry per line, bar group or pie; each has one value per category.</param>
+public sealed record ChartSeries(IReadOnlyList<string> Categories, IReadOnlyList<ChartValues> Series);

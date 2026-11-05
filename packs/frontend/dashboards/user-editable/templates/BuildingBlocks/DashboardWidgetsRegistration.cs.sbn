@@ -1,0 +1,45 @@
+{{~ policies = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+using {{ namespace }}.BuildingBlocks.Dashboards;
+using {{ namespace }}.BuildingBlocks.Identity;
+using {{ namespace }}.BuildingBlocks.Modules;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class DashboardWidgetsRegistration
+{
+    /// <summary>
+    /// The widgets every module declares in its <see cref="IModuleWidgets"/>, and the current user they are run for. A
+    /// widget that is not a valid declared module query stops the host, naming it.
+    /// </summary>
+    public static IServiceCollection AddDashboardWidgets(this IServiceCollection services, IReadOnlyList<IModule> modules)
+    {
+        {{ not_null "services" }}
+        {{ not_null "modules" }}
+
+        List<WidgetScan> scans = [];
+        foreach (var module in modules)
+        {
+            var api = module.GetType().Assembly;
+            var name = api.GetName().Name!;
+            name = name[..name.LastIndexOf('.')];
+            var application = ModuleAssemblies.Of(module, "Application");
+            scans.Add(WidgetCatalog.Scan(name[(name.LastIndexOf('.') + 1)..], application{{ if policies }}, api{{ end }}));
+            scans.Add(new WidgetScan([], [.. WidgetCatalog.Misplaced(api), .. WidgetCatalog.Misplaced(ModuleAssemblies.Of(module, "Infrastructure"))]));
+        }
+
+        List<string> problems = [.. scans.SelectMany(scan => scan.Problems)];
+        if (problems.Count > 0)
+        {
+            throw new InvalidOperationException($"The modules declare widgets that cannot be on a dashboard:{Environment.NewLine}{string.Join(Environment.NewLine, problems)}");
+        }
+
+        services.AddHttpContextAccessor();
+{{~ if policies ~}}
+        services.AddAuthorizationCore();
+{{~ end ~}}
+        return services
+            .AddSingleton(new WidgetCatalog([.. scans.SelectMany(scan => scan.Widgets)]))
+            .AddScoped<IWidgetAccess, WidgetAccess>()
+            .AddScoped<ICurrentUser, HttpCurrentUser>();
+    }
+}

@@ -1,0 +1,12 @@
+using {{ namespace }}.Modules.Dashboards.Domain;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.DTOs;
+
+public static class DashboardWidgetMappings
+{
+    public static DashboardWidgetDto ToDto(this DashboardWidget widget)
+    {
+        {{ not_null "widget" }}
+        return new DashboardWidgetDto(widget.Key, widget.Source, widget.Visual, widget.X, widget.Y, widget.Width, widget.Height);
+    }
+}

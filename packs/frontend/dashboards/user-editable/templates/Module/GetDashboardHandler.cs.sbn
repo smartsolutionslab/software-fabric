@@ -1,0 +1,50 @@
+{{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+{{~ func ok(type, value)
+  if typed
+    ret "Success(" + value + ")"
+  end
+  ret "Result<" + type + ", ApiError>.Success(" + value + ")"
+end ~}}
+{{~ func fail(type, error)
+  if typed
+    ret "Failure(" + error + ")"
+  end
+  ret "Result<" + type + ", ApiError>.Failure(" + error + ")"
+end ~}}
+using {{ namespace }}.BuildingBlocks.Identity;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Application.DTOs;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Queries.GetDashboard;
+
+public sealed class GetDashboardHandler(IDashboardStore dashboards, ICurrentUser user) : IQueryHandler<GetDashboard, Result<DashboardDto, ApiError>>
+{
+    public async Task<Result<DashboardDto, ApiError>> HandleAsync(GetDashboard query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        if (user.Subject is not { } owner)
+        {
+            return {{ fail "DashboardDto" "DashboardsFailures.NotSignedIn()" }};
+        }
+
+{{~ if option ~}}
+        var found = await dashboards.ReadAsync(query.Id, owner, cancellationToken);
+        if (!found.HasValue)
+        {
+            return {{ fail "DashboardDto" "DashboardsFailures.NotFound(query.Id)" }};
+        }
+
+        return {{ ok "DashboardDto" "found.Value.ToDashboardDto()" }};
+{{~ else ~}}
+        var dashboard = await dashboards.ReadAsync(query.Id, owner, cancellationToken);
+        if (dashboard is null)
+        {
+            return {{ fail "DashboardDto" "DashboardsFailures.NotFound(query.Id)" }};
+        }
+
+        return {{ ok "DashboardDto" "dashboard.ToDashboardDto()" }};
+{{~ end ~}}
+    }
+}

@@ -1,0 +1,9 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Commands.SaveDashboard;
+
+/// <summary>
+/// Creates the caller's dashboard with this id, or replaces it: the client chooses the id (a Guid v7), so sending the
+/// same request twice saves the same dashboard once, and a retried PUT cannot apply twice.
+/// </summary>
+public sealed record SaveDashboard(Guid Id, string Name, IReadOnlyList<WidgetPlacement> Widgets) : ICommand<Result<Guid, ApiError>>;
