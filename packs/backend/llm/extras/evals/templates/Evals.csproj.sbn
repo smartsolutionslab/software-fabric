@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The evals: the project's LLM use cases, answered by its own model and judged by it, against the threshold in
+    fabric.yaml. They call the real model, so the regular tests never run this project (its name does not end in
+    .Tests); .github/workflows/evals.yml does.
+  -->
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Evals</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI.Evaluation" />
+    <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" />
+    <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Reporting" />
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />
+  </ItemGroup>
+
+</Project>

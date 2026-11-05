@@ -1,0 +1,2 @@
+  <Project Path="tests/Evals/Evals.csproj" />
+  <Project Path="tests/Evals.Tests/Evals.Tests.csproj" />

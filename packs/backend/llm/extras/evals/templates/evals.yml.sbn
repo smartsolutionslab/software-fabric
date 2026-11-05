@@ -1,0 +1,65 @@
+{{~ provider = project["backend.llm"] ~}}
+{{~ if provider != "anthropic" && provider != "openai" && provider != "azure-openai" && provider != "ollama" ~}}
+#error The evals workflow knows the providers anthropic, openai, azure-openai and ollama; this one has no branch here yet (docs/adr/0006 of the generator).
+{{~ end ~}}
+name: evals
+
+# The evals score the project's LLM use cases with its own model (docs/adr, tests/Evals). They are off by default: a
+# run costs money and sends the examples and the answers to the provider. Run them by hand from the Actions tab, or set
+# the repository variable EVALS_SCHEDULED to true for the weekly run. The regular CI never runs them.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1"
+
+jobs:
+  evals:
+{%{    if: github.event_name != 'schedule' || vars.EVALS_SCHEDULED == 'true'}%}
+    runs-on: ubuntu-latest
+{{~ if provider == "ollama" ~}}
+    # The Ollama server at the version the AppHost runs; no key.
+    services:
+      ollama:
+        image: ollama/ollama:0.34.4
+        ports:
+          - 11434:11434
+    env:
+      Ollama__Endpoint: http://localhost:11434
+      Ollama__Model: llama3.2:1b
+{{~ else ~}}
+    # The key is the repository secret named after the provider, passed to the AppHost's parameter.
+    env:
+{{~ if provider == "anthropic" ~}}
+{%{      Parameters__anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}}%}
+{{~ else if provider == "openai" ~}}
+{%{      Parameters__openai-api-key: ${{ secrets.OPENAI_API_KEY }}}%}
+{{~ else if provider == "azure-openai" ~}}
+{%{      Parameters__azure-openai-api-key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      Parameters__azure-openai-endpoint: ${{ vars.AZURE_OPENAI_ENDPOINT }}}%}
+{{~ end ~}}
+{{~ end ~}}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+{{~ if provider == "ollama" ~}}
+      # The service may still be starting: retry until the server answers, then wait for the whole pull.
+      - name: Pull the model
+        run: |
+          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused http://localhost:11434/api/pull -d "{\"model\": \"$Ollama__Model\", \"stream\": false}"
+{{~ end ~}}
+      - run: dotnet build tests/Evals/Evals.csproj -c Release
+      - name: Evaluate
+        run: dotnet test --project tests/Evals/Evals.csproj -c Release --no-build
+      # The report shows every score, passing or not.
+      - name: Report
+{%{        if: ${{ !cancelled() && hashFiles('TestResults/evals/**') != '' }}}%}
+        run: |
+          dotnet tool restore
+          dotnet aieval report --path TestResults/evals --output TestResults/evals/report.html
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+{%{        if: ${{ !cancelled() && hashFiles('TestResults/evals/**') != '' }}}%}
+        with:
+          name: evals
+          path: TestResults/evals

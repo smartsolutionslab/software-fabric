@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The evals' gate: the eval code of tests/Evals, referenced with everything that project references, run with a
+    stand-in model and the fake judge. It never runs tests/Evals' own test against the real model, and calls no model,
+    so the regular tests run it.
+  -->
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Evals.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Evals/Evals.csproj" />
+    <Compile Include="../Fakes/*.cs" Link="Fakes/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

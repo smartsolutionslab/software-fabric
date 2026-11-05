@@ -110,6 +110,7 @@ Templates are [Scriban](https://github.com/scriban/scriban).
 | `namespace` | The same in PascalCase (`SmartShop`), for C# namespaces |
 | `project["<dimension>"]` | The project's choice: a string, or a list for multi-valued dimensions |
 | `module_defaults["<dimension>"]` | What new modules start from |
+| `settings["<dimension>.<option>.<setting>"]` | A chosen option's setting, a number: the value `fabric.yaml` records, the declared default unless set (`settings["backend.llm.extras.evals.threshold"]` is `4`). Only chosen options' settings are present (ADR-0014) |
 | `modules` | List of `{ name, namespace, values }` |
 | `module` | `{ name, namespace, values }` — per-module files only |
 | `slots["<slot>"]` | The slot's contributions in order, joined by its separator — files only, not slot contributions |

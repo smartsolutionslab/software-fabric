@@ -1,0 +1,73 @@
+{{~ provider = project["backend.llm"] ~}}
+{{~ if provider != "anthropic" && provider != "openai" && provider != "azure-openai" && provider != "ollama" ~}}
+#error The evals know the providers anthropic, openai, azure-openai and ollama; this one has no branch here yet (docs/adr/0006 of the generator).
+{{~ end ~}}
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Evals;
+
+/// <summary>
+/// The project's own model, registered as the host registers it, for the evals to answer with and to judge with.
+{{~ if provider == "ollama" ~}}
+/// The Ollama server and the model come from <c>Ollama__Endpoint</c> and <c>Ollama__Model</c> when set, and otherwise
+/// are a server on this machine's default port and the model the AppHost pulls; the evals workflow runs that server.
+{{~ else ~}}
+/// Its values are the AppHost's parameters, read from the AppHost's user secrets (dotnet user-secrets set
+/// Parameters:... --project src/AppHost) and from the environment (<c>Parameters__...</c>, as the evals workflow sets
+/// them); a parameter not set takes the AppHost's default, and a missing key fails naming its parameter.
+{{~ end ~}}
+/// </summary>
+public static class ProjectModel
+{
+    public static ServiceProvider Services()
+    {
+        var parameters = new ConfigurationBuilder()
+            .AddUserSecrets("fabric-{{ name }}-apphost")
+            .AddEnvironmentVariables()
+            .Build();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+{{~ if provider == "anthropic" ~}}
+                ["Anthropic:ApiKey"] = Parameter(parameters, "anthropic-api-key", string.Empty),
+                ["Anthropic:Model"] = Parameter(parameters, "anthropic-model", "claude-haiku-5-5"),
+{{~ else if provider == "openai" ~}}
+                ["OpenAI:ApiKey"] = Parameter(parameters, "openai-api-key", string.Empty),
+                ["OpenAI:Model"] = Parameter(parameters, "openai-model", "gpt-5-mini"),
+{{~ else if provider == "azure-openai" ~}}
+                ["AzureOpenAI:Endpoint"] = Parameter(parameters, "azure-openai-endpoint", string.Empty),
+                ["AzureOpenAI:Deployment"] = Parameter(parameters, "azure-openai-deployment", "gpt-5-mini"),
+                ["AzureOpenAI:ApiKey"] = Parameter(parameters, "azure-openai-api-key", string.Empty),
+{{~ else if provider == "ollama" ~}}
+                ["Ollama:Endpoint"] = Value(parameters, "Ollama:Endpoint", "http://localhost:11434"),
+                ["Ollama:Model"] = Value(parameters, "Ollama:Model", "llama3.2:1b"),
+{{~ end ~}}
+            })
+            .Build();
+
+        var services = new ServiceCollection().AddLogging();
+{{~ if provider == "anthropic" ~}}
+        services.AddAnthropicChatClient(configuration);
+{{~ else if provider == "openai" ~}}
+        services.AddOpenAIChatClient(configuration);
+{{~ else if provider == "azure-openai" ~}}
+        services.AddAzureOpenAIChatClient(configuration);
+{{~ else if provider == "ollama" ~}}
+        services.AddOllamaChatClient(configuration);
+{{~ end ~}}
+        return services.BuildServiceProvider();
+    }
+{{~ if provider == "ollama" ~}}
+
+    /// <summary>The configured value, or what the AppHost gives the host: its server's default port and its model.</summary>
+    private static string Value(IConfiguration configuration, string key, string fallback) =>
+        configuration[key] is { Length: > 0 } value ? value : fallback;
+{{~ else ~}}
+
+    /// <summary>The AppHost's parameter, or its default: empty for one without a default, which the client then reports.</summary>
+    private static string Parameter(IConfiguration configuration, string parameter, string fallback) =>
+        configuration[$"Parameters:{parameter}"] is { Length: > 0 } value ? value : fallback;
+{{~ end ~}}
+}
