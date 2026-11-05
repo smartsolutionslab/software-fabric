@@ -33,11 +33,6 @@ internal sealed class UseCaseFunction : AIFunction
         Converters = { new OptionJsonConverterFactory() },
 {{~ end ~}}
     };
-{{~ if option ~}}
-
-    /// <summary>An <see cref="Option{T}"/> is offered as its value's schema or null: the converter is opaque to schema generation.</summary>
-    private static readonly AIJsonSchemaCreateOptions Schemas = new() { TransformSchemaNode = ValueOrNull };
-{{~ end ~}}
 
     private readonly Type request;
     private readonly Type result;
@@ -58,7 +53,7 @@ internal sealed class UseCaseFunction : AIFunction
         readsOnly = contracts[0].GetGenericTypeDefinition() == typeof(IQuery<>);
         Name = SnakeCase(request.Name);
         Description = description;
-        JsonSchema = AIJsonUtilities.CreateJsonSchema(request, serializerOptions: Json{{ if option }}, inferenceOptions: Schemas{{ end }});
+        JsonSchema = AIJsonUtilities.CreateJsonSchema(request, serializerOptions: Json{{ if option }}, inferenceOptions: Schemas(new HashSet<Type>()){{ end }});
     }
 
     public override string Name { get; }
@@ -118,16 +113,24 @@ internal sealed class UseCaseFunction : AIFunction
     }
 
 {{~ if option ~}}
+    /// <summary>
+    /// Offers an <see cref="Option{T}"/> as its value's schema or null, which the converter, opaque to schema generation,
+    /// does not. <paramref name="expanding"/> holds the values whose schema is being written, so a request that contains
+    /// itself as an option ends there, unconstrained, instead of recursing for ever.
+    /// </summary>
+    private static AIJsonSchemaCreateOptions Schemas(IReadOnlySet<Type> expanding) =>
+        new() { TransformSchemaNode = (context, schema) => ValueOrNull(context.TypeInfo.Type, schema, expanding) };
+
     /// <summary>The schema of an <see cref="Option{T}"/>: its value's, or null (<c>{"type": ["integer", "null"]}</c>).</summary>
-    private static JsonNode ValueOrNull(AIJsonSchemaCreateContext context, JsonNode schema)
+    private static JsonNode ValueOrNull(Type type, JsonNode schema, IReadOnlySet<Type> expanding)
     {
-        var type = context.TypeInfo.Type;
-        if (!type.IsGenericType || type.GetGenericTypeDefinition() != typeof(Option<>))
+        if (!type.IsGenericType || type.GetGenericTypeDefinition() != typeof(Option<>) || expanding.Contains(type.GetGenericArguments()[0]))
         {
             return schema;
         }
 
-        var value = JsonSerializer.SerializeToNode(AIJsonUtilities.CreateJsonSchema(type.GetGenericArguments()[0], serializerOptions: Json, inferenceOptions: Schemas))!;
+        var valueType = type.GetGenericArguments()[0];
+        var value = JsonSerializer.SerializeToNode(AIJsonUtilities.CreateJsonSchema(valueType, serializerOptions: Json, inferenceOptions: Schemas(new HashSet<Type>(expanding) { valueType })))!;
         if (value is JsonObject valueSchema && valueSchema["type"] is JsonValue single && single.GetValueKind() == JsonValueKind.String)
         {
             valueSchema["type"] = new JsonArray(single.GetValue<string>(), "null");
