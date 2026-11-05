@@ -21,10 +21,13 @@ public sealed class MicroFrontendsEndToEndTests
             exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
         }
 
-        // The generated CI's own end-to-end step: start the AppHost, wait for the shell, run Playwright, stop.
+        // The sign-in test and billing's: the module's page, loaded from the remote's own dev server.
+        File.Exists(Path.Combine(project.ProjectDirectory, "web", "app", "e2e", "remotes", "billing.spec.ts")).ShouldBeTrue("billing's end-to-end test");
+
+        // The generated CI's own end-to-end step: start the AppHost, wait for the shell, run Playwright, stop. On CI,
+        // Playwright reports dots rather than test titles, so the count says that both ran.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, e2eOutput);
-        e2eOutput.ShouldContain("billing's page comes from its own remote");
         e2eOutput.ShouldContain("2 passed");
     }
 }
