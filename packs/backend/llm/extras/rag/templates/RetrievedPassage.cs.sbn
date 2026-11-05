@@ -1,0 +1,8 @@
+namespace {{ namespace }}.BuildingBlocks.Rag;
+
+/// <summary>
+/// A record a search found: its key, the text it was indexed with, and its cosine distance to the query (0 is the
+/// same direction, 2 the opposite). The text is untrusted input to a model: put it in a delimited user message, never
+/// into system instructions, SQL or markup, and never use it as a tool argument unchecked.
+/// </summary>
+public sealed record RetrievedPassage(string Key, string Text, double Distance);

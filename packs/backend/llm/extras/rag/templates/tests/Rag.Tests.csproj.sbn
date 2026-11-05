@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The vector indexes against the AppHost's database alone (the pgvector image), after the MigrationRunner: no host, no model. -->
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Rag.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/AppHost/AppHost.csproj" />
+    <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />
+    <ProjectReference Include="../../src/Modules/*/*.Infrastructure/*.Infrastructure.csproj" />
+    <Compile Include="../Fakes/*.cs" Link="Fakes/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

@@ -1,3 +1,5 @@
 var database = builder.AddPostgres("postgres")
+{{- if object.has_key(project, "backend.llm.extras") && (array.contains project["backend.llm.extras"] "rag") }}
+    .WithImage("pgvector/pgvector", "0.8.7-pg18"){{ end }}
     .WithDataVolume()
     .AddDatabase("database");

@@ -106,14 +106,15 @@ public sealed class NewCommandTests : IDisposable
     }
 
     [Fact]
-    public void A_project_choosing_rag_writes_nothing_and_names_the_rag_pack_it_still_lacks()
+    public void A_project_choosing_rag_generates_with_its_embeddings_following_the_model_provider()
     {
         var run = CliRun.Of("new", Path.Combine(root, "rag"), "--profile", "lean-crud", "--set", "backend.llm=openai", "--set", "backend.llm.extras=rag", "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
 
-        run.ExitCode.ShouldBe(1);
-        run.Error.ShouldContain("error: no pack for backend.llm.extras=rag.");
-        run.Error.ShouldNotContain("no pack for backend.llm.embeddings");
-        Directory.Exists(Path.Combine(root, "rag")).ShouldBeFalse();
+        run.ExitCode.ShouldBe(0, run.Error);
+        var fabric = File.ReadAllText(Path.Combine(root, "rag", "fabric.yaml"));
+        fabric.ShouldContain("backend.llm.extras: [rag]");
+        fabric.ShouldContain("backend.llm.embeddings: openai");
+        File.Exists(Path.Combine(root, "rag", "src", "BuildingBlocks", "Rag", "ModuleVectorIndex.cs")).ShouldBeTrue();
     }
 
     [Fact]
