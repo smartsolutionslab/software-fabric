@@ -96,6 +96,17 @@ public sealed class AgentTests
         answer.Value.ShouldBe("The tool said: cccc");
         dispatcher.Requests.ShouldContain(new LongestWord("a bb cccc", Option<int>.Some(2)));
     }
+
+    [Fact]
+    public void A_request_that_contains_itself_as_an_option_is_offered_with_a_schema_that_ends()
+    {
+        var dispatcher = new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider()));
+
+        var next = DispatcherTool.For<Trail>(dispatcher, "Follows a trail.").JsonSchema.GetProperty("properties").GetProperty("next");
+
+        next.GetProperty("type").EnumerateArray().Select(type => type.GetString()).ShouldBe(["object", "null"], ignoreOrder: true);
+        next.GetProperty("properties").GetProperty("step").GetProperty("type").GetString().ShouldBe("string");
+    }
 {{~ end ~}}
 
     [Fact]

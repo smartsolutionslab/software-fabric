@@ -154,7 +154,7 @@ public sealed class AgentFrameworkTests
         var (agentsExitCode, agentsOutput) = project.Test("tests/Agents.Tests/Agents.Tests.csproj");
         agentsExitCode.ShouldBe(0, agentsOutput);
         agentsOutput.ShouldContain("failed: 0");
-        agentsOutput.ShouldContain("succeeded: 7");
+        agentsOutput.ShouldContain("succeeded: 8");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
@@ -174,7 +174,7 @@ public sealed class AgentFrameworkTests
         var (agentsExitCode, agentsOutput) = project.Test("tests/Agents.Tests/Agents.Tests.csproj");
         agentsExitCode.ShouldBe(0, agentsOutput);
         agentsOutput.ShouldContain("failed: 0");
-        agentsOutput.ShouldContain("succeeded: 8");
+        agentsOutput.ShouldContain("succeeded: 9");
 
         var (mcpExitCode, mcpOutput) = project.Test("tests/Mcp.Tests/Mcp.Tests.csproj");
         mcpExitCode.ShouldBe(0, mcpOutput);
