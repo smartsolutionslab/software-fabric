@@ -21,7 +21,7 @@ profiles:
     frontend.api-client: orval
     frontend.routing: vue-router
     frontend.forms: vee-validate
-    frontend.ui-library: reka-ui
+    frontend.ui-library: shadcn-vue
 
   industrial-event-driven-mfe:
     frontend.framework: react

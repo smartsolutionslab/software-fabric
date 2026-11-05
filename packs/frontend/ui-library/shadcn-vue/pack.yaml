@@ -1,0 +1,19 @@
+option: frontend.ui-library.shadcn-vue
+files:
+  - { template: templates/components.json.sbn, target: web/app/components.json }
+  - { template: templates/utils.ts.sbn, target: web/app/src/lib/utils.ts }
+  - { template: templates/index.ts.sbn, target: web/app/src/components/ui/button/index.ts }
+  - { template: templates/Button.vue.sbn, target: web/app/src/components/ui/button/Button.vue }
+  - { template: templates/Button.test.ts.sbn, target: web/app/src/components/ui/button/Button.test.ts }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.dev-dependencies, template: templates/dev-dependencies.sbn }
+  - { slot: web.styles, template: templates/styles.sbn, order: 20 }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 20 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing another Vue component library (PrimeVue, Vuetify, Quasar, Element Plus, Ant Design Vue, Naive UI, Headless UI, Radix Vue) fails lint.", file: templates/restricted.sbn }
+  - { kind: ci-step, describes: "src/index.css defines the theme components.json names (cssVariables, slate) and applies its border, ring, background and foreground with @apply, so a theme that lacks them fails the build: Tailwind refuses an unknown utility in @apply.", file: templates/styles.sbn }
+  - { kind: unit-test, describes: "Button renders a button in the theme's colours, has the registry's variants and sizes, and with as-child gives its child the button's look instead (src/components/ui/button/Button.test.ts).", file: templates/Button.test.ts.sbn }
