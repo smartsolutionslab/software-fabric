@@ -159,6 +159,24 @@ public class DashboardsTests(AspireFixture aspire)
         visitorsChart!["chart"]!["categories"]!.AsArray().Select(category => category!.GetValue<string>()).ShouldNotContain(name);
     }
 
+    [Fact]
+    public async Task The_widget_count_chart_counts_every_dashboard_of_the_caller_not_only_the_first_page()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var batch = Guid.CreateVersion7();
+        using var developer = await aspire.CreateHostClientAsync("developer");
+        List<string> names = [.. Enumerable.Range(0, 21).Select(index => $"Many {batch} {index:D2}")];
+        foreach (var name in names)
+        {
+            (await developer.PutAsJsonAsync(Path(Guid.CreateVersion7()), Dashboard(name, (Chart, "bar")), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        }
+
+        var chart = await developer.GetFromJsonAsync<JsonObject>($"/dashboards/widgets/{Chart}?page=1&pageSize=20", cancellationToken);
+
+        var categories = chart!["chart"]!["categories"]!.AsArray().Select(category => category!.GetValue<string>()).ToList();
+        names.ShouldBeSubsetOf(categories);
+    }
+
     private static string Path(Guid id) => $"/dashboards/{id}";
 
     private static object Dashboard(string name, params (string Source, string Visual)[] widgets) => new
