@@ -1,0 +1,5 @@
+            {
+              group: ['@{{ name }}/module-*'],
+              message:
+                "The shell loads a module's screens from its remote at run time; it never imports them (docs/adr).",
+            }

@@ -1,0 +1,6 @@
+## Micro-frontends
+
+The shell is `web/app`; each module's screens are its own remote in `web/modules/<module>`, created by
+`fabric add-module`. Under Aspire every remote runs as a dev server of its own (`remote-<module>` in the dashboard)
+and the shell loads it at run time. Run `pnpm install` in `web/` before the first start: the remotes do not install by
+themselves.

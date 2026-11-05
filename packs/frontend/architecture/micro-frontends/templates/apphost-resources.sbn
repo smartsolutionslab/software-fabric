@@ -1,0 +1,3 @@
+
+// Each directory of web/modules is a module's remote, run as its own Vite dev server (docs/adr).
+var remotes = builder.AddRemotes();

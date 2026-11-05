@@ -1,3 +1,11 @@
+{{~ if project["frontend.architecture"] == "micro-frontends" ~}}
+import { Remote } from '@/remotes/Remote';
+
+/** The module's screens live in its own remote, web/modules/{{ module.name }}; the shell mounts it here (docs/adr). */
+export function {{ module.namespace }}Page() {
+  return <Remote module="{{ module.name }}" />;
+}
+{{~ else ~}}
 export function {{ module.namespace }}Page() {
   return (
     <main>
@@ -5,3 +13,4 @@ export function {{ module.namespace }}Page() {
     </main>
   );
 }
+{{~ end ~}}

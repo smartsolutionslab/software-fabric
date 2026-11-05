@@ -1,0 +1,29 @@
+{{~ if project["frontend.framework"] != "react" || project["frontend.design-system"] != "tokens-and-components" ~}}
+throw new Error('The module-federation pack builds React remotes on the tokens-and-components design system only so far; frontend.framework is {{ project["frontend.framework"] }}, frontend.design-system is {{ project["frontend.design-system"] }} (docs/adr/0006 of the generator).');
+{{~ end ~}}
+import { federation } from '@module-federation/vite';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vitest/config';
+
+// The {{ module.name }} module's remote: the shell loads ./Page from its remoteEntry.js at run time (docs/adr).
+// Under Aspire its own dev server serves it; built, a deployment serves dist under /modules/{{ module.name }}/.
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/modules/{{ module.name }}/' : '/',
+  plugins: [
+    react(),
+    federation({
+      name: '{{ module.name }}',
+      filename: 'remoteEntry.js',
+      exposes: { './Page': './src/{{ module.namespace }}Page.tsx' },
+      // One instance of each, the shell's (web/app/federation.ts shares the same).
+      shared: {
+        react: { singleton: true },
+        'react-dom': { singleton: true },
+        '@{{ name }}/ui': { singleton: true },
+      },
+      dts: false,
+    }),
+  ],
+  build: { target: 'esnext' },
+  test: { environment: 'jsdom', include: ['src/**/*.test.{ts,tsx}'], setupFiles: ['./src/test-setup.ts'] },
+}));

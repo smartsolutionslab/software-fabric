@@ -1,0 +1,24 @@
+import { loadRemote } from '@module-federation/runtime';
+import { render, screen } from '@testing-library/react';
+import { expect, test, vi } from 'vitest';
+import { Remote } from './Remote';
+
+vi.mock('@module-federation/runtime', () => ({ loadRemote: vi.fn() }));
+
+test("a module's page is the page its remote exposes", async () => {
+  vi.mocked(loadRemote).mockResolvedValue({ default: () => <h1>Billing</h1> });
+
+  render(<Remote module="billing" />);
+
+  expect(await screen.findByRole('heading', { name: 'Billing' })).toBeInTheDocument();
+  expect(loadRemote).toHaveBeenCalledWith('billing/Page');
+});
+
+test('a remote that cannot be loaded leaves the shell running and says so', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  vi.mocked(loadRemote).mockRejectedValue(new Error('remoteEntry.js did not load'));
+
+  render(<Remote module="shipping" />);
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('shipping could not be loaded.');
+});

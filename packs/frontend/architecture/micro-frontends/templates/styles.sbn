@@ -1,0 +1,2 @@
+/* Every remote's screens are styled by the shell's Tailwind, so it finds their class names too. */
+@source '../../modules';

@@ -1,0 +1,2 @@
+import { federation } from '@module-federation/vite';
+import { shellFederation } from './federation.js';
