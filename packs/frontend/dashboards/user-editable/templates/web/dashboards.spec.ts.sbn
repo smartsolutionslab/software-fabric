@@ -1,0 +1,47 @@
+import { expect, type Locator, test } from '@playwright/test';
+
+/** Where the element is on the page; it must be visible. */
+async function box(locator: Locator) {
+  const found = await locator.boundingBox();
+  if (!found) {
+    throw new Error('The element is not on the page.');
+  }
+  return found;
+}
+
+test('a user builds a dashboard, resizes a widget, saves it and finds it again after a reload', async ({ page }) => {
+  const name = `E2E ${Date.now()}`;
+  await page.goto('/dashboards');
+  await page.getByLabel('Username or email').fill('developer');
+  await page.getByLabel('Password', { exact: true }).fill('developer');
+  await page.getByRole('button', { name: 'Sign In' }).click();
+
+  await page.getByRole('button', { name: 'New dashboard' }).click();
+  await page.getByLabel('Dashboard name').fill(name);
+  await page.getByLabel('Widget').selectOption({ label: 'Widgets per dashboard' });
+  await page.getByLabel('Shown as').selectOption('bar');
+  await page.getByRole('button', { name: 'Add widget' }).click();
+  const widget = page.getByRole('region', { name: 'Widgets per dashboard' });
+  await expect(widget).toBeVisible();
+
+  const before = (await box(widget));
+  const handle = widget.locator('xpath=ancestor::*[contains(@class, "react-grid-item")]').locator('.react-resizable-handle');
+  const grip = (await box(handle));
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(grip.x + 300, grip.y + 120, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(async () => (await box(widget)).width).toBeGreaterThan(before.width + 100);
+  const resized = (await box(widget));
+
+  await page.getByRole('button', { name: 'Save dashboard' }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved.');
+
+  await page.reload();
+  await page.getByRole('button', { name }).click();
+  const reloaded = page.getByRole('region', { name: 'Widgets per dashboard' });
+  await expect(reloaded).toBeVisible();
+  await expect(reloaded.getByRole('img', { name: 'Widgets per dashboard' })).toBeVisible();
+  await expect.poll(async () => Math.round((await box(reloaded)).width)).toBe(Math.round(resized.width));
+  await expect(page.getByLabel('Dashboard name')).toHaveValue(name);
+});

@@ -1,0 +1,119 @@
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, expect, test, vi } from 'vitest';
+import { axe } from 'vitest-axe';
+import type { DashboardDto, PagedResultOfDashboardSummaryDto, PagedResultOfWidgetDescriptionDto, WidgetData } from '@/api/generated';
+import { DashboardEditor } from './DashboardEditor';
+
+const save = vi.fn();
+const refetch = vi.fn();
+
+const sales: DashboardDto = {
+  id: '01960000-0000-7000-8000-000000000001',
+  name: 'Sales',
+  widgets: [{ key: 'counts', source: 'dashboards.widget-counts', visual: 'bar', x: 0, y: 0, width: 6, height: 4 }],
+};
+const list: PagedResultOfDashboardSummaryDto = {
+  items: [{ id: sales.id, name: sales.name, widgetCount: 1 }],
+  totalCount: 1,
+  page: 1,
+  pageSize: 100,
+};
+const catalog: PagedResultOfWidgetDescriptionDto = {
+  items: [
+    { id: 'dashboards.my-dashboards', title: 'My dashboards', kind: 'Table' },
+    { id: 'dashboards.widget-counts', title: 'Widgets per dashboard', kind: 'Chart' },
+  ],
+  totalCount: 2,
+  page: 1,
+  pageSize: 100,
+};
+const chart: WidgetData = {
+  kind: 'Chart',
+  chart: { categories: ['Sales'], series: [{ name: 'Widgets', values: [1] }] },
+  table: null,
+};
+const table: WidgetData = {
+  kind: 'Table',
+  chart: null,
+  table: { columns: ['id', 'name', 'widgetCount'], rows: [{ id: sales.id, name: 'Sales', widgetCount: 1 }], totalCount: 1, page: 1, pageSize: 20 },
+};
+
+// The generated client's hooks, answered here: the editor is tested against what the host serves, without a host.
+vi.mock('@/api/generated', () => ({
+  useGetDashboardsQuery: () => ({ data: list, refetch }),
+  useGetDashboardsByIdQuery: (_: unknown, options?: { skip?: boolean }) => ({ data: options?.skip ? undefined : sales }),
+  useGetDashboardsWidgetsQuery: () => ({ data: catalog }),
+  useGetDashboardsWidgetsByIdQuery: ({ id }: { id: string }) => ({ data: id === 'dashboards.my-dashboards' ? table : chart }),
+  usePutDashboardsByIdMutation: () => [save, { isLoading: false }],
+}));
+
+// ECharts draws on a canvas jsdom does not have; the chart's accessible name is what the editor decides.
+vi.mock('@/components/chart', () => ({
+  Chart: ({ label }: { label: string }) => <div role="img" aria-label={label} />,
+}));
+
+beforeEach(() => {
+  save.mockReset();
+  save.mockReturnValue({ unwrap: () => Promise.resolve(sales.id) });
+  refetch.mockReset();
+});
+
+test('a user opens a dashboard, adds a widget, removes one, renames it and saves', async () => {
+  const user = userEvent.setup();
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+  expect(await screen.findByRole('img', { name: 'Widgets per dashboard' })).toBeInTheDocument();
+
+  await user.selectOptions(screen.getByLabelText('Widget'), 'dashboards.my-dashboards');
+  await user.selectOptions(screen.getByLabelText('Shown as'), 'table');
+  await user.click(screen.getByRole('button', { name: 'Add widget' }));
+  const added = await screen.findByRole('region', { name: 'My dashboards' });
+  expect(within(added).getByRole('cell', { name: 'Sales' })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Remove Widgets per dashboard' }));
+  expect(screen.queryByRole('img', { name: 'Widgets per dashboard' })).not.toBeInTheDocument();
+
+  await user.clear(screen.getByLabelText('Dashboard name'));
+  await user.type(screen.getByLabelText('Dashboard name'), 'Sales overview');
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  expect(save).toHaveBeenCalledWith({
+    id: sales.id,
+    saveDashboardRequest: {
+      name: 'Sales overview',
+      widgets: [expect.objectContaining({ source: 'dashboards.my-dashboards', visual: 'table', x: 0, width: 6, height: 4 })],
+    },
+  });
+  expect(await screen.findByRole('status')).toHaveTextContent('Saved.');
+  expect(refetch).toHaveBeenCalled();
+});
+
+test('a new dashboard gets a fresh time-ordered id and needs a name before it is saved', async () => {
+  const user = userEvent.setup();
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('A dashboard needs a name of 1 to 100 characters.');
+  expect(save).not.toHaveBeenCalled();
+
+  await user.type(screen.getByLabelText('Dashboard name'), 'Fresh');
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  const [{ id }] = save.mock.calls[0] as [{ id: string }];
+  expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  expect(id).not.toBe(sales.id);
+});
+
+test('the editor with a dashboard open has no accessibility violations axe can find', async () => {
+  const user = userEvent.setup();
+  const { container } = render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+  await screen.findByRole('img', { name: 'Widgets per dashboard' });
+
+  expect(await axe(container)).toHaveNoViolations();
+});

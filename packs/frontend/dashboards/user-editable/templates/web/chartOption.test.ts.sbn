@@ -1,0 +1,19 @@
+import { expect, test } from 'vitest';
+import { chartOption } from './chartOption';
+
+const series = { categories: ['January', 'February'], series: [{ name: 'Revenue', values: [3, '4'] }] };
+
+test('a bar or line chart puts the categories on the x axis and one series per named series', () => {
+  expect(chartOption(series, 'bar')).toMatchObject({
+    xAxis: { type: 'category', data: ['January', 'February'] },
+    yAxis: { type: 'value' },
+    series: [{ name: 'Revenue', type: 'bar', data: [3, 4] }],
+  });
+  expect(chartOption(series, 'line')).toMatchObject({ series: [{ type: 'line' }] });
+});
+
+test('a pie chart shows the first series, one slice per category', () => {
+  expect(chartOption(series, 'pie')).toMatchObject({
+    series: [{ type: 'pie', name: 'Revenue', data: [{ name: 'January', value: 3 }, { name: 'February', value: 4 }] }],
+  });
+});

@@ -187,6 +187,57 @@ public sealed class DashboardsTests
     }
 
     [Fact]
+    public void The_react_spa_gets_the_dashboard_page_on_react_grid_layout_and_the_module_page_renders_it()
+    {
+        var files = Files(Profile, Dashboards);
+
+        files["web/app/package.json"].ShouldContain("\"react-grid-layout\": \"2.3.0\"");
+        files["web/app/src/index.css"].ShouldStartWith("@import 'react-grid-layout/css/styles.css';\n");
+        files["web/app/src/modules/dashboards/DashboardsPage.tsx"].ShouldContain("<DashboardEditor />");
+        files.Keys.ShouldContain("web/app/src/dashboards/DashboardEditor.tsx");
+        files.Keys.ShouldContain("web/app/src/dashboards/DashboardEditor.test.tsx");
+        files.Keys.ShouldContain("web/app/e2e/dashboards.spec.ts");
+    }
+
+    [Fact]
+    public void Where_the_page_is_not_built_yet_the_module_keeps_the_routers_placeholder_page()
+    {
+        foreach (var (profile, overrides) in new[]
+        {
+            ("saas-standard-vue", new[] { Dashboards }),
+            ("lean-crud", new[] { Dashboards }),
+            ("industrial-event-driven-mfe", new[] { Dashboards }),
+        })
+        {
+            var files = Files(profile, overrides);
+
+            files.Keys.ShouldNotContain(path => path.StartsWith("web/app/src/dashboards/", StringComparison.Ordinal), profile);
+            files["web/app/package.json"].ShouldNotContain("react-grid-layout", customMessage: profile);
+        }
+    }
+
+    [Fact]
+    public void The_generated_web_app_builds_lints_and_passes_its_tests_and_the_end_to_end_test_finds_a_saved_dashboard_after_a_reload()
+    {
+        using var project = new GeneratedProject(Profile, Dashboards);
+        project.Build();
+
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        foreach (var step in new[] { "install", "build", "lint", "test" })
+        {
+            var (exitCode, output) = Shell.Run(web, "pnpm", step);
+            exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
+        }
+
+        var (formatExitCode, format) = Shell.Run(Path.Combine(web, "app"), "pnpm", "format:check");
+        formatExitCode.ShouldBe(0, format);
+
+        var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
+        e2eExitCode.ShouldBe(0, e2eOutput);
+        e2eOutput.ShouldContain("2 passed");
+    }
+
+    [Fact]
     public void The_realm_has_a_second_user_in_the_first_tenant_to_show_a_dashboard_is_its_owners_alone()
     {
         var realm = JsonNode.Parse(Files(Profile, Dashboards)["src/AppHost/realms/realm.json"])!;

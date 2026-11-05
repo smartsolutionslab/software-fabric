@@ -63,6 +63,11 @@ files:
   - { template: templates/Module/DashboardsDbContextModelSnapshot.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Migrations/DashboardsDbContextModelSnapshot.cs", per-module: true, when: 'module.name == "dashboards"' }
   - { template: templates/tests/EveryWidgetIsADeclaredModuleQuery.cs.sbn, target: tests/Architecture.Tests/Rules/EveryWidgetIsADeclaredModuleQuery.cs }
   - { template: templates/tests/DashboardsTests.cs.sbn, target: tests/Integration.Tests/DashboardsTests.cs }
+  - { template: templates/web/DashboardEditor.test.tsx.sbn, target: web/app/src/dashboards/DashboardEditor.test.tsx, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
+  - { template: templates/web/layout.test.ts.sbn, target: web/app/src/dashboards/layout.test.ts, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
+  - { template: templates/web/chartOption.test.ts.sbn, target: web/app/src/dashboards/chartOption.test.ts, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
+  - { template: templates/web/uuidV7.test.ts.sbn, target: web/app/src/dashboards/uuidV7.test.ts, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
+  - { template: templates/web/dashboards.spec.ts.sbn, target: web/app/e2e/dashboards.spec.ts, when: 'project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa"' }
 slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 30 }
   - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 50 }
