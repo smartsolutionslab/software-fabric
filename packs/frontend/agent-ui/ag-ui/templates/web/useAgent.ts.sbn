@@ -17,6 +17,10 @@ export function useAgent(name: string) {
       onMessagesChanged: ({ messages: changed }) => {
         setMessages([...changed]);
       },
+      // A failure the host streams as RUN_ERROR ends the run without rejecting runAgent.
+      onRunErrorEvent: ({ event }) => {
+        setFailure(event.message);
+      },
     });
     return () => {
       subscription.unsubscribe();

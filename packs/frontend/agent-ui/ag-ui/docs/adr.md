@@ -23,7 +23,7 @@ Tests never call a model. In Development, the AppHost parameter `model-stand-in`
 - `tests/Modules/Assistant.Tests/Queries/TalkToTheAssistantTests.cs`: the assistant's query streams a tool call through the dispatcher and the answer built from its result.
 {{~ if panel ~}}
 - Lint: importing CopilotKit (`@copilotkit/*`) fails.
-- `web/app/src/agents/AgentPanel.test.tsx`: the panel shows the answer while it streams, after the tool call and its result, sends the whole conversation{{ if signed_in }} with the user's token{{ end }}, and shows a refused run as an alert{{ if array.contains(project["frontend.test.extras"], "accessibility") }}; axe finds no violations{{ end }}.
+- `web/app/src/agents/AgentPanel.test.tsx`: the panel shows the answer while it streams, after the tool call and its result, sends the whole conversation{{ if signed_in }} with the user's token{{ end }}, shows a refused run or a streamed `RUN_ERROR` as an alert, and starts a new conversation for another agent{{ if array.contains(project["frontend.test.extras"], "accessibility") }}; axe finds no violations{{ end }}.
 - `web/app/e2e/agent-panel.spec.ts`, against the AppHost with the stand-in model: two messages from the assistant's page, each answered in several streamed chunks after a `count_words` call whose result the panel shows.
 {{~ end ~}}
 

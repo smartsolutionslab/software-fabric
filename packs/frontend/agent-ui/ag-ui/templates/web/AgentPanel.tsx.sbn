@@ -15,9 +15,14 @@ type MessageForm = z.infer<typeof messageSchema>;
 
 /**
  * A conversation with one of the host's agents, over AG-UI (POST /api/agents/{name}): the user's messages, each tool
- * call the agent makes with its result, and the agent's answers while they stream in.
+ * call the agent makes with its result, and the agent's answers while they stream in. Another agent starts another
+ * conversation.
  */
 export function AgentPanel({ agent }: { agent: string }) {
+  return <Conversation key={agent} agent={agent} />;
+}
+
+function Conversation({ agent }: { agent: string }) {
   const { messages, running, failure, send } = useAgent(agent);
   const {
     register,
