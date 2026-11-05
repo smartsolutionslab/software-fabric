@@ -925,6 +925,63 @@ public sealed class StrictEventSourcedTests
         exitCode.ShouldNotBe(0, output);
     }
 
+    [Fact]
+    public void A_generic_domain_type_that_does_not_constrain_its_type_parameter_to_exclude_null_is_named()
+    {
+        // Unconstrained, T Value = default! reads as nullable even over the class InvoiceNumber, so the event rule
+        // accepts Node<InvoiceNumber> although {} leaves its Value null without From. The constraint is required instead.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record Node<T>(Node<List<T>>? Next, T Value = default!);
+
+            public sealed record InvoiceNoded(InvoiceId Invoice, Node<InvoiceNumber> Root) : IDomainEvent;
+
+            public sealed class Noding : EventSourcedAggregate<InvoiceId>
+            {
+                private Noding()
+                {
+                }
+
+                private void Apply(InvoiceNoded noded) => Id = noded.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Node`1 does not constrain its type parameter T to exclude null");
+        exitCode.ShouldNotBe(0, output);
+    }
+
+    [Fact]
+    public void A_value_object_a_constrained_generic_domain_type_takes_through_an_optional_parameter_is_named()
+    {
+        // Under where T : notnull, T Value = default! reads as not nullable over InvoiceNumber: {} leaves it null.
+        var (exitCode, output) = ArchitectureTestsWith("""
+            using Shop.BuildingBlocks.EventSourcing;
+
+            namespace Shop.Modules.Billing.Domain.Invoices;
+
+            public sealed record Node<T>(Node<List<T>>? Next, T Value = default!)
+                where T : notnull;
+
+            public sealed record InvoiceNoded(InvoiceId Invoice, Node<InvoiceNumber> Root) : IDomainEvent;
+
+            public sealed class Noding : EventSourcedAggregate<InvoiceId>
+            {
+                private Noding()
+                {
+                }
+
+                private void Apply(InvoiceNoded noded) => Id = noded.Invoice;
+            }
+            """);
+
+        output.ShouldContain("Shop.Modules.Billing.Domain.Invoices.Node`1[Shop.Modules.Billing.Domain.Invoices.InvoiceNumber].Value carries a value object through an optional constructor parameter");
+        output.ShouldNotContain("does not constrain its type parameter");
+        exitCode.ShouldNotBe(0, output);
+    }
+
     private static (int ExitCode, string Output) ArchitectureTestsWith(string types)
     {
         using var project = new GeneratedProject("industrial-event-driven-mfe", Choices);

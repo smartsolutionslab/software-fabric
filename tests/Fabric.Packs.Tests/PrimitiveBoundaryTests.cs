@@ -768,6 +768,81 @@ public sealed partial class PrimitiveBoundaryTests
         }
         """;
 
+    private const string Generics = """
+        using System.Numerics;
+
+        namespace Shop.Modules.Billing.Domain.Generics;
+
+        public interface IMarker
+        {
+            string Name { get; }
+        }
+
+        public class Base;
+
+        public sealed class Unconstrained<T>;
+
+        public sealed class NullableClass<T>
+            where T : class?;
+
+        public sealed class NullableInterface<T>
+            where T : IMarker?;
+
+        public sealed class NullableBase<T>
+            where T : Base?;
+
+        public sealed class Pair<TKey, TValue>
+            where TKey : notnull;
+
+        public interface IReader<out T>
+        {
+            T Read();
+        }
+
+        public sealed class NotNull<T>
+            where T : notnull;
+
+        public sealed class Reference<T>
+            where T : class;
+
+        public sealed class Value<T>
+            where T : struct;
+
+        public sealed class Unmanaged<T>
+            where T : unmanaged;
+
+        public sealed class Marked<T>
+            where T : IMarker;
+
+        public sealed class Derived<T>
+            where T : Base;
+
+        public sealed class Numeric<T>
+            where T : INumber<T>;
+
+        public sealed class Outer<T>
+            where T : notnull
+        {
+            public sealed class Plain;
+
+            public sealed class Inner<TInner>;
+        }
+        """;
+
+    private const string ObliviousGenerics = """
+        #nullable disable
+
+        namespace Shop.Modules.Billing.Domain.Generics;
+
+        public sealed class Oblivious<T>;
+
+        public sealed class ObliviousClass<T>
+            where T : class;
+
+        public sealed class ObliviousNotNull<T>
+            where T : notnull;
+        """;
+
     [Fact]
     public void A_strict_module_passes_with_its_samples_and_fails_naming_each_primitive_an_aggregate_command_or_event_holds()
     {
@@ -941,6 +1016,39 @@ public sealed partial class PrimitiveBoundaryTests
             () => output.ShouldContain("failed: 1"));
     }
 
+    [Fact]
+    public void Every_generic_type_of_a_strict_domain_constrains_its_type_parameters_to_exclude_null()
+    {
+        using var project = new GeneratedProject("saas-strict-react");
+        project.AddModule("billing");
+
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Generics", Generics);
+        project.WriteTypes("src/Modules/Billing/Billing.Domain/Generics", ObliviousGenerics);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        List<string> named = [.. UnconstrainedTypeParameter().Matches(output).Select(match => match.Value).Distinct().Order(StringComparer.Ordinal)];
+
+        // No aggregate, command or event reaches these types: the rule reads every generic definition of the Domain.
+        // Any constraint that excludes null satisfies it; class? and IMarker? do not, nor class where nullability is off.
+        output.ShouldSatisfyAllConditions(
+            () => exitCode.ShouldNotBe(0, output),
+            () => named.ShouldBe(
+            [
+                "Shop.Modules.Billing.Domain.Generics.IReader`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.NullableBase`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.NullableClass`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.NullableInterface`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.Oblivious`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.ObliviousClass`1 does not constrain its type parameter T",
+                "Shop.Modules.Billing.Domain.Generics.Outer`1+Inner`1 does not constrain its type parameter TInner",
+                "Shop.Modules.Billing.Domain.Generics.Pair`2 does not constrain its type parameter TValue",
+                "Shop.Modules.Billing.Domain.Generics.Unconstrained`1 does not constrain its type parameter T",
+            ]),
+            () => output.ShouldContain("failed: 1"));
+    }
+
     /// <summary>
     /// Runs one test project of the generated solution and stops it, with every process it started, once the limit
     /// passes: a walk that never ends spins without ever reaching a cancellation point, so the platform's own
@@ -977,4 +1085,7 @@ public sealed partial class PrimitiveBoundaryTests
 
     [GeneratedRegex(@"Shop\.Modules\.\S+ holds \w+")]
     private static partial Regex Violation();
+
+    [GeneratedRegex(@"Shop\.Modules\.\S+ does not constrain its type parameter \w+")]
+    private static partial Regex UnconstrainedTypeParameter();
 }
