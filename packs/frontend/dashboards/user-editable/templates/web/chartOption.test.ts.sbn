@@ -14,6 +14,15 @@ test('a bar or line chart puts the categories on the x axis and one series per n
 
 test('a pie chart shows the first series, one slice per category', () => {
   expect(chartOption(series, 'pie')).toMatchObject({
-    series: [{ type: 'pie', name: 'Revenue', data: [{ name: 'January', value: 3 }, { name: 'February', value: 4 }] }],
+    series: [
+      {
+        type: 'pie',
+        name: 'Revenue',
+        data: [
+          { name: 'January', value: 3 },
+          { name: 'February', value: 4 },
+        ],
+      },
+    ],
   });
 });

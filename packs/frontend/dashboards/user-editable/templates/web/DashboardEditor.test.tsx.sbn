@@ -1,8 +1,13 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { axe } from 'vitest-axe';
-import type { DashboardDto, PagedResultOfDashboardSummaryDto, PagedResultOfWidgetDescriptionDto, WidgetData } from '@/api/generated';
+import type {
+  DashboardDto,
+  PagedResultOfDashboardSummaryDto,
+  PagedResultOfWidgetDescriptionDto,
+  WidgetData,
+} from '@/api/generated';
 import { DashboardEditor } from './DashboardEditor';
 
 const save = vi.fn();
@@ -36,15 +41,25 @@ const chart: WidgetData = {
 const table: WidgetData = {
   kind: 'Table',
   chart: null,
-  table: { columns: ['id', 'name', 'widgetCount'], rows: [{ id: sales.id, name: 'Sales', widgetCount: 1 }], totalCount: 1, page: 1, pageSize: 20 },
+  table: {
+    columns: ['id', 'name', 'widgetCount'],
+    rows: [{ id: sales.id, name: 'Sales', widgetCount: 1 }],
+    totalCount: 1,
+    page: 1,
+    pageSize: 20,
+  },
 };
 
 // The generated client's hooks, answered here: the editor is tested against what the host serves, without a host.
 vi.mock('@/api/generated', () => ({
   useGetDashboardsQuery: () => ({ data: list, refetch }),
-  useGetDashboardsByIdQuery: (_: unknown, options?: { skip?: boolean }) => ({ data: options?.skip ? undefined : sales }),
+  useGetDashboardsByIdQuery: (_: unknown, options?: { skip?: boolean }) => ({
+    data: options?.skip ? undefined : sales,
+  }),
   useGetDashboardsWidgetsQuery: () => ({ data: catalog }),
-  useGetDashboardsWidgetsByIdQuery: ({ id }: { id: string }) => ({ data: id === 'dashboards.my-dashboards' ? table : chart }),
+  useGetDashboardsWidgetsByIdQuery: ({ id }: { id: string }) => ({
+    data: id === 'dashboards.my-dashboards' ? table : chart,
+  }),
   usePutDashboardsByIdMutation: () => [save, { isLoading: false }],
 }));
 
@@ -52,6 +67,8 @@ vi.mock('@/api/generated', () => ({
 vi.mock('@/components/chart', () => ({
   Chart: ({ label }: { label: string }) => <div role="img" aria-label={label} />,
 }));
+
+afterEach(cleanup);
 
 beforeEach(() => {
   save.mockReset();
@@ -84,7 +101,9 @@ test('a user opens a dashboard, adds a widget, removes one, renames it and saves
     id: sales.id,
     saveDashboardRequest: {
       name: 'Sales overview',
-      widgets: [expect.objectContaining({ source: 'dashboards.my-dashboards', visual: 'table', x: 0, width: 6, height: 4 })],
+      widgets: [
+        expect.objectContaining({ source: 'dashboards.my-dashboards', visual: 'table', x: 0, width: 6, height: 4 }),
+      ],
     },
   });
   expect(await screen.findByRole('status')).toHaveTextContent('Saved.');
