@@ -102,6 +102,34 @@ public sealed class AgentTests
     }
 
     [Fact]
+    public void A_page_that_may_be_absent_is_offered_as_a_whole_number_within_its_bounds_or_null()
+    {
+        var tool = DispatcherTool.For<BrowseWords>(new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider())), "Browses the words of a text.");
+
+        var page = tool.JsonSchema.GetProperty("properties").GetProperty("page");
+        page.GetProperty("type").EnumerateArray().Select(type => type.GetString()).ShouldBe(["integer", "null"], ignoreOrder: true, customMessage: page.GetRawText());
+        page.GetProperty("minimum").GetInt32().ShouldBe(1, page.GetRawText());
+        page.GetProperty("maximum").GetInt32().ShouldBe(Page.Maximum, page.GetRawText());
+        tool.JsonSchema.GetProperty("properties").GetProperty("pageSize").GetProperty("type").GetString().ShouldBe("integer");
+    }
+
+    [Fact]
+    public async Task A_page_that_may_be_absent_reaches_the_handler_as_null_when_the_model_passes_null()
+    {
+        using var model = new ToolCallingChatClient("unused", new Dictionary<string, object?>());
+        await using var services = Services(model);
+        var dispatcher = services.GetRequiredService<RecordingDispatcher>();
+        var tool = DispatcherTool.For<BrowseWords>(dispatcher, "Browses the words of a text.");
+
+        var answer = await tool.InvokeAsync(
+            new AIFunctionArguments(new Dictionary<string, object?> { ["text"] = "a b c", ["page"] = null, ["pageSize"] = 2 }),
+            TestContext.Current.CancellationToken);
+
+        answer?.ToString().ShouldBe("{\"items\":[\"a\",\"b\"],\"totalCount\":3,\"page\":1,\"pageSize\":2}");
+        dispatcher.Requests.OfType<BrowseWords>().ShouldHaveSingleItem().Page.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task A_page_out_of_its_bounds_is_refused_before_dispatch_and_the_model_is_told_the_bounds()
     {
         using var model = new ToolCallingChatClient("list_words", new Dictionary<string, object?> { ["text"] = "a b c", ["page"] = 0, ["pageSize"] = 2 });
@@ -363,6 +391,7 @@ public sealed class AgentTests
             .AddScoped<IQueryHandler<AskAboutWords, Result<string, ApiError>>, AskAboutWordsHandler>()
             .AddScoped<IQueryHandler<CountWords, Result<int, ApiError>>, CountWordsHandler>()
             .AddScoped<IQueryHandler<ListWords, Result<PagedResult<string>, ApiError>>, ListWordsHandler>()
+            .AddScoped<IQueryHandler<BrowseWords, Result<PagedResult<string>, ApiError>>, BrowseWordsHandler>()
 {{~ if option ~}}
             .AddScoped<IQueryHandler<LongestWord, Result<Option<string>, ApiError>>, LongestWordHandler>()
 {{~ end ~}}

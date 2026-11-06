@@ -22,6 +22,8 @@ files:
   - { template: templates/tests/NothingToCount.cs.sbn, target: tests/Agents.Tests/NothingToCount.cs }
   - { template: templates/tests/ListWords.cs.sbn, target: tests/Agents.Tests/ListWords.cs }
   - { template: templates/tests/ListWordsHandler.cs.sbn, target: tests/Agents.Tests/ListWordsHandler.cs }
+  - { template: templates/tests/BrowseWords.cs.sbn, target: tests/Agents.Tests/BrowseWords.cs }
+  - { template: templates/tests/BrowseWordsHandler.cs.sbn, target: tests/Agents.Tests/BrowseWordsHandler.cs }
   - { template: templates/tests/ShelfCode.cs.sbn, target: tests/Agents.Tests/ShelfCode.cs }
   - { template: templates/tests/FindShelf.cs.sbn, target: tests/Agents.Tests/FindShelf.cs }
   - { template: templates/tests/ShelfLabel.cs.sbn, target: tests/Agents.Tests/ShelfLabel.cs }
