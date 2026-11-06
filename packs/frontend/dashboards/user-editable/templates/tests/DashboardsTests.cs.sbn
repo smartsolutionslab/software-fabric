@@ -115,6 +115,22 @@ public class DashboardsTests(AspireFixture aspire)
         run.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
+    [Fact]
+    public async Task A_declared_widget_is_described_by_its_id_whatever_page_of_the_catalogue_lists_it()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var developer = await aspire.CreateHostClientAsync("developer");
+
+        var declaration = await developer.GetFromJsonAsync<JsonObject>($"/dashboards/widget-declarations/{Chart}", cancellationToken);
+
+        declaration!["id"]!.GetValue<string>().ShouldBe(Chart);
+        declaration["title"]!.GetValue<string>().ShouldBe("Widgets per dashboard");
+        declaration["kind"]!.GetValue<string>().ShouldBe("Chart");
+        var unknown = await developer.GetAsync(new Uri("/dashboards/widget-declarations/dashboards.everyones-dashboards", UriKind.Relative), cancellationToken);
+        unknown.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        (await unknown.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["code"]!.GetValue<string>().ShouldBe("dashboards.widget-not-found");
+    }
+
     [Theory]
     [InlineData(int.MaxValue, 1)]
     [InlineData(11, int.MaxValue)]
