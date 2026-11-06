@@ -18,10 +18,10 @@ public sealed class McpClientTests
     private const string Token = "stand-in-token";
     private const string HostOnlyVariable = "MCP_TESTS_HOST_ONLY";
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_server_declared_by_url_lists_its_tools_and_answers_a_call()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         await using var server = await EchoServer.StartHttpAsync(Token, "echo", cancellationToken);
         await using var services = await HostServicesAsync(DeclareByUrl(withToken: true), UrlParameters(server), cancellationToken);
         var tools = services.GetRequiredService<IMcpTools>();
@@ -29,28 +29,28 @@ public sealed class McpClientTests
         var listed = await tools.ListAsync(cancellationToken);
         var result = await tools.CallAsync("echo-server", "echo", new Dictionary<string, object?> { ["text"] = "hello" }, cancellationToken);
 
-        listed.Select(tool => $"{tool.Server}/{tool.Name}").Order(StringComparer.Ordinal).ShouldBe(["echo-server/echo", "echo-server/sees"]);
-        result.IsError.ShouldBeFalse();
-        result.Text.ShouldBe("echo: hello");
+        {{ `listed.Select(tool => $"{tool.Server}/{tool.Name}").Order(StringComparer.Ordinal)` | should_be `["echo-server/echo", "echo-server/sees"]` }};
+        {{ `result.IsError` | should_be_false }};
+        {{ `result.Text` | should_be `"echo: hello"` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_server_declared_by_url_without_its_token_refuses_the_client()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         await using var server = await EchoServer.StartHttpAsync(Token, "echo", cancellationToken);
         await using var services = await HostServicesAsync(DeclareByUrl(withToken: false), UrlParameters(server), cancellationToken);
         var tools = services.GetRequiredService<IMcpTools>();
 
-        var refusal = await Should.ThrowAsync<HttpRequestException>(() => tools.ListAsync(cancellationToken));
+        var refusal = await {{ should_throw_async `HttpRequestException` `() => tools.ListAsync(cancellationToken)` }};
 
-        refusal.StatusCode.ShouldBe(System.Net.HttpStatusCode.Unauthorized);
+        {{ `refusal.StatusCode` | should_be `System.Net.HttpStatusCode.Unauthorized` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_server_declared_by_command_gets_its_secret_and_none_of_the_hosts_environment()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         Environment.SetEnvironmentVariable(HostOnlyVariable, "the host's own configuration");
         var serverAssembly = Path.Combine(AppContext.BaseDirectory, "Mcp.TestServer.dll");
         await using var services = await HostServicesAsync(
@@ -67,29 +67,29 @@ public sealed class McpClientTests
         var seesToken = await tools.CallAsync("echo-process", "sees", new Dictionary<string, object?> { ["variable"] = EchoServer.TokenVariable }, cancellationToken);
         var seesHostOnly = await tools.CallAsync("echo-process", "sees", new Dictionary<string, object?> { ["variable"] = HostOnlyVariable }, cancellationToken);
 
-        echo.Text.ShouldBe("echo: hello");
-        seesToken.Text.ShouldBe("true");
-        seesHostOnly.Text.ShouldBe("false");
+        {{ `echo.Text` | should_be `"echo: hello"` }};
+        {{ `seesToken.Text` | should_be `"true"` }};
+        {{ `seesHostOnly.Text` | should_be `"false"` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_tool_call_the_model_asks_for_runs_on_the_server_and_its_result_goes_back_to_the_model()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         await using var server = await EchoServer.StartHttpAsync(Token, "echo", cancellationToken);
         await using var services = await HostServicesAsync(DeclareByUrl(withToken: true), UrlParameters(server), cancellationToken);
         using var chat = new ChatClientBuilder(new ToolCallingChatClient("echo-server__echo")).UseMcpTools(AllowEveryCall).Build(services);
 
         var response = await chat.GetResponseAsync("Say hello through the echo tool.", cancellationToken: cancellationToken);
 
-        response.Text.ShouldStartWith("The tool said:");
-        response.Text.ShouldContain("echo: hello");
+        {{ `response.Text` | should_start_with `"The tool said:"` }};
+        {{ `response.Text` | should_contain `"echo: hello"` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task Two_servers_with_a_tool_of_the_same_name_offer_it_under_their_own_names_and_each_call_reaches_its_server()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         await using var first = await EchoServer.StartHttpAsync(Token, "first", cancellationToken);
         await using var second = await EchoServer.StartHttpAsync(Token, "second", cancellationToken);
         await using var services = await HostServicesAsync(
@@ -103,15 +103,15 @@ public sealed class McpClientTests
 
         var response = await chat.GetResponseAsync("Say hello through the second server's echo.", cancellationToken: cancellationToken);
 
-        model.Offered.ShouldContain("first__echo");
-        model.Offered.ShouldContain("second__echo");
-        response.Text.ShouldContain("second: hello");
+        {{ `model.Offered` | should_contain `"first__echo"` }};
+        {{ `model.Offered` | should_contain `"second__echo"` }};
+        {{ `response.Text` | should_contain `"second: hello"` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_tool_call_the_check_refuses_never_reaches_the_server_and_the_model_is_told_so()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         await using var server = await EchoServer.StartHttpAsync(Token, "echo", cancellationToken);
         await using var services = await HostServicesAsync(DeclareByUrl(withToken: true), UrlParameters(server), cancellationToken);
         List<McpToolCall> checkedCalls = [];
@@ -125,12 +125,12 @@ public sealed class McpClientTests
 
         var response = await chat.GetResponseAsync("Say hello through the echo tool.", cancellationToken: cancellationToken);
 
-        var refused = checkedCalls.ShouldHaveSingleItem();
-        refused.Server.ShouldBe("echo-server");
-        refused.Tool.ShouldBe("echo");
-        refused.Arguments["text"]?.ToString().ShouldBe("hello");
-        response.Text.ShouldNotContain("echo: hello");
-        response.Text.ShouldContain("refused");
+        var refused = {{ `checkedCalls` | should_have_single_item }};
+        {{ `refused.Server` | should_be `"echo-server"` }};
+        {{ `refused.Tool` | should_be `"echo"` }};
+        {{ `refused.Arguments["text"]?.ToString()` | should_be `"hello"` }};
+        {{ `response.Text` | should_not_contain `"echo: hello"` }};
+        {{ `response.Text` | should_contain `"refused"` }};
     }
 
     /// <summary>The check a test passes when the call itself is not under test; a project checks the arguments.</summary>
