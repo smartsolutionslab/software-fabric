@@ -1,5 +1,6 @@
 {{~ tenanted = project["backend.tenancy"] != "none"
-   signed_in = project["backend.auth"] != "none" ~}}
+   signed_in = project["backend.auth"] != "none"
+   test = project["frontend.framework"] == "vue" ? "ts" : "tsx" ~}}
 # Realtime: SignalR
 
 **Status:** Accepted (generated)
@@ -17,7 +18,7 @@ In Development, `POST /hubs/events/test` with `{ "text": "..." }` sends a `TestE
 ## Gates
 
 - `tests/Integration.Tests/ServerEventsTests.cs`, against the running application: {{ if tenanted }}a browser of the sender's tenant receives a test event and one of another tenant does not{{ else }}a connected browser receives a test event{{ end }}{{ if signed_in }}; a connection without a token is refused, and one whose token expires is closed{{ end }}.
-- `src/realtime/useServerEvent.test.tsx` and `ServerEvents.test.tsx`: a component receives the events it listens for and stops when it unmounts; a connection that fails to start or closes for good is started again while mounted.
+- `src/realtime/useServerEvent.test.{{ test }}` and `ServerEvents.test.{{ test }}`: a component receives the events it listens for and stops when it unmounts; a connection that fails to start or closes for good is started again while mounted.
 - `e2e/server-events.spec.ts`: the {{ if signed_in }}signed-in {{ end }}browser's own connection receives a test event.
 
 ## Consequences
