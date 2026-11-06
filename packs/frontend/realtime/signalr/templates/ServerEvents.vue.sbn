@@ -1,0 +1,48 @@
+<script setup lang="ts">
+import { onMounted, onUnmounted, provide } from 'vue';
+import { connectServerEvents } from './connection';
+import { serverEventsKey } from './serverEventsKey';
+
+/** Holds one connection to the host's event hub while it is mounted; useServerEvent listens on it. */
+const connection = connectServerEvents();
+provide(serverEventsKey, connection);
+
+/** How long to wait before the next attempt to start: SignalR reconnects an established connection, never a first one. */
+const retryDelay = (attempt: number) => Math.min(30_000, 1_000 * 2 ** attempt);
+
+let mounted = false;
+let retry: ReturnType<typeof setTimeout> | undefined;
+
+const start = (attempt: number) => {
+  connection.start().catch((error: unknown) => {
+    if (!mounted) {
+      return;
+    }
+    console.warn('Server events are not connected yet; trying again.', error);
+    retry = setTimeout(() => start(attempt + 1), retryDelay(attempt));
+  });
+};
+
+// Automatic reconnects give up after a few attempts; a connection closed for good starts over while mounted. The close
+// that stop() causes on unmounting is not one.
+connection.onclose(() => {
+  if (mounted) {
+    start(0);
+  }
+});
+
+onMounted(() => {
+  mounted = true;
+  start(0);
+});
+
+onUnmounted(() => {
+  mounted = false;
+  clearTimeout(retry);
+  void connection.stop();
+});
+</script>
+
+<template>
+  <slot />
+</template>

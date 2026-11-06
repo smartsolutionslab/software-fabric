@@ -20,7 +20,7 @@ test('a server event reaches the {{ if project["backend.auth"] == "none" }}brows
   await page.getByRole('button', { name: 'Sign In' }).click();
   await expect(page.getByText('Signed in as developer')).toBeVisible();
 
-  // The token the app signed in with, from where react-oidc-context keeps it.
+  // The token the app signed in with, from where {{ if project["frontend.framework"] == "vue" }}oidc-client-ts{{ else }}react-oidc-context{{ end }} keeps it.
   const token = await page.evaluate(() => {
     const key = Object.keys(sessionStorage).find((name) => name.startsWith('oidc.user:'));
     const user: unknown = JSON.parse((key && sessionStorage.getItem(key)) || '{}');

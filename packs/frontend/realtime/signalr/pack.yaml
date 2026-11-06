@@ -8,12 +8,19 @@ files:
   - { template: templates/ServerEventsEndpoints.cs.sbn, target: src/Host/Wiring/ServerEventsEndpoints.cs }
   - { template: templates/ServerEventsTests.cs.sbn, target: tests/Integration.Tests/ServerEventsTests.cs }
   - { template: templates/connection.ts.sbn, target: web/app/src/realtime/connection.ts }
-  - { template: templates/ServerEventsContext.ts.sbn, target: web/app/src/realtime/ServerEventsContext.ts }
-  - { template: templates/ServerEvents.tsx.sbn, target: web/app/src/realtime/ServerEvents.tsx }
-  - { template: templates/ServerEvents.test.tsx.sbn, target: web/app/src/realtime/ServerEvents.test.tsx }
+  # The connection's holder is a React context provider or a Vue component; useServerEvent is a hook or a composable,
+  # branched in its template (ADR-0006). The connection and the end-to-end test are the same for both.
+  - { template: templates/ServerEventsContext.ts.sbn, target: web/app/src/realtime/ServerEventsContext.ts, when: 'project["frontend.framework"] != "vue"' }
+  - { template: templates/ServerEvents.tsx.sbn, target: web/app/src/realtime/ServerEvents.tsx, when: 'project["frontend.framework"] != "vue"' }
+  - { template: templates/ServerEvents.test.tsx.sbn, target: web/app/src/realtime/ServerEvents.test.tsx, when: 'project["frontend.framework"] != "vue"' }
   - { template: templates/useServerEvent.ts.sbn, target: web/app/src/realtime/useServerEvent.ts }
-  - { template: templates/useServerEvent.test.tsx.sbn, target: web/app/src/realtime/useServerEvent.test.tsx }
-  - { template: templates/server-events-provider.tsx.sbn, target: web/app/src/providers/serverEvents.tsx }
+  - { template: templates/useServerEvent.test.tsx.sbn, target: web/app/src/realtime/useServerEvent.test.tsx, when: 'project["frontend.framework"] != "vue"' }
+  - { template: templates/server-events-provider.tsx.sbn, target: web/app/src/providers/serverEvents.tsx, when: 'project["frontend.framework"] != "vue"' }
+  - { template: templates/serverEventsKey.ts.sbn, target: web/app/src/realtime/serverEventsKey.ts, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/ServerEvents.vue.sbn, target: web/app/src/realtime/ServerEvents.vue, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/ServerEvents.test.ts.sbn, target: web/app/src/realtime/ServerEvents.test.ts, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/useServerEvent.test.ts.sbn, target: web/app/src/realtime/useServerEvent.test.ts, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/server-events-provider.ts.sbn, target: web/app/src/providers/serverEvents.ts, when: 'project["frontend.framework"] == "vue"' }
   - { template: templates/server-events.spec.ts.sbn, target: web/app/e2e/server-events.spec.ts }
 slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 30 }
@@ -31,4 +38,6 @@ gates:
   - { kind: unit-test, describes: "Against the running application, a browser of the sender's tenant receives a server event and one of another tenant does not, a connection without a token is refused unless backend.auth is none, and with Keycloak one whose token expires is closed (tests/Integration.Tests/ServerEventsTests.cs).", file: templates/ServerEventsTests.cs.sbn }
   - { kind: unit-test, describes: "useServerEvent hands a component the events it subscribes to and unsubscribes when it unmounts (src/realtime/useServerEvent.test.tsx).", file: templates/useServerEvent.test.tsx.sbn }
   - { kind: unit-test, describes: "ServerEvents starts a connection again when its first start fails or its reconnects run out, and stops once unmounted (src/realtime/ServerEvents.test.tsx).", file: templates/ServerEvents.test.tsx.sbn }
+  - { kind: unit-test, describes: "With Vue, useServerEvent hands a component the events it subscribes to and unsubscribes when it unmounts (src/realtime/useServerEvent.test.ts).", file: templates/useServerEvent.test.ts.sbn }
+  - { kind: unit-test, describes: "With Vue, ServerEvents starts a connection again when its first start fails or its reconnects run out, and stops once unmounted (src/realtime/ServerEvents.test.ts).", file: templates/ServerEvents.test.ts.sbn }
   - { kind: end-to-end-test, describes: "A signed-in browser's own connection receives a server event (e2e/server-events.spec.ts, run against the running AppHost).", file: templates/server-events.spec.ts.sbn }
