@@ -207,5 +207,12 @@ assemblies; the repository owner accepted all of it.
   becomes `supported` once the matrix builds it. `client` (#82),
   `server` (#81), `anthropic` (#77), `openai` (#78), `azure-openai` (#79)
   and `ollama` (#80) have packs and stay `experimental` until then.
+- **Since 2026-11-06 (#186)** one profile calls a model: `saas-ai-react` extends
+  `saas-standard-react` with `openai`, whose key its embeddings reuse, agents, `rag` and
+  `evals`, the agent panel and both dashboards (owner's decision on #186). Profile CI uses
+  the stand-in model and key-shaped values only, and runs the evals gate with its fake
+  judge, never the real eval. Its options stay `experimental` until promoted (ADR-0003).
+  The sentences above and in ADR-0011 to ADR-0015 that say every profile takes
+  `backend.llm: none` describe the catalog before it.
 - `backend.llm.agents` (ADR-0011, 2026-11-05), retrieval-augmented generation (ADR-0012,
   2026-11-05) and evaluations (ADR-0014, 2026-11-05) are later decisions, each with its own ADR.
