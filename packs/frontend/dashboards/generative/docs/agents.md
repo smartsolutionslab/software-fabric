@@ -1,0 +1,5 @@
+## Generative dashboards
+
+- The `dashboards` module's agent (`Application/Agents/DashboardAgent.cs`, reached as `POST /agents/dashboards`) proposes widgets; the user accepts and saves them. Never give it, or any agent of the dashboards module, a command as a tool: `TheDashboardAgentSavesNothing` fails the build.
+- Its tools are `ListWidgets` and `ProposeWidget`, through `DispatcherTool.For`. A new kind of proposal is another query beside them, checked against `WidgetCatalog` and `IWidgetAccess` as `ProposeWidgetHandler` checks, never a query naming something outside the catalogue.
+- The run's state is the browser's open draft, untrusted: read it only through `DashboardDraft.Read`, which bounds its shape and size, and never save it or put it in the agent's instructions.

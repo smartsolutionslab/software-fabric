@@ -1,0 +1,59 @@
+{{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+{{~ func ok(type, value)
+  if typed
+    ret "Success(" + value + ")"
+  end
+  ret "Result<" + type + ", ApiError>.Success(" + value + ")"
+end ~}}
+{{~ func fail(type, error)
+  if typed
+    ret "Failure(" + error + ")"
+  end
+  ret "Result<" + type + ", ApiError>.Failure(" + error + ")"
+end ~}}
+using {{ namespace }}.BuildingBlocks.Dashboards;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Application.DTOs;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Queries.ProposeWidget;
+
+/// <summary>
+/// Only a declared widget the caller may see is proposed, as a visual its kind can show, under its declared title: the
+/// model's arguments are untrusted input. Saving the proposal is the user's, through the same checks as any save.
+/// </summary>
+public sealed class ProposeWidgetHandler(WidgetCatalog catalog, IWidgetAccess access) : IQueryHandler<ProposeWidget, Result<WidgetProposalDto, ApiError>>
+{
+    /// <summary>The longest key a dashboard's widget may have.</summary>
+    public const int MaximumKeyLength = 64;
+
+    private static readonly string[] ChartVisuals = ["bar", "line", "pie"];
+
+    public async Task<Result<WidgetProposalDto, ApiError>> HandleAsync(ProposeWidget query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        if (query.Source is null || !catalog.TryFind(query.Source, out var widget) || !await access.AllowsAsync(widget, cancellationToken))
+        {
+            return {{ fail "WidgetProposalDto" "DashboardsFailures.UnknownWidget(query.Source ?? string.Empty)" }};
+        }
+
+        var fits = widget.Kind == WidgetKind.Chart ? ChartVisuals.Contains(query.Visual, StringComparer.Ordinal) : query.Visual == "table";
+        if (!fits)
+        {
+            return {{ fail "WidgetProposalDto" "DashboardsFailures.InvalidWidget(widget.Id, widget.Kind == WidgetKind.Chart ? \"shows a chart: bar, line or pie.\" : \"shows a table: table.\")" }};
+        }
+
+{{~ if option ~}}
+        var replaces = query.Replaces.Match<string?>(key => key, () => null);
+{{~ else ~}}
+        var replaces = query.Replaces;
+{{~ end ~}}
+        if (replaces is not null && (string.IsNullOrWhiteSpace(replaces) || replaces.Length > MaximumKeyLength))
+        {
+            return {{ fail "WidgetProposalDto" "DashboardsFailures.InvalidWidget(replaces, $\"is not a key a dashboard's widget can have: 1 to {MaximumKeyLength} characters.\")" }};
+        }
+
+        return {{ ok "WidgetProposalDto" "widget.ToWidgetProposalDto(query.Visual, replaces)" }};
+    }
+}

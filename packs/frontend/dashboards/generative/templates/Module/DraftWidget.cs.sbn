@@ -1,0 +1,4 @@
+namespace {{ namespace }}.Modules.Dashboards.Application.Queries.TalkToTheDashboards;
+
+/// <summary>A widget of the open draft as the model sees it: its key, the declared widget it shows, how, and its declared title.</summary>
+public sealed record DraftWidget(string Key, string Source, string Visual, string Title);

@@ -1,0 +1,7 @@
+namespace {{ namespace }}.Modules.Dashboards.Application;
+
+/// <summary>What the dashboards agent's own use cases refuse, beyond <see cref="DashboardsFailures"/>.</summary>
+public static class DashboardAgentFailures
+{
+    public static ApiError InvalidDraft(string reason) => new InvalidDraft(reason);
+}

@@ -1,0 +1,7 @@
+namespace {{ namespace }}.Modules.Dashboards.Application.DTOs;
+
+/// <summary>
+/// A widget the dashboards agent proposes: the declared widget, its declared title, how to show it, and the key of the
+/// draft's widget it takes the place of (null for a new one). The browser shows it pending until the user accepts it.
+/// </summary>
+public sealed record WidgetProposalDto(string Source, string Title, string Visual, string? Replaces);

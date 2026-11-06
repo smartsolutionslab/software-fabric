@@ -1,0 +1,28 @@
+using {{ namespace }}.BuildingBlocks.Agents;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.ListWidgets;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.ProposeWidget;
+using Microsoft.Agents.AI;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Agents;
+
+/// <summary>
+/// The dashboards agent: it finds declared widgets and proposes them for the open dashboard. Both tools are queries sent
+/// through the dispatcher as the caller, so it sees only the widgets the caller may, and it saves nothing: the user
+/// accepts a proposal and saves. TheDashboardAgentSavesNothing fails the build on a command given to it as a tool.
+/// </summary>
+public static class DashboardAgent
+{
+    public static AIAgent Create(IChatClient model, IDispatcher dispatcher) =>
+        model.AsAIAgent(
+            instructions: "You help the user put widgets on the dashboard open in their browser. Find widgets with list_widgets and propose each with propose_widget; never name a widget list_widgets did not list. "
+                + "The user accepts or discards a proposal and saves the dashboard; never say a widget was added or saved.",
+            name: "dashboards",
+            description: "Proposes widgets for the user's dashboard from the widgets the modules declare.",
+            tools:
+            [
+                DispatcherTool.For<ListWidgets>(dispatcher, "Lists the widgets the user may put on a dashboard, a page at a time: each one's id, title and kind (Chart or Table)."),
+                DispatcherTool.For<ProposeWidget>(dispatcher, "Proposes one widget for the open dashboard, which the user then accepts or discards; it saves nothing."),
+            ]);
+}

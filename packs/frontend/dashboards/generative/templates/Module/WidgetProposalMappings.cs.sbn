@@ -1,0 +1,14 @@
+using {{ namespace }}.BuildingBlocks.Dashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.DTOs;
+
+public static class WidgetProposalMappings
+{
+    /// <summary>The declared widget as a proposal, under its declared title: the model chooses the widget, not its name.</summary>
+    public static WidgetProposalDto ToWidgetProposalDto(this WidgetDefinition widget, string visual, string? replaces)
+    {
+        {{ not_null "widget" }}
+
+        return new WidgetProposalDto(widget.Id, widget.Title, visual, replaces);
+    }
+}

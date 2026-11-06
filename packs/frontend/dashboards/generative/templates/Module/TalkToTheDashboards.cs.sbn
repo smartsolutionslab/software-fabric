@@ -1,0 +1,16 @@
+using System.Text.Json;
+using {{ namespace }}.BuildingBlocks.Agents;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Queries.TalkToTheDashboards;
+
+/// <summary>
+/// One run of a conversation with the dashboards agent, as the browser posts it to <c>/agents/dashboards</c>. Its state
+/// carries the open dashboard's draft, <c>{ "widgets": [{ "key", "source", "visual" }] }</c>: untrusted, read-only context.
+/// </summary>
+public sealed record TalkToTheDashboards(IReadOnlyList<ChatMessage> Messages, JsonElement? State) : IAgentConversation<TalkToTheDashboards>
+{
+    public static string AgentName => "dashboards";
+
+    public static TalkToTheDashboards Start(IReadOnlyList<ChatMessage> messages, JsonElement? state) => new(messages, state);
+}
