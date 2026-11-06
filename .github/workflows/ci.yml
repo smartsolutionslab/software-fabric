@@ -41,21 +41,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-      # apt stalls at ~30 kB/s on some runners' first mirror (#218); a short timeout makes it retry and fall over to the
-      # next mirror in the runner's list instead of waiting out each package.
-      - run: printf 'Acquire::http::Timeout "10";\nAcquire::Retries "5";\n' | sudo tee /etc/apt/apt.conf.d/99-timeouts
       # The sign-in test drives a generated app in Chromium.
-      # Chromium is cached per OS and Playwright version (#218): downloading it took up to 11 min on some runners. A
-      # hit still installs the system libraries, which live outside the cache.
-      - id: playwright
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      - uses: ./.github/actions/playwright-chromium
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}
-      - if: steps.playwright.outputs.cache-hit != 'true'
-        run: npx --yes "playwright@$PLAYWRIGHT_VERSION" install --with-deps chromium
-      - if: steps.playwright.outputs.cache-hit == 'true'
-        run: npx --yes "playwright@$PLAYWRIGHT_VERSION" install-deps chromium
+          version: ${{ env.PLAYWRIGHT_VERSION }}
       # Generated AppHosts use the Aspire CLI bundle; set it up once instead of letting parallel builds race to do it.
       - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
       - run: dotnet build Fabric.slnx -c Release
@@ -135,21 +124,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-      # apt stalls at ~30 kB/s on some runners' first mirror (#218); a short timeout makes it retry and fall over to the
-      # next mirror in the runner's list instead of waiting out each package.
-      - run: printf 'Acquire::http::Timeout "10";\nAcquire::Retries "5";\n' | sudo tee /etc/apt/apt.conf.d/99-timeouts
       # The generated project's e2e tests drive Chromium; its own `playwright install` finds it here on a hit.
-      # Chromium is cached per OS and Playwright version (#218): downloading it took up to 11 min on some runners. A
-      # hit still installs the system libraries, which live outside the cache.
-      - id: playwright
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      - uses: ./.github/actions/playwright-chromium
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}
-      - if: steps.playwright.outputs.cache-hit != 'true'
-        run: npx --yes "playwright@$PLAYWRIGHT_VERSION" install --with-deps chromium
-      - if: steps.playwright.outputs.cache-hit == 'true'
-        run: npx --yes "playwright@$PLAYWRIGHT_VERSION" install-deps chromium
+          version: ${{ env.PLAYWRIGHT_VERSION }}
       - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
       - run: dotnet build Fabric.slnx -c Release
       - run: build/profile-ci.sh "${{ matrix.profile }}"
