@@ -1,5 +1,19 @@
+{{~ if module.name == "assistant" && object.has_key(project, "frontend.agent-ui") && project["frontend.agent-ui"] == "ag-ui" ~}}
+<script setup lang="ts">
+// The module the agent panel choice brings; its screen is a conversation with its agent (docs/adr).
+import AgentPanel from '@/agents/AgentPanel.vue';
+</script>
+
+<template>
+  <main>
+    <h1>{{ module.namespace }}</h1>
+    <AgentPanel agent="assistant" />
+  </main>
+</template>
+{{~ else ~}}
 <template>
   <main>
     <h1>{{ module.namespace }}</h1>
   </main>
 </template>
+{{~ end ~}}

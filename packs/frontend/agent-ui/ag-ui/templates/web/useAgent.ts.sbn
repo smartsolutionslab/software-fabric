@@ -1,3 +1,49 @@
+{{~ if project["frontend.framework"] == "vue" ~}}
+import { randomUUID, type Message } from '@ag-ui/client';
+import { onScopeDispose, ref, shallowRef } from 'vue';
+import { connectAgent } from './connectAgent';
+
+/**
+ * A conversation with one agent: its messages, updated as each answer streams in, whether a run is under way, and why
+ * the last run failed. The agent keeps the conversation, so every run sends all of it. Call it in a component's setup:
+ * the conversation ends with the component.
+ */
+export function useAgent(name: string) {
+  const agent = connectAgent(name);
+  const messages = shallowRef<readonly Message[]>([]);
+  const running = ref(false);
+  const failure = ref<string>();
+
+  const subscription = agent.subscribe({
+    onMessagesChanged: ({ messages: changed }) => {
+      messages.value = [...changed];
+    },
+    // A failure the host streams as RUN_ERROR ends the run without rejecting runAgent.
+    onRunErrorEvent: ({ event }) => {
+      failure.value = event.message;
+    },
+  });
+  onScopeDispose(() => {
+    subscription.unsubscribe();
+    agent.abortRun();
+  });
+
+  async function send(text: string) {
+    failure.value = undefined;
+    running.value = true;
+    agent.addMessage({ id: randomUUID(), role: 'user', content: text });
+    try {
+      await agent.runAgent();
+    } catch (error) {
+      failure.value = error instanceof Error ? error.message : String(error);
+    } finally {
+      running.value = false;
+    }
+  }
+
+  return { messages, running, failure, send };
+}
+{{~ else ~}}
 import { randomUUID, type Message } from '@ag-ui/client';
 import { useCallback, useEffect, useState } from 'react';
 import { connectAgent } from './connectAgent';
@@ -46,3 +92,4 @@ export function useAgent(name: string) {
 
   return { messages, running, failure, send };
 }
+{{~ end ~}}
