@@ -10,6 +10,7 @@ import { DashboardEditor } from './DashboardEditor';
 
 const save = vi.fn();
 const refetch = vi.fn();
+const refetchWidget = vi.fn();
 const fetchMock = vi.fn<typeof fetch>();
 
 const sales: DashboardDto = {
@@ -52,7 +53,7 @@ vi.mock('@/api/generated', () => ({
   },
   useGetDashboardsWidgetsByIdQuery: ({ id }: { id: string }) => ({
     data: id === 'dashboards.my-dashboards' ? table : chart,
-    refetch,
+    refetch: refetchWidget,
   }),
   useGetDashboardsWidgetDeclarationsByIdQuery: ({ id }: { id: string }) => ({
     data: catalog.find((widget) => widget.id === id),
@@ -83,6 +84,16 @@ function eventStream() {
   };
 }
 
+/** The agent's propose_widget call with the arguments, in its message, and the host's result for it. */
+function proposalCall(id: string, message: string, args: object, result: string) {
+  return [
+    { type: 'TOOL_CALL_START', toolCallId: id, toolCallName: 'propose_widget', parentMessageId: message },
+    { type: 'TOOL_CALL_ARGS', toolCallId: id, delta: JSON.stringify(args) },
+    { type: 'TOOL_CALL_END', toolCallId: id },
+    { type: 'TOOL_CALL_RESULT', messageId: `${id}-result`, toolCallId: id, content: result, role: 'tool' },
+  ];
+}
+
 /** One run in which the agent calls propose_widget with the arguments and the host answers the tool with the result. */
 function proposalRun(id: string, args: object, result: string) {
   const run = eventStream();
@@ -90,10 +101,7 @@ function proposalRun(id: string, args: object, result: string) {
   return () => {
     run.send(
       { type: 'RUN_STARTED', threadId: 'thread-1', runId: id },
-      { type: 'TOOL_CALL_START', toolCallId: id, toolCallName: 'propose_widget', parentMessageId: `${id}-message` },
-      { type: 'TOOL_CALL_ARGS', toolCallId: id, delta: JSON.stringify(args) },
-      { type: 'TOOL_CALL_END', toolCallId: id },
-      { type: 'TOOL_CALL_RESULT', messageId: `${id}-result`, toolCallId: id, content: result, role: 'tool' },
+      ...proposalCall(id, `${id}-message`, args, result),
       { type: 'TEXT_MESSAGE_START', messageId: `${id}-answer`, role: 'assistant' },
       { type: 'TEXT_MESSAGE_CONTENT', messageId: `${id}-answer`, delta: 'Here it is.' },
       { type: 'TEXT_MESSAGE_END', messageId: `${id}-answer` },
@@ -115,6 +123,7 @@ beforeEach(() => {
   save.mockReset();
   save.mockReturnValue({ unwrap: () => Promise.resolve(sales.id) });
   refetch.mockReset();
+  refetchWidget.mockReset();
 });
 
 // Vitest runs without globals, so Testing Library cannot register its own cleanup.
@@ -186,6 +195,70 @@ test('a proposed widget shows on the grid as pending with its data, and Accept o
       ],
     },
   });
+});
+
+test('two proposals of one run both wait on the grid, and each is accepted or discarded on its own', async () => {
+  const user = userEvent.setup();
+  const run = eventStream();
+  fetchMock.mockResolvedValueOnce(run.response);
+  const pie = { source: 'dashboards.widget-counts', title: 'Widgets per dashboard', visual: 'pie', replaces: null };
+  render(<DashboardEditor />);
+  await openSales(user);
+
+  await ask(user, 'Show my dashboards, and the counts as a pie');
+  run.send(
+    { type: 'RUN_STARTED', threadId: 'thread-1', runId: 'run-1' },
+    ...proposalCall(
+      'call-1',
+      'answer-1',
+      { source: myDashboards.source, visual: 'table', replaces: null },
+      JSON.stringify(myDashboards),
+    ),
+    ...proposalCall('call-2', 'answer-1', { source: pie.source, visual: 'pie', replaces: null }, JSON.stringify(pie)),
+    { type: 'RUN_FINISHED', threadId: 'thread-1', runId: 'run-1' },
+  );
+  run.close();
+
+  const proposedPie = await screen.findByRole('region', { name: 'Proposed: Widgets per dashboard' });
+  expect(screen.getByRole('region', { name: 'Proposed: My dashboards' })).toBeInTheDocument();
+  await user.click(within(proposedPie).getByRole('button', { name: 'Accept' }));
+  const proposedTable = screen.getByRole('region', { name: 'Proposed: My dashboards' });
+  await user.click(within(proposedTable).getByRole('button', { name: 'Discard' }));
+
+  expect(screen.queryByRole('region', { name: /^Proposed/ })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  expect(save).toHaveBeenCalledWith({
+    id: sales.id,
+    saveDashboardRequest: {
+      name: 'Sales',
+      widgets: [
+        expect.objectContaining({ key: 'counts', source: 'dashboards.widget-counts', visual: 'bar' }),
+        expect.objectContaining({ source: 'dashboards.widget-counts', visual: 'pie', x: 0, y: 4, width: 6, height: 4 }),
+      ],
+    },
+  });
+});
+
+test("saving reads a pending widget's data again, as it does for the placed ones", async () => {
+  const user = userEvent.setup();
+  const answer = proposalRun(
+    'call-1',
+    { source: myDashboards.source, visual: 'table', replaces: null },
+    JSON.stringify(myDashboards),
+  );
+  render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  await user.type(screen.getByLabelText('Dashboard name'), 'Fresh');
+
+  await ask(user, 'Show my dashboards as a table');
+  answer();
+  await screen.findByRole('region', { name: 'Proposed: My dashboards' });
+  expect(refetchWidget).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() => expect(refetchWidget).toHaveBeenCalled());
+  expect(screen.getByRole('region', { name: 'Proposed: My dashboards' })).toBeInTheDocument();
 });
 
 test('Discard takes the proposal away and leaves the draft as it was', async () => {

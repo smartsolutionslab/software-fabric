@@ -267,7 +267,8 @@ public sealed class GenerativeDashboardsTests
         var web = Path.Combine(project.ProjectDirectory, "web");
         var (installExitCode, install) = Shell.Run(web, "pnpm", "install");
         installExitCode.ShouldBe(0, install);
-        var (exitCode, output) = Shell.Run(Path.Combine(web, "app"), "pnpm", "test", "src/dashboards/DashboardAssistant.test.tsx");
+        // Without colours, which CI's runners turn on, so the failed test's line is plain text.
+        var (exitCode, output) = Shell.Run(Path.Combine(web, "app"), new Dictionary<string, string> { ["NO_COLOR"] = "1" }, "pnpm", "test", "src/dashboards/DashboardAssistant.test.tsx");
 
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("FAIL  src/dashboards/DashboardAssistant.test.tsx > a proposed widget shows on the grid as pending with its data, and Accept only puts it on the draft", customMessage: output);
