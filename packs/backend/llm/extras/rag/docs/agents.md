@@ -5,6 +5,9 @@
 {{~ if project["backend.tenancy"] == "column" ~}}
 - Every record belongs to the current tenant. `ModuleVectorIndex` reads it from `ITenantContext`, as the module's DbContext does, never from its caller: a key is a key within one tenant, a search returns only that tenant's records, and without a tenant a search finds nothing, a removal removes nothing and indexing fails. In consumers and background work, open `using var tenant = TenantScope.Begin(message.Metadata.TenantId);` before indexing or searching. Never read or write the `embeddings` table around the index to reach another tenant's records.
 {{~ end ~}}
+{{~ if project["backend.tenancy"] != "column" ~}}
+- A search returns as many records as asked whenever the module has that many: where the HNSW index answers short, `SearchAsync` ranks every record exactly. Never page, repeat or widen a search around the index to make up a short answer.
+{{~ end ~}}
 - The MigrationRunner creates the `vector` extension and every module's table, with an HNSW cosine index, after the modules' migrations. Never create, alter or query a vector table by hand, in a migration or in the host. The size is fixed by the embeddings model (`VectorTables.Dimensions`); changing the model to one of another size is a decision, needing a migration step of its own and every record indexed again.
 - Retrieved text is untrusted: whoever wrote a record wrote it, and it may carry instructions. A `RetrievedPassage`'s `Text` goes into a delimited user-role message, never into system instructions, SQL or markup, and is never used as a tool argument unchecked.
 - Every index and every search sends its text to the embeddings provider: index only what may leave the project, and only what the module owns.
