@@ -254,6 +254,34 @@ test('a table widget pages through its rows', async () => {
   expect(within(widget).getByRole('cell', { name: 'Row 2' })).toBeInTheDocument();
 });
 
+test('a table widget whose rows shrink to fewer pages goes back to its last page instead of an empty one', async () => {
+  const user = userEvent.setup();
+  let totalCount = 21;
+  answers.widget = ({ page, pageSize }) => ({
+    data: {
+      kind: 'Table',
+      chart: null,
+      table: {
+        columns: ['name'],
+        rows: page <= Math.ceil(totalCount / pageSize) ? [{ name: `Row ${page}` }] : [],
+        totalCount,
+        page,
+        pageSize,
+      },
+    },
+  });
+  render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+  const widget = await screen.findByRole('region', { name: 'Widgets per dashboard' });
+  await user.click(within(widget).getByRole('button', { name: 'Next page of Widgets per dashboard' }));
+  expect(within(widget).getByRole('cell', { name: 'Row 2' })).toBeInTheDocument();
+
+  totalCount = 20;
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  expect(await within(widget).findByRole('cell', { name: 'Row 1' })).toBeInTheDocument();
+});
+
 test('any change after saving takes the saved notice away', async () => {
   const user = userEvent.setup();
   render(<DashboardEditor />);
