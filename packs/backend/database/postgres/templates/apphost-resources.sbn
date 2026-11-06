@@ -1,5 +1,13 @@
+{{- if object.has_key(project, "backend.llm.extras") && (array.contains project["backend.llm.extras"] "rag") -}}
+var postgres = builder.AddPostgres("postgres")
+    .WithImage("pgvector/pgvector", "0.8.7-pg18");
+// Aspire places the data volume by the major version in the image tag, which pgvector's tag does not carry; PostgreSQL 18
+// keeps its data under /var/lib/postgresql and refuses to start over a mount at the older /var/lib/postgresql/data.
+var database = postgres
+    .WithVolume(VolumeNameGenerator.Generate(postgres, "data"), "/var/lib/postgresql")
+    .AddDatabase("database");
+{{- else -}}
 var database = builder.AddPostgres("postgres")
-{{- if object.has_key(project, "backend.llm.extras") && (array.contains project["backend.llm.extras"] "rag") }}
-    .WithImage("pgvector/pgvector", "0.8.7-pg18"){{ end }}
     .WithDataVolume()
     .AddDatabase("database");
+{{- end -}}
