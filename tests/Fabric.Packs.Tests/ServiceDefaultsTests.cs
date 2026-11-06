@@ -4,13 +4,51 @@ namespace Fabric.Packs.Tests;
 
 /// <summary>
 /// The base's ServiceDefaults: every HttpClient retries only idempotent methods unless a client opts back in, and the
-/// standard resilience handler is registered there once, for every client.
+/// standard resilience handler is registered there once, for every client. The tracer listens to the application's own
+/// source and to the sources other packs name through <c>service-defaults.activity-sources</c>.
 /// </summary>
 public sealed partial class ServiceDefaultsTests
 {
     private const string Profile = "saas-standard-react";
 
     private const string ArchitectureTests = "tests/Architecture.Tests/Architecture.Tests.csproj";
+
+    private const string TracedSourceTests = """
+        using System.Diagnostics;
+        using Microsoft.Extensions.DependencyInjection;
+        using Microsoft.Extensions.Hosting;
+        using OpenTelemetry;
+        using OpenTelemetry.Trace;
+
+        namespace Shop.Architecture.Tests.Probes;
+
+        public sealed class TracedSourceTests
+        {
+            [Fact]
+            public void The_service_defaults_trace_a_source_another_pack_names_and_not_one_nobody_names()
+            {
+                var builder = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(settings: null);
+                builder.AddServiceDefaults();
+                List<string> ended = [];
+                builder.Services.ConfigureOpenTelemetryTracerProvider(tracing => tracing.AddProcessor(new EndedSpans(ended)));
+                using var provider = builder.Services.BuildServiceProvider();
+                provider.GetRequiredService<TracerProvider>();
+
+                foreach (var name in new[] { "Shop.Probe", "Shop.Unnamed" })
+                {
+                    using var source = new ActivitySource(name);
+                    using var span = source.StartActivity("probe");
+                }
+
+                ended.ShouldBe(["Shop.Probe"]);
+            }
+        }
+
+        internal sealed class EndedSpans(List<string> sources) : BaseProcessor<Activity>
+        {
+            public override void OnEnd(Activity data) => sources.Add(data.Source.Name);
+        }
+        """;
 
     [Fact]
     public void A_default_http_client_retries_a_get_but_not_a_post_and_a_client_can_opt_back_in()
@@ -78,6 +116,28 @@ public sealed partial class ServiceDefaultsTests
         output.ShouldNotContain("BillingHttpClients.cs:8:");
         output.ShouldNotContain("BillingHttpClients.cs:11:");
         output.ShouldNotContain("BillingHttpClients.cs:14:");
+    }
+
+    [Fact]
+    public void A_source_another_pack_names_through_the_slot_is_traced_by_the_service_defaults()
+    {
+        // contract-tests has no pack yet; the probe takes its place and fills the slot.
+        using var probe = new ProbePack("backend.test.extras.contract-tests", new Dictionary<string, string>
+        {
+            ["service-defaults.activity-sources"] = "\"Shop.Probe\"",
+        });
+        using var project = new GeneratedProject(Profile, [probe.Manifest], "backend.test.extras=contract-tests");
+        project.WriteTypes("tests/Architecture.Tests/Probes", TracedSourceTests);
+        project.Build();
+
+        var (exitCode, output) = project.DotNetCommand(
+            new Dictionary<string, string>(),
+            "test", "--project", ArchitectureTests, "-c", "Release", "--no-build", "--no-ansi",
+            "--", "--filter-class", "Shop.Architecture.Tests.Probes.TracedSourceTests");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("succeeded: 1", customMessage: output);
+        output.ShouldContain("failed: 0", customMessage: output);
     }
 
     [Fact]

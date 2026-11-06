@@ -22,5 +22,6 @@ Tests never call a model. In Development, the AppHost parameter `model-stand-in`
 ## Consequences
 
 - Every message a user sends is a request to the provider, tool results included, with its cost; a conversation's history travels with every run, from the browser.
+- A run that fails after its stream has started reaches the browser only as a generic `RUN_ERROR`, so no exception text leaks to it. The cause is in the trace: ServiceDefaults listen to the SDK's source (`Experimental.AGUI.Server`), whose `agui.run` span ends with an error status, the exception's message and its type (`error.type`).
 - An agent's answer is untrusted input: the panel shows it as text and never executes it.
 - What the gate cannot see: an endpoint that speaks the AG-UI wire format by hand without the SDK, and which use cases an agent is given. Give an agent only the use cases its users may call.

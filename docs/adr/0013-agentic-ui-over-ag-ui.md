@@ -133,6 +133,11 @@ none is a new choice of option.
   `AspireFixture` sets it (`integration-tests.parameters`). `e2e.sh` has no
   slot for it yet; the React panel's end-to-end test (#203) adds that, since
   it is the first end-to-end test that needs it.
+- **A run that fails mid-stream** reaches the browser as the SDK's generic
+  `RUN_ERROR`. The SDK traces the cause on its `agui.run` span, on the source
+  `AGUIServerInstrumentation.ActivitySourceName` (`Experimental.AGUI.Server`),
+  and only while something listens. The pack names that source through the
+  base's `service-defaults.activity-sources` slot (#205).
 - **The gate** `AgentUiGoesThroughAQuery` reads the compiled assemblies: the
   modules and the BuildingBlocks reference no `AGUI.*`, the host (which the
   architecture tests already reference for their endpoint rules) references
