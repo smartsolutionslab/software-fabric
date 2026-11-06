@@ -171,7 +171,7 @@ public sealed class VueFrontendTests
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "build");
 
         exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("The orval pack generates TanStack Query hooks for Vue with frontend.state pinia-tanstack-query only so far");
+        output.ShouldContain("The orval pack generates TanStack Query hooks for Vue with frontend.state tanstack-query or pinia-tanstack-query only so far");
     }
 
     private static GeneratedProject Generate(params string[] overrides) => new(Profile, overrides);
