@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
 using Fabric.Core.Choices;
 using Fabric.Core.Generation;
+using Fabric.Core.Packs;
+using Fabric.Core.Rendering;
 
 namespace Fabric.Packs.Tests;
 
@@ -226,6 +228,42 @@ public sealed class DashboardsTests
             files.Single(file => file.Key.StartsWith("web/app/src/modules/dashboards/DashboardsPage.", StringComparison.Ordinal)).Value
                 .ShouldNotContain("DashboardEditor", customMessage: profile);
         }
+    }
+
+    /// <summary>
+    /// Only <c>spa</c> has a pack today, so no profile can reach another architecture; the two packs' templates are rendered
+    /// with a project that chooses it, to show the module page names the editor exactly where the editor is generated.
+    /// </summary>
+    [Theory]
+    [InlineData("spa")]
+    [InlineData("multi-app")]
+    public void The_module_page_renders_the_dashboard_editor_only_where_the_editor_is_generated(string architecture)
+    {
+        var router = Repository.Packs.Packs["frontend.routing.react-router"];
+        var dashboards = Repository.Packs.Packs["frontend.dashboards.user-editable"];
+        var choices = new ProjectChoices(
+            new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["frontend.framework"] = ["react"],
+                ["frontend.architecture"] = [architecture],
+                ["frontend.api-client"] = ["rtk-query-codegen"],
+                ["frontend.dashboards"] = ["user-editable"],
+            },
+            new Dictionary<string, IReadOnlyList<string>>(),
+            new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> { ["dashboards"] = new Dictionary<string, IReadOnlyList<string>>() });
+        const string Page = "web/app/src/modules/dashboards/DashboardsPage.tsx";
+        const string Editor = "web/app/src/dashboards/DashboardEditor.tsx";
+        List<ComposedFile> files =
+        [
+            new(router, router.Files.Single(file => file.Template == "templates/module-page.tsx.sbn"), Page, "dashboards"),
+            new(dashboards, dashboards.Files.Single(file => file.Target == Editor), Editor, null),
+        ];
+
+        var rendered = Renderer.Render(Repository.Catalog, new Composition([router, dashboards], files, new Dictionary<string, IReadOnlyList<SlotEntry>>(), []), choices, "shop");
+
+        rendered.Errors.ShouldBeEmpty();
+        var generated = rendered.Files.ToDictionary(file => file.Path, file => file.Content);
+        generated[Page].Contains("DashboardEditor", StringComparison.Ordinal).ShouldBe(generated.ContainsKey(Editor), architecture);
     }
 
     [Fact]
