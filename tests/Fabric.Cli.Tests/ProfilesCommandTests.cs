@@ -9,7 +9,7 @@ public class ProfilesCommandTests
 
         run.ExitCode.ShouldBe(0);
         run.Output.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
-            .ShouldBe(["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud", "saas-strict-react"]);
+            .ShouldBe(["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud", "saas-strict-react", "saas-ai-react"]);
     }
 
     [Fact]

@@ -90,6 +90,25 @@ public class ChoiceResolverTests
     }
 
     [Fact]
+    public void The_ai_profile_adds_openai_agents_rag_evals_the_agent_panel_and_dashboards_to_the_standard_react_profile()
+    {
+        var choices = ResolveSuccessfully("saas-ai-react");
+        var standard = ResolveSuccessfully("saas-standard-react");
+
+        choices.Project["backend.llm"].ShouldBe(["openai"]);
+        choices.Project["backend.llm.agents"].ShouldBe(["agent-framework"]);
+        choices.Project["backend.llm.extras"].ShouldBe(["rag", "evals"]);
+        choices.Project["backend.llm.embeddings"].ShouldBe(["openai"], "the embeddings follow backend.llm (default-from).");
+        choices.Project["frontend.agent-ui"].ShouldBe(["ag-ui"]);
+        choices.Project["frontend.dashboards"].ShouldBe(["user-editable", "generative"]);
+        choices.Settings["backend.llm.extras.evals.threshold"].ShouldBe(4m);
+        foreach (var (dimension, options) in standard.Project.Where(choice => choice.Key is not ("backend.llm" or "frontend.dashboards")))
+        {
+            choices.Project[dimension].ShouldBe(options, dimension);
+        }
+    }
+
+    [Fact]
     public void Overrides_win_over_the_profile_and_activate_dependent_dimensions()
     {
         var choices = ResolveSuccessfully("lean-crud", "backend.bus.transport=kafka");
