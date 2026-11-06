@@ -134,6 +134,11 @@ none is a new choice of option.
   through the slot the React panel added for it (below). Only a tool result
   after the latest user message counts, so every turn of a conversation calls
   the tool again (#203).
+- **A run that fails mid-stream** reaches the browser as the SDK's generic
+  `RUN_ERROR`. The SDK traces the cause on its `agui.run` span, on the source
+  `AGUIServerInstrumentation.ActivitySourceName` (`Experimental.AGUI.Server`),
+  and only while something listens. The pack names that source through the
+  base's `service-defaults.activity-sources` slot (#205).
 - **The gate** `AgentUiGoesThroughAQuery` reads the compiled assemblies: the
   modules and the BuildingBlocks reference no `AGUI.*`, the host (which the
   architecture tests already reference for their endpoint rules) references
