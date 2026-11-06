@@ -1,4 +1,13 @@
-{{~ if module.name == "assistant" && object.has_key(project, "frontend.agent-ui") && project["frontend.agent-ui"] == "ag-ui" ~}}
+{{~ if module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains project["frontend.dashboards"] "user-editable" && project["frontend.api-client"] == "orval" && project["frontend.architecture"] == "spa" ~}}
+<script setup lang="ts">
+// The module the dashboards choice brings; its screen is that choice's dashboard editor (docs/adr).
+import DashboardEditor from '@/dashboards/DashboardEditor.vue';
+</script>
+
+<template>
+  <DashboardEditor />
+</template>
+{{~ else if module.name == "assistant" && object.has_key(project, "frontend.agent-ui") && project["frontend.agent-ui"] == "ag-ui" ~}}
 <script setup lang="ts">
 // The module the agent panel choice brings; its screen is a conversation with its agent (docs/adr).
 import AgentPanel from '@/agents/AgentPanel.vue';

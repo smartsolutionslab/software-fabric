@@ -9,6 +9,7 @@ import type {
   PagedResultOfDashboardSummaryDto,
   PagedResultOfWidgetDescriptionDto,
   WidgetData,
+  WidgetDescriptionDto,
 } from '@/api/generated';
 import { DashboardEditor } from './DashboardEditor';
 
@@ -69,6 +70,7 @@ interface Answers {
   detail: () => Answer<DashboardDto>;
   catalog: (arg: PageArg) => Answer<PagedResultOfWidgetDescriptionDto>;
   widget: (arg: PageArg & { id: string }) => Answer<WidgetData>;
+  declaration: (arg: { id: string }) => Answer<WidgetDescriptionDto>;
 }
 
 /** What each generated hook answers in a test; reset before every test, changed by the tests that need more. */
@@ -77,6 +79,7 @@ const answers: Answers = {
   detail: () => ({ data: sales }),
   catalog: () => ({ data: catalog }),
   widget: ({ id }) => ({ data: id === 'dashboards.my-dashboards' ? table : chart }),
+  declaration: ({ id }) => ({ data: catalog.items.find((widget) => widget.id === id) }),
 };
 const defaults = { ...answers };
 
@@ -94,6 +97,7 @@ vi.mock('@/api/generated', () => ({
     ...answers.widget(arg),
     refetch: refetchWidget,
   }),
+  useGetDashboardsWidgetDeclarationsByIdQuery: (arg: { id: string }) => answers.declaration(arg),
   usePutDashboardsByIdMutation: () => [save, { isLoading: false }],
 }));
 
@@ -445,4 +449,33 @@ test('while the next page of the widget picker loads, it offers nothing from the
   expect(screen.getByLabelText('Widget')).toBeEnabled();
   expect(screen.getByRole('option', { name: 'Trend' })).toBeInTheDocument();
   expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+});
+
+test("a saved dashboard's widgets keep their titles whatever page of the widget picker is on screen", async () => {
+  const user = userEvent.setup();
+  answers.catalog = ({ page }) => ({
+    data: { items: [page === 1 ? rows : trend], totalCount: 101, page, pageSize: 100 },
+  });
+  answers.declaration = ({ id }) => ({ data: [rows, trend].find((widget) => widget.id === id) });
+  answers.detail = () => ({
+    data: {
+      ...sales,
+      widgets: [
+        { key: 'first', source: rows.id, visual: 'table', x: 0, y: 0, width: 6, height: 4 },
+        { key: 'second', source: trend.id, visual: 'line', x: 6, y: 0, width: 6, height: 4 },
+      ],
+    },
+  });
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  expect(await screen.findByRole('region', { name: 'Rows' })).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: 'Trend' })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Next page of widgets' }));
+
+  expect(screen.getByRole('heading', { name: 'Rows' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Remove Rows' })).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: 'Trend' })).toBeInTheDocument();
 });

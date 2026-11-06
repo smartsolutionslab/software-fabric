@@ -2,6 +2,8 @@ option: backend.llm.agents.agent-framework
 files:
   - { template: templates/DispatcherTool.cs.sbn, target: src/BuildingBlocks/Agents/DispatcherTool.cs }
   - { template: templates/UseCaseFunction.cs.sbn, target: src/BuildingBlocks/Agents/UseCaseFunction.cs }
+  - { template: templates/PageJsonConverter.cs.sbn, target: src/BuildingBlocks/Agents/PageJsonConverter.cs }
+  - { template: templates/PageSizeJsonConverter.cs.sbn, target: src/BuildingBlocks/Agents/PageSizeJsonConverter.cs }
   - { template: templates/OptionJsonConverter.cs.sbn, target: src/BuildingBlocks/Agents/OptionJsonConverter.cs, when: 'project["backend.absence"] == "option"' }
   - { template: templates/OptionJsonConverterFactory.cs.sbn, target: src/BuildingBlocks/Agents/OptionJsonConverterFactory.cs, when: 'project["backend.absence"] == "option"' }
   - { template: templates/IAgentMcpTools.cs.sbn, target: src/BuildingBlocks/Agents/IAgentMcpTools.cs, when: 'array.contains project["backend.mcp"] "client"' }
@@ -18,6 +20,14 @@ files:
   - { template: templates/tests/CountWords.cs.sbn, target: tests/Agents.Tests/CountWords.cs }
   - { template: templates/tests/CountWordsHandler.cs.sbn, target: tests/Agents.Tests/CountWordsHandler.cs }
   - { template: templates/tests/NothingToCount.cs.sbn, target: tests/Agents.Tests/NothingToCount.cs }
+  - { template: templates/tests/ListWords.cs.sbn, target: tests/Agents.Tests/ListWords.cs }
+  - { template: templates/tests/ListWordsHandler.cs.sbn, target: tests/Agents.Tests/ListWordsHandler.cs }
+  - { template: templates/tests/BrowseWords.cs.sbn, target: tests/Agents.Tests/BrowseWords.cs }
+  - { template: templates/tests/BrowseWordsHandler.cs.sbn, target: tests/Agents.Tests/BrowseWordsHandler.cs }
+  - { template: templates/tests/ShelfCode.cs.sbn, target: tests/Agents.Tests/ShelfCode.cs }
+  - { template: templates/tests/FindShelf.cs.sbn, target: tests/Agents.Tests/FindShelf.cs }
+  - { template: templates/tests/ShelfLabel.cs.sbn, target: tests/Agents.Tests/ShelfLabel.cs }
+  - { template: templates/tests/LabelShelf.cs.sbn, target: tests/Agents.Tests/LabelShelf.cs }
   - { template: templates/tests/LongestWord.cs.sbn, target: tests/Agents.Tests/LongestWord.cs, when: 'project["backend.absence"] == "option"' }
   - { template: templates/tests/LongestWordHandler.cs.sbn, target: tests/Agents.Tests/LongestWordHandler.cs, when: 'project["backend.absence"] == "option"' }
   - { template: templates/tests/Trail.cs.sbn, target: tests/Agents.Tests/Trail.cs, when: 'project["backend.absence"] == "option"' }
@@ -48,4 +58,4 @@ gates:
   - { kind: architecture-test, describes: "Only a module's Application project references Microsoft Agent Framework (Microsoft.Agents.AI*): an agent defined, created or run in a module's Domain, Infrastructure or Api, or in the BuildingBlocks, fails the build naming the assembly.", file: templates/AgentsLiveInApplication.cs.sbn }
   - { kind: architecture-test, describes: "Every tool a module gives an agent is a command or query made with DispatcherTool.For, sent through IDispatcher: a module type deriving from AITool, or code that makes one another way (new, AIFunctionFactory.Create, an agent's AsAIFunction), fails the build naming the type.", file: templates/AgentToolsGoThroughTheDispatcher.cs.sbn }
   - { kind: architecture-test, describes: "Every command or query a module makes an agent's tool of with DispatcherTool.For is one DispatcherTool.Problems accepts, the definition the tool itself checks: a command or query, and with Option absence no Option inside a collection or dictionary; otherwise the build fails naming the request and the property.", file: templates/EveryAgentToolRequestIsValid.cs.sbn }
-  - { kind: unit-test, describes: "A query runs a sample agent against a stand-in model that asks for a tool call; the tool's query goes through the dispatcher to its handler and the agent answers with its result. Arguments that do not fit never reach the handler, a failed Result reaches the model as its error code, and with the MCP client an agent calls a declared server's tool.", file: templates/tests/AgentTests.cs.sbn }
+  - { kind: unit-test, describes: "A query runs a sample agent against a stand-in model that asks for a tool call; the tool's query goes through the dispatcher to its handler and the agent answers with its result. Arguments that do not fit, that no constructor can build the request from or that a constructor refuses never reach the handler and the run goes on; a paged query is a tool whose Page and PageSize are whole numbers within their bounds; a failed Result reaches the model as its error code, and with the MCP client an agent calls a declared server's tool.", file: templates/tests/AgentTests.cs.sbn }

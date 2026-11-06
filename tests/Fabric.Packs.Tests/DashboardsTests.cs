@@ -149,6 +149,10 @@ public sealed class DashboardsTests
                 var run = await manager.GetFromJsonAsync<JsonObject>("/dashboards/widgets/billing.revenue?page=1&pageSize=20", cancellationToken);
                 run!["chart"]!["series"]![0]!["values"]![0]!.GetValue<decimal>().ShouldBe(42m);
                 (await visitor.GetAsync(new Uri("/dashboards/widgets/billing.revenue?page=1&pageSize=20", UriKind.Relative), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+                var declaration = await manager.GetFromJsonAsync<JsonObject>("/dashboards/widget-declarations/billing.revenue", cancellationToken);
+                declaration!["title"]!.GetValue<string>().ShouldBe("Revenue");
+                (await visitor.GetAsync(new Uri("/dashboards/widget-declarations/billing.revenue", UriKind.Relative), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
             }
 
             private static List<string> Ids(JsonObject catalog) =>
@@ -189,6 +193,13 @@ public sealed class DashboardsTests
     }
 
     [Fact]
+    public void The_frontends_openapi_document_describes_the_lookup_of_one_widget_declaration()
+    {
+        Files(Profile, Dashboards)["web/app/openapi.json"].ShouldContain("\"/dashboards/widget-declarations/{id}\"");
+        Files("saas-standard-vue", Dashboards)["web/app/openapi.json"].ShouldContain("\"/dashboards/widget-declarations/{id}\"");
+    }
+
+    [Fact]
     public void The_react_spa_gets_the_dashboard_page_on_react_grid_layout_and_the_module_page_renders_it()
     {
         var files = Files(Profile, Dashboards);
@@ -212,12 +223,26 @@ public sealed class DashboardsTests
         without["web/app/src/dashboards/DashboardEditor.test.tsx"].ShouldNotContain("axe");
     }
 
+    /// <summary>
+    /// Where the page imports no styles its <c>web.styles</c> contribution renders empty, and an empty contribution adds no
+    /// separator: <c>src/index.css</c> stays as it is without dashboards, with no blank first line for Prettier to refuse.
+    /// </summary>
+    [Theory]
+    [InlineData("lean-crud")]
+    [InlineData("industrial-event-driven-mfe")]
+    [InlineData("saas-standard-vue")]
+    public void Where_the_page_imports_no_styles_index_css_is_the_same_as_without_dashboards(string profile)
+    {
+        const string Styles = "web/app/src/index.css";
+
+        Files(profile, Dashboards)[Styles].ShouldBe(Files(profile)[Styles]);
+    }
+
     [Fact]
     public void Where_the_page_is_not_built_yet_the_module_keeps_the_routers_placeholder_page()
     {
         foreach (var (profile, overrides) in new[]
         {
-            ("saas-standard-vue", new[] { Dashboards }),
             ("lean-crud", new[] { Dashboards }),
             ("industrial-event-driven-mfe", new[] { Dashboards }),
         })

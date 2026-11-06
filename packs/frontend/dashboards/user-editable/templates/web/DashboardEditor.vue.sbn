@@ -1,0 +1,118 @@
+{%{<script setup lang="ts">
+import { keepPreviousData } from '@tanstack/vue-query';
+import { computed, ref, watch } from 'vue';
+import { useGetDashboards, useGetDashboardsId } from '@/api/generated';
+import { Button } from '@/components/ui/button';
+import DashboardCanvas from './DashboardCanvas.vue';
+import Failure from './Failure.vue';
+import { fromSaved, type Placement } from './layout';
+import Pager from './Pager.vue';
+import { uuidV7 } from './uuidV7';
+
+const pageSize = 100;
+
+interface Opened {
+  id: string;
+  isNew: boolean;
+}
+
+interface Draft {
+  id: string;
+  name: string;
+  widgets: Placement[];
+}
+
+/** The signed-in user's dashboards: open one or start a new one, then edit and save it. */
+const page = ref(1);
+// As the list pages, the page before stays until the next arrives, so the list and its pager do not blink.
+const {
+  data: dashboards,
+  isError: listFailed,
+  refetch: refetchList,
+} = useGetDashboards(
+  computed(() => ({ page: page.value, pageSize })),
+  { query: { placeholderData: keepPreviousData } },
+);
+const opened = ref<Opened>();
+const draft = ref<Draft>();
+const {
+  data: detail,
+  isFetching: detailFetching,
+  isError: detailFailed,
+  refetch: refetchDetail,
+} = useGetDashboardsId(
+  computed(() => opened.value?.id ?? ''),
+  { query: { enabled: computed(() => opened.value?.isNew === false) } },
+);
+
+// A dashboard opened again is edited from what the host answers now: never from the copy cached before a save, nor
+// from the one the cache keeps when the refresh fails. Once open, it is the user's draft: a later refresh leaves it be.
+watch(
+  [opened, detail, detailFetching, detailFailed],
+  ([current, saved, fetching, failed]) => {
+    if (current && !current.isNew && !draft.value && !fetching && !failed && saved?.id === current.id) {
+      draft.value = { id: saved.id, name: saved.name, widgets: fromSaved(saved.widgets) };
+    }
+  },
+  { immediate: true },
+);
+
+function open(id: string) {
+  if (opened.value?.id === id) {
+    return;
+  }
+
+  draft.value = undefined;
+  opened.value = { id, isNew: false };
+}
+
+function start() {
+  const id = uuidV7();
+  opened.value = { id, isNew: true };
+  draft.value = { id, name: '', widgets: [] };
+}
+</script>
+
+<template>
+  <main class="flex flex-col gap-4 p-4">
+    <h1 class="text-xl font-semibold">Dashboards</h1>
+    <nav aria-label="Your dashboards" class="flex flex-wrap items-center gap-2">
+      <Failure
+        v-if="listFailed"
+        message="Your dashboards could not be loaded."
+        retry="Try loading your dashboards again"
+        @retry="refetchList()"
+      />
+      <template v-else>
+        <Button
+          v-for="dashboard in dashboards?.items ?? []"
+          :key="dashboard.id"
+          variant="outline"
+          :aria-pressed="String(opened?.id === dashboard.id)"
+          @click="open(dashboard.id)"
+        >
+          {{ dashboard.name }}
+        </Button>
+      </template>
+      <Button @click="start()">New dashboard</Button>
+      <Pager
+        label="your dashboards"
+        :page="page"
+        :page-size="pageSize"
+        :total="dashboards?.totalCount"
+        @page="page = $event"
+      />
+    </nav>
+    <template v-if="opened && !opened.isNew && !draft">
+      <Failure
+        v-if="detailFailed"
+        message="This dashboard could not be loaded."
+        retry="Try loading the dashboard again"
+        @retry="refetchDetail()"
+      />
+      <p v-else>Loading the dashboard…</p>
+    </template>
+    <DashboardCanvas v-if="draft" :key="draft.id" :dashboard="draft" @saved="refetchList()" />
+  </main>
+</template>
+}%}

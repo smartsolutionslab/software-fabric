@@ -1,0 +1,14 @@
+namespace {{ namespace }}.Agents.Tests;
+
+/// <summary>A value object whose public constructor guards its value, as one built from JSON would.</summary>
+public sealed record ShelfLabel
+{
+    public ShelfLabel(string value)
+    {
+        {{ not_blank "value" }}
+
+        Value = value;
+    }
+
+    public string Value { get; }
+}

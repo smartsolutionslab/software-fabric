@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Failure } from './Failure';
 import { applyLayout, columns, hasRoom, lowest, nextPlacement, type Placement, toLayout, withinReach } from './layout';
 import { Pager } from './Pager';
+import { PlacedWidget } from './PlacedWidget';
 import { uuidV7 } from './uuidV7';
 import { checkChoice, visuals } from './widgetChoice';
-import { WidgetView } from './WidgetView';
 
 const rowHeight = 40;
 /** The host refuses a dashboard with more widgets than this. */
@@ -54,8 +54,6 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   const [savedRevision, setSavedRevision] = useState<number | undefined>();
   const [failed, setFailed] = useState(false);
   const [catalogPage, setCatalogPage] = useState(1);
-  // The titles of widgets added from any page of the catalogue, which the current page may not list.
-  const [addedTitles, setAddedTitles] = useState<ReadonlyMap<string, WidgetDescriptionDto>>(new Map());
   const widgets = useGetDashboardsWidgetsQuery({ page: catalogPage, pageSize: catalogPageSize });
   const [save, { isLoading: saving }] = usePutDashboardsByIdMutation();
   const { width, containerRef } = useContainerWidth();
@@ -63,10 +61,7 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   // it would be added from a page no longer on screen.
   const catalog = widgets.currentData?.items ?? noWidgets;
   const loading = widgets.isFetching;
-  const titles = useMemo(
-    () => new Map([...addedTitles, ...catalog.map((widget) => [widget.id, widget] as const)]),
-    [addedTitles, catalog],
-  );
+  const listed = useMemo(() => new Map(catalog.map((widget) => [widget.id, widget] as const)), [catalog]);
 
   const [saves, setSaves] = useState(0);
   const [tooLow, setTooLow] = useState(false);
@@ -86,7 +81,7 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
 
   const naming = useForm({ resolver: zodResolver(nameSchema), defaultValues: { name: dashboard.name } });
   const adding = useForm({ resolver: zodResolver(widgetSchema), defaultValues: { source: '', visual: '' } });
-  const chosen = titles.get(useWatch({ control: adding.control, name: 'source' }));
+  const chosen = listed.get(useWatch({ control: adding.control, name: 'source' }));
 
   // Another page of the picker lists other widgets: a choice from this one would be added with the next page's visual.
   const pickerPage = (page: number) => {
@@ -101,10 +96,6 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
       return;
     }
 
-    const widget = titles.get(source);
-    if (widget) {
-      setAddedTitles((known) => new Map(known).set(source, widget));
-    }
     change((current) => [...current, nextPlacement(current, uuidV7(), source, visual)]);
     adding.reset();
   });
@@ -145,7 +136,7 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
             disabled={loading}
             {...adding.register('source', {
               onChange: (event: { target: { value: string } }) =>
-                adding.setValue('visual', visuals[titles.get(event.target.value)?.kind ?? 'Chart'][0].value),
+                adding.setValue('visual', visuals[listed.get(event.target.value)?.kind ?? 'Chart'][0].value),
             })}
           >
             <option value="">Choose a widget</option>
@@ -213,36 +204,16 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
             change(() => moved);
           }}
         >
-          {placements.map((placement) => {
-            const title = titles.get(placement.source)?.title ?? placement.source;
-            return (
-              <div key={placement.key}>
-                <section aria-label={title} className="flex h-full flex-col overflow-hidden rounded border bg-card p-2">
-                  <header className="flex items-center justify-between gap-2">
-                    <h2 className="text-sm font-medium">{title}</h2>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      aria-label={`Remove ${title}`}
-                      onClick={() => change((current) => current.filter((other) => other.key !== placement.key))}
-                    >
-                      Remove
-                    </Button>
-                  </header>
-                  <div className="min-h-0 flex-1 overflow-auto">
-                    <WidgetView
-                      source={placement.source}
-                      visual={placement.visual}
-                      title={title}
-                      height={Math.max(120, placement.height * rowHeight - 60)}
-                      refresh={saves}
-                    />
-                  </div>
-                </section>
-              </div>
-            );
-          })}
+          {placements.map((placement) => (
+            <div key={placement.key}>
+              <PlacedWidget
+                placement={placement}
+                rowHeight={rowHeight}
+                refresh={saves}
+                onRemove={() => change((current) => current.filter((other) => other.key !== placement.key))}
+              />
+            </div>
+          ))}
         </ReactGridLayout>
       </div>
     </section>

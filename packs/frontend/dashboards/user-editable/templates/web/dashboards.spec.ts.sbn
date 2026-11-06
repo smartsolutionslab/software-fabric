@@ -1,3 +1,5 @@
+{{~ # The grid's class names are react-grid-layout's, or grid-layout-plus's for Vue; everything else is the same page. ~}}
+{{~ vue = project["frontend.framework"] == "vue" ~}}
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 /** Where the element is on the page; it must be visible. */
@@ -11,7 +13,7 @@ async function box(locator: Locator) {
 
 /** How many of the grid's 12 columns the widget spans: its width against the grid's, which a scroll bar may change. */
 async function span(widget: Locator, page: Page) {
-  const grid = await box(page.locator('.react-grid-layout'));
+  const grid = await box(page.locator('.{{ if vue }}vgl-layout{{ else }}react-grid-layout{{ end }}'));
   return Math.round(((await box(widget)).width / grid.width) * 12);
 }
 
@@ -33,9 +35,13 @@ test('a user builds a dashboard, resizes a widget, saves it and finds it again a
   await expect(widget).toBeVisible();
 
   const before = await box(widget);
+{{~ if vue ~}}
+  const handle = widget.locator('xpath=ancestor::*[contains(@class, "vgl-item")]').locator('.vgl-item__resizer');
+{{~ else ~}}
   const handle = widget
     .locator('xpath=ancestor::*[contains(@class, "react-grid-item")]')
     .locator('.react-resizable-handle');
+{{~ end ~}}
   const grip = await box(handle);
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
   await page.mouse.down();

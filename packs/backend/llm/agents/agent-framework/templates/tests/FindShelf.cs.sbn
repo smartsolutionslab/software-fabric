@@ -1,0 +1,6 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Agents.Tests;
+
+/// <summary>A query whose argument no JSON can build: a tool of it refuses every call before dispatch.</summary>
+public sealed record FindShelf(ShelfCode Code) : IQuery<Result<string, ApiError>>;

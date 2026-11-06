@@ -113,7 +113,9 @@ namespace, and a pack that puts one anywhere else fails the build.
 ## Slots
 
 Cardinality `0+` unless stated. "Separator" is what joins contributions
-(new, see Generator changes); default is a newline.
+(new, see Generator changes); default is a newline. A contribution that
+renders empty or whitespace-only is dropped before the join, so it adds no
+separator (added in #221).
 
 A contribution to a slot no selected pack declares is an error, unless
 it carries `optional: true` (added for #134): then it is dropped when the
