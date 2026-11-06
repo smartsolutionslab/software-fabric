@@ -1,0 +1,29 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace {{ namespace }}.BuildingBlocks.Agents;
+
+/// <summary>
+/// A tool's page as the whole number a list endpoint's <c>?page=</c> is, read through <see cref="Page.TryFrom"/>: a
+/// paged query can be an agent's tool, and a page out of bounds is refused before the query is sent.
+/// </summary>
+internal sealed class PageJsonConverter : JsonConverter<Page>
+{
+    public override Page Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt32(out var number) && Page.TryFrom(number, out var page))
+        {
+            return page;
+        }
+
+        throw new JsonException($"A page is a whole number from 1 to {Page.Maximum}.");
+    }
+
+    public override void Write(Utf8JsonWriter writer, Page value, JsonSerializerOptions options)
+    {
+        {{ not_null "writer" }}
+        {{ not_null "value" }}
+
+        writer.WriteNumberValue(value.Value);
+    }
+}

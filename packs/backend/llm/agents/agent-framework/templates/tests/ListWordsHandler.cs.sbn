@@ -1,0 +1,21 @@
+{{~ typed = object.has_key(project, "backend.result-style") && project["backend.result-style"] == "typed-outcomes" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Agents.Tests;
+
+public sealed class ListWordsHandler : IQueryHandler<ListWords, Result<PagedResult<string>, ApiError>>
+{
+    public Task<Result<PagedResult<string>, ApiError>> HandleAsync(ListWords query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        var words = query.Text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        List<string> page = [.. words.Skip(query.Page.Skip(query.PageSize)).Take(query.PageSize.Value)];
+        var result = new PagedResult<string>(page, words.Length, query.Page.Value, query.PageSize.Value);
+{{~ if typed ~}}
+        return Task.FromResult<Result<PagedResult<string>, ApiError>>(Success(result));
+{{~ else ~}}
+        return Task.FromResult(Result<PagedResult<string>, ApiError>.Success(result));
+{{~ end ~}}
+    }
+}

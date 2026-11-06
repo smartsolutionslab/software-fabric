@@ -70,6 +70,14 @@ would do, and the option would stay `experimental` until a stable release.
     request and the property, `DispatcherTool.For` refuses such a request,
     and the architecture rule `EveryAgentToolRequestIsValid` fails the build
     on it.
+  - **A paged query is a tool too** (owner's decision on #185, built in #215).
+    The Kernel's `Page` and `PageSize` are whole numbers in a tool's schema and
+    arguments, with their bounds, read through `TryFrom` as a list endpoint
+    reads its query string; a value out of bounds is refused before dispatch.
+    Arguments the request record cannot be built from are refused the same
+    way, the model told why, whether the JSON does not match, a type has no
+    constructor JSON can call, or a constructor refuses the value: none of
+    them ends the agent's run.
   - With `backend.mcp` containing `client`, the BuildingBlocks also gain
     `IAgentMcpTools`, the declared servers' tools for an agent, each call
     checked by the project's `allow` before it reaches the server, as

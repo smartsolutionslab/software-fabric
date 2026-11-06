@@ -7,8 +7,8 @@ using System.Reflection;
 {{~ end ~}}
 using System.Text;
 using System.Text.Json;
-{{~ if option ~}}
 using System.Text.Json.Nodes;
+{{~ if option ~}}
 using System.Text.Json.Serialization.Metadata;
 {{~ end ~}}
 using {{ namespace }}.BuildingBlocks.Messaging;
@@ -24,16 +24,19 @@ namespace {{ namespace }}.BuildingBlocks.Agents;
 internal sealed class UseCaseFunction : AIFunction
 {
     /// <summary>
-    /// Web defaults, but a missing argument or a null where the record allows none is refused, not defaulted{{ if option }};
-    /// an absent <see cref="Option{T}"/> is <c>null</c>, in the arguments and in the answer{{ end }}.
+    /// Web defaults, but a missing argument or a null where the record allows none is refused, not defaulted; a
+    /// <see cref="Page"/> and a <see cref="PageSize"/> are whole numbers within their bounds{{ if option }}; an absent
+    /// <see cref="Option{T}"/> is <c>null</c>, in the arguments and in the answer{{ end }}.
     /// </summary>
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
         RespectRequiredConstructorParameters = true,
         RespectNullableAnnotations = true,
 {{~ if option ~}}
-        Converters = { new OptionJsonConverterFactory() },
+        Converters = { new PageJsonConverter(), new PageSizeJsonConverter(), new OptionJsonConverterFactory() },
         TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { OptionsAreRequired } },
+{{~ else ~}}
+        Converters = { new PageJsonConverter(), new PageSizeJsonConverter() },
 {{~ end ~}}
     };
 {{~ if option ~}}
@@ -69,7 +72,7 @@ internal sealed class UseCaseFunction : AIFunction
 {{~ if option ~}}
         JsonSchema = Schema(request);
 {{~ else ~}}
-        JsonSchema = AIJsonUtilities.CreateJsonSchema(request, serializerOptions: Json);
+        JsonSchema = AIJsonUtilities.CreateJsonSchema(request, serializerOptions: Json, inferenceOptions: new AIJsonSchemaCreateOptions { TransformSchemaNode = Paging });
 {{~ end ~}}
     }
 
@@ -92,7 +95,17 @@ internal sealed class UseCaseFunction : AIFunction
         }
         catch (JsonException exception)
         {
-            return $"The arguments are not a {request.Name}: {exception.Message}";
+            return Refused(exception);
+        }
+        catch (NotSupportedException exception)
+        {
+            // The record, or a type in it, has no constructor JSON can call: no arguments can build it.
+            return Refused(exception);
+        }
+        catch (ArgumentException exception)
+        {
+            // A constructor of the record, or of a value in it, refused what the model gave.
+            return Refused(exception);
         }
 
         if (message is null)
@@ -106,6 +119,26 @@ internal sealed class UseCaseFunction : AIFunction
         var handled = (Task)dispatch.Invoke(dispatcher, [message, cancellationToken])!;
         await handled;
         return Answer(handled.GetType().GetProperty(nameof(Task<object>.Result))!.GetValue(handled)!);
+    }
+
+    /// <summary>The arguments did not become the request: the model is told why, and the request is not sent.</summary>
+    private string Refused(Exception exception) => $"The arguments are not a {request.Name}: {exception.Message}";
+
+    /// <summary>
+    /// A <see cref="Page"/> or a <see cref="PageSize"/> as the whole number within its bounds that the converters read, or
+    /// null where the property may be null; the converters are opaque to schema generation, which would otherwise describe
+    /// the record behind them.
+    /// </summary>
+    private static JsonNode Paging(AIJsonSchemaCreateContext context, JsonNode node)
+    {
+        var maximum = context.TypeInfo.Type == typeof(Page) ? Page.Maximum : context.TypeInfo.Type == typeof(PageSize) ? PageSize.Maximum : 0;
+        if (maximum == 0)
+        {
+            return node;
+        }
+
+        JsonNode type = context.PropertyInfo is { IsSetNullable: true } ? new JsonArray("integer", "null") : "integer";
+        return new JsonObject { ["type"] = type, ["minimum"] = 1, ["maximum"] = maximum };
     }
 
     /// <summary>A Result's value as JSON, or its ApiError as text starting with the error's code.</summary>
@@ -142,6 +175,7 @@ internal sealed class UseCaseFunction : AIFunction
         {
             TransformSchemaNode = (context, node) =>
             {
+                node = Paging(context, node);
                 if (context.PropertyInfo?.AttributeProvider is not PropertyInfo { PropertyType: var type } || !IsOption(type))
                 {
                     return node;

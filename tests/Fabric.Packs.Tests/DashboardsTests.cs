@@ -149,6 +149,10 @@ public sealed class DashboardsTests
                 var run = await manager.GetFromJsonAsync<JsonObject>("/dashboards/widgets/billing.revenue?page=1&pageSize=20", cancellationToken);
                 run!["chart"]!["series"]![0]!["values"]![0]!.GetValue<decimal>().ShouldBe(42m);
                 (await visitor.GetAsync(new Uri("/dashboards/widgets/billing.revenue?page=1&pageSize=20", UriKind.Relative), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+                var declaration = await manager.GetFromJsonAsync<JsonObject>("/dashboards/widget-declarations/billing.revenue", cancellationToken);
+                declaration!["title"]!.GetValue<string>().ShouldBe("Revenue");
+                (await visitor.GetAsync(new Uri("/dashboards/widget-declarations/billing.revenue", UriKind.Relative), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
             }
 
             private static List<string> Ids(JsonObject catalog) =>
@@ -186,6 +190,13 @@ public sealed class DashboardsTests
     {
         Files(Profile, Dashboards)["web/app/openapi.json"].ShouldContain("\"/dashboards/{id}\"");
         Files("saas-standard-vue", Dashboards)["web/app/openapi.json"].ShouldContain("\"/dashboards/{id}\"");
+    }
+
+    [Fact]
+    public void The_frontends_openapi_document_describes_the_lookup_of_one_widget_declaration()
+    {
+        Files(Profile, Dashboards)["web/app/openapi.json"].ShouldContain("\"/dashboards/widget-declarations/{id}\"");
+        Files("saas-standard-vue", Dashboards)["web/app/openapi.json"].ShouldContain("\"/dashboards/widget-declarations/{id}\"");
     }
 
     [Fact]

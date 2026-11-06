@@ -1,5 +1,6 @@
 using {{ namespace }}.BuildingBlocks.Api;
 using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.DescribeWidget;
 using {{ namespace }}.Modules.Dashboards.Application.Queries.ListWidgets;
 using {{ namespace }}.Modules.Dashboards.Application.Queries.RunWidget;
 using Microsoft.AspNetCore.Builder;
@@ -8,7 +9,7 @@ using Microsoft.AspNetCore.Routing;
 
 namespace {{ namespace }}.Modules.Dashboards.Api.Endpoints;
 
-/// <summary>The widgets the modules declare that the caller may see, and running one of them as the caller.</summary>
+/// <summary>The widgets the modules declare that the caller may see, one of them by its id, and running one of them as the caller.</summary>
 public sealed class WidgetEndpoints : IEndpoint
 {
     public void Map(IEndpointRouteBuilder endpoints)
@@ -17,6 +18,8 @@ public sealed class WidgetEndpoints : IEndpoint
 
         endpoints.MapGet("/widgets", async (Page page, PageSize pageSize, IDispatcher dispatcher, CancellationToken cancellationToken) =>
             (await dispatcher.QueryAsync(new ListWidgets(page, pageSize), cancellationToken)).ToHttpResult());
+        endpoints.MapGet("/widget-declarations/{id}", async (string id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+            (await dispatcher.QueryAsync(new DescribeWidget(id), cancellationToken)).ToHttpResult());
         endpoints.MapGet("/widgets/{id}", async (string id, Page page, PageSize pageSize, IDispatcher dispatcher, CancellationToken cancellationToken) =>
             (await dispatcher.QueryAsync(new RunWidget(id, page, pageSize), cancellationToken)).ToHttpResult());
     }

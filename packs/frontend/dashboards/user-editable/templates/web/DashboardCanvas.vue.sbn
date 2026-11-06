@@ -25,9 +25,9 @@ import {
   withinReach,
 } from './layout';
 import Pager from './Pager.vue';
+import PlacedWidget from './PlacedWidget.vue';
 import { uuidV7 } from './uuidV7';
 import { checkChoice, visuals } from './widgetChoice';
-import WidgetView from './WidgetView.vue';
 
 const rowHeight = 40;
 /** The host refuses a dashboard with more widgets than this. */
@@ -71,8 +71,6 @@ const failed = ref(false);
 const saves = ref(0);
 const tooLow = ref(false);
 const catalogPage = ref(1);
-// The titles of widgets added from any page of the catalogue, which the current page may not list.
-const addedTitles = ref<ReadonlyMap<string, WidgetDescriptionDto>>(new Map());
 // Only the page asked for: while the next page loads there is no data, so nothing from the page before is offered.
 const {
   data: widgets,
@@ -82,9 +80,7 @@ const {
 } = useGetDashboardsWidgets(computed(() => ({ page: catalogPage.value, pageSize: catalogPageSize })));
 const { mutateAsync: save, isPending: saving } = usePutDashboardsId();
 const catalog = computed(() => widgets.value?.items ?? noWidgets);
-const titles = computed(
-  () => new Map([...addedTitles.value, ...catalog.value.map((widget) => [widget.id, widget] as const)]),
-);
+const listed = computed(() => new Map(catalog.value.map((widget) => [widget.id, widget] as const)));
 const full = computed(() => placements.value.length >= maximumWidgets);
 const roomLeft = computed(() => hasRoom(placements.value));
 
@@ -116,13 +112,13 @@ const {
 } = useForm({ validationSchema: toTypedSchema(widgetSchema), initialValues: { source: '', visual: '' } });
 const [source, sourceAttributes] = widgetField('source');
 const [visual, visualAttributes] = widgetField('visual');
-const chosen = computed(() => titles.value.get(source.value ?? ''));
+const chosen = computed(() => listed.value.get(source.value ?? ''));
 
 /** A widget chosen: show it the first way its kind can be shown. */
 const choose = (event: Event) =>
   setWidgetValue(
     'visual',
-    visuals[titles.value.get((event.target as HTMLSelectElement).value)?.kind ?? 'Chart'][0].value,
+    visuals[listed.value.get((event.target as HTMLSelectElement).value)?.kind ?? 'Chart'][0].value,
   );
 
 // Another page of the picker lists other widgets: a choice from this one would be added with the next page's visual.
@@ -138,10 +134,6 @@ const add = handleAdd(({ source: chosenSource, visual: chosenVisual }) => {
     return;
   }
 
-  const widget = titles.value.get(chosenSource);
-  if (widget) {
-    addedTitles.value = new Map(addedTitles.value).set(chosenSource, widget);
-  }
   change((current) => [...current, nextPlacement(current, uuidV7(), chosenSource, chosenVisual)]);
   resetWidget();
 });
@@ -199,11 +191,11 @@ function samePlaces(left: readonly Placement[], right: readonly Placement[]) {
 
 const remove = (key: string) => change((current) => current.filter((other) => other.key !== key));
 
-/** Each widget on the grid with its place, as the grid has it, and its title. */
+/** Each widget on the grid with its place, as the grid has it. */
 const tiles = computed(() =>
   layout.value.flatMap((item) => {
     const placement = placements.value.find((each) => each.key === item.i);
-    return placement ? [{ item, placement, title: titles.value.get(placement.source)?.title ?? placement.source }] : [];
+    return placement ? [{ item, placement }] : [];
   }),
 );
 </script>
@@ -268,7 +260,7 @@ const tiles = computed(() =>
     <p v-if="tooLow" role="alert">A widget cannot start below row {{ lowest }}; it went back where it was.</p>
     <GridLayout :layout="layout" :col-num="columns" :row-height="rowHeight" @layout-updated="placed">
       <GridItem
-        v-for="{ item, placement, title } in tiles"
+        v-for="{ item, placement } in tiles"
         :key="item.i"
         :i="item.i"
         :x="item.x"
@@ -278,29 +270,12 @@ const tiles = computed(() =>
         :max-h="item.maxH"
         drag-ignore-from="button, select, input, table"
       >
-        <section :aria-label="title" class="flex h-full flex-col overflow-hidden rounded border bg-card p-2">
-          <header class="flex items-center justify-between gap-2">
-            <h2 class="text-sm font-medium">{{ title }}</h2>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              :aria-label="`Remove ${title}`"
-              @click="remove(placement.key)"
-            >
-              Remove
-            </Button>
-          </header>
-          <div class="min-h-0 flex-1 overflow-auto">
-            <WidgetView
-              :source="placement.source"
-              :visual="placement.visual"
-              :title="title"
-              :height="Math.max(120, item.h * rowHeight - 60)"
-              :refresh="saves"
-            />
-          </div>
-        </section>
+        <PlacedWidget
+          :placement="placement"
+          :height="Math.max(120, item.h * rowHeight - 60)"
+          :refresh="saves"
+          @remove="remove(placement.key)"
+        />
       </GridItem>
     </GridLayout>
   </section>
