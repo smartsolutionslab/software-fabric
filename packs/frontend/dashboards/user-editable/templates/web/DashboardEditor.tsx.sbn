@@ -61,7 +61,7 @@ export function DashboardEditor() {
           label="your dashboards"
           page={page}
           pageSize={pageSize}
-          total={dashboards.data?.totalCount ?? 0}
+          total={dashboards.data?.totalCount}
           onPage={setPage}
         />
       </nav>

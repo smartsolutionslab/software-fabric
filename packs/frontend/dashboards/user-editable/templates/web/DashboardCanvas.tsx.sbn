@@ -9,6 +9,7 @@ import { Failure } from './Failure';
 import { applyLayout, columns, hasRoom, lowest, nextPlacement, type Placement, toLayout, withinReach } from './layout';
 import { Pager } from './Pager';
 import { uuidV7 } from './uuidV7';
+import { checkChoice, visuals } from './widgetChoice';
 import { WidgetView } from './WidgetView';
 
 const rowHeight = 40;
@@ -16,15 +17,6 @@ const rowHeight = 40;
 const maximumWidgets = 50;
 const catalogPageSize = 100;
 const noWidgets: WidgetDescriptionDto[] = [];
-
-const visuals = {
-  Chart: [
-    { value: 'bar', label: 'Bar' },
-    { value: 'line', label: 'Line' },
-    { value: 'pie', label: 'Pie' },
-  ],
-  Table: [{ value: 'table', label: 'Table' }],
-} as const;
 
 const nameSchema = z.object({
   name: z
@@ -67,7 +59,10 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   const widgets = useGetDashboardsWidgetsQuery({ page: catalogPage, pageSize: catalogPageSize });
   const [save, { isLoading: saving }] = usePutDashboardsByIdMutation();
   const { width, containerRef } = useContainerWidth();
-  const catalog = widgets.data?.items ?? noWidgets;
+  // Only the page asked for: RTK Query's data keeps the page before while the next one loads, and a widget chosen from
+  // it would be added from a page no longer on screen.
+  const catalog = widgets.currentData?.items ?? noWidgets;
+  const loading = widgets.isFetching;
   const titles = useMemo(
     () => new Map([...addedTitles, ...catalog.map((widget) => [widget.id, widget] as const)]),
     [addedTitles, catalog],
@@ -100,6 +95,12 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   };
 
   const add = adding.handleSubmit(({ source, visual }) => {
+    const choice = checkChoice(catalog, source, visual);
+    if (!choice.ok) {
+      adding.setError(choice.field, { message: choice.message });
+      return;
+    }
+
     const widget = titles.get(source);
     if (widget) {
       setAddedTitles((known) => new Map(known).set(source, widget));
@@ -141,6 +142,7 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
           Widget
           <select
             className="rounded border px-2 py-1"
+            disabled={loading}
             {...adding.register('source', {
               onChange: (event: { target: { value: string } }) =>
                 adding.setValue('visual', visuals[titles.get(event.target.value)?.kind ?? 'Chart'][0].value),
@@ -156,7 +158,7 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
         </label>
         <label className="flex flex-col gap-1 text-sm">
           Shown as
-          <select className="rounded border px-2 py-1" {...adding.register('visual')}>
+          <select className="rounded border px-2 py-1" disabled={loading} {...adding.register('visual')}>
             {visuals[chosen?.kind ?? 'Chart'].map((visual) => (
               <option key={visual.value} value={visual.value}>
                 {visual.label}
@@ -164,17 +166,18 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
             ))}
           </select>
         </label>
-        <Button type="submit" variant="secondary" disabled={full || !roomLeft}>
+        <Button type="submit" variant="secondary" disabled={loading || full || !roomLeft}>
           Add widget
         </Button>
         {full && <p>A dashboard holds at most {maximumWidgets} widgets.</p>}
         {!full && !roomLeft && <p>There is no room for another widget: a dashboard reaches down to row {lowest}.</p>}
         {adding.formState.errors.source && <p role="alert">{adding.formState.errors.source.message}</p>}
+        {adding.formState.errors.visual && <p role="alert">{adding.formState.errors.visual.message}</p>}
         <Pager
           label="widgets"
           page={catalogPage}
           pageSize={catalogPageSize}
-          total={widgets.data?.totalCount ?? 0}
+          total={loading ? undefined : widgets.currentData?.totalCount}
           onPage={pickerPage}
         />
       </form>
