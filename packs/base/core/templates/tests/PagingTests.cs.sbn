@@ -1,123 +1,120 @@
-{{~ if project["backend.test.framework"] != "xunit" || project["backend.test.assertions"] != "shouldly" ~}}
-#error The base's Kernel paging tests are written for xUnit and Shouldly only so far (docs/adr/0006 of the generator).
-{{~ end ~}}
 namespace {{ namespace }}.Kernel.Tests;
 
 public class PagingTests
 {
-    [Theory]
-    [InlineData(1)]
-    [InlineData(Page.Maximum)]
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `1` }}
+    {{ test_case_attribute `Page.Maximum` }}
     public void A_page_from_one_to_the_maximum_is_taken(int value)
     {
-        Page.TryFrom(value, out var page).ShouldBeTrue();
-        page!.Value.ShouldBe(value);
+        {{ `Page.TryFrom(value, out var page)` | should_be_true }};
+        {{ `page!.Value` | should_be `value` }};
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    [InlineData(Page.Maximum + 1)]
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `0` }}
+    {{ test_case_attribute `-1` }}
+    {{ test_case_attribute `Page.Maximum + 1` }}
     public void A_page_outside_its_range_is_refused(int value)
     {
-        Page.TryFrom(value, out var page).ShouldBeFalse();
-        page.ShouldBeNull();
+        {{ `Page.TryFrom(value, out var page)` | should_be_false }};
+        {{ `page` | should_be_null }};
     }
 
-    [Theory]
-    [InlineData(1)]
-    [InlineData(PageSize.Maximum)]
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `1` }}
+    {{ test_case_attribute `PageSize.Maximum` }}
     public void A_page_size_from_one_to_the_maximum_is_taken(int value)
     {
-        PageSize.TryFrom(value, out var pageSize).ShouldBeTrue();
-        pageSize!.Value.ShouldBe(value);
+        {{ `PageSize.TryFrom(value, out var pageSize)` | should_be_true }};
+        {{ `pageSize!.Value` | should_be `value` }};
     }
 
-    [Theory]
-    [InlineData(0)]
-    [InlineData(PageSize.Maximum + 1)]
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `0` }}
+    {{ test_case_attribute `PageSize.Maximum + 1` }}
     public void A_page_size_outside_its_range_is_refused(int value)
     {
-        PageSize.TryFrom(value, out var pageSize).ShouldBeFalse();
-        pageSize.ShouldBeNull();
+        {{ `PageSize.TryFrom(value, out var pageSize)` | should_be_false }};
+        {{ `pageSize` | should_be_null }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public void The_first_page_skips_nothing_and_a_later_page_skips_the_pages_before_it()
     {
-        PageSize.TryFrom(10, out var pageSize).ShouldBeTrue();
-        Page.TryFrom(3, out var third).ShouldBeTrue();
+        {{ `PageSize.TryFrom(10, out var pageSize)` | should_be_true }};
+        {{ `Page.TryFrom(3, out var third)` | should_be_true }};
 
-        Page.First.Skip(pageSize!).ShouldBe(0);
-        third!.Skip(pageSize!).ShouldBe(20);
+        {{ `Page.First.Skip(pageSize!)` | should_be `0` }};
+        {{ `third!.Skip(pageSize!)` | should_be `20` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public void The_last_page_at_the_largest_page_size_still_has_an_offset()
     {
-        PageSize.TryFrom(PageSize.Maximum, out var pageSize).ShouldBeTrue();
-        Page.TryFrom(Page.Maximum, out var last).ShouldBeTrue();
+        {{ `PageSize.TryFrom(PageSize.Maximum, out var pageSize)` | should_be_true }};
+        {{ `Page.TryFrom(Page.Maximum, out var last)` | should_be_true }};
 
-        last!.Skip(pageSize!).ShouldBeGreaterThan(0);
+        {{ `last!.Skip(pageSize!)` | should_be_greater_than `0` }};
     }
 
-    [Theory]
-    [InlineData("1", 1)]
-    [InlineData("42", 42)]
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `"1", 1` }}
+    {{ test_case_attribute `"42", 42` }}
     public void A_query_string_page_is_parsed(string text, int value)
     {
-        Page.TryParse(text, null, out var page).ShouldBeTrue();
-        page!.Value.ShouldBe(value);
+        {{ `Page.TryParse(text, null, out var page)` | should_be_true }};
+        {{ `page!.Value` | should_be `value` }};
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("first")]
-    [InlineData("-1")]
-    [InlineData("1.5")]
-    [InlineData("0")]
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `null` }}
+    {{ test_case_attribute `""` }}
+    {{ test_case_attribute `"first"` }}
+    {{ test_case_attribute `"-1"` }}
+    {{ test_case_attribute `"1.5"` }}
+    {{ test_case_attribute `"0"` }}
     public void A_query_string_page_that_is_no_page_is_refused(string? text) =>
-        Page.TryParse(text, null, out _).ShouldBeFalse();
+        {{ `Page.TryParse(text, null, out _)` | should_be_false }};
 
-    [Fact]
+    {{ test_attribute }}
     public void A_query_string_page_size_is_parsed()
     {
-        PageSize.TryParse("25", null, out var pageSize).ShouldBeTrue();
-        pageSize!.Value.ShouldBe(25);
+        {{ `PageSize.TryParse("25", null, out var pageSize)` | should_be_true }};
+        {{ `pageSize!.Value` | should_be `25` }};
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("all")]
-    [InlineData("101")]
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `null` }}
+    {{ test_case_attribute `"all"` }}
+    {{ test_case_attribute `"101"` }}
     public void A_query_string_page_size_that_is_no_page_size_is_refused(string? text) =>
-        PageSize.TryParse(text, null, out _).ShouldBeFalse();
+        {{ `PageSize.TryParse(text, null, out _)` | should_be_false }};
 
-    [Fact]
+    {{ test_attribute }}
     public void Without_a_page_size_a_list_takes_twenty()
     {
-        PageSize.Default.Value.ShouldBe(20);
+        {{ `PageSize.Default.Value` | should_be `20` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public void A_paged_result_carries_its_page_and_the_total()
     {
         var result = new PagedResult<string>(["INV-0011", "INV-0012"], 12, 2, 10);
 
-        result.Items.ShouldBe(["INV-0011", "INV-0012"]);
-        result.TotalCount.ShouldBe(12);
-        result.Page.ShouldBe(2);
-        result.PageSize.ShouldBe(10);
+        {{ `result.Items` | should_be `["INV-0011", "INV-0012"]` }};
+        {{ `result.TotalCount` | should_be `12` }};
+        {{ `result.Page` | should_be `2` }};
+        {{ `result.PageSize` | should_be `10` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public void A_sorting_names_its_field_and_direction()
     {
         var sorting = new Sorting<DayOfWeek>(DayOfWeek.Monday, SortDirection.Descending);
 
-        sorting.Field.ShouldBe(DayOfWeek.Monday);
-        sorting.Direction.ShouldBe(SortDirection.Descending);
-        sorting.ShouldBe(new Sorting<DayOfWeek>(DayOfWeek.Monday, SortDirection.Descending));
+        {{ `sorting.Field` | should_be `DayOfWeek.Monday` }};
+        {{ `sorting.Direction` | should_be `SortDirection.Descending` }};
+        {{ `sorting` | should_be `new Sorting<DayOfWeek>(DayOfWeek.Monday, SortDirection.Descending)` }};
     }
 }

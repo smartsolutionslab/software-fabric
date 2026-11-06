@@ -11,11 +11,11 @@ public class OpenApiDocumentTests(AspireFixture aspire)
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
 
     /// <summary>The frontend's client is generated from web/app/openapi.json; it must describe the API the host serves.</summary>
-    [Fact]
+    {{ test_attribute }}
     public async Task The_frontends_copy_of_the_openapi_document_is_current()
     {
         using var client = aspire.CreateHostClient();
-        var served = JsonNode.Parse(await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative), TestContext.Current.CancellationToken))!.AsObject();
+        var served = JsonNode.Parse(await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative), {{ test_cancellation_token }}))!.AsObject();
         // Where the host happened to listen is not part of the API; the frontend calls it through /api.
         served.Remove("servers");
         var expected = served.ToJsonString(Indented) + "\n";
@@ -24,14 +24,10 @@ public class OpenApiDocumentTests(AspireFixture aspire)
         var actual = File.Exists(path) ? File.ReadAllText(path).ReplaceLineEndings("\n") : string.Empty;
         if (actual != expected)
         {
-            await File.WriteAllTextAsync(path, expected, TestContext.Current.CancellationToken);
+            await File.WriteAllTextAsync(path, expected, {{ test_cancellation_token }});
         }
 
-        {{~ if project["backend.test.assertions"] == "shouldly" ~}}
-        actual.ShouldBe(expected, "web/app/openapi.json was stale and has been rewritten: commit it and run pnpm codegen in web/app.");
-        {{~ else ~}}
-        actual.Should().Be(expected, "web/app/openapi.json was stale and has been rewritten: commit it and run pnpm codegen in web/app");
-        {{~ end ~}}
+        {{ `actual` | should_be `expected` `"web/app/openapi.json was stale and has been rewritten: commit it and run pnpm codegen in web/app."` }};
     }
 
     private static string RepositoryRoot()

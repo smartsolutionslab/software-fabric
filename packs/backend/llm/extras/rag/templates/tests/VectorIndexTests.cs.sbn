@@ -1,6 +1,3 @@
-{{~ if project["backend.test.assertions"] != "shouldly" ~}}
-#error The rag pack's tests assert with Shouldly only so far (docs/adr/0006 of the generator).
-{{~ end ~}}
 {{~ tenant_argument = ""
 if project["backend.tenancy"] == "column"
   tenant_argument = ", tenant"
@@ -29,17 +26,17 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
 {{~ if project["backend.tenancy"] == "column" ~}}
-        await VectorTables.CreateAsync(database.ConnectionString, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema], TestContext.Current.CancellationToken);
+        await VectorTables.CreateAsync(database.ConnectionString, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema], {{ test_cancellation_token }});
 {{~ else ~}}
-        await VectorTables.CreateAsync(database.ConnectionString, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema, SampleLibraryDbContext.Schema], TestContext.Current.CancellationToken);
+        await VectorTables.CreateAsync(database.ConnectionString, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema, SampleLibraryDbContext.Schema], {{ test_cancellation_token }});
 {{~ end ~}}
         dataSource = VectorTables.DataSource(database.ConnectionString);
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_search_returns_the_nearest_records_first_with_their_text()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var notes = new ModuleVectorIndex<SampleNotesDbContext>(DataSource, generator{{ tenant_argument }});
         await notes.IndexAsync("note-3", "team lunch on friday", cancellationToken);
         await notes.IndexAsync("invoice-1", "unpaid invoice for office chairs", cancellationToken);
@@ -47,33 +44,33 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
 
         var passages = await notes.SearchAsync("unpaid invoice for chairs", 3, cancellationToken);
 
-        passages.Select(passage => passage.Key).ShouldBe(["invoice-1", "invoice-2", "note-3"]);
-        passages[0].Text.ShouldBe("unpaid invoice for office chairs");
-        passages.Select(passage => passage.Distance).ShouldBeInOrder();
-        (await notes.SearchAsync("unpaid invoice for chairs", 1, cancellationToken)).Select(passage => passage.Key).ShouldBe(["invoice-1"]);
+        {{ `passages.Select(passage => passage.Key)` | should_be `["invoice-1", "invoice-2", "note-3"]` }};
+        {{ `passages[0].Text` | should_be `"unpaid invoice for office chairs"` }};
+        {{ `passages.Select(passage => passage.Distance)` | should_be_in_order }};
+        {{ `(await notes.SearchAsync("unpaid invoice for chairs", 1, cancellationToken)).Select(passage => passage.Key)` | should_be `["invoice-1"]` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task Indexing_a_key_again_replaces_its_record_and_removing_it_leaves_none()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var drafts = new ModuleVectorIndex<SampleDraftsDbContext>(DataSource, generator{{ tenant_argument }});
         await drafts.IndexAsync("draft-1", "first draft about chairs", cancellationToken);
 
         await drafts.IndexAsync("draft-1", "second draft about desks", cancellationToken);
 
         var replaced = await drafts.SearchAsync("desks", 5, cancellationToken);
-        replaced.Select(passage => (passage.Key, passage.Text)).ShouldBe([("draft-1", "second draft about desks")]);
+        {{ `replaced.Select(passage => (passage.Key, passage.Text))` | should_be `[("draft-1", "second draft about desks")]` }};
 
         await drafts.RemoveAsync("draft-1", cancellationToken);
 
-        (await drafts.SearchAsync("desks", 5, cancellationToken)).ShouldBeEmpty();
+        {{ `(await drafts.SearchAsync("desks", 5, cancellationToken))` | should_be_empty }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_search_the_hnsw_index_answers_returns_as_many_records_as_asked_beyond_its_default_breadth_of_40()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off" };
         await using var indexed = VectorTables.DataSource(indexOnly.ConnectionString);
         var shelf = new ModuleVectorIndex<SampleShelfDbContext>(indexed, generator{{ tenant_argument }});
@@ -88,15 +85,15 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
 
         var passages = await shelf.SearchAsync("book", 50, cancellationToken);
 
-        passages.Count.ShouldBe(50);
-        passages.Select(passage => passage.Distance).ShouldBeInOrder();
+        {{ `passages.Count` | should_be `50` }};
+        {{ `passages.Select(passage => passage.Distance)` | should_be_in_order }};
     }
 {{~ if project["backend.tenancy"] != "column" ~}}
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_search_the_hnsw_index_answers_short_ranks_every_record_exactly_and_returns_as_many_as_asked()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off" };
         await using var indexed = VectorTables.DataSource(indexOnly.ConnectionString);
         var library = new ModuleVectorIndex<SampleLibraryDbContext>(indexed, generator);
@@ -114,7 +111,7 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
 
         var passages = await library.SearchAsync("book", 5, cancellationToken);
 
-        passages.Select(passage => passage.Key).ShouldBe(["atlas", "novel", "lunch", "blank-1", "blank-2"]);
+        {{ `passages.Select(passage => passage.Key)` | should_be `["atlas", "novel", "lunch", "blank-1", "blank-2"]` }};
     }
 {{~ end ~}}
 

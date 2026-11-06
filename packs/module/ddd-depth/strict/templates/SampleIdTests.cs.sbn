@@ -1,23 +1,29 @@
+{{~ func guard_exception(bcl)
+  if project["backend.guards"] == "ensure-that"
+    ret "GuardException"
+  end
+  ret bcl
+end ~}}
 using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
 
 namespace {{ namespace }}.Modules.{{ module.namespace }}.Tests.Samples;
 
 public class SampleIdTests
 {
-    [Fact]
+    {{ test_attribute }}
     public void A_new_identifier_is_a_version_7_guid() =>
-        SampleId.New().Value.Version.ShouldBe(7);
+        {{ `SampleId.New().Value.Version` | should_be `7` }};
 
-    [Fact]
+    {{ test_attribute }}
     public void An_identifier_comes_back_from_its_value()
     {
         var identifier = SampleId.New();
 
-        SampleId.From(identifier.Value).ShouldBe(identifier);
-        identifier.ToString().ShouldBe(identifier.Value.ToString());
+        {{ `SampleId.From(identifier.Value)` | should_be `identifier` }};
+        {{ `identifier.ToString()` | should_be `identifier.Value.ToString()` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public void An_empty_guid_is_not_an_identifier() =>
-        Should.Throw<{{ if project["backend.guards"] == "ensure-that" }}GuardException{{ else }}ArgumentException{{ end }}>(() => SampleId.From(Guid.Empty));
+        {{ should_throw (guard_exception "ArgumentException") `() => SampleId.From(Guid.Empty)` }};
 }

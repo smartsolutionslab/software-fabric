@@ -135,7 +135,7 @@ pack fill a slot of a choice it can be combined with but does not need
 
 | Slot | File | Filled by |
 |---|---|---|
-| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`) |
+| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11) |
 | `dotnet.build-items` *(added with the kernel options)* | `Directory.Build.props` | ensure-that (ban list), typed-outcomes (`using static Outcome`) |
 | `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
@@ -150,10 +150,48 @@ pack fill a slot of a choice it can be combined with but does not need
 | `tests.packages` | `tests/Directory.Build.props` | xunit, shouldly, nsubstitute, aspire-fixture |
 | `tests.usings` | `tests/Directory.Build.props` | xunit, shouldly, nsubstitute |
 | `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak (the host and `Microsoft.AspNetCore.Mvc.Testing`, for its endpoint rule) |
-| `tests.assert-no-violations` *(added in M1-04, declared by the test-framework pack, exactly-one)* | `tests/Architecture.Tests/ArchitectureRulesTests.cs` | shouldly (`violations.ShouldBeEmpty(description);`) |
-| `tests.assert-does-not-throw` *(added in M1-04, declared by the test-framework pack, exactly-one)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs` | shouldly (`Should.NotThrow(buildContainer);`) |
 | `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides); agent-framework (`IDispatcher`, which a handler running an agent takes, and `IAgentMcpTools` with the MCP client) |
 | `integration-tests.parameters` *(added for #77, declared by aspire-fixture)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter); agent-ui ag-ui (`model-stand-in` true: the host's stand-in model answers the agents) |
+
+#### The test vocabulary *(M3-11)*
+
+A pack's generated tests never name the test framework or the assertion
+library: they call `templates.functions` that every pack of those two
+dimensions defines, so another option plugs in by defining the same
+functions instead of editing every pack's tests (owner decision D6).
+Arguments are C# code as Scriban strings, best as backtick verbatim
+strings (no escapes, may span lines); each function returns C# code
+without a trailing `;`. `TestVocabularyTests` fails when a pack of either
+dimension defines more or fewer functions, when a pack's template names
+xUnit or Shouldly directly, or when a template refuses another option
+with `#error`. The framework and assertion packs' own files may use their
+library directly.
+
+| Function | Returns (xUnit v3 / Shouldly) |
+|---|---|
+| `test_attribute` | `[Fact]` |
+| `test_cases_attribute` | `[Theory]` |
+| `test_case_attribute arguments` | `[InlineData(arguments)]` |
+| `test_cancellation_token` | `TestContext.Current.CancellationToken` |
+| `write_test_output text` | `TestContext.Current.TestOutputHelper?.WriteLine(text)` |
+| `actual \| should_be expected [message]` | `actual.ShouldBe(expected)`; also `should_be_ignoring_order` (sequences), `should_contain`, `should_not_contain`, `should_start_with`, `should_be_greater_than`, `should_all_be` (a predicate), `should_be_subset_of`, `should_be_same_as` |
+| `actual \| should_be_true [message]` | `actual.ShouldBeTrue()`; also `should_be_false`, `should_be_null`, `should_not_be_null`, `should_be_empty`, `should_not_be_empty`, `should_be_in_order` |
+| `actual \| should_be_in_range from to` | `actual.ShouldBeInRange(from, to)` |
+| `actual \| should_have_single_item` | the single item |
+| `actual \| should_be_of_type type`, `should_be_assignable_to type` | the value as `type` |
+| `should_throw type action`, `should_throw_async type action` | the exception (awaitable for the async one) |
+| `should_not_throw action` | `Should.NotThrow(action)` |
+
+Scriban indents every later line of a multi-line result by the
+indentation of the line the call starts, when nothing but whitespace
+precedes it there: write a multi-line argument's later lines that much
+less indented than they should come out.
+
+Every assertion renders after its `actual`, so `actual` may continue the
+line above (`` `.Message` ``) as in a fluent chain. A template writes
+`{{ `total` | should_be `42` }};` for `total.ShouldBe(42);`. Fixtures and
+their lifetimes (the Aspire fixture, the rag tests' database) are the
+integration pack's vocabulary, not this one (M3-12).
 
 **One package, one owner.** A `PackageVersion` is declared by exactly
 one pack; others only reference it. Two packs declaring the same version

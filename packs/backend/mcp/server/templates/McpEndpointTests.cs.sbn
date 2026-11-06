@@ -16,38 +16,38 @@ public class McpEndpointTests(AspireFixture aspire)
     private static readonly Uri Endpoint = new("/mcp", UriKind.Relative);
 {{~ if auth ~}}
 
-    [Fact]
+    {{ test_attribute }}
     public async Task An_anonymous_caller_is_unauthorized()
     {
         using var client = aspire.CreateHostClient();
 
         using var response = await InitializeAsync(client);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        {{ `response.StatusCode` | should_be `HttpStatusCode.Unauthorized` }};
     }
 {{~ end ~}}
 {{~ if keycloak ~}}
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_signed_in_user_starts_a_session()
     {
         using var client = await aspire.CreateHostClientAsync("developer");
 
         using var response = await InitializeAsync(client);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        {{ `response.StatusCode` | should_be `HttpStatusCode.OK` }};
     }
 {{~ end ~}}
 {{~ if !auth ~}}
 
-    [Fact]
+    {{ test_attribute }}
     public async Task An_anonymous_caller_starts_a_session()
     {
         using var client = aspire.CreateHostClient();
 
         using var response = await InitializeAsync(client);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        {{ `response.StatusCode` | should_be `HttpStatusCode.OK` }};
     }
 {{~ end ~}}
 
@@ -59,6 +59,6 @@ public class McpEndpointTests(AspireFixture aspire)
         };
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
-        return await client.SendAsync(request, TestContext.Current.CancellationToken);
+        return await client.SendAsync(request, {{ test_cancellation_token }});
     }
 }
