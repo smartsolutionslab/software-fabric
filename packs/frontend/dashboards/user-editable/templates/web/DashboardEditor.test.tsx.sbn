@@ -1,0 +1,448 @@
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+{{~ if array.contains project["frontend.test.extras"] "accessibility" ~}}
+import { axe } from 'vitest-axe';
+{{~ end ~}}
+import type {
+  DashboardDto,
+  PagedResultOfDashboardSummaryDto,
+  PagedResultOfWidgetDescriptionDto,
+  WidgetData,
+} from '@/api/generated';
+import { DashboardEditor } from './DashboardEditor';
+
+const save = vi.fn();
+const refetch = vi.fn();
+const refetchWidget = vi.fn();
+
+const sales: DashboardDto = {
+  id: '01960000-0000-7000-8000-000000000001',
+  name: 'Sales',
+  widgets: [{ key: 'counts', source: 'dashboards.widget-counts', visual: 'bar', x: 0, y: 0, width: 6, height: 4 }],
+};
+const list: PagedResultOfDashboardSummaryDto = {
+  items: [{ id: sales.id, name: sales.name, widgetCount: 1 }],
+  totalCount: 1,
+  page: 1,
+  pageSize: 100,
+};
+const catalog: PagedResultOfWidgetDescriptionDto = {
+  items: [
+    { id: 'dashboards.my-dashboards', title: 'My dashboards', kind: 'Table' },
+    { id: 'dashboards.widget-counts', title: 'Widgets per dashboard', kind: 'Chart' },
+  ],
+  totalCount: 2,
+  page: 1,
+  pageSize: 100,
+};
+const chart: WidgetData = {
+  kind: 'Chart',
+  chart: { categories: ['Sales'], series: [{ name: 'Widgets', values: [1] }] },
+  table: null,
+};
+const table: WidgetData = {
+  kind: 'Table',
+  chart: null,
+  table: {
+    columns: ['id', 'name', 'widgetCount'],
+    rows: [{ id: sales.id, name: 'Sales', widgetCount: 1 }],
+    totalCount: 1,
+    page: 1,
+    pageSize: 20,
+  },
+};
+
+interface Answer<T> {
+  data?: T;
+  isError?: boolean;
+  isFetching?: boolean;
+}
+
+interface PageArg {
+  page: number;
+  pageSize: number;
+}
+
+interface Answers {
+  list: (arg: PageArg) => Answer<PagedResultOfDashboardSummaryDto>;
+  detail: () => Answer<DashboardDto>;
+  catalog: (arg: PageArg) => Answer<PagedResultOfWidgetDescriptionDto>;
+  widget: (arg: PageArg & { id: string }) => Answer<WidgetData>;
+}
+
+/** What each generated hook answers in a test; reset before every test, changed by the tests that need more. */
+const answers: Answers = {
+  list: () => ({ data: list }),
+  detail: () => ({ data: sales }),
+  catalog: () => ({ data: catalog }),
+  widget: ({ id }) => ({ data: id === 'dashboards.my-dashboards' ? table : chart }),
+};
+const defaults = { ...answers };
+
+// The generated client's hooks, answered here: the editor is tested against what the host serves, without a host.
+vi.mock('@/api/generated', () => ({
+  useGetDashboardsQuery: (arg: PageArg) => ({ ...answers.list(arg), refetch }),
+  useGetDashboardsByIdQuery: (_: unknown, options?: { skip?: boolean }) =>
+    options?.skip ? { refetch } : { ...answers.detail(), refetch },
+  // As RTK Query does: data keeps the page before while the next one loads; currentData is the asked page's alone.
+  useGetDashboardsWidgetsQuery: (arg: PageArg) => {
+    const answer = answers.catalog(arg);
+    return { ...answer, currentData: answer.isFetching ? undefined : answer.data, refetch };
+  },
+  useGetDashboardsWidgetsByIdQuery: (arg: PageArg & { id: string }) => ({
+    ...answers.widget(arg),
+    refetch: refetchWidget,
+  }),
+  usePutDashboardsByIdMutation: () => [save, { isLoading: false }],
+}));
+
+// ECharts draws on a canvas jsdom does not have; the chart's accessible name is what the editor decides.
+vi.mock('@/components/chart', () => ({
+  Chart: ({ label }: { label: string }) => <div role="img" aria-label={label} />,
+}));
+
+afterEach(cleanup);
+
+beforeEach(() => {
+  Object.assign(answers, defaults);
+  save.mockReset();
+  save.mockReturnValue({ unwrap: () => Promise.resolve(sales.id) });
+  refetch.mockReset();
+  refetchWidget.mockReset();
+});
+
+test('a user opens a dashboard, adds a widget, removes one, renames it and saves', async () => {
+  const user = userEvent.setup();
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+  expect(await screen.findByRole('img', { name: 'Widgets per dashboard' })).toBeInTheDocument();
+
+  await user.selectOptions(screen.getByLabelText('Widget'), 'dashboards.my-dashboards');
+  await user.selectOptions(screen.getByLabelText('Shown as'), 'table');
+  await user.click(screen.getByRole('button', { name: 'Add widget' }));
+  const added = await screen.findByRole('region', { name: 'My dashboards' });
+  expect(within(added).getByRole('cell', { name: 'Sales' })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Remove Widgets per dashboard' }));
+  expect(screen.queryByRole('img', { name: 'Widgets per dashboard' })).not.toBeInTheDocument();
+
+  await user.clear(screen.getByLabelText('Dashboard name'));
+  await user.type(screen.getByLabelText('Dashboard name'), 'Sales overview');
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  expect(save).toHaveBeenCalledWith({
+    id: sales.id,
+    saveDashboardRequest: {
+      name: 'Sales overview',
+      widgets: [
+        expect.objectContaining({ source: 'dashboards.my-dashboards', visual: 'table', x: 0, width: 6, height: 4 }),
+      ],
+    },
+  });
+  expect(await screen.findByRole('status')).toHaveTextContent('Saved.');
+  expect(refetch).toHaveBeenCalled();
+});
+
+test('a new dashboard gets a fresh time-ordered id and needs a name before it is saved', async () => {
+  const user = userEvent.setup();
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('A dashboard needs a name of 1 to 100 characters.');
+  expect(save).not.toHaveBeenCalled();
+
+  await user.type(screen.getByLabelText('Dashboard name'), 'Fresh');
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+  const [{ id }] = save.mock.calls[0] as [{ id: string }];
+  expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  expect(id).not.toBe(sales.id);
+});
+
+{{~ if array.contains project["frontend.test.extras"] "accessibility" ~}}
+test('the editor with a dashboard open has no accessibility violations axe can find', async () => {
+  const user = userEvent.setup();
+  const { container } = render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+  await screen.findByRole('img', { name: 'Widgets per dashboard' });
+
+  expect(await axe(container)).toHaveNoViolations();
+});
+
+{{~ end ~}}
+test('reopening a dashboard waits for its saved state instead of editing the copy it had before', async () => {
+  const user = userEvent.setup();
+  render(<DashboardEditor />);
+  answers.detail = () => ({ data: sales, isFetching: true });
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  expect(await screen.findByText('Loading the dashboard…')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Dashboard name')).not.toBeInTheDocument();
+});
+
+test('a failed read says so and offers to try again, instead of looking empty', async () => {
+  const user = userEvent.setup();
+  answers.list = () => ({ isError: true });
+  answers.catalog = () => ({ isError: true });
+  answers.detail = () => ({ isError: true });
+  render(<DashboardEditor />);
+
+  expect(screen.getByText('Your dashboards could not be loaded.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  expect(screen.getByText('The widgets could not be loaded.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Try loading your dashboards again' }));
+  expect(refetch).toHaveBeenCalled();
+});
+
+test('a failed read of the opened dashboard says so', async () => {
+  const user = userEvent.setup();
+  answers.detail = () => ({ isError: true });
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  expect(screen.getByText('This dashboard could not be loaded.')).toBeInTheDocument();
+});
+
+test('more dashboards and widgets than one page holds are reached page by page', async () => {
+  const user = userEvent.setup();
+  answers.list = ({ page }) => ({
+    data: {
+      items: [{ id: `id-${page}`, name: `Dashboard ${page}`, widgetCount: 0 }],
+      totalCount: 101,
+      page,
+      pageSize: 100,
+    },
+  });
+  answers.catalog = ({ page }) => ({
+    data: {
+      items: [{ id: `module.widget-${page}`, title: `Widget ${page}`, kind: 'Chart' }],
+      totalCount: 101,
+      page,
+      pageSize: 100,
+    },
+  });
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'Next page of your dashboards' }));
+  expect(screen.getByRole('button', { name: 'Dashboard 2' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Dashboard 1' })).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  await user.click(screen.getByRole('button', { name: 'Next page of widgets' }));
+  expect(screen.getByRole('option', { name: 'Widget 2' })).toBeInTheDocument();
+});
+
+test('a table widget pages through its rows', async () => {
+  const user = userEvent.setup();
+  answers.widget = ({ page }) => ({
+    data: {
+      kind: 'Table',
+      chart: null,
+      table: { columns: ['name'], rows: [{ name: `Row ${page}` }], totalCount: 21, page, pageSize: 20 },
+    },
+  });
+  render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+  const widget = await screen.findByRole('region', { name: 'Widgets per dashboard' });
+  expect(within(widget).getByRole('cell', { name: 'Row 1' })).toBeInTheDocument();
+
+  await user.click(within(widget).getByRole('button', { name: 'Next page of Widgets per dashboard' }));
+
+  expect(within(widget).getByRole('cell', { name: 'Row 2' })).toBeInTheDocument();
+});
+
+test('a table widget whose rows shrink to fewer pages goes back to its last page instead of an empty one', async () => {
+  const user = userEvent.setup();
+  let totalCount = 21;
+  answers.widget = ({ page, pageSize }) => ({
+    data: {
+      kind: 'Table',
+      chart: null,
+      table: {
+        columns: ['name'],
+        rows: page <= Math.ceil(totalCount / pageSize) ? [{ name: `Row ${page}` }] : [],
+        totalCount,
+        page,
+        pageSize,
+      },
+    },
+  });
+  render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+  const widget = await screen.findByRole('region', { name: 'Widgets per dashboard' });
+  await user.click(within(widget).getByRole('button', { name: 'Next page of Widgets per dashboard' }));
+  expect(within(widget).getByRole('cell', { name: 'Row 2' })).toBeInTheDocument();
+
+  totalCount = 20;
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  expect(await within(widget).findByRole('cell', { name: 'Row 1' })).toBeInTheDocument();
+});
+
+test('any change after saving takes the saved notice away', async () => {
+  const user = userEvent.setup();
+  render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+  await user.click(await screen.findByRole('button', { name: 'Save dashboard' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('Saved.');
+
+  await user.click(screen.getByRole('button', { name: 'Remove Widgets per dashboard' }));
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('Saved.');
+  await user.type(screen.getByLabelText('Dashboard name'), ' 2');
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+test('a failed refresh of a dashboard opened before does not open the copy it had', async () => {
+  const user = userEvent.setup();
+  answers.detail = () => ({ data: sales, isError: true });
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  expect(screen.getByText('This dashboard could not be loaded.')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Dashboard name')).not.toBeInTheDocument();
+});
+
+test('edits made while a save is under way are not reported as saved', async () => {
+  const user = userEvent.setup();
+  let finish: (id: string) => void = () => undefined;
+  save.mockReturnValue({ unwrap: () => new Promise<string>((resolve) => (finish = resolve)) });
+  render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+  await user.click(await screen.findByRole('button', { name: 'Save dashboard' }));
+
+  await user.click(screen.getByRole('button', { name: 'Remove Widgets per dashboard' }));
+  finish(sales.id);
+
+  await waitFor(() => expect(refetch).toHaveBeenCalled());
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+test('saving refreshes the widgets on the dashboard, whose data may be what was just saved', async () => {
+  const user = userEvent.setup();
+  render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+  await screen.findByRole('img', { name: 'Widgets per dashboard' });
+  refetchWidget.mockClear();
+
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() => expect(refetchWidget).toHaveBeenCalled());
+});
+
+test('a dashboard holds at most 50 widgets, and the editor says so before the host would refuse it', async () => {
+  const user = userEvent.setup();
+  answers.detail = () => ({
+    data: {
+      ...sales,
+      widgets: Array.from({ length: 50 }, (_, index) => ({
+        key: `w${index}`,
+        source: 'dashboards.widget-counts',
+        visual: 'bar',
+        x: 0,
+        y: index * 4,
+        width: 6,
+        height: 4,
+      })),
+    },
+  });
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  expect(await screen.findByRole('button', { name: 'Add widget' })).toBeDisabled();
+  expect(screen.getByText('A dashboard holds at most 50 widgets.')).toBeInTheDocument();
+});
+
+test('paging the widget picker clears the choice, so a widget of one page is never added as a visual of another', async () => {
+  const user = userEvent.setup();
+  answers.catalog = ({ page }) => ({
+    data: {
+      items:
+        page === 1
+          ? [{ id: 'module.rows', title: 'Rows', kind: 'Table' }]
+          : [{ id: 'module.trend', title: 'Trend', kind: 'Chart' }],
+      totalCount: 101,
+      page,
+      pageSize: 100,
+    },
+  });
+  render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  await user.selectOptions(screen.getByLabelText('Widget'), 'module.rows');
+
+  await user.click(screen.getByRole('button', { name: 'Next page of widgets' }));
+
+  expect(screen.getByLabelText('Widget')).toHaveValue('');
+  await user.selectOptions(screen.getByLabelText('Shown as'), 'line');
+  await user.click(screen.getByRole('button', { name: 'Add widget' }));
+  expect(await screen.findByText('Choose a widget.')).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Rows' })).not.toBeInTheDocument();
+});
+
+test('a dashboard that reaches row 1000 takes no further widget, and the editor says why', async () => {
+  const user = userEvent.setup();
+  // 42 full-width widgets 24 rows high: the last starts at row 984 and ends at 1008, so a 43rd would start below 1000.
+  answers.detail = () => ({
+    data: {
+      ...sales,
+      widgets: Array.from({ length: 42 }, (_, index) => ({
+        key: `tall${index}`,
+        source: 'dashboards.widget-counts',
+        visual: 'bar',
+        x: 0,
+        y: index * 24,
+        width: 12,
+        height: 24,
+      })),
+    },
+  });
+  render(<DashboardEditor />);
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  expect(await screen.findByRole('button', { name: 'Add widget' })).toBeDisabled();
+  expect(
+    screen.getByText('There is no room for another widget: a dashboard reaches down to row 1000.'),
+  ).toBeInTheDocument();
+});
+
+const rows = { id: 'module.rows', title: 'Rows', kind: 'Table' } as const;
+const trend = { id: 'module.trend', title: 'Trend', kind: 'Chart' } as const;
+
+test('while the next page of the widget picker loads, it offers nothing from the page before and then stays on the next page', async () => {
+  const user = userEvent.setup();
+  let pageTwoArrived = false;
+  const pageOf = (page: number): PagedResultOfWidgetDescriptionDto => ({
+    items: [page === 1 ? rows : trend],
+    totalCount: 101,
+    page,
+    pageSize: 100,
+  });
+  answers.catalog = ({ page }) =>
+    page === 2 && !pageTwoArrived ? { data: pageOf(1), isFetching: true } : { data: pageOf(page) };
+  const { rerender } = render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+
+  await user.click(screen.getByRole('button', { name: 'Next page of widgets' }));
+
+  expect(screen.getByLabelText('Widget')).toBeDisabled();
+  expect(screen.queryByRole('option', { name: 'Rows' })).not.toBeInTheDocument();
+
+  pageTwoArrived = true;
+  rerender(<DashboardEditor />);
+
+  expect(screen.getByLabelText('Widget')).toBeEnabled();
+  expect(screen.getByRole('option', { name: 'Trend' })).toBeInTheDocument();
+  expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+});

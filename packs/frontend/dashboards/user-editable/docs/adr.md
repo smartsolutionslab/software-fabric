@@ -17,4 +17,8 @@ Users want to arrange the figures they watch on dashboards of their own. A dashb
 
 - A module offers a widget by changing its own Application project; no shared file lists widgets.
 - The rule sees that a widget is declared, not that its query reads only what its viewers may see; that stays the query's business, as for an endpoint.
-- The web app reaches these endpoints through the generated API client; the dashboard page itself (a react-grid-layout grid rendering the ECharts and DataTable components) is still to come.
+{{~ if project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa" ~}}
+- **The page** (`/dashboards`) lists the user's dashboards, opens one or starts a new one with a client-made v7 UUID, and edits it on a react-grid-layout 2.3.0 grid of 12 columns: add a declared widget as a bar, line or pie chart or a table, move, resize and remove widgets, rename, and save with the PUT above. Each widget draws `GET /dashboards/widgets/{id}` with the project's `Chart` or `DataTable`. It uses only the generated API client.
+{{~ else ~}}
+- The web app reaches these endpoints through the generated API client. The dashboard page is built for a React single-page app on RTK Query so far; here the module keeps the router's placeholder page, and the framework's grid library (react-grid-layout, or grid-layout-plus for Vue) is already a dependency.
+{{~ end ~}}

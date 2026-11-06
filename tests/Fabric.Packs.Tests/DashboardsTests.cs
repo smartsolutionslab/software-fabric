@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
 using Fabric.Core.Choices;
 using Fabric.Core.Generation;
+using Fabric.Core.Packs;
+using Fabric.Core.Rendering;
 
 namespace Fabric.Packs.Tests;
 
@@ -184,6 +186,105 @@ public sealed class DashboardsTests
     {
         Files(Profile, Dashboards)["web/app/openapi.json"].ShouldContain("\"/dashboards/{id}\"");
         Files("saas-standard-vue", Dashboards)["web/app/openapi.json"].ShouldContain("\"/dashboards/{id}\"");
+    }
+
+    [Fact]
+    public void The_react_spa_gets_the_dashboard_page_on_react_grid_layout_and_the_module_page_renders_it()
+    {
+        var files = Files(Profile, Dashboards);
+
+        files["web/app/package.json"].ShouldContain("\"react-grid-layout\": \"2.3.0\"");
+        files["web/app/src/index.css"].ShouldStartWith("@import 'react-grid-layout/css/styles.css';\n");
+        files["web/app/src/modules/dashboards/DashboardsPage.tsx"].ShouldContain("<DashboardEditor />");
+        files.Keys.ShouldContain("web/app/src/dashboards/DashboardEditor.tsx");
+        files.Keys.ShouldContain("web/app/src/dashboards/DashboardEditor.test.tsx");
+        files.Keys.ShouldContain("web/app/e2e/dashboards.spec.ts");
+    }
+
+    [Fact]
+    public void The_page_checks_accessibility_with_axe_only_where_the_project_has_the_accessibility_tests()
+    {
+        Files(Profile, Dashboards)["web/app/src/dashboards/DashboardEditor.test.tsx"].ShouldContain("from 'vitest-axe'");
+
+        var without = Files(Profile, Dashboards, "frontend.test.extras=");
+
+        without["web/app/package.json"].ShouldNotContain("vitest-axe");
+        without["web/app/src/dashboards/DashboardEditor.test.tsx"].ShouldNotContain("axe");
+    }
+
+    [Fact]
+    public void Where_the_page_is_not_built_yet_the_module_keeps_the_routers_placeholder_page()
+    {
+        foreach (var (profile, overrides) in new[]
+        {
+            ("saas-standard-vue", new[] { Dashboards }),
+            ("lean-crud", new[] { Dashboards }),
+            ("industrial-event-driven-mfe", new[] { Dashboards }),
+        })
+        {
+            var files = Files(profile, overrides);
+
+            files.Keys.ShouldNotContain(path => path.StartsWith("web/app/src/dashboards/", StringComparison.Ordinal), profile);
+            files.Single(file => file.Key.StartsWith("web/app/src/modules/dashboards/DashboardsPage.", StringComparison.Ordinal)).Value
+                .ShouldNotContain("DashboardEditor", customMessage: profile);
+        }
+    }
+
+    /// <summary>
+    /// Only <c>spa</c> has a pack today, so no profile can reach another architecture; the two packs' templates are rendered
+    /// with a project that chooses it, to show the module page names the editor exactly where the editor is generated.
+    /// </summary>
+    [Theory]
+    [InlineData("spa")]
+    [InlineData("multi-app")]
+    public void The_module_page_renders_the_dashboard_editor_only_where_the_editor_is_generated(string architecture)
+    {
+        var router = Repository.Packs.Packs["frontend.routing.react-router"];
+        var dashboards = Repository.Packs.Packs["frontend.dashboards.user-editable"];
+        var choices = new ProjectChoices(
+            new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["frontend.framework"] = ["react"],
+                ["frontend.architecture"] = [architecture],
+                ["frontend.api-client"] = ["rtk-query-codegen"],
+                ["frontend.dashboards"] = ["user-editable"],
+            },
+            new Dictionary<string, IReadOnlyList<string>>(),
+            new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> { ["dashboards"] = new Dictionary<string, IReadOnlyList<string>>() });
+        const string Page = "web/app/src/modules/dashboards/DashboardsPage.tsx";
+        const string Editor = "web/app/src/dashboards/DashboardEditor.tsx";
+        List<ComposedFile> files =
+        [
+            new(router, router.Files.Single(file => file.Template == "templates/module-page.tsx.sbn"), Page, "dashboards"),
+            new(dashboards, dashboards.Files.Single(file => file.Target == Editor), Editor, null),
+        ];
+
+        var rendered = Renderer.Render(Repository.Catalog, new Composition([router, dashboards], files, new Dictionary<string, IReadOnlyList<SlotEntry>>(), []), choices, "shop");
+
+        rendered.Errors.ShouldBeEmpty();
+        var generated = rendered.Files.ToDictionary(file => file.Path, file => file.Content);
+        generated[Page].Contains("DashboardEditor", StringComparison.Ordinal).ShouldBe(generated.ContainsKey(Editor), architecture);
+    }
+
+    [Fact]
+    public void The_generated_web_app_builds_lints_and_passes_its_tests_and_the_end_to_end_test_finds_a_saved_dashboard_after_a_reload()
+    {
+        using var project = new GeneratedProject(Profile, Dashboards);
+        project.Build();
+
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        foreach (var step in new[] { "install", "build", "lint", "test" })
+        {
+            var (exitCode, output) = Shell.Run(web, "pnpm", step);
+            exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
+        }
+
+        var (formatExitCode, format) = Shell.Run(Path.Combine(web, "app"), "pnpm", "format:check");
+        formatExitCode.ShouldBe(0, format);
+
+        var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
+        e2eExitCode.ShouldBe(0, e2eOutput);
+        e2eOutput.ShouldContain("2 passed");
     }
 
     [Fact]

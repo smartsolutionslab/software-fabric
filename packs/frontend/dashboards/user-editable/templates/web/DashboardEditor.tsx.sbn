@@ -1,0 +1,79 @@
+import { useState } from 'react';
+import { type DashboardSummaryDto, useGetDashboardsByIdQuery, useGetDashboardsQuery } from '@/api/generated';
+import { Button } from '@/components/ui/button';
+import { DashboardCanvas, type DraftDashboard } from './DashboardCanvas';
+import { Failure } from './Failure';
+import { fromSaved } from './layout';
+import { Pager } from './Pager';
+import { uuidV7 } from './uuidV7';
+
+const pageSize = 100;
+const noDashboards: DashboardSummaryDto[] = [];
+
+interface Opened {
+  id: string;
+  isNew: boolean;
+}
+
+/** The signed-in user's dashboards: open one or start a new one, then edit and save it. */
+export function DashboardEditor() {
+  const [page, setPage] = useState(1);
+  const dashboards = useGetDashboardsQuery({ page, pageSize });
+  const [opened, setOpened] = useState<Opened | undefined>();
+  const detail = useGetDashboardsByIdQuery(
+    { id: opened?.id ?? '' },
+    { skip: !opened || opened.isNew, refetchOnMountOrArgChange: true },
+  );
+
+  // A dashboard opened again is edited from what the host answers now: never from the copy cached before a save, nor
+  // from the one RTK Query keeps when the refresh fails.
+  let draft: DraftDashboard | undefined;
+  if (opened?.isNew) {
+    draft = { id: opened.id, name: '', widgets: [] };
+  } else if (opened && !detail.isFetching && !detail.isError && detail.data?.id === opened.id) {
+    draft = { id: detail.data.id, name: detail.data.name, widgets: fromSaved(detail.data.widgets) };
+  }
+
+  return (
+    <main className="flex flex-col gap-4 p-4">
+      <h1 className="text-xl font-semibold">Dashboards</h1>
+      <nav aria-label="Your dashboards" className="flex flex-wrap items-center gap-2">
+        {dashboards.isError ? (
+          <Failure
+            message="Your dashboards could not be loaded."
+            retry="Try loading your dashboards again"
+            onRetry={dashboards.refetch}
+          />
+        ) : (
+          (dashboards.data?.items ?? noDashboards).map((dashboard) => (
+            <Button
+              key={dashboard.id}
+              variant="outline"
+              aria-pressed={opened?.id === dashboard.id}
+              onClick={() => setOpened({ id: dashboard.id, isNew: false })}
+            >
+              {dashboard.name}
+            </Button>
+          ))
+        )}
+        <Button onClick={() => setOpened({ id: uuidV7(), isNew: true })}>New dashboard</Button>
+        <Pager
+          label="your dashboards"
+          page={page}
+          pageSize={pageSize}
+          total={dashboards.data?.totalCount}
+          onPage={setPage}
+        />
+      </nav>
+      {opened && !opened.isNew && detail.isError && (
+        <Failure
+          message="This dashboard could not be loaded."
+          retry="Try loading the dashboard again"
+          onRetry={detail.refetch}
+        />
+      )}
+      {opened && !opened.isNew && !detail.isError && !draft && <p>Loading the dashboard…</p>}
+      {draft && <DashboardCanvas key={draft.id} dashboard={draft} onSaved={() => void dashboards.refetch()} />}
+    </main>
+  );
+}

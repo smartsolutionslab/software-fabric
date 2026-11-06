@@ -1,0 +1,31 @@
+import { expect, test } from 'vitest';
+import { checkChoice } from './widgetChoice';
+
+const catalog = [
+  { id: 'module.rows', title: 'Rows', kind: 'Table' },
+  { id: 'module.trend', title: 'Trend', kind: 'Chart' },
+] as const;
+
+test('a widget the catalogue lists, shown in a way that suits its kind, is a valid choice', () => {
+  expect(checkChoice(catalog, 'module.trend', 'line')).toEqual({ ok: true });
+  expect(checkChoice(catalog, 'module.rows', 'table')).toEqual({ ok: true });
+});
+
+test('a widget the catalogue does not list is refused, whatever page it was chosen from', () => {
+  expect(checkChoice(catalog, 'module.gone', 'table')).toEqual({
+    ok: false,
+    field: 'source',
+    message: 'That widget is no longer offered; choose another.',
+  });
+});
+
+test('a visual that does not suit the widget kind is refused, so a table is never drawn as a chart', () => {
+  const refused = {
+    ok: false,
+    field: 'visual',
+    message: 'That widget cannot be shown that way; choose how to show it.',
+  };
+
+  expect(checkChoice(catalog, 'module.rows', 'bar')).toEqual(refused);
+  expect(checkChoice(catalog, 'module.trend', 'table')).toEqual(refused);
+});
