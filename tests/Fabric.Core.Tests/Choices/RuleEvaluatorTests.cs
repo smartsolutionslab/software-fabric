@@ -146,7 +146,7 @@ public class RuleEvaluatorTests
     [Fact]
     public void Module_rules_are_checked_per_module_and_name_the_module()
     {
-        var choices = ChoiceResolver.Resolve(RepositoryCatalog, "saas-standard-react", []).Choices.ShouldNotBeNull();
+        var choices = ChoiceResolver.Resolve(RepositoryCatalog, "saas-standard-react", ["backend.tenancy=none"]).Choices.ShouldNotBeNull();
         Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> modules = new()
         {
             ["billing"] = Values(("module.style", "ddd"), ("module.cqrs", "logical")),

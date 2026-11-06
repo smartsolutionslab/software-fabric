@@ -182,16 +182,16 @@ public sealed class MicroFrontendsTests
     }
 
     [Fact]
-    public void A_remote_for_a_framework_or_design_system_the_pack_does_not_build_fails_loudly()
+    public void A_remote_for_a_design_system_the_pack_does_not_build_fails_loudly()
     {
         using var project = new GeneratedProject(
-            "saas-standard-vue",
+            "saas-standard-react",
             "frontend.architecture=micro-frontends",
-            "frontend.design-system=tokens-and-components");
+            "frontend.design-system=tokens");
         project.AddModule("billing");
 
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "modules", "billing", "vite.config.ts"))
-            .ShouldStartWith("throw new Error('The module-federation pack builds React remotes on the tokens-and-components design system only so far; frontend.framework is vue, frontend.design-system is tokens-and-components (docs/adr/0006 of the generator).');");
+            .ShouldStartWith("throw new Error('The module-federation pack builds React remotes on the tokens-and-components design system only so far; frontend.framework is react, frontend.design-system is tokens (docs/adr/0006 of the generator).');");
     }
 
     private static void RunWeb(GeneratedProject project, params string[] steps)
