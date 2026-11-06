@@ -11,6 +11,7 @@ files:
   - { template: templates/tests/SampleNotesDbContext.cs.sbn, target: tests/Rag.Tests/SampleNotesDbContext.cs }
   - { template: templates/tests/SampleDraftsDbContext.cs.sbn, target: tests/Rag.Tests/SampleDraftsDbContext.cs }
   - { template: templates/tests/SampleShelfDbContext.cs.sbn, target: tests/Rag.Tests/SampleShelfDbContext.cs }
+  - { template: templates/tests/SampleLibraryDbContext.cs.sbn, target: tests/Rag.Tests/SampleLibraryDbContext.cs, when: 'project["backend.tenancy"] != "column"' }
   - { template: templates/tests/VectorIndexTests.cs.sbn, target: tests/Rag.Tests/VectorIndexTests.cs }
   - { template: templates/tests/VectorTablesTests.cs.sbn, target: tests/Rag.Tests/VectorTablesTests.cs }
   - { template: templates/tests/OneTenant.cs.sbn, target: tests/Rag.Tests/OneTenant.cs, when: 'project["backend.tenancy"] == "column"' }

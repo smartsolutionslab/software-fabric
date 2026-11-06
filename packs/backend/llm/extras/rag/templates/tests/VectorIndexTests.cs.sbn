@@ -28,7 +28,11 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
+{{~ if project["backend.tenancy"] == "column" ~}}
         await VectorTables.CreateAsync(database.ConnectionString, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema], TestContext.Current.CancellationToken);
+{{~ else ~}}
+        await VectorTables.CreateAsync(database.ConnectionString, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema, SampleLibraryDbContext.Schema], TestContext.Current.CancellationToken);
+{{~ end ~}}
         dataSource = VectorTables.DataSource(database.ConnectionString);
     }
 
@@ -87,6 +91,31 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
         passages.Count.ShouldBe(50);
         passages.Select(passage => passage.Distance).ShouldBeInOrder();
     }
+{{~ if project["backend.tenancy"] != "column" ~}}
+
+    [Fact]
+    public async Task A_search_the_hnsw_index_answers_short_ranks_every_record_exactly_and_returns_as_many_as_asked()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // The HNSW scan stops once it has visited hnsw.max_scan_tuples (20,000 by default, 100 here) beyond its first
+        // hnsw.ef_search candidates, and the index widens that breadth to 1000 at most, so a search for 1,100 of 1,200
+        // records comes back short through the index. Records it cannot reach at all (equidistant ties) do the same.
+        var scanLimited = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off -c hnsw.max_scan_tuples=100" };
+        await using var indexed = VectorTables.DataSource(scanLimited.ConnectionString);
+        var library = new ModuleVectorIndex<SampleLibraryDbContext>(indexed, generator);
+        for (var number = 0; number < 1200; number++)
+        {
+            await library.IndexAsync($"book-{number}", $"book {number} {number + 1}", cancellationToken);
+        }
+
+        var passages = await library.SearchAsync("book", 1100, cancellationToken);
+
+        passages.Count.ShouldBe(1100);
+        passages.Select(passage => passage.Key).ShouldBeUnique();
+        passages.Select(passage => passage.Distance).ShouldBeInOrder();
+    }
+{{~ end ~}}
 
     public async ValueTask DisposeAsync()
     {
