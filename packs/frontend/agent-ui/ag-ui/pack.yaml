@@ -32,6 +32,9 @@ slots:
   - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 40 }
   - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 40 }
   - { slot: integration-tests.parameters, template: templates/integration-tests-parameters.sbn }
+  # AGUIServerInstrumentation.ActivitySourceName, spelled out because ServiceDefaults does not reference the SDK. Its agui.run
+  # span carries a mid-stream failure, which the browser sees only as a generic RUN_ERROR; without a listener, no span.
+  - { slot: service-defaults.activity-sources, template: templates/service-defaults-activity-sources.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
