@@ -1,0 +1,45 @@
+{%{<script setup lang="ts">
+import { computed } from 'vue';
+import { useGetDashboardsWidgetDeclarationsId } from '@/api/generated';
+import { Button } from '@/components/ui/button';
+import type { Placement } from './layout';
+import WidgetView from './WidgetView.vue';
+
+interface PlacedWidgetProps {
+  placement: Placement;
+  height: number;
+  /** Goes up with every save of the dashboard, so the widget's data is read again. */
+  refresh: number;
+}
+
+/**
+ * A widget on the dashboard, titled by its own declaration rather than by the page of the widget picker on screen; its
+ * id stands in until the declaration arrives, or when the widget is no longer declared for the user.
+ */
+const { placement, height, refresh } = defineProps<PlacedWidgetProps>();
+const emit = defineEmits<{ remove: [] }>();
+
+const { data: declaration } = useGetDashboardsWidgetDeclarationsId(computed(() => placement.source));
+const title = computed(() => declaration.value?.title ?? placement.source);
+</script>
+
+<template>
+  <section :aria-label="title" class="flex h-full flex-col overflow-hidden rounded border bg-card p-2">
+    <header class="flex items-center justify-between gap-2">
+      <h2 class="text-sm font-medium">{{ title }}</h2>
+      <Button type="button" variant="ghost" size="sm" :aria-label="`Remove ${title}`" @click="emit('remove')">
+        Remove
+      </Button>
+    </header>
+    <div class="min-h-0 flex-1 overflow-auto">
+      <WidgetView
+        :source="placement.source"
+        :visual="placement.visual"
+        :title="title"
+        :height="height"
+        :refresh="refresh"
+      />
+    </div>
+  </section>
+</template>
+}%}
