@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 
 interface PagerProps {
@@ -9,9 +10,18 @@ interface PagerProps {
   onPage: (page: number) => void;
 }
 
-/** Previous and next page of a paged list; nothing while everything fits on one page. */
+/**
+ * Previous and next page of a paged list; nothing while everything fits on one page.
+ * A total that shrinks below the current page moves to the last page, which would otherwise be empty and unreachable.
+ */
 export function Pager({ label, page, pageSize, total, onPage }: PagerProps) {
   const pages = Math.max(1, Math.ceil(Number(total) / pageSize));
+  useEffect(() => {
+    if (page > pages) {
+      onPage(pages);
+    }
+  }, [page, pages, onPage]);
+
   if (pages <= 1) {
     return null;
   }
