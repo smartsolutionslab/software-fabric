@@ -1,6 +1,3 @@
-{{~ if project["backend.test.framework"] != "xunit" || project["backend.test.assertions"] != "shouldly" ~}}
-#error The evals are written for xUnit and Shouldly only so far (docs/adr/0006 of the generator).
-{{~ end ~}}
 using System.Globalization;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,7 +10,7 @@ namespace {{ namespace }}.Evals;
 /// </summary>
 public sealed class UseCaseEvals
 {
-    [Fact]
+    {{ test_attribute }}
     public async Task Every_metric_reaches_the_threshold_on_average_over_each_use_cases_examples()
     {
         var threshold = EvalThreshold.Read();
@@ -21,16 +18,16 @@ public sealed class UseCaseEvals
         var model = services.GetRequiredService<IChatClient>();
         var executionName = TimeProvider.System.GetUtcNow().ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture);
 
-        var scores = await EvalRun.RunAsync(UseCases.All, model, judge: model, EvalPaths.Results, executionName, TestContext.Current.CancellationToken);
+        var scores = await EvalRun.RunAsync(UseCases.All, model, judge: model, EvalPaths.Results, executionName, {{ test_cancellation_token }});
 
         foreach (var line in scores.Report())
         {
-            TestContext.Current.TestOutputHelper?.WriteLine(line);
+            {{ write_test_output `line` }};
         }
 
         var violations = scores.BelowThreshold(threshold);
         var description = $"The threshold in fabric.yaml is {threshold.ToString(CultureInfo.InvariantCulture)}. Every score: {string.Join("; ", scores.Report())}";
 
-{{ slots["tests.assert-no-violations"] }}
+        {{ `violations` | should_be_empty `description` }};
     }
 }

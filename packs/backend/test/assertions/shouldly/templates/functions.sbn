@@ -1,0 +1,72 @@
+func should_be(actual, expected, message = null)
+  ret actual + ".ShouldBe(" + ([expected, message] | array.compact | array.join ", ") + ")"
+end
+func should_be_ignoring_order(actual, expected, message = null)
+  if message == null
+    ret actual + ".ShouldBe(" + expected + ", ignoreOrder: true)"
+  end
+  ret actual + ".ShouldBe(" + expected + ", ignoreOrder: true, customMessage: " + message + ")"
+end
+func should_be_true(actual, message = null)
+  ret actual + ".ShouldBeTrue(" + ([message] | array.compact | array.join ", ") + ")"
+end
+func should_be_false(actual, message = null)
+  ret actual + ".ShouldBeFalse(" + ([message] | array.compact | array.join ", ") + ")"
+end
+func should_be_null(actual, message = null)
+  ret actual + ".ShouldBeNull(" + ([message] | array.compact | array.join ", ") + ")"
+end
+func should_not_be_null(actual, message = null)
+  ret actual + ".ShouldNotBeNull(" + ([message] | array.compact | array.join ", ") + ")"
+end
+func should_be_empty(actual, message = null)
+  ret actual + ".ShouldBeEmpty(" + ([message] | array.compact | array.join ", ") + ")"
+end
+func should_not_be_empty(actual, message = null)
+  ret actual + ".ShouldNotBeEmpty(" + ([message] | array.compact | array.join ", ") + ")"
+end
+func should_contain(actual, expected, message = null)
+  ret actual + ".ShouldContain(" + ([expected, message] | array.compact | array.join ", ") + ")"
+end
+func should_not_contain(actual, expected, message = null)
+  ret actual + ".ShouldNotContain(" + ([expected, message] | array.compact | array.join ", ") + ")"
+end
+func should_start_with(actual, expected, message = null)
+  ret actual + ".ShouldStartWith(" + ([expected, message] | array.compact | array.join ", ") + ")"
+end
+func should_be_greater_than(actual, expected, message = null)
+  ret actual + ".ShouldBeGreaterThan(" + ([expected, message] | array.compact | array.join ", ") + ")"
+end
+func should_be_in_range(actual, from, to)
+  ret actual + ".ShouldBeInRange(" + from + ", " + to + ")"
+end
+func should_all_be(actual, predicate, message = null)
+  ret actual + ".ShouldAllBe(" + ([predicate, message] | array.compact | array.join ", ") + ")"
+end
+func should_be_in_order(actual)
+  ret actual + ".ShouldBeInOrder()"
+end
+func should_be_subset_of(actual, expected)
+  ret actual + ".ShouldBeSubsetOf(" + expected + ")"
+end
+func should_be_same_as(actual, expected)
+  ret actual + ".ShouldBeSameAs(" + expected + ")"
+end
+func should_have_single_item(actual)
+  ret actual + ".ShouldHaveSingleItem()"
+end
+func should_be_of_type(actual, type)
+  ret actual + ".ShouldBeOfType<" + type + ">()"
+end
+func should_be_assignable_to(actual, type)
+  ret actual + ".ShouldBeAssignableTo<" + type + ">()"
+end
+func should_throw(type, action)
+  ret "Should.Throw<" + type + ">(" + action + ")"
+end
+func should_throw_async(type, action)
+  ret "Should.ThrowAsync<" + type + ">(" + action + ")"
+end
+func should_not_throw(action)
+  ret "Should.NotThrow(" + action + ")"
+end

@@ -14,11 +14,11 @@ public class ListEndpointsArePagedTests(AspireFixture aspire)
 {
     private const string PagedResultSchema = "#/components/schemas/PagedResultOf";
 
-    [Fact]
+    {{ test_attribute }}
     public async Task Every_list_endpoint_answers_a_paged_result_and_takes_page_and_page_size()
     {
         using var client = aspire.CreateHostClient();
-        var document = JsonNode.Parse(await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative), TestContext.Current.CancellationToken))!;
+        var document = JsonNode.Parse(await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative), {{ test_cancellation_token }}))!;
 
         List<string> violations = [];
         foreach (var (path, item) in document["paths"]?.AsObject() ?? [])
@@ -40,11 +40,7 @@ public class ListEndpointsArePagedTests(AspireFixture aspire)
             }
         }
 
-        {{~ if project["backend.test.assertions"] == "shouldly" ~}}
-        violations.ShouldBeEmpty(string.Join(Environment.NewLine, violations));
-        {{~ else ~}}
-        violations.Should().BeEmpty(string.Join(Environment.NewLine, violations));
-        {{~ end ~}}
+        {{ `violations` | should_be_empty `string.Join(Environment.NewLine, violations)` }};
     }
 
     private static bool IsArray(JsonNode schema) =>
