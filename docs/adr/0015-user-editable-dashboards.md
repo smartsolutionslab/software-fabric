@@ -246,7 +246,9 @@ React.
 - **Where it shows.** `DashboardCanvas.vue` branches on `generative`, as
   React's canvas does. The pending proposals are `static` items of
   grid-layout-plus's layout below the draft's widgets, and the layout is drawn
-  again whenever the draft or the pending proposals change.
+  again whenever the draft or the pending proposals change. In both
+  frameworks the assistant sits below the grid, so the page above the grid,
+  and every place on it, is where it is without `generative`.
 - **Tests.** `DashboardAssistant.test.ts` is `DashboardAssistant.test.tsx`'s
   cases with Testing Library for Vue, on the generated client and a host the
   test answers. `e2e/generative-dashboards.spec.ts` is React's file; it

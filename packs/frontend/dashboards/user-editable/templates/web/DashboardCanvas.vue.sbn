@@ -303,10 +303,7 @@ const tiles = computed(() =>
       @retry="refetchCatalog()"
     />
 
-}%}{{~ if generative ~}}
-    <DashboardAssistant :widgets="placements" @proposal="propose" />
-{{~ end ~}}
-{%{    <p v-if="tooLow" role="alert">A widget cannot start below row {{ lowest }}; it went back where it was.</p>
+    <p v-if="tooLow" role="alert">A widget cannot start below row {{ lowest }}; it went back where it was.</p>
     <GridLayout :layout="layout" :col-num="columns" :row-height="rowHeight" @layout-updated="placed">
       <GridItem
         v-for="{ item, placement } in tiles"
@@ -349,6 +346,9 @@ const tiles = computed(() =>
       </GridItem>
 {{~ end ~}}
 {%{    </GridLayout>
-  </section>
+}%}{{~ if generative ~}}
+    <DashboardAssistant :widgets="placements" @proposal="propose" />
+{{~ end ~}}
+{%{  </section>
 </template>
 }%}

@@ -203,10 +203,7 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
         />
       )}
 
-}%}{{~ if generative ~}}
-      <DashboardAssistant widgets={placements} onProposal={propose} />
-{{~ end ~}}
-{%{      {tooLow && <p role="alert">A widget cannot start below row {lowest}; it went back where it was.</p>}
+      {tooLow && <p role="alert">A widget cannot start below row {lowest}; it went back where it was.</p>}
       <div ref={containerRef}>
         <ReactGridLayout
           width={width}
@@ -265,7 +262,10 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
 {{~ end ~}}
 {%{        </ReactGridLayout>
       </div>
-    </section>
+}%}{{~ if generative ~}}
+      <DashboardAssistant widgets={placements} onProposal={propose} />
+{{~ end ~}}
+{%{    </section>
   );
 }
 
