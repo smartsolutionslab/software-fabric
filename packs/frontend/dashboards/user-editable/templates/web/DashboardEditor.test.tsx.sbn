@@ -85,7 +85,11 @@ vi.mock('@/api/generated', () => ({
   useGetDashboardsQuery: (arg: PageArg) => ({ ...answers.list(arg), refetch }),
   useGetDashboardsByIdQuery: (_: unknown, options?: { skip?: boolean }) =>
     options?.skip ? { refetch } : { ...answers.detail(), refetch },
-  useGetDashboardsWidgetsQuery: (arg: PageArg) => ({ ...answers.catalog(arg), refetch }),
+  // As RTK Query does: data keeps the page before while the next one loads; currentData is the asked page's alone.
+  useGetDashboardsWidgetsQuery: (arg: PageArg) => {
+    const answer = answers.catalog(arg);
+    return { ...answer, currentData: answer.isFetching ? undefined : answer.data, refetch };
+  },
   useGetDashboardsWidgetsByIdQuery: (arg: PageArg & { id: string }) => ({
     ...answers.widget(arg),
     refetch: refetchWidget,
@@ -411,4 +415,34 @@ test('a dashboard that reaches row 1000 takes no further widget, and the editor 
   expect(
     screen.getByText('There is no room for another widget: a dashboard reaches down to row 1000.'),
   ).toBeInTheDocument();
+});
+
+const rows = { id: 'module.rows', title: 'Rows', kind: 'Table' } as const;
+const trend = { id: 'module.trend', title: 'Trend', kind: 'Chart' } as const;
+
+test('while the next page of the widget picker loads, it offers nothing from the page before and then stays on the next page', async () => {
+  const user = userEvent.setup();
+  let pageTwoArrived = false;
+  const pageOf = (page: number): PagedResultOfWidgetDescriptionDto => ({
+    items: [page === 1 ? rows : trend],
+    totalCount: 101,
+    page,
+    pageSize: 100,
+  });
+  answers.catalog = ({ page }) =>
+    page === 2 && !pageTwoArrived ? { data: pageOf(1), isFetching: true } : { data: pageOf(page) };
+  const { rerender } = render(<DashboardEditor />);
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+
+  await user.click(screen.getByRole('button', { name: 'Next page of widgets' }));
+
+  expect(screen.getByLabelText('Widget')).toBeDisabled();
+  expect(screen.queryByRole('option', { name: 'Rows' })).not.toBeInTheDocument();
+
+  pageTwoArrived = true;
+  rerender(<DashboardEditor />);
+
+  expect(screen.getByLabelText('Widget')).toBeEnabled();
+  expect(screen.getByRole('option', { name: 'Trend' })).toBeInTheDocument();
+  expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
 });
