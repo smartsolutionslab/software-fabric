@@ -1,0 +1,4 @@
+            {
+              group: ['@copilotkit/*'],
+              message: 'Talk to the agents through the AgentPanel in src/agents, on @ag-ui/client (docs/adr).',
+            }

@@ -27,6 +27,30 @@ public class AgentUiTests(AspireFixture aspire)
         }
         """;
 
+    // The browser sends the whole conversation every turn: here the first turn, its tool call, the call's result and the
+    // answer, then a new message.
+    private const string SecondTurn = """
+        {
+          "threadId": "thread-1",
+          "runId": "run-2",
+          "state": {},
+          "messages": [
+            { "id": "message-1", "role": "user", "content": "one two three" },
+            {
+              "id": "message-2",
+              "role": "assistant",
+              "toolCalls": [{ "id": "call-1", "type": "function", "function": { "name": "count_words", "arguments": "{\"text\":\"one two three\"}" } }]
+            },
+            { "id": "message-3", "role": "tool", "toolCallId": "call-1", "content": "3" },
+            { "id": "message-4", "role": "assistant", "content": "The tool said: 3" },
+            { "id": "message-5", "role": "user", "content": "four five" }
+          ],
+          "tools": [],
+          "context": [],
+          "forwardedProps": {}
+        }
+        """;
+
     [Fact]
     public async Task The_assistants_answer_streams_in_several_chunks_after_its_tool_ran_through_the_dispatcher()
     {
@@ -37,7 +61,7 @@ public class AgentUiTests(AspireFixture aspire)
         using var caller = aspire.CreateHostClient();
 {{~ end ~}}
 
-        using var response = await PostAsync(caller, "/agents/assistant", cancellationToken);
+        using var response = await PostAsync(caller, "/agents/assistant", Run, cancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(cancellationToken));
         response.Content.Headers.ContentType?.MediaType.ShouldBe("text/event-stream");
@@ -54,6 +78,30 @@ public class AgentUiTests(AspireFixture aspire)
         chunks.Count.ShouldBeGreaterThan(1);
         string.Concat(chunks).ShouldBe("The tool said: 3");
     }
+
+    [Fact]
+    public async Task In_a_second_turn_the_tool_runs_again_for_the_new_message_and_the_answer_comes_from_that_result()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+{{~ if signed_in ~}}
+        using var caller = await aspire.CreateHostClientAsync("developer");
+{{~ else ~}}
+        using var caller = aspire.CreateHostClient();
+{{~ end ~}}
+
+        using var response = await PostAsync(caller, "/agents/assistant", SecondTurn, cancellationToken);
+
+        var stream = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, stream);
+        var events = Events(stream);
+
+        // The first turn's result belongs to the first message: the stand-in model asks for the tool again, which counts
+        // the two words of the new message, and answers from that result alone.
+        events.Count(agUiEvent => Type(agUiEvent) == "TOOL_CALL_START").ShouldBe(1, stream);
+        events.Single(agUiEvent => Type(agUiEvent) == "TOOL_CALL_RESULT")["content"]!.GetValue<string>().ShouldBe("2");
+        string.Concat(events.Where(agUiEvent => Type(agUiEvent) == "TEXT_MESSAGE_CONTENT").Select(agUiEvent => agUiEvent["delta"]!.GetValue<string>()))
+            .ShouldBe("The tool said: 2");
+    }
 {{~ if signed_in ~}}
 
     [Fact]
@@ -61,7 +109,7 @@ public class AgentUiTests(AspireFixture aspire)
     {
         using var anonymous = aspire.CreateHostClient();
 
-        using var response = await PostAsync(anonymous, "/agents/assistant", TestContext.Current.CancellationToken);
+        using var response = await PostAsync(anonymous, "/agents/assistant", Run, TestContext.Current.CancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
@@ -77,15 +125,15 @@ public class AgentUiTests(AspireFixture aspire)
         using var caller = aspire.CreateHostClient();
 {{~ end ~}}
 
-        using var response = await PostAsync(caller, "/agents/nobody", cancellationToken);
+        using var response = await PostAsync(caller, "/agents/nobody", Run, cancellationToken);
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await response.Content.ReadAsStringAsync(cancellationToken)).ShouldContain("agents.not-found");
     }
 
-    private static async Task<HttpResponseMessage> PostAsync(HttpClient caller, string path, CancellationToken cancellationToken)
+    private static async Task<HttpResponseMessage> PostAsync(HttpClient caller, string path, string run, CancellationToken cancellationToken)
     {
-        using var content = new StringContent(Run, Encoding.UTF8, "application/json");
+        using var content = new StringContent(run, Encoding.UTF8, "application/json");
         return await caller.PostAsync(new Uri(path, UriKind.Relative), content, cancellationToken);
     }
 

@@ -1,0 +1,28 @@
+{{~ if object.has_key(project, "frontend.auth-client") && project["frontend.auth-client"] != "oidc-client-ts" ~}}
+throw new Error('The ag-ui pack takes the token from oidc-client-ts only so far (docs/adr/0006 of the generator).');
+{{~ end ~}}
+import { HttpAgent } from '@ag-ui/client';
+{{~ if object.has_key(project, "frontend.auth-client") ~}}
+import { accessToken } from '@/auth/accessToken';
+{{~ end ~}}
+
+/**
+ * A conversation with one of the host's agents over AG-UI: each run posts the whole conversation to
+ * /api/agents/{name}, like every other call through /api, and reads the answer as it streams back.
+ */
+export function connectAgent(name: string) {
+  return new HttpAgent({
+    url: `/api/agents/${name}`,
+{{~ if object.has_key(project, "frontend.auth-client") ~}}
+    // The token is read for every run, as the API client reads it for every call: it may have been renewed meanwhile.
+    fetch: (url, init) => {
+      const headers = new Headers(init.headers);
+      const token = accessToken();
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+      return fetch(url, { ...init, headers });
+    },
+{{~ end ~}}
+  });
+}

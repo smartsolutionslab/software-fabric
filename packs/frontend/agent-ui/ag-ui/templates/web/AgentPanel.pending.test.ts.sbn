@@ -1,0 +1,1 @@
+throw new Error('The ag-ui pack builds the agent panel for a React single-page app only so far; frontend.framework is {{ project["frontend.framework"] }}, frontend.architecture is {{ project["frontend.architecture"] }} (docs/adr/0006 of the generator).');

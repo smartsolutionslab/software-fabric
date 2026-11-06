@@ -12,6 +12,18 @@ import { DashboardEditor } from '@/dashboards/DashboardEditor';
 export function {{ module.namespace }}Page() {
   return <DashboardEditor />;
 }
+{{~ else if module.name == "assistant" && object.has_key(project, "frontend.agent-ui") && project["frontend.agent-ui"] == "ag-ui" ~}}
+import { AgentPanel } from '@/agents/AgentPanel';
+
+/** The module the agent panel choice brings; its screen is a conversation with its agent (docs/adr). */
+export function {{ module.namespace }}Page() {
+  return (
+    <main>
+      <h1>{{ module.namespace }}</h1>
+      <AgentPanel agent="assistant" />
+    </main>
+  );
+}
 {{~ else ~}}
 export function {{ module.namespace }}Page() {
   return (

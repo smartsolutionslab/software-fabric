@@ -7,8 +7,9 @@ namespace {{ namespace }}.Host.Agents;
 /// <summary>
 /// The project's model while the agent panel is tested, in Development only: the AppHost's <c>model-stand-in</c>
 /// parameter switches it on, and only the tests set it. Asked first, it calls the
-/// first tool it is offered, giving every argument the tool requires the user's last message; given the tool's result,
-/// it answers <c>The tool said: &lt;result&gt;</c>, and offered no tool, it repeats the user's message. It streams each
+/// first tool it is offered, giving every argument the tool requires the user's last message; given the tool's result
+/// after that message, it answers <c>The tool said: &lt;result&gt;</c>, and offered no tool, it repeats the user's
+/// message. A result from an earlier turn does not count, so every turn calls the tool again. It streams each
 /// answer a word at a time, so the panel shows text arriving as a real model sends it. It never calls a model.
 /// </summary>
 public sealed class StandInChatClient : IChatClient
@@ -24,8 +25,11 @@ public sealed class StandInChatClient : IChatClient
         {{ not_null "messages" }}
 
         List<ChatMessage> conversation = [.. messages];
-        var question = conversation.LastOrDefault(message => message.Role == ChatRole.User)?.Text ?? string.Empty;
-        var result = conversation.SelectMany(message => message.Contents).OfType<FunctionResultContent>().LastOrDefault();
+        var latest = conversation.FindLastIndex(message => message.Role == ChatRole.User);
+        var question = latest < 0 ? string.Empty : conversation[latest].Text;
+
+        // Only a result that answers the latest message counts: an earlier turn's results are history.
+        var result = conversation.Skip(latest + 1).SelectMany(message => message.Contents).OfType<FunctionResultContent>().LastOrDefault();
         if (result is null && options?.Tools?.OfType<AIFunctionDeclaration>().FirstOrDefault() is { } tool)
         {
             var call = new FunctionCallContent($"call-{Guid.CreateVersion7():N}", tool.Name, Arguments(tool, question));
