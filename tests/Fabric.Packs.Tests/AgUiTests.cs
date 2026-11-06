@@ -460,6 +460,55 @@ public sealed class AgUiTests
         output.ShouldNotContain("skipped: 1");
     }
 
+    [Fact]
+    public void A_second_answer_sent_in_one_chunk_fails_the_integration_test_of_the_second_turn()
+    {
+        using var project = WithTheSecondAnswerInOneChunk();
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain(
+            "failed Shop.Integration.Tests.AgentUiTests.In_a_second_turn_the_tool_runs_again_for_the_new_message_and_the_answer_comes_from_that_result",
+            customMessage: output);
+        output.ShouldContain("failed: 1", customMessage: output);
+    }
+
+    [Fact]
+    public void A_second_answer_sent_in_one_chunk_fails_the_panels_end_to_end_test()
+    {
+        using var project = WithTheSecondAnswerInOneChunk();
+        project.Build();
+        var (installExitCode, install) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "install");
+        installExitCode.ShouldBe(0, install);
+
+        var (exitCode, output) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("agent-panel.spec.ts", customMessage: output);
+        output.ShouldContain("1 failed", customMessage: output);
+        output.ShouldContain("1 passed", customMessage: output);
+    }
+
+    /// <summary>
+    /// A project whose stand-in model answers "four five", the second turn of the integration and end-to-end tests, in one
+    /// TEXT_MESSAGE_CONTENT event, and every other message a word at a time.
+    /// </summary>
+    private static GeneratedProject WithTheSecondAnswerInOneChunk()
+    {
+        var project = NewProject(Anthropic, AgentFramework, AgUi);
+        var path = Path.Combine(project.ProjectDirectory, "src", "Host", "Agents", "StandInChatClient.cs");
+        var streamed = File.ReadAllText(path);
+        var inOneChunk = streamed.Replace(
+            "foreach (var chunk in Chunks(answer))",
+            "var chunks = string.Equals(question, \"four five\", StringComparison.Ordinal) ? Enumerable.Repeat(answer, 1) : Chunks(answer);\n        foreach (var chunk in chunks)",
+            StringComparison.Ordinal);
+        inOneChunk.ShouldNotBe(streamed);
+        project.Write("src/Host/Agents/StandInChatClient.cs", inOneChunk);
+        return project;
+    }
+
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
     {
         var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, overrides);

@@ -114,6 +114,58 @@ public sealed class PackLoaderTests : IDisposable
         SingleError().ShouldEndWith("declares the role slot 'web.dependencies' joined by a newline; the catalog joins it by ',\\n'.");
     }
 
+    // The end-to-end script is the framework's, and the ag-ui pack and the model providers fill its AppHost arguments
+    // whichever framework is chosen (#208).
+    [Fact]
+    public void A_framework_pack_without_the_end_to_end_scripts_apphost_arguments_is_rejected_by_the_repository_catalog()
+    {
+        packs.Add(
+            "frontend.framework.vue",
+            FrameworkManifest("frontend.framework.vue", RepositoryFrameworkRoleSlots(apphostArgumentsDeclared: false)),
+            FrameworkFiles);
+
+        PackLoader.Load(packs.Root, RepositoryCatalog).Errors.ShouldHaveSingleItem()
+            .ShouldEndWith("does not declare the role slot 'e2e.apphost-arguments' that every frontend.framework option declares (catalog).");
+    }
+
+    [Fact]
+    public void The_end_to_end_scripts_apphost_arguments_are_joined_by_a_space_in_the_repository_catalog()
+    {
+        packs.Add(
+            "frontend.framework.vue",
+            FrameworkManifest("frontend.framework.vue", RepositoryFrameworkRoleSlots(apphostArgumentsDeclared: true)),
+            FrameworkFiles);
+
+        PackLoader.Load(packs.Root, RepositoryCatalog).Errors.ShouldHaveSingleItem()
+            .ShouldEndWith("declares the role slot 'e2e.apphost-arguments' joined by a newline; the catalog joins it by ' '.");
+    }
+
+    private static readonly CatalogModel RepositoryCatalog = CatalogReader.ReadFile(RepositoryRoot.File("catalog", "catalog.yaml"));
+
+    /// <summary>
+    /// The repository catalog's role slots of frontend.framework as a pack declares them, but e2e.apphost-arguments
+    /// with no separator, a newline, when <paramref name="apphostArgumentsDeclared"/>, or not at all.
+    /// </summary>
+    private static string RepositoryFrameworkRoleSlots(bool apphostArgumentsDeclared)
+    {
+        List<string> declarations = [];
+        foreach (var role in RepositoryCatalog.Dimensions["frontend.framework"].RoleSlots.Values.Where(role => role.Slot != "e2e.apphost-arguments"))
+        {
+            declarations.Add(Declaration(role.Slot, role.Separator));
+        }
+
+        if (apphostArgumentsDeclared)
+        {
+            declarations.Add(Declaration("e2e.apphost-arguments", separator: null));
+        }
+
+        return string.Join("\n", declarations);
+    }
+
+    // A JSON string is a YAML double-quoted scalar.
+    private static string Declaration(string slot, string? separator) =>
+        $"  - {{ slot: {slot}, description: \"The slot.\"{(separator is null ? string.Empty : $", separator: {System.Text.Json.JsonSerializer.Serialize(separator)}")} }}";
+
     [Fact]
     public void Packs_are_keyed_by_option_and_ordered_by_it()
     {

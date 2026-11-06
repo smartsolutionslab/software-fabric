@@ -99,8 +99,9 @@ public class AgentUiTests(AspireFixture aspire)
         // the two words of the new message, and answers from that result alone.
         events.Count(agUiEvent => Type(agUiEvent) == "TOOL_CALL_START").ShouldBe(1, stream);
         events.Single(agUiEvent => Type(agUiEvent) == "TOOL_CALL_RESULT")["content"]!.GetValue<string>().ShouldBe("2");
-        string.Concat(events.Where(agUiEvent => Type(agUiEvent) == "TEXT_MESSAGE_CONTENT").Select(agUiEvent => agUiEvent["delta"]!.GetValue<string>()))
-            .ShouldBe("The tool said: 2");
+        List<string> chunks = [.. events.Where(agUiEvent => Type(agUiEvent) == "TEXT_MESSAGE_CONTENT").Select(agUiEvent => agUiEvent["delta"]!.GetValue<string>())];
+        chunks.Count.ShouldBeGreaterThan(1, stream);
+        string.Concat(chunks).ShouldBe("The tool said: 2");
     }
 {{~ if signed_in ~}}
 
