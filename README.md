@@ -57,10 +57,10 @@ fabric add-module billing --project ../shop --catalog tests/fixtures/minimal/cat
 fabric matrix --catalog catalog/catalog.yaml --packs packs --extra build/matrix-extra.yaml --output build/matrix.json
 ```
 
-`fabric matrix` writes the pairwise matrix (ADR-0003): full choice sets,
-as `--set` arguments over no profile, that together contain every pair of
-options with a pack that some valid choice set contains, and the pairs
-none does. `build/matrix.json` is checked in, and a test fails when it is
+`fabric matrix` writes the pairwise matrix (ADR-0003): full choice sets
+without a profile, each one's `choices` ready for `fabric new --choices`,
+that together contain every pair of options with a pack that some valid
+choice set contains, and the pairs none does. `build/matrix.json` is checked in, and a test fails when it is
 stale; `build/matrix-extra.yaml` adds combinations a defect needs.
 
 `build/profiles.sh` is what CI runs after the tests: every fixture profile
