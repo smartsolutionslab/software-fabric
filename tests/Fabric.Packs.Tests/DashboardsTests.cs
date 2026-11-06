@@ -337,12 +337,14 @@ public sealed class DashboardsTests
     }
 
     [Fact]
-    public void Dashboards_need_authentication_and_generative_ones_need_user_editable_ones_and_agents()
+    public void Dashboards_need_authentication_and_generative_ones_need_user_editable_ones_and_the_agent_panel()
     {
         Validate("backend.auth=none", Dashboards).ShouldContain("frontend.dashboards is set to user-editable, but it only applies when backend.auth != none, and backend.auth is none.");
         Validate("frontend.dashboards=generative").ShouldNotBeEmpty();
         Validate("frontend.dashboards=user-editable,generative").ShouldNotBeEmpty();
-        Validate("backend.llm=anthropic", "backend.llm.agents=agent-framework", "frontend.dashboards=user-editable,generative").ShouldBeEmpty();
+        Validate("backend.llm=anthropic", "backend.llm.agents=agent-framework", "frontend.dashboards=user-editable,generative")
+            .ShouldContain("frontend.dashboards=generative requires frontend.agent-ui == ag-ui, but frontend.agent-ui is none.");
+        Validate("backend.llm=anthropic", "backend.llm.agents=agent-framework", "frontend.agent-ui=ag-ui", "frontend.dashboards=user-editable,generative").ShouldBeEmpty();
     }
 
     [Fact]

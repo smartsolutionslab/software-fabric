@@ -1,0 +1,139 @@
+{{~ if project["backend.test.assertions"] != "shouldly" ~}}
+#error The generative dashboards' integration tests assert with Shouldly only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using System.Net;
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>
+/// The dashboards agent through the running application, POST /agents/dashboards: it proposes only a declared widget,
+/// as a fitting visual, and saves nothing; the user accepts a proposal in the browser and saves it as any edit. The host
+/// answers with its stand-in model, which calls the tool a message names with the JSON arguments the message gives.
+/// The visitor asks: no other test saves a dashboard of theirs, so their count shows that nothing was saved.
+/// </summary>
+public class GenerativeDashboardsTests(AspireFixture aspire)
+{
+    [Fact]
+    public async Task A_declared_widget_is_proposed_with_its_declared_title_and_nothing_is_saved()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var visitor = await aspire.CreateHostClientAsync("visitor");
+        var before = await CountAsync(visitor, cancellationToken);
+
+        var events = await RunAsync(visitor, """propose_widget {"source":"dashboards.widget-counts","visual":"bar","replaces":null}""", null, cancellationToken);
+
+        events.Single(agUiEvent => Type(agUiEvent) == "TOOL_CALL_START")["toolCallName"]!.GetValue<string>().ShouldBe("propose_widget");
+        var proposal = JsonNode.Parse(Result(events))!;
+        proposal["source"]!.GetValue<string>().ShouldBe("dashboards.widget-counts");
+        proposal["title"]!.GetValue<string>().ShouldBe("Widgets per dashboard");
+        proposal["visual"]!.GetValue<string>().ShouldBe("bar");
+        proposal["replaces"].ShouldBeNull();
+        (await CountAsync(visitor, cancellationToken)).ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task A_proposal_may_replace_a_widget_of_the_open_draft()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var visitor = await aspire.CreateHostClientAsync("visitor");
+        const string Draft = """{ "widgets": [{ "key": "w-1", "source": "dashboards.widget-counts", "visual": "bar" }] }""";
+
+        var events = await RunAsync(visitor, """propose_widget {"source":"dashboards.widget-counts","visual":"pie","replaces":"w-1"}""", Draft, cancellationToken);
+
+        var proposal = JsonNode.Parse(Result(events))!;
+        proposal["visual"]!.GetValue<string>().ShouldBe("pie");
+        proposal["replaces"]!.GetValue<string>().ShouldBe("w-1");
+    }
+
+    [Fact]
+    public async Task A_widget_the_modules_do_not_declare_is_refused()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var visitor = await aspire.CreateHostClientAsync("visitor");
+
+        var events = await RunAsync(visitor, """propose_widget {"source":"billing.everything","visual":"bar","replaces":null}""", null, cancellationToken);
+
+        Result(events).ShouldStartWith("Failed: dashboards.unknown-widget");
+    }
+
+    [Fact]
+    public async Task A_table_proposed_as_a_chart_is_refused()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var visitor = await aspire.CreateHostClientAsync("visitor");
+
+        var events = await RunAsync(visitor, """propose_widget {"source":"dashboards.my-dashboards","visual":"bar","replaces":null}""", null, cancellationToken);
+
+        Result(events).ShouldStartWith("Failed: dashboards.invalid-widget");
+    }
+
+    [Fact]
+    public async Task The_agent_can_list_the_declared_widgets_a_page_at_a_time()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var visitor = await aspire.CreateHostClientAsync("visitor");
+
+        var events = await RunAsync(visitor, """list_widgets {"page":1,"pageSize":20}""", null, cancellationToken);
+
+        var page = JsonNode.Parse(Result(events))!;
+        page["items"]!.AsArray().Select(widget => widget!["id"]!.GetValue<string>()).ShouldContain("dashboards.widget-counts");
+    }
+
+    [Fact]
+    public async Task A_draft_that_is_not_a_list_of_widgets_is_refused()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var visitor = await aspire.CreateHostClientAsync("visitor");
+
+        using var response = await PostAsync(visitor, "Show me something.", """{ "widgets": "all of them" }""", cancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync(cancellationToken)).ShouldContain("dashboards.invalid-draft");
+    }
+
+    private static async Task<List<JsonObject>> RunAsync(HttpClient caller, string message, string? draft, CancellationToken cancellationToken)
+    {
+        using var response = await PostAsync(caller, message, draft, cancellationToken);
+        var stream = await response.Content.ReadAsStringAsync(cancellationToken);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, stream);
+        return
+        [
+            .. stream.Split('\n')
+                .Where(line => line.StartsWith("data:", StringComparison.Ordinal))
+                .Select(line => JsonNode.Parse(line["data:".Length..])!.AsObject()),
+        ];
+    }
+
+    private static async Task<HttpResponseMessage> PostAsync(HttpClient caller, string message, string? draft, CancellationToken cancellationToken)
+    {
+        var run = $$"""
+            {
+              "threadId": "thread-1",
+              "runId": "run-1",
+              "state": {{draft ?? "{}"}},
+              "messages": [{ "id": "message-1", "role": "user", "content": {{JsonSerializer.Serialize(message)}} }],
+              "tools": [],
+              "context": [],
+              "forwardedProps": {}
+            }
+            """;
+        using var content = new StringContent(run, Encoding.UTF8, "application/json");
+        return await caller.PostAsync(new Uri("/agents/dashboards", UriKind.Relative), content, cancellationToken);
+    }
+
+    private static async Task<int> CountAsync(HttpClient caller, CancellationToken cancellationToken)
+    {
+        var page = await caller.GetFromJsonAsync<JsonObject>("/dashboards?page=1&pageSize=100", cancellationToken);
+        return page!["totalCount"]!.GetValue<int>();
+    }
+
+    /// <summary>The one tool result of the run, as the browser receives it.</summary>
+    private static string Result(List<JsonObject> events) =>
+        events.Single(agUiEvent => Type(agUiEvent) == "TOOL_CALL_RESULT")["content"]!.GetValue<string>();
+
+    private static string Type(JsonObject agUiEvent) => agUiEvent["type"]!.GetValue<string>();
+}
