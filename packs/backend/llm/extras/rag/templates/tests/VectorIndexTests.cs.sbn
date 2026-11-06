@@ -73,9 +73,13 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
         var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off" };
         await using var indexed = VectorTables.DataSource(indexOnly.ConnectionString);
         var shelf = new ModuleVectorIndex<SampleShelfDbContext>(indexed, generator{{ tenant_argument }});
+        // Each record shares a word with the next. Records that shared only "book" would all lie at the same distance
+        // from one another; HNSW keeps a neighbour of a record only when it lies nearer to the record than to the
+        // neighbours already kept, so it would link each record to one other and, at random, leave some unreachable:
+        // the search would come back short whatever its breadth.
         for (var number = 0; number < 60; number++)
         {
-            await shelf.IndexAsync($"book-{number}", $"book {number}", cancellationToken);
+            await shelf.IndexAsync($"book-{number}", $"book {number} {number + 1}", cancellationToken);
         }
 
         var passages = await shelf.SearchAsync("book", 50, cancellationToken);
