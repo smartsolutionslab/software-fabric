@@ -244,7 +244,7 @@ public sealed class GenerativeDashboardsTests
         files.Keys.ShouldContain($"{Page}/DashboardAssistant.test.ts");
         files[$"{Page}/proposal.ts"].ShouldBe(Files(Profile, Anthropic, AgentFramework, AgUi, Generative)[$"{Page}/proposal.ts"]);
         files.Keys.ShouldContain($"{Page}/proposal.test.ts");
-        files[EndToEndTest].ShouldContain("page.locator('.vgl-item')");
+        files[EndToEndTest].ShouldContain("page.locator('.vgl-item:not(.vgl-item--placeholder)')");
         files.Keys.ShouldNotContain(path => path.EndsWith(".tsx", StringComparison.Ordinal));
         files["web/app/src/agents/useAgent.ts"].ShouldContain("export function useAgent(name: string, state?: () => unknown)");
         files["AGENTS.md"].ShouldContain("`DashboardAssistant.vue`");
