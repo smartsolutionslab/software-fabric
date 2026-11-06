@@ -46,3 +46,46 @@ and passing. A `supported` option whose nightly run fails becomes a
   the matrix runner reports duration per combination so it can be watched.
 - Dependency upgrades (Renovate/Dependabot) run through the same layers
   and are well-suited agent issues.
+
+## Amendment (2026-11-06, M3)
+
+The owner's decisions on the M3 plan. The text above stands; where this
+section differs, it takes precedence.
+
+**The matrix domain is every option that has a pack**, not only the
+`supported` ones. Read as written, the decision above lets no experimental
+option enter the matrix, so none could ever be promoted.
+
+- An option without a pack cannot be generated; it joins the domain in the
+  PR that adds its pack.
+- A *deferred* option stays in the catalog as experimental and has no pack,
+  so it is outside the domain. A *dropped* option leaves the catalog. The
+  roadmap's M3 section lists both.
+- Each combination has one module set: the module defaults, on every module.
+  A defect that needs a second module style, or any three options together,
+  is covered by adding that combination explicitly, as above.
+- A pairwise matrix over experimental options turns the tiers' meaning
+  around: `experimental` now means *not yet passing*, not *not tested*. The
+  warning on generation stays.
+
+**An option is promoted to `supported` once its pairs pass**: every matrix
+combination that contains it is green in the same nightly run. The PR that
+changes its tier cites that run. Adding a pack does not promote its option.
+The rule above for a `supported` option that fails stands: a `bug` issue on
+the board, no silent demotion.
+
+**Cadence:**
+
+| Layer | Runs | Does |
+|---|---|---|
+| Pairwise matrix, generation | every PR | generates every combination of the covering set; any generation error fails the PR |
+| Pairwise matrix, build and test | nightly, and on demand | builds each combination and runs its unit, architecture and integration tests and its frontend checks; no end-to-end tests |
+| Profiles | every PR | unchanged: full CI, end-to-end tests included |
+
+Building the matrix on every PR would take CI capacity the agents need for
+their own runs; a nightly run does not compete with them. The definition of
+passing above already leaves end-to-end tests out.
+
+**Gate.** The matrix counts as green after two consecutive green nightly
+runs, which filters out a single flaky failure. M3's gate is that, with
+every option in the domain `supported`.
