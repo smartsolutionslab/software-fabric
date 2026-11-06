@@ -2,6 +2,7 @@ using System.CommandLine;
 using Fabric.Core.Catalog;
 using Fabric.Core.Choices;
 using Fabric.Core.Generation;
+using Fabric.Core.Matrix;
 using Fabric.Core.Packs;
 
 namespace Fabric.Cli;
@@ -23,6 +24,7 @@ public static class FabricCli
             NewCommand(output, error),
             AddModuleCommand(output, error),
             ProfilesCommand(output, error),
+            MatrixCommand(output, error),
         };
 
         return root.Parse(args).Invoke(new InvocationConfiguration { Output = output, Error = error });
@@ -194,6 +196,58 @@ public static class FabricCli
 
         return command;
     }
+
+    private static Command MatrixCommand(TextWriter output, TextWriter error)
+    {
+        var (catalog, packs) = (CatalogOption(), PacksOption());
+        var extra = new Option<string?>("--extra") { Description = "A matrix-extra.yaml of combinations to add to the covering set." };
+        var file = new Option<string?>("--output") { Description = "Where to write matrix.json. Without it, the matrix is printed." };
+        var command = new Command(
+            "matrix",
+            "Build the pairwise matrix (ADR-0003): valid choice sets that together contain every pair of options with a pack " +
+            "that any valid choice set contains, plus the pairs none does.")
+        {
+            extra,
+            file,
+            catalog,
+            packs,
+        };
+
+        command.SetAction(result => Guarded(error, () =>
+        {
+            var catalogModel = CatalogReader.ReadFile(result.GetValue(catalog)!);
+            var loaded = PackLoader.Load(result.GetValue(packs)!, catalogModel);
+            if (loaded.Errors.Count > 0)
+            {
+                return Fail(error, loaded.Errors);
+            }
+
+            var extras = result.GetValue(extra) is { } extraPath ? MatrixExtraReader.ReadFile(extraPath) : [];
+            var matrix = PairwiseMatrix.Build(catalogModel, loaded.Packs.Keys, extras);
+            if (matrix.Errors.Count > 0)
+            {
+                return Fail(error, matrix.Errors);
+            }
+
+            var json = MatrixFile.Write(matrix);
+            if (result.GetValue(file) is not { } target)
+            {
+                output.Write(json);
+                return 0;
+            }
+
+            File.WriteAllText(target, json);
+            var infeasible = matrix.InfeasiblePairs.Count;
+            output.WriteLine(
+                $"wrote {target}: {Count(matrix.Combinations.Count, "combination")} cover {matrix.FeasiblePairs} feasible pairs; " +
+                $"{Count(infeasible, "pair")} {(infeasible == 1 ? "is" : "are")} infeasible.");
+            return 0;
+        }));
+
+        return command;
+    }
+
+    private static string Count(int count, string noun) => count == 1 ? $"1 {noun}" : $"{count} {noun}s";
 
     private static string Files(int count) => count == 1 ? "1 file" : $"{count} files";
 
