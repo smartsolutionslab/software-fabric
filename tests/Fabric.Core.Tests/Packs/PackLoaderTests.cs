@@ -121,7 +121,7 @@ public sealed class PackLoaderTests : IDisposable
     {
         packs.Add(
             "frontend.framework.vue",
-            FrameworkManifest("frontend.framework.vue", RepositoryFrameworkRoleSlots(apphostArguments: null)),
+            FrameworkManifest("frontend.framework.vue", RepositoryFrameworkRoleSlots(apphostArgumentsDeclared: false)),
             FrameworkFiles);
 
         PackLoader.Load(packs.Root, RepositoryCatalog).Errors.ShouldHaveSingleItem()
@@ -133,7 +133,7 @@ public sealed class PackLoaderTests : IDisposable
     {
         packs.Add(
             "frontend.framework.vue",
-            FrameworkManifest("frontend.framework.vue", RepositoryFrameworkRoleSlots(apphostArguments: "\n")),
+            FrameworkManifest("frontend.framework.vue", RepositoryFrameworkRoleSlots(apphostArgumentsDeclared: true)),
             FrameworkFiles);
 
         PackLoader.Load(packs.Root, RepositoryCatalog).Errors.ShouldHaveSingleItem()
@@ -144,9 +144,9 @@ public sealed class PackLoaderTests : IDisposable
 
     /// <summary>
     /// The repository catalog's role slots of frontend.framework as a pack declares them, but e2e.apphost-arguments
-    /// joined by <paramref name="apphostArguments"/>, or not declared when it is null.
+    /// with no separator, a newline, when <paramref name="apphostArgumentsDeclared"/>, or not at all.
     /// </summary>
-    private static string RepositoryFrameworkRoleSlots(string? apphostArguments)
+    private static string RepositoryFrameworkRoleSlots(bool apphostArgumentsDeclared)
     {
         List<string> declarations = [];
         foreach (var role in RepositoryCatalog.Dimensions["frontend.framework"].RoleSlots.Values.Where(role => role.Slot != "e2e.apphost-arguments"))
@@ -154,9 +154,9 @@ public sealed class PackLoaderTests : IDisposable
             declarations.Add(Declaration(role.Slot, role.Separator));
         }
 
-        if (apphostArguments is not null)
+        if (apphostArgumentsDeclared)
         {
-            declarations.Add(Declaration("e2e.apphost-arguments", apphostArguments));
+            declarations.Add(Declaration("e2e.apphost-arguments", separator: null));
         }
 
         return string.Join("\n", declarations);
