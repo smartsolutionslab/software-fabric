@@ -174,6 +174,23 @@ public class PairwiseMatrixTests
         matrix.Errors.ShouldBe(["extra 'event sourcing on sqlserver': no valid choice set contains backend.database=sqlserver, module.style=event-sourced."]);
     }
 
+    /// <summary>A dimension whose options have no pack has no factors; an extra pinning it empty still pins it active.</summary>
+    [Fact]
+    public void An_extra_pinning_a_dimension_without_packs_is_kept_active_or_is_an_error()
+    {
+        string[] domain = [.. Domain.Where(option => !option.StartsWith("backend.authorization.", StringComparison.Ordinal))];
+        var empty = new Dictionary<string, IReadOnlyList<string>> { ["backend.authorization"] = [] };
+        var impossible = new Dictionary<string, IReadOnlyList<string>> { ["backend.auth"] = ["none"], ["backend.authorization"] = [] };
+
+        var kept = PairwiseMatrix.Build(Catalog, domain, [new MatrixExtra("no authorization", empty)]);
+        var refused = PairwiseMatrix.Build(Catalog, domain, [new MatrixExtra("none", impossible)]);
+
+        kept.Errors.ShouldBeEmpty();
+        kept.Combinations[0].Set.ShouldContain("backend.authorization=");
+        kept.Combinations[0].Set.ShouldContain("backend.auth=keycloak");
+        refused.Errors.ShouldBe(["extra 'none': no valid choice set contains backend.auth=none, backend.authorization=."]);
+    }
+
     [Theory]
     [InlineData("backend.database", "oracle", "extra 'x': backend.database=oracle has no pack, so it is outside the matrix.")]
     [InlineData("backend.database", "db2", "extra 'x': 'db2' is not an option of backend.database.")]
