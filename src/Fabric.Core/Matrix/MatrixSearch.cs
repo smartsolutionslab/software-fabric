@@ -29,6 +29,7 @@ internal sealed class MatrixSearch
     private readonly List<int>[] watchers;
     private readonly int[] order;
     private readonly int[] assignment;
+    private HashSet<int> pinned = [];
     private int steps;
 
     public MatrixSearch(CatalogModel catalog, IReadOnlyList<MatrixFactor> factors)
@@ -75,8 +76,13 @@ internal sealed class MatrixSearch
     /// Fills every factor the seed leaves open, trying the values <paramref name="score"/> ranks highest first and
     /// breaking ties by catalog order, so the same input always gives the same choice set.
     /// </summary>
-    public SearchOutcome Complete(IReadOnlyDictionary<int, int> seed, Func<int, int, int> score)
+    /// <param name="pinnedDimensions">
+    /// Dimensions the seed sets, by catalog position, which must be active: one whose options have no pack has no
+    /// factor to seed, so this is all that holds an empty pin of it.
+    /// </param>
+    public SearchOutcome Complete(IReadOnlyDictionary<int, int> seed, IEnumerable<int> pinnedDimensions, Func<int, int, int> score)
     {
+        pinned = [.. pinnedDimensions];
         Array.Fill(assignment, Unassigned);
         foreach (var (factor, value) in seed)
         {
@@ -212,7 +218,7 @@ internal sealed class MatrixSearch
         var chosen = own.Count(factor => assignment[factor] >= 0);
         var active = Active(dimension);
         if ((inactive > 0 && chosen > 0)
-            || (active == false && chosen > 0)
+            || (active == false && (chosen > 0 || pinned.Contains(dimension)))
             || (active == true && (inactive > 0 || (own.Count == 0 && !dimensions[dimension].Multi))))
         {
             return false;

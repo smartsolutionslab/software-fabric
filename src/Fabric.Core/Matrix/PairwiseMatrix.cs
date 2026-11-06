@@ -91,7 +91,8 @@ public static class PairwiseMatrix
                 continue;
             }
 
-            switch (search.Complete(seed, Score))
+            var pinnedDimensions = extra.Choices.Keys.Select(dimension => catalog.Dimensions.Keys.ToList().IndexOf(dimension));
+            switch (search.Complete(seed, pinnedDimensions, Score))
             {
                 case SearchOutcome.Found:
                     combinations.Add(new MatrixCombination($"extra-{combinations.Count + 1}", extra.Reason, search.Choices()));
@@ -114,7 +115,7 @@ public static class PairwiseMatrix
             foreach (var (first, second) in seeds)
             {
                 var seed = new Dictionary<int, int> { [points[first].Factor] = points[first].Value, [points[second].Factor] = points[second].Value };
-                switch (search.Complete(seed, Score))
+                switch (search.Complete(seed, [], Score))
                 {
                     case SearchOutcome.Found:
                         var assigned = Assigned().ToList();
