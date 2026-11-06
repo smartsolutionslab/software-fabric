@@ -27,8 +27,9 @@ files:
   - { template: templates/web/useAgent.ts.sbn, target: web/app/src/agents/useAgent.ts, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa"' }
   - { template: templates/web/AgentPanel.tsx.sbn, target: web/app/src/agents/AgentPanel.tsx, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa"' }
   - { template: templates/web/AgentPanel.test.tsx.sbn, target: web/app/src/agents/AgentPanel.test.tsx, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa"' }
-  - { template: templates/web/agent-panel.spec.ts.sbn, target: web/app/e2e/agent-panel.spec.ts, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa"' }
-  - { template: templates/web/AgentPanel.pending.test.ts.sbn, target: web/app/src/agents/AgentPanel.test.ts, when: 'project["frontend.framework"] != "react" || project["frontend.architecture"] != "spa"' }
+  - { template: templates/web/agent-panel.spec.ts.sbn, target: web/app/e2e/agent-panel.spec.ts, when: '(project["frontend.framework"] == "react" || project["frontend.framework"] == "vue") && project["frontend.architecture"] == "spa"' }
+  # Vue's component test; with micro-frontends, a test that fails saying the panel is not built there yet.
+  - { template: templates/web/AgentPanel.test.ts.sbn, target: web/app/src/agents/AgentPanel.test.ts, when: 'project["frontend.framework"] != "react" || project["frontend.architecture"] != "spa"' }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
   - { slot: host.packages, template: templates/host-packages.sbn }
