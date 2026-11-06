@@ -15,7 +15,7 @@ type QuestionForm = z.infer<typeof questionSchema>;
 interface DashboardAssistantProps {
   /** The open draft's widgets, which every run sends the agent as context. */
   widgets: readonly Placement[];
-  /** Called once for each widget the agent proposes, which the canvas shows pending until the user decides. */
+  /** Called once for each widget the agent proposes, which the canvas shows pending until the user decides on it. */
   onProposal: (pending: PendingProposal) => void;
 }
 
@@ -42,16 +42,19 @@ export function DashboardAssistant({ widgets, onProposal }: DashboardAssistantPr
       ),
     [messages],
   );
-  const latest = useMemo(() => latestProposal(messages, results), [messages, results]);
+  const proposals = useMemo(() => proposalsOf(messages, results), [messages, results]);
 
-  // Each proposal goes to the canvas once: a discarded one does not come back when the conversation goes on.
-  const reported = useRef<string | undefined>(undefined);
+  // Each proposal goes to the canvas once, in the order the agent made them: a decided one does not come back when the
+  // conversation goes on.
+  const reported = useRef(new Set<string>());
   useEffect(() => {
-    if (latest && latest.call !== reported.current) {
-      reported.current = latest.call;
-      onProposal(latest);
+    for (const proposal of proposals) {
+      if (!reported.current.has(proposal.call)) {
+        reported.current.add(proposal.call);
+        onProposal(proposal);
+      }
     }
-  }, [latest, onProposal]);
+  }, [proposals, onProposal]);
 
   const onSubmit = handleSubmit(async ({ question }) => {
     reset();
@@ -97,12 +100,9 @@ export function DashboardAssistant({ widgets, onProposal }: DashboardAssistantPr
   );
 }
 
-/** The newest widget the agent proposed, by its call; a refused call proposes nothing. */
-function latestProposal(
-  messages: readonly Message[],
-  results: ReadonlyMap<string, string>,
-): PendingProposal | undefined {
-  let latest: PendingProposal | undefined;
+/** Every widget the agent proposed, in order, by its call; a refused call proposes nothing. */
+function proposalsOf(messages: readonly Message[], results: ReadonlyMap<string, string>): PendingProposal[] {
+  const proposals: PendingProposal[] = [];
   for (const message of messages) {
     if (message.role !== 'assistant') {
       continue;
@@ -113,12 +113,12 @@ function latestProposal(
       const proposal =
         call.function.name === 'propose_widget' && result !== undefined ? readProposal(result) : undefined;
       if (proposal) {
-        latest = { call: call.id, proposal };
+        proposals.push({ call: call.id, proposal });
       }
     }
   }
 
-  return latest;
+  return proposals;
 }
 
 /** What the conversation shows of one message, as text: the user's, the agent's, and what each of its tools did. */

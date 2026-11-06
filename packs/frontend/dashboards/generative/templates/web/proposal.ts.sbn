@@ -52,10 +52,21 @@ export function acceptProposal(placements: readonly Placement[], proposal: Widge
   return [...placements, nextPlacement(placements, key, source, visual)];
 }
 
-/** Where the pending proposal shows on the grid: where it would go as a new widget, fixed there until it is decided. */
-export function pendingItem(placements: readonly Placement[], { call, proposal }: PendingProposal) {
-  const { x, y, width, height } = nextPlacement(placements, call, proposal.source, proposal.visual);
-  return { i: `proposed-${call}`, x, y, w: width, h: height, static: true };
+/**
+ * Where the pending proposals show on the grid: one below the other under the draft's widgets, where each would go as a
+ * new widget, fixed there until it is decided.
+ */
+export function pendingOnGrid(placements: readonly Placement[], pending: readonly PendingProposal[]) {
+  const above: Placement[] = [...placements];
+  return pending.map((proposed) => {
+    const { call, proposal } = proposed;
+    const place = nextPlacement(above, call, proposal.source, proposal.visual);
+    above.push(place);
+    return {
+      proposed,
+      item: { i: `proposed-${call}`, x: place.x, y: place.y, w: place.width, h: place.height, static: true },
+    };
+  });
 }
 
 /** The run's AG-UI state: the open draft's widgets by key, source and visual, which the agent reads as context. */

@@ -206,10 +206,12 @@ other frontend the page stays as `user-editable` leaves it until its own step.
   proposal by its declared title, a refusal by the host's reason.
 - **A proposal waits on the grid.** The assistant reads each `propose_widget`
   result through `readProposal`, a zod schema, since a tool result is
-  untrusted, and hands it to `DashboardCanvas`, which places it below the
-  draft's widgets as a fixed `PendingWidget` with its live data from
-  `GET /dashboards/widgets/{id}`, and Accept and Discard. A refused proposal
-  leaves nothing pending.
+  untrusted, and hands each to `DashboardCanvas` once. The canvas places
+  every undecided proposal, one below the other under the draft's widgets, as
+  a fixed `PendingWidget` with its live data from
+  `GET /dashboards/widgets/{id}` (read again after each save, as a placed
+  widget's is), and Accept and Discard. A refused proposal leaves nothing
+  pending.
 - **Accept only changes the draft**, adding the widget below the others or
   putting it in the place of the one it names (as a new widget when the draft
   no longer has it); the existing Save persists it. Accept is disabled when a
