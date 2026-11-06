@@ -3,7 +3,7 @@ throw new Error('The ag-ui pack builds the agent panel for a React or Vue single
 {{~ else ~}}
 {{~ signed_in = object.has_key(project, "frontend.auth-client") ~}}
 {{~ axe = array.contains(project["frontend.test.extras"], "accessibility") ~}}
-import { render, screen, within } from '@testing-library/vue';
+import { render, screen, waitFor, within } from '@testing-library/vue';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 {{~ if axe ~}}
@@ -105,7 +105,7 @@ test('the answer appears while it streams, after the tool call the agent made an
   run.close();
 
   expect(await within(messages).findByText('The tool said: 3')).toBeInTheDocument();
-  expect(await screen.findByRole('button', { name: 'Send' })).toBeEnabled();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
   expect(screen.getByRole('status')).toHaveTextContent('');
   expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
 });
@@ -146,7 +146,7 @@ test('a second message goes with the whole conversation, and its answer follows 
   );
   first.close();
   expect(await screen.findByText('The tool said: 3')).toBeInTheDocument();
-  expect(await screen.findByRole('button', { name: 'Send' })).toBeEnabled();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
 
   await say('four five');
   second.send(
@@ -180,7 +180,7 @@ test('a run the host refuses is shown as an alert, and the panel can send again'
   await say('hello');
 
   expect(await screen.findByRole('alert')).toHaveTextContent(/.+/);
-  expect(await screen.findByRole('button', { name: 'Send' })).toBeEnabled();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
 });
 
 test('a run the host ends with an error event is shown as an alert, and the panel can send again', async () => {
@@ -193,7 +193,7 @@ test('a run the host ends with an error event is shown as an alert, and the pane
   run.close();
 
   expect(await screen.findByRole('alert')).toHaveTextContent('The model is unavailable.');
-  expect(await screen.findByRole('button', { name: 'Send' })).toBeEnabled();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
 });
 
 test('a panel given another agent starts a new conversation with it', async () => {
@@ -204,10 +204,11 @@ test('a panel given another agent starts a new conversation with it', async () =
   run.send(started('run-1'), ...text('answer-1', 'Hello'), finished('run-1'));
   run.close();
   expect(await screen.findByText('Hello')).toBeInTheDocument();
-  expect(await screen.findByRole('button', { name: 'Send' })).toBeEnabled();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
 
   await rerender({ agent: 'planner' });
   await say('four five');
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
 
   expect(screen.queryByText('Hello')).not.toBeInTheDocument();
   expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/agents/planner');
