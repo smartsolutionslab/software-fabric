@@ -9,7 +9,7 @@ namespace {{ namespace }}.Integration.Tests;
 /// Dashboards through the running application: a dashboard is its owner's alone{{ if tenancy }}, inside their tenant{{ end }}, and shows only
 /// the widgets the modules declare. The visitor is a second user of the developer's tenant{{ if tenancy }}; developer-b is in another{{ end }}.
 /// </summary>
-public class DashboardsTests(AspireFixture aspire)
+public class DashboardsTests({{ integration_fixture }})
 {
     private const string Chart = "dashboards.widget-counts";
 
@@ -20,12 +20,12 @@ public class DashboardsTests(AspireFixture aspire)
     {
         var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
-        using (var developer = await aspire.CreateHostClientAsync("developer"))
+        using (var developer = await {{ signed_in_host_client `"developer"` }})
         {
             {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("Sales", (Chart, "bar"), (Table, "table")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
         }
 
-        using var reloaded = await aspire.CreateHostClientAsync("developer");
+        using var reloaded = await {{ signed_in_host_client `"developer"` }};
         var dashboard = await reloaded.GetFromJsonAsync<JsonObject>(Path(id), cancellationToken);
 
         {{ `dashboard!["name"]!.GetValue<string>()` | should_be `"Sales"` }};
@@ -41,7 +41,7 @@ public class DashboardsTests(AspireFixture aspire)
     {
         var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
-        using var developer = await aspire.CreateHostClientAsync("developer");
+        using var developer = await {{ signed_in_host_client `"developer"` }};
 
         {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("First", (Chart, "bar")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
         {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("Second", (Chart, "line")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
@@ -58,8 +58,8 @@ public class DashboardsTests(AspireFixture aspire)
     {
         var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
-        using var developer = await aspire.CreateHostClientAsync("developer");
-        using var visitor = await aspire.CreateHostClientAsync("visitor");
+        using var developer = await {{ signed_in_host_client `"developer"` }};
+        using var visitor = await {{ signed_in_host_client `"visitor"` }};
         {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("Mine", (Chart, "pie")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
 
         {{ `(await visitor.GetAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.NotFound` }};
@@ -77,8 +77,8 @@ public class DashboardsTests(AspireFixture aspire)
     {
         var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
-        using var developer = await aspire.CreateHostClientAsync("developer");
-        using var otherTenant = await aspire.CreateHostClientAsync("developer-b");
+        using var developer = await {{ signed_in_host_client `"developer"` }};
+        using var otherTenant = await {{ signed_in_host_client `"developer-b"` }};
         {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("Tenant A", (Chart, "bar")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
 
         {{ `(await otherTenant.GetAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.NotFound` }};
@@ -91,7 +91,7 @@ public class DashboardsTests(AspireFixture aspire)
     {
         var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
-        using var developer = await aspire.CreateHostClientAsync("developer");
+        using var developer = await {{ signed_in_host_client `"developer"` }};
         {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("Short-lived", (Chart, "bar")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
 
         {{ `(await developer.DeleteAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
@@ -104,7 +104,7 @@ public class DashboardsTests(AspireFixture aspire)
     {
         var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
-        using var developer = await aspire.CreateHostClientAsync("developer");
+        using var developer = await {{ signed_in_host_client `"developer"` }};
 
         var saved = await developer.PutAsJsonAsync(Path(id), Dashboard("Prying", ("dashboards.everyones-dashboards", "table")), cancellationToken);
         {{ `saved.StatusCode` | should_be `HttpStatusCode.BadRequest` }};
@@ -119,7 +119,7 @@ public class DashboardsTests(AspireFixture aspire)
     public async Task A_declared_widget_is_described_by_its_id_whatever_page_of_the_catalogue_lists_it()
     {
         var cancellationToken = {{ test_cancellation_token }};
-        using var developer = await aspire.CreateHostClientAsync("developer");
+        using var developer = await {{ signed_in_host_client `"developer"` }};
 
         var declaration = await developer.GetFromJsonAsync<JsonObject>($"/dashboards/widget-declarations/{Chart}", cancellationToken);
 
@@ -140,7 +140,7 @@ public class DashboardsTests(AspireFixture aspire)
     {
         var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
-        using var developer = await aspire.CreateHostClientAsync("developer");
+        using var developer = await {{ signed_in_host_client `"developer"` }};
         var dashboard = new { name = "Off the grid", widgets = new[] { new { key = "w0", source = Chart, visual = "bar", x, y = 0, width, height = 4 } } };
 
         var saved = await developer.PutAsJsonAsync(Path(id), dashboard, cancellationToken);
@@ -155,8 +155,8 @@ public class DashboardsTests(AspireFixture aspire)
         var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
         var name = $"Counted {id}";
-        using var developer = await aspire.CreateHostClientAsync("developer");
-        using var visitor = await aspire.CreateHostClientAsync("visitor");
+        using var developer = await {{ signed_in_host_client `"developer"` }};
+        using var visitor = await {{ signed_in_host_client `"visitor"` }};
         {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard(name, (Chart, "bar"), (Table, "table")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
 
         var catalog = await developer.GetFromJsonAsync<JsonObject>("/dashboards/widgets?page=1&pageSize=100", cancellationToken);
@@ -180,7 +180,7 @@ public class DashboardsTests(AspireFixture aspire)
     {
         var cancellationToken = {{ test_cancellation_token }};
         var batch = Guid.CreateVersion7();
-        using var developer = await aspire.CreateHostClientAsync("developer");
+        using var developer = await {{ signed_in_host_client `"developer"` }};
         List<string> names = [.. Enumerable.Range(0, 21).Select(index => $"Many {batch} {index:D2}")];
         foreach (var name in names)
         {

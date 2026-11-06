@@ -1,12 +1,9 @@
-{{~ if project["backend.test.integration"] != "aspire-fixture" ~}}
-#error The rtk-query-codegen pack checks openapi.json through the aspire-fixture integration tests only so far (docs/adr/0006 of the generator).
-{{~ end ~}}
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace {{ namespace }}.Integration.Tests;
 
-public class OpenApiDocumentTests(AspireFixture aspire)
+public class OpenApiDocumentTests({{ integration_fixture }})
 {
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
 
@@ -14,7 +11,7 @@ public class OpenApiDocumentTests(AspireFixture aspire)
     {{ test_attribute }}
     public async Task The_frontends_copy_of_the_openapi_document_is_current()
     {
-        using var client = aspire.CreateHostClient();
+        using var client = {{ host_client }};
         var served = JsonNode.Parse(await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative), {{ test_cancellation_token }}))!.AsObject();
         // Where the host happened to listen is not part of the API; the frontend calls it through /api.
         served.Remove("servers");

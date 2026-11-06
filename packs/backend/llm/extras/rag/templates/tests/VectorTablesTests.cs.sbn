@@ -11,7 +11,7 @@ namespace {{ namespace }}.Rag.Tests;
 {{~ else ~}}
 /// <summary>The vector tables the MigrationRunner made: one per module schema, of the embeddings model's size, with an HNSW cosine index.</summary>
 {{~ end ~}}
-public sealed class VectorTablesTests(AspireDatabase database)
+public sealed class VectorTablesTests({{ database_fixture }})
 {
     {{ test_attribute }}
     public async Task Every_modules_schema_has_an_embeddings_table_of_the_models_size_with_an_hnsw_cosine_index()
@@ -38,10 +38,10 @@ public sealed class VectorTablesTests(AspireDatabase database)
     {
         var cancellationToken = {{ test_cancellation_token }};
         const string Schema = "rag_tests_again";
-        await VectorTables.CreateAsync(database.ConnectionString, [Schema], cancellationToken);
+        await VectorTables.CreateAsync({{ database_connection_string }}, [Schema], cancellationToken);
         await ExecuteAsync($"INSERT INTO {VectorTables.Table(Schema)} ({{ if column }}tenant_id, {{ end }}key, content, embedding) VALUES ({{ if column }}'tenant-a', {{ end }}'kept', 'kept', array_fill(1, ARRAY[{VectorTables.Dimensions}])::vector)");
 
-        await VectorTables.CreateAsync(database.ConnectionString, [Schema], cancellationToken);
+        await VectorTables.CreateAsync({{ database_connection_string }}, [Schema], cancellationToken);
 
         {{ `(await ProblemsAsync(Schema))` | should_be_empty }};
         {{ `(await ScalarAsync($"SELECT count(*)::text FROM {VectorTables.Table(Schema)}"))` | should_be `"1"` }};
@@ -80,7 +80,7 @@ public sealed class VectorTablesTests(AspireDatabase database)
 
     private async Task<string?> ScalarAsync(string sql)
     {
-        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await using var connection = new NpgsqlConnection({{ database_connection_string }});
         await connection.OpenAsync({{ test_cancellation_token }});
         await using var command = new NpgsqlCommand(sql, connection);
         return await command.ExecuteScalarAsync({{ test_cancellation_token }}) as string;
@@ -88,7 +88,7 @@ public sealed class VectorTablesTests(AspireDatabase database)
 
     private async Task ExecuteAsync(string sql)
     {
-        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await using var connection = new NpgsqlConnection({{ database_connection_string }});
         await connection.OpenAsync({{ test_cancellation_token }});
         await using var command = new NpgsqlCommand(sql, connection);
         await command.ExecuteNonQueryAsync({{ test_cancellation_token }});

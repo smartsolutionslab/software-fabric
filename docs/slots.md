@@ -135,7 +135,7 @@ pack fill a slot of a choice it can be combined with but does not need
 
 | Slot | File | Filled by |
 |---|---|---|
-| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11) |
+| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11); the integration pack (the integration-fixture vocabulary below, M3-12) |
 | `dotnet.build-items` *(added with the kernel options)* | `Directory.Build.props` | ensure-that (ban list), typed-outcomes (`using static Outcome`) |
 | `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
@@ -174,6 +174,9 @@ library directly.
 | `test_case_attribute arguments` | `[InlineData(arguments)]` |
 | `test_cancellation_token` | `TestContext.Current.CancellationToken` |
 | `write_test_output text` | `TestContext.Current.TestOutputHelper?.WriteLine(text)` |
+| `test_run_fixture type` | `[assembly: AssemblyFixture(typeof(type))]`: `type` starts once per test run, and test classes take it as a constructor parameter (*M3-12*) |
+| `test_lifetime` | `IAsyncLifetime`, the interface of a class whose `test_setup` and `test_teardown` run around its tests, or once around the run for a fixture (*M3-12*) |
+| `test_setup`, `test_teardown` | `public async ValueTask InitializeAsync()`, `public async ValueTask DisposeAsync()` (*M3-12*) |
 | `actual \| should_be expected [message]` | `actual.ShouldBe(expected)`; also `should_be_ignoring_order` (sequences), `should_contain`, `should_not_contain`, `should_start_with`, `should_be_greater_than`, `should_all_be` (a predicate), `should_be_subset_of`, `should_be_same_as` |
 | `actual \| should_be_true [message]` | `actual.ShouldBeTrue()`; also `should_be_false`, `should_be_null`, `should_not_be_null`, `should_be_empty`, `should_not_be_empty`, `should_be_in_order` |
 | `actual \| should_be_in_range from to` | `actual.ShouldBeInRange(from, to)` |
@@ -189,9 +192,42 @@ less indented than they should come out.
 
 Every assertion renders after its `actual`, so `actual` may continue the
 line above (`` `.Message` ``) as in a fluent chain. A template writes
-`{{ `total` | should_be `42` }};` for `total.ShouldBe(42);`. Fixtures and
-their lifetimes (the Aspire fixture, the rag tests' database) are the
-integration pack's vocabulary, not this one (M3-12).
+`{{ `total` | should_be `42` }};` for `total.ShouldBe(42);`. The fixtures
+themselves are the integration pack's vocabulary, below; only their
+lifetimes are this one's.
+
+#### The integration-fixture vocabulary *(M3-12)*
+
+A pack's generated tests never name the integration fixture either: how
+a test reaches the running application, calls the host as an anonymous or
+signed-in caller, or reaches the application's database alone comes from
+`templates.functions` that every pack of `backend.test.integration`
+defines, so Testcontainers (#260) plugs in by defining the same functions
+instead of editing every pack's tests. The integration pack's fixture
+starts through the test framework's `test_run_fixture` and `test_lifetime`,
+so it does not refuse another framework. `IntegrationVocabularyTests` fails
+when the pack defines more or fewer functions, when a template outside the
+pack's own files (its fixture, `HostTests.cs`, `Integration.Tests.csproj`)
+names the Aspire fixture, or when a template refuses another integration
+option or test framework with `#error`. The MCP client's tests read the
+AppHost's model and start nothing; Aspire is the composition root whatever
+the integration option, so they are not the fixture's.
+
+| Function | Returns (aspire-fixture) |
+|---|---|
+| `integration_fixture` | `AspireFixture aspire`: the constructor parameter of a test class against the running application |
+| `host_client` | `aspire.CreateHostClient()`: an `HttpClient` calling the host anonymously |
+| `signed_in_host_client user` | `aspire.CreateHostClientAsync(user)`: awaitable, a client calling the host as the identity provider's local user `user` (a C# string) |
+| `database_fixture` | `AspireDatabase database`: the constructor parameter of a test class against the application's database alone, migrated, with nothing else running |
+| `database_connection_string` | `database.ConnectionString` |
+| `database_fixture_file namespace` | the C# file declaring that database fixture in `namespace` (rag's `tests/Rag.Tests/AspireDatabase.cs`) |
+| `database_fixture_package_references`, `database_fixture_project_references` | the `PackageReference` and `ProjectReference` items a test project needs for the database fixture |
+
+Signalr's Keycloak-only helpers still reach the Keycloak resource through
+the Aspire application (`aspire.App`); that is the identity-provider
+vocabulary's to replace (M3-13). A database fixture of another option
+lands in rag's file `AspireDatabase.cs` until rag's target is renamed,
+which would move the file in every rag project.
 
 **One package, one owner.** A `PackageVersion` is declared by exactly
 one pack; others only reference it. Two packs declaring the same version

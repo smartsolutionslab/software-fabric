@@ -13,3 +13,15 @@ end
 func write_test_output(text)
   ret "TestContext.Current.TestOutputHelper?.WriteLine(" + text + ")"
 end
+func test_run_fixture(type)
+  ret "[assembly: AssemblyFixture(typeof(" + type + "))]"
+end
+func test_lifetime
+  ret "IAsyncLifetime"
+end
+func test_setup
+  ret "public async ValueTask InitializeAsync()"
+end
+func test_teardown
+  ret "public async ValueTask DisposeAsync()"
+end

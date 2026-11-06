@@ -26,7 +26,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace {{ namespace }}.Integration.Tests;
 
 /// <summary>The host's event hub (/hubs/events) seen from a browser's side: what it receives, and who may connect.</summary>
-public class ServerEventsTests(AspireFixture aspire)
+public class ServerEventsTests({{ integration_fixture }})
 {
 {{~ if keycloak ~}}
     private const int ShortLifespan = 10;
@@ -39,8 +39,8 @@ public class ServerEventsTests(AspireFixture aspire)
     public async Task A_test_event_reaches_the_browsers_of_the_senders_tenant_only()
     {
         var cancellationToken = {{ test_cancellation_token }};
-        using var first = await aspire.CreateHostClientAsync("developer");
-        using var second = await aspire.CreateHostClientAsync("developer-b");
+        using var first = await {{ signed_in_host_client `"developer"` }};
+        using var second = await {{ signed_in_host_client `"developer-b"` }};
         await using var firstBrowser = await Browser.ConnectAsync(first, cancellationToken);
         await using var secondBrowser = await Browser.ConnectAsync(second, cancellationToken);
 
@@ -58,9 +58,9 @@ public class ServerEventsTests(AspireFixture aspire)
     {
         var cancellationToken = {{ test_cancellation_token }};
 {{~ if signed_in ~}}
-        using var sender = await aspire.CreateHostClientAsync("developer");
+        using var sender = await {{ signed_in_host_client `"developer"` }};
 {{~ else ~}}
-        using var sender = aspire.CreateHostClient();
+        using var sender = {{ host_client }};
 {{~ end ~}}
         await using var browser = await Browser.ConnectAsync(sender, cancellationToken);
 
@@ -74,7 +74,7 @@ public class ServerEventsTests(AspireFixture aspire)
     {{ test_attribute }}
     public async Task An_anonymous_connection_is_refused()
     {
-        using var anonymous = aspire.CreateHostClient();
+        using var anonymous = {{ host_client }};
 
         var refusal = await {{ should_throw_async `HttpRequestException` (`Browser.ConnectAsync(anonymous, ` + test_cancellation_token + `)`) }};
 
@@ -154,7 +154,7 @@ public class ServerEventsTests(AspireFixture aspire)
         var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken)
             ?? throw new InvalidOperationException("The realm returned no token.");
 
-        var caller = aspire.CreateHostClient();
+        var caller = {{ host_client }};
         caller.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
         return caller;
     }
