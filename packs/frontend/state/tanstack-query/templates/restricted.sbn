@@ -1,3 +1,10 @@
+{{~ if project["frontend.framework"] == "vue" ~}}
+            {
+              group: ['pinia', 'pinia-*', '@pinia/*', 'vuex', 'mobx', 'mobx-*', 'swrv', '@apollo/*', '@vue/apollo-*'],
+              message:
+                'Server data: the generated TanStack Query hooks; client state: Vue refs, and provide/inject when screens share it (docs/adr).',
+            }
+{{- else ~}}
             {
               group: [
                 'redux',
@@ -17,3 +24,4 @@
               message:
                 'Server data: the generated TanStack Query hooks; client state: React state and context (docs/adr).',
             }
+{{- end }}
