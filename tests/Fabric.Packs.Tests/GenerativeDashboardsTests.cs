@@ -104,7 +104,9 @@ public sealed class GenerativeDashboardsTests
         var (moduleExitCode, moduleOutput) = project.Test("tests/Modules/Dashboards.Tests/Dashboards.Tests.csproj");
         moduleExitCode.ShouldBe(0, moduleOutput);
         moduleOutput.ShouldContain("failed: 0");
-        moduleOutput.ShouldContain("TalkToTheDashboardsTests", customMessage: moduleOutput);
+
+        // The module's own test and the sample model test, then the agent's 8 and the proposal's 9.
+        moduleOutput.ShouldContain("succeeded: 19");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
@@ -121,6 +123,7 @@ public sealed class GenerativeDashboardsTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
+        output.ShouldContain("succeeded: 19");
     }
 
     [Fact]
@@ -152,7 +155,14 @@ public sealed class GenerativeDashboardsTests
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
         output.ShouldNotContain("skipped: 1");
-        output.ShouldContain("GenerativeDashboardsTests", customMessage: output);
+
+        // Passing tests are not named in the output: the class alone shows that its six ran.
+        var (classExitCode, classOutput) = project.DotNetCommand(
+            new Dictionary<string, string>(),
+            "test", "--project", "tests/Integration.Tests/Integration.Tests.csproj", "-c", "Release", "--no-build", "--no-ansi",
+            "--", "--filter-class", "Shop.Integration.Tests.GenerativeDashboardsTests");
+        classExitCode.ShouldBe(0, classOutput);
+        classOutput.ShouldContain("succeeded: 6", customMessage: classOutput);
     }
 
     private static List<string> Validate(params string[] overrides)

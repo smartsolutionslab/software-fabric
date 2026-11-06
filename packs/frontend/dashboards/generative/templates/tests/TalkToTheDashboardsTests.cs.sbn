@@ -82,13 +82,13 @@ public class TalkToTheDashboardsTests
     [Fact]
     public async Task A_draft_with_more_widgets_than_a_dashboard_holds_is_refused_with_its_code()
     {
-        var widgets = string.Join(',', Enumerable.Range(1, 51).Select(index => $$"""{ "key": "w-{{index}}", "source": "dashboards.widget-counts", "visual": "bar" }"""));
+        var widgets = string.Join(',', Enumerable.Range(1, 51).Select(index => "{ \"key\": \"w-" + index + "\", \"source\": \"dashboards.widget-counts\", \"visual\": \"bar\" }"));
         using var model = new RecordingChatClient();
         await using var services = DashboardServices.Build(model);
         await using var scope = services.CreateAsyncScope();
 
         var result = await scope.ServiceProvider.GetRequiredService<IDispatcher>().QueryAsync(
-            TalkToTheDashboards.Start([new ChatMessage(ChatRole.User, "Make the chart a pie.")], JsonDocument.Parse($$"""{ "widgets": [{{widgets}}] }""").RootElement),
+            TalkToTheDashboards.Start([new ChatMessage(ChatRole.User, "Make the chart a pie.")], JsonDocument.Parse("{ \"widgets\": [" + widgets + "] }").RootElement),
             TestContext.Current.CancellationToken);
 
         result.Error.Code.ShouldBe("dashboards.invalid-draft");
