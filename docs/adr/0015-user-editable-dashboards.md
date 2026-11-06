@@ -144,9 +144,9 @@ above changes for React.
   library than shadcn-vue, vee-validate and zod, `DashboardCanvas.vue` throws
   when it loads, saying so, as the Vue agent panel does (ADR-0013).
 - **Styles.** grid-layout-plus injects its own styles from its script, so the
-  page adds a comment to `src/index.css` instead of an import: the
-  `web.styles` slot joins its entries with a separator, and an empty entry
-  would leave a blank first line that Prettier refuses.
+  page adds nothing to `src/index.css`: its `web.styles` contribution renders
+  empty, and the generator drops an empty contribution before it joins a slot
+  (#221).
 
 ## Consequences
 
