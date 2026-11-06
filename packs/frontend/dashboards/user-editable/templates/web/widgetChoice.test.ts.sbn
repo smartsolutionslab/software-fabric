@@ -20,7 +20,11 @@ test('a widget the catalogue does not list is refused, whatever page it was chos
 });
 
 test('a visual that does not suit the widget kind is refused, so a table is never drawn as a chart', () => {
-  const refused = { ok: false, field: 'visual', message: 'That widget cannot be shown that way; choose how to show it.' };
+  const refused = {
+    ok: false,
+    field: 'visual',
+    message: 'That widget cannot be shown that way; choose how to show it.',
+  };
 
   expect(checkChoice(catalog, 'module.rows', 'bar')).toEqual(refused);
   expect(checkChoice(catalog, 'module.trend', 'table')).toEqual(refused);
