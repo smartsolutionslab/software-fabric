@@ -12,6 +12,12 @@ on:
   schedule:
     - cron: "17 5 * * 1"
 
+# One run per workflow and ref. Nothing here runs on a pull request, so a run is never cancelled while it runs: an eval
+# stopped halfway has already spent its calls and reports nothing; a newer run waits for it.
+{%{concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+}%}
 jobs:
   evals:
 {%{    if: github.event_name != 'schedule' || vars.EVALS_SCHEDULED == 'true'}%}
