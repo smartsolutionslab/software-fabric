@@ -222,6 +222,12 @@ public static class FabricCli
                 return Fail(error, loaded.Errors);
             }
 
+            // Without packs the domain is empty and so is the matrix; written over build/matrix.json, that would drop every row.
+            if (loaded.Packs.Count == 0)
+            {
+                return Fail(error, [$"no packs under {result.GetValue(packs)}; the matrix covers the options that have one."]);
+            }
+
             var extras = result.GetValue(extra) is { } extraPath ? MatrixExtraReader.ReadFile(extraPath) : [];
             var matrix = PairwiseMatrix.Build(catalogModel, loaded.Packs.Keys, extras);
             if (matrix.Errors.Count > 0)
