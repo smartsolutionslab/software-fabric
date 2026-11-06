@@ -3,11 +3,13 @@
 # classes in the fixed-ports collection run one after another on a runner, and a class's own tests run one after
 # another too, so both are spread over the shards by the times the build job prints for each class: rebalance by
 # those. A new line needs a new shard in ci.yml's matrix (TestShardTests checks it).
-Fabric.Packs.Tests.LeanCrudBackendTests Fabric.Packs.Tests.PagingTests Fabric.Packs.Tests.DomainEventTests Fabric.Packs.Tests.ServiceDefaultsTests
-Fabric.Packs.Tests.StrictEventSourcedTests Fabric.Packs.Tests.ErrorHandlingTests Fabric.Packs.Tests.MailpitTests Fabric.Packs.Tests.KernelOptionsTests
-Fabric.Packs.Tests.EventDrivenBackendTests Fabric.Packs.Tests.AzureOpenAITests Fabric.Packs.Tests.PolicyOwnershipTests Fabric.Packs.Tests.SqlCommandLogLevelTests
-Fabric.Packs.Tests.SaasStandardReactTests Fabric.Packs.Tests.OpenAITests Fabric.Packs.Tests.SignInTests Fabric.Packs.Tests.EndpointAuthorizationTests
-Fabric.Packs.Tests.ClaimAuthorizationTests Fabric.Packs.Tests.AnthropicTests Fabric.Packs.Tests.LeanCrudSignInTests Fabric.Packs.Tests.UniqueConstraintTests Fabric.Packs.Tests.FrontendPermissionTests Fabric.Packs.Tests.FrontendTests
-Fabric.Packs.Tests.McpServerTests Fabric.Packs.Tests.NoAuthenticationTests Fabric.Packs.Tests.McpClientTests Fabric.Packs.Tests.LeanCrudFrontendTests Fabric.Packs.Tests.RoleAuthorizationTests
-Fabric.Packs.Tests.CoverageGateTests
-Fabric.Packs.Tests.FormattingTests Fabric.Packs.Tests.CodeStyleTests Fabric.Packs.Tests.MigrationTests
+# Every class that takes 40 s or more is named, so the last shard runs only light ones and has room for a new class
+# until the next rebalance.
+Fabric.Packs.Tests.LeanCrudBackendTests Fabric.Packs.Tests.RagTests Fabric.Packs.Tests.AgUiVueTests Fabric.Packs.Tests.MicroFrontendsEndToEndTests Fabric.Packs.Tests.OpenAITests
+Fabric.Packs.Tests.StrictEventSourcedTests Fabric.Packs.Tests.VueSignInTests Fabric.Packs.Tests.SignInTests Fabric.Packs.Tests.AzureOpenAITests
+Fabric.Packs.Tests.AgUiTests Fabric.Packs.Tests.ClaimAuthorizationTests Fabric.Packs.Tests.SqlCommandLogLevelTests Fabric.Packs.Tests.ServiceDefaultsTests Fabric.Packs.Tests.VueSharedPacksTests Fabric.Packs.Tests.OneTypePerFileTests Fabric.Packs.Tests.FrontendPermissionTests Fabric.Packs.Tests.EventStoreJsonConverterTests Fabric.Packs.Tests.DtoMappingTests
+Fabric.Packs.Tests.RoleAuthorizationTests Fabric.Packs.Tests.MailpitTests Fabric.Packs.Tests.FormattingTests Fabric.Packs.Tests.VueFrontendTests Fabric.Packs.Tests.MicroFrontendsTests Fabric.Packs.Tests.CoverageGateTests Fabric.Packs.Tests.DesignSystemTests Fabric.Packs.Tests.MigrationTests Fabric.Packs.Tests.FrontendTests Fabric.Packs.Tests.ShadcnComponentsTests
+Fabric.Packs.Tests.SaasStandardReactTests Fabric.Packs.Tests.McpServerTests Fabric.Packs.Tests.ErrorHandlingTests Fabric.Packs.Tests.PagingTests Fabric.Packs.Tests.PolicyOwnershipTests
+Fabric.Packs.Tests.EventDrivenBackendTests Fabric.Packs.Tests.AgentFrameworkTests Fabric.Packs.Tests.CodeStyleTests Fabric.Packs.Tests.VueFormsAndComponentsTests Fabric.Packs.Tests.PrimitiveBoundaryTests Fabric.Packs.Tests.EvalsTests Fabric.Packs.Tests.DomainEventTests Fabric.Packs.Tests.LeanCrudFrontendTests
+Fabric.Packs.Tests.NoAuthenticationTests Fabric.Packs.Tests.ServerEventsEndToEndTests Fabric.Packs.Tests.LeanCrudSignInTests Fabric.Packs.Tests.KernelOptionsTests Fabric.Packs.Tests.GuidVersion7Tests Fabric.Packs.Tests.EndpointAuthorizationTests Fabric.Packs.Tests.ProfileCiTests Fabric.Packs.Tests.TimeProviderTests
+Fabric.Packs.Tests.DashboardsTests Fabric.Packs.Tests.EmbeddingsTests Fabric.Packs.Tests.McpClientTests Fabric.Packs.Tests.OllamaTests Fabric.Packs.Tests.AnthropicTests
