@@ -97,23 +97,24 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
     public async Task A_search_the_hnsw_index_answers_short_ranks_every_record_exactly_and_returns_as_many_as_asked()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-
-        // The HNSW scan stops once it has visited hnsw.max_scan_tuples (20,000 by default, 100 here) beyond its first
-        // hnsw.ef_search candidates, and the index widens that breadth to 1000 at most, so a search for 1,100 of 1,200
-        // records comes back short through the index. Records it cannot reach at all (equidistant ties) do the same.
-        var scanLimited = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off -c hnsw.max_scan_tuples=100" };
-        await using var indexed = VectorTables.DataSource(scanLimited.ConnectionString);
+        var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off" };
+        await using var indexed = VectorTables.DataSource(indexOnly.ConnectionString);
         var library = new ModuleVectorIndex<SampleLibraryDbContext>(indexed, generator);
-        for (var number = 0; number < 1200; number++)
+        await library.IndexAsync("novel", "a book of stories", cancellationToken);
+        await library.IndexAsync("atlas", "a book of maps", cancellationToken);
+        await library.IndexAsync("lunch", "team lunch on friday", cancellationToken);
+
+        // Two records the HNSW index cannot reach, so it answers short. Records at equal distances from one another leave
+        // some unreachable at random; a vector of no length is the certain case, as pgvector's cosine index leaves it out.
+        await using (var unreachable = indexed.CreateCommand($"INSERT INTO {VectorTables.Table(SampleLibraryDbContext.Schema)} (key, content, embedding) SELECT 'blank-' || number, 'blank', $1 FROM generate_series(1, 2) number"))
         {
-            await library.IndexAsync($"book-{number}", $"book {number} {number + 1}", cancellationToken);
+            unreachable.Parameters.Add(new Npgsql.NpgsqlParameter { Value = new Pgvector.Vector(new float[VectorTables.Dimensions]) });
+            await unreachable.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        var passages = await library.SearchAsync("book", 1100, cancellationToken);
+        var passages = await library.SearchAsync("book", 5, cancellationToken);
 
-        passages.Count.ShouldBe(1100);
-        passages.Select(passage => passage.Key).ShouldBeUnique();
-        passages.Select(passage => passage.Distance).ShouldBeInOrder();
+        passages.Select(passage => passage.Key).ShouldBe(["atlas", "novel", "lunch", "blank-1", "blank-2"]);
     }
 {{~ end ~}}
 
