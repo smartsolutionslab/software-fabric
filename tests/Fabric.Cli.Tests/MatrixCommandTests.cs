@@ -37,6 +37,26 @@ public sealed class MatrixCommandTests : IDisposable
         json.ShouldEndWith("}\n");
     }
 
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("empty")]
+    public void A_packs_directory_without_packs_fails_and_writes_nothing(string packs)
+    {
+        var directory = Path.Combine(root, packs);
+        if (packs == "empty")
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        var output = Path.Combine(root, "matrix.json");
+
+        var run = CliRun.Of("matrix", "--catalog", Paths.FixtureCatalog, "--packs", directory, "--output", output);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldBe($"error: no packs under {directory}; the matrix covers the options that have one.{Environment.NewLine}");
+        File.Exists(output).ShouldBeFalse();
+    }
+
     [Fact]
     public void Without_an_output_file_prints_the_matrix()
     {
