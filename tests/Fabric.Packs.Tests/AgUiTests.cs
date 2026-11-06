@@ -241,9 +241,24 @@ public sealed class AgUiTests
     }
 
     [Fact]
-    public void No_profile_changes_because_none_has_agents()
+    public void A_profile_without_the_agent_panel_does_not_change_and_one_with_it_gets_the_panel()
     {
-        foreach (var profile in Repository.Catalog.Profiles.Keys)
+        var without = Repository.ProfilesNotChoosing("frontend.agent-ui", "ag-ui");
+        var with = Repository.ProfilesChoosing("frontend.agent-ui", "ag-ui");
+        without.ShouldNotBeEmpty();
+        with.ShouldNotBeEmpty();
+
+        foreach (var profile in with)
+        {
+            var files = Files(profile);
+
+            files.Keys.ShouldContain(path => path.StartsWith("web/app/src/agents/", StringComparison.Ordinal), profile);
+            files[EndToEndScript].ShouldContain("--Parameters:model-stand-in=true", customMessage: profile);
+            files["src/ServiceDefaults/Wiring/Extensions.cs"].ShouldContain("AGUI", customMessage: profile);
+            files["fabric.yaml"].ShouldContain("  assistant:", customMessage: profile);
+        }
+
+        foreach (var profile in without)
         {
             var files = Files(profile);
 

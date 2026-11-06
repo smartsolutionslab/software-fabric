@@ -56,9 +56,22 @@ public sealed class AgentUiTests
     }
 
     [Fact]
-    public void No_profile_changes_because_none_has_agents()
+    public void A_profile_without_agents_does_not_change_and_one_with_the_agent_panel_has_no_none_rule()
     {
-        foreach (var profile in Repository.Catalog.Profiles.Keys)
+        var withoutAgents = Repository.ProfilesNotChoosing("backend.llm.agents", "agent-framework");
+        var withThePanel = Repository.ProfilesChoosing("frontend.agent-ui", "ag-ui");
+        withoutAgents.ShouldNotBeEmpty();
+        withThePanel.ShouldNotBeEmpty();
+
+        foreach (var profile in withThePanel)
+        {
+            var files = Files(profile);
+
+            files["fabric.yaml"].ShouldContain("  frontend.agent-ui: ag-ui\n", customMessage: profile);
+            files.Keys.ShouldNotContain(Rule, profile);
+        }
+
+        foreach (var profile in withoutAgents)
         {
             var files = Files(profile);
 

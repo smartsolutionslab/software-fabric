@@ -234,9 +234,23 @@ public sealed class RagTests
     }
 
     [Fact]
-    public void No_profile_changes_because_none_calls_a_model()
+    public void A_profile_without_rag_does_not_change_and_one_with_it_gets_the_store()
     {
-        foreach (var profile in Repository.Catalog.Profiles.Keys)
+        var without = Repository.ProfilesNotChoosing("backend.llm.extras", "rag");
+        var with = Repository.ProfilesChoosing("backend.llm.extras", "rag");
+        without.ShouldNotBeEmpty();
+        with.ShouldNotBeEmpty();
+
+        foreach (var profile in with)
+        {
+            var files = Files(profile);
+
+            files["src/AppHost/AppHost.cs"].ShouldContain(Image, customMessage: profile);
+            files.Keys.ShouldContain($"{Store}/ModuleVectorIndex.cs", profile);
+            files.Keys.ShouldContain(path => path.StartsWith("tests/Rag.Tests/", StringComparison.Ordinal), profile);
+        }
+
+        foreach (var profile in without)
         {
             var files = Files(profile);
 

@@ -170,9 +170,23 @@ public sealed partial class EvalsTests
     }
 
     [Fact]
-    public void No_profile_changes_because_none_calls_a_model()
+    public void A_profile_without_evals_does_not_change_and_one_with_them_gets_them()
     {
-        foreach (var profile in Repository.Catalog.Profiles.Keys)
+        var without = Repository.ProfilesNotChoosing("backend.llm.extras", "evals");
+        var with = Repository.ProfilesChoosing("backend.llm.extras", "evals");
+        without.ShouldNotBeEmpty();
+        with.ShouldNotBeEmpty();
+
+        foreach (var profile in with)
+        {
+            var files = ProfileFiles(profile);
+            files.Keys.ShouldContain(path => path.Contains("Evals", StringComparison.Ordinal), profile);
+            files.Keys.ShouldContain(path => path.Contains("FakeJudge", StringComparison.Ordinal), profile);
+            files.Keys.ShouldContain(Workflow, profile);
+            files["fabric.yaml"].ShouldContain("settings:", customMessage: profile);
+        }
+
+        foreach (var profile in without)
         {
             var files = ProfileFiles(profile);
             files.Keys.ShouldNotContain(path => path.Contains("Evals", StringComparison.Ordinal) || path.Contains("FakeJudge", StringComparison.Ordinal), profile);
