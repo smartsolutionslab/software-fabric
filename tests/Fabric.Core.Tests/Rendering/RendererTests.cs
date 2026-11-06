@@ -214,6 +214,58 @@ public sealed class RendererTests : IDisposable
         rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("{\n  \"react\": \"19\",\n  \"zod\": \"4\"\n}");
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData(" \n\t\n")]
+    public void An_empty_or_whitespace_only_contribution_adds_no_separator(string empty)
+    {
+        var owner = Pack("base.core", ("pkg.sbn", "[{{ slots[\"deps\"] }}]"));
+        var blank = Pack("backend.database.postgres", ("blank.sbn", empty));
+        var react = Pack("frontend.framework.react", ("react.sbn", "react"));
+        var zod = Pack("frontend.validation.zod", ("zod.sbn", "zod"));
+
+        var rendered = Renderer.Render(
+            Catalog,
+            new Composition(
+                [],
+                [Composed(owner, "pkg.sbn", "package.json")],
+                new Dictionary<string, IReadOnlyList<SlotEntry>>
+                {
+                    ["deps"] =
+                    [
+                        new(blank, new("deps", "blank.sbn", 0)),
+                        new(react, new("deps", "react.sbn", 1)),
+                        new(blank, new("deps", "blank.sbn", 2)),
+                        new(zod, new("deps", "zod.sbn", 3)),
+                        new(blank, new("deps", "blank.sbn", 4)),
+                    ],
+                },
+                [],
+                new Dictionary<string, string> { ["deps"] = ", " }),
+            Choices,
+            "shop");
+
+        rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("[react, zod]");
+    }
+
+    [Fact]
+    public void A_slot_whose_contributions_are_all_empty_renders_as_an_empty_string()
+    {
+        var owner = Pack("base.core", ("readme.sbn", "[{{ slots[\"readme.sections\"] }}]"));
+        var first = Pack("backend.database.postgres", ("empty.sbn", ""));
+        var second = Pack("module.style.ddd", ("blank.sbn", "  \n"));
+
+        var rendered = Renderer.Render(
+            Catalog,
+            Compose(
+                [Composed(owner, "readme.sbn", "README.md")],
+                new() { ["readme.sections"] = [new(first, new("readme.sections", "empty.sbn", 0)), new(second, new("readme.sections", "blank.sbn", 1))] }),
+            Choices,
+            "shop");
+
+        rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("[]");
+    }
+
     [Fact]
     public void The_project_name_and_its_namespace_are_available()
     {

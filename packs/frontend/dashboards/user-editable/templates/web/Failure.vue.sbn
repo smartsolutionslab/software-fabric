@@ -1,0 +1,18 @@
+{%{<script setup lang="ts">
+import { Button } from '@/components/ui/button';
+
+// Named in one word beside the page's other files; lint wants a component's name in two.
+defineOptions({ name: 'ReadFailure' });
+
+/** A read that failed, said so, with a way to try it again. */
+const { message, retry } = defineProps<{ message: string; retry: string }>();
+const emit = defineEmits<{ retry: [] }>();
+</script>
+
+<template>
+  <div role="alert" class="flex items-center gap-2 text-sm">
+    <span>{{ message }}</span>
+    <Button type="button" variant="outline" size="sm" :aria-label="retry" @click="emit('retry')">Try again</Button>
+  </div>
+</template>
+}%}
