@@ -5,6 +5,7 @@
 - A command or query runs the agent: its handler takes `IChatClient` and `IDispatcher`, creates the agent, runs it and returns its answer's text as a successful `Result`. An endpoint sends that request through `IDispatcher`; it never runs an agent.
 - A tool is one of the module's commands or queries: `DispatcherTool.For<FindInvoice>(dispatcher, "what it does, for the model")`. Never `AIFunctionFactory.Create`, an `AITool` of your own or an agent's `AsAIFunction`; an architecture rule fails the build.
 - Give a tool only to a use case a model may call with arguments of its own choosing. Its handler validates them as it would a request body.
+- A list query with `Page` and `PageSize` can be a tool as it is: the model passes them as whole numbers, as `?page=` and `?pageSize=`. Do not add a second, unpaged query for an agent.
 {{~ if project["backend.absence"] == "option" ~}}
 - An `Option<T>` argument of a tool is required and may be null: the model passes `null` for None, and a call without it is refused before the handler, even when its constructor parameter has a default. Never put an `Option` inside a collection or dictionary of a tool's request; `EveryAgentToolRequestIsValid` fails the build. Use a list of a record whose property is the `Option` instead.
 {{~ end ~}}

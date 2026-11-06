@@ -1,0 +1,6 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Agents.Tests;
+
+/// <summary>A paged query, as a module's list query is: the sample agent's tool <c>list_words</c>, a page at a time.</summary>
+public sealed record ListWords(string Text, Page Page, PageSize PageSize) : IQuery<Result<PagedResult<string>, ApiError>>;
