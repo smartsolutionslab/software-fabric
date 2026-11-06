@@ -70,13 +70,14 @@ test('a widget the modules do not declare is refused: nothing is pending and not
   await expect(page.locator('.react-grid-item')).toHaveCount(0);
   expect(saves).toEqual([]);
 
-  await page.reload();
-  await expect(page.getByText('Signed in as developer')).toBeVisible();
+  // The reload stays on the dashboards page, which lists the user's dashboards as it loads.
   const listed = page.waitForResponse(
     (response) => response.url().includes('/api/dashboards?') && response.request().method() === 'GET',
   );
-  await page.getByRole('link', { name: 'Dashboards' }).click();
+  await page.reload();
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
   expect((await listed).status()).toBe(200);
+  await page.getByRole('link', { name: 'Dashboards' }).click();
   await expect(page.getByRole('button', { name: 'New dashboard' })).toBeVisible();
   await expect(page.getByRole('button', { name })).toHaveCount(0);
 });
