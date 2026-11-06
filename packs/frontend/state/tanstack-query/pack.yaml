@@ -1,6 +1,8 @@
 option: frontend.state.tanstack-query
 files:
-  - { template: templates/query-provider.tsx.sbn, target: web/app/src/providers/query.tsx }
+  # The provider is React's context or Vue's plugin (ADR-0006); main.ts imports it from ./providers/query either way.
+  - { template: templates/query-provider.tsx.sbn, target: web/app/src/providers/query.tsx, when: 'project["frontend.framework"] != "vue"' }
+  - { template: templates/query-provider.ts.sbn, target: web/app/src/providers/query.ts, when: 'project["frontend.framework"] == "vue"' }
 slots:
   - { slot: web.dependencies, template: templates/dependencies.sbn }
   - { slot: web.imports, template: templates/import.sbn, order: 5 }
@@ -10,4 +12,4 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: lint-rule, describes: "Importing a store library (Redux, Zustand, MobX, Jotai, Recoil, Valtio) or another server-data cache (SWR, Apollo) fails lint.", file: templates/restricted.sbn }
+  - { kind: lint-rule, describes: "Importing a store library (Redux, Zustand, MobX, Jotai, Recoil, Valtio; with Vue, Pinia and Vuex) or another server-data cache (SWR, Apollo; with Vue, swrv, Apollo and Pinia Colada) fails lint.", file: templates/restricted.sbn }

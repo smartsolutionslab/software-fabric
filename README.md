@@ -71,6 +71,10 @@ Node 22 with pnpm and the Aspire CLI bundle needed).
 `build/profile-ci.sh saas-standard-react --set frontend.design-system=tokens-and-components`
 does the same with overrides, so a pack can go through profile CI before
 the profile that needs it is complete.
+`build/profile-ci.sh --combination <name> --steps generate,build,test,web`
+runs one combination of the pairwise matrix (`build/matrix.json`, ADR-0003)
+instead of a profile, without the end-to-end tests: its choices go to
+`fabric new --choices`, a JSON file of dimension to option.
 
 ## Stack of the generator itself
 

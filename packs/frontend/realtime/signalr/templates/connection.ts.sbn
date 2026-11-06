@@ -1,5 +1,5 @@
-{{~ if project["frontend.framework"] != "react" ~}}
-throw new Error('The signalr pack has a React client only so far (docs/adr/0006 of the generator).');
+{{~ if project["frontend.framework"] != "react" && project["frontend.framework"] != "vue" ~}}
+throw new Error('The signalr pack has a React and a Vue client only so far (docs/adr/0006 of the generator).');
 {{~ end ~}}
 {{~ if object.has_key(project, "frontend.auth-client") && project["frontend.auth-client"] != "oidc-client-ts" ~}}
 throw new Error('The signalr pack takes the token from oidc-client-ts only so far (docs/adr/0006 of the generator).');
