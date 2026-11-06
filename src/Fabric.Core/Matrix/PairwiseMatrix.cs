@@ -94,7 +94,7 @@ public static class PairwiseMatrix
             switch (search.Complete(seed, Score))
             {
                 case SearchOutcome.Found:
-                    combinations.Add(new MatrixCombination($"extra-{combinations.Count + 1}", extra.Reason, search.Set()));
+                    combinations.Add(new MatrixCombination($"extra-{combinations.Count + 1}", extra.Reason, search.Choices()));
                     Cover([.. Assigned()]);
                     break;
                 case SearchOutcome.None:
@@ -110,7 +110,7 @@ public static class PairwiseMatrix
         var pairwise = 0;
         while (errors.Count == 0 && Seeds(uncovered, points.Count) is { Count: > 0 } seeds)
         {
-            (IReadOnlyList<string> Set, List<int> Points, int Gain)? best = null;
+            (IReadOnlyList<MatrixChoice> Choices, List<int> Points, int Gain)? best = null;
             foreach (var (first, second) in seeds)
             {
                 var seed = new Dictionary<int, int> { [points[first].Factor] = points[first].Value, [points[second].Factor] = points[second].Value };
@@ -121,7 +121,7 @@ public static class PairwiseMatrix
                         var gain = Gain(assigned);
                         if (best is null || gain > best.Value.Gain)
                         {
-                            best = (search.Set(), assigned, gain);
+                            best = (search.Choices(), assigned, gain);
                         }
 
                         break;
@@ -138,7 +138,7 @@ public static class PairwiseMatrix
 
             if (best is { } row)
             {
-                combinations.Add(new MatrixCombination($"pairwise-{++pairwise}", null, row.Set));
+                combinations.Add(new MatrixCombination($"pairwise-{++pairwise}", null, row.Choices));
                 Cover(row.Points);
             }
         }

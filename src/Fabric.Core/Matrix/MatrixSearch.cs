@@ -87,19 +87,19 @@ internal sealed class MatrixSearch
         return Enumerable.Range(0, dimensions.Count).All(Check) ? Search(score) : SearchOutcome.None;
     }
 
-    /// <summary>The found choice set as <c>--set</c> arguments: one per active dimension, in catalog order.</summary>
-    public IReadOnlyList<string> Set()
+    /// <summary>The found choice set: one choice per active dimension, in catalog order.</summary>
+    public IReadOnlyList<MatrixChoice> Choices()
     {
-        List<string> set = [];
+        List<MatrixChoice> choices = [];
         for (var dimension = 0; dimension < dimensions.Count; dimension++)
         {
             if (State(dimension) is (true, { } values))
             {
-                set.Add($"{dimensions[dimension].Id}={string.Join(",", values)}");
+                choices.Add(new MatrixChoice(dimensions[dimension].Id, dimensions[dimension].Multi, values));
             }
         }
 
-        return set;
+        return choices;
     }
 
     private SearchOutcome Search(Func<int, int, int> score)
@@ -196,7 +196,8 @@ internal sealed class MatrixSearch
 
     private bool Valid()
     {
-        var resolution = ChoiceResolver.Resolve(catalog, null, Set());
+        var set = Choices().Select(choice => $"{choice.Dimension}={string.Join(",", choice.Options)}").ToList();
+        var resolution = ChoiceResolver.Resolve(catalog, null, set);
         return resolution.Choices is { } choices && RuleEvaluator.Check(catalog, choices).Count == 0;
     }
 

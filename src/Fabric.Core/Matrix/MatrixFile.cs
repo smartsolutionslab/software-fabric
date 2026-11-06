@@ -9,7 +9,7 @@ public static class MatrixFile
 {
     private const string About =
         "Written by fabric matrix: a pairwise covering set over every option with a pack (ADR-0003). " +
-        "Each combination is a full choice set without a profile, as --set arguments. Do not edit; regenerate it.";
+        "Each combination's choices are a full choice set without a profile, for fabric new --choices. Do not edit; regenerate it.";
 
     public static string Write(MatrixResult matrix)
     {
@@ -36,13 +36,26 @@ public static class MatrixFile
                     writer.WriteString("reason", reason);
                 }
 
-                writer.WriteStartArray("set");
-                foreach (var entry in combination.Set)
+                writer.WriteStartObject("choices");
+                foreach (var choice in combination.Choices)
                 {
-                    writer.WriteStringValue(entry);
+                    if (choice.Multi)
+                    {
+                        writer.WriteStartArray(choice.Dimension);
+                        foreach (var option in choice.Options)
+                        {
+                            writer.WriteStringValue(option);
+                        }
+
+                        writer.WriteEndArray();
+                    }
+                    else
+                    {
+                        writer.WriteString(choice.Dimension, choice.Options[0]);
+                    }
                 }
 
-                writer.WriteEndArray();
+                writer.WriteEndObject();
                 writer.WriteEndObject();
             }
 
