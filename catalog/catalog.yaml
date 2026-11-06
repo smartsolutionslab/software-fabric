@@ -252,7 +252,8 @@ dimensions:
     options:
       marten:
         tier: supported
-        requires: ["backend.database == postgres"]
+        # Reason: the Marten pack keeps no tenant apart in its event streams, so any tenancy would leak one tenant's events to another.
+        requires: ["backend.database == postgres", "backend.tenancy == none"]
       kurrentdb: { tier: experimental }
 
   module.ddd-depth:
@@ -269,7 +270,11 @@ dimensions:
     options:
       none:     { tier: supported }
       logical:  { tier: supported, note: "separate command and query handlers, one store" }
-      physical: { tier: supported, note: "separate read models fed by projections" }
+      physical:
+        tier: supported
+        note: "separate read models fed by projections"
+        # Reason: the read models are Marten projections of a module's events, so a module needs Marten's event store to have them.
+        requires: ["module.event-store == marten"]
 
   module.communication:
     scope: module
@@ -368,7 +373,10 @@ dimensions:
     active-when: "frontend.architecture == micro-frontends"
     default: module-federation
     options:
-      module-federation: { tier: experimental }
+      module-federation:
+        tier: experimental
+        # Reason: the pack builds React remotes only (owner decision D5, #232).
+        requires: ["frontend.framework == react"]
       native-federation: { tier: experimental }
       web-components:    { tier: experimental }
 
@@ -467,7 +475,11 @@ dimensions:
     options:
       tailwind:      { tier: supported }
       css-modules:   { tier: experimental }
-      library-theme: { tier: experimental, note: "the UI library's own theming system" }
+      library-theme:
+        tier: experimental
+        note: "the UI library's own theming system"
+        # Reason: these libraries are headless or styled with Tailwind only, so they have no theming system of their own.
+        conflicts: ["frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless)"]
 
   frontend.ui-library:
     scope: project
@@ -514,7 +526,11 @@ dimensions:
     options:
       none:   { tier: supported, note: "the UI library as shipped" }
       tokens: { tier: experimental, note: "Style Dictionary tokens, framework-neutral" }
-      tokens-and-components: { tier: experimental, note: "tokens plus an own component package with Storybook" }
+      tokens-and-components:
+        tier: experimental
+        note: "tokens plus an own component package with Storybook"
+        # Reason: the component package is React only (owner decision D5, #232).
+        requires: ["frontend.framework == react"]
       web-components:        { tier: experimental }
 
   frontend.data-grid:

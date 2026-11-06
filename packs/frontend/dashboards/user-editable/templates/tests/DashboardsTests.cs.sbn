@@ -15,182 +15,182 @@ public class DashboardsTests(AspireFixture aspire)
 
     private const string Table = "dashboards.my-dashboards";
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_user_saves_a_dashboard_and_finds_it_again_after_a_reload()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
         using (var developer = await aspire.CreateHostClientAsync("developer"))
         {
-            (await developer.PutAsJsonAsync(Path(id), Dashboard("Sales", (Chart, "bar"), (Table, "table")), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+            {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("Sales", (Chart, "bar"), (Table, "table")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
         }
 
         using var reloaded = await aspire.CreateHostClientAsync("developer");
         var dashboard = await reloaded.GetFromJsonAsync<JsonObject>(Path(id), cancellationToken);
 
-        dashboard!["name"]!.GetValue<string>().ShouldBe("Sales");
+        {{ `dashboard!["name"]!.GetValue<string>()` | should_be `"Sales"` }};
         var widgets = dashboard["widgets"]!.AsArray();
-        widgets.Select(widget => widget!["source"]!.GetValue<string>()).ShouldBe([Chart, Table]);
-        widgets[1]!["x"]!.GetValue<int>().ShouldBe(6);
-        widgets[1]!["visual"]!.GetValue<string>().ShouldBe("table");
-        (await Ids(reloaded, cancellationToken)).ShouldContain(id);
+        {{ `widgets.Select(widget => widget!["source"]!.GetValue<string>())` | should_be `[Chart, Table]` }};
+        {{ `widgets[1]!["x"]!.GetValue<int>()` | should_be `6` }};
+        {{ `widgets[1]!["visual"]!.GetValue<string>()` | should_be `"table"` }};
+        {{ `(await Ids(reloaded, cancellationToken))` | should_contain `id` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task Saving_again_replaces_the_dashboard_and_a_retried_save_applies_once()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
         using var developer = await aspire.CreateHostClientAsync("developer");
 
-        (await developer.PutAsJsonAsync(Path(id), Dashboard("First", (Chart, "bar")), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await developer.PutAsJsonAsync(Path(id), Dashboard("Second", (Chart, "line")), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
-        (await developer.PutAsJsonAsync(Path(id), Dashboard("Second", (Chart, "line")), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("First", (Chart, "bar")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
+        {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("Second", (Chart, "line")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
+        {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("Second", (Chart, "line")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
 
         var dashboard = await developer.GetFromJsonAsync<JsonObject>(Path(id), cancellationToken);
-        dashboard!["name"]!.GetValue<string>().ShouldBe("Second");
-        dashboard["widgets"]!.AsArray().Single()!["visual"]!.GetValue<string>().ShouldBe("line");
-        (await Ids(developer, cancellationToken)).Count(listed => listed == id).ShouldBe(1);
+        {{ `dashboard!["name"]!.GetValue<string>()` | should_be `"Second"` }};
+        {{ `dashboard["widgets"]!.AsArray().Single()!["visual"]!.GetValue<string>()` | should_be `"line"` }};
+        {{ `(await Ids(developer, cancellationToken)).Count(listed => listed == id)` | should_be `1` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task Another_user_of_the_tenant_neither_reads_lists_overwrites_nor_removes_it()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
         using var developer = await aspire.CreateHostClientAsync("developer");
         using var visitor = await aspire.CreateHostClientAsync("visitor");
-        (await developer.PutAsJsonAsync(Path(id), Dashboard("Mine", (Chart, "pie")), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("Mine", (Chart, "pie")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
 
-        (await visitor.GetAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
-        (await Ids(visitor, cancellationToken)).ShouldNotContain(id);
-        (await visitor.PutAsJsonAsync(Path(id), Dashboard("Theirs", (Chart, "bar")), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.Conflict);
-        (await visitor.DeleteAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        {{ `(await visitor.GetAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.NotFound` }};
+        {{ `(await Ids(visitor, cancellationToken))` | should_not_contain `id` }};
+        {{ `(await visitor.PutAsJsonAsync(Path(id), Dashboard("Theirs", (Chart, "bar")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.Conflict` }};
+        {{ `(await visitor.DeleteAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.NotFound` }};
 
         var dashboard = await developer.GetFromJsonAsync<JsonObject>(Path(id), cancellationToken);
-        dashboard!["name"]!.GetValue<string>().ShouldBe("Mine");
+        {{ `dashboard!["name"]!.GetValue<string>()` | should_be `"Mine"` }};
     }
 {{~ if tenancy ~}}
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_user_of_another_tenant_neither_reads_nor_lists_it()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
         using var developer = await aspire.CreateHostClientAsync("developer");
         using var otherTenant = await aspire.CreateHostClientAsync("developer-b");
-        (await developer.PutAsJsonAsync(Path(id), Dashboard("Tenant A", (Chart, "bar")), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("Tenant A", (Chart, "bar")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
 
-        (await otherTenant.GetAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
-        (await Ids(otherTenant, cancellationToken)).ShouldNotContain(id);
+        {{ `(await otherTenant.GetAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.NotFound` }};
+        {{ `(await Ids(otherTenant, cancellationToken))` | should_not_contain `id` }};
     }
 {{~ end ~}}
 
-    [Fact]
+    {{ test_attribute }}
     public async Task The_owner_removes_a_dashboard()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
         using var developer = await aspire.CreateHostClientAsync("developer");
-        (await developer.PutAsJsonAsync(Path(id), Dashboard("Short-lived", (Chart, "bar")), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("Short-lived", (Chart, "bar")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
 
-        (await developer.DeleteAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        {{ `(await developer.DeleteAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
 
-        (await developer.GetAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        {{ `(await developer.GetAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.NotFound` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_widget_the_modules_do_not_declare_is_refused_when_saving_and_when_run()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
         using var developer = await aspire.CreateHostClientAsync("developer");
 
         var saved = await developer.PutAsJsonAsync(Path(id), Dashboard("Prying", ("dashboards.everyones-dashboards", "table")), cancellationToken);
-        saved.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await saved.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["code"]!.GetValue<string>().ShouldBe("dashboards.unknown-widget");
-        (await developer.GetAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        {{ `saved.StatusCode` | should_be `HttpStatusCode.BadRequest` }};
+        {{ `(await saved.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["code"]!.GetValue<string>()` | should_be `"dashboards.unknown-widget"` }};
+        {{ `(await developer.GetAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.NotFound` }};
 
         var run = await developer.GetAsync(new Uri("/dashboards/widgets/dashboards.everyones-dashboards?page=1&pageSize=20", UriKind.Relative), cancellationToken);
-        run.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        {{ `run.StatusCode` | should_be `HttpStatusCode.NotFound` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_declared_widget_is_described_by_its_id_whatever_page_of_the_catalogue_lists_it()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         using var developer = await aspire.CreateHostClientAsync("developer");
 
         var declaration = await developer.GetFromJsonAsync<JsonObject>($"/dashboards/widget-declarations/{Chart}", cancellationToken);
 
-        declaration!["id"]!.GetValue<string>().ShouldBe(Chart);
-        declaration["title"]!.GetValue<string>().ShouldBe("Widgets per dashboard");
-        declaration["kind"]!.GetValue<string>().ShouldBe("Chart");
+        {{ `declaration!["id"]!.GetValue<string>()` | should_be `Chart` }};
+        {{ `declaration["title"]!.GetValue<string>()` | should_be `"Widgets per dashboard"` }};
+        {{ `declaration["kind"]!.GetValue<string>()` | should_be `"Chart"` }};
         var unknown = await developer.GetAsync(new Uri("/dashboards/widget-declarations/dashboards.everyones-dashboards", UriKind.Relative), cancellationToken);
-        unknown.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-        (await unknown.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["code"]!.GetValue<string>().ShouldBe("dashboards.widget-not-found");
+        {{ `unknown.StatusCode` | should_be `HttpStatusCode.NotFound` }};
+        {{ `(await unknown.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["code"]!.GetValue<string>()` | should_be `"dashboards.widget-not-found"` }};
     }
 
-    [Theory]
-    [InlineData(int.MaxValue, 1)]
-    [InlineData(11, int.MaxValue)]
-    [InlineData(-1, 6)]
-    [InlineData(7, 6)]
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `int.MaxValue, 1` }}
+    {{ test_case_attribute `11, int.MaxValue` }}
+    {{ test_case_attribute `-1, 6` }}
+    {{ test_case_attribute `7, 6` }}
     public async Task A_widget_outside_the_grids_twelve_columns_is_refused(int x, int width)
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
         using var developer = await aspire.CreateHostClientAsync("developer");
         var dashboard = new { name = "Off the grid", widgets = new[] { new { key = "w0", source = Chart, visual = "bar", x, y = 0, width, height = 4 } } };
 
         var saved = await developer.PutAsJsonAsync(Path(id), dashboard, cancellationToken);
 
-        saved.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await saved.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["code"]!.GetValue<string>().ShouldBe("dashboards.invalid-widget");
+        {{ `saved.StatusCode` | should_be `HttpStatusCode.BadRequest` }};
+        {{ `(await saved.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["code"]!.GetValue<string>()` | should_be `"dashboards.invalid-widget"` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task The_declared_widgets_are_listed_and_run_as_the_caller()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var id = Guid.CreateVersion7();
         var name = $"Counted {id}";
         using var developer = await aspire.CreateHostClientAsync("developer");
         using var visitor = await aspire.CreateHostClientAsync("visitor");
-        (await developer.PutAsJsonAsync(Path(id), Dashboard(name, (Chart, "bar"), (Table, "table")), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+        {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard(name, (Chart, "bar"), (Table, "table")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
 
         var catalog = await developer.GetFromJsonAsync<JsonObject>("/dashboards/widgets?page=1&pageSize=100", cancellationToken);
         var declared = catalog!["items"]!.AsArray().ToDictionary(widget => widget!["id"]!.GetValue<string>(), widget => widget!["kind"]!.GetValue<string>());
-        declared[Chart].ShouldBe("Chart");
-        declared[Table].ShouldBe("Table");
+        {{ `declared[Chart]` | should_be `"Chart"` }};
+        {{ `declared[Table]` | should_be `"Table"` }};
 
         var chart = await developer.GetFromJsonAsync<JsonObject>($"/dashboards/widgets/{Chart}?page=1&pageSize=20", cancellationToken);
-        chart!["kind"]!.GetValue<string>().ShouldBe("Chart");
-        chart["chart"]!["categories"]!.AsArray().Select(category => category!.GetValue<string>()).ShouldContain(name);
+        {{ `chart!["kind"]!.GetValue<string>()` | should_be `"Chart"` }};
+        {{ `chart["chart"]!["categories"]!.AsArray().Select(category => category!.GetValue<string>())` | should_contain `name` }};
         var table = await developer.GetFromJsonAsync<JsonObject>($"/dashboards/widgets/{Table}?page=1&pageSize=100", cancellationToken);
-        table!["table"]!["columns"]!.AsArray().Select(column => column!.GetValue<string>()).ShouldBe(["id", "name", "widgetCount"]);
-        table["table"]!["rows"]!.AsArray().Select(row => row!["name"]!.GetValue<string>()).ShouldContain(name);
+        {{ `table!["table"]!["columns"]!.AsArray().Select(column => column!.GetValue<string>())` | should_be `["id", "name", "widgetCount"]` }};
+        {{ `table["table"]!["rows"]!.AsArray().Select(row => row!["name"]!.GetValue<string>())` | should_contain `name` }};
 
         var visitorsChart = await visitor.GetFromJsonAsync<JsonObject>($"/dashboards/widgets/{Chart}?page=1&pageSize=20", cancellationToken);
-        visitorsChart!["chart"]!["categories"]!.AsArray().Select(category => category!.GetValue<string>()).ShouldNotContain(name);
+        {{ `visitorsChart!["chart"]!["categories"]!.AsArray().Select(category => category!.GetValue<string>())` | should_not_contain `name` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task The_widget_count_chart_counts_every_dashboard_of_the_caller_not_only_the_first_page()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var batch = Guid.CreateVersion7();
         using var developer = await aspire.CreateHostClientAsync("developer");
         List<string> names = [.. Enumerable.Range(0, 21).Select(index => $"Many {batch} {index:D2}")];
         foreach (var name in names)
         {
-            (await developer.PutAsJsonAsync(Path(Guid.CreateVersion7()), Dashboard(name, (Chart, "bar")), cancellationToken)).StatusCode.ShouldBe(HttpStatusCode.OK);
+            {{ `(await developer.PutAsJsonAsync(Path(Guid.CreateVersion7()), Dashboard(name, (Chart, "bar")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
         }
 
         var chart = await developer.GetFromJsonAsync<JsonObject>($"/dashboards/widgets/{Chart}?page=1&pageSize=20", cancellationToken);
 
         var categories = chart!["chart"]!["categories"]!.AsArray().Select(category => category!.GetValue<string>()).ToList();
-        names.ShouldBeSubsetOf(categories);
+        {{ `names` | should_be_subset_of `categories` }};
     }
 
     private static string Path(Guid id) => $"/dashboards/{id}";

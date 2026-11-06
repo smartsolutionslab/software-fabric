@@ -2,11 +2,7 @@
 #error The roles pack tests a module's sample policy through the aspire-fixture integration tests only so far (docs/adr/0006 of the generator).
 {{~ end ~}}
 {{~ func status(response, code)
-  if project["backend.test.assertions"] == "shouldly"
-    ret response + ".StatusCode.ShouldBe(HttpStatusCode." + code + ");"
-  else
-    ret response + ".StatusCode.Should().Be(HttpStatusCode." + code + ");"
-  end
+  ret (should_be (response + ".StatusCode") ("HttpStatusCode." + code)) + ";"
 end ~}}
 using System.Net;
 
@@ -17,32 +13,32 @@ public class {{ module.namespace }}RoleTests(AspireFixture aspire)
 {
     private static readonly Uri ManagePermission = new("/{{ module.name }}/permissions/manage", UriKind.Relative);
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_user_with_the_manager_role_is_allowed()
     {
         using var client = await aspire.CreateHostClientAsync("developer");
 
-        using var response = await client.GetAsync(ManagePermission, TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync(ManagePermission, {{ test_cancellation_token }});
 
         {{ status "response" "OK" }}
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_signed_in_user_without_the_role_is_forbidden()
     {
         using var client = await aspire.CreateHostClientAsync("visitor");
 
-        using var response = await client.GetAsync(ManagePermission, TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync(ManagePermission, {{ test_cancellation_token }});
 
         {{ status "response" "Forbidden" }}
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task An_anonymous_caller_is_unauthorized()
     {
         using var client = aspire.CreateHostClient();
 
-        using var response = await client.GetAsync(ManagePermission, TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync(ManagePermission, {{ test_cancellation_token }});
 
         {{ status "response" "Unauthorized" }}
     }

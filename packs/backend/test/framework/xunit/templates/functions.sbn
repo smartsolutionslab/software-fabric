@@ -1,0 +1,15 @@
+func test_attribute
+  ret "[Fact]"
+end
+func test_cases_attribute
+  ret "[Theory]"
+end
+func test_case_attribute(arguments)
+  ret "[InlineData(" + arguments + ")]"
+end
+func test_cancellation_token
+  ret "TestContext.Current.CancellationToken"
+end
+func write_test_output(text)
+  ret "TestContext.Current.TestOutputHelper?.WriteLine(" + text + ")"
+end
