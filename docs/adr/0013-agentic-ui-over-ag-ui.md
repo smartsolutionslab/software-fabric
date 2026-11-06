@@ -149,8 +149,8 @@ none is a new choice of option.
   query that runs it; `tests/Modules/Assistant.Tests` runs it through the
   dispatcher with `ToolCallingChatClient`, and `tests/Integration.Tests`
   through the running host.
-- The backend generates the same for React and Vue; the Vue panel's templates
-  (#183) are where the pack branches on the framework.
+- The backend generates the same for React and Vue; the panel's templates
+  are where the pack branches on the framework (#183, below).
 
 **As built for the React panel (#203).** These follow from the decisions
 above too.
@@ -169,10 +169,11 @@ above too.
   so `react-router`'s page template branches on this choice (ADR-0006), as
   it does for the dashboards module.
 - **Where it is not built yet.** It is built for a React single-page app
-  on shadcn/ui, React Hook Form and zod. With Vue (#183) or micro-frontends
-  the web app gets `src/agents/AgentPanel.test.ts`, which fails its tests
-  saying so; with another UI, forms or validation library, the panel's
-  module fails the build saying so.
+  on shadcn/ui, React Hook Form and zod, and since #183 for a Vue one
+  (below). With micro-frontends the web app gets
+  `src/agents/AgentPanel.test.ts`, which fails its tests saying so; with
+  another UI, forms or validation library, the panel's module fails the
+  build saying so.
 - **`e2e.sh`** has a slot, `e2e.apphost-arguments`, declared by the React
   and Vue packs (each owns its copy of the script): arguments the script
   starts the AppHost with, after `--`. The pack fills it with
@@ -191,11 +192,41 @@ above too.
   accessibility tests. `e2e/agent-panel.spec.ts` sends two messages through
   the panel against the AppHost with the stand-in model.
 
+**As built for the Vue panel (#183).** The same panel for a Vue
+single-page app, a branch of the same pack (ADR-0006); nothing above
+changes for React.
+
+- **The panel** is `AgentPanel.vue` in `web/app/src/agents`, which renders
+  `AgentConversation.vue` keyed by the agent's name, so another agent starts
+  another conversation, as React's panel does with its `key`. `useAgent` is a
+  composable over the same `HttpAgent`, ending the run and its subscription
+  with the component's scope. `connectAgent` is the same file for both
+  frameworks, so the token is read the same way, from `@/auth/accessToken`.
+  It is built from the shadcn-vue `Button` and a textarea styled with the
+  theme, in a vee-validate form with a zod schema through the forms pack's
+  `toTypedSchema`, as the project's other Vue forms are.
+- **Where it shows.** The `assistant` module's page is `vue-router`'s, so
+  that pack's page template branches on this choice (ADR-0006), as
+  `react-router`'s does.
+- **Where it is not built yet.** With another Vue UI library (Reka UI
+  alone, Vuetify, ...), forms or validation library, `AgentConversation.vue`
+  throws when it loads, saying so, and its imports fail the build.
+- **Which files branch.** A target is claimed whatever its `when` says, so a
+  file both frameworks have at one path branches inside its template: `useAgent.ts`
+  (a hook or a composable), and `src/agents/AgentPanel.test.ts` (Vue's
+  component test, or with micro-frontends the test that fails saying the
+  panel is not built there).
+- **Its tests.** `AgentPanel.test.ts` is `AgentPanel.test.tsx`'s cases
+  with Testing Library for Vue; it waits for the Send button to be enabled
+  and for a request to be sent rather than for the button to exist, because
+  Vue renders a tick after the state changes and vee-validate validates
+  before it submits. The end-to-end test is React's file,
+  `e2e/agent-panel.spec.ts`: the page's roles and names are the same.
+
 **Delivered in three steps** (owner's decision on #182): first this
 dimension, this ADR and the `none` pack; then the `ag-ui` pack's backend; then
-its React panel with the end-to-end test. The Vue panel is #183, a branch of
-the same pack (ADR-0006). Until #183 lands, the pack's templates fail loudly
-for Vue.
+its React panel with the end-to-end test. The Vue panel followed as #183, a
+branch of the same pack (ADR-0006).
 
 ## Sources checked
 
