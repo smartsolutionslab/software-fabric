@@ -1,3 +1,4 @@
+import { contentToText, type Message } from '@ag-ui/client';
 import { z } from 'zod';
 import { nextPlacement, type Placement } from './layout';
 
@@ -32,6 +33,51 @@ export function readProposal(content: string): WidgetProposal | undefined {
 
   const read = proposalSchema.safeParse(value);
   return read.success ? read.data : undefined;
+}
+
+/** Each tool call's result in the conversation, by the call's id. */
+export const toolResults = (messages: readonly Message[]): ReadonlyMap<string, string> =>
+  new Map(
+    messages.flatMap((message) =>
+      message.role === 'tool' ? [[message.toolCallId, contentToText(message.content)] as const] : [],
+    ),
+  );
+
+/** Every widget the agent proposed, in order, by its call; a refused call proposes nothing. */
+export function proposalsOf(messages: readonly Message[], results: ReadonlyMap<string, string>): PendingProposal[] {
+  const proposals: PendingProposal[] = [];
+  for (const message of messages) {
+    if (message.role !== 'assistant') {
+      continue;
+    }
+
+    for (const call of message.toolCalls ?? []) {
+      const result = results.get(call.id);
+      const proposal =
+        call.function.name === 'propose_widget' && result !== undefined ? readProposal(result) : undefined;
+      if (proposal) {
+        proposals.push({ call: call.id, proposal });
+      }
+    }
+  }
+
+  return proposals;
+}
+
+/** What a tool call did, as the conversation shows it: a proposal by its declared title, a refusal by the host's reason. */
+export function toolOutcome(tool: string, result: string | undefined): string {
+  if (tool !== 'propose_widget') {
+    return result === undefined ? `Running ${tool}…` : `Ran ${tool}.`;
+  }
+
+  if (result === undefined) {
+    return 'Proposing a widget…';
+  }
+
+  const proposal = readProposal(result);
+  return proposal
+    ? `Proposed: ${proposal.title} as ${proposal.visual}.`
+    : `Refused: ${result.replace(/^Failed: /, '')}`;
 }
 
 /** The draft's widget the proposal replaces, if the draft still has it. */

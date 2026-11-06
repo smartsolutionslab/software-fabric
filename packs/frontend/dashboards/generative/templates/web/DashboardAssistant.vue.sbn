@@ -1,0 +1,125 @@
+{{~ if project["frontend.ui-library"] != "shadcn-vue" || project["frontend.forms"] != "vee-validate" || project["frontend.validation"] != "zod" ~}}
+<script lang="ts">
+throw new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate and zod only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+</script>
+
+{{~ end ~}}
+{%{<script setup lang="ts">
+import { contentToText } from '@ag-ui/client';
+import { useForm } from 'vee-validate';
+import { computed, useId, watch } from 'vue';
+import { z } from 'zod';
+import { useAgent } from '@/agents/useAgent';
+import { Button } from '@/components/ui/button';
+import { toTypedSchema } from '@/forms/toTypedSchema';
+import type { Placement } from './layout';
+import { draftState, type PendingProposal, proposalsOf, toolOutcome, toolResults } from './proposal';
+
+/** What the conversation shows of one message, as text: the user's, the agent's, and what each of its tools did. */
+type Entry = { kind: 'user' | 'answer' | 'tool-call'; key: string; text: string };
+
+interface DashboardAssistantProps {
+  /** The open draft's widgets, which every run sends the agent as context. */
+  widgets: readonly Placement[];
+}
+
+/**
+ * A conversation with the dashboards agent (POST /api/agents/dashboards) about the open dashboard: the user asks for a
+ * widget, and each widget it proposes goes to the canvas, which shows it pending. The agent saves nothing.
+ */
+const { widgets } = defineProps<DashboardAssistantProps>();
+/** Emitted once for each widget the agent proposes, which the canvas shows pending until the user decides on it. */
+const emit = defineEmits<{ proposal: [pending: PendingProposal] }>();
+
+const questionSchema = z.object({ question: z.string().trim().min(1, 'Ask for a widget first.') });
+
+const { messages, running, failure, send } = useAgent('dashboards', () => draftState(widgets));
+const { defineField, errors, handleSubmit, resetForm } = useForm({
+  validationSchema: toTypedSchema(questionSchema),
+  initialValues: { question: '' },
+});
+const [question, questionAttributes] = defineField('question');
+const field = useId();
+
+const submit = handleSubmit(async (values) => {
+  resetForm();
+  await send(values.question);
+});
+
+const results = computed(() => toolResults(messages.value));
+
+// Each proposal goes to the canvas once, in the order the agent made them: a decided one does not come back when the
+// conversation goes on.
+const reported = new Set<string>();
+watch(
+  () => proposalsOf(messages.value, results.value),
+  (proposals) => {
+    for (const proposal of proposals) {
+      if (!reported.has(proposal.call)) {
+        reported.add(proposal.call);
+        emit('proposal', proposal);
+      }
+    }
+  },
+);
+
+const entries = computed(() =>
+  messages.value.flatMap((each): Entry[] => {
+    if (each.role === 'user') {
+      return [{ kind: 'user', key: each.id, text: contentToText(each.content) }];
+    }
+
+    if (each.role !== 'assistant') {
+      return [];
+    }
+
+    const text = contentToText(each.content);
+    return [
+      ...(text ? [{ kind: 'answer', key: each.id, text } as const] : []),
+      ...(each.toolCalls ?? []).map((call) => ({
+        kind: 'tool-call' as const,
+        key: call.id,
+        text: toolOutcome(call.function.name, results.value.get(call.id)),
+      })),
+    ];
+  }),
+);
+</script>
+
+<template>
+  <section aria-label="Dashboard assistant" class="flex flex-col gap-2 rounded border p-2">
+    <h2 class="text-sm font-medium">Assistant</h2>
+    <ol aria-label="Conversation" class="flex flex-col gap-2 text-sm">
+      <template v-for="entry in entries" :key="entry.key">
+        <li v-if="entry.kind === 'user'" class="self-end rounded-md bg-primary px-3 py-2 text-primary-foreground">
+          <p class="text-xs font-medium">You</p>
+          <p class="whitespace-pre-wrap">{{ entry.text }}</p>
+        </li>
+        <li v-else-if="entry.kind === 'answer'" class="rounded-md bg-muted px-3 py-2">
+          <p class="text-xs font-medium text-muted-foreground">Assistant</p>
+          <p class="whitespace-pre-wrap">{{ entry.text }}</p>
+        </li>
+        <li v-else class="rounded-md border px-3 py-2">{{ entry.text }}</li>
+      </template>
+    </ol>
+    <p aria-live="polite" class="text-sm text-muted-foreground">{{ running ? 'Answering…' : '' }}</p>
+    <p v-if="failure" role="alert" class="text-sm text-destructive">The assistant could not answer: {{ failure }}</p>
+    <form novalidate class="flex flex-col gap-2" @submit="submit">
+      <label :for="field" class="text-sm font-medium">Ask the assistant</label>
+      <textarea
+        :id="field"
+        v-model="question"
+        v-bind="questionAttributes"
+        rows="2"
+        :aria-invalid="errors.question ? true : undefined"
+        :aria-describedby="errors.question ? `${field}-error` : undefined"
+        class="flex field-sizing-content min-h-12 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+      />
+      <p v-if="errors.question" :id="`${field}-error`" role="alert" class="text-sm text-destructive">
+        {{ errors.question }}
+      </p>
+      <Button type="submit" variant="secondary" :disabled="running" class="self-end">Ask</Button>
+    </form>
+  </section>
+</template>
+}%}
