@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { useAgent } from '@/agents/useAgent';
 import { Button } from '@/components/ui/button';
 import type { Placement } from './layout';
-import { draftState, type PendingProposal, readProposal } from './proposal';
+import { draftState, type PendingProposal, proposalsOf, toolOutcome, toolResults } from './proposal';
 
 const questionSchema = z.object({ question: z.string().trim().min(1, 'Ask for a widget first.') });
 
@@ -33,15 +33,7 @@ export function DashboardAssistant({ widgets, onProposal }: DashboardAssistantPr
   } = useForm<QuestionForm>({ resolver: zodResolver(questionSchema), defaultValues: { question: '' } });
   const field = useId();
 
-  const results = useMemo(
-    () =>
-      new Map(
-        messages.flatMap((message) =>
-          message.role === 'tool' ? [[message.toolCallId, contentToText(message.content)] as const] : [],
-        ),
-      ),
-    [messages],
-  );
+  const results = useMemo(() => toolResults(messages), [messages]);
   const proposals = useMemo(() => proposalsOf(messages, results), [messages, results]);
 
   // Each proposal goes to the canvas once, in the order the agent made them: a decided one does not come back when the
@@ -100,27 +92,6 @@ export function DashboardAssistant({ widgets, onProposal }: DashboardAssistantPr
   );
 }
 
-/** Every widget the agent proposed, in order, by its call; a refused call proposes nothing. */
-function proposalsOf(messages: readonly Message[], results: ReadonlyMap<string, string>): PendingProposal[] {
-  const proposals: PendingProposal[] = [];
-  for (const message of messages) {
-    if (message.role !== 'assistant') {
-      continue;
-    }
-
-    for (const call of message.toolCalls ?? []) {
-      const result = results.get(call.id);
-      const proposal =
-        call.function.name === 'propose_widget' && result !== undefined ? readProposal(result) : undefined;
-      if (proposal) {
-        proposals.push({ call: call.id, proposal });
-      }
-    }
-  }
-
-  return proposals;
-}
-
 /** What the conversation shows of one message, as text: the user's, the agent's, and what each of its tools did. */
 function entries(message: Message, results: ReadonlyMap<string, string>) {
   if (message.role === 'user') {
@@ -148,24 +119,8 @@ function entries(message: Message, results: ReadonlyMap<string, string>) {
       : []),
     ...(message.toolCalls ?? []).map((call) => (
       <li key={call.id} className="rounded-md border px-3 py-2">
-        {outcome(call.function.name, results.get(call.id))}
+        {toolOutcome(call.function.name, results.get(call.id))}
       </li>
     )),
   ];
-}
-
-/** A proposal by its declared title, a refusal by the host's reason, and any other tool by its name. */
-function outcome(tool: string, result: string | undefined) {
-  if (tool !== 'propose_widget') {
-    return result === undefined ? `Running ${tool}…` : `Ran ${tool}.`;
-  }
-
-  if (result === undefined) {
-    return 'Proposing a widget…';
-  }
-
-  const proposal = readProposal(result);
-  return proposal
-    ? `Proposed: ${proposal.title} as ${proposal.visual}.`
-    : `Refused: ${result.replace(/^Failed: /, '')}`;
 }

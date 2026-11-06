@@ -5,10 +5,11 @@ import { connectAgent } from './connectAgent';
 
 /**
  * A conversation with one agent: its messages, updated as each answer streams in, whether a run is under way, and why
- * the last run failed. The agent keeps the conversation, so every run sends all of it. Call it in a component's setup:
- * the conversation ends with the component.
+ * the last run failed. The agent keeps the conversation, so every run sends all of it. `state`, when given, is read as
+ * each run starts and sent as the run's AG-UI state: what the page shows, which the agent's query reads as untrusted
+ * context. Call it in a component's setup: the conversation ends with the component.
  */
-export function useAgent(name: string) {
+export function useAgent(name: string, state?: () => unknown) {
   const agent = connectAgent(name);
   const messages = shallowRef<readonly Message[]>([]);
   const running = ref(false);
@@ -31,6 +32,9 @@ export function useAgent(name: string) {
   async function send(text: string) {
     failure.value = undefined;
     running.value = true;
+    if (state) {
+      agent.setState(state());
+    }
     agent.addMessage({ id: randomUUID(), role: 'user', content: text });
     try {
       await agent.runAgent();

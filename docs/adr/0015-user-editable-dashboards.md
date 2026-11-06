@@ -191,8 +191,8 @@ that paged queries become agent tools in the agent-framework pack (#215).
 - **Tests.** `tests/Modules/Dashboards.Tests` runs the agent and the proposal
   through the dispatcher; `tests/Integration.Tests/GenerativeDashboardsTests`
   runs them through the host with the stand-in model.
-- **Still to come:** the React panel on the dashboard page, with its
-  end-to-end test (below), and then the Vue one.
+- **Then:** the React page, with its end-to-end test, and the Vue page
+  (both below).
 
 **As built for generative, the React page (#185).** The page the user-editable
 pack builds for a React single-page app on RTK Query gains the agent; with any
@@ -229,14 +229,39 @@ other frontend the page stays as `user-editable` leaves it until its own step.
   `replaces` as `null`: an agent tool's `Option` argument is required, so the
   model states its absence (#215).
 
+**As built for generative, the Vue page (#185).** The same assistant on the Vue
+page of #214, a branch of the same packs (ADR-0006); nothing above changes for
+React.
+
+- **The files.** `DashboardAssistant.vue` and `PendingWidget.vue` are the
+  generative pack's, built from shadcn-vue in a vee-validate form with zod, as
+  the Vue agent panel is (ADR-0013). With another Vue UI, forms or validation
+  library, `DashboardAssistant.vue` throws when it loads, saying so.
+  `proposal.ts` serves both frameworks: besides reading and accepting a
+  proposal, it now holds the conversation's framework-free parts
+  (`toolResults`, `proposalsOf`, `toolOutcome`), which React's
+  `DashboardAssistant.tsx` uses too. Its tests passed unchanged.
+- **`useAgent`'s Vue composable** takes the same optional state getter, read
+  as each run starts.
+- **Where it shows.** `DashboardCanvas.vue` branches on `generative`, as
+  React's canvas does. The pending proposals are `static` items of
+  grid-layout-plus's layout below the draft's widgets, and the layout is drawn
+  again whenever the draft or the pending proposals change. In both
+  frameworks the assistant sits below the grid, so the page above the grid,
+  and every place on it, is where it is without `generative`.
+- **Tests.** `DashboardAssistant.test.ts` is `DashboardAssistant.test.tsx`'s
+  cases with Testing Library for Vue, on the generated client and a host the
+  test answers. `e2e/generative-dashboards.spec.ts` is React's file; it
+  branches only on the grid's class names, as `e2e/dashboards.spec.ts` does.
+
 ## Consequences
 
 - Every existing profile takes `frontend.dashboards: []`; its `fabric.yaml`
   gains that one line, as `backend.authorization` and `backend.mcp` did, and
   every other file is unchanged.
 - `user-editable` and `generative` are `experimental` (ADR-0003): the first has
-  a pack with a React and a Vue page; the second has a pack whose backend and
-  React page are built (#185) and whose Vue page is still to come.
+  a pack with a React and a Vue page; so does the second, whose backend is
+  built too (#185).
 - The frontend's checked-in OpenAPI document describes the module's endpoints:
   the API client packs declare the slots it fills.
 - A module that wants a widget changes its own Application project only; no

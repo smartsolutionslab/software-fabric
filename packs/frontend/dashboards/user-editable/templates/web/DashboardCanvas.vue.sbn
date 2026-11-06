@@ -1,3 +1,4 @@
+{{~ generative = array.contains project["frontend.dashboards"] "generative" ~}}
 {{~ if project["frontend.ui-library"] != "shadcn-vue" || project["frontend.forms"] != "vee-validate" || project["frontend.validation"] != "zod" ~}}
 <script lang="ts">
 throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate and zod only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
@@ -26,7 +27,12 @@ import {
 } from './layout';
 import Pager from './Pager.vue';
 import PlacedWidget from './PlacedWidget.vue';
-import { uuidV7 } from './uuidV7';
+}%}{{~ if generative ~}}
+import DashboardAssistant from './DashboardAssistant.vue';
+import PendingWidget from './PendingWidget.vue';
+import { acceptProposal, type PendingProposal, pendingOnGrid, replacedBy } from './proposal';
+{{~ end ~}}
+{%{import { uuidV7 } from './uuidV7';
 import { checkChoice, visuals } from './widgetChoice';
 
 const rowHeight = 40;
@@ -63,7 +69,15 @@ const placements = ref<Placement[]>(dashboard.widgets);
 // What the grid draws, rebuilt from the placements whenever they change; the grid moves its items in place.
 const layout = ref<Item[]>(toLayout(placements.value));
 watch(placements, (current) => (layout.value = toLayout(current)), { flush: 'sync' });
-// Counts the draft's changes; the notice says Saved only while the saved revision is still the current one, so a
+}%}{{~ if generative ~}}
+// The widgets the dashboards agent proposed: on the grid, outside the draft, until the user accepts or discards each.
+const pending = ref<PendingProposal[]>([]);
+const proposed = computed(() => pendingOnGrid(placements.value, pending.value));
+/** What the grid draws: the draft's widgets, and the pending proposals below them. */
+const drawn = () => [...toLayout(placements.value), ...proposed.value.map(({ item }) => item)];
+watch([placements, pending], () => (layout.value = drawn()), { flush: 'sync' });
+{{~ end ~}}
+{%{// Counts the draft's changes; the notice says Saved only while the saved revision is still the current one, so a
 // save that ends after a later edit does not call that edit saved.
 const revision = ref(0);
 const savedRevision = ref<number>();
@@ -164,8 +178,12 @@ function placed(reported: Layout) {
   // A widget moved or grown below the lowest row snaps back: the grid is drawn from the placements.
   if (!withinReach(moved)) {
     tooLow.value = true;
+}%}{{~ if generative ~}}
+    layout.value = drawn();
+{{~ else ~}}
     layout.value = toLayout(placements.value);
-    return;
+{{~ end ~}}
+{%{    return;
   }
 
   tooLow.value = false;
@@ -190,7 +208,35 @@ function samePlaces(left: readonly Placement[], right: readonly Placement[]) {
 }
 
 const remove = (key: string) => change((current) => current.filter((other) => other.key !== key));
+}%}{{~ if generative ~}}
 
+const propose = (proposal: PendingProposal) => (pending.value = [...pending.value, proposal]);
+const decide = (call: string) => (pending.value = pending.value.filter((other) => other.call !== call));
+
+/** Accept only changes the draft, adding the widget or replacing the one it names; Save persists it as any edit. */
+const accept = ({ call, proposal }: PendingProposal) => {
+  const key = uuidV7();
+  change((current) => acceptProposal(current, proposal, key));
+  decide(call);
+};
+
+/** Each pending proposal on the grid with its place, as the grid has it. */
+const pendingTiles = computed(() =>
+  layout.value.flatMap((item) => {
+    const waiting = proposed.value.find((each) => each.item.i === item.i);
+    return waiting
+      ? [
+          {
+            item,
+            proposal: waiting.proposed,
+            replacing: replacedBy(placements.value, waiting.proposed.proposal) !== undefined,
+          },
+        ]
+      : [];
+  }),
+);
+{{~ end ~}}
+{%{
 /** Each widget on the grid with its place, as the grid has it. */
 const tiles = computed(() =>
   layout.value.flatMap((item) => {
@@ -277,7 +323,32 @@ const tiles = computed(() =>
           @remove="remove(placement.key)"
         />
       </GridItem>
-    </GridLayout>
-  </section>
+}%}{{~ if generative ~}}
+      <GridItem
+        v-for="{ item, proposal, replacing } in pendingTiles"
+        :key="item.i"
+        :i="item.i"
+        :x="item.x"
+        :y="item.y"
+        :w="item.w"
+        :h="item.h"
+        static
+      >
+        <PendingWidget
+          :proposal="proposal.proposal"
+          :height="Math.max(120, item.h * rowHeight - 60)"
+          :replacing="replacing"
+          :can-accept="replacing || (!full && roomLeft)"
+          :refresh="saves"
+          @accept="accept(proposal)"
+          @discard="decide(proposal.call)"
+        />
+      </GridItem>
+{{~ end ~}}
+{%{    </GridLayout>
+}%}{{~ if generative ~}}
+    <DashboardAssistant :widgets="placements" @proposal="propose" />
+{{~ end ~}}
+{%{  </section>
 </template>
 }%}
