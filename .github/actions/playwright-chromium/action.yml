@@ -23,7 +23,7 @@ runs:
         key: playwright-chromium-${{ steps.image.outputs.image }}-${{ inputs.version }}
     - if: steps.cache.outputs.cache-hit == 'true'
       shell: bash
-      run: sudo cp ~/.cache/playwright-debs/*.deb /var/cache/apt/archives/
+      run: find ~/.cache/playwright-debs -maxdepth 1 -name '*.deb' -exec sudo cp -t /var/cache/apt/archives {} +
     - shell: bash
       env:
         PLAYWRIGHT_VERSION: ${{ inputs.version }}
@@ -35,4 +35,5 @@ runs:
       run: |
         npx --yes "playwright@$PLAYWRIGHT_VERSION" install chromium
         mkdir -p ~/.cache/playwright-debs
-        cp /var/cache/apt/archives/*.deb ~/.cache/playwright-debs/
+        # None when the image already has every package; that is not a failure.
+        find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp -t ~/.cache/playwright-debs {} +
