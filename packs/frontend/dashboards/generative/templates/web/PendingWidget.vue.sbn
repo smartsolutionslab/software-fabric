@@ -1,0 +1,49 @@
+{%{<script setup lang="ts">
+import { Button } from '@/components/ui/button';
+import type { WidgetProposal } from './proposal';
+import WidgetView from './WidgetView.vue';
+
+interface PendingWidgetProps {
+  proposal: WidgetProposal;
+  height: number;
+  /** Whether it takes the place of a widget on the draft rather than adding one. */
+  replacing: boolean;
+  /** Whether the draft has room for it: a replacement always has. */
+  canAccept: boolean;
+  /** Goes up with every save of the dashboard, so the widget's data is read again, as a placed widget's is. */
+  refresh: number;
+}
+
+/**
+ * A widget the dashboards agent proposed, on the grid with its live data until the user decides. Accept puts it on the
+ * draft and Discard drops it; neither saves anything.
+ */
+const { proposal, height, replacing, canAccept, refresh } = defineProps<PendingWidgetProps>();
+const emit = defineEmits<{ accept: []; discard: [] }>();
+</script>
+
+<template>
+  <section
+    :aria-label="`Proposed: ${proposal.title}`"
+    class="flex h-full flex-col overflow-hidden rounded border border-dashed border-primary bg-card p-2"
+  >
+    <header class="flex flex-wrap items-center justify-between gap-2">
+      <h2 class="text-sm font-medium">Proposed: {{ proposal.title }}</h2>
+      <div class="flex gap-1">
+        <Button type="button" size="sm" :disabled="!canAccept" @click="emit('accept')">Accept</Button>
+        <Button type="button" variant="ghost" size="sm" @click="emit('discard')">Discard</Button>
+      </div>
+    </header>
+    <p v-if="replacing" class="text-xs text-muted-foreground">Replaces a widget on this dashboard.</p>
+    <div class="min-h-0 flex-1 overflow-auto">
+      <WidgetView
+        :source="proposal.source"
+        :visual="proposal.visual"
+        :title="proposal.title"
+        :height="height"
+        :refresh="refresh"
+      />
+    </div>
+  </section>
+</template>
+}%}
