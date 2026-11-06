@@ -228,9 +228,21 @@ public sealed class AgentFrameworkTests
     }
 
     [Fact]
-    public void No_profile_changes_because_none_calls_a_model()
+    public void A_profile_without_a_model_does_not_change_and_one_with_agents_gets_them()
     {
-        foreach (var profile in Repository.Catalog.Profiles.Keys)
+        var withoutAModel = Repository.ProfilesChoosing("backend.llm", "none");
+        var withAgents = Repository.ProfilesChoosing("backend.llm.agents", "agent-framework");
+        withoutAModel.ShouldNotBeEmpty();
+        withAgents.ShouldNotBeEmpty();
+
+        foreach (var profile in withAgents)
+        {
+            var files = Files(profile);
+            files.Keys.ShouldContain(path => path.Contains("Agent", StringComparison.Ordinal), profile);
+            files["fabric.yaml"].ShouldContain("  backend.llm.agents: agent-framework\n", customMessage: profile);
+        }
+
+        foreach (var profile in withoutAModel)
         {
             var files = Files(profile);
             files.Keys.ShouldNotContain(path => path.Contains("Agent", StringComparison.Ordinal), profile);

@@ -116,9 +116,22 @@ public sealed class GenerativeDashboardsTests
     }
 
     [Fact]
-    public void No_profile_changes_because_none_has_generative_dashboards()
+    public void A_profile_without_generative_dashboards_does_not_change_and_one_with_them_gets_them()
     {
-        foreach (var profile in Repository.Catalog.Profiles.Keys)
+        var without = Repository.ProfilesNotChoosing("frontend.dashboards", "generative");
+        var with = Repository.ProfilesChoosing("frontend.dashboards", "generative");
+        without.ShouldNotBeEmpty();
+        with.ShouldNotBeEmpty();
+
+        foreach (var profile in with)
+        {
+            var files = Files(profile);
+
+            files.Keys.ShouldContain(path => path.Contains("DashboardAgent", StringComparison.Ordinal), profile);
+            files["fabric.yaml"].ShouldContain("generative", customMessage: profile);
+        }
+
+        foreach (var profile in without)
         {
             var files = Files(profile);
 

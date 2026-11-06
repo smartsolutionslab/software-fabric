@@ -194,9 +194,22 @@ public sealed class EmbeddingsTests
     }
 
     [Fact]
-    public void No_profile_gets_an_embeddings_part()
+    public void A_profile_without_rag_gets_no_embeddings_part_and_one_with_rag_does()
     {
-        foreach (var profile in Repository.Catalog.Profiles.Keys)
+        var without = Repository.ProfilesNotChoosing("backend.llm.extras", "rag");
+        var with = Repository.ProfilesChoosing("backend.llm.extras", "rag");
+        without.ShouldNotBeEmpty();
+        with.ShouldNotBeEmpty();
+
+        foreach (var profile in with)
+        {
+            var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, []);
+
+            generated.Errors.ShouldBeEmpty(profile);
+            generated.Files.ShouldContain(file => file.Content.Contains("EmbeddingGenerator", StringComparison.Ordinal), profile);
+        }
+
+        foreach (var profile in without)
         {
             var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, []);
 

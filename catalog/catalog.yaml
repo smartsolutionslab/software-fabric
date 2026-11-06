@@ -44,6 +44,16 @@ profiles:
     extends: saas-standard-react
     module.ddd-depth: strict
 
+  # Owner decisions on #186: OpenAI, whose key the embeddings reuse (default-from), so the end-to-end run needs no
+  # second parameter; evals generated and their gate tested with a fake judge, never against the real model.
+  saas-ai-react:
+    extends: saas-standard-react
+    backend.llm: openai
+    backend.llm.agents: agent-framework
+    backend.llm.extras: [rag, evals]
+    frontend.agent-ui: ag-ui
+    frontend.dashboards: [user-editable, generative]
+
 dimensions:
 
   # ─────────────────────────── Backend · project ───────────────────────────

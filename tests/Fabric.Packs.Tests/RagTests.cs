@@ -97,10 +97,31 @@ public sealed class RagTests
     public void The_database_runs_the_pgvector_image_only_with_rag()
     {
         RagFiles("openai", "openai")["src/AppHost/AppHost.cs"].ShouldContain(
-            "var database = builder.AddPostgres(\"postgres\")\n    " + Image + "\n    .WithDataVolume()\n    .AddDatabase(\"database\");");
+            "var postgres = builder.AddPostgres(\"postgres\")\n    " + Image + ";\n");
 
         Files(Profile, "backend.llm=openai")["src/AppHost/AppHost.cs"].ShouldNotContain("pgvector");
         Files(Profile)["src/AppHost/AppHost.cs"].ShouldNotContain("pgvector");
+    }
+
+    /// <summary>
+    /// Aspire reads PostgreSQL's major version from the image tag to place the data volume: at /var/lib/postgresql from
+    /// 18 on, at /var/lib/postgresql/data before. pgvector's tag, 0.8.7-pg18, reads as no version, so WithDataVolume
+    /// mounts the old path, and the PostgreSQL 18 image refuses to start over a mount there ("in 18+, these Docker images
+    /// are configured to store database data in a format which is compatible with pg_ctlcluster"). Only `dotnet run`
+    /// meets it, the end-to-end tests included: the Aspire fixture removes every volume.
+    /// </summary>
+    [Fact]
+    public void The_pgvector_database_keeps_its_data_where_postgresql_18_does()
+    {
+        var appHost = RagFiles("openai", "openai")["src/AppHost/AppHost.cs"];
+
+        appHost.ShouldContain(
+            "var database = postgres\n    .WithVolume(VolumeNameGenerator.Generate(postgres, \"data\"), \"/var/lib/postgresql\")\n    .AddDatabase(\"database\");",
+            Case.Sensitive,
+            appHost);
+        appHost.ShouldNotContain(".WithDataVolume()\n    .AddDatabase(\"database\")", Case.Sensitive, appHost);
+        Files(Profile)["src/AppHost/AppHost.cs"].ShouldContain(
+            "var database = builder.AddPostgres(\"postgres\")\n    .WithDataVolume()\n    .AddDatabase(\"database\");");
     }
 
     [Fact]
@@ -213,9 +234,23 @@ public sealed class RagTests
     }
 
     [Fact]
-    public void No_profile_changes_because_none_calls_a_model()
+    public void A_profile_without_rag_does_not_change_and_one_with_it_gets_the_store()
     {
-        foreach (var profile in Repository.Catalog.Profiles.Keys)
+        var without = Repository.ProfilesNotChoosing("backend.llm.extras", "rag");
+        var with = Repository.ProfilesChoosing("backend.llm.extras", "rag");
+        without.ShouldNotBeEmpty();
+        with.ShouldNotBeEmpty();
+
+        foreach (var profile in with)
+        {
+            var files = Files(profile);
+
+            files["src/AppHost/AppHost.cs"].ShouldContain(Image, customMessage: profile);
+            files.Keys.ShouldContain($"{Store}/ModuleVectorIndex.cs", profile);
+            files.Keys.ShouldContain(path => path.StartsWith("tests/Rag.Tests/", StringComparison.Ordinal), profile);
+        }
+
+        foreach (var profile in without)
         {
             var files = Files(profile);
 

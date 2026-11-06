@@ -121,7 +121,10 @@ pgvector's CHANGELOG):
   to `postgres:18.3`, so pg18 keeps the major. The postgres pack's AppHost
   resource adds `.WithImage("pgvector/pgvector", "0.8.7-pg18")` only when
   `backend.llm.extras` has `rag` (ADR-0006); without it, its output is
-  unchanged.
+  unchanged. With it, the data volume is mounted at `/var/lib/postgresql`
+  explicitly (#186): Aspire places `WithDataVolume` by the major version it
+  reads from the image tag, `0.8.7-pg18` reads as none, and the PostgreSQL 18
+  image refuses to start over the older `/var/lib/postgresql/data` mount.
 - **Package:** `Pgvector` 0.3.2 (2025-05-20, MIT, by pgvector's author), the
   Npgsql type plugin; it depends on Npgsql >= 8.0.5, which the Npgsql 10 the
   base brings satisfies. The store is a small BuildingBlocks class over Npgsql.

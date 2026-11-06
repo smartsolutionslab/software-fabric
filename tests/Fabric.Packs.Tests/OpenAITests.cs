@@ -100,10 +100,24 @@ public sealed class OpenAITests
             openAITargets.ShouldNotContain(shared);
         }
 
-        foreach (var profile in Repository.Catalog.Profiles.Keys)
+        var withoutAModel = Repository.ProfilesChoosing("backend.llm", "none");
+        var withAModel = Repository.ProfilesNotChoosing("backend.llm", "none");
+        withoutAModel.ShouldNotBeEmpty();
+        withAModel.ShouldNotBeEmpty();
+        foreach (var profile in withoutAModel)
         {
             var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, []);
             generated.Files.Select(file => file.Path).ShouldNotContain(path => SharedModelFiles.Contains(path), profile);
+        }
+
+        foreach (var profile in withAModel)
+        {
+            var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, []);
+            var paths = generated.Files.Select(file => file.Path).ToList();
+            foreach (var shared in SharedModelFiles)
+            {
+                paths.ShouldContain(shared, profile);
+            }
         }
     }
 
