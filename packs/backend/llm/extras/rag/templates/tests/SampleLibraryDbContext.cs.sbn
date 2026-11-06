@@ -1,0 +1,11 @@
+using {{ namespace }}.BuildingBlocks.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace {{ namespace }}.Rag.Tests;
+
+/// <summary>Stands in for a module's DbContext: only its schema is used, to keep the test of a search the index answers short apart. It is never created.</summary>
+public sealed class SampleLibraryDbContext(DbContextOptions<SampleLibraryDbContext> options, IServiceProvider services)
+    : ModuleDbContext(options, services, Schema)
+{
+    public const string Schema = "rag_tests_library";
+}

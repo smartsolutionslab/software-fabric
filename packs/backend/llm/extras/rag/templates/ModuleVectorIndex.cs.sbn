@@ -130,29 +130,40 @@ public sealed class ModuleVectorIndex<TContext>(
                 passages.Add(new RetrievedPassage(reader.GetString(0), reader.GetString(1), reader.GetDouble(2)));
             }
         }
-{{~ if column ~}}
 
+{{~ if column ~}}
         // The HNSW index holds every tenant's vectors and its scan stops after hnsw.max_scan_tuples, so where other
         // tenants' records lie nearer it can come back short. Then the tenant's records are ranked exactly, read through
         // the key's index (tenant_id leads it); the materialized set keeps the HNSW index out of that ranking.
+{{~ else ~}}
+        // The HNSW index is approximate: its scan stops after hnsw.max_scan_tuples, and a record no other links to in its
+        // graph (as with records at equal distances from one another) is found at no breadth, so it can come back short.
+        // Then every record is ranked exactly; the materialized set keeps the HNSW index out of that ranking.
+{{~ end ~}}
         if (passages.Count < count)
         {
             passages.Clear();
             await using var exact = new NpgsqlCommand(
+{{~ if column ~}}
                 $"WITH tenant AS MATERIALIZED (SELECT key, content, embedding FROM {Table} WHERE tenant_id = $3) " +
                 "SELECT key, content, embedding <=> $1 FROM tenant ORDER BY embedding <=> $1, key LIMIT $2",
+{{~ else ~}}
+                $"WITH records AS MATERIALIZED (SELECT key, content, embedding FROM {Table}) " +
+                "SELECT key, content, embedding <=> $1 FROM records ORDER BY embedding <=> $1, key LIMIT $2",
+{{~ end ~}}
                 connection,
                 transaction);
             exact.Parameters.Add(new NpgsqlParameter { Value = embedding });
             exact.Parameters.Add(new NpgsqlParameter { Value = count });
+{{~ if column ~}}
             exact.Parameters.Add(new NpgsqlParameter { Value = tenant });
+{{~ end ~}}
             await using var reader = await exact.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
                 passages.Add(new RetrievedPassage(reader.GetString(0), reader.GetString(1), reader.GetDouble(2)));
             }
         }
-{{~ end ~}}
 
         await transaction.CommitAsync(cancellationToken);
         return passages;

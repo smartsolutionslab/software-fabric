@@ -180,6 +180,22 @@ public sealed class RagTests
         files[$"{Store}/Wiring/VectorIndexRegistration.cs"].ShouldContain(".AddSingleton(typeof(ModuleVectorIndex<>))");
     }
 
+    [Fact]
+    public void Rag_without_tenancy_ranks_every_record_exactly_when_the_index_answers_short()
+    {
+        var files = RagFiles("openai", "openai");
+
+        var store = files[$"{Store}/ModuleVectorIndex.cs"];
+        store.ShouldContain("if (passages.Count < count)");
+        store.ShouldContain("$\"WITH records AS MATERIALIZED (SELECT key, content, embedding FROM {Table}) \" +");
+        store.ShouldContain("\"SELECT key, content, embedding <=> $1 FROM records ORDER BY embedding <=> $1, key LIMIT $2\"");
+        var adr = files.Single(file => file.Key.EndsWith("-backend-llm-extras-rag.md", StringComparison.Ordinal)).Value;
+        adr.ShouldNotContain("does not come back short");
+        adr.ShouldContain("ranks every record of the module exactly");
+        files["AGENTS.md"].ShouldContain("A search returns as many records as asked whenever the module has that many");
+        files.Keys.ShouldContain("tests/Rag.Tests/SampleLibraryDbContext.cs");
+    }
+
     [Theory]
     [InlineData("schema-per-tenant")]
     [InlineData("database-per-tenant")]
@@ -221,7 +237,7 @@ public sealed class RagTests
         var (ragExitCode, ragOutput) = project.Test("tests/Rag.Tests/Rag.Tests.csproj");
         ragExitCode.ShouldBe(0, ragOutput);
         ragOutput.ShouldContain("failed: 0");
-        ragOutput.ShouldContain("succeeded: 5");
+        ragOutput.ShouldContain("succeeded: 6");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
