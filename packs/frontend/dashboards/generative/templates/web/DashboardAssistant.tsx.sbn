@@ -1,0 +1,171 @@
+import { contentToText, type Message } from '@ag-ui/client';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect, useId, useMemo, useRef } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { useAgent } from '@/agents/useAgent';
+import { Button } from '@/components/ui/button';
+import type { Placement } from './layout';
+import { draftState, type PendingProposal, readProposal } from './proposal';
+
+const questionSchema = z.object({ question: z.string().trim().min(1, 'Ask for a widget first.') });
+
+type QuestionForm = z.infer<typeof questionSchema>;
+
+interface DashboardAssistantProps {
+  /** The open draft's widgets, which every run sends the agent as context. */
+  widgets: readonly Placement[];
+  /** Called once for each widget the agent proposes, which the canvas shows pending until the user decides. */
+  onProposal: (pending: PendingProposal) => void;
+}
+
+/**
+ * A conversation with the dashboards agent (POST /api/agents/dashboards) about the open dashboard: the user asks for a
+ * widget, and each widget it proposes goes to the canvas, which shows it pending. The agent saves nothing.
+ */
+export function DashboardAssistant({ widgets, onProposal }: DashboardAssistantProps) {
+  const { messages, running, failure, send } = useAgent('dashboards', () => draftState(widgets));
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<QuestionForm>({ resolver: zodResolver(questionSchema), defaultValues: { question: '' } });
+  const field = useId();
+
+  const results = useMemo(
+    () =>
+      new Map(
+        messages.flatMap((message) =>
+          message.role === 'tool' ? [[message.toolCallId, contentToText(message.content)] as const] : [],
+        ),
+      ),
+    [messages],
+  );
+  const latest = useMemo(() => latestProposal(messages, results), [messages, results]);
+
+  // Each proposal goes to the canvas once: a discarded one does not come back when the conversation goes on.
+  const reported = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (latest && latest.call !== reported.current) {
+      reported.current = latest.call;
+      onProposal(latest);
+    }
+  }, [latest, onProposal]);
+
+  const onSubmit = handleSubmit(async ({ question }) => {
+    reset();
+    await send(question);
+  });
+
+  return (
+    <section aria-label="Dashboard assistant" className="flex flex-col gap-2 rounded border p-2">
+      <h2 className="text-sm font-medium">Assistant</h2>
+      <ol aria-label="Conversation" className="flex flex-col gap-2 text-sm">
+        {messages.flatMap((message) => entries(message, results))}
+      </ol>
+      <p aria-live="polite" className="text-sm text-muted-foreground">
+        {running ? 'Answering…' : ''}
+      </p>
+      {failure && (
+        <p role="alert" className="text-sm text-destructive">
+          The assistant could not answer: {failure}
+        </p>
+      )}
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-2">
+        <label htmlFor={field} className="text-sm font-medium">
+          Ask the assistant
+        </label>
+        <textarea
+          id={field}
+          rows={2}
+          aria-invalid={errors.question ? true : undefined}
+          aria-describedby={errors.question ? `${field}-error` : undefined}
+          className="flex field-sizing-content min-h-12 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+          {...register('question')}
+        />
+        {errors.question && (
+          <p id={`${field}-error`} role="alert" className="text-sm text-destructive">
+            {errors.question.message}
+          </p>
+        )}
+        <Button type="submit" variant="secondary" disabled={running} className="self-end">
+          Ask
+        </Button>
+      </form>
+    </section>
+  );
+}
+
+/** The newest widget the agent proposed, by its call; a refused call proposes nothing. */
+function latestProposal(
+  messages: readonly Message[],
+  results: ReadonlyMap<string, string>,
+): PendingProposal | undefined {
+  let latest: PendingProposal | undefined;
+  for (const message of messages) {
+    if (message.role !== 'assistant') {
+      continue;
+    }
+
+    for (const call of message.toolCalls ?? []) {
+      const result = results.get(call.id);
+      const proposal =
+        call.function.name === 'propose_widget' && result !== undefined ? readProposal(result) : undefined;
+      if (proposal) {
+        latest = { call: call.id, proposal };
+      }
+    }
+  }
+
+  return latest;
+}
+
+/** What the conversation shows of one message, as text: the user's, the agent's, and what each of its tools did. */
+function entries(message: Message, results: ReadonlyMap<string, string>) {
+  if (message.role === 'user') {
+    return [
+      <li key={message.id} className="self-end rounded-md bg-primary px-3 py-2 text-primary-foreground">
+        <p className="text-xs font-medium">You</p>
+        <p className="whitespace-pre-wrap">{contentToText(message.content)}</p>
+      </li>,
+    ];
+  }
+
+  if (message.role !== 'assistant') {
+    return [];
+  }
+
+  const text = contentToText(message.content);
+  return [
+    ...(text
+      ? [
+          <li key={message.id} className="rounded-md bg-muted px-3 py-2">
+            <p className="text-xs font-medium text-muted-foreground">Assistant</p>
+            <p className="whitespace-pre-wrap">{text}</p>
+          </li>,
+        ]
+      : []),
+    ...(message.toolCalls ?? []).map((call) => (
+      <li key={call.id} className="rounded-md border px-3 py-2">
+        {outcome(call.function.name, results.get(call.id))}
+      </li>
+    )),
+  ];
+}
+
+/** A proposal by its declared title, a refusal by the host's reason, and any other tool by its name. */
+function outcome(tool: string, result: string | undefined) {
+  if (tool !== 'propose_widget') {
+    return result === undefined ? `Running ${tool}…` : `Ran ${tool}.`;
+  }
+
+  if (result === undefined) {
+    return 'Proposing a widget…';
+  }
+
+  const proposal = readProposal(result);
+  return proposal
+    ? `Proposed: ${proposal.title} as ${proposal.visual}.`
+    : `Refused: ${result.replace(/^Failed: /, '')}`;
+}

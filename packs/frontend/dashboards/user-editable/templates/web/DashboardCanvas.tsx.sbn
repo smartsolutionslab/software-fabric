@@ -1,3 +1,4 @@
+{{~ generative = array.contains project["frontend.dashboards"] "generative" ~}}
 {%{import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState } from 'react';
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
@@ -9,7 +10,12 @@ import { Failure } from './Failure';
 import { applyLayout, columns, hasRoom, lowest, nextPlacement, type Placement, toLayout, withinReach } from './layout';
 import { Pager } from './Pager';
 import { PlacedWidget } from './PlacedWidget';
-import { uuidV7 } from './uuidV7';
+}%}{{~ if generative ~}}
+import { DashboardAssistant } from './DashboardAssistant';
+import { PendingWidget } from './PendingWidget';
+import { acceptProposal, type PendingProposal, pendingItem, replacedBy } from './proposal';
+{{~ end ~}}
+{%{import { uuidV7 } from './uuidV7';
 import { checkChoice, visuals } from './widgetChoice';
 
 const rowHeight = 40;
@@ -67,7 +73,13 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   const [tooLow, setTooLow] = useState(false);
   const full = placements.length >= maximumWidgets;
   const roomLeft = hasRoom(placements);
-
+}%}{{~ if generative ~}}
+  // A widget the dashboards agent proposed: on the grid, outside the draft, until the user accepts or discards it.
+  const [pending, setPending] = useState<PendingProposal>();
+  const pendingAt = pending ? pendingItem(placements, pending) : undefined;
+  const replacing = pending ? replacedBy(placements, pending.proposal) !== undefined : false;
+{{~ end ~}}
+{%{
   const edited = () => {
     setRevision((current) => current + 1);
     setFailed(false);
@@ -78,7 +90,20 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
     setPlacements(next);
     edited();
   };
+}%}{{~ if generative ~}}
 
+  /** Accept only changes the draft, adding the widget or replacing the one it names; Save persists it as any edit. */
+  const acceptPending = () => {
+    if (!pending) {
+      return;
+    }
+
+    const key = uuidV7();
+    change((current) => acceptProposal(current, pending.proposal, key));
+    setPending(undefined);
+  };
+{{~ end ~}}
+{%{
   const naming = useForm({ resolver: zodResolver(nameSchema), defaultValues: { name: dashboard.name } });
   const adding = useForm({ resolver: zodResolver(widgetSchema), defaultValues: { source: '', visual: '' } });
   const chosen = listed.get(useWatch({ control: adding.control, name: 'source' }));
@@ -180,12 +205,19 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
         />
       )}
 
-      {tooLow && <p role="alert">A widget cannot start below row {lowest}; it went back where it was.</p>}
+}%}{{~ if generative ~}}
+      <DashboardAssistant widgets={placements} onProposal={setPending} />
+{{~ end ~}}
+{%{      {tooLow && <p role="alert">A widget cannot start below row {lowest}; it went back where it was.</p>}
       <div ref={containerRef}>
         <ReactGridLayout
           width={width}
+}%}{{~ if generative ~}}
+          layout={pendingAt ? [...toLayout(placements), pendingAt] : toLayout(placements)}
+{{~ else ~}}
           layout={toLayout(placements)}
-          gridConfig={{ cols: columns, rowHeight }}
+{{~ end ~}}
+{%{          gridConfig={{ cols: columns, rowHeight }}
           dragConfig={{ cancel: 'button, select, input, table' }}
           onLayoutChange={(layout) => {
             const moved = applyLayout(placements, layout);
@@ -214,7 +246,22 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
               />
             </div>
           ))}
-        </ReactGridLayout>
+}%}{{~ if generative ~}}
+          {pending && pendingAt && (
+            <div key={pendingAt.i}>
+              <PendingWidget
+                proposal={pending.proposal}
+                rows={pendingAt.h}
+                rowHeight={rowHeight}
+                replacing={replacing}
+                canAccept={replacing || (!full && roomLeft)}
+                onAccept={acceptPending}
+                onDiscard={() => setPending(undefined)}
+              />
+            </div>
+          )}
+{{~ end ~}}
+{%{        </ReactGridLayout>
       </div>
     </section>
   );

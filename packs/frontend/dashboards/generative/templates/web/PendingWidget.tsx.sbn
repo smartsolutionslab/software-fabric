@@ -1,0 +1,61 @@
+import { Button } from '@/components/ui/button';
+import type { WidgetProposal } from './proposal';
+import { WidgetView } from './WidgetView';
+
+interface PendingWidgetProps {
+  proposal: WidgetProposal;
+  /** How many grid rows it spans, and how high one is. */
+  rows: number;
+  rowHeight: number;
+  /** Whether it takes the place of a widget on the draft rather than adding one. */
+  replacing: boolean;
+  /** Whether the draft has room for it: a replacement always has. */
+  canAccept: boolean;
+  onAccept: () => void;
+  onDiscard: () => void;
+}
+
+/**
+ * A widget the dashboards agent proposed, on the grid with its live data until the user decides. Accept puts it on the
+ * draft and Discard drops it; neither saves anything.
+ */
+export function PendingWidget({
+  proposal,
+  rows,
+  rowHeight,
+  replacing,
+  canAccept,
+  onAccept,
+  onDiscard,
+}: PendingWidgetProps) {
+  const { source, title, visual } = proposal;
+
+  return (
+    <section
+      aria-label={`Proposed: ${title}`}
+      className="flex h-full flex-col overflow-hidden rounded border border-dashed border-primary bg-card p-2"
+    >
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-medium">Proposed: {title}</h2>
+        <div className="flex gap-1">
+          <Button type="button" size="sm" disabled={!canAccept} onClick={onAccept}>
+            Accept
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={onDiscard}>
+            Discard
+          </Button>
+        </div>
+      </header>
+      {replacing && <p className="text-xs text-muted-foreground">Replaces a widget on this dashboard.</p>}
+      <div className="min-h-0 flex-1 overflow-auto">
+        <WidgetView
+          source={source}
+          visual={visual}
+          title={title}
+          height={Math.max(120, rows * rowHeight - 60)}
+          refresh={0}
+        />
+      </div>
+    </section>
+  );
+}

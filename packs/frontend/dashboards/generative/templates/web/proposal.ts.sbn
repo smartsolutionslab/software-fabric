@@ -1,0 +1,64 @@
+import { z } from 'zod';
+import { nextPlacement, type Placement } from './layout';
+
+/** What propose_widget answers: a declared widget the user may see, as a visual its kind can show, under its title. */
+const proposalSchema = z.object({
+  source: z.string(),
+  title: z.string(),
+  visual: z.string(),
+  /** The key of the draft's widget it takes the place of, or null for a new widget. */
+  replaces: z.string().nullable(),
+});
+
+export type WidgetProposal = z.infer<typeof proposalSchema>;
+
+/** A proposal the user has neither accepted nor discarded yet, by the tool call that made it. */
+export interface PendingProposal {
+  call: string;
+  proposal: WidgetProposal;
+}
+
+/**
+ * The proposal a propose_widget result holds, or none. The result is the model's turn and the host's answer, so it is
+ * read as untrusted input: a refusal is text, and anything not shaped like a proposal is none.
+ */
+export function readProposal(content: string): WidgetProposal | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(content);
+  } catch {
+    return undefined;
+  }
+
+  const read = proposalSchema.safeParse(value);
+  return read.success ? read.data : undefined;
+}
+
+/** The draft's widget the proposal replaces, if the draft still has it. */
+export const replacedBy = (placements: readonly Placement[], proposal: WidgetProposal): Placement | undefined =>
+  proposal.replaces === null ? undefined : placements.find((placement) => placement.key === proposal.replaces);
+
+/**
+ * The draft with the proposal accepted: in the place of the widget it replaces, or below everything as a new widget,
+ * as one added from the picker. Nothing is saved; Save does that.
+ */
+export function acceptProposal(placements: readonly Placement[], proposal: WidgetProposal, key: string): Placement[] {
+  const { source, visual } = proposal;
+  const replaced = replacedBy(placements, proposal);
+  if (replaced) {
+    return placements.map((placement) => (placement === replaced ? { ...placement, key, source, visual } : placement));
+  }
+
+  return [...placements, nextPlacement(placements, key, source, visual)];
+}
+
+/** Where the pending proposal shows on the grid: where it would go as a new widget, fixed there until it is decided. */
+export function pendingItem(placements: readonly Placement[], { call, proposal }: PendingProposal) {
+  const { x, y, width, height } = nextPlacement(placements, call, proposal.source, proposal.visual);
+  return { i: `proposed-${call}`, x, y, w: width, h: height, static: true };
+}
+
+/** The run's AG-UI state: the open draft's widgets by key, source and visual, which the agent reads as context. */
+export const draftState = (placements: readonly Placement[]) => ({
+  widgets: placements.map(({ key, source, visual }) => ({ key, source, visual })),
+});
