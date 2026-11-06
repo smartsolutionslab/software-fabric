@@ -1,0 +1,58 @@
+import { useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+
+interface PagerProps {
+  /** What is paged, for the buttons' names: "Next page of {label}". */
+  label: string;
+  page: number;
+  pageSize: number;
+  /** Undefined while the total is not known yet, as while a page loads: a missing total is not one page. */
+  total: number | string | undefined;
+  onPage: (page: number) => void;
+}
+
+/**
+ * Previous and next page of a paged list; nothing while everything fits on one page or the total is not known yet.
+ * A known total that shrinks below the current page moves to the last page, which would otherwise be empty and
+ * unreachable.
+ */
+export function Pager({ label, page, pageSize, total, onPage }: PagerProps) {
+  const pages = total === undefined ? undefined : Math.max(1, Math.ceil(Number(total) / pageSize));
+  useEffect(() => {
+    if (pages !== undefined && page > pages) {
+      onPage(pages);
+    }
+  }, [page, pages, onPage]);
+
+  if (pages === undefined || pages <= 1) {
+    return null;
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label={`Previous page of ${label}`}
+        disabled={page <= 1}
+        onClick={() => onPage(page - 1)}
+      >
+        Previous
+      </Button>
+      <span>
+        Page {page} of {pages}
+      </span>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label={`Next page of ${label}`}
+        disabled={page >= pages}
+        onClick={() => onPage(page + 1)}
+      >
+        Next
+      </Button>
+    </div>
+  );
+}

@@ -1,0 +1,79 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useGetDashboardsWidgetsByIdQuery, type WidgetTable } from '@/api/generated';
+import { Chart } from '@/components/chart';
+import { DataTable } from '@/components/ui/data-table';
+import { columnsOf } from '@/components/ui/data-table-columns';
+import { chartOption, type ChartVisual } from './chartOption';
+import { Pager } from './Pager';
+
+type Row = Record<string, unknown>;
+
+const rows = columnsOf<Row>();
+const none: Row[] = [];
+
+/** How many rows a table widget shows at once; a chart's query takes no page and ignores it. */
+const pageSize = 20;
+
+interface WidgetViewProps {
+  source: string;
+  visual: string;
+  title: string;
+  height: number;
+  /** Goes up with every save of the dashboard: the widget's data may be what was just saved, so it is read again. */
+  refresh: number;
+}
+
+/** A widget's data from GET /dashboards/widgets/{id}, run as the signed-in user, drawn as a chart or a table. */
+export function WidgetView({ source, visual, title, height, refresh }: WidgetViewProps) {
+  const [page, setPage] = useState(1);
+  const { data, isError, refetch } = useGetDashboardsWidgetsByIdQuery({ id: source, page, pageSize });
+  useEffect(() => {
+    if (refresh > 0) {
+      void refetch();
+    }
+  }, [refresh, refetch]);
+  const option = useMemo(
+    () => (data?.chart && visual !== 'table' ? chartOption(data.chart, visual as ChartVisual) : undefined),
+    [data, visual],
+  );
+
+  if (isError) {
+    return <p role="alert">This widget could not be loaded.</p>;
+  }
+
+  if (data?.table) {
+    return (
+      <>
+        <WidgetRows table={data.table} />
+        <Pager label={title} page={page} pageSize={pageSize} total={data.table.totalCount} onPage={setPage} />
+      </>
+    );
+  }
+
+  if (option) {
+    return <Chart option={option} label={title} height={height} />;
+  }
+
+  return <p>Loading…</p>;
+}
+
+function WidgetRows({ table }: { table: WidgetTable }) {
+  const columns = useMemo(
+    () =>
+      rows.columns(
+        table.columns.map((column) => rows.accessor((row) => display(row[column]), { id: column, header: column })),
+      ),
+    [table.columns],
+  );
+  const data = useMemo<Row[]>(() => (Array.isArray(table.rows) ? (table.rows as Row[]) : none), [table.rows]);
+
+  return <DataTable columns={columns} data={data} />;
+}
+
+function display(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return typeof value === 'object' ? JSON.stringify(value) : String(value);
+}

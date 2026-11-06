@@ -1,0 +1,6 @@
+{{~ # The framework's grid library; the page that uses it is built for a React SPA on RTK Query so far (docs/adr). ~}}
+{{~ if project["frontend.framework"] == "vue" ~}}
+    "grid-layout-plus": "1.1.1"
+{{- else ~}}
+    "react-grid-layout": "2.3.0"
+{{- end }}
