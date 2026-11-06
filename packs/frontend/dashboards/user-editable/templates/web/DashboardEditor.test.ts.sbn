@@ -1,0 +1,492 @@
+{{~ axe = array.contains(project["frontend.test.extras"], "accessibility") ~}}
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
+import userEvent from '@testing-library/user-event';
+import { render, screen, waitFor, within } from '@testing-library/vue';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+{{~ if axe ~}}
+import { axe } from 'vitest-axe';
+{{~ end ~}}
+import type {
+  DashboardDto,
+  PagedResultOfDashboardSummaryDto,
+  PagedResultOfWidgetDescriptionDto,
+  SaveDashboardRequest,
+  WidgetData,
+} from '@/api/generated';
+import DashboardEditor from './DashboardEditor.vue';
+
+// ECharts draws on a canvas jsdom does not have; the chart's accessible name is what the editor decides.
+vi.mock('@/components/DataChart.vue', async () => {
+  const { defineComponent, h } = await import('vue');
+  return {
+    default: defineComponent({
+      props: { option: { type: Object, required: true }, label: { type: String, required: true }, height: Number },
+      setup: (props) => () => h('div', { role: 'img', 'aria-label': props.label }),
+    }),
+  };
+});
+
+const sales: DashboardDto = {
+  id: '01960000-0000-7000-8000-000000000001',
+  name: 'Sales',
+  widgets: [{ key: 'counts', source: 'dashboards.widget-counts', visual: 'bar', x: 0, y: 0, width: 6, height: 4 }],
+};
+const list: PagedResultOfDashboardSummaryDto = {
+  items: [{ id: sales.id, name: sales.name, widgetCount: 1 }],
+  totalCount: 1,
+  page: 1,
+  pageSize: 100,
+};
+const catalog: PagedResultOfWidgetDescriptionDto = {
+  items: [
+    { id: 'dashboards.my-dashboards', title: 'My dashboards', kind: 'Table' },
+    { id: 'dashboards.widget-counts', title: 'Widgets per dashboard', kind: 'Chart' },
+  ],
+  totalCount: 2,
+  page: 1,
+  pageSize: 100,
+};
+const chart: WidgetData = {
+  kind: 'Chart',
+  chart: { categories: ['Sales'], series: [{ name: 'Widgets', values: [1] }] },
+  table: null,
+};
+const table: WidgetData = {
+  kind: 'Table',
+  chart: null,
+  table: {
+    columns: ['id', 'name', 'widgetCount'],
+    rows: [{ id: sales.id, name: 'Sales', widgetCount: 1 }],
+    totalCount: 1,
+    page: 1,
+    pageSize: 20,
+  },
+};
+
+/** What the host answers: a body, a failure, or either later. */
+type Answer<T> = T | 'failure' | Promise<T | 'failure'>;
+
+interface Answers {
+  list: (page: number) => Answer<PagedResultOfDashboardSummaryDto>;
+  detail: (id: string) => Answer<DashboardDto>;
+  catalog: (page: number) => Answer<PagedResultOfWidgetDescriptionDto>;
+  widget: (id: string, page: number, pageSize: number) => Answer<WidgetData>;
+  save: (id: string, request: SaveDashboardRequest) => Answer<string>;
+}
+
+/** What the host answers in a test; reset before every test, changed by the tests that need more. */
+const answers: Answers = {
+  list: () => list,
+  detail: () => sales,
+  catalog: () => catalog,
+  widget: (id) => (id === 'dashboards.my-dashboards' ? table : chart),
+  save: (id) => id,
+};
+const defaults = { ...answers };
+
+/** A promise the test settles when it chooses, as a host that has not answered yet. */
+function later<T>() {
+  let settle: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((resolve) => (settle = resolve));
+  return { promise, settle };
+}
+
+async function respond<T>(answer: Answer<T>): Promise<Response> {
+  const settled = await answer;
+  return settled === 'failure'
+    ? new Response('{"code":"failure"}', { status: 500 })
+    : new Response(JSON.stringify(settled), { headers: { 'Content-Type': 'application/json' } });
+}
+
+// The host, as the generated client reaches it through apiFetch: the editor runs on the real client and query cache.
+const fetchMock = vi.fn<typeof fetch>((input, init) => {
+  const url = new URL(String(input), 'http://localhost');
+  const path = url.pathname.replace(/^\/api/, '');
+  const page = Number(url.searchParams.get('page'));
+  const pageSize = Number(url.searchParams.get('pageSize'));
+  if (init?.method === 'PUT') {
+    return respond(
+      answers.save(path.slice('/dashboards/'.length), JSON.parse(String(init.body)) as SaveDashboardRequest),
+    );
+  }
+
+  if (path === '/dashboards') {
+    return respond(answers.list(page));
+  }
+
+  if (path === '/dashboards/widgets') {
+    return respond(answers.catalog(page));
+  }
+
+  if (path.startsWith('/dashboards/widgets/')) {
+    return respond(answers.widget(decodeURIComponent(path.slice('/dashboards/widgets/'.length)), page, pageSize));
+  }
+
+  return respond(answers.detail(path.slice('/dashboards/'.length)));
+});
+
+/** The paths of the GET requests made so far, without the query string. */
+const reads = () =>
+  fetchMock.mock.calls
+    .filter(([, init]) => init?.method !== 'PUT')
+    .map(([input]) => new URL(String(input), 'http://localhost').pathname.replace(/^\/api/, ''));
+
+/** The bodies of the PUT requests made so far. */
+const saves = () =>
+  fetchMock.mock.calls
+    .filter(([, init]) => init?.method === 'PUT')
+    .map(([input, init]) => ({
+      path: new URL(String(input), 'http://localhost').pathname.replace(/^\/api/, ''),
+      request: JSON.parse(String(init?.body)) as SaveDashboardRequest,
+    }));
+
+function renderEditor() {
+  // A failed read fails at once: the query client's retries would only slow the test down.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(DashboardEditor, { global: { plugins: [[VueQueryPlugin, { queryClient }]] } });
+}
+
+beforeEach(() => {
+  Object.assign(answers, defaults);
+  vi.stubGlobal('fetch', fetchMock);
+});
+
+afterEach(() => {
+  fetchMock.mockClear();
+  vi.unstubAllGlobals();
+});
+
+test('a user opens a dashboard, adds a widget, removes one, renames it and saves', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+  expect(await screen.findByRole('img', { name: 'Widgets per dashboard' })).toBeInTheDocument();
+
+  await user.selectOptions(await screen.findByRole('combobox', { name: 'Widget' }), 'dashboards.my-dashboards');
+  await user.selectOptions(screen.getByLabelText('Shown as'), 'table');
+  await user.click(screen.getByRole('button', { name: 'Add widget' }));
+  const added = await screen.findByRole('region', { name: 'My dashboards' });
+  expect(await within(added).findByRole('cell', { name: 'Sales' })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Remove Widgets per dashboard' }));
+  expect(screen.queryByRole('img', { name: 'Widgets per dashboard' })).not.toBeInTheDocument();
+
+  await user.clear(screen.getByLabelText('Dashboard name'));
+  await user.type(screen.getByLabelText('Dashboard name'), 'Sales overview');
+  const listed = reads().filter((path) => path === '/dashboards').length;
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() => expect(saves()).toHaveLength(1));
+  expect(saves()[0]).toEqual({
+    path: `/dashboards/${sales.id}`,
+    request: {
+      name: 'Sales overview',
+      widgets: [
+        expect.objectContaining({ source: 'dashboards.my-dashboards', visual: 'table', x: 0, width: 6, height: 4 }),
+      ],
+    },
+  });
+  expect(await screen.findByRole('status')).toHaveTextContent('Saved.');
+  await waitFor(() => expect(reads().filter((path) => path === '/dashboards').length).toBeGreaterThan(listed));
+});
+
+test('a new dashboard gets a fresh time-ordered id and needs a name before it is saved', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  await user.click(await screen.findByRole('button', { name: 'Save dashboard' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('A dashboard needs a name of 1 to 100 characters.');
+  expect(saves()).toHaveLength(0);
+
+  await user.type(screen.getByLabelText('Dashboard name'), 'Fresh');
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() => expect(saves()).toHaveLength(1));
+  const id = saves()[0]?.path.slice('/dashboards/'.length);
+  expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  expect(id).not.toBe(sales.id);
+});
+
+{{~ if axe ~}}
+test('the editor with a dashboard open has no accessibility violations axe can find', async () => {
+  const user = userEvent.setup();
+  const { container } = renderEditor();
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+  await screen.findByRole('img', { name: 'Widgets per dashboard' });
+
+  expect(await axe(container)).toHaveNoViolations();
+});
+
+{{~ end ~}}
+test('reopening a dashboard waits for its saved state instead of editing the copy it had before', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+  expect(await screen.findByLabelText('Dashboard name')).toHaveValue('Sales');
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  answers.detail = () => later<DashboardDto>().promise;
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  expect(await screen.findByText('Loading the dashboard…')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Dashboard name')).not.toBeInTheDocument();
+});
+
+test('a failed read says so and offers to try again, instead of looking empty', async () => {
+  const user = userEvent.setup();
+  answers.list = () => 'failure';
+  answers.catalog = () => 'failure';
+  answers.detail = () => 'failure';
+  renderEditor();
+
+  expect(await screen.findByText('Your dashboards could not be loaded.')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  expect(await screen.findByText('The widgets could not be loaded.')).toBeInTheDocument();
+  const listed = reads().filter((path) => path === '/dashboards').length;
+  await user.click(screen.getByRole('button', { name: 'Try loading your dashboards again' }));
+  await waitFor(() => expect(reads().filter((path) => path === '/dashboards').length).toBeGreaterThan(listed));
+});
+
+test('a failed read of the opened dashboard says so', async () => {
+  const user = userEvent.setup();
+  answers.detail = () => 'failure';
+  renderEditor();
+
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+
+  expect(await screen.findByText('This dashboard could not be loaded.')).toBeInTheDocument();
+});
+
+test('more dashboards and widgets than one page holds are reached page by page', async () => {
+  const user = userEvent.setup();
+  answers.list = (page) => ({
+    items: [{ id: `id-${page}`, name: `Dashboard ${page}`, widgetCount: 0 }],
+    totalCount: 101,
+    page,
+    pageSize: 100,
+  });
+  answers.catalog = (page) => ({
+    items: [{ id: `module.widget-${page}`, title: `Widget ${page}`, kind: 'Chart' }],
+    totalCount: 101,
+    page,
+    pageSize: 100,
+  });
+  renderEditor();
+
+  await user.click(await screen.findByRole('button', { name: 'Next page of your dashboards' }));
+  expect(await screen.findByRole('button', { name: 'Dashboard 2' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Dashboard 1' })).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  await user.click(await screen.findByRole('button', { name: 'Next page of widgets' }));
+  expect(await screen.findByRole('option', { name: 'Widget 2' })).toBeInTheDocument();
+});
+
+test('a table widget pages through its rows', async () => {
+  const user = userEvent.setup();
+  answers.widget = (_, page) => ({
+    kind: 'Table',
+    chart: null,
+    table: { columns: ['name'], rows: [{ name: `Row ${page}` }], totalCount: 21, page, pageSize: 20 },
+  });
+  renderEditor();
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+  const widget = await screen.findByRole('region', { name: 'Widgets per dashboard' });
+  expect(await within(widget).findByRole('cell', { name: 'Row 1' })).toBeInTheDocument();
+
+  await user.click(within(widget).getByRole('button', { name: 'Next page of Widgets per dashboard' }));
+
+  expect(await within(widget).findByRole('cell', { name: 'Row 2' })).toBeInTheDocument();
+});
+
+test('a table widget whose rows shrink to fewer pages goes back to its last page instead of an empty one', async () => {
+  const user = userEvent.setup();
+  let totalCount = 21;
+  answers.widget = (_, page, pageSize) => ({
+    kind: 'Table',
+    chart: null,
+    table: {
+      columns: ['name'],
+      rows: page <= Math.ceil(totalCount / pageSize) ? [{ name: `Row ${page}` }] : [],
+      totalCount,
+      page,
+      pageSize,
+    },
+  });
+  renderEditor();
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+  const widget = await screen.findByRole('region', { name: 'Widgets per dashboard' });
+  await user.click(await within(widget).findByRole('button', { name: 'Next page of Widgets per dashboard' }));
+  expect(await within(widget).findByRole('cell', { name: 'Row 2' })).toBeInTheDocument();
+
+  totalCount = 20;
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  expect(await within(widget).findByRole('cell', { name: 'Row 1' })).toBeInTheDocument();
+});
+
+test('any change after saving takes the saved notice away', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+  await user.click(await screen.findByRole('button', { name: 'Save dashboard' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('Saved.');
+
+  await user.click(screen.getByRole('button', { name: 'Remove Widgets per dashboard' }));
+  await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('Saved.');
+  await user.type(screen.getByLabelText('Dashboard name'), ' 2');
+  await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+});
+
+test('a failed refresh of a dashboard opened before does not open the copy it had', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+  expect(await screen.findByLabelText('Dashboard name')).toHaveValue('Sales');
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  answers.detail = () => 'failure';
+
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  expect(await screen.findByText('This dashboard could not be loaded.')).toBeInTheDocument();
+  expect(screen.queryByLabelText('Dashboard name')).not.toBeInTheDocument();
+});
+
+test('edits made while a save is under way are not reported as saved', async () => {
+  const user = userEvent.setup();
+  const pending = later<string>();
+  answers.save = () => pending.promise;
+  renderEditor();
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+  await user.click(await screen.findByRole('button', { name: 'Save dashboard' }));
+  await waitFor(() => expect(saves()).toHaveLength(1));
+
+  await user.click(screen.getByRole('button', { name: 'Remove Widgets per dashboard' }));
+  const listed = reads().filter((path) => path === '/dashboards').length;
+  pending.settle(sales.id);
+
+  await waitFor(() => expect(reads().filter((path) => path === '/dashboards').length).toBeGreaterThan(listed));
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+test('saving refreshes the widgets on the dashboard, whose data may be what was just saved', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+  await screen.findByRole('img', { name: 'Widgets per dashboard' });
+  const ran = reads().filter((path) => path === '/dashboards/widgets/dashboards.widget-counts').length;
+
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() =>
+    expect(reads().filter((path) => path === '/dashboards/widgets/dashboards.widget-counts').length).toBeGreaterThan(
+      ran,
+    ),
+  );
+});
+
+test('a dashboard holds at most 50 widgets, and the editor says so before the host would refuse it', async () => {
+  const user = userEvent.setup();
+  answers.detail = () => ({
+    ...sales,
+    widgets: Array.from({ length: 50 }, (_, index) => ({
+      key: `w${index}`,
+      source: 'dashboards.widget-counts',
+      visual: 'bar',
+      x: 0,
+      y: index * 4,
+      width: 6,
+      height: 4,
+    })),
+  });
+  renderEditor();
+
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Add widget' })).toBeDisabled());
+  expect(screen.getByText('A dashboard holds at most 50 widgets.')).toBeInTheDocument();
+});
+
+test('paging the widget picker clears the choice, so a widget of one page is never added as a visual of another', async () => {
+  const user = userEvent.setup();
+  answers.catalog = (page) => ({
+    items:
+      page === 1
+        ? [{ id: 'module.rows', title: 'Rows', kind: 'Table' }]
+        : [{ id: 'module.trend', title: 'Trend', kind: 'Chart' }],
+    totalCount: 101,
+    page,
+    pageSize: 100,
+  });
+  renderEditor();
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  await screen.findByRole('option', { name: 'Rows' });
+  await user.selectOptions(screen.getByLabelText('Widget'), 'module.rows');
+
+  await user.click(screen.getByRole('button', { name: 'Next page of widgets' }));
+
+  await screen.findByRole('option', { name: 'Trend' });
+  expect(screen.getByLabelText('Widget')).toHaveValue('');
+  await user.selectOptions(screen.getByLabelText('Shown as'), 'line');
+  await user.click(screen.getByRole('button', { name: 'Add widget' }));
+  expect(await screen.findByText('Choose a widget.')).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Rows' })).not.toBeInTheDocument();
+});
+
+test('a dashboard that reaches row 1000 takes no further widget, and the editor says why', async () => {
+  const user = userEvent.setup();
+  // 42 full-width widgets 24 rows high: the last starts at row 984 and ends at 1008, so a 43rd would start below 1000.
+  answers.detail = () => ({
+    ...sales,
+    widgets: Array.from({ length: 42 }, (_, index) => ({
+      key: `tall${index}`,
+      source: 'dashboards.widget-counts',
+      visual: 'bar',
+      x: 0,
+      y: index * 24,
+      width: 12,
+      height: 24,
+    })),
+  });
+  renderEditor();
+
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Add widget' })).toBeDisabled());
+  expect(
+    screen.getByText('There is no room for another widget: a dashboard reaches down to row 1000.'),
+  ).toBeInTheDocument();
+});
+
+test('while the next page of the widget picker loads, it offers nothing from the page before and then stays on the next page', async () => {
+  const user = userEvent.setup();
+  const pageTwo = later<PagedResultOfWidgetDescriptionDto>();
+  answers.catalog = (page) =>
+    page === 1
+      ? { items: [{ id: 'module.rows', title: 'Rows', kind: 'Table' }], totalCount: 101, page, pageSize: 100 }
+      : pageTwo.promise;
+  renderEditor();
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  await screen.findByRole('option', { name: 'Rows' });
+
+  await user.click(screen.getByRole('button', { name: 'Next page of widgets' }));
+
+  await waitFor(() => expect(screen.getByLabelText('Widget')).toBeDisabled());
+  expect(screen.queryByRole('option', { name: 'Rows' })).not.toBeInTheDocument();
+
+  pageTwo.settle({
+    items: [{ id: 'module.trend', title: 'Trend', kind: 'Chart' }],
+    totalCount: 101,
+    page: 2,
+    pageSize: 100,
+  });
+
+  await waitFor(() => expect(screen.getByLabelText('Widget')).toBeEnabled());
+  expect(screen.getByRole('option', { name: 'Trend' })).toBeInTheDocument();
+  expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+});

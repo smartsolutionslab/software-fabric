@@ -1,0 +1,76 @@
+{%{<script setup lang="ts">
+import { computed, ref, watch } from 'vue';
+import { useGetDashboardsWidgetsId } from '@/api/generated';
+import DataChart from '@/components/DataChart.vue';
+import DataTable from '@/components/ui/DataTable.vue';
+import { columnsOf } from '@/components/ui/data-table-columns';
+import { chartOption, type ChartVisual } from './chartOption';
+import Pager from './Pager.vue';
+
+type Row = Record<string, unknown>;
+
+const rows = columnsOf<Row>();
+const none: Row[] = [];
+
+/** How many rows a table widget shows at once; a chart's query takes no page and ignores it. */
+const pageSize = 20;
+
+interface WidgetViewProps {
+  source: string;
+  visual: string;
+  title: string;
+  height: number;
+  /** Goes up with every save of the dashboard: the widget's data may be what was just saved, so it is read again. */
+  refresh: number;
+}
+
+/** A widget's data from GET /dashboards/widgets/{id}, run as the signed-in user, drawn as a chart or a table. */
+const { source, visual, title, height, refresh } = defineProps<WidgetViewProps>();
+
+const page = ref(1);
+const { data, isError, refetch } = useGetDashboardsWidgetsId(
+  computed(() => source),
+  computed(() => ({ page: page.value, pageSize })),
+);
+watch(
+  () => refresh,
+  (count) => {
+    if (count > 0) {
+      void refetch();
+    }
+  },
+);
+
+const option = computed(() =>
+  data.value?.chart && visual !== 'table' ? chartOption(data.value.chart, visual as ChartVisual) : undefined,
+);
+const table = computed(() => data.value?.table ?? undefined);
+const columns = computed(() =>
+  rows.columns(
+    (table.value?.columns ?? []).map((column) =>
+      rows.accessor((row) => display(row[column]), { id: column, header: column }),
+    ),
+  ),
+);
+const tableRows = computed<Row[]>(() => (Array.isArray(table.value?.rows) ? (table.value.rows as Row[]) : none));
+
+function display(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return typeof value === 'object' ? JSON.stringify(value) : String(value);
+}
+</script>
+
+<template>
+  <p v-if="isError" role="alert">This widget could not be loaded.</p>
+  <template v-else-if="table">
+    <!-- The table takes its columns once: other columns are another table. -->
+    <DataTable :key="table.columns.join('\n')" :columns="columns" :data="tableRows" />
+    <Pager :label="title" :page="page" :page-size="pageSize" :total="table.totalCount" @page="page = $event" />
+  </template>
+  <DataChart v-else-if="option" :option="option" :label="title" :height="height" />
+  <p v-else>Loading…</p>
+</template>
+}%}
