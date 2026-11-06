@@ -28,6 +28,15 @@ public class ValidateCommandTests
     }
 
     [Fact]
+    public void Marten_with_a_tenancy_exits_one_and_prints_the_sentence()
+    {
+        var run = CliRun.Of("validate", "--profile", "industrial-event-driven-mfe", "--set", "backend.tenancy=column", "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: module defaults: module.event-store=marten requires backend.tenancy == none, but backend.tenancy is column.");
+    }
+
+    [Fact]
     public void Several_overrides_are_applied()
     {
         var run = CliRun.Of(

@@ -66,6 +66,60 @@ public class RuleEvaluatorTests
         Violations(profile, setting).ShouldContain(violation);
     }
 
+    [Theory]
+    [InlineData("industrial-event-driven-mfe", new[] { "backend.tenancy=column" },
+        "module defaults: module.event-store=marten requires backend.tenancy == none, but backend.tenancy is column.")]
+    [InlineData("industrial-event-driven-mfe", new[] { "backend.tenancy=schema-per-tenant" },
+        "module defaults: module.event-store=marten requires backend.tenancy == none, but backend.tenancy is schema-per-tenant.")]
+    [InlineData("industrial-event-driven-mfe", new[] { "backend.tenancy=database-per-tenant" },
+        "module defaults: module.event-store=marten requires backend.tenancy == none, but backend.tenancy is database-per-tenant.")]
+    [InlineData("saas-standard-react", new[] { "module.cqrs=physical" },
+        "module defaults: module.cqrs=physical requires module.event-store == marten, but module.event-store is not set.")]
+    [InlineData("industrial-event-driven-mfe", new[] { "module.event-store=kurrentdb" },
+        "module defaults: module.cqrs=physical requires module.event-store == marten, but module.event-store is kurrentdb.")]
+    [InlineData("saas-standard-vue", new[] { "frontend.design-system=tokens-and-components" },
+        "frontend.design-system=tokens-and-components requires frontend.framework == react, but frontend.framework is vue.")]
+    [InlineData("saas-standard-vue", new[] { "frontend.architecture=micro-frontends", "frontend.design-system=tokens" },
+        "frontend.mfe-technique=module-federation requires frontend.framework == react, but frontend.framework is vue.")]
+    [InlineData("saas-standard-react", new[] { "frontend.styling=library-theme", "frontend.ui-library=radix-headless" },
+        "frontend.styling=library-theme conflicts with frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless).")]
+    public void Rejects_a_combination_the_packs_refuse_in_one_sentence(string profile, string[] settings, string violation)
+    {
+        Violations(profile, settings).ShouldBe([violation]);
+    }
+
+    [Theory]
+    [InlineData("saas-standard-react", "shadcn")]
+    [InlineData("saas-standard-vue", "shadcn-vue")]
+    [InlineData("saas-standard-vue", "reka-ui")]
+    public void Rejects_the_library_theme_of_a_tailwind_only_library(string profile, string library)
+    {
+        Violations(profile, "frontend.styling=library-theme", $"frontend.ui-library={library}")
+            .ShouldContain("frontend.styling=library-theme conflicts with frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless).");
+    }
+
+    [Theory]
+    [InlineData("saas-standard-react", "mui")]
+    [InlineData("saas-standard-vue", "vuetify")]
+    public void A_library_with_its_own_theming_may_use_it(string profile, string library)
+    {
+        Violations(profile, "frontend.styling=library-theme", $"frontend.ui-library={library}").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Physical_cqrs_is_refused_on_each_module_that_is_not_event_sourced_on_marten()
+    {
+        var choices = ChoiceResolver.Resolve(RepositoryCatalog, "industrial-event-driven-mfe", []).Choices.ShouldNotBeNull();
+        Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> modules = new()
+        {
+            ["ledger"] = Values(("module.style", "event-sourced"), ("module.cqrs", "physical"), ("module.event-store", "marten")),
+            ["billing"] = Values(("module.style", "ddd"), ("module.cqrs", "physical")),
+        };
+
+        RuleEvaluator.Check(RepositoryCatalog, choices.Project, modules)
+            .ShouldBe(["module 'billing': module.cqrs=physical requires module.event-store == marten, but module.event-store is not set."]);
+    }
+
     [Fact]
     public void Rejects_rag_on_sql_server_in_one_sentence()
     {
