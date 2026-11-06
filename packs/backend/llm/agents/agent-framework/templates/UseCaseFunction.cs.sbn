@@ -125,20 +125,21 @@ internal sealed class UseCaseFunction : AIFunction
     private string Refused(Exception exception) => $"The arguments are not a {request.Name}: {exception.Message}";
 
     /// <summary>
-    /// A <see cref="Page"/> or a <see cref="PageSize"/> as the whole number within its bounds that the converters read; the
-    /// converters are opaque to schema generation, which would otherwise describe the record behind them.
+    /// A <see cref="Page"/> or a <see cref="PageSize"/> as the whole number within its bounds that the converters read, or
+    /// null where the property may be null; the converters are opaque to schema generation, which would otherwise describe
+    /// the record behind them.
     /// </summary>
     private static JsonNode Paging(AIJsonSchemaCreateContext context, JsonNode node)
     {
-        if (context.TypeInfo.Type == typeof(Page))
+        var maximum = context.TypeInfo.Type == typeof(Page) ? Page.Maximum : context.TypeInfo.Type == typeof(PageSize) ? PageSize.Maximum : 0;
+        if (maximum == 0)
         {
-            return WholeNumber(Page.Maximum);
+            return node;
         }
 
-        return context.TypeInfo.Type == typeof(PageSize) ? WholeNumber(PageSize.Maximum) : node;
+        JsonNode type = context.PropertyInfo is { IsSetNullable: true } ? new JsonArray("integer", "null") : "integer";
+        return new JsonObject { ["type"] = type, ["minimum"] = 1, ["maximum"] = maximum };
     }
-
-    private static JsonObject WholeNumber(int maximum) => new() { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = maximum };
 
     /// <summary>A Result's value as JSON, or its ApiError as text starting with the error's code.</summary>
     private static object Answer(object outcome)
