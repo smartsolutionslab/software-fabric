@@ -33,9 +33,13 @@ public static partial class Renderer
         var slots = new ScriptObject();
         foreach (var (slot, entries) in composition.Slots.Where(slot => slot.Key != Composer.TemplateFunctionsSlot))
         {
-            var parts = entries.Select(entry => RenderTemplate(entry.Pack, entry.Contribution.Template, functions, errors, model));
+            // A contribution that renders empty or whitespace-only under its pack's conditions leaves no trace, not even a separator.
+            var parts = entries
+                .Select(entry => RenderTemplate(entry.Pack, entry.Contribution.Template, functions, errors, model))
+                .OfType<string>()
+                .Where(part => !string.IsNullOrWhiteSpace(part));
             var separator = composition.SlotSeparators?.GetValueOrDefault(slot) ?? "\n";
-            slots.SetValue(slot, string.Join(separator, parts.OfType<string>()), readOnly: true);
+            slots.SetValue(slot, string.Join(separator, parts), readOnly: true);
         }
 
         List<RenderedFile> files = [];

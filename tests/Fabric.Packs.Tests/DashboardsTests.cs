@@ -223,6 +223,21 @@ public sealed class DashboardsTests
         without["web/app/src/dashboards/DashboardEditor.test.tsx"].ShouldNotContain("axe");
     }
 
+    /// <summary>
+    /// Where the page imports no styles its <c>web.styles</c> contribution renders empty, and an empty contribution adds no
+    /// separator: <c>src/index.css</c> stays as it is without dashboards, with no blank first line for Prettier to refuse.
+    /// </summary>
+    [Theory]
+    [InlineData("lean-crud")]
+    [InlineData("industrial-event-driven-mfe")]
+    [InlineData("saas-standard-vue")]
+    public void Where_the_page_imports_no_styles_index_css_is_the_same_as_without_dashboards(string profile)
+    {
+        const string Styles = "web/app/src/index.css";
+
+        Files(profile, Dashboards)[Styles].ShouldBe(Files(profile)[Styles]);
+    }
+
     [Fact]
     public void Where_the_page_is_not_built_yet_the_module_keeps_the_routers_placeholder_page()
     {
