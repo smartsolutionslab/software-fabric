@@ -5,7 +5,7 @@ import { Remote } from '@/remotes/Remote';
 export function {{ module.namespace }}Page() {
   return <Remote module="{{ module.name }}" />;
 }
-{{~ else if module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains project["frontend.dashboards"] "user-editable" && project["frontend.api-client"] == "rtk-query-codegen" ~}}
+{{~ else if module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains project["frontend.dashboards"] "user-editable" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa" ~}}
 import { DashboardEditor } from '@/dashboards/DashboardEditor';
 
 /** The module the dashboards choice brings; its screen is that choice's dashboard editor (docs/adr). */
