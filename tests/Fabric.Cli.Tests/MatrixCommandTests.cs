@@ -30,8 +30,9 @@ public sealed class MatrixCommandTests : IDisposable
         run.Output.ShouldMatch($"^wrote {Regex.Escape(output)}: [4-9] combinations cover 23 feasible pairs; 1 pair is infeasible.{Environment.NewLine}$");
         var json = File.ReadAllText(output);
         json.ShouldContain("\"name\": \"pairwise-1\"");
-        json.ShouldContain("\"backend.database=postgres\"");
-        json.ShouldContain("\"module.style=crud\"");
+        json.ShouldContain("\"choices\": {\n        \"backend.database\": \"postgres\",\n        \"backend.api-protocols\": [");
+        json.ShouldContain("\"module.style\": \"crud\"");
+        json.ShouldContain("\"backend.api-protocols\": []");
         json.ShouldContain("\"backend.api-protocols without rest\",\n      \"backend.api-protocols has grpc\"");
         json.ShouldEndWith("}\n");
     }
