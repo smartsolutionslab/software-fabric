@@ -1,0 +1,39 @@
+name: Playwright Chromium
+description: Installs Playwright's Chromium and the system libraries it needs, both from a cache when they are in it (#218).
+inputs:
+  version:
+    description: The Playwright version whose Chromium to install.
+    required: true
+runs:
+  using: composite
+  steps:
+    # apt fetches the system libraries' fonts (21 MB) from the runner's mirror at about 30 kB/s on roughly one job in
+    # ten, for 9-11 min; a shorter apt timeout does not help, since the bytes keep trickling in. So the .deb files are
+    # cached with the browser. The key names the runner image, whose package versions the .deb files match: a new image
+    # starts a new cache entry rather than leaving apt to download what no longer matches.
+    - id: image
+      shell: bash
+      run: echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+    - id: cache
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      with:
+        path: |
+          ~/.cache/ms-playwright
+          ~/.cache/playwright-debs
+        key: playwright-chromium-${{ steps.image.outputs.image }}-${{ inputs.version }}
+    - if: steps.cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: find ~/.cache/playwright-debs -maxdepth 1 -name '*.deb' -exec sudo cp -t /var/cache/apt/archives {} +
+    - shell: bash
+      env:
+        PLAYWRIGHT_VERSION: ${{ inputs.version }}
+      run: npx --yes "playwright@$PLAYWRIGHT_VERSION" install-deps chromium
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        PLAYWRIGHT_VERSION: ${{ inputs.version }}
+      run: |
+        npx --yes "playwright@$PLAYWRIGHT_VERSION" install chromium
+        mkdir -p ~/.cache/playwright-debs
+        # None when the image already has every package; that is not a failure.
+        find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp -t ~/.cache/playwright-debs {} +
