@@ -83,17 +83,22 @@ public sealed partial class IntegrationVocabularyTests
         using var project = new GeneratedProject(profile, [integration.Manifest, framework.Manifest], overrides);
         project.AddModule("billing");
 
-        // The integration pack's own files: its fixture, the host's tests and the test project.
+        // The integration pack's own files: its fixture, the host's tests and the test project. The MCP client's tests
+        // read the AppHost's model and start nothing: Aspire is the composition root whatever the integration option.
         var ownFiles = new[] { "tests/Integration.Tests/AspireFixture.cs", "tests/Integration.Tests/HostTests.cs", "tests/Integration.Tests/Integration.Tests.csproj" };
         var named = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "tests"), "*", SearchOption.AllDirectories)
             .Where(path => path.EndsWith(".cs", StringComparison.Ordinal) || path.EndsWith(".csproj", StringComparison.Ordinal))
-            .Where(path => !ownFiles.Contains(Path.GetRelativePath(project.ProjectDirectory, path).Replace('\\', '/'), StringComparer.Ordinal))
+            .Select(path => (path, relative: Path.GetRelativePath(project.ProjectDirectory, path).Replace('\\', '/')))
+            .Where(file => !ownFiles.Contains(file.relative, StringComparer.Ordinal) && !file.relative.StartsWith("tests/Mcp.Tests/", StringComparison.Ordinal))
+            .Select(file => file.path)
             .SelectMany(path => File.ReadLines(path).Select((line, index) => (path, line, index)))
             .Where(entry => AspireFixture().IsMatch(entry.line))
             .Select(entry => $"{Path.GetRelativePath(project.ProjectDirectory, entry.path)}:{entry.index + 1}: {entry.line.Trim()}")
             .ToList();
 
         named.ShouldBeEmpty(string.Join(Environment.NewLine, named));
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "tests/Integration.Tests/ListEndpointsArePagedTests.cs"))
+            .ShouldContain("using var client = host_client();");
     }
 
     [GeneratedRegex(@"aspire-fixture|Aspire fixture|xUnit only|for xUnit and")]
