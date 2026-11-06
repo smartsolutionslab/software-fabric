@@ -13,6 +13,7 @@ namespace Fabric.Packs.Tests;
 public sealed class GenerativeDashboardsTests
 {
     private const string Profile = "saas-standard-react";
+    private const string Vue = "saas-standard-vue";
     private const string Anthropic = "backend.llm=anthropic";
     private const string AgentFramework = "backend.llm.agents=agent-framework";
     private const string AgUi = "frontend.agent-ui=ag-ui";
@@ -21,6 +22,26 @@ public sealed class GenerativeDashboardsTests
     private const string Rule = "tests/Architecture.Tests/Rules/TheDashboardAgentSavesNothing.cs";
     private const string Page = "web/app/src/dashboards";
     private const string EndToEndTest = "web/app/e2e/generative-dashboards.spec.ts";
+
+    /// <summary>The Vue page's pending widget, wrapped so that Accept saves at once instead of only changing the draft.</summary>
+    private const string VuePendingWidgetSavingAtOnce = """
+        <script setup lang="ts">
+        import { usePutDashboardsId } from '@/api/generated';
+        import Accepting from './AcceptingPendingWidget.vue';
+
+        const emit = defineEmits<{ accept: []; discard: [] }>();
+        const { mutateAsync: save } = usePutDashboardsId();
+
+        const accept = () => {
+          void save({ id: 'saved-at-once', data: { name: 'At once', widgets: [] } });
+          emit('accept');
+        };
+        </script>
+
+        <template>
+          <Accepting v-bind="$attrs" @accept="accept" @discard="emit('discard')" />
+        </template>
+        """;
 
     /// <summary>The page's pending widget, wrapped so that Accept saves at once instead of only changing the draft.</summary>
     private const string PendingWidgetSavingAtOnce = """
@@ -212,14 +233,40 @@ public sealed class GenerativeDashboardsTests
     }
 
     [Fact]
-    public void With_vue_the_dashboard_page_gets_no_assistant_until_its_own_step()
+    public void The_vue_dashboard_page_gets_the_same_assistant_with_the_shared_proposal_and_end_to_end_test()
     {
-        var files = Files("saas-standard-vue", Anthropic, AgentFramework, AgUi, Generative);
+        var files = Files(Vue, Anthropic, AgentFramework, AgUi, Generative);
 
+        files[$"{Page}/DashboardCanvas.vue"].ShouldContain("<DashboardAssistant ");
+        files[$"{Page}/DashboardCanvas.vue"].ShouldContain("<PendingWidget");
+        files[$"{Page}/DashboardAssistant.vue"].ShouldContain("useAgent('dashboards', ");
+        files.Keys.ShouldContain($"{Page}/PendingWidget.vue");
+        files.Keys.ShouldContain($"{Page}/DashboardAssistant.test.ts");
+        files[$"{Page}/proposal.ts"].ShouldBe(Files(Profile, Anthropic, AgentFramework, AgUi, Generative)[$"{Page}/proposal.ts"]);
+        files.Keys.ShouldContain($"{Page}/proposal.test.ts");
+        files[EndToEndTest].ShouldContain("page.locator('.vgl-item')");
+        files.Keys.ShouldNotContain(path => path.EndsWith(".tsx", StringComparison.Ordinal));
+        files["web/app/src/agents/useAgent.ts"].ShouldContain("export function useAgent(name: string, state?: () => unknown)");
+        files["AGENTS.md"].ShouldContain("`DashboardAssistant.vue`");
+    }
+
+    [Fact]
+    public void Without_generative_dashboards_the_vue_dashboard_page_has_no_assistant()
+    {
+        var files = Files(Vue, Anthropic, AgentFramework, AgUi, "frontend.dashboards=user-editable");
+
+        files[$"{Page}/DashboardCanvas.vue"].ShouldNotContain("DashboardAssistant");
+        files[$"{Page}/DashboardCanvas.vue"].ShouldNotContain("PendingWidget");
         files.Keys.ShouldNotContain(path => path.Contains("DashboardAssistant", StringComparison.Ordinal) || path.Contains("PendingWidget", StringComparison.Ordinal) || path.Contains("proposal.", StringComparison.Ordinal));
         files.Keys.ShouldNotContain(EndToEndTest);
-        files[$"{Page}/DashboardCanvas.vue"].ShouldNotContain("Assistant");
-        files["web/app/src/agents/useAgent.ts"].ShouldNotContain("state?:");
+    }
+
+    [Fact]
+    public void With_another_vue_ui_library_the_assistant_fails_saying_it_is_built_on_shadcn_vue_only()
+    {
+        var files = Files(Vue, Anthropic, AgentFramework, AgUi, Generative, "frontend.ui-library=reka-ui");
+
+        files[$"{Page}/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate and zod only so far; frontend.ui-library is reka-ui");
     }
 
     [Fact]
@@ -231,6 +278,9 @@ public sealed class GenerativeDashboardsTests
 
         without["web/app/package.json"].ShouldNotContain("vitest-axe");
         without[$"{Page}/DashboardAssistant.test.tsx"].ShouldNotContain("axe");
+
+        Files(Vue, Anthropic, AgentFramework, AgUi, Generative)[$"{Page}/DashboardAssistant.test.ts"].ShouldContain("from 'vitest-axe'");
+        Files(Vue, Anthropic, AgentFramework, AgUi, Generative, "frontend.test.extras=")[$"{Page}/DashboardAssistant.test.ts"].ShouldNotContain("axe");
     }
 
     [Fact]
@@ -272,6 +322,46 @@ public sealed class GenerativeDashboardsTests
 
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("FAIL  src/dashboards/DashboardAssistant.test.tsx > a proposed widget shows on the grid as pending with its data, and Accept only puts it on the draft", customMessage: output);
+    }
+
+    [Fact]
+    public void The_vue_web_app_builds_lints_and_passes_its_tests_and_the_end_to_end_tests_accept_save_and_reload_a_proposed_widget()
+    {
+        using var project = NewProject(Vue, Anthropic, AgentFramework, AgUi, Generative);
+        project.Build();
+
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        foreach (var step in new[] { "install", "build", "lint", "test" })
+        {
+            var (exitCode, output) = Shell.Run(web, "pnpm", step);
+            exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
+        }
+
+        var (formatExitCode, format) = Shell.Run(Path.Combine(web, "app"), "pnpm", "format:check");
+        formatExitCode.ShouldBe(0, format);
+
+        // Sign-in, the assistant's panel, the dashboard page, and the two of the dashboards agent, as with React.
+        var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
+        e2eExitCode.ShouldBe(0, e2eOutput);
+        e2eOutput.ShouldContain("5 passed");
+    }
+
+    [Fact]
+    public void A_vue_accept_that_saves_at_once_fails_the_assistants_component_tests()
+    {
+        using var project = NewProject(Vue, Anthropic, AgentFramework, AgUi, Generative);
+        var pendingWidget = Path.Combine(project.ProjectDirectory, Page, "PendingWidget.vue");
+        File.Move(pendingWidget, Path.Combine(project.ProjectDirectory, Page, "AcceptingPendingWidget.vue"));
+        project.Write($"{Page}/PendingWidget.vue", VuePendingWidgetSavingAtOnce);
+
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, install) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, install);
+        // Without colours, which CI's runners turn on, so the failed test's line is plain text.
+        var (exitCode, output) = Shell.Run(Path.Combine(web, "app"), new Dictionary<string, string> { ["NO_COLOR"] = "1" }, "pnpm", "test", "src/dashboards/DashboardAssistant.test.ts");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("FAIL  src/dashboards/DashboardAssistant.test.ts > a proposed widget shows on the grid as pending with its data, and Accept only puts it on the draft", customMessage: output);
     }
 
     private static List<string> Validate(params string[] overrides)

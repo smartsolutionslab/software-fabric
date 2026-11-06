@@ -1,0 +1,450 @@
+{{~ axe = array.contains(project["frontend.test.extras"], "accessibility") ~}}
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
+import userEvent from '@testing-library/user-event';
+import { render, screen, waitFor, within } from '@testing-library/vue';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+{{~ if axe ~}}
+import { axe } from 'vitest-axe';
+{{~ end ~}}
+import type { DashboardDto, SaveDashboardRequest, WidgetData, WidgetDescriptionDto } from '@/api/generated';
+import DashboardEditor from './DashboardEditor.vue';
+
+// ECharts draws on a canvas jsdom does not have; the chart's accessible name is what the page decides.
+vi.mock('@/components/DataChart.vue', async () => {
+  const { defineComponent, h } = await import('vue');
+  return {
+    default: defineComponent({
+      props: { option: { type: Object, required: true }, label: { type: String, required: true }, height: Number },
+      setup: (props) => () => h('div', { role: 'img', 'aria-label': props.label }),
+    }),
+  };
+});
+
+const sales: DashboardDto = {
+  id: '01960000-0000-7000-8000-000000000001',
+  name: 'Sales',
+  widgets: [{ key: 'counts', source: 'dashboards.widget-counts', visual: 'bar', x: 0, y: 0, width: 6, height: 4 }],
+};
+const catalog: WidgetDescriptionDto[] = [
+  { id: 'dashboards.my-dashboards', title: 'My dashboards', kind: 'Table' },
+  { id: 'dashboards.widget-counts', title: 'Widgets per dashboard', kind: 'Chart' },
+];
+const chart: WidgetData = {
+  kind: 'Chart',
+  chart: { categories: ['Sales'], series: [{ name: 'Widgets', values: [1] }] },
+  table: null,
+};
+const table: WidgetData = {
+  kind: 'Table',
+  chart: null,
+  table: {
+    columns: ['id', 'name', 'widgetCount'],
+    rows: [{ id: sales.id, name: 'Sales', widgetCount: 1 }],
+    totalCount: 1,
+    page: 1,
+    pageSize: 20,
+  },
+};
+
+const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } });
+
+/** The answers to the runs the page will send to the dashboards agent, in order. */
+const runs: Response[] = [];
+
+// The host, as the generated client and the agent's client reach it: the page runs on the real client and query cache.
+const fetchMock = vi.fn<typeof fetch>((input, init) => {
+  const url = new URL(String(input), 'http://localhost');
+  const path = url.pathname.replace(/^\/api/, '');
+  if (path === '/agents/dashboards') {
+    return Promise.resolve(runs.shift() ?? new Response('{"title":"No run"}', { status: 500 }));
+  }
+
+  if (init?.method === 'PUT') {
+    return Promise.resolve(json(path.slice('/dashboards/'.length)));
+  }
+
+  if (path === '/dashboards') {
+    return Promise.resolve(
+      json({ items: [{ id: sales.id, name: sales.name, widgetCount: 1 }], totalCount: 1, page: 1, pageSize: 100 }),
+    );
+  }
+
+  if (path === '/dashboards/widgets') {
+    return Promise.resolve(json({ items: catalog, totalCount: catalog.length, page: 1, pageSize: 100 }));
+  }
+
+  if (path.startsWith('/dashboards/widget-declarations/')) {
+    const id = decodeURIComponent(path.slice('/dashboards/widget-declarations/'.length));
+    return Promise.resolve(json(catalog.find((widget) => widget.id === id)));
+  }
+
+  if (path.startsWith('/dashboards/widgets/')) {
+    const id = decodeURIComponent(path.slice('/dashboards/widgets/'.length));
+    return Promise.resolve(json(id === 'dashboards.my-dashboards' ? table : chart));
+  }
+
+  return Promise.resolve(json(sales));
+});
+
+// The host's side of a run, as POST /agents/dashboards streams it: AG-UI events, one server-sent event each.
+function eventStream() {
+  const encoder = new TextEncoder();
+  let stream: ReadableStreamDefaultController<Uint8Array> | undefined;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      stream = controller;
+    },
+  });
+  return {
+    response: new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }),
+    send: (...events: object[]) => {
+      events.forEach((event) => stream?.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`)));
+    },
+    close: () => stream?.close(),
+  };
+}
+
+/** The agent's propose_widget call with the arguments, in its message, and the host's result for it. */
+function proposalCall(id: string, message: string, args: object, result: string) {
+  return [
+    { type: 'TOOL_CALL_START', toolCallId: id, toolCallName: 'propose_widget', parentMessageId: message },
+    { type: 'TOOL_CALL_ARGS', toolCallId: id, delta: JSON.stringify(args) },
+    { type: 'TOOL_CALL_END', toolCallId: id },
+    { type: 'TOOL_CALL_RESULT', messageId: `${id}-result`, toolCallId: id, content: result, role: 'tool' },
+  ];
+}
+
+/** One run in which the agent calls propose_widget with the arguments and the host answers the tool with the result. */
+function proposalRun(id: string, args: object, result: string) {
+  const run = eventStream();
+  runs.push(run.response);
+  return () => {
+    run.send(
+      { type: 'RUN_STARTED', threadId: 'thread-1', runId: id },
+      ...proposalCall(id, `${id}-message`, args, result),
+      { type: 'TEXT_MESSAGE_START', messageId: `${id}-answer`, role: 'assistant' },
+      { type: 'TEXT_MESSAGE_CONTENT', messageId: `${id}-answer`, delta: 'Here it is.' },
+      { type: 'TEXT_MESSAGE_END', messageId: `${id}-answer` },
+      { type: 'RUN_FINISHED', threadId: 'thread-1', runId: id },
+    );
+    run.close();
+  };
+}
+
+const myDashboards = {
+  source: 'dashboards.my-dashboards',
+  title: 'My dashboards',
+  visual: 'table',
+  replaces: null,
+};
+
+beforeEach(() => {
+  runs.length = 0;
+  vi.stubGlobal('fetch', fetchMock);
+});
+
+afterEach(() => {
+  fetchMock.mockClear();
+  vi.unstubAllGlobals();
+});
+
+function renderEditor() {
+  // A failed read fails at once: the query client's retries would only slow the test down.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(DashboardEditor, { global: { plugins: [[VueQueryPlugin, { queryClient }]] } });
+}
+
+type User = ReturnType<typeof userEvent.setup>;
+
+async function openSales(user: User) {
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+  await screen.findByRole('img', { name: 'Widgets per dashboard' });
+}
+
+/** Asks once the form takes a question: Vue renders a tick after the state changes. */
+async function ask(user: User, message: string) {
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Ask' })).toBeEnabled());
+  await user.type(screen.getByRole('textbox', { name: 'Ask the assistant' }), message);
+  await user.click(screen.getByRole('button', { name: 'Ask' }));
+}
+
+/** The requests sent to the dashboards agent so far. */
+const agentCalls = () => fetchMock.mock.calls.filter(([input]) => String(input).endsWith('/api/agents/dashboards'));
+
+/** The JSON body of the n-th run the page sent. */
+function sent(call: number): { state?: unknown; messages: { role: string; content?: unknown }[] } {
+  const init = agentCalls()[call]?.[1];
+  return JSON.parse(String(init?.body)) as { state?: unknown; messages: { role: string; content?: unknown }[] };
+}
+
+/** The bodies of the PUT requests made so far. */
+const saves = () =>
+  fetchMock.mock.calls
+    .filter(([, init]) => init?.method === 'PUT')
+    .map(([input, init]) => ({
+      path: new URL(String(input), 'http://localhost').pathname.replace(/^\/api/, ''),
+      request: JSON.parse(String(init?.body)) as SaveDashboardRequest,
+    }));
+
+/** How many times a widget's data was read. */
+const widgetReads = (id: string) =>
+  fetchMock.mock.calls.filter(([input]) =>
+    new URL(String(input), 'http://localhost').pathname.endsWith(`/dashboards/widgets/${id}`),
+  ).length;
+
+test('a proposed widget shows on the grid as pending with its data, and Accept only puts it on the draft', async () => {
+  const user = userEvent.setup();
+  const answer = proposalRun(
+    'call-1',
+    { source: myDashboards.source, visual: 'table', replaces: null },
+    JSON.stringify(myDashboards),
+  );
+  const { container } = renderEditor();
+  await openSales(user);
+
+  await ask(user, 'Show my dashboards as a table');
+  answer();
+
+  const pending = await screen.findByRole('region', { name: 'Proposed: My dashboards' });
+  expect(container.querySelector('.vgl-layout')?.contains(pending)).toBe(true);
+  expect(await within(pending).findByRole('cell', { name: 'Sales' })).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'My dashboards' })).not.toBeInTheDocument();
+
+  await user.click(within(pending).getByRole('button', { name: 'Accept' }));
+
+  await waitFor(() =>
+    expect(screen.queryByRole('region', { name: 'Proposed: My dashboards' })).not.toBeInTheDocument(),
+  );
+  expect(await screen.findByRole('region', { name: 'My dashboards' })).toBeInTheDocument();
+  expect(saves()).toHaveLength(0);
+
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() => expect(saves()).toHaveLength(1));
+  expect(saves()[0]).toEqual({
+    path: `/dashboards/${sales.id}`,
+    request: {
+      name: 'Sales',
+      widgets: [
+        expect.objectContaining({ key: 'counts', source: 'dashboards.widget-counts', visual: 'bar' }),
+        expect.objectContaining({
+          source: 'dashboards.my-dashboards',
+          visual: 'table',
+          x: 0,
+          y: 4,
+          width: 6,
+          height: 4,
+        }),
+      ],
+    },
+  });
+});
+
+test('two proposals of one run both wait on the grid, and each is accepted or discarded on its own', async () => {
+  const user = userEvent.setup();
+  const run = eventStream();
+  runs.push(run.response);
+  const pie = { source: 'dashboards.widget-counts', title: 'Widgets per dashboard', visual: 'pie', replaces: null };
+  renderEditor();
+  await openSales(user);
+
+  await ask(user, 'Show my dashboards, and the counts as a pie');
+  run.send(
+    { type: 'RUN_STARTED', threadId: 'thread-1', runId: 'run-1' },
+    ...proposalCall(
+      'call-1',
+      'answer-1',
+      { source: myDashboards.source, visual: 'table', replaces: null },
+      JSON.stringify(myDashboards),
+    ),
+    ...proposalCall('call-2', 'answer-1', { source: pie.source, visual: 'pie', replaces: null }, JSON.stringify(pie)),
+    { type: 'RUN_FINISHED', threadId: 'thread-1', runId: 'run-1' },
+  );
+  run.close();
+
+  const proposedPie = await screen.findByRole('region', { name: 'Proposed: Widgets per dashboard' });
+  expect(screen.getByRole('region', { name: 'Proposed: My dashboards' })).toBeInTheDocument();
+  await user.click(within(proposedPie).getByRole('button', { name: 'Accept' }));
+  const proposedTable = await screen.findByRole('region', { name: 'Proposed: My dashboards' });
+  await user.click(within(proposedTable).getByRole('button', { name: 'Discard' }));
+
+  await waitFor(() => expect(screen.queryByRole('region', { name: /^Proposed/ })).not.toBeInTheDocument());
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+  await waitFor(() => expect(saves()).toHaveLength(1));
+  expect(saves()[0]?.request).toEqual({
+    name: 'Sales',
+    widgets: [
+      expect.objectContaining({ key: 'counts', source: 'dashboards.widget-counts', visual: 'bar' }),
+      expect.objectContaining({ source: 'dashboards.widget-counts', visual: 'pie', x: 0, y: 4, width: 6, height: 4 }),
+    ],
+  });
+});
+
+test("saving reads a pending widget's data again, as it does for the placed ones", async () => {
+  const user = userEvent.setup();
+  const answer = proposalRun(
+    'call-1',
+    { source: myDashboards.source, visual: 'table', replaces: null },
+    JSON.stringify(myDashboards),
+  );
+  renderEditor();
+  await user.click(screen.getByRole('button', { name: 'New dashboard' }));
+  await user.type(await screen.findByLabelText('Dashboard name'), 'Fresh');
+
+  await ask(user, 'Show my dashboards as a table');
+  answer();
+  const pending = await screen.findByRole('region', { name: 'Proposed: My dashboards' });
+  await within(pending).findByRole('cell', { name: 'Sales' });
+  const before = widgetReads('dashboards.my-dashboards');
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() => expect(widgetReads('dashboards.my-dashboards')).toBeGreaterThan(before));
+  expect(screen.getByRole('region', { name: 'Proposed: My dashboards' })).toBeInTheDocument();
+});
+
+test('Discard takes the proposal away and leaves the draft as it was', async () => {
+  const user = userEvent.setup();
+  const answer = proposalRun(
+    'call-1',
+    { source: myDashboards.source, visual: 'table', replaces: null },
+    JSON.stringify(myDashboards),
+  );
+  renderEditor();
+  await openSales(user);
+
+  await ask(user, 'Show my dashboards as a table');
+  answer();
+  const pending = await screen.findByRole('region', { name: 'Proposed: My dashboards' });
+  await user.click(within(pending).getByRole('button', { name: 'Discard' }));
+
+  await waitFor(() =>
+    expect(screen.queryByRole('region', { name: 'Proposed: My dashboards' })).not.toBeInTheDocument(),
+  );
+  expect(screen.queryByRole('region', { name: 'My dashboards' })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+  await waitFor(() => expect(saves()).toHaveLength(1));
+  expect(saves()[0]?.request).toEqual({ name: 'Sales', widgets: [expect.objectContaining({ key: 'counts' })] });
+});
+
+test("accepting a proposal that names a widget of the draft puts it in that widget's place", async () => {
+  const user = userEvent.setup();
+  const answer = proposalRun(
+    'call-1',
+    { source: 'dashboards.widget-counts', visual: 'pie', replaces: 'counts' },
+    JSON.stringify({
+      source: 'dashboards.widget-counts',
+      title: 'Widgets per dashboard',
+      visual: 'pie',
+      replaces: 'counts',
+    }),
+  );
+  renderEditor();
+  await openSales(user);
+
+  await ask(user, 'Make that chart a pie');
+  answer();
+  const pending = await screen.findByRole('region', { name: 'Proposed: Widgets per dashboard' });
+  expect(pending).toHaveTextContent('Replaces a widget on this dashboard.');
+  await user.click(within(pending).getByRole('button', { name: 'Accept' }));
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+
+  await waitFor(() => expect(saves()).toHaveLength(1));
+  expect(saves()[0]?.request).toEqual({
+    name: 'Sales',
+    widgets: [
+      expect.objectContaining({ source: 'dashboards.widget-counts', visual: 'pie', x: 0, y: 0, width: 6, height: 4 }),
+    ],
+  });
+});
+
+test('a refused proposal is shown as refused, and nothing is pending', async () => {
+  const user = userEvent.setup();
+  const answer = proposalRun(
+    'call-1',
+    { source: 'nothing.declared', visual: 'bar', replaces: null },
+    'Failed: dashboards.unknown-widget: No widget nothing.declared is declared for you.',
+  );
+  renderEditor();
+  await openSales(user);
+
+  await ask(user, 'Show me everything');
+  answer();
+
+  const conversation = screen.getByRole('list', { name: 'Conversation' });
+  expect(
+    await within(conversation).findByText(
+      'Refused: dashboards.unknown-widget: No widget nothing.declared is declared for you.',
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: /^Proposed/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Accept' })).not.toBeInTheDocument();
+});
+
+test("every run goes to the dashboards agent with the open draft's widgets as its state, an accepted proposal included", async () => {
+  const user = userEvent.setup();
+  const first = proposalRun(
+    'call-1',
+    { source: myDashboards.source, visual: 'table', replaces: null },
+    JSON.stringify(myDashboards),
+  );
+  const second = proposalRun(
+    'call-2',
+    { source: myDashboards.source, visual: 'table', replaces: null },
+    JSON.stringify(myDashboards),
+  );
+  renderEditor();
+  await openSales(user);
+
+  await ask(user, 'Show my dashboards as a table');
+  first();
+  const pending = await screen.findByRole('region', { name: 'Proposed: My dashboards' });
+  await user.click(within(pending).getByRole('button', { name: 'Accept' }));
+  await screen.findByRole('region', { name: 'My dashboards' });
+  await ask(user, 'And once more');
+  second();
+  await screen.findByRole('region', { name: 'Proposed: My dashboards' });
+
+  expect(agentCalls()[0]?.[0]).toBe('/api/agents/dashboards');
+  expect(sent(0).state).toEqual({ widgets: [{ key: 'counts', source: 'dashboards.widget-counts', visual: 'bar' }] });
+  expect(sent(1).state).toEqual({
+    widgets: [
+      { key: 'counts', source: 'dashboards.widget-counts', visual: 'bar' },
+      { key: expect.any(String), source: 'dashboards.my-dashboards', visual: 'table' },
+    ],
+  });
+  expect(sent(1).messages.at(-1)).toEqual(expect.objectContaining({ role: 'user', content: 'And once more' }));
+});
+
+test('a run the host refuses is shown as an alert, and nothing is pending', async () => {
+  const user = userEvent.setup();
+  runs.push(new Response('{"title":"Bad request"}', { status: 400 }));
+  renderEditor();
+  await openSales(user);
+
+  await ask(user, 'Show my dashboards as a table');
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(/.+/);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Ask' })).toBeEnabled());
+  expect(screen.queryByRole('region', { name: /^Proposed/ })).not.toBeInTheDocument();
+});
+{{~ if axe ~}}
+
+test('the dashboard with a pending proposal has no accessibility violations axe can find', async () => {
+  const user = userEvent.setup();
+  const answer = proposalRun(
+    'call-1',
+    { source: myDashboards.source, visual: 'table', replaces: null },
+    JSON.stringify(myDashboards),
+  );
+  const { container } = renderEditor();
+  await openSales(user);
+
+  await ask(user, 'Show my dashboards as a table');
+  answer();
+  const pending = await screen.findByRole('region', { name: 'Proposed: My dashboards' });
+  await within(pending).findByRole('cell', { name: 'Sales' });
+  await screen.findByText('Here it is.');
+
+  expect(await axe(container)).toHaveNoViolations();
+});
+{{~ end ~}}
