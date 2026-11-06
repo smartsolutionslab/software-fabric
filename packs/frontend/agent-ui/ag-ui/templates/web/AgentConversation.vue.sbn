@@ -1,0 +1,113 @@
+{{~ if project["frontend.ui-library"] != "shadcn-vue" || project["frontend.forms"] != "vee-validate" || project["frontend.validation"] != "zod" ~}}
+<script lang="ts">
+throw new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate and zod only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+</script>
+
+{{~ end ~}}
+<script setup lang="ts">
+import { contentToText } from '@ag-ui/client';
+import { useForm } from 'vee-validate';
+import { computed, useId } from 'vue';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
+import { toTypedSchema } from '@/forms/toTypedSchema';
+import { useAgent } from './useAgent';
+
+/** What the panel shows of one message: the user's text, or the agent's text and tool calls; tool results go with their calls. */
+type Entry =
+  | { kind: 'user'; key: string; text: string }
+  | { kind: 'answer'; key: string; text: string }
+  | { kind: 'tool-call'; key: string; name: string; arguments: string; result: string | undefined };
+
+const { agent } = defineProps<{ agent: string }>();
+
+const messageSchema = z.object({ message: z.string().trim().min(1, 'Write a message first.') });
+
+const { messages, running, failure, send } = useAgent(agent);
+const { defineField, errors, handleSubmit, resetForm } = useForm({
+  validationSchema: toTypedSchema(messageSchema),
+  initialValues: { message: '' },
+});
+const [message, messageAttributes] = defineField('message');
+const field = useId();
+
+const submit = handleSubmit(async (values) => {
+  resetForm();
+  await send(values.message);
+});
+
+const entries = computed(() => {
+  const results = new Map(
+    messages.value.flatMap((each) =>
+      each.role === 'tool' ? [[each.toolCallId, contentToText(each.content)] as const] : [],
+    ),
+  );
+
+  return messages.value.flatMap((each): Entry[] => {
+    if (each.role === 'user') {
+      return [{ kind: 'user', key: each.id, text: contentToText(each.content) }];
+    }
+
+    if (each.role !== 'assistant') {
+      return [];
+    }
+
+    const text = contentToText(each.content);
+    return [
+      ...(text ? [{ kind: 'answer', key: each.id, text } as const] : []),
+      ...(each.toolCalls ?? []).map((call) => ({
+        kind: 'tool-call' as const,
+        key: call.id,
+        name: call.function.name,
+        arguments: call.function.arguments,
+        result: results.get(call.id),
+      })),
+    ];
+  });
+});
+</script>
+
+<template>
+  <section :aria-label="`Conversation with ${agent}`" class="flex max-w-3xl flex-col gap-4 p-4">
+    <ol aria-label="Messages" class="flex flex-col gap-3">
+      <template v-for="entry in entries" :key="entry.key">
+        <li v-if="entry.kind === 'user'" class="self-end rounded-md bg-primary px-3 py-2 text-primary-foreground">
+          <p class="text-xs font-medium">You</p>
+          <p class="whitespace-pre-wrap">{{ "{{" }} entry.text {{ "}}" }}</p>
+        </li>
+        <li v-else-if="entry.kind === 'answer'" class="rounded-md bg-muted px-3 py-2">
+          <p class="text-xs font-medium text-muted-foreground">{{ "{{" }} agent {{ "}}" }}</p>
+          <p class="whitespace-pre-wrap">{{ "{{" }} entry.text {{ "}}" }}</p>
+        </li>
+        <li v-else class="rounded-md border px-3 py-2 text-sm">
+          <p class="text-xs font-medium text-muted-foreground">Tool call</p>
+          <p>
+            <code>{{ "{{" }} entry.name {{ "}}" }}</code> <code class="break-all">{{ "{{" }} entry.arguments {{ "}}" }}</code>
+          </p>
+          <p v-if="entry.result === undefined">Running…</p>
+          <p v-else>
+            Result: <code>{{ "{{" }} entry.result {{ "}}" }}</code>
+          </p>
+        </li>
+      </template>
+    </ol>
+    <p role="status" class="text-sm text-muted-foreground">{{ "{{" }} running ? 'Answering…' : '' {{ "}}" }}</p>
+    <p v-if="failure" role="alert" class="text-sm text-destructive">The agent could not answer: {{ "{{" }} failure {{ "}}" }}</p>
+    <form novalidate class="flex flex-col gap-2" @submit="submit">
+      <label :for="field" class="text-sm font-medium">Message</label>
+      <textarea
+        :id="field"
+        v-model="message"
+        v-bind="messageAttributes"
+        rows="3"
+        :aria-invalid="errors.message ? true : undefined"
+        :aria-describedby="errors.message ? `${field}-error` : undefined"
+        class="flex field-sizing-content min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+      />
+      <p v-if="errors.message" :id="`${field}-error`" role="alert" class="text-sm text-destructive">
+        {{ "{{" }} errors.message {{ "}}" }}
+      </p>
+      <Button type="submit" :disabled="running" class="self-end">Send</Button>
+    </form>
+  </section>
+</template>

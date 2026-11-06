@@ -22,11 +22,14 @@ files:
   - { template: templates/tests/TalkToTheAssistantTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Queries/TalkToTheAssistantTests.cs", per-module: true, when: 'module.name == "assistant"' }
   - { template: templates/tests/AgentUiGoesThroughAQuery.cs.sbn, target: tests/Architecture.Tests/Rules/AgentUiGoesThroughAQuery.cs }
   - { template: templates/tests/AgentUiTests.cs.sbn, target: tests/Integration.Tests/AgentUiTests.cs }
-  # The panel, for a React single-page app; elsewhere a test that fails saying it is not built yet (ADR-0006).
-  - { template: templates/web/connectAgent.ts.sbn, target: web/app/src/agents/connectAgent.ts, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa"' }
-  - { template: templates/web/useAgent.ts.sbn, target: web/app/src/agents/useAgent.ts, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa"' }
+  # The panel, for a React or Vue single-page app; elsewhere a test that fails saying it is not built yet (ADR-0006).
+  # connectAgent is the same for both; useAgent is a hook or a composable, branched in its template.
+  - { template: templates/web/connectAgent.ts.sbn, target: web/app/src/agents/connectAgent.ts, when: '(project["frontend.framework"] == "react" || project["frontend.framework"] == "vue") && project["frontend.architecture"] == "spa"' }
+  - { template: templates/web/useAgent.ts.sbn, target: web/app/src/agents/useAgent.ts, when: '(project["frontend.framework"] == "react" || project["frontend.framework"] == "vue") && project["frontend.architecture"] == "spa"' }
   - { template: templates/web/AgentPanel.tsx.sbn, target: web/app/src/agents/AgentPanel.tsx, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa"' }
   - { template: templates/web/AgentPanel.test.tsx.sbn, target: web/app/src/agents/AgentPanel.test.tsx, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa"' }
+  - { template: templates/web/AgentPanel.vue.sbn, target: web/app/src/agents/AgentPanel.vue, when: 'project["frontend.framework"] == "vue" && project["frontend.architecture"] == "spa"' }
+  - { template: templates/web/AgentConversation.vue.sbn, target: web/app/src/agents/AgentConversation.vue, when: 'project["frontend.framework"] == "vue" && project["frontend.architecture"] == "spa"' }
   - { template: templates/web/agent-panel.spec.ts.sbn, target: web/app/e2e/agent-panel.spec.ts, when: '(project["frontend.framework"] == "react" || project["frontend.framework"] == "vue") && project["frontend.architecture"] == "spa"' }
   # Vue's component test; with micro-frontends, a test that fails saying the panel is not built there yet.
   - { template: templates/web/AgentPanel.test.ts.sbn, target: web/app/src/agents/AgentPanel.test.ts, when: 'project["frontend.framework"] != "react" || project["frontend.architecture"] != "spa"' }
@@ -55,4 +58,5 @@ gates:
   - { kind: unit-test, describes: "The assistant's query, run through the dispatcher with a stand-in model that asks for a tool call, streams the call, its result and the answer built from it (tests/Modules/Assistant.Tests).", file: templates/tests/TalkToTheAssistantTests.cs.sbn }
   - { kind: lint-rule, describes: "Importing CopilotKit (@copilotkit/*) in the web app fails lint: the panel talks to the agents on @ag-ui/client.", file: templates/web-restricted.sbn }
   - { kind: unit-test, describes: "The agent panel shows the user's messages, each tool call with its result and the answer while it streams, sends the whole conversation with the signed-in user's token to /api/agents/{name}, shows a refused run and a streamed RUN_ERROR as an alert, starts a new conversation for another agent, and passes axe where the project has the accessibility tests (src/agents/AgentPanel.test.tsx).", file: templates/web/AgentPanel.test.tsx.sbn }
+  - { kind: unit-test, describes: "With Vue, the same: the agent panel shows the user's messages, each tool call with its result and the answer while it streams, sends the whole conversation with the signed-in user's token to /api/agents/{name}, shows a refused run and a streamed RUN_ERROR as an alert, starts a new conversation for another agent, and passes axe where the project has the accessibility tests (src/agents/AgentPanel.test.ts).", file: templates/web/AgentPanel.test.ts.sbn }
   - { kind: end-to-end-test, describes: "Against the AppHost with the stand-in model, a browser sends two messages from the assistant's page; each answer streams in more than one TEXT_MESSAGE_CONTENT event after a count_words call whose result the panel shows (e2e/agent-panel.spec.ts).", file: templates/web/agent-panel.spec.ts.sbn }

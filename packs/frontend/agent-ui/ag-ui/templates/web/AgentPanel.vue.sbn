@@ -1,0 +1,14 @@
+<script setup lang="ts">
+import AgentConversation from './AgentConversation.vue';
+
+/**
+ * A conversation with one of the host's agents, over AG-UI (POST /api/agents/{name}): the user's messages, each tool
+ * call the agent makes with its result, and the agent's answers while they stream in. Another agent starts another
+ * conversation.
+ */
+const { agent } = defineProps<{ agent: string }>();
+</script>
+
+<template>
+  <AgentConversation :key="agent" :agent="agent" />
+</template>
