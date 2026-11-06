@@ -133,7 +133,9 @@ none is a new choice of option.
   `AspireFixture` sets it (`integration-tests.parameters`), and `e2e.sh`
   through the slot the React panel added for it (below). Only a tool result
   after the latest user message counts, so every turn of a conversation calls
-  the tool again (#203).
+  the tool again (#203). A message that is an offered tool's name, a space and a
+  JSON object calls that tool with those arguments instead (#185), so a test
+  can ask for a call whose arguments are not one text.
 - **A run that fails mid-stream** reaches the browser as the SDK's generic
   `RUN_ERROR`. The SDK traces the cause on its `agui.run` span, on the source
   `AGUIServerInstrumentation.ActivitySourceName` (`Experimental.AGUI.Server`),

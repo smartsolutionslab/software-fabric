@@ -1,0 +1,26 @@
+option: frontend.dashboards.generative
+files:
+  - { template: templates/Module/DashboardAgent.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Agents/DashboardAgent.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/ProposeWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/ProposeWidget/ProposeWidget.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/ProposeWidgetHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/ProposeWidget/ProposeWidgetHandler.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/WidgetProposalDto.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/WidgetProposalDto.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/WidgetProposalMappings.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/WidgetProposalMappings.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/TalkToTheDashboards.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/TalkToTheDashboards/TalkToTheDashboards.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/TalkToTheDashboardsHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/TalkToTheDashboards/TalkToTheDashboardsHandler.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardDraft.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/TalkToTheDashboards/DashboardDraft.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DraftWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/TalkToTheDashboards/DraftWidget.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/InvalidDraft.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidDraft.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/DashboardAgentFailures.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DashboardAgentFailures.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/tests/DashboardServices.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Queries/DashboardServices.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/tests/RecordingChatClient.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Queries/RecordingChatClient.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/tests/ProposeWidgetTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Queries/ProposeWidgetTests.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/tests/TalkToTheDashboardsTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Queries/TalkToTheDashboardsTests.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/tests/TheDashboardAgentSavesNothing.cs.sbn, target: tests/Architecture.Tests/Rules/TheDashboardAgentSavesNothing.cs }
+  - { template: templates/tests/GenerativeDashboardsTests.cs.sbn, target: tests/Integration.Tests/GenerativeDashboardsTests.cs }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No agent of the dashboards module is given a command as a tool: a DispatcherTool.For<TRequest> in the module's Application project whose request is an ICommand fails the build naming the type and the command.", file: templates/tests/TheDashboardAgentSavesNothing.cs.sbn }
+  - { kind: unit-test, describes: "Through the dispatcher, the dashboards agent is offered list_widgets and propose_widget alone; a proposal names a declared widget the caller may see, as a visual its kind can show, under its declared title, and a replaced key a dashboard can hold; the open draft reaches the model before the conversation with declared titles only, and a draft that is not a list of at most 50 widgets is refused (tests/Modules/Dashboards.Tests).", file: templates/tests/TalkToTheDashboardsTests.cs.sbn }
+  - { kind: end-to-end-test, describes: "Through Aspire, POST /agents/dashboards proposes a declared widget with its declared title and saves nothing, may name a draft widget it replaces, refuses an undeclared widget and a table as a chart, lists the catalogue a page at a time, and refuses a draft that is not a list of widgets.", file: templates/tests/GenerativeDashboardsTests.cs.sbn }

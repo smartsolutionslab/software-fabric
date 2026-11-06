@@ -537,8 +537,8 @@ dimensions:
         requires: ["backend.errors == result", "backend.data-access == ef-core", "backend.database == postgres"]
       generative:
         tier: experimental
-        note: "an agent creates or changes widgets on request, from the same declared widgets (#185)"
-        requires: ["frontend.dashboards has user-editable", "backend.llm.agents == agent-framework"]
+        note: "an agent in the agent panel proposes widgets from the same declared widgets; the user accepts and saves them (#185)"
+        requires: ["frontend.dashboards has user-editable", "frontend.agent-ui == ag-ui"]
 
   frontend.realtime:
     scope: project

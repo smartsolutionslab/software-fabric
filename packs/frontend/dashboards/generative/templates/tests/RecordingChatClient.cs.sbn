@@ -1,0 +1,38 @@
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.AI;
+
+namespace {{ namespace }}.Modules.Dashboards.Tests.Queries;
+
+/// <summary>A model that keeps the messages of every request and answers each with the same text; it never calls a tool.</summary>
+internal sealed class RecordingChatClient : IChatClient
+{
+    private readonly List<IReadOnlyList<ChatMessage>> requests = [];
+
+    /// <summary>The messages each request carried, in the order the requests came.</summary>
+    public IReadOnlyList<IReadOnlyList<ChatMessage>> Requests => requests;
+
+    public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        requests.Add([.. messages]);
+        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "Noted.")));
+    }
+
+    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> messages,
+        ChatOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var response = await GetResponseAsync(messages, options, cancellationToken);
+        foreach (var update in response.ToChatResponseUpdates())
+        {
+            yield return update;
+        }
+    }
+
+    public object? GetService(Type serviceType, object? serviceKey = null) =>
+        serviceKey is null && serviceType is not null && serviceType.IsInstanceOfType(this) ? this : null;
+
+    public void Dispose()
+    {
+    }
+}

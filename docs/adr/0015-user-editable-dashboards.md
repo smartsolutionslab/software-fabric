@@ -35,8 +35,9 @@ a typed declaration per module, and a module the pack brings (ADR-0005, #187).
   | `[user-editable]` | lets each user arrange, resize and save widgets on dashboards of their own. |
   | `[user-editable, generative]` | also lets an agent create or change widgets on request (#185). |
 
-  `generative` requires `user-editable` and `backend.llm.agents ==
-  agent-framework`. As a multi dimension the two combine without a third option,
+  `generative` requires `user-editable` and, since #185, `frontend.agent-ui ==
+  ag-ui` (which is active only with `backend.llm.agents == agent-framework`):
+  the agent is reached through the agent panel's endpoint. As a multi dimension the two combine without a third option,
   as `backend.authorization` and `backend.mcp` do (ADR-0009, ADR-0010). A
   dashboard belongs to a signed-in user, so without authentication the dimension
   is inactive.
@@ -148,13 +149,59 @@ above changes for React.
   empty, and the generator drops an empty contribution before it joins a slot
   (#221).
 
+**As built for generative, the backend (#185).** The owner settled the open
+choices on #185 by accepting the recommendations put to them
+([comment](https://github.com/smartsolutionslab/software-fabric/issues/185#issuecomment-6680464205)),
+with React and Vue panels as later steps, and decided on a second escalation
+that paged queries become agent tools in the agent-framework pack (#215).
+
+- **The catalog.** `generative` requires `frontend.agent-ui == ag-ui` instead
+  of the agents option it implies. It has its own pack,
+  `packs/frontend/dashboards/generative`, which adds files to the brought
+  `dashboards` module only.
+- **The agent lives in the dashboards module**, as ADR-0011 places agents:
+  `Agents/DashboardAgent`, run by the query `TalkToTheDashboards`, the agent
+  `dashboards` of `POST /agents/{name}` (ADR-0013). Modules do not reference
+  each other, so the `assistant` module could not use these queries.
+- **Its tools are two queries through the dispatcher:** `ListWidgets`, the
+  catalogue the caller may see, a page at a time (a paged query is a tool
+  since #215), and `ProposeWidget`. A proposal names a declared widget the
+  caller may see, a visual its kind can show and, optionally, the key of the
+  draft's widget it replaces; it answers the widget under its declared title
+  and saves nothing. An undeclared or hidden widget is
+  `dashboards.unknown-widget`, an unfitting visual or key
+  `dashboards.invalid-widget`. The browser renders the tool's result as a
+  pending widget with Accept and Discard; Accept only changes the draft, and
+  the existing Save persists it through every check a save makes.
+- **Shared state is the open draft, read-only.** The browser sends the draft's
+  widgets (key, source, visual) as the run's AG-UI state. `DashboardDraft.Read`
+  checks its shape and size (at most 50 widgets, short texts; otherwise
+  `dashboards.invalid-draft`, a 400), and the handler gives the model the
+  declared widgets among them, with their declared titles, as one message
+  before the conversation, never in the agent's instructions. The host
+  endpoint does not change: no state events, and no tools the browser
+  declares.
+- **The gate** `TheDashboardAgentSavesNothing` fails the build when the
+  dashboards module gives an agent a command as a tool, found in the compiled
+  code as `EveryAgentToolRequestIsValid` finds tool requests.
+- **The stand-in model** (ADR-0013) also calls a tool a message names: a
+  message that is an offered tool's name, a space and a JSON object calls that
+  tool with those arguments, so the tests can ask for a precise proposal.
+  Every other message is answered as before.
+- **Tests.** `tests/Modules/Dashboards.Tests` runs the agent and the proposal
+  through the dispatcher; `tests/Integration.Tests/GenerativeDashboardsTests`
+  runs them through the host with the stand-in model.
+- **Still to come:** the React panel on the dashboard page, with its
+  end-to-end test, and then the Vue one.
+
 ## Consequences
 
 - Every existing profile takes `frontend.dashboards: []`; its `fabric.yaml`
   gains that one line, as `backend.authorization` and `backend.mcp` did, and
   every other file is unchanged.
 - `user-editable` and `generative` are `experimental` (ADR-0003): the first has
-  a pack, whose React page is still to come; the second has none until #185.
+  a pack with a React and a Vue page; the second has a pack whose backend is
+  built (#185) and whose pages are still to come.
 - The frontend's checked-in OpenAPI document describes the module's endpoints:
   the API client packs declare the slots it fills.
 - A module that wants a widget changes its own Application project only; no

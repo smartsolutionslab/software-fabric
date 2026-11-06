@@ -1,0 +1,23 @@
+using {{ namespace }}.Modules.Dashboards.Api;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Modules.Dashboards.Tests.Queries;
+
+/// <summary>The dashboards module with what the host provides: the dispatcher, the model and the module's own widgets.</summary>
+internal static class DashboardServices
+{
+    public static ServiceProvider Build(IChatClient model)
+    {
+        var services = new ServiceCollection().AddLogging();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:database"] = "Host=localhost" })
+            .Build();
+        services.AddDispatcher();
+        services.AddSingleton(model);
+        services.AddDashboardWidgets([new DashboardsModule()]);
+        new DashboardsModule().AddServices(services, configuration);
+        return services.BuildServiceProvider();
+    }
+}
