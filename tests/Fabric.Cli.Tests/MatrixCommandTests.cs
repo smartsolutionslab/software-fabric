@@ -57,6 +57,27 @@ public sealed class MatrixCommandTests : IDisposable
         File.Exists(output).ShouldBeFalse();
     }
 
+    /// <summary>A combination's choices are what <c>fabric new --choices</c> reads: dimension to option, or to a list for a multi-valued one.</summary>
+    [Fact]
+    public void Each_combination_generates_with_fabric_new_from_its_choices()
+    {
+        var matrix = Path.Combine(root, "matrix.json");
+        Matrix("--output", matrix).ExitCode.ShouldBe(0);
+        using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(matrix));
+
+        foreach (var combination in document.RootElement.GetProperty("combinations").EnumerateArray())
+        {
+            var name = combination.GetProperty("name").GetString()!;
+            var choices = Path.Combine(root, $"{name}.json");
+            File.WriteAllText(choices, combination.GetProperty("choices").GetRawText());
+
+            var run = CliRun.Of("new", Path.Combine(root, name), "--choices", choices, "--catalog", Paths.FixtureCatalog, "--packs", Paths.FixturePacks);
+
+            run.ExitCode.ShouldBe(0, $"{name}: {run.Error}");
+            File.ReadAllText(Path.Combine(root, name, "fabric.yaml")).ShouldNotContain("profile:", Case.Sensitive, name);
+        }
+    }
+
     [Fact]
     public void Without_an_output_file_prints_the_matrix()
     {
