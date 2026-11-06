@@ -12,6 +12,21 @@ namespace Fabric.Packs.Tests;
 /// </summary>
 public sealed class ProfileCiTests
 {
+    /// <summary>
+    /// Stands for a matrix in build/matrix.json's shape among a test's arguments: the run writes <see cref="MatrixJson"/>
+    /// to its temporary directory and passes that path instead.
+    /// </summary>
+    private const string Matrix = "<matrix.json>";
+
+    private const string MatrixJson = """
+        {
+          "combinations": [
+            { "name": "pair-1", "choices": { "backend.llm": "openai", "module.ddd-depth": "strict" } },
+            { "name": "pair-2", "choices": { "module.ddd-depth": "light" } }
+          ]
+        }
+        """;
+
     private static readonly string[] CatalogProfiles = [.. Repository.Catalog.Profiles.Keys];
 
     /// <summary>The profiles the real packs generate alone, without stand-ins.</summary>
@@ -85,10 +100,68 @@ public sealed class ProfileCiTests
         output.ShouldNotContain("::group::", Case.Sensitive, output);
     }
 
+    [Fact]
+    public void A_matrix_combination_is_what_profile_CI_generates_with_no_profile()
+    {
+        var (_, output, fabricYaml) = ProfileCiUntilItsFirstStep("--combination", "pair-1", "--matrix", Matrix);
+
+        output.ShouldContain("::group::combination pair-1: backend format check", Case.Sensitive, output);
+        fabricYaml.ShouldNotBeNull(output);
+        fabricYaml.ShouldNotContain("profile:", Case.Sensitive, output);
+        fabricYaml.ShouldContain("  module.ddd-depth: strict\n", Case.Sensitive, output);
+        fabricYaml.ShouldContain("  backend.llm: openai\n", Case.Sensitive, output);
+    }
+
+    [Fact]
+    public void Profile_CI_runs_only_the_steps_it_is_given()
+    {
+        var (exitCode, output, fabricYaml) = ProfileCiUntilItsFirstStep("--combination", "pair-1", "--matrix", Matrix, "--steps", "generate");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldNotContain("::group::", Case.Sensitive, output);
+        output.ShouldContain("combination pair-1: generated\n", Case.Sensitive, output);
+        fabricYaml.ShouldBeNull("the work directory is removed when the run ends.");
+    }
+
+    [Fact]
+    public void A_combination_the_matrix_lacks_stops_profile_CI_before_its_first_step()
+    {
+        var (exitCode, output, _) = ProfileCiUntilItsFirstStep("--combination", "pair-9", "--matrix", Matrix);
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain("no combination pair-9 in ", Case.Sensitive, output);
+        output.ShouldContain("matrix.json", Case.Sensitive, output);
+        output.ShouldNotContain("::group::", Case.Sensitive, output);
+    }
+
+    [Theory]
+    [InlineData("generate,deploy", "unknown step deploy; the steps are generate,build,test,web,e2e")]
+    [InlineData("build,test", "every run starts with generate")]
+    [InlineData("generate,test", "test needs build")]
+    [InlineData("generate,build,e2e", "e2e needs web")]
+    public void Steps_profile_CI_cannot_run_are_refused_before_generating(string steps, string message)
+    {
+        var (exitCode, output, fabricYaml) = ProfileCiUntilItsFirstStep("saas-standard-react", "--steps", steps);
+
+        exitCode.ShouldBe(2, output);
+        output.ShouldContain(message, Case.Sensitive, output);
+        fabricYaml.ShouldBeNull(output);
+    }
+
+    [Fact]
+    public void A_profile_and_a_combination_together_are_refused()
+    {
+        var (exitCode, output, _) = ProfileCiUntilItsFirstStep("saas-standard-react", "--combination", "pair-1", "--matrix", Matrix);
+
+        exitCode.ShouldBe(2, output);
+        output.ShouldContain("Usage: build/profile-ci.sh --combination <name>", Case.Sensitive, output);
+    }
+
     /// <summary>
     /// Runs build/profile-ci.sh only as far as its first CI step, so a test sees what it generated without running the
     /// generated project's CI. Its work directory is made in a temporary directory of the test's own, so the generated
-    /// project's <c>fabric.yaml</c> can be read when the script got that far, and nothing is left behind.
+    /// project's <c>fabric.yaml</c> can be read when the script got that far, and nothing is left behind. The test
+    /// matrix is written there too.
     /// </summary>
     private static (int ExitCode, string Output, string? FabricYaml) ProfileCiUntilItsFirstStep(params string[] arguments)
     {
@@ -97,9 +170,11 @@ public sealed class ProfileCiTests
         {
             var start = new ProcessStartInfo("bash") { WorkingDirectory = Repository.Root, RedirectStandardOutput = true, RedirectStandardError = true };
             start.ArgumentList.Add("build/profile-ci.sh");
+            var matrix = Path.Combine(temporary.FullName, "matrix.json");
+            File.WriteAllText(matrix, MatrixJson);
             foreach (var argument in arguments)
             {
-                start.ArgumentList.Add(argument);
+                start.ArgumentList.Add(argument == Matrix ? matrix : argument);
             }
 
             start.Environment["TMPDIR"] = temporary.FullName;

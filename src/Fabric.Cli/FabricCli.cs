@@ -67,11 +67,17 @@ public static class FabricCli
         var (profile, set, catalog, packs) = (ProfileOption(), SetOption(), CatalogOption(), PacksOption());
         var directory = new Argument<string>("directory") { Description = "Where to create the project; must be new or empty." };
         var name = new Option<string?>("--name") { Description = "The project's name in lower kebab-case. Defaults to the directory's name." };
-        var command = new Command("new", "Generate a project from a profile plus overrides.")
+        var choices = new Option<string?>("--choices")
+        {
+            Description = "A JSON file of dimension to option (or to a list of options), such as a combination of build/matrix.json, " +
+                "to generate from instead of a profile. Overrides apply on top of it.",
+        };
+        var command = new Command("new", "Generate a project from a profile, or a choice set file, plus overrides.")
         {
             directory,
             name,
             profile,
+            choices,
             set,
             catalog,
             packs,
@@ -86,6 +92,23 @@ public static class FabricCli
                 return Fail(error, [$"project name '{projectName}' must be lower-case letters, digits and hyphens, starting with a letter. Pass --name."]);
             }
 
+            IReadOnlyList<string> overrides = result.GetValue(set) ?? [];
+            if (result.GetValue(choices) is { } choiceSetPath)
+            {
+                if (result.GetValue(profile) is not null)
+                {
+                    return Fail(error, ["--choices is a whole choice set and takes no --profile; pass one or the other."]);
+                }
+
+                var choiceSet = ChoiceSetFile.Read(File.ReadAllText(choiceSetPath), choiceSetPath);
+                if (choiceSet.Errors.Count > 0)
+                {
+                    return Fail(error, choiceSet.Errors);
+                }
+
+                overrides = [.. choiceSet.Overrides, .. overrides];
+            }
+
             var catalogModel = CatalogReader.ReadFile(result.GetValue(catalog)!);
             var loaded = PackLoader.Load(result.GetValue(packs)!, catalogModel);
             if (loaded.Errors.Count > 0)
@@ -93,7 +116,7 @@ public static class FabricCli
                 return Fail(error, loaded.Errors);
             }
 
-            var generated = Generator.New(catalogModel, loaded.Packs, projectName, result.GetValue(profile), result.GetValue(set) ?? []);
+            var generated = Generator.New(catalogModel, loaded.Packs, projectName, result.GetValue(profile), overrides);
             if (generated.Errors.Count > 0)
             {
                 return Fail(error, generated.Errors);

@@ -183,4 +183,77 @@ public sealed class NewCommandTests : IDisposable
         run.ExitCode.ShouldBe(1);
         run.Error.ShouldContain("error: project name 'Some_Directory' must be lower-case letters, digits and hyphens, starting with a letter. Pass --name.");
     }
+
+    private string ChoiceSet(string json)
+    {
+        var path = Path.Combine(root, "choices.json");
+        File.WriteAllText(path, json);
+        return path;
+    }
+
+    [Fact]
+    public void A_choice_set_generates_the_project_its_profile_would_and_records_no_profile()
+    {
+        var choices = ChoiceSet("""{ "backend.database": "sqlserver", "backend.api-protocols": ["rest", "grpc"], "module.style": "crud" }""");
+
+        var run = New("from-choices", "--name", "shop", "--choices", choices);
+        New("from-profile", "--name", "shop", "--profile", "everything").ExitCode.ShouldBe(0);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        Tree("from-choices")["fabric.yaml"].ShouldNotContain("profile:");
+        Tree("from-choices")["fabric.yaml"].ShouldBe(Tree("from-profile")["fabric.yaml"].Replace("profile: everything\n", string.Empty, StringComparison.Ordinal));
+        Tree("from-choices").Where(file => file.Key != "fabric.yaml").ShouldBe(Tree("from-profile").Where(file => file.Key != "fabric.yaml"));
+    }
+
+    [Fact]
+    public void An_override_wins_over_the_choice_set()
+    {
+        var choices = ChoiceSet("""{ "backend.database": "sqlserver" }""");
+
+        var run = New("shop", "--choices", choices, "--set", "backend.database=postgres");
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        Tree("shop")["fabric.yaml"].ShouldContain("backend.database: postgres\n");
+    }
+
+    [Fact]
+    public void A_choice_set_with_a_profile_is_refused_before_anything_is_written()
+    {
+        var choices = ChoiceSet("""{ "backend.database": "sqlserver" }""");
+
+        var run = New("shop", "--choices", choices, "--profile", "minimal");
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldBe($"error: --choices is a whole choice set and takes no --profile; pass one or the other.{Environment.NewLine}");
+        Directory.Exists(Path.Combine(root, "shop")).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("""{ "module.style": 3 }""", "module.style must be an option or a list of options")]
+    [InlineData("""{ "backend.api-protocols": ["rest", 1] }""", "backend.api-protocols must be an option or a list of options")]
+    [InlineData("""["backend.database=postgres"]""", "must be a JSON object of dimension to option")]
+    [InlineData("""{ "backend.database": """, "is not valid JSON")]
+    public void A_choice_set_that_is_not_dimensions_to_options_is_refused_naming_the_file(string json, string message)
+    {
+        var choices = ChoiceSet(json);
+
+        var run = New("shop", "--choices", choices);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldStartWith($"error: {choices}: ");
+        run.Error.ShouldContain(message);
+        Directory.Exists(Path.Combine(root, "shop")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_choice_set_naming_an_option_the_catalog_lacks_is_refused_like_an_override()
+    {
+        var choices = ChoiceSet("""{ "backend.database": "oracle" }""");
+
+        var run = New("shop", "--choices", choices);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("'oracle' is not an option of backend.database");
+        Directory.Exists(Path.Combine(root, "shop")).ShouldBeFalse();
+    }
 }
