@@ -192,7 +192,42 @@ that paged queries become agent tools in the agent-framework pack (#215).
   through the dispatcher; `tests/Integration.Tests/GenerativeDashboardsTests`
   runs them through the host with the stand-in model.
 - **Still to come:** the React panel on the dashboard page, with its
-  end-to-end test, and then the Vue one.
+  end-to-end test (below), and then the Vue one.
+
+**As built for generative, the React page (#185).** The page the user-editable
+pack builds for a React single-page app on RTK Query gains the agent; with any
+other frontend the page stays as `user-editable` leaves it until its own step.
+
+- **The assistant** is `DashboardAssistant` in `web/app/src/dashboards`, a
+  file of the generative pack: a conversation with the agent `dashboards`
+  through the ag-ui pack's `useAgent`, which takes an optional state getter
+  for it, read as each run starts. It sends the open draft's widgets (key,
+  source, visual) as the run's state, and shows each tool call as text: a
+  proposal by its declared title, a refusal by the host's reason.
+- **A proposal waits on the grid.** The assistant reads each `propose_widget`
+  result through `readProposal`, a zod schema, since a tool result is
+  untrusted, and hands each to `DashboardCanvas` once. The canvas places
+  every undecided proposal, one below the other under the draft's widgets, as
+  a fixed `PendingWidget` with its live data from
+  `GET /dashboards/widgets/{id}` (read again after each save, as a placed
+  widget's is), and Accept and Discard. A refused proposal leaves nothing
+  pending.
+- **Accept only changes the draft**, adding the widget below the others or
+  putting it in the place of the one it names (as a new widget when the draft
+  no longer has it); the existing Save persists it. Accept is disabled when a
+  new widget would not fit, as Add widget is.
+- **Where it shows.** The user-editable pack's `DashboardCanvas.tsx` branches
+  on `generative` (ADR-0006) to render the assistant and the pending widget,
+  rather than a slot; without `generative` it is unchanged.
+- **Tests.** `DashboardAssistant.test.tsx` renders the page against a
+  server-sent event stream the test writes, with axe where the project has the
+  accessibility tests. `e2e/generative-dashboards.spec.ts`, against the
+  AppHost with the stand-in model, asks for
+  `propose_widget {"source":"dashboards.widget-counts","visual":"bar","replaces":null}`,
+  accepts, saves, reloads and finds the chart, and asks for an undeclared
+  widget, which is refused with nothing pending or saved. The message names
+  `replaces` as `null`: an agent tool's `Option` argument is required, so the
+  model states its absence (#215).
 
 ## Consequences
 
@@ -200,8 +235,8 @@ that paged queries become agent tools in the agent-framework pack (#215).
   gains that one line, as `backend.authorization` and `backend.mcp` did, and
   every other file is unchanged.
 - `user-editable` and `generative` are `experimental` (ADR-0003): the first has
-  a pack with a React and a Vue page; the second has a pack whose backend is
-  built (#185) and whose pages are still to come.
+  a pack with a React and a Vue page; the second has a pack whose backend and
+  React page are built (#185) and whose Vue page is still to come.
 - The frontend's checked-in OpenAPI document describes the module's endpoints:
   the API client packs declare the slots it fills.
 - A module that wants a widget changes its own Application project only; no

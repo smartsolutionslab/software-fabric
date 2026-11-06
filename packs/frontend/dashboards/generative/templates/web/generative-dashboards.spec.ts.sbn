@@ -1,0 +1,83 @@
+import { expect, type Page, test } from '@playwright/test';
+
+async function openDashboards(page: Page) {
+  await page.goto('/');
+  await page.getByLabel('Username or email').fill('developer');
+  await page.getByLabel('Password', { exact: true }).fill('developer');
+  await page.getByRole('button', { name: 'Sign In' }).click();
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+  await page.getByRole('link', { name: 'Dashboards' }).click();
+}
+
+/** Asks the dashboards agent, through the page's assistant, and waits for the host to answer with a stream. */
+async function ask(page: Page, message: string) {
+  const answered = page.waitForResponse((response) => response.url().endsWith('/api/agents/dashboards'));
+  await page.getByRole('textbox', { name: 'Ask the assistant' }).fill(message);
+  await page.getByRole('button', { name: 'Ask' }).click();
+  const response = await answered;
+  expect(response.status()).toBe(200);
+  expect(response.headers()['content-type']).toContain('text/event-stream');
+}
+
+// The AppHost runs with the stand-in model (e2e.sh sets model-stand-in): a message that is an offered tool's name and a
+// JSON object calls that tool with those arguments, so the test asks for a precise proposal.
+test('a user asks the assistant for a chart, accepts it, saves the dashboard and finds the chart after a reload', async ({
+  page,
+}) => {
+  const name = `Assistant ${Date.now()}`;
+  await openDashboards(page);
+  await page.getByRole('button', { name: 'New dashboard' }).click();
+  await page.getByLabel('Dashboard name').fill(name);
+
+  await ask(page, 'propose_widget {"source":"dashboards.widget-counts","visual":"bar","replaces":null}');
+  const pending = page.getByRole('region', { name: 'Proposed: Widgets per dashboard' });
+  await expect(pending.getByRole('img', { name: 'Widgets per dashboard' })).toBeVisible();
+
+  await pending.getByRole('button', { name: 'Accept' }).click();
+  await expect(pending).toHaveCount(0);
+  const widget = page.getByRole('region', { name: 'Widgets per dashboard', exact: true });
+  await expect(widget.getByRole('img', { name: 'Widgets per dashboard' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Save dashboard' }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved.');
+
+  await page.reload();
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+  await page.getByRole('link', { name: 'Dashboards' }).click();
+  await page.getByRole('button', { name }).click();
+  const reloaded = page.getByRole('region', { name: 'Widgets per dashboard', exact: true });
+  await expect(reloaded.getByRole('img', { name: 'Widgets per dashboard' })).toBeVisible();
+  await expect(page.getByLabel('Dashboard name')).toHaveValue(name);
+});
+
+test('a widget the modules do not declare is refused: nothing is pending and nothing is saved', async ({ page }) => {
+  const saves: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'PUT' && request.url().includes('/api/dashboards/')) {
+      saves.push(request.url());
+    }
+  });
+  const name = `Refused ${Date.now()}`;
+  await openDashboards(page);
+  await page.getByRole('button', { name: 'New dashboard' }).click();
+  await page.getByLabel('Dashboard name').fill(name);
+
+  await ask(page, 'propose_widget {"source":"nothing.declared","visual":"bar","replaces":null}');
+
+  await expect(page.getByRole('list', { name: 'Conversation' })).toContainText('Refused: dashboards.unknown-widget');
+  await expect(page.getByRole('region', { name: /^Proposed:/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Accept' })).toHaveCount(0);
+  await expect(page.locator('.react-grid-item')).toHaveCount(0);
+  expect(saves).toEqual([]);
+
+  // The reload stays on the dashboards page, which lists the user's dashboards as it loads.
+  const listed = page.waitForResponse(
+    (response) => response.url().includes('/api/dashboards?') && response.request().method() === 'GET',
+  );
+  await page.reload();
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+  expect((await listed).status()).toBe(200);
+  await page.getByRole('link', { name: 'Dashboards' }).click();
+  await expect(page.getByRole('button', { name: 'New dashboard' })).toBeVisible();
+  await expect(page.getByRole('button', { name })).toHaveCount(0);
+});

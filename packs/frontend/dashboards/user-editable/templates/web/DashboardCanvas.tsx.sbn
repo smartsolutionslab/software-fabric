@@ -1,3 +1,4 @@
+{{~ generative = array.contains project["frontend.dashboards"] "generative" ~}}
 {%{import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState } from 'react';
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
@@ -9,7 +10,12 @@ import { Failure } from './Failure';
 import { applyLayout, columns, hasRoom, lowest, nextPlacement, type Placement, toLayout, withinReach } from './layout';
 import { Pager } from './Pager';
 import { PlacedWidget } from './PlacedWidget';
-import { uuidV7 } from './uuidV7';
+}%}{{~ if generative ~}}
+import { DashboardAssistant } from './DashboardAssistant';
+import { PendingWidget } from './PendingWidget';
+import { acceptProposal, type PendingProposal, pendingOnGrid, replacedBy } from './proposal';
+{{~ end ~}}
+{%{import { uuidV7 } from './uuidV7';
 import { checkChoice, visuals } from './widgetChoice';
 
 const rowHeight = 40;
@@ -67,7 +73,12 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   const [tooLow, setTooLow] = useState(false);
   const full = placements.length >= maximumWidgets;
   const roomLeft = hasRoom(placements);
-
+}%}{{~ if generative ~}}
+  // The widgets the dashboards agent proposed: on the grid, outside the draft, until the user accepts or discards each.
+  const [pending, setPending] = useState<PendingProposal[]>([]);
+  const proposed = pendingOnGrid(placements, pending);
+{{~ end ~}}
+{%{
   const edited = () => {
     setRevision((current) => current + 1);
     setFailed(false);
@@ -78,7 +89,19 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
     setPlacements(next);
     edited();
   };
+}%}{{~ if generative ~}}
 
+  const propose = (proposal: PendingProposal) => setPending((current) => [...current, proposal]);
+  const decide = (call: string) => setPending((current) => current.filter((other) => other.call !== call));
+
+  /** Accept only changes the draft, adding the widget or replacing the one it names; Save persists it as any edit. */
+  const accept = ({ call, proposal }: PendingProposal) => {
+    const key = uuidV7();
+    change((current) => acceptProposal(current, proposal, key));
+    decide(call);
+  };
+{{~ end ~}}
+{%{
   const naming = useForm({ resolver: zodResolver(nameSchema), defaultValues: { name: dashboard.name } });
   const adding = useForm({ resolver: zodResolver(widgetSchema), defaultValues: { source: '', visual: '' } });
   const chosen = listed.get(useWatch({ control: adding.control, name: 'source' }));
@@ -180,12 +203,19 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
         />
       )}
 
-      {tooLow && <p role="alert">A widget cannot start below row {lowest}; it went back where it was.</p>}
+}%}{{~ if generative ~}}
+      <DashboardAssistant widgets={placements} onProposal={propose} />
+{{~ end ~}}
+{%{      {tooLow && <p role="alert">A widget cannot start below row {lowest}; it went back where it was.</p>}
       <div ref={containerRef}>
         <ReactGridLayout
           width={width}
+}%}{{~ if generative ~}}
+          layout={[...toLayout(placements), ...proposed.map(({ item }) => item)]}
+{{~ else ~}}
           layout={toLayout(placements)}
-          gridConfig={{ cols: columns, rowHeight }}
+{{~ end ~}}
+{%{          gridConfig={{ cols: columns, rowHeight }}
           dragConfig={{ cancel: 'button, select, input, table' }}
           onLayoutChange={(layout) => {
             const moved = applyLayout(placements, layout);
@@ -214,7 +244,26 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
               />
             </div>
           ))}
-        </ReactGridLayout>
+}%}{{~ if generative ~}}
+          {proposed.map(({ proposed: proposal, item }) => {
+            const replacing = replacedBy(placements, proposal.proposal) !== undefined;
+            return (
+              <div key={item.i}>
+                <PendingWidget
+                  proposal={proposal.proposal}
+                  rows={item.h}
+                  rowHeight={rowHeight}
+                  replacing={replacing}
+                  canAccept={replacing || (!full && roomLeft)}
+                  refresh={saves}
+                  onAccept={() => accept(proposal)}
+                  onDiscard={() => decide(proposal.call)}
+                />
+              </div>
+            );
+          })}
+{{~ end ~}}
+{%{        </ReactGridLayout>
       </div>
     </section>
   );

@@ -194,6 +194,9 @@ above too.
   stream the test writes, and checks axe where the project has the
   accessibility tests. `e2e/agent-panel.spec.ts` sends two messages through
   the panel against the AppHost with the stand-in model.
+- **Shared state** (#185). `useAgent` takes an optional getter, read as each
+  run starts and sent as the run's `state`; the panel passes none. Generative
+  dashboards pass the open draft (ADR-0015).
 
 **As built for the Vue panel (#183).** The same panel for a Vue
 single-page app, a branch of the same pack (ADR-0006); nothing above
