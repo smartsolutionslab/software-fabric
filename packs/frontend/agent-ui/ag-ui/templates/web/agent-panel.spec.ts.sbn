@@ -48,8 +48,9 @@ test('the assistant answers in the panel, streaming its text after its tool ran 
   await expect(messages).toContainText('The tool said: 3');
 
   // A second turn is a new question: the tool runs again for it rather than the first answer coming back.
-  await say(page, 'four five');
+  const second = await say(page, 'four five');
 
+  expect(second.filter((type) => type === 'TEXT_MESSAGE_CONTENT').length).toBeGreaterThan(1);
   await expect(toolCalls).toHaveCount(2);
   await expect(toolCalls.nth(1)).toContainText('Result: 2');
   await expect(messages).toContainText('The tool said: 2');
