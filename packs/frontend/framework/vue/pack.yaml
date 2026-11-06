@@ -1,3 +1,4 @@
+# Probe for #241: a frontend-only pack change; not to be merged.
 option: frontend.framework.vue
 files:
   - { template: templates/package.json.sbn, target: web/app/package.json }
