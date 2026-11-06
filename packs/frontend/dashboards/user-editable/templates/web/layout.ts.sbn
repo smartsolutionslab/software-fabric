@@ -11,7 +11,7 @@ export interface Placement {
   height: number;
 }
 
-/** One item of react-grid-layout's layout: the widget's key and its place in grid units. */
+/** One item of {{ if project["frontend.framework"] == "vue" }}grid-layout-plus's{{ else }}react-grid-layout's{{ end }} layout: the widget's key and its place in grid units. */
 export interface GridItem {
   i: string;
   x: number;

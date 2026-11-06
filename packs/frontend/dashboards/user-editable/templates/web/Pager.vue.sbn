@@ -1,0 +1,62 @@
+{%{<script setup lang="ts">
+import { computed, watch } from 'vue';
+import { Button } from '@/components/ui/button';
+
+interface PagerProps {
+  /** What is paged, for the buttons' names: "Next page of {label}". */
+  label: string;
+  page: number;
+  pageSize: number;
+  /** Undefined while the total is not known yet, as while a page loads: a missing total is not one page. */
+  total?: number | string;
+}
+
+// Named in one word beside the page's other files; lint wants a component's name in two.
+defineOptions({ name: 'DashboardPager' });
+
+/**
+ * Previous and next page of a paged list; nothing while everything fits on one page or the total is not known yet.
+ * A known total that shrinks below the current page moves to the last page, which would otherwise be empty and
+ * unreachable.
+ */
+const { label, page, pageSize, total } = defineProps<PagerProps>();
+const emit = defineEmits<{ page: [page: number] }>();
+
+const pages = computed(() => (total === undefined ? undefined : Math.max(1, Math.ceil(Number(total) / pageSize))));
+watch(
+  [() => page, pages],
+  ([current, count]) => {
+    if (count !== undefined && current > count) {
+      emit('page', count);
+    }
+  },
+  { immediate: true },
+);
+</script>
+
+<template>
+  <div v-if="pages !== undefined && pages > 1" class="flex items-center gap-2 text-sm">
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      :aria-label="`Previous page of ${label}`"
+      :disabled="page <= 1"
+      @click="emit('page', page - 1)"
+    >
+      Previous
+    </Button>
+    <span>Page {{ page }} of {{ pages }}</span>
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      :aria-label="`Next page of ${label}`"
+      :disabled="page >= pages"
+      @click="emit('page', page + 1)"
+    >
+      Next
+    </Button>
+  </div>
+</template>
+}%}
