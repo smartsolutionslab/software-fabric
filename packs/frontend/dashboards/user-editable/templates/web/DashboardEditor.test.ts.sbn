@@ -12,6 +12,7 @@ import type {
   PagedResultOfWidgetDescriptionDto,
   SaveDashboardRequest,
   WidgetData,
+  WidgetDescriptionDto,
 } from '@/api/generated';
 import DashboardEditor from './DashboardEditor.vue';
 
@@ -71,6 +72,7 @@ interface Answers {
   detail: (id: string) => Answer<DashboardDto>;
   catalog: (page: number) => Answer<PagedResultOfWidgetDescriptionDto>;
   widget: (id: string, page: number, pageSize: number) => Answer<WidgetData>;
+  declaration: (id: string) => Answer<WidgetDescriptionDto>;
   save: (id: string, request: SaveDashboardRequest) => Answer<string>;
 }
 
@@ -80,6 +82,7 @@ const answers: Answers = {
   detail: () => sales,
   catalog: () => catalog,
   widget: (id) => (id === 'dashboards.my-dashboards' ? table : chart),
+  declaration: (id) => catalog.items.find((widget) => widget.id === id) ?? 'failure',
   save: (id) => id,
 };
 const defaults = { ...answers };
@@ -116,6 +119,10 @@ const fetchMock = vi.fn<typeof fetch>((input, init) => {
 
   if (path === '/dashboards/widgets') {
     return respond(answers.catalog(page));
+  }
+
+  if (path.startsWith('/dashboards/widget-declarations/')) {
+    return respond(answers.declaration(decodeURIComponent(path.slice('/dashboards/widget-declarations/'.length))));
   }
 
   if (path.startsWith('/dashboards/widgets/')) {
@@ -489,4 +496,33 @@ test('while the next page of the widget picker loads, it offers nothing from the
   await waitFor(() => expect(screen.getByLabelText('Widget')).toBeEnabled());
   expect(screen.getByRole('option', { name: 'Trend' })).toBeInTheDocument();
   expect(screen.getByText('Page 2 of 2')).toBeInTheDocument();
+});
+
+test("a saved dashboard's widgets keep their titles whatever page of the widget picker is on screen", async () => {
+  const user = userEvent.setup();
+  const rows = { id: 'module.rows', title: 'Rows', kind: 'Table' } as const;
+  const trend = { id: 'module.trend', title: 'Trend', kind: 'Chart' } as const;
+  answers.catalog = (page) => ({ items: [page === 1 ? rows : trend], totalCount: 101, page, pageSize: 100 });
+  answers.declaration = (id) => [rows, trend].find((widget) => widget.id === id) ?? 'failure';
+  answers.widget = () => chart;
+  answers.detail = () => ({
+    ...sales,
+    widgets: [
+      { key: 'first', source: rows.id, visual: 'table', x: 0, y: 0, width: 6, height: 4 },
+      { key: 'second', source: trend.id, visual: 'line', x: 6, y: 0, width: 6, height: 4 },
+    ],
+  });
+  renderEditor();
+
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+
+  expect(await screen.findByRole('region', { name: 'Rows' })).toBeInTheDocument();
+  expect(await screen.findByRole('img', { name: 'Trend' })).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Next page of widgets' }));
+  await screen.findByRole('option', { name: 'Trend' });
+
+  expect(screen.getByRole('heading', { name: 'Rows' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Remove Rows' })).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: 'Trend' })).toBeInTheDocument();
 });
