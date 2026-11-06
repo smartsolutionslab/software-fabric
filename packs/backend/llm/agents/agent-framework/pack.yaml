@@ -18,6 +18,12 @@ files:
   - { template: templates/tests/CountWords.cs.sbn, target: tests/Agents.Tests/CountWords.cs }
   - { template: templates/tests/CountWordsHandler.cs.sbn, target: tests/Agents.Tests/CountWordsHandler.cs }
   - { template: templates/tests/NothingToCount.cs.sbn, target: tests/Agents.Tests/NothingToCount.cs }
+  - { template: templates/tests/ListWords.cs.sbn, target: tests/Agents.Tests/ListWords.cs }
+  - { template: templates/tests/ListWordsHandler.cs.sbn, target: tests/Agents.Tests/ListWordsHandler.cs }
+  - { template: templates/tests/ShelfCode.cs.sbn, target: tests/Agents.Tests/ShelfCode.cs }
+  - { template: templates/tests/FindShelf.cs.sbn, target: tests/Agents.Tests/FindShelf.cs }
+  - { template: templates/tests/ShelfLabel.cs.sbn, target: tests/Agents.Tests/ShelfLabel.cs }
+  - { template: templates/tests/LabelShelf.cs.sbn, target: tests/Agents.Tests/LabelShelf.cs }
   - { template: templates/tests/LongestWord.cs.sbn, target: tests/Agents.Tests/LongestWord.cs, when: 'project["backend.absence"] == "option"' }
   - { template: templates/tests/LongestWordHandler.cs.sbn, target: tests/Agents.Tests/LongestWordHandler.cs, when: 'project["backend.absence"] == "option"' }
   - { template: templates/tests/Trail.cs.sbn, target: tests/Agents.Tests/Trail.cs, when: 'project["backend.absence"] == "option"' }
