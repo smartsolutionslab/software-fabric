@@ -1,3 +1,5 @@
 {{~ if project["frontend.framework"] == "react" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa" ~}}
 @import 'react-grid-layout/css/styles.css';
+{{~ else if project["frontend.framework"] == "vue" && project["frontend.api-client"] == "orval" && project["frontend.architecture"] == "spa" ~}}
+/* The dashboard grid brings its own styles with its script; nothing to import here. */
 {{~ end ~}}

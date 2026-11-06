@@ -117,6 +117,37 @@ is added as a dependency. The router pack renders the editor in the brought
 module's page, a generation-time branch on this choice (ADR-0006), since there
 are no per-module slots.
 
+**As built for the Vue page (#214).** The same page for a Vue single-page app
+on Orval's TanStack Query client, a branch of the same pack (ADR-0006); nothing
+above changes for React.
+
+- **The page** is `DashboardEditor.vue`, `DashboardCanvas.vue` and
+  `WidgetView.vue` in `web/app/src/dashboards`, with `Pager.vue` and
+  `Failure.vue`, on grid-layout-plus 1.1.1, with the project's `DataChart` and
+  `DataTable`. It carries every fix of the React page's review rounds (#201):
+  paging, failed reads with "Try again", "Saved." only for the saved
+  revision, widgets read again after a save, the 50-widget and row-1000
+  limits, the picker's loading guard and pair check, and the pager's clamp
+  on a known total only.
+- **What differs from React's, and why.** TanStack Query has no `data` that
+  keeps the page before, so the picker reads `data` and the list asks for
+  `keepPreviousData`. It refetches on focus, so an opened dashboard is copied
+  into a draft once, from an answer that is neither cached nor failed, and
+  later refreshes leave the draft alone.
+- **Shared files.** `layout.ts`, `chartOption.ts`, `uuidV7.ts`,
+  `widgetChoice.ts` and their tests use neither framework and are React's
+  files; so is `e2e/dashboards.spec.ts`, which branches only on the grid's
+  class names.
+- **Where it shows.** `vue-router`'s module page renders the editor for the
+  brought module, as `react-router`'s does.
+- **Where it is not built yet.** With another Vue UI, forms or validation
+  library than shadcn-vue, vee-validate and zod, `DashboardCanvas.vue` throws
+  when it loads, saying so, as the Vue agent panel does (ADR-0013).
+- **Styles.** grid-layout-plus injects its own styles from its script, so the
+  page adds a comment to `src/index.css` instead of an import: the
+  `web.styles` slot joins its entries with a separator, and an empty entry
+  would leave a blank first line that Prettier refuses.
+
 ## Consequences
 
 - Every existing profile takes `frontend.dashboards: []`; its `fabric.yaml`

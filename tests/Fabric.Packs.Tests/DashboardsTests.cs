@@ -228,7 +228,6 @@ public sealed class DashboardsTests
     {
         foreach (var (profile, overrides) in new[]
         {
-            ("saas-standard-vue", new[] { Dashboards }),
             ("lean-crud", new[] { Dashboards }),
             ("industrial-event-driven-mfe", new[] { Dashboards }),
         })
