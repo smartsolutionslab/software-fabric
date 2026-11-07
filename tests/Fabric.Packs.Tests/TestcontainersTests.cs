@@ -62,6 +62,23 @@ public sealed partial class TestcontainersTests
     }
 
     /// <summary>
+    /// The MCP client's tests read the AppHost's model through Aspire's testing package whatever the integration option,
+    /// so its version is declared, once, without the Aspire fixture too.
+    /// </summary>
+    [Theory]
+    [InlineData("backend.test.integration=testcontainers")]
+    [InlineData("backend.test.integration=aspire-fixture")]
+    public void The_mcp_clients_tests_find_aspires_testing_package_with_either_integration_option(string integration)
+    {
+        using var project = new GeneratedProject("saas-ai-react", integration, "backend.mcp=client");
+
+        var versions = File.ReadAllLines(Path.Combine(project.ProjectDirectory, "Directory.Packages.props"));
+        versions.Count(line => line.Contains("<PackageVersion Include=\"Aspire.Hosting.Testing\"", StringComparison.Ordinal)).ShouldBe(1);
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "tests/Mcp.Tests/Mcp.Tests.csproj"))
+            .ShouldContain("<PackageReference Include=\"Aspire.Hosting.Testing\" />");
+    }
+
+    /// <summary>
     /// Rag's tests take the database alone: its container and the MigrationRunner, and nothing else the application
     /// runs. The model providers' settings, which the AppHost passes the host as parameters, reach the in-process host.
     /// </summary>
