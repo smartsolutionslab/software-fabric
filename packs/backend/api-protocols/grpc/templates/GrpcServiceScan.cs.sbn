@@ -1,0 +1,19 @@
+using System.Reflection;
+using Grpc.Core;
+
+namespace {{ namespace }}.Host.GrpcServices;
+
+public static class GrpcServiceScan
+{
+    /// <summary>
+    /// The gRPC services an assembly implements: every concrete class whose base was generated from a <c>.proto</c>
+    /// service, which marks it with <see cref="BindServiceMethodAttribute"/>.
+    /// </summary>
+    public static IEnumerable<Type> In(Assembly assembly)
+    {
+        {{ not_null "assembly" }}
+
+        return assembly.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && type.IsDefined(typeof(BindServiceMethodAttribute), inherit: true));
+    }
+}

@@ -1,0 +1,36 @@
+option: backend.api-protocols.grpc
+files:
+  - { template: templates/ResultGrpcExtensions.cs.sbn, target: src/BuildingBlocks/Grpc/Wiring/ResultGrpcExtensions.cs }
+  - { template: templates/GrpcServiceAssembly.cs.sbn, target: src/Host/GrpcServices/GrpcServiceAssembly.cs }
+  - { template: templates/GrpcServiceScan.cs.sbn, target: src/Host/GrpcServices/GrpcServiceScan.cs }
+  - { template: templates/GrpcServiceRegistration.cs.sbn, target: src/Host/Wiring/GrpcServiceRegistration.cs }
+  - { template: templates/GrpcServiceEndpoints.cs.sbn, target: src/Host/Wiring/GrpcServiceEndpoints.cs }
+  - { template: templates/GrpcServicesOnlyDispatch.cs.sbn, target: tests/Architecture.Tests/Rules/GrpcServicesOnlyDispatch.cs }
+  - { template: templates/GrpcEndpointTests.cs.sbn, target: tests/Integration.Tests/GrpcEndpointTests.cs, when: 'project["backend.test.integration"] == "aspire-fixture"' }
+  - { template: templates/tests/GrpcServices.Tests.csproj.sbn, target: tests/GrpcServices.Tests/GrpcServices.Tests.csproj }
+  - { template: templates/tests/samples.proto.sbn, target: tests/GrpcServices.Tests/Protos/samples.proto }
+  - { template: templates/tests/GrpcHost.cs.sbn, target: tests/GrpcServices.Tests/GrpcHost.cs }
+  - { template: templates/tests/SamplesService.cs.sbn, target: tests/GrpcServices.Tests/SamplesService.cs }
+  - { template: templates/tests/Shout.cs.sbn, target: tests/GrpcServices.Tests/Shout.cs }
+  - { template: templates/tests/Shouted.cs.sbn, target: tests/GrpcServices.Tests/Shouted.cs }
+  - { template: templates/tests/ShoutHandler.cs.sbn, target: tests/GrpcServices.Tests/ShoutHandler.cs }
+  - { template: templates/tests/NothingToShout.cs.sbn, target: tests/GrpcServices.Tests/NothingToShout.cs }
+  - { template: templates/tests/TestUser.cs.sbn, target: tests/GrpcServices.Tests/TestUser.cs, when: 'project["backend.auth"] != "none"' }
+  - { template: templates/tests/GrpcServiceTests.cs.sbn, target: tests/GrpcServices.Tests/GrpcServiceTests.cs }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: host.packages, template: templates/host-packages.sbn }
+  - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: host.endpoints, template: templates/host-endpoints.sbn }
+  - { slot: host.kestrel-endpoints, template: templates/host-kestrel-endpoints.sbn }
+  - { slot: buildingblocks.packages, template: templates/buildingblocks-packages.sbn }
+  - { slot: modules.packages.api, template: templates/modules-packages-api.sbn }
+  - { slot: solution.projects, template: templates/solution-projects.sbn }
+  - { slot: readme.sections, template: templates/readme-section.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "A gRPC service (a class implementing a base generated from a .proto) lives in a module's Api project and takes nothing but IDispatcher: it translates calls to commands and queries and reaches no repository, DbContext or service of its own; otherwise the build fails naming the service and what it takes.", file: templates/GrpcServicesOnlyDispatch.cs.sbn }
+  - { kind: unit-test, describes: "The real host in process, called with a client generated from a .proto: a query answers with its handler's result through the dispatcher; a failed Result is an RpcException with the ApiError's status mapped to gRPC's, its message and its code in the error-code trailer; an anonymous caller is refused when authentication is on.", file: templates/tests/GrpcServiceTests.cs.sbn }
+  - { kind: end-to-end-test, describes: "The host started through Aspire answers HTTP/2 without TLS on its grpc endpoint, which gRPC needs and the http endpoint does not speak.", file: templates/GrpcEndpointTests.cs.sbn }

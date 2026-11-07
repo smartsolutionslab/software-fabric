@@ -1,0 +1,37 @@
+using System.Net;
+
+namespace Grpc.Core;
+
+public static class ResultGrpcExtensions
+{
+    /// <summary>The trailer that carries a failed result's <see cref="ApiError.Code"/>, as problem details carry it in <c>code</c>.</summary>
+    public const string ErrorCodeTrailer = "error-code";
+
+    /// <summary>
+    /// The reply built from the value, or an <see cref="RpcException"/> with the error's status mapped to gRPC's, its
+    /// message as the detail and its code in the <see cref="ErrorCodeTrailer"/> trailer.
+    /// </summary>
+    public static TReply ToGrpcReply<TValue, TError, TReply>(this Result<TValue, TError> result, Func<TValue, TReply> reply)
+        where TValue : notnull
+        where TError : ApiError
+    {
+        {{ not_null "reply" }}
+
+        return result.Match<TReply>(reply, error => throw new RpcException(new Status(StatusOf(error.Status), error.Message), new Metadata { { ErrorCodeTrailer, error.Code } }));
+    }
+
+    /// <summary>gRPC's status for an HTTP one, as google.rpc.Code pairs them; a 409 is Aborted, a conflict with the current state.</summary>
+    private static StatusCode StatusOf(HttpStatusCode status) =>
+        status switch
+        {
+            HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity => StatusCode.InvalidArgument,
+            HttpStatusCode.Unauthorized => StatusCode.Unauthenticated,
+            HttpStatusCode.Forbidden => StatusCode.PermissionDenied,
+            HttpStatusCode.NotFound => StatusCode.NotFound,
+            HttpStatusCode.Conflict => StatusCode.Aborted,
+            HttpStatusCode.PreconditionFailed => StatusCode.FailedPrecondition,
+            HttpStatusCode.TooManyRequests => StatusCode.ResourceExhausted,
+            _ when (int)status is >= 400 and < 500 => StatusCode.FailedPrecondition,
+            _ => StatusCode.Internal,
+        };
+}

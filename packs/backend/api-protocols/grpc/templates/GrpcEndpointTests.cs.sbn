@@ -1,0 +1,28 @@
+using System.Net;
+using Aspire.Hosting.Testing;
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>
+/// The host's grpc endpoint, started through Aspire: gRPC needs HTTP/2, which Kestrel speaks without TLS only on an
+/// endpoint that speaks nothing else, so the host has one of its own beside http.
+/// </summary>
+{{~ integration_fixture_attributes ~}}
+public class GrpcEndpointTests({{ integration_fixture }})
+{
+    {{ test_attribute }}
+    public async Task The_grpc_endpoint_answers_http2_without_tls()
+    {
+        using var client = new HttpClient
+        {
+            BaseAddress = aspire.App.GetEndpoint("host", "grpc"),
+            DefaultRequestVersion = HttpVersion.Version20,
+            DefaultVersionPolicy = HttpVersionPolicy.RequestVersionExact,
+        };
+
+        using var response = await client.GetAsync(new Uri("/alive", UriKind.Relative), {{ test_cancellation_token }});
+
+        {{ `response.StatusCode` | should_be `HttpStatusCode.OK` }};
+        {{ `response.Version` | should_be `HttpVersion.Version20` }};
+    }
+}

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The host's gRPC services, in process, through clients generated from the .proto files; the samples here stand in for a module's. -->
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.GrpcServices.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <Protobuf Include="Protos/*.proto" GrpcServices="Both" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Host/Host.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,38 @@
+{{~ auth = project["backend.auth"] != "none" ~}}
+using System.Reflection;
+using {{ namespace }}.Host.GrpcServices;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Microsoft.AspNetCore.Builder;
+
+public static class GrpcServiceEndpoints
+{
+    private static readonly MethodInfo MapGrpcService = typeof(GrpcEndpointRouteBuilderExtensions).GetMethods()
+        .Single(method => method is { Name: nameof(GrpcEndpointRouteBuilderExtensions.MapGrpcService), IsGenericMethodDefinition: true });
+
+    /// <summary>
+    /// Maps every gRPC service of the assemblies the host serves (<c>AddModuleGrpcServices</c>){{ if auth }}, for signed-in
+    /// callers only, as the module routes are{{ end }}. A gRPC route is the service's own (<c>/billing.Invoices/Count</c>),
+    /// not under the module's group, because a client calls it there.
+    /// </summary>
+    public static IEndpointRouteBuilder MapModuleGrpcServices(this IEndpointRouteBuilder endpoints)
+    {
+        {{ not_null "endpoints" }}
+
+        foreach (var service in endpoints.ServiceProvider.GetServices<GrpcServiceAssembly>()
+            .SelectMany(served => GrpcServiceScan.In(served.Assembly))
+            .Distinct()
+            .OrderBy(type => type.FullName, StringComparer.Ordinal))
+        {
+{{~ if auth ~}}
+            var mapped = (GrpcServiceEndpointConventionBuilder)MapGrpcService.MakeGenericMethod(service).Invoke(null, [endpoints])!;
+            mapped.RequireAuthorization();
+{{~ else ~}}
+            MapGrpcService.MakeGenericMethod(service).Invoke(null, [endpoints]);
+{{~ end ~}}
+        }
+
+        return endpoints;
+    }
+}
