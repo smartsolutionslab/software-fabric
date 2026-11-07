@@ -524,10 +524,22 @@ public sealed class KurrentDbTests
             """);
         project.Build();
 
-        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+        // Only the invoice's tests: its endpoints make the frontend's copy of the OpenAPI document stale by design.
+        var (exitCode, output) = project.DotNetCommand(
+            new Dictionary<string, string>(),
+            "test",
+            "--project",
+            "tests/Integration.Tests/Integration.Tests.csproj",
+            "-c",
+            "Release",
+            "--no-build",
+            "--no-ansi",
+            "--filter-class",
+            "Shop.Integration.Tests.InvoiceTests");
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
+        output.ShouldContain("succeeded: 1");
     }
 
     [Fact]
