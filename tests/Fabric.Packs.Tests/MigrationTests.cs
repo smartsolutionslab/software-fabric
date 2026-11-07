@@ -54,6 +54,56 @@ public sealed class MigrationTests
     }
 
     [Fact]
+    public void A_schema_another_pack_gives_a_module_context_holds_its_model_its_migrations_and_their_history()
+    {
+        // As above, the probe stands in for mantine. Its schema comes from AppContext, which its step sets to two schemas in
+        // turn: a context's tables, its migrations and their history all follow, and each schema gets a model of its own.
+        using var probe = new ProbePack("frontend.ui-library.mantine", new Dictionary<string, string>
+        {
+            ["persistence.schema"] = """AppContext.GetData("probe-schema") as string ?? schema""",
+            ["migration-runner.steps"] = """
+                foreach (var probeSchema in (string[])["billing_one", "billing_two"])
+                {
+                    AppContext.SetData("probe-schema", probeSchema);
+                    await using var probeScope = host.Services.CreateAsyncScope();
+                    var billing = probeScope.ServiceProvider.GetRequiredService<Shop.Modules.Billing.Infrastructure.Persistence.BillingDbContext>();
+                    await billing.Database.MigrateAsync();
+                    billing.Add(new Shop.Modules.Billing.Domain.Note(Guid.CreateVersion7(), probeSchema));
+                    await billing.SaveChangesAsync();
+                }
+                """,
+        });
+        using var project = new GeneratedProject(Profile, [probe.Manifest], "frontend.ui-library=mantine", "backend.tenancy=none");
+        project.AddModule("billing");
+        AddNotesWithAMigration(project);
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = project.DotNetCommand(
+            new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
+            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+
+        exitCode.ShouldBe(0, output);
+        postgres.Psql(DatabasePassword, "select \"Text\" from billing_one.notes").ShouldBe("billing_one");
+        postgres.Psql(DatabasePassword, "select \"Text\" from billing_two.notes").ShouldBe("billing_two");
+        postgres.Psql(DatabasePassword, "select \"MigrationId\" from billing_one.\"__EFMigrationsHistory\"").ShouldEndWith("_Initial");
+        postgres.Psql(DatabasePassword, "select \"MigrationId\" from billing_two.\"__EFMigrationsHistory\"").ShouldEndWith("_Initial");
+        postgres.Psql(DatabasePassword, "select count(*) from billing.notes").ShouldBe("0");
+    }
+
+    [Fact]
+    public void Without_a_schema_from_another_pack_the_module_context_works_in_the_modules_schema_alone()
+    {
+        using var project = new GeneratedProject(Profile);
+
+        var context = File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "BuildingBlocks", "Persistence", "ModuleDbContext.cs"));
+        context.ShouldContain("modelBuilder.HasDefaultSchema(schema);");
+        context.ShouldNotContain("CurrentSchema");
+        context.ShouldNotContain("ReplaceService");
+        File.Exists(Path.Combine(project.ProjectDirectory, "src", "BuildingBlocks", "Persistence", "SchemaMigrationsAssembly.cs")).ShouldBeFalse();
+        File.Exists(Path.Combine(project.ProjectDirectory, "src", "BuildingBlocks", "Persistence", "SchemaModelCacheKeyFactory.cs")).ShouldBeFalse();
+    }
+
+    [Fact]
     public void Without_a_step_the_migration_runner_ends_with_the_migrations()
     {
         using var project = new GeneratedProject(Profile);
