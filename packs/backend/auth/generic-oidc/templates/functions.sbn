@@ -121,6 +121,19 @@ end
 func id_token_roles_claim
   ret "roles"
 end
+func id_token_users_comment
+  ret `// The ID tokens the local provider issues its users (src/AppHost/realms/realm.json): a user without a role has no
+// roles, one without a department no department.`
+end
+func role_mapping_adr
+  ret "**The provider's roles become role claims.** The provider lists the user's roles in the token's top-level `roles` claim. `OidcRoleClaims` (an `IClaimsTransformation`) copies them into `ClaimTypes.Role`, which `RequireRole` reads."
+end
+func role_mapping_provider
+  ret "generic OIDC"
+end
+func tenant_claim_adr
+  ret "exactly one value of its `tenant` claim (locally `tenant-a` or `tenant-b`)"
+end
 func tenant_claim(user)
   ret `var tenants = ` + user + `.FindAll(TenantClaim)
     .Select(claim => claim.Value)

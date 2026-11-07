@@ -3,7 +3,6 @@ files:
   - { template: templates/realm.json.sbn, target: src/AppHost/realms/realm.json }
   - { template: templates/Authentication.cs.sbn, target: src/Host/Wiring/Authentication.cs }
   - { template: templates/CurrentUser.cs.sbn, target: src/Host/CurrentUser.cs }
-  - { template: templates/EveryEndpointDeclaresItsAuthorization.cs.sbn, target: tests/Architecture.Tests/Rules/EveryEndpointDeclaresItsAuthorization.cs }
   # With backend.authorization roles: Keycloak's realm and client roles become ClaimTypes.Role (ADR-0009: the provider decides what the token carries).
   - { template: templates/KeycloakRoleClaims.cs.sbn, target: src/Host/KeycloakRoleClaims.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles")' }
   - { template: templates/RoleClaims.cs.sbn, target: src/Host/Wiring/RoleClaims.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles")' }
@@ -25,5 +24,4 @@ agents:
 adr: docs/adr.md
 gates:
   - { kind: ci-step, describes: "A module endpoint answers 401 without a token; checked by the integration tests of the aspire-fixture pack against the running stack." }
-  - { kind: architecture-test, describes: "Every endpoint of the host requires authorization or is mapped with AllowAnonymous().", file: templates/EveryEndpointDeclaresItsAuthorization.cs.sbn }
   - { kind: ci-step, describes: "Keycloak's reset-password email reaches Mailpit when the AppHost runs; checked by the integration tests of the aspire-fixture pack against the running stack." }

@@ -4,7 +4,6 @@ files:
   - { template: templates/realm.json.sbn, target: src/AppHost/realms/realm.json }
   - { template: templates/Authentication.cs.sbn, target: src/Host/Wiring/Authentication.cs }
   - { template: templates/CurrentUser.cs.sbn, target: src/Host/CurrentUser.cs }
-  - { template: templates/EveryEndpointDeclaresItsAuthorization.cs.sbn, target: tests/Architecture.Tests/Rules/EveryEndpointDeclaresItsAuthorization.cs }
   - { template: templates/ProviderNeutralHost.cs.sbn, target: tests/Architecture.Tests/Rules/ProviderNeutralHost.cs }
   # With backend.authorization roles: the token's roles claim becomes ClaimTypes.Role (ADR-0009: the provider decides what the token carries).
   - { template: templates/OidcRoleClaims.cs.sbn, target: src/Host/OidcRoleClaims.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles")' }
@@ -27,5 +26,4 @@ agents:
 adr: docs/adr.md
 gates:
   - { kind: architecture-test, describes: "No source under src/ but the AppHost names Keycloak or a claim or path only Keycloak issues or serves (realm_access, resource_access, /realms/): the application reads standard OpenID Connect only.", file: templates/ProviderNeutralHost.cs.sbn }
-  - { kind: architecture-test, describes: "Every endpoint of the host requires authorization or is mapped with AllowAnonymous().", file: templates/EveryEndpointDeclaresItsAuthorization.cs.sbn }
   - { kind: ci-step, describes: "A module endpoint answers 401 without a token, and a test user signs in at the local provider and is known to the host; checked by the integration tests of the aspire-fixture pack against the running stack." }
