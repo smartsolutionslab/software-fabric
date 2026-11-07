@@ -23,8 +23,18 @@ public static class PairwiseMatrix
         ArgumentNullException.ThrowIfNull(domain);
         ArgumentNullException.ThrowIfNull(extras);
 
+        if (ActiveWhenCycles.Find(catalog) is { Count: > 0 } cycles)
+        {
+            return Failed(cycles);
+        }
+
         var inDomain = domain.ToHashSet(StringComparer.Ordinal);
         var factors = Factors(catalog, inDomain);
+        if (factors.Count < 2)
+        {
+            return Failed([NoPair(factors)]);
+        }
+
         var firstPoint = new int[factors.Count];
         List<(int Factor, int Value)> points = [];
         for (var factor = 0; factor < factors.Count; factor++)
@@ -145,7 +155,7 @@ public static class PairwiseMatrix
         }
 
         return errors.Count > 0
-            ? new MatrixResult([], 0, [], errors)
+            ? Failed(errors)
             : new MatrixResult(
                 combinations,
                 candidatePairs - infeasible.Count,
@@ -173,6 +183,17 @@ public static class PairwiseMatrix
         }
 
         return seeds;
+    }
+
+    private static MatrixResult Failed(IReadOnlyList<string> errors) => new([], 0, [], errors);
+
+    /// <summary>Pairs are of values of two factors, so one factor, or none, leaves the matrix nothing to cover.</summary>
+    private static string NoPair(List<MatrixFactor> factors)
+    {
+        const string Needs = "so there is no pair to cover; the matrix needs options with a pack in two dimensions, or two options of a multi-valued one.";
+        return factors.Count == 0
+            ? $"no option of the catalog has a pack, {Needs}"
+            : $"the options with a pack are the values of one factor ({string.Join(", ", factors[0].Labels)}), {Needs}";
     }
 
     private static string OutOfSteps =>

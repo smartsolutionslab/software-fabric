@@ -19,7 +19,7 @@ public static class CatalogLinter
             CheckDimension(catalog, dimension, problems);
         }
 
-        CheckActiveWhenCycles(catalog, problems);
+        problems.AddRange(ActiveWhenCycles.Find(catalog));
 
         foreach (var profile in catalog.Profiles.Keys)
         {
@@ -100,42 +100,6 @@ public static class CatalogLinter
         else if (setting.Default < setting.Minimum || setting.Default > setting.Maximum)
         {
             problems.Add($"{subject} defaults to {SettingNumber.Format(setting.Default)}, outside its range {minimum} to {maximum}.");
-        }
-    }
-
-    /// <summary>
-    /// Each dimension has at most one active-when, so following them from a dimension either ends or returns to a dimension
-    /// already passed. A cycle is reported once, from its member that comes first in the catalog; a self-reference is reported
-    /// by <see cref="CheckDimension"/>.
-    /// </summary>
-    private static void CheckActiveWhenCycles(CatalogModel catalog, List<string> problems)
-    {
-        HashSet<string> reported = new(StringComparer.Ordinal);
-        foreach (var start in catalog.Dimensions.Keys)
-        {
-            if (reported.Contains(start))
-            {
-                continue;
-            }
-
-            List<string> path = [start];
-            var current = start;
-            while (catalog.Dimensions.TryGetValue(current, out var dimension)
-                && dimension.ActiveWhen is { } activeWhen
-                && activeWhen.Dimension != current
-                && !path.Contains(activeWhen.Dimension, StringComparer.Ordinal))
-            {
-                current = activeWhen.Dimension;
-                path.Add(current);
-            }
-
-            var closes = catalog.Dimensions.TryGetValue(current, out var last) && last.ActiveWhen?.Dimension == start;
-            if (path.Count > 1 && closes)
-            {
-                reported.UnionWith(path);
-                problems.Add($"{start} active-when: cycle {string.Join(" -> ", path)} -> {start}; " +
-                    "each dimension is active only if the next one is, so none can be decided.");
-            }
         }
     }
 
