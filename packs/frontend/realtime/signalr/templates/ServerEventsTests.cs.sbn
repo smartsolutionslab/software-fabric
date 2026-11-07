@@ -1,6 +1,3 @@
-{{~ if project["backend.test.assertions"] != "shouldly" ~}}
-#error The signalr pack's integration tests assert with Shouldly only so far (docs/adr/0006 of the generator).
-{{~ end ~}}
 {{~ if project["backend.tenancy"] != "none" && project["backend.auth"] == "none" ~}}
 #error frontend.realtime signalr with backend.tenancy {{ project["backend.tenancy"] }} needs an identity provider: a browser's tenant comes from its user's token, and backend.auth none signs nobody in (docs/adr/0009 of the generator).
 {{~ end ~}}
@@ -29,7 +26,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace {{ namespace }}.Integration.Tests;
 
 /// <summary>The host's event hub (/hubs/events) seen from a browser's side: what it receives, and who may connect.</summary>
-public class ServerEventsTests(AspireFixture aspire)
+public class ServerEventsTests({{ integration_fixture }})
 {
 {{~ if keycloak ~}}
     private const int ShortLifespan = 10;
@@ -38,12 +35,12 @@ public class ServerEventsTests(AspireFixture aspire)
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(30);
 {{~ if tenanted ~}}
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_test_event_reaches_the_browsers_of_the_senders_tenant_only()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var first = await aspire.CreateHostClientAsync("developer");
-        using var second = await aspire.CreateHostClientAsync("developer-b");
+        var cancellationToken = {{ test_cancellation_token }};
+        using var first = await {{ signed_in_host_client `"developer"` }};
+        using var second = await {{ signed_in_host_client `"developer-b"` }};
         await using var firstBrowser = await Browser.ConnectAsync(first, cancellationToken);
         await using var secondBrowser = await Browser.ConnectAsync(second, cancellationToken);
 
@@ -51,51 +48,51 @@ public class ServerEventsTests(AspireFixture aspire)
         var secondText = await SendUntilReceivedAsync(second, secondBrowser, cancellationToken);
         var firstText = await SendUntilReceivedAsync(first, firstBrowser, cancellationToken);
 
-        firstBrowser.Received.ShouldNotContain(secondText);
-        secondBrowser.Received.ShouldNotContain(firstText);
+        {{ `firstBrowser.Received` | should_not_contain `secondText` }};
+        {{ `secondBrowser.Received` | should_not_contain `firstText` }};
     }
 {{~ else ~}}
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_test_event_reaches_every_connected_browser()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
 {{~ if signed_in ~}}
-        using var sender = await aspire.CreateHostClientAsync("developer");
+        using var sender = await {{ signed_in_host_client `"developer"` }};
 {{~ else ~}}
-        using var sender = aspire.CreateHostClient();
+        using var sender = {{ host_client }};
 {{~ end ~}}
         await using var browser = await Browser.ConnectAsync(sender, cancellationToken);
 
         var text = await SendUntilReceivedAsync(sender, browser, cancellationToken);
 
-        browser.Received.ShouldContain(text);
+        {{ `browser.Received` | should_contain `text` }};
     }
 {{~ end ~}}
 {{~ if signed_in ~}}
 
-    [Fact]
+    {{ test_attribute }}
     public async Task An_anonymous_connection_is_refused()
     {
-        using var anonymous = aspire.CreateHostClient();
+        using var anonymous = {{ host_client }};
 
-        var refusal = await Should.ThrowAsync<HttpRequestException>(Browser.ConnectAsync(anonymous, TestContext.Current.CancellationToken));
+        var refusal = await {{ should_throw_async `HttpRequestException` (`Browser.ConnectAsync(anonymous, ` + test_cancellation_token + `)`) }};
 
-        refusal.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        {{ `refusal.StatusCode` | should_be `HttpStatusCode.Unauthorized` }};
     }
 {{~ end ~}}
 {{~ if keycloak ~}}
 
-    [Fact]
+    {{ test_attribute }}
     public async Task A_connection_is_closed_once_its_access_token_expires()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         using var caller = await ShortLivedCallerAsync("developer", cancellationToken);
         await using var browser = await Browser.ConnectAsync(caller, cancellationToken);
 
         var closed = await browser.ClosesWithinAsync(TimeSpan.FromMinutes(1), cancellationToken);
 
-        closed.ShouldBeTrue("a connection whose token expired must close, so that reconnecting checks the user and their tenant again");
+        {{ `closed` | should_be_true `"a connection whose token expired must close, so that reconnecting checks the user and their tenant again"` }};
     }
 {{~ end ~}}
 
@@ -157,7 +154,7 @@ public class ServerEventsTests(AspireFixture aspire)
         var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken)
             ?? throw new InvalidOperationException("The realm returned no token.");
 
-        var caller = aspire.CreateHostClient();
+        var caller = {{ host_client }};
         caller.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
         return caller;
     }

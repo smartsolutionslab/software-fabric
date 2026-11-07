@@ -6,6 +6,7 @@ files:
 declares-slots:
   - { slot: integration-tests.parameters, description: "Statements on the testing builder (builder) giving AppHost parameters their values for the test run: builder.Configuration[\"Parameters:<name>\"] = \"...\";. Never a real secret." }
 slots:
+  - { slot: templates.functions, template: templates/functions.sbn }
   - { slot: dotnet.package-versions, template: templates/package-version.sbn }
   - { slot: solution.projects, template: templates/solution-project.sbn }
 agents:

@@ -1,6 +1,3 @@
-{{~ if project["backend.test.assertions"] != "shouldly" ~}}
-#error The ag-ui pack's assistant tests assert with Shouldly only so far (docs/adr/0006 of the generator).
-{{~ end ~}}
 using {{ namespace }}.BuildingBlocks.Messaging;
 using {{ namespace }}.Modules.Assistant.Api;
 using {{ namespace }}.Modules.Assistant.Application.Queries.CountWords;
@@ -15,10 +12,10 @@ namespace {{ namespace }}.Modules.Assistant.Tests.Queries;
 /// <summary>The assistant run through its query and the dispatcher, as the host's POST /agents/assistant runs it.</summary>
 public class TalkToTheAssistantTests
 {
-    [Fact]
+    {{ test_attribute }}
     public async Task The_assistant_streams_a_word_count_its_tool_got_through_the_dispatcher()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         var model = new ToolCallingChatClient("count_words", new Dictionary<string, object?> { ["text"] = "one two three" });
         await using var services = Services(model);
         await using var scope = services.CreateAsyncScope();
@@ -26,28 +23,28 @@ public class TalkToTheAssistantTests
 
         var result = await dispatcher.QueryAsync(TalkToTheAssistant.Start([new ChatMessage(ChatRole.User, "How many words?")], null), cancellationToken);
 
-        result.IsSuccess.ShouldBeTrue();
+        {{ `result.IsSuccess` | should_be_true }};
         List<ChatResponseUpdate> updates = [];
         await foreach (var update in result.Value.WithCancellation(cancellationToken))
         {
             updates.Add(update);
         }
 
-        model.Offered[0].ShouldBe(["count_words"]);
-        updates.SelectMany(update => update.Contents).OfType<FunctionResultContent>().Single().Result?.ToString().ShouldBe("3");
-        string.Concat(updates.Select(update => update.Text)).ShouldBe("The tool said: 3");
+        {{ `model.Offered[0]` | should_be `["count_words"]` }};
+        {{ `updates.SelectMany(update => update.Contents).OfType<FunctionResultContent>().Single().Result?.ToString()` | should_be `"3"` }};
+        {{ `string.Concat(updates.Select(update => update.Text))` | should_be `"The tool said: 3"` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task Counting_the_words_of_an_empty_text_fails_with_its_code()
     {
         await using var services = Services(new FakeChatClient("unused"));
         await using var scope = services.CreateAsyncScope();
 
-        var result = await scope.ServiceProvider.GetRequiredService<IDispatcher>().QueryAsync(new CountWords(" "), TestContext.Current.CancellationToken);
+        var result = await scope.ServiceProvider.GetRequiredService<IDispatcher>().QueryAsync(new CountWords(" "), {{ test_cancellation_token }});
 
-        result.IsSuccess.ShouldBeFalse();
-        result.Error.Code.ShouldBe("assistant.nothing-to-count");
+        {{ `result.IsSuccess` | should_be_false }};
+        {{ `result.Error.Code` | should_be `"assistant.nothing-to-count"` }};
     }
 
     /// <summary>The module's services with what the host provides: the dispatcher and the model.</summary>

@@ -58,6 +58,8 @@ public static class FabricCli
 
             var subject = profileName is null ? "catalog defaults" : $"profile {profileName}";
             output.WriteLine($"valid: {subject} resolves to {choices.Project.Count} project choices and {choices.ModuleDefaults.Count} module defaults.");
+            var projectChoices = new ProjectChoices(choices.Project, choices.ModuleDefaults, new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>());
+            WarnExperimental(error, ExperimentalOptions.Chosen(catalogModel, projectChoices));
             return 0;
         }));
 
@@ -130,6 +132,7 @@ public static class FabricCli
             }
 
             output.WriteLine($"created {target} with {Files(generated.Files.Count)}.");
+            WarnExperimental(error, generated.Experimental);
             if (FirstSteps(generated.Files) is { } firstSteps)
             {
                 output.WriteLine();
@@ -196,6 +199,7 @@ public static class FabricCli
             }
 
             output.WriteLine($"added module {moduleName} with {Files(addition.Created.Count)}.");
+            WarnExperimental(error, addition.Experimental);
             return 0;
         }));
 
@@ -327,6 +331,15 @@ public static class FabricCli
         catch (Exception exception) when (exception is CatalogException or FabricFileException or IOException or UnauthorizedAccessException)
         {
             return Fail(error, [exception.Message]);
+        }
+    }
+
+    /// <summary>ADR-0003: an experimental option is generated with a warning. Standard error, so scripts reading the output are unaffected.</summary>
+    private static void WarnExperimental(TextWriter error, IReadOnlyList<string> options)
+    {
+        foreach (var option in options)
+        {
+            error.WriteLine($"warning: {option} is experimental (ADR-0003): it is generated, but not yet passing the test matrix.");
         }
     }
 

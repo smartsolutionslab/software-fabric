@@ -6,10 +6,9 @@ files:
   - { template: templates/coverage-gate.proj.sbn, target: .github/scripts/coverage-gate.proj }
   - { template: templates/test.sh.sbn, target: .github/scripts/test.sh }
 declares-slots:
-  - { slot: tests.assert-no-violations, description: "One statement asserting that IReadOnlyList<string> violations is empty, with string description as the message.", cardinality: exactly-one }
-  - { slot: tests.assert-does-not-throw, description: "One statement asserting that Action buildContainer does not throw.", cardinality: exactly-one }
   - { slot: tests.module-host-services, description: "Statements adding to IServiceCollection services what the host provides and a module may depend on, before the module's own services; each module's test validates its registrations against them." }
 slots:
+  - { slot: templates.functions, template: templates/functions.sbn }
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
   - { slot: tests.build-properties, template: templates/build-properties.sbn }
   - { slot: tests.packages, template: templates/packages.sbn }

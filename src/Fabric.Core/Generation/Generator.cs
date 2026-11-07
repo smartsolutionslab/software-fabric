@@ -90,7 +90,10 @@ public static class Generator
         var rendered = Renderer.Render(catalog, moduleOnly, choices, project.Name);
         return rendered.Errors.Count > 0
             ? AdditionFailure(rendered.Errors)
-            : new ModuleAddition(rendered.Files, FabricFile.Write(catalog, project.Name, project.Profile, choices), []);
+            : new ModuleAddition(rendered.Files, FabricFile.Write(catalog, project.Name, project.Profile, choices), [])
+            {
+                Experimental = ExperimentalOptions.Chosen(catalog, choices),
+            };
     }
 
     private static string? ProjectWideRefusal(PackManifest pack)
@@ -183,7 +186,10 @@ public static class Generator
         }
 
         var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, name, profile, choices));
-        return new GenerationResult([.. rendered.Files.Append(fabricFile).OrderBy(file => file.Path, StringComparer.Ordinal)], []);
+        return new GenerationResult([.. rendered.Files.Append(fabricFile).OrderBy(file => file.Path, StringComparer.Ordinal)], [])
+        {
+            Experimental = ExperimentalOptions.Chosen(catalog, choices),
+        };
     }
 
     /// <summary>Puts the packs that bring a module in front of a rule violation reported for that module.</summary>

@@ -1,6 +1,3 @@
-{{~ if project["backend.test.assertions"] != "shouldly" ~}}
-#error The rag pack's tests assert with Shouldly only so far (docs/adr/0006 of the generator).
-{{~ end ~}}
 {{~ column = project["backend.tenancy"] == "column" ~}}
 using System.Reflection;
 using {{ namespace }}.BuildingBlocks.Persistence;
@@ -14,9 +11,9 @@ namespace {{ namespace }}.Rag.Tests;
 {{~ else ~}}
 /// <summary>The vector tables the MigrationRunner made: one per module schema, of the embeddings model's size, with an HNSW cosine index.</summary>
 {{~ end ~}}
-public sealed class VectorTablesTests(AspireDatabase database)
+public sealed class VectorTablesTests({{ database_fixture }})
 {
-    [Fact]
+    {{ test_attribute }}
     public async Task Every_modules_schema_has_an_embeddings_table_of_the_models_size_with_an_hnsw_cosine_index()
     {
         var schemas = Directory.EnumerateFiles(AppContext.BaseDirectory, "{{ namespace }}.Modules.*.Infrastructure.dll")
@@ -33,21 +30,21 @@ public sealed class VectorTablesTests(AspireDatabase database)
             missing.AddRange(await ProblemsAsync(schema));
         }
 
-        missing.ShouldBeEmpty();
+        {{ `missing` | should_be_empty }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task Creating_the_tables_again_keeps_the_table_and_its_records()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         const string Schema = "rag_tests_again";
-        await VectorTables.CreateAsync(database.ConnectionString, [Schema], cancellationToken);
+        await VectorTables.CreateAsync({{ database_connection_string }}, [Schema], cancellationToken);
         await ExecuteAsync($"INSERT INTO {VectorTables.Table(Schema)} ({{ if column }}tenant_id, {{ end }}key, content, embedding) VALUES ({{ if column }}'tenant-a', {{ end }}'kept', 'kept', array_fill(1, ARRAY[{VectorTables.Dimensions}])::vector)");
 
-        await VectorTables.CreateAsync(database.ConnectionString, [Schema], cancellationToken);
+        await VectorTables.CreateAsync({{ database_connection_string }}, [Schema], cancellationToken);
 
-        (await ProblemsAsync(Schema)).ShouldBeEmpty();
-        (await ScalarAsync($"SELECT count(*)::text FROM {VectorTables.Table(Schema)}")).ShouldBe("1");
+        {{ `(await ProblemsAsync(Schema))` | should_be_empty }};
+        {{ `(await ScalarAsync($"SELECT count(*)::text FROM {VectorTables.Table(Schema)}"))` | should_be `"1"` }};
     }
 
     private async Task<List<string>> ProblemsAsync(string schema)
@@ -83,17 +80,17 @@ public sealed class VectorTablesTests(AspireDatabase database)
 
     private async Task<string?> ScalarAsync(string sql)
     {
-        await using var connection = new NpgsqlConnection(database.ConnectionString);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var connection = new NpgsqlConnection({{ database_connection_string }});
+        await connection.OpenAsync({{ test_cancellation_token }});
         await using var command = new NpgsqlCommand(sql, connection);
-        return await command.ExecuteScalarAsync(TestContext.Current.CancellationToken) as string;
+        return await command.ExecuteScalarAsync({{ test_cancellation_token }}) as string;
     }
 
     private async Task ExecuteAsync(string sql)
     {
-        await using var connection = new NpgsqlConnection(database.ConnectionString);
-        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var connection = new NpgsqlConnection({{ database_connection_string }});
+        await connection.OpenAsync({{ test_cancellation_token }});
         await using var command = new NpgsqlCommand(sql, connection);
-        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        await command.ExecuteNonQueryAsync({{ test_cancellation_token }});
     }
 }

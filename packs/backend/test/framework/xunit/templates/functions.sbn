@@ -1,0 +1,27 @@
+func test_attribute
+  ret "[Fact]"
+end
+func test_cases_attribute
+  ret "[Theory]"
+end
+func test_case_attribute(arguments)
+  ret "[InlineData(" + arguments + ")]"
+end
+func test_cancellation_token
+  ret "TestContext.Current.CancellationToken"
+end
+func write_test_output(text)
+  ret "TestContext.Current.TestOutputHelper?.WriteLine(" + text + ")"
+end
+func test_run_fixture(type)
+  ret "[assembly: AssemblyFixture(typeof(" + type + "))]"
+end
+func test_lifetime
+  ret "IAsyncLifetime"
+end
+func test_setup
+  ret "public async ValueTask InitializeAsync()"
+end
+func test_teardown
+  ret "public async ValueTask DisposeAsync()"
+end

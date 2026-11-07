@@ -1,6 +1,3 @@
-{{~ if project["backend.test.assertions"] != "shouldly" ~}}
-#error The ag-ui pack's integration tests assert with Shouldly only so far (docs/adr/0006 of the generator).
-{{~ end ~}}
 {{~ signed_in = project["backend.auth"] != "none" ~}}
 using System.Net;
 using System.Text;
@@ -13,7 +10,7 @@ namespace {{ namespace }}.Integration.Tests;
 /// AG-UI events, its text in several chunks, after a tool call its query ran through the dispatcher. The host answers
 /// with its stand-in model, which the fixture switches on; no test calls a model.
 /// </summary>
-public class AgentUiTests(AspireFixture aspire)
+public class AgentUiTests({{ integration_fixture }})
 {
     private const string Run = """
         {
@@ -51,85 +48,85 @@ public class AgentUiTests(AspireFixture aspire)
         }
         """;
 
-    [Fact]
+    {{ test_attribute }}
     public async Task The_assistants_answer_streams_in_several_chunks_after_its_tool_ran_through_the_dispatcher()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
 {{~ if signed_in ~}}
-        using var caller = await aspire.CreateHostClientAsync("developer");
+        using var caller = await {{ signed_in_host_client `"developer"` }};
 {{~ else ~}}
-        using var caller = aspire.CreateHostClient();
+        using var caller = {{ host_client }};
 {{~ end ~}}
 
         using var response = await PostAsync(caller, "/agents/assistant", Run, cancellationToken);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync(cancellationToken));
-        response.Content.Headers.ContentType?.MediaType.ShouldBe("text/event-stream");
+        {{ `response.StatusCode` | should_be `HttpStatusCode.OK` `await response.Content.ReadAsStringAsync(cancellationToken)` }};
+        {{ `response.Content.Headers.ContentType?.MediaType` | should_be `"text/event-stream"` }};
         var events = Events(await response.Content.ReadAsStringAsync(cancellationToken));
-        Types(events).First().ShouldBe("RUN_STARTED");
-        Types(events).Last().ShouldBe("RUN_FINISHED");
+        {{ `Types(events).First()` | should_be `"RUN_STARTED"` }};
+        {{ `Types(events).Last()` | should_be `"RUN_FINISHED"` }};
 
         // The stand-in model asks for the first tool it is offered, count_words, with the user's message; the dispatcher
         // sends the tool's query to its handler, which counts three words.
-        events.Single(agUiEvent => Type(agUiEvent) == "TOOL_CALL_START")["toolCallName"]!.GetValue<string>().ShouldBe("count_words");
-        events.Single(agUiEvent => Type(agUiEvent) == "TOOL_CALL_RESULT")["content"]!.GetValue<string>().ShouldBe("3");
+        {{ `events.Single(agUiEvent => Type(agUiEvent) == "TOOL_CALL_START")["toolCallName"]!.GetValue<string>()` | should_be `"count_words"` }};
+        {{ `events.Single(agUiEvent => Type(agUiEvent) == "TOOL_CALL_RESULT")["content"]!.GetValue<string>()` | should_be `"3"` }};
 
         List<string> chunks = [.. events.Where(agUiEvent => Type(agUiEvent) == "TEXT_MESSAGE_CONTENT").Select(agUiEvent => agUiEvent["delta"]!.GetValue<string>())];
-        chunks.Count.ShouldBeGreaterThan(1);
-        string.Concat(chunks).ShouldBe("The tool said: 3");
+        {{ `chunks.Count` | should_be_greater_than `1` }};
+        {{ `string.Concat(chunks)` | should_be `"The tool said: 3"` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public async Task In_a_second_turn_the_tool_runs_again_for_the_new_message_and_the_answer_comes_from_that_result()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
 {{~ if signed_in ~}}
-        using var caller = await aspire.CreateHostClientAsync("developer");
+        using var caller = await {{ signed_in_host_client `"developer"` }};
 {{~ else ~}}
-        using var caller = aspire.CreateHostClient();
+        using var caller = {{ host_client }};
 {{~ end ~}}
 
         using var response = await PostAsync(caller, "/agents/assistant", SecondTurn, cancellationToken);
 
         var stream = await response.Content.ReadAsStringAsync(cancellationToken);
-        response.StatusCode.ShouldBe(HttpStatusCode.OK, stream);
+        {{ `response.StatusCode` | should_be `HttpStatusCode.OK` `stream` }};
         var events = Events(stream);
 
         // The first turn's result belongs to the first message: the stand-in model asks for the tool again, which counts
         // the two words of the new message, and answers from that result alone.
-        events.Count(agUiEvent => Type(agUiEvent) == "TOOL_CALL_START").ShouldBe(1, stream);
-        events.Single(agUiEvent => Type(agUiEvent) == "TOOL_CALL_RESULT")["content"]!.GetValue<string>().ShouldBe("2");
+        {{ `events.Count(agUiEvent => Type(agUiEvent) == "TOOL_CALL_START")` | should_be `1` `stream` }};
+        {{ `events.Single(agUiEvent => Type(agUiEvent) == "TOOL_CALL_RESULT")["content"]!.GetValue<string>()` | should_be `"2"` }};
         List<string> chunks = [.. events.Where(agUiEvent => Type(agUiEvent) == "TEXT_MESSAGE_CONTENT").Select(agUiEvent => agUiEvent["delta"]!.GetValue<string>())];
-        chunks.Count.ShouldBeGreaterThan(1, stream);
-        string.Concat(chunks).ShouldBe("The tool said: 2");
+        {{ `chunks.Count` | should_be_greater_than `1` `stream` }};
+        {{ `string.Concat(chunks)` | should_be `"The tool said: 2"` }};
     }
 {{~ if signed_in ~}}
 
-    [Fact]
+    {{ test_attribute }}
     public async Task An_anonymous_caller_is_refused()
     {
-        using var anonymous = aspire.CreateHostClient();
+        using var anonymous = {{ host_client }};
 
-        using var response = await PostAsync(anonymous, "/agents/assistant", Run, TestContext.Current.CancellationToken);
+        using var response = await PostAsync(anonymous, "/agents/assistant", Run, {{ test_cancellation_token }});
 
-        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        {{ `response.StatusCode` | should_be `HttpStatusCode.Unauthorized` }};
     }
 {{~ end ~}}
 
-    [Fact]
+    {{ test_attribute }}
     public async Task An_agent_no_module_registers_is_not_found()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
 {{~ if signed_in ~}}
-        using var caller = await aspire.CreateHostClientAsync("developer");
+        using var caller = await {{ signed_in_host_client `"developer"` }};
 {{~ else ~}}
-        using var caller = aspire.CreateHostClient();
+        using var caller = {{ host_client }};
 {{~ end ~}}
 
         using var response = await PostAsync(caller, "/agents/nobody", Run, cancellationToken);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-        (await response.Content.ReadAsStringAsync(cancellationToken)).ShouldContain("agents.not-found");
+        {{ `response.StatusCode` | should_be `HttpStatusCode.NotFound` }};
+        {{ `(await response.Content.ReadAsStringAsync(cancellationToken))` | should_contain `"agents.not-found"` }};
     }
 
     private static async Task<HttpResponseMessage> PostAsync(HttpClient caller, string path, string run, CancellationToken cancellationToken)

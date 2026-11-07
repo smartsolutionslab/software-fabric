@@ -16,10 +16,10 @@ public sealed class AgentMcpToolTests
 {
     private const string Token = "stand-in-token";
 
-    [Fact]
+    {{ test_attribute }}
     public async Task An_agent_given_a_declared_servers_tools_calls_one_and_answers_with_its_result()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = {{ test_cancellation_token }};
         await using var server = await EchoServer.StartHttpAsync(Token, "echo", cancellationToken);
         var declared = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -34,9 +34,9 @@ public sealed class AgentMcpToolTests
 
         var response = await model.AsAIAgent(instructions: "Echo what you are asked to.", tools: [.. tools]).RunAsync("Say hello through the echo tool.", cancellationToken: cancellationToken);
 
-        model.Offered[0].ShouldContain("echo-server__echo");
-        response.Text.ShouldStartWith("The tool said:");
-        response.Text.ShouldContain("echo: hello");
+        {{ `model.Offered[0]` | should_contain `"echo-server__echo"` }};
+        {{ `response.Text` | should_start_with `"The tool said:"` }};
+        {{ `response.Text` | should_contain `"echo: hello"` }};
     }
 
     /// <summary>The check a test passes when the call itself is not under test; a project checks the arguments.</summary>

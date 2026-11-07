@@ -1,6 +1,3 @@
-{{~ if project["backend.test.framework"] != "xunit" || project["backend.test.assertions"] != "shouldly" ~}}
-#error The typed-outcomes result style's Kernel tests are written for xUnit and Shouldly only so far (docs/adr/0006 of the generator).
-{{~ end ~}}
 using System.Globalization;
 using System.Net;
 
@@ -10,58 +7,58 @@ public class ResultTests
 {
     private static readonly ApiError NotFound = new InvoiceNotFound();
 
-    [Fact]
+    {{ test_attribute }}
     public void A_success_has_its_value_and_no_error()
     {
         Result<int, ApiError> result = Success(42);
 
-        result.IsSuccess.ShouldBeTrue();
-        result.IsFailure.ShouldBeFalse();
-        result.Value.ShouldBe(42);
-        Should.Throw<InvalidOperationException>(() => result.Error);
+        {{ `result.IsSuccess` | should_be_true }};
+        {{ `result.IsFailure` | should_be_false }};
+        {{ `result.Value` | should_be `42` }};
+        {{ should_throw `InvalidOperationException` `() => result.Error` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public void A_failure_has_its_error_and_no_value()
     {
         Result<int, ApiError> result = Failure(NotFound);
 
-        result.IsSuccess.ShouldBeFalse();
-        result.IsFailure.ShouldBeTrue();
-        result.Error.ShouldBe(NotFound);
-        Should.Throw<InvalidOperationException>(() => result.Value);
+        {{ `result.IsSuccess` | should_be_false }};
+        {{ `result.IsFailure` | should_be_true }};
+        {{ `result.Error` | should_be `NotFound` }};
+        {{ should_throw `InvalidOperationException` `() => result.Value` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public void Match_takes_the_branch_of_the_outcome()
     {
-        Result<int, ApiError>.Success(42).Match(value => value.ToString(CultureInfo.InvariantCulture), error => error.Code).ShouldBe("42");
-        Result<int, ApiError>.Failure(NotFound).Match(value => value.ToString(CultureInfo.InvariantCulture), error => error.Code).ShouldBe("billing.invoice-not-found");
+        {{ `Result<int, ApiError>.Success(42).Match(value => value.ToString(CultureInfo.InvariantCulture), error => error.Code)` | should_be `"42"` }};
+        {{ `Result<int, ApiError>.Failure(NotFound).Match(value => value.ToString(CultureInfo.InvariantCulture), error => error.Code)` | should_be `"billing.invoice-not-found"` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public void Match_needs_both_branches() =>
-        Should.Throw<ArgumentException>(() => Result<int, ApiError>.Success(42).Match(null!, error => error.Code));
+        {{ should_throw `ArgumentException` `() => Result<int, ApiError>.Success(42).Match(null!, error => error.Code)` }};
 
-    [Fact]
+    {{ test_attribute }}
     public void Map_error_translates_a_failure_and_keeps_a_success()
     {
-        Result<int, DomainError>.Success(42).MapError(error => ApiError.From(error, HttpStatusCode.Conflict)).Value.ShouldBe(42);
-        Result<int, DomainError>.Failure(new InvoiceOverdue()).MapError(error => ApiError.From(error, HttpStatusCode.Conflict)).Error.Code.ShouldBe("billing.invoice-overdue");
+        {{ `Result<int, DomainError>.Success(42).MapError(error => ApiError.From(error, HttpStatusCode.Conflict)).Value` | should_be `42` }};
+        {{ `Result<int, DomainError>.Failure(new InvoiceOverdue()).MapError(error => ApiError.From(error, HttpStatusCode.Conflict)).Error.Code` | should_be `"billing.invoice-overdue"` }};
     }
 
-    [Fact]
+    {{ test_attribute }}
     public void A_domain_error_becomes_an_api_error_with_the_status_application_gives_it()
     {
         var overdue = new InvoiceOverdue();
 
         var error = ApiError.From(overdue, HttpStatusCode.Conflict);
 
-        error.Code.ShouldBe("billing.invoice-overdue");
-        error.Message.ShouldBe("The invoice is overdue.");
-        error.Status.ShouldBe(HttpStatusCode.Conflict);
-        error.ShouldBeOfType<DomainFailure>().Error.ShouldBe(overdue);
-        Unit.Value.ShouldBe(default(Unit));
+        {{ `error.Code` | should_be `"billing.invoice-overdue"` }};
+        {{ `error.Message` | should_be `"The invoice is overdue."` }};
+        {{ `error.Status` | should_be `HttpStatusCode.Conflict` }};
+        {{ ((`error` | should_be_of_type `DomainFailure`) + `.Error`) | should_be `overdue` }};
+        {{ `Unit.Value` | should_be `default(Unit)` }};
     }
 
     private sealed record InvoiceNotFound() : ApiError("billing.invoice-not-found", "No such invoice.", HttpStatusCode.NotFound);

@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using Fabric.Core.Choices;
 using Fabric.Core.Generation;
+using YamlDotNet.RepresentationModel;
 
 namespace Fabric.Packs.Tests;
 
@@ -68,6 +70,103 @@ public sealed class ProfileCiTests
         {
             workflow.ShouldNotContain($"profile-ci.sh {profile}", Case.Sensitive, "the workflow names a profile; the matrix comes from build/complete-profiles.sh.");
         }
+    }
+
+    [Fact]
+    public void Without_a_list_of_changes_every_profile_is_affected()
+    {
+        var (exitCode, output) = Script.Value;
+
+        exitCode.ShouldBe(0, output);
+        Listed(output, "affected").ShouldBe(CompleteProfiles, output);
+    }
+
+    [Fact]
+    public void A_change_to_frontend_packs_affects_only_the_profiles_that_choose_one_of_them()
+    {
+        string[] expected = [.. CatalogProfiles.Where(profile => Selects(profile, "frontend.state.redux-toolkit") || Selects(profile, "frontend.framework.vue"))];
+
+        var (exitCode, output) = CompleteProfilesAfter("packs/frontend/state/redux-toolkit/templates/store.ts.sbn", "packs/frontend/framework/vue/pack.yaml");
+
+        exitCode.ShouldBe(0, output);
+        expected.ShouldNotBeEmpty();
+        expected.Length.ShouldBeLessThan(CatalogProfiles.Length, "the packs must leave a profile out, or the test proves nothing.");
+        Listed(output, "affected").ShouldBe(expected, output);
+        Listed(output, "profiles").ShouldBe(CompleteProfiles, "every profile is still listed, so every profile job reports.");
+    }
+
+    [Fact]
+    public void A_change_to_a_module_pack_affects_the_profiles_whose_module_defaults_choose_it()
+    {
+        string[] expected = [.. CatalogProfiles.Where(profile => Selects(profile, "module.ddd-depth.strict"))];
+
+        var (exitCode, output) = CompleteProfilesAfter("packs/module/ddd-depth/strict/docs/adr.md");
+
+        exitCode.ShouldBe(0, output);
+        expected.ShouldNotBeEmpty();
+        expected.Length.ShouldBeLessThan(CatalogProfiles.Length);
+        Listed(output, "affected").ShouldBe(expected, output);
+    }
+
+    [Fact]
+    public void A_change_to_a_pack_no_profile_chooses_affects_none()
+    {
+        var unchosen = Repository.Packs.Packs.Values
+            .Where(pack => !pack.IsBase)
+            .Select(pack => pack.Option)
+            .First(option => !CatalogProfiles.Any(profile => Selects(profile, option)));
+
+        var (exitCode, output) = CompleteProfilesAfter($"packs/{unchosen.Replace('.', '/')}/pack.yaml");
+
+        exitCode.ShouldBe(0, output);
+        Listed(output, "affected").ShouldBeEmpty(output);
+    }
+
+    [Fact]
+    public void A_change_to_documentation_or_the_generator_s_tests_affects_no_profile()
+    {
+        var (exitCode, output) = CompleteProfilesAfter("docs/roadmap.md", "README.md", "tests/Fabric.Packs.Tests/ProfileCiTests.cs");
+
+        exitCode.ShouldBe(0, output);
+        Listed(output, "affected").ShouldBeEmpty(output);
+    }
+
+    [Theory]
+    [InlineData("src/Fabric.Core/Generation/Generator.cs")]
+    [InlineData("build/profile-ci.sh")]
+    [InlineData("catalog/catalog.yaml")]
+    [InlineData("packs/base/core/templates/README.md.sbn")]
+    [InlineData(".github/workflows/ci.yml")]
+    public void A_change_outside_the_option_packs_affects_every_profile(string path)
+    {
+        var (exitCode, output) = CompleteProfilesAfter("packs/frontend/state/redux-toolkit/pack.yaml", path);
+
+        exitCode.ShouldBe(0, output);
+        Listed(output, "affected").ShouldBe(CompleteProfiles, output);
+        output.ShouldContain($"every profile is affected: {path} changed", Case.Sensitive, output);
+    }
+
+    [Fact]
+    public void The_workflow_lists_the_affected_profiles_and_an_unaffected_profile_job_runs_none_of_its_steps()
+    {
+        var jobs = (YamlMappingNode)Workflow()["jobs"];
+        var list = ((YamlSequenceNode)((YamlMappingNode)jobs["profiles"])["steps"]).Children.Cast<YamlMappingNode>()
+            .Single(step => step.Children.TryGetValue(new YamlScalarNode("id"), out var id) && ((YamlScalarNode)id).Value == "list");
+        var profile = (YamlMappingNode)jobs["profile"];
+        var matrix = (YamlMappingNode)((YamlMappingNode)profile["strategy"])["matrix"];
+        var affected = ((YamlScalarNode)((YamlMappingNode)profile["env"])["AFFECTED"]).Value!;
+        var steps = ((YamlSequenceNode)profile["steps"]).Children.Cast<YamlMappingNode>().ToList();
+
+        ((YamlScalarNode)list["run"]).Value!.ShouldContain("build/complete-profiles.sh --changed ");
+        ((YamlScalarNode)matrix["profile"]).Value.ShouldBe("${{ fromJSON(needs.profiles.outputs.complete) }}", "every profile job appears, so every one reports.");
+        affected.ShouldBe("${{ contains(fromJSON(needs.profiles.outputs.affected), matrix.profile) }}");
+        foreach (var step in steps)
+        {
+            step.Children.ShouldContainKey(new YamlScalarNode("if"), $"a profile job step without an if runs for an unaffected profile: {step}");
+            ((YamlScalarNode)step["if"]).Value.ShouldStartWith("env.AFFECTED ");
+        }
+
+        steps.Count(step => ((YamlScalarNode)step["if"]).Value == "env.AFFECTED == 'true'").ShouldBe(steps.Count - 1);
     }
 
     [Fact]
@@ -246,10 +345,42 @@ public sealed class ProfileCiTests
         }
     }
 
-    /// <summary>The <c>profiles=[...]</c> line the script writes for <c>$GITHUB_OUTPUT</c>.</summary>
-    private static string[] Listed(string output)
+    /// <summary>Whether <paramref name="profile"/> selects the pack of <paramref name="option"/>, a project choice or a module default.</summary>
+    private static bool Selects(string profile, string option)
     {
-        const string prefix = "profiles=";
+        var choices = ChoiceResolver.Resolve(Repository.Catalog, profile, []).Choices
+            ?? throw new InvalidOperationException($"profile '{profile}' does not resolve.");
+        return choices.Project.Concat(choices.ModuleDefaults)
+            .Any(choice => choice.Value.Any(chosen => $"{choice.Key}.{chosen}" == option));
+    }
+
+    /// <summary>Runs build/complete-profiles.sh with a list of changed paths, as the workflow does on a pull request.</summary>
+    private static (int ExitCode, string Output) CompleteProfilesAfter(params string[] changed)
+    {
+        var temporary = Directory.CreateTempSubdirectory("complete-profiles-changed-");
+        try
+        {
+            var list = Path.Combine(temporary.FullName, "changed");
+            File.WriteAllText(list, string.Concat(changed.Select(path => path + "\n")));
+            return Shell.Run(Repository.Root, "bash", "build/complete-profiles.sh", "--changed", list);
+        }
+        finally
+        {
+            temporary.Delete(recursive: true);
+        }
+    }
+
+    private static YamlMappingNode Workflow()
+    {
+        var stream = new YamlStream();
+        stream.Load(new StringReader(File.ReadAllText(Path.Combine(Repository.Root, ".github", "workflows", "ci.yml"))));
+        return (YamlMappingNode)stream.Documents[0].RootNode;
+    }
+
+    /// <summary>A <c>name=[...]</c> line the script writes for <c>$GITHUB_OUTPUT</c>: <c>profiles</c> or <c>affected</c>.</summary>
+    private static string[] Listed(string output, string name = "profiles")
+    {
+        var prefix = $"{name}=";
         var line = output.Split('\n').SingleOrDefault(line => line.StartsWith(prefix, StringComparison.Ordinal));
         line.ShouldNotBeNull($"no '{prefix}' line in:\n{output}");
         return JsonSerializer.Deserialize<string[]>(line[prefix.Length..])!;

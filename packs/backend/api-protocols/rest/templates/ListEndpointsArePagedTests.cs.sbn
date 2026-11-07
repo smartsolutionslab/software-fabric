@@ -1,6 +1,3 @@
-{{~ if project["backend.test.integration"] != "aspire-fixture" ~}}
-#error The REST pack checks list endpoints through the aspire-fixture integration tests only so far (docs/adr/0006 of the generator).
-{{~ end ~}}
 using System.Text.Json.Nodes;
 
 namespace {{ namespace }}.Integration.Tests;
@@ -10,15 +7,15 @@ namespace {{ namespace }}.Integration.Tests;
 /// (docs/adr). Read from the OpenAPI document the running host serves: a GET whose success is a JSON array, or a
 /// <c>PagedResult</c>, is a list endpoint.
 /// </summary>
-public class ListEndpointsArePagedTests(AspireFixture aspire)
+public class ListEndpointsArePagedTests({{ integration_fixture }})
 {
     private const string PagedResultSchema = "#/components/schemas/PagedResultOf";
 
-    [Fact]
+    {{ test_attribute }}
     public async Task Every_list_endpoint_answers_a_paged_result_and_takes_page_and_page_size()
     {
-        using var client = aspire.CreateHostClient();
-        var document = JsonNode.Parse(await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative), TestContext.Current.CancellationToken))!;
+        using var client = {{ host_client }};
+        var document = JsonNode.Parse(await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative), {{ test_cancellation_token }}))!;
 
         List<string> violations = [];
         foreach (var (path, item) in document["paths"]?.AsObject() ?? [])
@@ -40,11 +37,7 @@ public class ListEndpointsArePagedTests(AspireFixture aspire)
             }
         }
 
-        {{~ if project["backend.test.assertions"] == "shouldly" ~}}
-        violations.ShouldBeEmpty(string.Join(Environment.NewLine, violations));
-        {{~ else ~}}
-        violations.Should().BeEmpty(string.Join(Environment.NewLine, violations));
-        {{~ end ~}}
+        {{ `violations` | should_be_empty `string.Join(Environment.NewLine, violations)` }};
     }
 
     private static bool IsArray(JsonNode schema) =>

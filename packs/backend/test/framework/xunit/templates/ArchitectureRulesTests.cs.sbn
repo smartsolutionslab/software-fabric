@@ -14,6 +14,6 @@ public class ArchitectureRulesTests
         var violations = architectureRule.Violations(Model).ToList();
         var description = architectureRule.Description;
 
-{{ slots["tests.assert-no-violations"] }}
+        {{ `violations` | should_be_empty `description` }};
     }
 }
