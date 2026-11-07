@@ -1,0 +1,12 @@
+        // The AppHost's PostgreSQL server{{ if object.has_key(project, "backend.llm.extras") && (array.contains project["backend.llm.extras"] "rag") }} (the pgvector image){{ end }} and its database "database".
+        var postgres = await StartAsync(
+            new ContainerBuilder("{{ if object.has_key(project, "backend.llm.extras") && (array.contains project["backend.llm.extras"] "rag") }}pgvector/pgvector:0.8.7-pg18{{ else }}postgres:18.3{{ end }}")
+                .WithPortBinding(5432, assignRandomHostPort: true)
+                .WithEnvironment("POSTGRES_USER", "postgres")
+                .WithEnvironment("POSTGRES_PASSWORD", "postgres")
+                .WithEnvironment("POSTGRES_DB", "database")
+                // The image's first start runs a server on its socket only; the server on TCP is the one that stays.
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilCommandIsCompleted("pg_isready", "--host", "127.0.0.1", "--dbname", "database", "--username", "postgres"))
+                .Build(),
+            cancellationToken);
+        settings["ConnectionStrings:database"] = $"Host={postgres.Hostname};Port={postgres.GetMappedPublicPort(5432)};Database=database;Username=postgres;Password=postgres";

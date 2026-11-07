@@ -1,0 +1,9 @@
+{{ if project["backend.llm"] == "azure-openai" ~}}
+        // Embeddings use the chat model's endpoint and key, given their values above; the AppHost's default deployment.
+{{~ else ~}}
+        // A resource that does not exist, a key-shaped value Azure does not accept, and the AppHost's default deployment: the
+        // integration tests never call the embedding model.
+        settings["AzureOpenAI:Endpoint"] = "https://not-a-real-resource.openai.azure.com";
+        settings["AzureOpenAI:ApiKey"] = "not-a-real-key";
+{{~ end }}
+        settings["AzureOpenAI:EmbeddingDeployment"] = "text-embedding-3-small";

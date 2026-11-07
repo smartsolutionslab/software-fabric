@@ -1,0 +1,2 @@
+        // Every module's migrations, by the MigrationRunner, before the host starts.
+        await RunProjectAsync("src/MigrationRunner", cancellationToken);

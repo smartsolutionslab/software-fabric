@@ -1,0 +1,3 @@
+        // The AppHost's broker, "messaging".
+        var messaging = await StartAsync(new Testcontainers.RabbitMq.RabbitMqBuilder("rabbitmq:4.3-management").Build(), cancellationToken);
+        settings["ConnectionStrings:messaging"] = messaging.GetConnectionString();
