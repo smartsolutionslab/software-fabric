@@ -4,7 +4,7 @@ files:
   - { template: templates/IValueObjectOfValue.cs.sbn, target: "src/Kernel/IValueObject{TValue}.cs" }
   - { template: templates/ValueObjectConverter.cs.sbn, target: src/BuildingBlocks/Persistence/ValueObjectConverter.cs }
   - { template: templates/ValueObjectConventions.cs.sbn, target: src/BuildingBlocks/Persistence/ValueObjectConventions.cs }
-  # Only beside Marten: the converter is registered through its slot, which no other event store declares.
+  # Only beside an event store: the converter is registered through module.event-store's role slot (ADR-0008).
   - { template: templates/ValueObjectJsonConverterFactory.cs.sbn, target: src/BuildingBlocks/EventStore/ValueObjectJsonConverterFactory.cs, when: 'object.has_key(slots, "event-store.json-converters")' }
   - { template: templates/ValueObjectJsonConverter.cs.sbn, target: src/BuildingBlocks/EventStore/ValueObjectJsonConverter.cs, when: 'object.has_key(slots, "event-store.json-converters")' }
   - { template: templates/PrimitiveBoundary.cs.sbn, target: tests/Architecture.Tests/PrimitiveBoundary.cs }
@@ -20,7 +20,7 @@ files:
   - { template: templates/SampleNameTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleNameTests.cs", per-module: true }
 slots:
   - { slot: persistence.context-members, template: templates/context-members.sbn }
-  # Marten is chosen only with event-sourced modules; a project of ddd modules has no event store to register with.
+  # An event store is chosen only with event-sourced modules; a project of ddd modules has no event store to register with.
   - { slot: event-store.json-converters, template: templates/json-converters.sbn, optional: true }
 agents:
   agents-md: docs/agents.md

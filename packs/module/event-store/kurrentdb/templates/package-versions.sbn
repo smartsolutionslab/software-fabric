@@ -1,0 +1,2 @@
+    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.KurrentDB" Version="13.6.1" />
+    <PackageVersion Include="KurrentDB.Client" Version="1.6.1" />

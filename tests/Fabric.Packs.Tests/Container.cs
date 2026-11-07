@@ -32,6 +32,36 @@ internal sealed class Container : IDisposable
         return container;
     }
 
+    /// <summary>A single KurrentDB node without TLS, as the AppHost runs it in development; ready once its HTTP port reports itself live.</summary>
+    public static Container KurrentDb(string image)
+    {
+        var container = Start(image, 2113, "KURRENTDB_INSECURE=true", "KURRENTDB_CLUSTER_SIZE=1");
+        using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+        for (var attempt = 0; attempt < 90; attempt++)
+        {
+            try
+            {
+                if (client.GetAsync(new Uri($"http://127.0.0.1:{container.Port}/health/live")).GetAwaiter().GetResult().IsSuccessStatusCode)
+                {
+                    return container;
+                }
+            }
+            catch (System.Net.Http.HttpRequestException)
+            {
+                // Not listening yet.
+            }
+            catch (TaskCanceledException)
+            {
+                // Listening, not answering yet.
+            }
+
+            Thread.Sleep(1000);
+        }
+
+        container.Dispose();
+        throw new InvalidOperationException($"KurrentDB ({image}) did not become live.");
+    }
+
     /// <summary>
     /// A single-node Kafka (the image Aspire runs). A client is told the broker's address by the broker itself, so it
     /// listens on the same port inside and outside the container and advertises that one.

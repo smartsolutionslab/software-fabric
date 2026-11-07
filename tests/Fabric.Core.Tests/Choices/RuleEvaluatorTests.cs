@@ -77,6 +77,8 @@ public class RuleEvaluatorTests
         "module defaults: module.cqrs=physical requires module.event-store == marten, but module.event-store is not set.")]
     [InlineData("industrial-event-driven-mfe", new[] { "module.event-store=kurrentdb" },
         "module defaults: module.cqrs=physical requires module.event-store == marten, but module.event-store is kurrentdb.")]
+    [InlineData("industrial-event-driven-mfe", new[] { "module.event-store=kurrentdb", "module.cqrs=logical", "backend.tenancy=column" },
+        "module defaults: module.event-store=kurrentdb requires backend.tenancy == none, but backend.tenancy is column.")]
     [InlineData("saas-standard-vue", new[] { "frontend.design-system=tokens-and-components" },
         "frontend.design-system=tokens-and-components requires frontend.framework == react, but frontend.framework is vue.")]
     [InlineData("saas-standard-vue", new[] { "frontend.architecture=micro-frontends", "frontend.design-system=tokens" },
