@@ -1,0 +1,17 @@
+namespace {{ namespace }}.BuildingBlocks.Realtime;
+
+/// <summary>
+{{~ if project["backend.tenancy"] == "none" ~}}
+/// Sends an event to every browser with the host's event stream (/server-events) open.
+{{~ else ~}}
+/// Sends an event to the current tenant's browsers with the host's event stream (/server-events) open; without a
+/// tenant it throws.
+{{~ end ~}}
+/// A consumer forwards an integration event with <c>browserEvents.SendAsync(message, cancellationToken)</c>.
+/// </summary>
+public interface IBrowserEvents
+{
+    /// <summary>Sends the event under its type's name: a browser listens with <c>useServerEvent('InvoicePaidV1', ...)</c>.</summary>
+    Task SendAsync<TEvent>(TEvent browserEvent, CancellationToken cancellationToken)
+        where TEvent : class;
+}

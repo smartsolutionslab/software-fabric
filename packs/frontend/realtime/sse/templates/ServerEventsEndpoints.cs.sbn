@@ -1,0 +1,90 @@
+{{~ tenanted = project["backend.tenancy"] != "none"
+   signed_in = project["backend.auth"] != "none" ~}}
+using System.Net.ServerSentEvents;
+using {{ namespace }}.BuildingBlocks.Realtime;
+{{~ if tenanted ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
+using {{ namespace }}.Host.Realtime;
+{{~ if signed_in ~}}
+using Microsoft.AspNetCore.Authentication;
+{{~ end ~}}
+
+namespace Microsoft.AspNetCore.Builder;
+
+public static class ServerEventsEndpoints
+{
+    /// <summary>
+{{~ if signed_in ~}}
+    /// The browsers' event stream, GET /server-events, for signed-in users, and in Development POST /server-events/test,
+    /// which sends a <see cref="TestEvent"/> to the caller's browsers{{ if tenanted }} and the rest of their tenant's{{ end }}.
+{{~ else ~}}
+    /// The browsers' event stream, GET /server-events, open to anyone (backend.auth: none), and in Development
+    /// POST /server-events/test, which sends a <see cref="TestEvent"/> to every browser.
+{{~ end ~}}
+    /// </summary>
+    public static WebApplication MapServerEvents(this WebApplication app)
+    {
+        {{ not_null "app" }}
+
+{{~ if signed_in ~}}
+        app.MapGet("/server-events", (BrowserEventStreams streams{{ if tenanted }}, ITenantContext tenant{{ end }}, TimeProvider time, HttpContext context) =>
+                TypedResults.ServerSentEvents(AfterTheHeadersAsync(context.Response, streams.ListenAsync({{ if tenanted }}tenant.TenantId, {{ end }}UntilTheTokenExpires(context, time)))))
+            .RequireAuthorization()
+            .ExcludeFromDescription();
+{{~ else ~}}
+        app.MapGet("/server-events", (BrowserEventStreams streams, HttpContext context) =>
+                TypedResults.ServerSentEvents(AfterTheHeadersAsync(context.Response, streams.ListenAsync(context.RequestAborted))))
+            .ExcludeFromDescription();
+{{~ end ~}}
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapPost("/server-events/test", async (TestEvent testEvent, IBrowserEvents browserEvents, CancellationToken cancellationToken) =>
+            {
+                await browserEvents.SendAsync(testEvent, cancellationToken);
+                return TypedResults.NoContent();
+            })
+{{~ if signed_in ~}}
+                .RequireAuthorization()
+{{~ end ~}}
+                .ExcludeFromDescription();
+        }
+
+        return app;
+    }
+
+    /// <summary>
+    /// The events, once the response has started. The result sends its headers with the first event otherwise, and a
+    /// browser's EventSource counts as open only when they arrive.
+    /// </summary>
+    private static async IAsyncEnumerable<SseItem<object>> AfterTheHeadersAsync(HttpResponse response, IAsyncEnumerable<SseItem<object>> events)
+    {
+        await response.Body.FlushAsync(response.HttpContext.RequestAborted);
+        await foreach (var browserEvent in events)
+        {
+            yield return browserEvent;
+        }
+    }
+{{~ if signed_in ~}}
+
+    /// <summary>
+    /// Cancelled when the request ends or its access token expires. A stream outlives the token it started with; ending
+    /// it then makes the browser open it again with a fresh one, so the user and their tenant are checked again.
+    /// </summary>
+    private static CancellationToken UntilTheTokenExpires(HttpContext context, TimeProvider time)
+    {
+        var expires = context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Properties?.ExpiresUtc;
+        if (expires is not { } expiry)
+        {
+            return context.RequestAborted;
+        }
+
+        var remaining = expiry - time.GetUtcNow();
+        var expired = new CancellationTokenSource(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero, time);
+        var lifetime = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, expired.Token);
+        context.Response.RegisterForDispose(expired);
+        context.Response.RegisterForDispose(lifetime);
+        return lifetime.Token;
+    }
+{{~ end ~}}
+}

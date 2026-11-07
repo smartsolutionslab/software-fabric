@@ -1,0 +1,120 @@
+{{~ signed_in = object.has_key(project, "frontend.auth-client") ~}}
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+{{~ if signed_in ~}}
+{{ store_access_token_import }}
+{{~ end ~}}
+import { connectServerEvents } from './connection';
+
+type Listener = (event: MessageEvent<string>) => void;
+
+/** Stands in for the browser's EventSource: records what the connection opens and lets a test play the host. */
+class FakeEventSource {
+  static opened: FakeEventSource[] = [];
+
+  readonly listeners = new Map<string, Set<Listener>>();
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  closed = false;
+
+  constructor(readonly url: string) {
+    FakeEventSource.opened.push(this);
+  }
+
+  addEventListener(name: string, listener: Listener) {
+    const named = this.listeners.get(name) ?? new Set<Listener>();
+    named.add(listener);
+    this.listeners.set(name, named);
+  }
+
+  removeEventListener(name: string, listener: Listener) {
+    this.listeners.get(name)?.delete(listener);
+  }
+
+  close() {
+    this.closed = true;
+  }
+
+  send(name: string, payload: unknown) {
+    this.listeners.get(name)?.forEach((listener) => {
+      listener(new MessageEvent(name, { data: JSON.stringify(payload) }));
+    });
+  }
+}
+
+const latest = () => {
+  const source = FakeEventSource.opened.at(-1);
+  if (!source) {
+    throw new Error('No stream was opened.');
+  }
+  return source;
+};
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  FakeEventSource.opened = [];
+  vi.stubGlobal('EventSource', FakeEventSource);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  sessionStorage.clear();
+});
+
+test('a listener receives the events of its name, parsed, until it stops listening', () => {
+  const stream = connectServerEvents();
+  const received: unknown[] = [];
+  const handler = (payload: unknown) => received.push(payload);
+  stream.on('TestEvent', handler);
+  stream.start();
+
+  latest().send('TestEvent', { text: 'hello from the host' });
+  latest().send('OtherEvent', { text: 'not for this listener' });
+  stream.off('TestEvent', handler);
+  latest().send('TestEvent', { text: 'after it stopped listening' });
+
+  expect(received).toEqual([{ text: 'hello from the host' }]);
+});
+
+test('a listener added while the stream is open receives its events', () => {
+  const stream = connectServerEvents();
+  stream.start();
+  const received: unknown[] = [];
+  stream.on('TestEvent', (payload) => received.push(payload));
+
+  latest().send('TestEvent', { text: 'hello from the host' });
+
+  expect(received).toEqual([{ text: 'hello from the host' }]);
+});
+
+test('a stream that fails is opened anew{{ if signed_in }} with the current access token{{ end }}, and once stopped stays closed', async () => {
+{{~ if signed_in ~}}
+  {{ store_access_token "'token-of-developer'" }};
+{{~ end ~}}
+  const stream = connectServerEvents();
+  stream.start();
+  const first = latest();
+{{~ if signed_in ~}}
+  expect(first.url).toBe('/api/server-events?access_token=token-of-developer');
+  {{ store_access_token "'renewed-token'" }};
+{{~ else ~}}
+  expect(first.url).toBe('/api/server-events');
+{{~ end ~}}
+
+  first.onerror?.();
+  await vi.advanceTimersByTimeAsync(1_000);
+
+  expect(first.closed).toBe(true);
+  expect(FakeEventSource.opened).toHaveLength(2);
+{{~ if signed_in ~}}
+  expect(latest().url).toBe('/api/server-events?access_token=renewed-token');
+{{~ else ~}}
+  expect(latest().url).toBe('/api/server-events');
+{{~ end ~}}
+
+  latest().onerror?.();
+  stream.stop();
+  await vi.advanceTimersByTimeAsync(120_000);
+
+  expect(FakeEventSource.opened).toHaveLength(2);
+});

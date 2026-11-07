@@ -1,0 +1,4 @@
+namespace {{ namespace }}.Host.Realtime;
+
+/// <summary>What POST /server-events/test sends, in Development only, to show that the stream works.</summary>
+public sealed record TestEvent(string Text);
