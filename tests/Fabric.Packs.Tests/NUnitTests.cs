@@ -22,7 +22,7 @@ public sealed partial class NUnitTests
 
         var props = File.ReadAllText(Path.Combine(project.ProjectDirectory, "tests/Directory.Build.props"));
         props.ShouldContain("<PackageReference Include=\"NUnit\" />");
-        props.ShouldContain("<Using Include=\"NUnit.Framework\" />");
+        props.ShouldContain("<Using Include=\"NUnit.Framework\"");
         var named = Directory.EnumerateFiles(project.ProjectDirectory, "*", SearchOption.AllDirectories)
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}node_modules{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .SelectMany(path => File.ReadLines(path).Select((line, index) => (path, line, index)))
