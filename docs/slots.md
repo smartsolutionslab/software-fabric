@@ -308,14 +308,16 @@ caller: `{{ accept_query_token ... | string.replace "\n" "\n        " }}`.
 
 An identity provider pack also brings, as its own files and slot
 contributions: the host's authentication (`host.services`,
-`host.middleware`), `GET /me` answering `CurrentUser` (the frontend's
-OpenAPI copy starts with it whenever `backend.auth` is not `none`), the
+`host.middleware`), the
 architecture tests' host references (`tests.architecture.references`), the
 mapping of its token's roles to `ClaimTypes.Role` when
 `backend.authorization` has `roles`, and the local test users the tests
 sign in as, passwords equal to their names: `developer` (and `developer-b`
 with tenancy), plus `visitor`, `clerk` and `analyst` as the roles and
-claims ADRs describe.
+claims ADRs describe. The base maps `GET /me`, answering `CurrentUser`
+with the claim `user_name_claim` names, whenever `backend.auth` is not
+`none` (the frontend's OpenAPI copy starts with it); a provider carries no
+copy of it (*#322*).
 
 | Function | Returns (keycloak) |
 |---|---|
@@ -340,6 +342,9 @@ claims ADRs describe.
 | `tenant_claim user` | statements, the body of a method returning `string?`, that return the tenant the claims principal `user` (a C# expression, `ClaimsPrincipal?`, which the statements continue with `.`) belongs to, or `null` when its token names none or several: the one group under `/tenants/` in `groups` (*#251*) |
 | `tenant_claim_members` | the private members those statements need, in the same class (`TenantGroupPrefix`); the class's `IHttpContextAccessor accessor` is in scope (*#252*) |
 | `tenant_claim_description` | prose for the class's summary: `the user's one group under /tenants/` |
+| `user_name_claim` | the access token claim `GET /me` answers as the user's name: `preferred_username` (*#322*) |
+| `browser_client_settings` | the browser OIDC client's settings for its client ID and scope, TS object-literal lines each ending in `,`: `client_id: '<name>-web',`, the realm's own client, and no scope (*#322*) |
+| `browser_client_env` | the `ImportMetaEnv` members those settings read, one per line, or nothing: nothing (*#322*) |
 
 Generic OIDC (`backend.auth.generic-oidc`, *#251*) reads standard claims
 under the provider's own names (`MapInboundClaims = false`): its
@@ -349,7 +354,11 @@ under the provider's own names (`MapInboundClaims = false`): its
 reads the token endpoint from the local provider's discovery document,
 `id_token_roles roles` is `roles: [roles]`, `id_token_roles_claim` is
 `roles`, `role_mapping_provider` is `generic OIDC`, and `tenant_claim user`
-returns the one value of the token's `tenant` claim. Its local provider is
+returns the one value of the token's `tenant` claim. Its
+`browser_client_settings` read the client ID and scope from
+`VITE_OIDC_CLIENT_ID` and `VITE_OIDC_SCOPE`, falling back on `<name>-web`
+and `openid`, and `browser_client_env` declares both: production's provider
+registers its own web client (*#322*). Its local provider is
 Keycloak, named `identity` in the AppHost and configured to issue those
 claims; the short-lived token, the login page and the authority are that
 local Keycloak's, as for the keycloak pack.
@@ -367,7 +376,9 @@ document (`/organizations/v2.0/.well-known/openid-configuration`),
 `ShortLivedTokenAsync` member, `browser_sign_in` fills the stand-in's form
 (`Username`, `Password`, `Sign in`), `browser_authority` is
 `http://localhost:8080/organizations/v2.0`, `id_token_roles roles` is
-`roles: [roles]`, `role_mapping_provider` is `Microsoft Entra ID`, and
+`roles: [roles]`, `role_mapping_provider` is `Microsoft Entra ID`,
+`browser_client_settings` and `browser_client_env` are generic OIDC's (a
+real Entra ID needs the registration's client ID and a scope of the API), and
 `tenant_claim user` maps the token's one `tid` to the tenant through
 `AzureAd:Tenants:<tenant> = <directory id>`, read from the request's
 `IConfiguration`. Its local provider is `src/IdentityStandIn`, an
@@ -413,7 +424,7 @@ AppHost's model with it, declares it instead (*#260*).
 | `host.packages` | `src/Host/Host.csproj` | 0+ | keycloak, wolverine, ef-core, agent-ui ag-ui (`AGUI.Server`, `AGUI.Formatting`: only the host speaks AG-UI) |
 | `host.services` | `src/Host/Program.cs` | 0+ | keycloak, wolverine (with `modules` in scope), result (problem details, the guard exception handler), tenancy, ef-core (the unique-constraint exception handler), agent-ui ag-ui (the agents by name, and in Development the stand-in model; after the provider's client, order 40) |
 | `host.middleware` | `src/Host/Program.cs` | 0+ | result (`UseExceptionHandler`, first), keycloak, tenancy |
-| `host.endpoints` *(added in M1-06)* | `src/Host/Program.cs` | 0+ | keycloak (`/me`), tenancy (`/me/tenant`), agent-ui ag-ui (`POST /agents/{name}`) |
+| `host.endpoints` *(added in M1-06)* | `src/Host/Program.cs` | 0+ | the base with an identity provider (`/me`), tenancy (`/me/tenant`), agent-ui ag-ui (`POST /agents/{name}`) |
 | `host.log-levels` | `src/Host/appsettings.json`, under `Logging:LogLevel` | 0+ | ef-core (SQL commands at `Warning`) |
 | `modules.infrastructure` | `src/BuildingBlocks/Modules/ModuleInfrastructure.cs` | 0+ | ef-core, wolverine, tenancy, agent-ui ag-ui (registers the module's `IAgentConversation<TSelf>` queries by their agents' names) |
 | `modules.endpoints` *(added in M1-02)* | `src/BuildingBlocks/Modules/ModuleEndpoints.cs` | 0+ | minimal-apis (maps `IEndpoint`s), keycloak (`group.RequireAuthorization()`) |

@@ -3,7 +3,6 @@ files:
   # The local provider: Keycloak, configured to issue standard claims only. The host and the browser know its authority alone.
   - { template: templates/realm.json.sbn, target: src/AppHost/realms/realm.json }
   - { template: templates/Authentication.cs.sbn, target: src/Host/Wiring/Authentication.cs }
-  - { template: templates/CurrentUser.cs.sbn, target: src/Host/CurrentUser.cs }
   - { template: templates/ProviderNeutralHost.cs.sbn, target: tests/Architecture.Tests/Rules/ProviderNeutralHost.cs }
   # With backend.authorization roles: the token's roles claim becomes ClaimTypes.Role (ADR-0009: the provider decides what the token carries).
   - { template: templates/OidcRoleClaims.cs.sbn, target: src/Host/OidcRoleClaims.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles")' }
@@ -18,7 +17,6 @@ slots:
   - { slot: host.services, template: templates/host-services.sbn }
   - { slot: host.middleware, template: templates/host-middleware.sbn, order: -10 }
   - { slot: modules.endpoints, template: templates/module-endpoints.sbn, order: -10 }
-  - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 10 }
   - { slot: tests.architecture.references, template: templates/architecture-tests-references.sbn }
   # With backend.test.integration testcontainers only (ADR-0002: dropped where no pack declares the slot).
   - { slot: integration-tests.resources, template: templates/testcontainers-resources.sbn, order: 20, optional: true }

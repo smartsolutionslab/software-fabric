@@ -149,7 +149,7 @@ public sealed partial class GenericOidcTests
         FailedTest().Matches(output).Select(match => match.Groups[1].Value)
             .ShouldBe(["Shop.Integration.Tests.OpenApiDocumentTests.The_frontends_copy_of_the_openapi_document_is_current"], customMessage: output);
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "tests", "Integration.Tests", "HostTests.cs"))
-            .ShouldContain("A_token_from_the_realm_identifies_the_user");
+            .ShouldContain("A_token_from_the_identity_provider_identifies_the_user");
     }
 
     /// <summary>

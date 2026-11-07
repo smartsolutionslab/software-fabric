@@ -169,3 +169,12 @@ end
 func tenant_claim_description
   ret "the user's one group under /tenants/"
 end
+func user_name_claim
+  ret "preferred_username"
+end
+func browser_client_settings
+  ret `client_id: '` + name + `-web',`
+end
+func browser_client_env
+  ret ""
+end
