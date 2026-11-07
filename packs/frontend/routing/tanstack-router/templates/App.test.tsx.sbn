@@ -1,0 +1,11 @@
+import { render, screen } from '@testing-library/react';
+import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
+import { expect, test } from 'vitest';
+import { App } from './App';
+import { createAppRouter } from './router';
+
+test('the start page names the application', async () => {
+  render(<RouterProvider router={createAppRouter(createMemoryHistory(), <App />)} />);
+
+  expect(await screen.findByRole('heading', { name: '{{ name }}' })).toBeInTheDocument();
+});

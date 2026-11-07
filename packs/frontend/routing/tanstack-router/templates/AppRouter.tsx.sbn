@@ -1,0 +1,12 @@
+import { createBrowserHistory, RouterProvider } from '@tanstack/react-router';
+import { useState, type ReactNode } from 'react';
+import { createAppRouter } from '@/router';
+
+/**
+ * Creates the router when it first renders, not when the providers are composed: the history reads the address once,
+ * and the providers before it may still change it (a sign-in callback leaves its code there until it is handled).
+ */
+export function AppRouter({ app }: { app: ReactNode }) {
+  const [router] = useState(() => createAppRouter(createBrowserHistory(), app));
+  return <RouterProvider router={router} />;
+}

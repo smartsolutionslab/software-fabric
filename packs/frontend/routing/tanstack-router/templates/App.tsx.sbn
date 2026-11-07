@@ -1,0 +1,19 @@
+import { Link, Outlet } from '@tanstack/react-router';
+import { moduleRoutes } from '@/modules';
+
+/** The root route's page: the navigation, then the matched route's page. */
+export function App() {
+  return (
+    <div>
+      <nav aria-label="Modules" className="flex gap-4 p-2">
+        <Link to="/">Home</Link>
+        {moduleRoutes.map((route) => (
+          <Link key={route.path} to={`/${route.path}`}>
+            {route.title}
+          </Link>
+        ))}
+      </nav>
+      <Outlet />
+    </div>
+  );
+}

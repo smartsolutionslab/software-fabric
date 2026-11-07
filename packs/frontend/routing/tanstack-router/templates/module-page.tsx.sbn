@@ -1,0 +1,35 @@
+{{~ if project["frontend.architecture"] == "micro-frontends" ~}}
+import { Remote } from '@/remotes/Remote';
+
+/** The module's screens live in its own remote, web/modules/{{ module.name }}; the shell mounts it here (docs/adr). */
+export function {{ module.namespace }}Page() {
+  return <Remote module="{{ module.name }}" />;
+}
+{{~ else if module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains project["frontend.dashboards"] "user-editable" && project["frontend.api-client"] == "rtk-query-codegen" && project["frontend.architecture"] == "spa" ~}}
+import { DashboardEditor } from '@/dashboards/DashboardEditor';
+
+/** The module the dashboards choice brings; its screen is that choice's dashboard editor (docs/adr). */
+export function {{ module.namespace }}Page() {
+  return <DashboardEditor />;
+}
+{{~ else if module.name == "assistant" && object.has_key(project, "frontend.agent-ui") && project["frontend.agent-ui"] == "ag-ui" ~}}
+import { AgentPanel } from '@/agents/AgentPanel';
+
+/** The module the agent panel choice brings; its screen is a conversation with its agent (docs/adr). */
+export function {{ module.namespace }}Page() {
+  return (
+    <main>
+      <h1>{{ module.namespace }}</h1>
+      <AgentPanel agent="assistant" />
+    </main>
+  );
+}
+{{~ else ~}}
+export function {{ module.namespace }}Page() {
+  return (
+    <main>
+      <h1>{{ module.namespace }}</h1>
+    </main>
+  );
+}
+{{~ end ~}}
