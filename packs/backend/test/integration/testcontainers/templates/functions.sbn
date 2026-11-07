@@ -30,6 +30,7 @@ func database_fixture_project_references
 end
 func database_fixture_file(space)
   ret `using System.Diagnostics;
+using System.Globalization;
 using System.Reflection;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
@@ -44,7 +45,10 @@ namespace ` + space + `;
 /// </summary>
 public sealed class ApplicationDatabase : ` + test_lifetime + `
 {
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    /// <summary>How long setup may take: five minutes, or the time span in INTEGRATION_TESTS_STARTUP_TIMEOUT.</summary>
+    private static readonly TimeSpan StartupTimeout = Environment.GetEnvironmentVariable("INTEGRATION_TESTS_STARTUP_TIMEOUT") is { } startupTimeout
+        ? TimeSpan.Parse(startupTimeout, CultureInfo.InvariantCulture)
+        : TimeSpan.FromMinutes(5);
 
     private readonly List<IContainer> containers = [];
 
@@ -117,7 +121,18 @@ public sealed class ApplicationDatabase : ` + test_lifetime + `
         using var process = Process.Start(start) ?? throw new InvalidOperationException($"dotnet run {project} did not start.");
         var output = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var error = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelling the wait stops only the waiting: the project, and what dotnet run started, would run on.
+            process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(CancellationToken.None);
+            throw;
+        }
+
         if (process.ExitCode != 0)
         {
             throw new InvalidOperationException($"{project} ended with exit code {process.ExitCode}:{Environment.NewLine}{await output}{await error}");
