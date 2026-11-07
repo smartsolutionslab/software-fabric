@@ -21,6 +21,7 @@ public sealed partial class TestVocabularyTests
         "test_lifetime",
         "test_setup",
         "test_teardown",
+        "test_takes_run_fixture",
     ];
 
     private static readonly string[] AssertionVocabulary =
