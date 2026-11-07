@@ -81,6 +81,27 @@ public sealed class MatrixCommandTests : IDisposable
         File.Exists(output).ShouldBeFalse();
     }
 
+    /// <summary>The reviewer's reproduction: a dimension without a pack added to the fixture catalog, active only if it is itself.</summary>
+    [Fact]
+    public void A_catalog_with_an_active_when_on_its_own_dimension_fails_naming_it_and_writes_nothing()
+    {
+        var catalog = Path.Combine(root, "catalog.yaml");
+        File.WriteAllText(
+            catalog,
+            File.ReadAllText(Paths.FixtureCatalog) + """
+
+                  x.a: { scope: project, active-when: "x.a == on", default: on, options: { on: { tier: supported } } }
+
+                """);
+        var output = Path.Combine(root, "matrix.json");
+
+        var run = CliRun.Of("matrix", "--catalog", catalog, "--packs", Paths.FixturePacks, "--output", output);
+
+        run.ExitCode.ShouldBe(1, run.Output);
+        run.Error.ShouldBe("error: x.a active-when: condition 'x.a == on' refers to its own dimension." + Environment.NewLine);
+        File.Exists(output).ShouldBeFalse();
+    }
+
     /// <summary>The reviewer's reproduction: packs for the two options of one single-valued dimension, and no other.</summary>
     [Fact]
     public void Packs_for_only_one_factor_fail_instead_of_writing_an_empty_matrix()

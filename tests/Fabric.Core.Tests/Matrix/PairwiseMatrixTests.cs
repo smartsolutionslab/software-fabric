@@ -212,6 +212,26 @@ public class PairwiseMatrixTests
         matrix.Combinations.ShouldBeEmpty();
     }
 
+    /// <summary>
+    /// A dimension without a pack, active only if it is itself: the search would follow it to itself without end, so the
+    /// matrix refuses the catalog with the linter's message before it searches.
+    /// </summary>
+    [Fact]
+    public void An_active_when_on_its_own_dimension_is_an_error_before_any_search()
+    {
+        var selfReferring = CatalogReader.Read(
+            new StringReader(CatalogText + """
+
+                  x.a: { scope: project, active-when: "x.a == on", default: on, options: { on: { tier: supported } } }
+                """),
+            "catalog.yaml");
+
+        var matrix = PairwiseMatrix.Build(selfReferring, Domain, []);
+
+        matrix.Errors.ShouldBe(["x.a active-when: condition 'x.a == on' refers to its own dimension."]);
+        matrix.Combinations.ShouldBeEmpty();
+    }
+
     /// <summary>Options with a pack in only one factor leave no pair to cover; an empty matrix would look like success.</summary>
     [Theory]
     [InlineData(

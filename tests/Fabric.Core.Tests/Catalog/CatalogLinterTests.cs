@@ -153,12 +153,28 @@ public class CatalogLinterTests
             """).ShouldBe([$"x.y=o: condition '{condition}' uses '{op}' on multi-valued x.z; use has."]);
     }
 
+    /// <summary>The cycle check reports a self-reference as a cycle of one; the linter must not report it a second time.</summary>
     [Fact]
-    public void An_active_when_on_its_own_dimension_is_reported()
+    public void An_active_when_on_its_own_dimension_is_reported_once()
     {
         Lint("""
               x.y: { scope: project, active-when: "x.y == o", default: o, options: { o: { tier: supported } } }
-            """).ShouldContain("x.y active-when: condition 'x.y == o' refers to its own dimension.");
+            """).ShouldBe(["x.y active-when: condition 'x.y == o' refers to its own dimension."]);
+    }
+
+    [Fact]
+    public void The_cycle_check_reports_an_active_when_on_its_own_dimension_as_a_cycle_of_one()
+    {
+        var catalog = CatalogReader.Read(
+            new StringReader("""
+                version: 1
+                profiles: {}
+                dimensions:
+                  x.y: { scope: project, active-when: "x.y == o", default: o, options: { o: { tier: supported } } }
+                """),
+            "test.yaml");
+
+        ActiveWhenCycles.Find(catalog).ShouldBe(["x.y active-when: condition 'x.y == o' refers to its own dimension."]);
     }
 
     [Fact]
