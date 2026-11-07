@@ -1,0 +1,9 @@
+import { createContext } from 'react';
+
+/** What a component needs of the connection: to start and stop listening for one event. */
+export interface ServerEventsConnection {
+  on(name: string, handler: (payload: unknown) => void): void;
+  off(name: string, handler: (payload: unknown) => void): void;
+}
+
+export const ServerEventsContext = createContext<ServerEventsConnection | undefined>(undefined);

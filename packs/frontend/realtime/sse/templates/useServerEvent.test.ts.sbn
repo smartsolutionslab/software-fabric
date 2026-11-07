@@ -1,0 +1,38 @@
+import { render, screen } from '@testing-library/vue';
+import { expect, test } from 'vitest';
+import { defineComponent, h, ref } from 'vue';
+import { type ServerEventsConnection, serverEventsKey } from './serverEventsKey';
+import { useServerEvent } from './useServerEvent';
+
+interface TestEvent {
+  text: string;
+}
+
+const LatestTestEvent = defineComponent({
+  setup() {
+    const text = ref('nothing yet');
+    useServerEvent<TestEvent>('TestEvent', (event) => {
+      text.value = event.text;
+    });
+    return () => h('p', text.value);
+  },
+});
+
+test('a component sees the server events it listens for, and stops listening when it unmounts', async () => {
+  const handlers = new Map<string, (payload: unknown) => void>();
+  const connection: ServerEventsConnection = {
+    on: (name, handler) => handlers.set(name, handler),
+    off: (name, handler) => {
+      if (handlers.get(name) === handler) {
+        handlers.delete(name);
+      }
+    },
+  };
+
+  const { unmount } = render(LatestTestEvent, { global: { provide: { [serverEventsKey]: connection } } });
+  handlers.get('TestEvent')?.({ text: 'hello from the host' });
+
+  expect(await screen.findByText('hello from the host')).toBeInTheDocument();
+  unmount();
+  expect(handlers.has('TestEvent')).toBe(false);
+});

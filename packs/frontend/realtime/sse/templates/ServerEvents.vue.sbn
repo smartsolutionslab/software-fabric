@@ -1,0 +1,21 @@
+<script setup lang="ts">
+import { onMounted, onUnmounted, provide } from 'vue';
+import { connectServerEvents } from './connection';
+import { serverEventsKey } from './serverEventsKey';
+
+/** Holds the app's one stream from the host, open while it is mounted; useServerEvent listens on it. */
+const stream = connectServerEvents();
+provide(serverEventsKey, stream);
+
+onMounted(() => {
+  stream.start();
+});
+
+onUnmounted(() => {
+  stream.stop();
+});
+</script>
+
+<template>
+  <slot />
+</template>

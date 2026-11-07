@@ -1,0 +1,31 @@
+import { render } from '@testing-library/react';
+import { beforeEach, expect, test, vi } from 'vitest';
+import { ServerEvents } from './ServerEvents';
+
+const stream = vi.hoisted(() => ({
+  start: vi.fn(),
+  stop: vi.fn(),
+  on: vi.fn(),
+  off: vi.fn(),
+}));
+vi.mock('./connection', () => ({ connectServerEvents: () => stream }));
+
+beforeEach(() => {
+  stream.start.mockReset();
+  stream.stop.mockReset();
+});
+
+test('the stream is open while the provider is mounted and closed once it unmounts', () => {
+  const { unmount } = render(
+    <ServerEvents>
+      <p>app</p>
+    </ServerEvents>,
+  );
+
+  expect(stream.start).toHaveBeenCalled();
+  expect(stream.stop.mock.calls.length).toBeLessThan(stream.start.mock.calls.length);
+
+  unmount();
+
+  expect(stream.stop).toHaveBeenCalledTimes(stream.start.mock.calls.length);
+});

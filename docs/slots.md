@@ -278,10 +278,10 @@ the `backend.auth` pack, and
 how the browser holds its access token from those of the
 `frontend.auth-client` pack, so generic-oidc (#251), entra-id (#252) and
 msal (#266) plug in by defining the same functions instead of editing
-roles, claims, column tenancy, signalr, ag-ui, the micro-frontends, the MCP
-server and the base's policy rule. `backend.auth` `none` defines none of them: a template
-calls them only when `backend.auth` is not `none`, and a provider pack that
-lacks one fails generation naming it. `IdentityVocabularyTests` fails when a
+roles, claims, column tenancy, signalr, sse, ag-ui, the micro-frontends, the
+MCP server and the base's policy rule. `backend.auth` `none` defines none of
+them: a template calls them only when `backend.auth` is not `none`, and a
+provider pack that lacks one fails generation naming it. `IdentityVocabularyTests` fails when a
 provider or auth-client pack defines more or fewer functions, when a
 template refuses another provider or auth client with `#error` or
 `throw new Error(...)`, or when a project rendered with stand-in
