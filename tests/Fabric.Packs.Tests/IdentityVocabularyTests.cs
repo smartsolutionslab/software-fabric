@@ -36,6 +36,7 @@ public sealed partial class IdentityVocabularyTests
         "tenant_claim",
         "tenant_claim_members",
         "tenant_claim_description",
+        "user_name_claim",
     ];
 
     private static readonly string[] AuthClientVocabulary =
