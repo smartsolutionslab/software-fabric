@@ -90,7 +90,7 @@ public class HostTests(AspireFixture aspire)
     }
 
     {{ test_attribute }}
-    public async Task A_token_from_the_realm_identifies_the_user()
+    public async Task A_token_from_the_identity_provider_identifies_the_user()
     {
         using var client = await aspire.CreateHostClientAsync("developer");
 
