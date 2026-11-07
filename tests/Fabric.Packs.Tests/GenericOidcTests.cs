@@ -78,6 +78,33 @@ public sealed partial class GenericOidcTests
     }
 
     [Fact]
+    public void The_decision_records_and_the_permission_tests_describe_the_providers_claims_not_keycloaks()
+    {
+        var files = Files(GenericOidc, RolesAndClaims);
+        var tenancy = files.Single(file => file.Key.EndsWith("-backend-tenancy-column.md", StringComparison.Ordinal)).Value;
+        var roles = files.Single(file => file.Key.EndsWith("-backend-authorization-roles.md", StringComparison.Ordinal)).Value;
+        var permissionTests = files["web/app/src/auth/RequirePermission.test.tsx"];
+
+        tenancy.ShouldContain("`tenant` claim");
+        tenancy.ShouldNotContain("/tenants/");
+        roles.ShouldContain("`OidcRoleClaims`");
+        roles.ShouldContain("`src/Host/OidcRoleClaims.cs`");
+        roles.ShouldNotContain("KeycloakRoleClaims");
+        roles.ShouldNotContain("Keycloak's roles");
+        permissionTests.ShouldNotContain("realm_access");
+        permissionTests.ShouldNotContain("Keycloak");
+    }
+
+    [Fact]
+    public void The_pack_states_why_its_apphost_suppresses_the_preview_keycloak_diagnostics()
+    {
+        var adr = Files(GenericOidc).Single(file => file.Key.EndsWith("-backend-auth-generic-oidc.md", StringComparison.Ordinal)).Value;
+
+        adr.ShouldContain("ASPIREHOSTINGKEYCLOAK001");
+        adr.ShouldContain("#308");
+    }
+
+    [Fact]
     public void The_architecture_tests_pass_and_fail_once_the_host_names_keycloak()
     {
         using var project = NewProject(GenericOidc, RolesAndClaims, SignalR);

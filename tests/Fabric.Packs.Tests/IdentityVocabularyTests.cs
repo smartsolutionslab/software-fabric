@@ -29,6 +29,10 @@ public sealed partial class IdentityVocabularyTests
         "id_token_roles",
         "id_token_has_role",
         "id_token_roles_claim",
+        "id_token_users_comment",
+        "role_mapping_adr",
+        "role_mapping_provider",
+        "tenant_claim_adr",
         "tenant_claim",
         "tenant_claim_members",
         "tenant_claim_description",
@@ -156,6 +160,18 @@ public sealed partial class IdentityVocabularyTests
 
         var errors = string.Join(Environment.NewLine, generated.Errors);
         errors.ShouldContain("tenant_claim", customMessage: errors);
+    }
+
+    [Fact]
+    public void The_endpoint_rule_is_the_bases_for_every_identity_provider()
+    {
+        const string Rule = "tests/Architecture.Tests/Rules/EveryEndpointDeclaresItsAuthorization.cs";
+        var owners = Repository.Packs.Packs.Values
+            .Where(pack => pack.Files.Any(file => file.Target == Rule))
+            .Select(pack => pack.Option)
+            .ToList();
+
+        owners.ShouldBe(["base.core"]);
     }
 
     [Theory]
