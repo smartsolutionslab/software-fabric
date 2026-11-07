@@ -142,3 +142,11 @@ end
 func user_name_claim
   ret "preferred_username"
 end
+func browser_client_settings
+  ret `client_id: import.meta.env.VITE_OIDC_CLIENT_ID ?? '` + name + `-web',
+scope: import.meta.env.VITE_OIDC_SCOPE ?? 'openid',`
+end
+func browser_client_env
+  ret `readonly VITE_OIDC_CLIENT_ID?: string;
+readonly VITE_OIDC_SCOPE?: string;`
+end

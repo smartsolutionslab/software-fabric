@@ -343,6 +343,8 @@ copy of it (*#322*).
 | `tenant_claim_members` | the private members those statements need, in the same class (`TenantGroupPrefix`); the class's `IHttpContextAccessor accessor` is in scope (*#252*) |
 | `tenant_claim_description` | prose for the class's summary: `the user's one group under /tenants/` |
 | `user_name_claim` | the access token claim `GET /me` answers as the user's name: `preferred_username` (*#322*) |
+| `browser_client_settings` | the browser OIDC client's settings for its client ID and scope, TS object-literal lines each ending in `,`: `client_id: '<name>-web',`, the realm's own client, and no scope (*#322*) |
+| `browser_client_env` | the `ImportMetaEnv` members those settings read, one per line, or nothing: nothing (*#322*) |
 
 Generic OIDC (`backend.auth.generic-oidc`, *#251*) reads standard claims
 under the provider's own names (`MapInboundClaims = false`): its
@@ -352,7 +354,11 @@ under the provider's own names (`MapInboundClaims = false`): its
 reads the token endpoint from the local provider's discovery document,
 `id_token_roles roles` is `roles: [roles]`, `id_token_roles_claim` is
 `roles`, `role_mapping_provider` is `generic OIDC`, and `tenant_claim user`
-returns the one value of the token's `tenant` claim. Its local provider is
+returns the one value of the token's `tenant` claim. Its
+`browser_client_settings` read the client ID and scope from
+`VITE_OIDC_CLIENT_ID` and `VITE_OIDC_SCOPE`, falling back on `<name>-web`
+and `openid`, and `browser_client_env` declares both: production's provider
+registers its own web client (*#322*). Its local provider is
 Keycloak, named `identity` in the AppHost and configured to issue those
 claims; the short-lived token, the login page and the authority are that
 local Keycloak's, as for the keycloak pack.
@@ -370,7 +376,9 @@ document (`/organizations/v2.0/.well-known/openid-configuration`),
 `ShortLivedTokenAsync` member, `browser_sign_in` fills the stand-in's form
 (`Username`, `Password`, `Sign in`), `browser_authority` is
 `http://localhost:8080/organizations/v2.0`, `id_token_roles roles` is
-`roles: [roles]`, `role_mapping_provider` is `Microsoft Entra ID`, and
+`roles: [roles]`, `role_mapping_provider` is `Microsoft Entra ID`,
+`browser_client_settings` and `browser_client_env` are generic OIDC's (a
+real Entra ID needs the registration's client ID and a scope of the API), and
 `tenant_claim user` maps the token's one `tid` to the tenant through
 `AzureAd:Tenants:<tenant> = <directory id>`, read from the request's
 `IConfiguration`. Its local provider is `src/IdentityStandIn`, an

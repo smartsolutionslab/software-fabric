@@ -172,3 +172,9 @@ end
 func user_name_claim
   ret "preferred_username"
 end
+func browser_client_settings
+  ret `client_id: '` + name + `-web',`
+end
+func browser_client_env
+  ret ""
+end

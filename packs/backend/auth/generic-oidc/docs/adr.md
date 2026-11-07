@@ -37,6 +37,9 @@ The audience is the API's identifier at the provider (`<name>-api` locally); the
 ## Consequences
 
 - Production sets `Authentication:Authority` and `Authentication:Audience` to the real provider, registers the API and the web client there, and configures it to issue the claims above. A provider that names a claim differently maps it on its side (a claim mapper, a custom claim, an action), not in the application.
+{{~ if project["frontend.auth-client"] == "oidc-client-ts" ~}}
+- The web client's ID and the scope the browser asks for are the provider's too: the web app's build environment sets `VITE_OIDC_CLIENT_ID` and `VITE_OIDC_SCOPE` (`web/app/src/auth/oidcConfig.ts`) beside `VITE_OIDC_AUTHORITY`. Unset, they are the local client `<name>-web` and `openid`.
+{{~ end ~}}
 - `ProviderNeutralHost` checks names, not behaviour: code that reads a provider's quirk under a neutral name is review's to catch.
 - Nothing provider-specific is generated for email, account management or user administration: those are the provider's own consoles. The local Keycloak sends no email.
 - A token that lives briefly cannot be asked of a provider in a standard way; the tests that need one ask the local Keycloak's admin API, in the tests only.
