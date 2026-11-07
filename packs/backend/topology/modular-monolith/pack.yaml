@@ -10,6 +10,7 @@ declares-slots:
   - { slot: host.services, description: "Statements registering services on the host's builder; IReadOnlyList<IModule> modules is in scope." }
   - { slot: host.middleware, description: "Statements adding middleware to the built app, before endpoints are mapped." }
   - { slot: host.endpoints, description: "Host-wide endpoints mapped on WebApplication app, beside the modules' (e.g. /me)." }
+  - { slot: host.kestrel-endpoints, description: "JSON entries \"<name>\": { \"Url\": \"http://localhost:<port>\", \"Protocols\": \"...\" } under Kestrel:Endpoints of the host's appsettings.json, each indented six spaces, beside the host's own http endpoint (launchSettings' http://localhost:5080). Rendered only with a contribution; Aspire turns every Kestrel endpoint into an endpoint of the host resource, by its name.", separator: ",\n" }
   - { slot: host.log-levels, description: "JSON entries \"<category>\": \"<level>\" under Logging:LogLevel of the host's appsettings.json, after Default and Microsoft.AspNetCore, each indented six spaces.", separator: ",\n" }
 slots:
   - { slot: apphost.host, template: templates/apphost-host.sbn }
