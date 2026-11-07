@@ -141,12 +141,14 @@ public sealed partial class TestcontainersTests
     /// A MigrationRunner that outlives the fixture's startup timeout is killed with the setup it fails, not left running
     /// (#314): the timeout comes from INTEGRATION_TESTS_STARTUP_TIMEOUT, here seconds, and the runner stalls forever
     /// after recording its process ID. <c>dotnet run</c> starts it as a child of its own, so only killing the whole
-    /// process tree ends it.
+    /// process tree ends it. Both fixtures that run it are covered: the application's, and rag's database alone (#317).
     /// </summary>
-    [Fact]
-    public void A_migration_runner_that_outlives_the_startup_timeout_is_killed_when_setup_fails()
+    [Theory]
+    [InlineData("lean-crud", "tests/Integration.Tests/Integration.Tests.csproj", new[] { "frontend.realtime=signalr", "backend.auth=none", "backend.tenancy=none" })]
+    [InlineData("saas-ai-react", "tests/Rag.Tests/Rag.Tests.csproj", new string[0])]
+    public void A_migration_runner_that_outlives_the_startup_timeout_is_killed_when_setup_fails(string profile, string tests, string[] overrides)
     {
-        using var project = NewProject("lean-crud", "frontend.realtime=signalr", "backend.auth=none", "backend.tenancy=none");
+        using var project = NewProject(profile, overrides);
         project.Write("src/MigrationRunner/Program.cs", """
             using System.Globalization;
 
@@ -160,7 +162,7 @@ public sealed partial class TestcontainersTests
         var pidFile = Path.Combine(project.ProjectDirectory, "stalling-runner.pid");
 
         var (exitCode, output) = project.Test(
-            "tests/Integration.Tests/Integration.Tests.csproj",
+            tests,
             new Dictionary<string, string>
             {
                 ["INTEGRATION_TESTS_STARTUP_TIMEOUT"] = "00:01:30",
@@ -184,15 +186,31 @@ public sealed partial class TestcontainersTests
         }
     }
 
-    /// <summary>Whether a process runs: a killed one its parent has not reaped yet is a zombie, and runs no more.</summary>
+    /// <summary>
+    /// Whether a process runs. On Linux a killed one its parent has not reaped yet is a zombie, and runs no more; only
+    /// <c>/proc</c> tells it apart, as the process API counts it running. Elsewhere the process API answers.
+    /// </summary>
     private static bool IsRunning(int processId)
     {
+        if (OperatingSystem.IsLinux())
+        {
+            try
+            {
+                var stat = File.ReadAllText($"/proc/{processId}/stat");
+                return stat[(stat.LastIndexOf(')') + 2)..][0] != 'Z';
+            }
+            catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+            {
+                return false;
+            }
+        }
+
         try
         {
-            var stat = File.ReadAllText($"/proc/{processId}/stat");
-            return stat[(stat.LastIndexOf(')') + 2)..][0] != 'Z';
+            using var process = Process.GetProcessById(processId);
+            return !process.HasExited;
         }
-        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        catch (ArgumentException)
         {
             return false;
         }
