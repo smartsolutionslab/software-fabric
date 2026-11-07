@@ -57,6 +57,51 @@ public sealed class MatrixCommandTests : IDisposable
         File.Exists(output).ShouldBeFalse();
     }
 
+    /// <summary>The reviewer's reproduction: two dimensions without packs added to the fixture catalog, each active only if the other is.</summary>
+    [Fact]
+    public void A_catalog_with_an_active_when_cycle_fails_naming_the_cycle_and_writes_nothing()
+    {
+        var catalog = Path.Combine(root, "catalog.yaml");
+        File.WriteAllText(
+            catalog,
+            File.ReadAllText(Paths.FixtureCatalog) + """
+
+                  x.a: { scope: project, active-when: "x.b == on", default: on, options: { on: { tier: supported } } }
+                  x.b: { scope: project, active-when: "x.a == on", default: on, options: { on: { tier: supported } } }
+
+                """);
+        var output = Path.Combine(root, "matrix.json");
+
+        var run = CliRun.Of("matrix", "--catalog", catalog, "--packs", Paths.FixturePacks, "--output", output);
+
+        run.ExitCode.ShouldBe(1, run.Output);
+        run.Error.ShouldBe(
+            "error: x.a active-when: cycle x.a -> x.b -> x.a; each dimension is active only if the next one is, so none can be decided." +
+            Environment.NewLine);
+        File.Exists(output).ShouldBeFalse();
+    }
+
+    /// <summary>The reviewer's reproduction: packs for the two options of one single-valued dimension, and no other.</summary>
+    [Fact]
+    public void Packs_for_only_one_factor_fail_instead_of_writing_an_empty_matrix()
+    {
+        var packs = Path.Combine(root, "packs");
+        foreach (var pack in new[] { Path.Combine("base", "core"), Path.Combine("backend", "database") })
+        {
+            NewCommandTests.CopyDirectory(Path.Combine(Paths.FixturePacks, pack), Path.Combine(packs, pack));
+        }
+
+        var output = Path.Combine(root, "matrix.json");
+
+        var run = CliRun.Of("matrix", "--catalog", Paths.FixtureCatalog, "--packs", packs, "--output", output);
+
+        run.ExitCode.ShouldBe(1, run.Output);
+        run.Error.ShouldBe(
+            "error: the options with a pack are the values of one factor (backend.database=postgres, backend.database=sqlserver), so there is no pair to cover; " +
+            "the matrix needs options with a pack in two dimensions, or two options of a multi-valued one." + Environment.NewLine);
+        File.Exists(output).ShouldBeFalse();
+    }
+
     /// <summary>A combination's choices are what <c>fabric new --choices</c> reads: dimension to option, or to a list for a multi-valued one.</summary>
     [Fact]
     public void Each_combination_generates_with_fabric_new_from_its_choices()

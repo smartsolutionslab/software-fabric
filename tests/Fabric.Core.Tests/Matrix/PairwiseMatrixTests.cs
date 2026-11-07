@@ -191,6 +191,45 @@ public class PairwiseMatrixTests
         refused.Errors.ShouldBe(["extra 'none': no valid choice set contains backend.auth=none, backend.authorization=."]);
     }
 
+    /// <summary>
+    /// Two dimensions without packs, each active only if the other is: the search would follow one to the other without
+    /// end, so the matrix refuses the catalog with the linter's message before it searches.
+    /// </summary>
+    [Fact]
+    public void An_active_when_cycle_is_an_error_naming_the_cycle_before_any_search()
+    {
+        var cyclic = CatalogReader.Read(
+            new StringReader(CatalogText + """
+
+                  x.a: { scope: project, active-when: "x.b == on", default: on, options: { on: { tier: supported } } }
+                  x.b: { scope: project, active-when: "x.a == on", default: on, options: { on: { tier: supported } } }
+                """),
+            "catalog.yaml");
+
+        var matrix = PairwiseMatrix.Build(cyclic, Domain, []);
+
+        matrix.Errors.ShouldBe(["x.a active-when: cycle x.a -> x.b -> x.a; each dimension is active only if the next one is, so none can be decided."]);
+        matrix.Combinations.ShouldBeEmpty();
+    }
+
+    /// <summary>Options with a pack in only one factor leave no pair to cover; an empty matrix would look like success.</summary>
+    [Theory]
+    [InlineData(
+        "backend.database.postgres backend.database.sqlserver",
+        "the options with a pack are the values of one factor (backend.database=postgres, backend.database=sqlserver), so there is no pair to cover; " +
+        "the matrix needs options with a pack in two dimensions, or two options of a multi-valued one.")]
+    [InlineData(
+        "",
+        "no option of the catalog has a pack, so there is no pair to cover; " +
+        "the matrix needs options with a pack in two dimensions, or two options of a multi-valued one.")]
+    public void A_domain_without_a_pair_to_cover_is_an_error_instead_of_an_empty_matrix(string domain, string error)
+    {
+        var matrix = PairwiseMatrix.Build(Catalog, domain.Split(' ', StringSplitOptions.RemoveEmptyEntries), []);
+
+        matrix.Errors.ShouldBe([error]);
+        matrix.Combinations.ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("backend.database", "oracle", "extra 'x': backend.database=oracle has no pack, so it is outside the matrix.")]
     [InlineData("backend.database", "db2", "extra 'x': 'db2' is not an option of backend.database.")]
