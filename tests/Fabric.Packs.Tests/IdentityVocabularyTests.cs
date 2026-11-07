@@ -28,6 +28,7 @@ public sealed partial class IdentityVocabularyTests
         "browser_authority",
         "id_token_roles",
         "id_token_has_role",
+        "id_token_roles_claim",
         "tenant_claim",
         "tenant_claim_members",
         "tenant_claim_description",
