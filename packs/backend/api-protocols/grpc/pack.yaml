@@ -27,6 +27,7 @@ slots:
   - { slot: modules.packages.api, template: templates/modules-packages-api.sbn }
   - { slot: solution.projects, template: templates/solution-projects.sbn }
   - { slot: readme.sections, template: templates/readme-section.sbn }
+  - { slot: integration-tests.resources, template: templates/testcontainers-resources.sbn, order: 50, optional: true }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
