@@ -99,6 +99,24 @@ public sealed partial class TUnitTests
         output.ShouldContain("succeeded: 6");
     }
 
+    /// <summary>
+    /// TUnit registers the tests of every test assembly a test project loads; the evals' gate references tests/Evals,
+    /// whose own test calls the real model, and must never run it.
+    /// </summary>
+    [Fact]
+    public void A_test_project_referencing_another_test_project_runs_only_its_own_tests()
+    {
+        using var project = NewProject("lean-crud", "backend.llm=openai", "backend.llm.extras=evals");
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Evals.Tests/Evals.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+        output.ShouldNotContain("succeeded: 0");
+        output.ShouldContain("skipped: 0");
+    }
+
     /// <summary>The coverage gate is the test framework's, the same with any: TUnit's pack carries xUnit's files unchanged.</summary>
     [Theory]
     [InlineData("coverage.props.sbn")]
