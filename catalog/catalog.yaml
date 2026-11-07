@@ -358,6 +358,7 @@ dimensions:
       web.providers: { description: "Wrappers around the app, outermost first, in the framework's own form.", separator: ",\n" }
       web.styles: { description: "Lines of the global stylesheet." }
       e2e.apphost-arguments: { description: "Arguments .github/scripts/e2e.sh starts the AppHost with, after '--': values only the end-to-end tests give its parameters (--Parameters:<name>=<value>), never a real secret.", separator: " " }
+      e2e.after-tests: { description: "Commands .github/scripts/e2e.sh runs once the end-to-end tests have passed, while the application it started still runs; a failing one ends the script with fail." }
     options:
       react: { tier: supported }
       vue:   { tier: experimental }

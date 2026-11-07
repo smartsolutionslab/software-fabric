@@ -1,0 +1,1 @@
+(cd web/app && pnpm screenshots) || fail "The screenshot tests failed."
