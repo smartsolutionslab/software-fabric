@@ -169,3 +169,6 @@ end
 func tenant_claim_description
   ret "the user's one group under /tenants/"
 end
+func user_name_claim
+  ret "preferred_username"
+end

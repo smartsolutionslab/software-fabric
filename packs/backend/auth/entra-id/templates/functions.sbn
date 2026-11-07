@@ -139,3 +139,6 @@ end
 func tenant_claim_description
   ret "the tenant whose Entra ID directory issued the user's token (tid)"
 end
+func user_name_claim
+  ret "preferred_username"
+end
