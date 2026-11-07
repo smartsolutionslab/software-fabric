@@ -1,0 +1,13 @@
+        // The AppHost's event store, "eventstore": the image and settings the Aspire integration runs it with.
+        var eventstore = await StartAsync(
+            new ContainerBuilder("docker.kurrent.io/kurrent-latest/kurrentdb:26.1.1")
+                .WithPortBinding(2113, assignRandomHostPort: true)
+                .WithEnvironment("KURRENTDB_CLUSTER_SIZE", "1")
+                .WithEnvironment("KURRENTDB_RUN_PROJECTIONS", "All")
+                .WithEnvironment("KURRENTDB_START_STANDARD_PROJECTIONS", "true")
+                .WithEnvironment("KURRENTDB_INSECURE", "true")
+                // Live answers 204 No Content, not the 200 the wait expects by default.
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request => request.ForPort(2113).ForPath("/health/live").ForStatusCode(System.Net.HttpStatusCode.NoContent)))
+                .Build(),
+            cancellationToken);
+        settings["ConnectionStrings:eventstore"] = $"kurrentdb://{eventstore.Hostname}:{eventstore.GetMappedPublicPort(2113)}?tls=false";

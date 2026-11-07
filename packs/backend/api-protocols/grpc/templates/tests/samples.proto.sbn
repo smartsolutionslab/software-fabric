@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option csharp_namespace = "{{ namespace }}.GrpcServices.Tests";
+
+package samples;
+
+// Stands in for a module's service: SamplesService implements it with the sample query.
+service Samples {
+  rpc Shout (ShoutRequest) returns (ShoutReply);
+}
+
+message ShoutRequest {
+  string text = 1;
+}
+
+message ShoutReply {
+  string text = 1;
+}

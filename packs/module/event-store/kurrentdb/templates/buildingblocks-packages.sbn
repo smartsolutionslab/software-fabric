@@ -1,0 +1,2 @@
+    <PackageReference Include="KurrentDB.Client" />
+    <ProjectReference Include="../BuildingBlocks.EventSourcing/BuildingBlocks.EventSourcing.csproj" />

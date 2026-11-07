@@ -1,0 +1,6 @@
+            // A pattern, not a group: a group's 'react-router' would match the end of '@tanstack/react-router' as well.
+            { regex: '^react-router(-dom)?(/.*)?$', message: 'Use @tanstack/react-router (docs/adr).' },
+            {
+              group: ['@tanstack/router-plugin', '@tanstack/router-plugin/*', '@tanstack/router-vite-plugin'],
+              message: 'Routes are declared in src/router.tsx and src/modules/*/routes.tsx (docs/adr).',
+            }

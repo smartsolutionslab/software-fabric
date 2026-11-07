@@ -1,0 +1,2 @@
+    <PackageVersion Include="Grpc.AspNetCore" Version="2.85.0" />
+    <PackageVersion Include="Grpc.Core.Api" Version="2.85.0" />

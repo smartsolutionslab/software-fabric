@@ -1,0 +1,3 @@
+        // Ports of its own, as the AppHost gives them: the host in process would otherwise also bind the configured 5080 and 5081.
+        settings["Kestrel:Endpoints:http:Url"] = "http://127.0.0.1:0";
+        settings["Kestrel:Endpoints:grpc:Url"] = "http://127.0.0.1:0";

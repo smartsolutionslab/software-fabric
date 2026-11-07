@@ -248,12 +248,18 @@ dimensions:
     scope: module
     active-when: "module.style == event-sourced"
     default: marten
+    # Role slots (ADR-0008): every event store's pack declares them; strict DDD depth writes value objects through them.
+    role-slots:
+      event-store.json-converters: { description: "Statements on JsonSerializerOptions json, the System.Text.Json options the event store writes and reads every module's events with, each indented twelve spaces: json.Converters.Add(new SomeConverter()). Rendered only with a contribution." }
     options:
       marten:
         tier: supported
         # Reason: the Marten pack keeps no tenant apart in its event streams, so any tenancy would leak one tenant's events to another.
         requires: ["backend.database == postgres", "backend.tenancy == none"]
-      kurrentdb: { tier: experimental }
+      kurrentdb:
+        tier: experimental
+        # Reason: the KurrentDB pack keeps no tenant apart in its streams, so any tenancy would leak one tenant's events to another.
+        requires: ["backend.tenancy == none"]
 
   module.ddd-depth:
     scope: module

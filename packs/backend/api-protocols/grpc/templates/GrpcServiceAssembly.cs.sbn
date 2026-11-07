@@ -1,0 +1,6 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Host.GrpcServices;
+
+/// <summary>An assembly whose gRPC services the host maps: each module's Api assembly, and whatever a test adds.</summary>
+public sealed record GrpcServiceAssembly(Assembly Assembly);
