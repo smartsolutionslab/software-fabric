@@ -66,10 +66,12 @@ public sealed partial class IdentityVocabularyTests
 
     private static readonly string[] CheckedDirectories = ["src", "tests", "web"];
 
-    /// <summary>The files that may name how oidc-client-ts holds the token: its own, and the API client's headers it fills.</summary>
+    /// <summary>
+    /// Besides oidc-client-ts's own targets (added from its manifest), the files that may name how it holds the token:
+    /// the API client's headers, which it fills.
+    /// </summary>
     private static readonly string[] AuthClientFiles =
     [
-        "web/app/src/auth/",
         "web/app/src/api/baseApi.ts",
     ];
 
@@ -142,18 +144,20 @@ public sealed partial class IdentityVocabularyTests
     public void A_project_generated_with_other_vocabularies_names_keycloak_and_oidc_client_ts_only_in_their_own_files(string profile, string[] overrides)
     {
         var keycloak = Repository.Packs.Packs["backend.auth.keycloak"];
+        var oidcClient = Repository.Packs.Packs["frontend.auth-client.oidc-client-ts"];
         using var identityProvider = new VocabularyProbe(keycloak, IdentityProviderVocabulary);
-        using var authClient = new VocabularyProbe(Repository.Packs.Packs["frontend.auth-client.oidc-client-ts"], AuthClientVocabulary);
+        using var authClient = new VocabularyProbe(oidcClient, AuthClientVocabulary);
         using var integration = new VocabularyProbe(Repository.Packs.Packs["backend.test.integration.aspire-fixture"], IntegrationVocabulary);
         using var project = new GeneratedProject(profile, [identityProvider.Manifest, authClient.Manifest, integration.Manifest], overrides);
         project.AddModule("billing");
 
         var keycloakFiles = keycloak.Files.Select(file => file.Target).Concat(SharedFiles).ToHashSet(StringComparer.Ordinal);
+        var authClientFiles = oidcClient.Files.Select(file => file.Target).Concat(AuthClientFiles).ToHashSet(StringComparer.Ordinal);
         var named = Code(project)
             .Where(entry => !entry.relative.StartsWith("src/AppHost/", StringComparison.Ordinal) && !keycloakFiles.Contains(entry.relative))
             .Where(entry => KeycloakSpecific().IsMatch(entry.line))
             .Concat(Code(project)
-                .Where(entry => !AuthClientFiles.Any(own => entry.relative.StartsWith(own, StringComparison.Ordinal)))
+                .Where(entry => !authClientFiles.Contains(entry.relative))
                 .Where(entry => AuthClientSpecific().IsMatch(entry.line)))
             .Select(entry => $"{entry.relative}:{entry.number}: {entry.line.Trim()}")
             .Distinct(StringComparer.Ordinal)
