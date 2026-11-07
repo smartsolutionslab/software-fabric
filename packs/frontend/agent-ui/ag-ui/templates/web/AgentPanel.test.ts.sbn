@@ -10,7 +10,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 {{~ end ~}}
 {{~ if signed_in ~}}
-import { oidcConfig } from '@/auth/oidcConfig';
+{{ store_access_token_import }}
 {{~ end ~}}
 import AgentPanel from './AgentPanel.vue';
 
@@ -52,10 +52,7 @@ const fetchMock = vi.fn<typeof fetch>();
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
 {{~ if signed_in ~}}
-  sessionStorage.setItem(
-    `oidc.user:${oidcConfig.authority}:${oidcConfig.client_id}`,
-    JSON.stringify({ access_token: 'token-of-developer', token_type: 'Bearer', profile: { sub: 'developer' } }),
-  );
+  {{ store_access_token "'token-of-developer'" }};
 {{~ end ~}}
 });
 

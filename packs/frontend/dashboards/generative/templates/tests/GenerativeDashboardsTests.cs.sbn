@@ -11,6 +11,7 @@ namespace {{ namespace }}.Integration.Tests;
 /// answers with its stand-in model, which calls the tool a message names with the JSON arguments the message gives.
 /// The visitor asks: no other test saves a dashboard of theirs, so their count shows that nothing was saved.
 /// </summary>
+{{~ integration_fixture_attributes ~}}
 public class GenerativeDashboardsTests({{ integration_fixture }})
 {
     {{ test_attribute }}

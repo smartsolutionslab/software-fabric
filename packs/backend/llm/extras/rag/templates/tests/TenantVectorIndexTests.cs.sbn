@@ -11,6 +11,7 @@ namespace {{ namespace }}.Rag.Tests;
 /// <see cref="TenantScope"/> as in consumers and jobs, never from the caller, and each tenant finds only its own
 /// records. No test calls a real model.
 /// </summary>
+{{~ database_fixture_attributes ~}}
 public sealed class TenantVectorIndexTests({{ database_fixture }}) : {{ test_lifetime }}
 {
     private const string TenantA = "tenant-a";

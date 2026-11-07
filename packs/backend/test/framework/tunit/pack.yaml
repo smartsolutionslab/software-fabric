@@ -1,0 +1,24 @@
+option: backend.test.framework.tunit
+files:
+  - { template: templates/ArchitectureRulesTests.cs.sbn, target: tests/Architecture.Tests/ArchitectureRulesTests.cs }
+  - { template: templates/ModuleTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/{{ module.namespace }}ModuleTests.cs", per-module: true }
+  - { template: templates/ITestLifetime.cs.sbn, target: tests/TestRun/ITestLifetime.cs }
+  - { template: templates/OwnTestsOnlyAttribute.cs.sbn, target: tests/TestRun/OwnTestsOnlyAttribute.cs }
+  - { template: templates/coverage.props.sbn, target: tests/coverage.props }
+  - { template: templates/coverage-gate.proj.sbn, target: .github/scripts/coverage-gate.proj }
+  - { template: templates/test.sh.sbn, target: .github/scripts/test.sh }
+declares-slots:
+  - { slot: tests.module-host-services, description: "Statements adding to IServiceCollection services what the host provides and a module may depend on, before the module's own services; each module's test validates its registrations against them." }
+slots:
+  - { slot: templates.functions, template: templates/functions.sbn }
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: tests.build-properties, template: templates/build-properties.sbn }
+  - { slot: tests.packages, template: templates/packages.sbn }
+  - { slot: tests.usings, template: templates/usings.sbn }
+  - { slot: ci.backend-steps, template: templates/ci-step.sbn, order: 10 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "Every architecture rule runs as a test case and fails it on any violation.", file: templates/ArchitectureRulesTests.cs.sbn }
+  - { kind: ci-step, describes: "Each module's Domain and Application, and the Kernel, keep the line coverage tests/coverage.props sets (90 %, 80 % and 90 % by default); CI fails below it, naming the assembly, the layer and the number.", file: templates/coverage-gate.proj.sbn }

@@ -20,9 +20,7 @@ async function span(widget: Locator, page: Page) {
 test('a user builds a dashboard, resizes a widget, saves it and finds it again after a reload', async ({ page }) => {
   const name = `E2E ${Date.now()}`;
   await page.goto('/');
-  await page.getByLabel('Username or email').fill('developer');
-  await page.getByLabel('Password', { exact: true }).fill('developer');
-  await page.getByRole('button', { name: 'Sign In' }).click();
+  {{ browser_sign_in "page" "'developer'" }}
   await expect(page.getByText('Signed in as developer')).toBeVisible();
   await page.getByRole('link', { name: 'Dashboards' }).click();
 

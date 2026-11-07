@@ -164,17 +164,6 @@ public sealed class RoleAuthorizationTests
     }
 
     [Fact]
-    public void Roles_with_an_identity_provider_the_pack_does_not_handle_fail_the_build_saying_why()
-    {
-        using var project = new GeneratedProject(Profile, "backend.auth=entra-id", Roles);
-
-        var (exitCode, output) = project.TryBuild();
-
-        exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("The roles pack reads Keycloak's realm and client roles");
-    }
-
-    [Fact]
     public void The_generated_integration_tests_give_a_manager_200_a_visitor_403_and_an_anonymous_caller_401()
     {
         using var project = NewProject(Profile);

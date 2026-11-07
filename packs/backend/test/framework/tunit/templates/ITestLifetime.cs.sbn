@@ -1,0 +1,11 @@
+using TUnit.Core.Interfaces;
+
+namespace {{ namespace }};
+
+/// <summary>
+/// A class set up and torn down around its work: a test class around each of its tests (TUnit makes an instance per
+/// test, runs <see cref="IAsyncInitializer.InitializeAsync"/> before the test and disposes the instance after it), a
+/// run fixture once around the test session (the classes taking it share it through
+/// <c>[ClassDataSource&lt;T&gt;(Shared = SharedType.PerTestSession)]</c>).
+/// </summary>
+internal interface ITestLifetime : IAsyncInitializer, IAsyncDisposable;

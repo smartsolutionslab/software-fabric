@@ -63,7 +63,7 @@ public sealed class EveryEndpointDeclaresItsAuthorization : IArchitectureRule
 {{~ else if project["backend.bus.transport"] != "none" ~}}
             builder.UseSetting("ConnectionStrings:messaging", "amqp://localhost");
 {{~ end ~}}
-            builder.UseSetting("Authentication:Authority", "http://localhost/realms/unused");
+            {{ unstarted_host_settings }}
             builder.ConfigureServices(services => services.RemoveAll<IHostedService>());
         }
     }

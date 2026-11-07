@@ -1,6 +1,3 @@
-{{~ if project["backend.auth"] != "keycloak" ~}}
-#error The claims pack's sample users and their department come from the Keycloak realm only so far; another identity provider needs its own way to put a department into the token (docs/adr/0006 of the generator).
-{{~ end ~}}
 {{~ roles = project["backend.authorization"] | array.contains "roles" ~}}
 {{~ func status(response, code)
   ret (should_be (response + ".StatusCode") ("HttpStatusCode." + code)) + ";"
@@ -32,6 +29,7 @@ namespace {{ namespace }}.Integration.Tests;
 /// developer and analyst hold; clerk is in sales and visitor has no department.
 /// </summary>
 {{~ end ~}}
+{{~ integration_fixture_attributes ~}}
 public class {{ module.namespace }}ClaimTests({{ integration_fixture }})
 {
     private static readonly Uri ManagePermission = new("/{{ module.name }}/permissions/manage", UriKind.Relative);

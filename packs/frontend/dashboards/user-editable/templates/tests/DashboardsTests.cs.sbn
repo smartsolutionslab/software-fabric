@@ -9,6 +9,7 @@ namespace {{ namespace }}.Integration.Tests;
 /// Dashboards through the running application: a dashboard is its owner's alone{{ if tenancy }}, inside their tenant{{ end }}, and shows only
 /// the widgets the modules declare. The visitor is a second user of the developer's tenant{{ if tenancy }}; developer-b is in another{{ end }}.
 /// </summary>
+{{~ integration_fixture_attributes ~}}
 public class DashboardsTests({{ integration_fixture }})
 {
     private const string Chart = "dashboards.widget-counts";

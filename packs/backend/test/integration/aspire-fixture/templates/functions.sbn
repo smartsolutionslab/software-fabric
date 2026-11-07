@@ -7,8 +7,17 @@ end
 func signed_in_host_client(user)
   ret "aspire.CreateHostClientAsync(" + user + ")"
 end
+func running_application
+  ret "aspire.App"
+end
+func integration_fixture_attributes
+  ret test_takes_run_fixture "AspireFixture"
+end
 func database_fixture
   ret "AspireDatabase database"
+end
+func database_fixture_attributes
+  ret test_takes_run_fixture "AspireDatabase"
 end
 func database_connection_string
   ret "database.ConnectionString"
@@ -45,7 +54,7 @@ public sealed class AspireDatabase : ` + test_lifetime + `
 
     public string ConnectionString => connectionString ?? throw new InvalidOperationException("The database has not started.");
 
-    ` + test_setup + `
+    ` + (test_setup | string.replace "\n" "\n    ") + `
     {
         using var timeout = new CancellationTokenSource(StartupTimeout);
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AppHost>(timeout.Token);
@@ -92,7 +101,7 @@ public sealed class AspireDatabase : ` + test_lifetime + `
             ?? throw new InvalidOperationException("The AppHost's database has no connection string.");
     }
 
-    ` + test_teardown + `
+    ` + (test_teardown | string.replace "\n" "\n    ") + `
     {
         if (app is not null)
         {

@@ -14,7 +14,7 @@ const developer = new User({
   token_type: 'Bearer',
   profile: {
     sub: 'developer-id',
-    iss: 'http://localhost:8080/realms/{{ name }}',
+    iss: '{{ browser_authority }}',
     aud: '{{ name }}-web',
     exp: 0,
     iat: 0,

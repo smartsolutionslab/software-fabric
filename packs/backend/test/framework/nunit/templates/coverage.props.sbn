@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    The coverage gate's thresholds (docs/adr): the least line coverage, in percent, each module's Domain and Application
+    assembly and the Kernel keep. .github/scripts/test.sh measures it; change a threshold here, nowhere else.
+  -->
+  <PropertyGroup>
+    <CoverageThresholdDomain>90</CoverageThresholdDomain>
+    <CoverageThresholdApplication>80</CoverageThresholdApplication>
+    <CoverageThresholdKernel>90</CoverageThresholdKernel>
+  </PropertyGroup>
+</Project>

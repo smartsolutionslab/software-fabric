@@ -1,0 +1,21 @@
+using NUnit.Framework.Interfaces;
+using NUnit.Framework.Internal;
+
+namespace {{ namespace }};
+
+/// <summary>
+/// On the assembly, names a run fixture: one instance of <see cref="Fixture"/>, started before the first test and
+/// disposed after the last (<see cref="RunFixtures"/>). On a test class, hands that instance to the class's constructor,
+/// which NUnit does not do by itself. A class takes one run fixture.
+/// </summary>
+[AttributeUsage(AttributeTargets.Assembly | AttributeTargets.Class, AllowMultiple = true)]
+internal sealed class RunFixtureAttribute(Type fixture) : NUnitAttribute, IFixtureBuilder2
+{
+    public Type Fixture { get; } = fixture;
+
+    public IEnumerable<TestSuite> BuildFrom(ITypeInfo typeInfo) => TakingTheFixture().BuildFrom(typeInfo);
+
+    public IEnumerable<TestSuite> BuildFrom(ITypeInfo typeInfo, IPreFilter filter) => TakingTheFixture().BuildFrom(typeInfo, filter);
+
+    private TestFixtureAttribute TakingTheFixture() => new(RunFixtures.Of(Fixture));
+}

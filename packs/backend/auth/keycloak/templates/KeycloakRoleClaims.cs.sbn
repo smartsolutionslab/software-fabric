@@ -1,6 +1,3 @@
-{{~ if project["backend.auth"] != "keycloak" ~}}
-#error The roles pack reads Keycloak's realm and client roles (realm_access, resource_access) only so far; another identity provider puts roles elsewhere in its tokens (docs/adr/0006 of the generator).
-{{~ end ~}}
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;

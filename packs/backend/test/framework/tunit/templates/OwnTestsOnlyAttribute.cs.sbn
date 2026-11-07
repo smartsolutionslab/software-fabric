@@ -1,0 +1,28 @@
+using System.Reflection;
+using TUnit.Core.Interfaces;
+
+[assembly: {{ namespace }}.OwnTestsOnly]
+
+namespace {{ namespace }};
+
+/// <summary>
+/// TUnit registers the tests of every test assembly a test project loads, so a test project referencing another
+/// (the evals' gate references tests/Evals) would run that project's tests too. A test runs only in its own project;
+/// elsewhere it is reported skipped, since TUnit cannot leave a registered test out of the run.
+/// </summary>
+[AttributeUsage(AttributeTargets.Assembly)]
+internal sealed class OwnTestsOnlyAttribute : Attribute, ITestRegisteredEventReceiver
+{
+    public int Order => 0;
+
+    public ValueTask OnTestRegistered(TestRegisteredContext context)
+    {
+        // Without an entry assembly there is no running project to compare with: skip nothing.
+        if (Assembly.GetEntryAssembly() is { } running && context.TestDetails.ClassType.Assembly != running)
+        {
+            context.SetSkipped("It belongs to another test project, which runs it.");
+        }
+
+        return ValueTask.CompletedTask;
+    }
+}

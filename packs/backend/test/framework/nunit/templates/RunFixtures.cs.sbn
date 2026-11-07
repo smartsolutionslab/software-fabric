@@ -1,0 +1,54 @@
+using System.Reflection;
+
+// A new instance of a test class for each test: no test sees what another left in its fields.
+[assembly: FixtureLifeCycle(LifeCycle.InstancePerTestCase)]
+
+namespace {{ namespace }};
+
+/// <summary>
+/// Starts each run fixture the assembly names with <see cref="RunFixtureAttribute"/> before the first test, in the
+/// order named, and disposes them after the last, in reverse. Every test of the assembly is in this namespace or below
+/// it, so this runs around all of them.
+/// </summary>
+[SetUpFixture]
+internal sealed class RunFixtures
+{
+    private static readonly Dictionary<Type, ITestLifetime> Instances = [];
+
+    /// <summary>The run's one instance of the fixture; NUnit asks for it while it builds the tests, before the run starts it.</summary>
+    public static ITestLifetime Of(Type fixture)
+    {
+        lock (Instances)
+        {
+            if (!Instances.TryGetValue(fixture, out var instance))
+            {
+                instance = Activator.CreateInstance(fixture) as ITestLifetime
+                    ?? throw new InvalidOperationException($"{fixture} is not a run fixture: it needs a parameterless constructor and {nameof(ITestLifetime)}.");
+                Instances.Add(fixture, instance);
+            }
+
+            return instance;
+        }
+    }
+
+    [OneTimeSetUp]
+    public async Task StartAsync()
+    {
+        foreach (var fixture in Named())
+        {
+            await Of(fixture).InitializeAsync();
+        }
+    }
+
+    [OneTimeTearDown]
+    public async Task StopAsync()
+    {
+        foreach (var fixture in Named().Reverse())
+        {
+            await Of(fixture).DisposeAsync();
+        }
+    }
+
+    private static IEnumerable<Type> Named() =>
+        typeof(RunFixtures).Assembly.GetCustomAttributes<RunFixtureAttribute>().Select(attribute => attribute.Fixture);
+}
