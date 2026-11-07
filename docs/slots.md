@@ -41,7 +41,7 @@ tests/
   Directory.Build.props         base; test packages and usings by slot
   Architecture.Tests/           base; packs add gate tests as their own files
   Integration.Tests/            backend.test.integration.aspire-fixture; the REST pack adds ListEndpointsArePagedTests
-  TestRun/                      backend.test.framework.nunit: the run fixtures, compiled into every test project
+  TestRun/                      backend.test.framework.nunit: the run fixtures; tunit: ITestLifetime; compiled into every test project
   Kernel/Paging.Tests/          base; the guards, absence and result packs add their own Kernel test projects
   Modules/<Module>.Tests/       base (per module)
 web/
@@ -147,9 +147,9 @@ pack fill a slot of a choice it can be combined with but does not need
 | `modules.packages.infrastructure` | 〃 | ef-core, postgres, wolverine |
 | `modules.packages.api` | 〃 | minimal-apis |
 | `buildingblocks.packages` | `src/BuildingBlocks/BuildingBlocks.csproj` | ef-core, wolverine, result |
-| `tests.build-properties` *(added in M1-02)* | `tests/Directory.Build.props` | xunit (`OutputType Exe` for xUnit v3); nunit (`OutputType Exe` and `EnableNUnitRunner`) |
-| `tests.packages` | `tests/Directory.Build.props` | xunit or nunit, shouldly, nsubstitute, aspire-fixture; nunit also compiles `tests/TestRun/*.cs` (its run fixtures) into every test project |
-| `tests.usings` | `tests/Directory.Build.props` | xunit or nunit (test projects only: a program under `tests/` keeps `System.ComponentModel`'s `[Description]`), shouldly, nsubstitute |
+| `tests.build-properties` *(added in M1-02)* | `tests/Directory.Build.props` | xunit (`OutputType Exe` for xUnit v3); nunit (`OutputType Exe` and `EnableNUnitRunner`); tunit (`OutputType Exe`, and `TUnitImplicitUsings` false) |
+| `tests.packages` | `tests/Directory.Build.props` | xunit, nunit or tunit, shouldly, nsubstitute, aspire-fixture; nunit and tunit also compile `tests/TestRun/*.cs` into every test project; tunit references `TUnit.Engine` from test projects only |
+| `tests.usings` | `tests/Directory.Build.props` | xunit, nunit or tunit (test projects only: a program under `tests/` keeps `System.ComponentModel`'s `[Description]`), shouldly, nsubstitute |
 | `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak (the host and `Microsoft.AspNetCore.Mvc.Testing`, for its endpoint rule) |
 | `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides); agent-framework (`IDispatcher`, which a handler running an agent takes, and `IAgentMcpTools` with the MCP client) |
 | `integration-tests.parameters` *(added for #77, declared by aspire-fixture)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter); agent-ui ag-ui (`model-stand-in` true: the host's stand-in model answers the agents) |
@@ -178,7 +178,7 @@ library directly.
 | `test_run_fixture type` | `[assembly: AssemblyFixture(typeof(type))]`: `type` starts once per test run, and test classes take it as a constructor parameter (*M3-12*) |
 | `test_lifetime` | `IAsyncLifetime`, the interface of a class whose `test_setup` and `test_teardown` run around its tests, or once around the run for a fixture (*M3-12*) |
 | `test_setup`, `test_teardown` | `public async ValueTask InitializeAsync()`, `public async ValueTask DisposeAsync()`; another framework may return several lines (an attribute above the method), which a template indents as Scriban does (*M3-12*) |
-| `test_takes_run_fixture type` | nothing: the attributes, each ending its own line, of a test class whose constructor takes the run fixture `type`; xUnit injects it by itself, a framework that does not (NUnit) names it on the class. A template writes it on its own line right above the class, as `{{~ … ~}}`, so that an empty result leaves no blank line (*#256*) |
+| `test_takes_run_fixture type` | nothing: the attributes, each ending its own line, of a test class whose constructor takes the run fixture `type`; xUnit injects it by itself, a framework that does not (NUnit, TUnit) names it on the class. A template writes it on its own line right above the class, as `{{~ … ~}}`, so that an empty result leaves no blank line (*#256*) |
 | `actual \| should_be expected [message]` | `actual.ShouldBe(expected)`; also `should_be_ignoring_order` (sequences), `should_contain`, `should_not_contain`, `should_start_with`, `should_be_greater_than`, `should_all_be` (a predicate), `should_be_subset_of`, `should_be_same_as` |
 | `actual \| should_be_true [message]` | `actual.ShouldBeTrue()`; also `should_be_false`, `should_be_null`, `should_not_be_null`, `should_be_empty`, `should_not_be_empty`, `should_be_in_order` |
 | `actual \| should_be_in_range from to` | `actual.ShouldBeInRange(from, to)` |
@@ -197,6 +197,19 @@ line; `test_lifetime` is `ITestLifetime` (an `IAsyncDisposable`),
 `test_setup` `[SetUp]` above `public async ValueTask InitializeAsync()`,
 `test_teardown` `public async ValueTask DisposeAsync()`, which NUnit calls
 when it disposes each test's instance.
+
+TUnit (`backend.test.framework.tunit`, *#257*) returns `[Test]` for both
+test attributes, `[Arguments(arguments)]`,
+`TestContext.Current!.Execution.CancellationToken`,
+`TestContext.Current?.Output.WriteLine(text)`. TUnit shares a run fixture
+through the classes that take it, not the assembly:
+`test_takes_run_fixture type` is
+`[ClassDataSource<type>(Shared = SharedType.PerTestSession)]` on its own
+line, and `test_run_fixture type` is a comment saying so. `test_lifetime`
+is `ITestLifetime` (TUnit's `IAsyncInitializer` and `IAsyncDisposable`),
+`test_setup` `public async Task InitializeAsync()`, which TUnit runs
+before each test and once for a shared fixture, `test_teardown`
+`public async ValueTask DisposeAsync()`.
 
 Scriban indents every later line of a multi-line result by the
 indentation of the line the call starts, when nothing but whitespace
@@ -305,7 +318,7 @@ is a defect in the second pack.
 
 | Slot | File | Filled by |
 |---|---|---|
-| `ci.backend-steps` | `.github/workflows/ci.yml` | xunit or nunit (runs every test project with code coverage, then the coverage gate; the integration tests need Docker, which GitHub's runners have) |
+| `ci.backend-steps` | `.github/workflows/ci.yml` | xunit, nunit or tunit (runs every test project with code coverage, then the coverage gate; the integration tests need Docker, which GitHub's runners have) |
 | `pr-template.sections` *(added in M1-06)* | `.github/pull_request_template.md` | fabric (`## Spec and plan`), red-first (`## Tests observed failing`, `## Tests observed passing before the change`) |
 | `ci.frontend-steps` | 〃 | pnpm, react (`pnpm format:check`), rtk-query-codegen (generated client is current), accessibility |
 | `readme.first-steps` *(added for #11)* | `README.md` (`## First steps`, printed by `fabric new`) | pnpm (create and commit `web/pnpm-lock.yaml`) |

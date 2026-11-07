@@ -1,0 +1,30 @@
+func test_attribute
+  ret "[Test]"
+end
+func test_cases_attribute
+  ret "[Test]"
+end
+func test_case_attribute(arguments)
+  ret "[Arguments(" + arguments + ")]"
+end
+func test_cancellation_token
+  ret "TestContext.Current!.Execution.CancellationToken"
+end
+func write_test_output(text)
+  ret "TestContext.Current?.Output.WriteLine(" + text + ")"
+end
+func test_run_fixture(type)
+  ret "// One " + type + " for the test session: TUnit starts it for the first class taking it and disposes it after the last."
+end
+func test_lifetime
+  ret "ITestLifetime"
+end
+func test_setup
+  ret "public async Task InitializeAsync()"
+end
+func test_teardown
+  ret "public async ValueTask DisposeAsync()"
+end
+func test_takes_run_fixture(type)
+  ret "[ClassDataSource<" + type + ">(Shared = SharedType.PerTestSession)]\n"
+end

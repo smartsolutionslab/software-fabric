@@ -1,0 +1,3 @@
+    <PackageReference Include="TUnit.Engine" Condition="'$(IsTestProject)' != 'false'" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+    <Compile Include="$(MSBuildThisFileDirectory)TestRun/*.cs" Link="TestRun/%(Filename)%(Extension)" Condition="'$(IsTestProject)' != 'false'" />
