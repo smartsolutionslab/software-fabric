@@ -1,0 +1,12 @@
+import { expect, test } from '@playwright/test';
+
+test('the start page looks as its committed screenshot', async ({ page }) => {
+  await page.goto('/');
+{{~ if project["backend.auth"] != "none" }}
+
+  {{ browser_sign_in "page" "'developer'" }}
+{{~ end }}
+
+  await expect(page.getByRole('heading', { name: '{{ name }}' })).toBeVisible();
+  await expect(page).toHaveScreenshot('start-page.png', { fullPage: true });
+});

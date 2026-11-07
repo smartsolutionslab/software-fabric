@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Screenshot tests (docs/adr): compares the running application's pages with the baselines committed under
+# web/app/e2e/__screenshots__. Playwright's container, pinned by digest, renders them, so every machine uses the same
+# browser, fonts and OS. e2e.sh runs it while the application runs. With the AppHost running, `pnpm screenshots`
+# compares and `pnpm screenshots:update` writes the baselines again; review them and commit them.
+# Needs Docker with host networking (Linux, or Docker Desktop with host networking turned on) and `pnpm install` in web/.
+set -euo pipefail
+
+cd "$(dirname "$0")/../.."
+web="$PWD/web"
+baselines="$web/app/e2e/__screenshots__"
+# Moves with @playwright/test: the tests run with the project's installed package and the image's browsers.
+image="mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27"
+playwright="${image#*:v}"
+playwright="${playwright%%-*}"
+
+installed="$(node -p 'require(process.argv[1]).version' "$web/app/node_modules/@playwright/test/package.json")"
+if [ "$installed" != "$playwright" ]; then
+  echo "@playwright/test is $installed, but .github/scripts/screenshots.sh runs Playwright $playwright's image: change both together."
+  exit 1
+fi
+
+if [ "${1:-}" = "--update" ]; then
+  update=changed
+elif [ -z "$(find "$baselines" -name '*.png' 2> /dev/null | head -n1)" ]; then
+  echo "::warning::No screenshot baselines are committed yet, so this run compares nothing and writes them to" \
+    "web/app/e2e/__screenshots__. Run pnpm screenshots:update in web/app with the AppHost running, then commit them."
+  update=changed
+else
+  update=none
+fi
+
+docker run --rm --platform linux/amd64 --network host --ipc host --user "$(id -u):$(id -g)" \
+  --env HOME=/tmp --env CI --env E2E_BASE_URL --volume "$web:$web" --workdir "$web/app" "$image" \
+  node_modules/.bin/playwright test --config e2e/screenshots.config.ts --update-snapshots="$update"
