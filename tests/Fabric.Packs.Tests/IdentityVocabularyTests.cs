@@ -5,10 +5,10 @@ namespace Fabric.Packs.Tests;
 
 /// <summary>
 /// The identity-provider vocabulary (docs/slots.md, M3-13): what depends on the identity provider (where its roles sit
-/// in the token, how a test user signs in, its login page, the shape of its ID token) comes from
-/// <c>templates.functions</c> of the <c>backend.auth</c> pack, and how the browser holds its access token from those of
-/// the <c>frontend.auth-client</c> pack, so generic-oidc, entra-id and msal plug in by defining the same functions
-/// instead of editing roles, claims, signalr, ag-ui, the micro-frontends and the base's policy rule.
+/// in the token, which tenant its user belongs to, how a test user signs in, its login page, the shape of its ID token)
+/// comes from <c>templates.functions</c> of the <c>backend.auth</c> pack, and how the browser holds its access token
+/// from those of the <c>frontend.auth-client</c> pack, so generic-oidc, entra-id and msal plug in by defining the same
+/// functions instead of editing roles, claims, tenancy, signalr, ag-ui, the micro-frontends and the base's policy rule.
 /// </summary>
 public sealed partial class IdentityVocabularyTests
 {
@@ -28,6 +28,9 @@ public sealed partial class IdentityVocabularyTests
         "browser_authority",
         "id_token_roles",
         "id_token_has_role",
+        "tenant_claim",
+        "tenant_claim_members",
+        "tenant_claim_description",
     ];
 
     private static readonly string[] AuthClientVocabulary =
@@ -78,8 +81,8 @@ public sealed partial class IdentityVocabularyTests
     ];
 
     /// <summary>
-    /// Every user of the vocabulary: roles and claims with their tests, the MCP server, signalr and ag-ui on React, the
-    /// Vue sign-in, and the micro-frontends' end-to-end tests.
+    /// Every user of the vocabulary: roles and claims with their tests, column tenancy, the MCP server, signalr and ag-ui
+    /// on React, the Vue sign-in, and the micro-frontends' end-to-end tests.
     /// </summary>
     public static TheoryData<string, string[]> Generations => new()
     {
@@ -141,6 +144,19 @@ public sealed partial class IdentityVocabularyTests
         errors.ShouldContain("accept_query_token", customMessage: errors);
     }
 
+    [Fact]
+    public void An_identity_provider_without_the_vocabulary_fails_generation_of_column_tenancy_naming_the_tenant_claim()
+    {
+        using var standIns = new StandIns();
+        string[] overrides = ["backend.auth=entra-id"];
+        var packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, "saas-standard-react", overrides);
+
+        var generated = Generator.New(Repository.Catalog, packs, "shop", "saas-standard-react", overrides);
+
+        var errors = string.Join(Environment.NewLine, generated.Errors);
+        errors.ShouldContain("tenant_claim", customMessage: errors);
+    }
+
     [Theory]
     [MemberData(nameof(Generations))]
     public void A_project_generated_with_other_vocabularies_names_keycloak_and_oidc_client_ts_only_in_their_own_files(string profile, string[] overrides)
@@ -186,7 +202,7 @@ public sealed partial class IdentityVocabularyTests
     [GeneratedRegex(@"Keycloak|keycloak|oidc-client-ts only|realm_access")]
     private static partial Regex IdentityOnly();
 
-    [GeneratedRegex(@"[Kk]eycloak|/realms/|realm_access|resource_access|admin-cli|Username or email")]
+    [GeneratedRegex(@"[Kk]eycloak|/realms/|realm_access|resource_access|admin-cli|Username or email|/tenants/")]
     private static partial Regex KeycloakSpecific();
 
     [GeneratedRegex(@"oidc\.user:|@/auth/accessToken|@/auth/oidcConfig|\baccessToken\(\)")]
