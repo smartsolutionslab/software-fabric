@@ -162,6 +162,45 @@ public class CatalogLinterTests
     }
 
     [Fact]
+    public void An_active_when_cycle_across_two_dimensions_is_reported_once_with_the_cycle_named()
+    {
+        Lint("""
+              x.a: { scope: project, active-when: "x.b == on", default: on, options: { on: { tier: supported } } }
+              x.b: { scope: project, active-when: "x.a == on", default: on, options: { on: { tier: supported } } }
+            """).ShouldBe(["x.a active-when: cycle x.a -> x.b -> x.a; each dimension is active only if the next one is, so none can be decided."]);
+    }
+
+    [Fact]
+    public void An_active_when_cycle_across_three_dimensions_is_reported_once_with_the_cycle_named()
+    {
+        Lint("""
+              x.a: { scope: project, active-when: "x.b == on", default: on, options: { on: { tier: supported } } }
+              x.b: { scope: project, active-when: "x.c == on", default: on, options: { on: { tier: supported } } }
+              x.c: { scope: project, active-when: "x.a == on", default: on, options: { on: { tier: supported } } }
+            """).ShouldBe(["x.a active-when: cycle x.a -> x.b -> x.c -> x.a; each dimension is active only if the next one is, so none can be decided."]);
+    }
+
+    [Fact]
+    public void A_dimension_whose_active_when_leads_into_a_cycle_does_not_report_it_again()
+    {
+        Lint("""
+              x.a: { scope: project, active-when: "x.b == on", default: on, options: { on: { tier: supported } } }
+              x.b: { scope: project, active-when: "x.c == on", default: on, options: { on: { tier: supported } } }
+              x.c: { scope: project, active-when: "x.b == on", default: on, options: { on: { tier: supported } } }
+            """).ShouldBe(["x.b active-when: cycle x.b -> x.c -> x.b; each dimension is active only if the next one is, so none can be decided."]);
+    }
+
+    [Fact]
+    public void An_active_when_chain_without_a_cycle_is_not_reported()
+    {
+        Lint("""
+              x.a: { scope: project, active-when: "x.b == on", default: on, options: { on: { tier: supported } } }
+              x.b: { scope: project, active-when: "x.c == on", default: on, options: { on: { tier: supported } } }
+              x.c: { scope: project, default: on, options: { on: { tier: supported } } }
+            """).ShouldBeEmpty();
+    }
+
+    [Fact]
     public void A_default_that_is_not_an_option_is_reported()
     {
         Lint("""
