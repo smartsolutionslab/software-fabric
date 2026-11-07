@@ -1,0 +1,48 @@
+using AwesomeAssertions.Collections;
+using AwesomeAssertions.Primitives;
+using AwesomeAssertions.Specialized;
+
+namespace AwesomeAssertions;
+
+/// <summary>
+/// Two things the tests ask of every value that AwesomeAssertions offers only under another shape: <c>Be</c> for a
+/// sequence, and the asserted value as a method.
+/// </summary>
+internal static class AssertionExtensions
+{
+    /// <summary>
+    /// The sequence holds the expected items in the expected order (AwesomeAssertions' <c>Equal</c>), so <c>Be</c> reads
+    /// the same for a sequence as for a single value.
+    /// </summary>
+    public static AndConstraint<TAssertions> Be<TCollection, T, TAssertions>(
+        this GenericCollectionAssertions<TCollection, T, TAssertions> assertions,
+        IEnumerable<T> expected,
+        string because = "",
+        params object[] becauseArgs)
+        where TCollection : IEnumerable<T>
+        where TAssertions : GenericCollectionAssertions<TCollection, T, TAssertions> =>
+        assertions.Equal(expected, because, becauseArgs);
+
+    /// <summary>
+    /// The single item, the value as the type asserted, or what else the assertion picked out: AwesomeAssertions offers it
+    /// as the property <c>Which</c>, which C# does not take as a statement, so an assertion that returns its value reads
+    /// the same whether a test goes on with the value or not.
+    /// </summary>
+    public static TSubject Value<TParent, TSubject>(this AndWhichConstraint<TParent, TSubject> constraint) =>
+        constraint.Which;
+
+    /// <summary>The exception thrown.</summary>
+    public static TException Value<TException>(this ExceptionAssertions<TException> assertions)
+        where TException : Exception =>
+        assertions.Which;
+
+    /// <summary>The exception thrown, once the asserted call has finished.</summary>
+    public static async Task<TException> Value<TException>(this Task<ExceptionAssertions<TException>> assertions)
+        where TException : Exception =>
+        (await assertions).Which;
+
+    /// <summary>The value asserted, after an assertion that kept its type (<c>NotBeNull().And</c>).</summary>
+    public static TSubject Value<TSubject, TAssertions>(this ReferenceTypeAssertions<TSubject, TAssertions> assertions)
+        where TAssertions : ReferenceTypeAssertions<TSubject, TAssertions> =>
+        assertions.Subject;
+}

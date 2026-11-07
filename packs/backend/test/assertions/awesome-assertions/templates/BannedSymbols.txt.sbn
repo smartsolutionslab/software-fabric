@@ -1,0 +1,8 @@
+{{~ if project["backend.test.framework"] == "xunit" ~}}
+T:Xunit.Assert;Use AwesomeAssertions (docs/adr)
+{{~ else if project["backend.test.framework"] == "nunit" ~}}
+T:NUnit.Framework.Assert;Use AwesomeAssertions (docs/adr)
+T:NUnit.Framework.Legacy.ClassicAssert;Use AwesomeAssertions (docs/adr)
+{{~ else ~}}
+T:TUnit.Assertions.Assert;Use AwesomeAssertions (docs/adr)
+{{~ end ~}}
