@@ -336,4 +336,25 @@ public sealed class RendererTests : IDisposable
 
         rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("hi!");
     }
+    [Theory]
+    [InlineData("line one\nline two\n  {{ missing }}\n", "t.sbn(3,6)")]
+    [InlineData("line one\nline two\n  {{ end }}\n", "t.sbn(3,8)")]
+    [InlineData("{{ missing }}\n", "t.sbn(1,4)")]
+    public void An_error_in_a_template_rendered_with_functions_reports_the_template_s_own_line_and_column(string template, string position)
+    {
+        var guards = Pack(
+            "backend.guards.ensure-that",
+            ("functions.sbn", "func one(text)\n  ret text\nend\n\nfunc two(text)\n  ret text\nend"));
+        var owner = Pack("base.core", ("t.sbn", template));
+
+        var rendered = Renderer.Render(
+            Catalog,
+            Compose(
+                [Composed(owner, "t.sbn", "a.txt")],
+                new() { [Composer.TemplateFunctionsSlot] = [new(guards, new(Composer.TemplateFunctionsSlot, "functions.sbn", 0))] }),
+            Choices,
+            "shop");
+
+        rendered.Errors.ShouldHaveSingleItem().ShouldContain(position);
+    }
 }
