@@ -1,6 +1,2 @@
 
-    .WaitFor(identity)
-    .WithEnvironment("AzureAd__Instance", identity.GetEndpoint("http"))
-    .WithEnvironment("AzureAd__Audience", "api://{{ name }}-api")
-    .WithEnvironment("AzureAd__Tenants__tenant-a", "00000000-0000-0000-0000-00000000000a")
-    .WithEnvironment("AzureAd__Tenants__tenant-b", "00000000-0000-0000-0000-00000000000b")
+    .WithStandIn(identity, "api://{{ name }}-api")

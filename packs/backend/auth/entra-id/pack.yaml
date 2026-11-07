@@ -2,6 +2,7 @@ option: backend.auth.entra-id
 files:
   - { template: templates/Authentication.cs.sbn, target: src/Host/Wiring/Authentication.cs }
   - { template: templates/CurrentUser.cs.sbn, target: src/Host/CurrentUser.cs }
+  - { template: templates/StandInWiring.cs.sbn, target: src/AppHost/Wiring/StandInWiring.cs }
   - { template: templates/OnlyTheAppHostRunsTheStandIn.cs.sbn, target: tests/Architecture.Tests/Rules/OnlyTheAppHostRunsTheStandIn.cs }
   - { template: templates/DirectoryTests.cs.sbn, target: tests/Integration.Tests/DirectoryTests.cs }
   # With backend.authorization roles: the token's app roles become ClaimTypes.Role (ADR-0009: the provider decides what the token carries).

@@ -70,10 +70,12 @@ public sealed partial class EntraIdTests
 
         var appHost = files["src/AppHost/AppHost.cs"];
         appHost.ShouldContain("AddProject<Projects.IdentityStandIn>(\"identity\")");
-        appHost.ShouldContain("\"AzureAd__Audience\", \"api://shop-api\"");
-        appHost.ShouldContain($"\"AzureAd__Tenants__tenant-a\", \"{TenantA}\"");
-        appHost.ShouldContain($"\"AzureAd__Tenants__tenant-b\", \"{TenantB}\"");
+        appHost.ShouldContain(".WithStandIn(identity, \"api://shop-api\")");
         appHost.ShouldNotContain("Keycloak");
+        var wiring = files["src/AppHost/Wiring/StandInWiring.cs"];
+        wiring.ShouldContain("\"AzureAd__Audience\", audience");
+        wiring.ShouldContain($"\"AzureAd__Tenants__tenant-a\", \"{TenantA}\"");
+        wiring.ShouldContain($"\"AzureAd__Tenants__tenant-b\", \"{TenantB}\"");
 
         var authentication = files["src/Host/Wiring/Authentication.cs"];
         authentication.ShouldContain("AzureAd:Instance");

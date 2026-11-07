@@ -1,3 +1,2 @@
 
-    .WaitFor(identity)
-    .WithEnvironment("VITE_OIDC_AUTHORITY", ReferenceExpression.Create($"{identity.GetEndpoint("http")}/organizations/v2.0"))
+    .WithStandInAuthority(identity)

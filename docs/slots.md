@@ -371,8 +371,8 @@ document (`/organizations/v2.0/.well-known/openid-configuration`),
 `tenant_claim user` maps the token's one `tid` to the tenant through
 `AzureAd:Tenants:<tenant> = <directory id>`, read from the request's
 `IConfiguration`. Its local provider is `src/IdentityStandIn`, an
-in-process issuer named `identity` in the AppHost (Testcontainers runs the
-built project in a container); its users and the directories of
+in-process issuer named `identity` in the AppHost while it runs, never when it
+publishes (Testcontainers runs the built project in a container); its users and the directories of
 `tenant-a` and `tenant-b` are in its `appsettings.json`.
 
 | Function | Returns (oidc-client-ts) |

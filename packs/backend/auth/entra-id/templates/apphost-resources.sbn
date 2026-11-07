@@ -1,4 +1,7 @@
-// The local stand-in for Microsoft Entra ID (src/IdentityStandIn), in development and tests only: it issues tokens
-// for two directories, one per tenant, as Entra ID would. The host and the browser know only its address.
-var identity = builder.AddProject<Projects.IdentityStandIn>("identity")
-    .WithHttpHealthCheck("/organizations/v2.0/.well-known/openid-configuration");
+// The local stand-in for Microsoft Entra ID (src/IdentityStandIn) runs with the AppHost, in development and tests, and
+// is never published: it issues tokens for two directories, one per tenant, as Entra ID would. The host and the
+// browser know only its address; a deployment configures them for Entra ID itself (docs/adr).
+var identity = builder.ExecutionContext.IsRunMode
+    ? builder.AddProject<Projects.IdentityStandIn>("identity")
+        .WithHttpHealthCheck("/organizations/v2.0/.well-known/openid-configuration")
+    : null;
