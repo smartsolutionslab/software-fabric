@@ -176,7 +176,8 @@ library directly.
 | `write_test_output text` | `TestContext.Current.TestOutputHelper?.WriteLine(text)` |
 | `test_run_fixture type` | `[assembly: AssemblyFixture(typeof(type))]`: `type` starts once per test run, and test classes take it as a constructor parameter (*M3-12*) |
 | `test_lifetime` | `IAsyncLifetime`, the interface of a class whose `test_setup` and `test_teardown` run around its tests, or once around the run for a fixture (*M3-12*) |
-| `test_setup`, `test_teardown` | `public async ValueTask InitializeAsync()`, `public async ValueTask DisposeAsync()` (*M3-12*) |
+| `test_setup`, `test_teardown` | `public async ValueTask InitializeAsync()`, `public async ValueTask DisposeAsync()`; another framework may return several lines (an attribute above the method), which a template indents as Scriban does (*M3-12*) |
+| `test_takes_run_fixture type` | nothing: the attributes, each ending its own line, of a test class whose constructor takes the run fixture `type`; xUnit injects it by itself, a framework that does not (NUnit) names it on the class. A template writes it on its own line right above the class, as `{{~ … ~}}`, so that an empty result leaves no blank line (*#256*) |
 | `actual \| should_be expected [message]` | `actual.ShouldBe(expected)`; also `should_be_ignoring_order` (sequences), `should_contain`, `should_not_contain`, `should_start_with`, `should_be_greater_than`, `should_all_be` (a predicate), `should_be_subset_of`, `should_be_same_as` |
 | `actual \| should_be_true [message]` | `actual.ShouldBeTrue()`; also `should_be_false`, `should_be_null`, `should_not_be_null`, `should_be_empty`, `should_not_be_empty`, `should_be_in_order` |
 | `actual \| should_be_in_range from to` | `actual.ShouldBeInRange(from, to)` |
@@ -206,7 +207,8 @@ defines, so Testcontainers (#260) plugs in by defining the same functions
 instead of editing every pack's tests. The integration pack's fixture
 starts through the test framework's `test_run_fixture` and `test_lifetime`,
 so it does not refuse another framework. `IntegrationVocabularyTests` fails
-when the pack defines more or fewer functions, when a template outside the
+when the pack defines more or fewer functions, when a class taking a fixture
+is not preceded by that fixture's attributes, when a template outside the
 pack's own files (its fixture, `HostTests.cs`, `Integration.Tests.csproj`)
 names the Aspire fixture, or when a template refuses another integration
 option or test framework with `#error`. The MCP client's tests read the
@@ -218,7 +220,9 @@ the integration option, so they are not the fixture's.
 | `integration_fixture` | `AspireFixture aspire`: the constructor parameter of a test class against the running application |
 | `host_client` | `aspire.CreateHostClient()`: an `HttpClient` calling the host anonymously |
 | `signed_in_host_client user` | `aspire.CreateHostClientAsync(user)`: awaitable, a client calling the host as the identity provider's local user `user` (a C# string) |
+| `integration_fixture_attributes` | `test_takes_run_fixture "AspireFixture"`: written right above every class taking `integration_fixture` (*#256*) |
 | `database_fixture` | `AspireDatabase database`: the constructor parameter of a test class against the application's database alone, migrated, with nothing else running |
+| `database_fixture_attributes` | `test_takes_run_fixture "AspireDatabase"`: written right above every class taking `database_fixture` (*#256*) |
 | `database_connection_string` | `database.ConnectionString` |
 | `database_fixture_file namespace` | the C# file declaring that database fixture in `namespace` (rag's `tests/Rag.Tests/AspireDatabase.cs`) |
 | `database_fixture_package_references`, `database_fixture_project_references` | the `PackageReference` and `ProjectReference` items a test project needs for the database fixture |
