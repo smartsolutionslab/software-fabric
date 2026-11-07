@@ -197,9 +197,9 @@ func identity_resource
   ret "identity"
 end
 func short_lived_test_user_token_summary
-  ret `/// A client calling the host as a local user with a token that lives ShortLifespan seconds: the local provider's realm
-/// gets a copy of the web client (its mappers included) whose tokens expire that soon, so other tests' tokens are
-/// untouched.`
+  ret `/// A client calling the host as a local user with a token that lives ShortLifespan seconds: the local provider's
+/// realm gets a copy of the web client (its mappers included) whose tokens expire that soon, so other tests' tokens
+/// are untouched.`
 end
 func unstarted_people_resources_adr
   ret "What the AppHost starts only for people (the Kafka and RabbitMQ consoles) is not started."
