@@ -116,13 +116,17 @@ public sealed partial class TestcontainersTests
     [InlineData("saas-standard-react", new string[0])]
     [InlineData("industrial-event-driven-mfe", new string[0])]
     [InlineData("lean-crud", new[] { "frontend.realtime=signalr", "backend.auth=none", "backend.tenancy=none" })]
-    // Not with roles: their modules' /permissions/manage endpoints are missing from the frontend's generated
-    // openapi.json, whatever the integration option, so its staleness test fails on any fixture.
-    [InlineData("saas-ai-react", new[] { "backend.mcp=server" })]
+    [InlineData("saas-ai-react", new[] { "backend.authorization=roles,claims", "backend.mcp=server" })]
     public void The_integration_tests_pass_on_testcontainers(string profile, string[] overrides)
     {
         using var project = NewProject(profile, overrides);
-        project.AddModule("billing");
+        // A profile that brings modules is tested with them. A module added afterwards would, with authorization, bring
+        // its /permissions/manage endpoint, which makes the frontend's OpenAPI copy stale by design (RoleAuthorizationTests).
+        if (!Directory.Exists(Path.Combine(project.ProjectDirectory, "src", "Modules")))
+        {
+            project.AddModule("billing");
+        }
+
         project.Build();
 
         foreach (var tests in ContainerTests.Where(path => File.Exists(Path.Combine(project.ProjectDirectory, path))))
