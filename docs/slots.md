@@ -148,8 +148,8 @@ pack fill a slot of a choice it can be combined with but does not need
 | `modules.packages.api` | 〃 | minimal-apis |
 | `buildingblocks.packages` | `src/BuildingBlocks/BuildingBlocks.csproj` | ef-core, wolverine, result |
 | `tests.build-properties` *(added in M1-02)* | `tests/Directory.Build.props` | xunit (`OutputType Exe` for xUnit v3); nunit (`OutputType Exe` and `EnableNUnitRunner`); tunit (`OutputType Exe`, and `TUnitImplicitUsings` false) |
-| `tests.packages` | `tests/Directory.Build.props` | xunit, nunit or tunit, shouldly, nsubstitute, aspire-fixture; nunit and tunit also compile `tests/TestRun/*.cs` into every test project; tunit references `TUnit.Engine` from test projects only |
-| `tests.usings` | `tests/Directory.Build.props` | xunit, nunit or tunit (test projects only: a program under `tests/` keeps `System.ComponentModel`'s `[Description]`), shouldly, nsubstitute |
+| `tests.packages` | `tests/Directory.Build.props` | xunit, nunit or tunit, shouldly or awesome-assertions, nsubstitute, aspire-fixture; nunit and tunit also compile `tests/TestRun/*.cs` into every test project; tunit references `TUnit.Engine` from test projects only; awesome-assertions compiles `tests/Assertions/*.cs` into every project under `tests/` |
+| `tests.usings` | `tests/Directory.Build.props` | xunit, nunit or tunit (test projects only: a program under `tests/` keeps `System.ComponentModel`'s `[Description]`), shouldly or awesome-assertions, nsubstitute |
 | `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak, generic-oidc (the host and `Microsoft.AspNetCore.Mvc.Testing`, for the base's endpoint rule `EveryEndpointDeclaresItsAuthorization`, rendered whenever `backend.auth` is not `none`) |
 | `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides); agent-framework (`IDispatcher`, which a handler running an agent takes, and `IAgentMcpTools` with the MCP client) |
 | `integration-tests.parameters` *(added for #77, declared by aspire-fixture)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter); agent-ui ag-ui (`model-stand-in` true: the host's stand-in model answers the agents) |
@@ -215,6 +215,18 @@ Scriban indents every later line of a multi-line result by the
 indentation of the line the call starts, when nothing but whitespace
 precedes it there: write a multi-line argument's later lines that much
 less indented than they should come out.
+
+AwesomeAssertions (`backend.test.assertions.awesome-assertions`, *#258*)
+returns `actual.Should().Be(expected)` and so on, a message as
+`because: message`, `BeEquivalentTo` for `should_be_ignoring_order`,
+`OnlyContain` for `should_all_be`, `BeInAscendingOrder` for
+`should_be_in_order`, and `FluentActions.Invoking(action)` (or `Awaiting`,
+which takes a lambda or a task) for the three `should_*throw*`. Its file
+`tests/Assertions/AssertionExtensions.cs` adds what the vocabulary asks of
+every value: `Be` on a sequence (AwesomeAssertions' `Equal`, the items in
+order), and `.Value()`, the value an assertion returns (the single item, the
+value as a type, the exception), as a method, because AwesomeAssertions'
+`Which` is a property and does not stand as a statement.
 
 Every assertion renders after its `actual`, so `actual` may continue the
 line above (`` `.Message` ``) as in a fluent chain. A template writes

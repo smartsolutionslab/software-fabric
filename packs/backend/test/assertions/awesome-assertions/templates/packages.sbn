@@ -1,0 +1,3 @@
+    <PackageReference Include="AwesomeAssertions" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
+    <Compile Include="$(MSBuildThisFileDirectory)Assertions/*.cs" Link="Assertions/%(Filename)%(Extension)" />
