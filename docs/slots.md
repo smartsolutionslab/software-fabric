@@ -150,7 +150,7 @@ pack fill a slot of a choice it can be combined with but does not need
 | `tests.build-properties` *(added in M1-02)* | `tests/Directory.Build.props` | xunit (`OutputType Exe` for xUnit v3); nunit (`OutputType Exe` and `EnableNUnitRunner`); tunit (`OutputType Exe`, and `TUnitImplicitUsings` false) |
 | `tests.packages` | `tests/Directory.Build.props` | xunit, nunit or tunit, shouldly or awesome-assertions, nsubstitute or moq, aspire-fixture; nunit and tunit also compile `tests/TestRun/*.cs` into every test project; tunit references `TUnit.Engine` from test projects only; awesome-assertions compiles `tests/Assertions/*.cs` into every project under `tests/` |
 | `tests.usings` | `tests/Directory.Build.props` | xunit, nunit or tunit (test projects only: a program under `tests/` keeps `System.ComponentModel`'s `[Description]`), shouldly or awesome-assertions, nsubstitute or moq |
-| `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak, generic-oidc (the host and `Microsoft.AspNetCore.Mvc.Testing`, for the base's endpoint rule `EveryEndpointDeclaresItsAuthorization`, rendered whenever `backend.auth` is not `none`) |
+| `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak, generic-oidc, entra-id (the host and `Microsoft.AspNetCore.Mvc.Testing`, for the base's endpoint rule `EveryEndpointDeclaresItsAuthorization`, rendered whenever `backend.auth` is not `none`) |
 | `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides); agent-framework (`IDispatcher`, which a handler running an agent takes, and `IAgentMcpTools` with the MCP client) |
 | `integration-tests.parameters` *(added for #77, declared by aspire-fixture; contributed with `optional: true` since #260)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter); agent-ui ag-ui (`model-stand-in` true: the host's stand-in model answers the agents) |
 | `integration-tests.database` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/ContainerFixture.cs` and the database fixture alone (rag's `ApplicationDatabase.cs`), first in the setup; `settings`, `cancellationToken`, `StartAsync(container, …)` and `RunProjectAsync("src/<Project>", …)` in scope | postgres (its container, the pgvector image with rag, with the core `ContainerBuilder`, and `ConnectionStrings:database`), ef-core (runs the MigrationRunner, order 20) |
@@ -338,7 +338,7 @@ claims ADRs describe.
 | `role_mapping_provider` | the provider's name in prose: `Keycloak` |
 | `tenant_claim_adr` | Markdown for the column tenancy ADR: what in the token names the tenant (`membership of exactly one group under /tenants/ …`) |
 | `tenant_claim user` | statements, the body of a method returning `string?`, that return the tenant the claims principal `user` (a C# expression, `ClaimsPrincipal?`, which the statements continue with `.`) belongs to, or `null` when its token names none or several: the one group under `/tenants/` in `groups` (*#251*) |
-| `tenant_claim_members` | the private members those statements need, in the same class (`TenantGroupPrefix`) |
+| `tenant_claim_members` | the private members those statements need, in the same class (`TenantGroupPrefix`); the class's `IHttpContextAccessor accessor` is in scope (*#252*) |
 | `tenant_claim_description` | prose for the class's summary: `the user's one group under /tenants/` |
 
 Generic OIDC (`backend.auth.generic-oidc`, *#251*) reads standard claims
@@ -353,6 +353,27 @@ returns the one value of the token's `tenant` claim. Its local provider is
 Keycloak, named `identity` in the AppHost and configured to issue those
 claims; the short-lived token, the login page and the authority are that
 local Keycloak's, as for the keycloak pack.
+
+Microsoft Entra ID (`backend.auth.entra-id`, *#252*) reads Entra ID's
+claims under their own names (`MapInboundClaims = false`) and accepts only
+the directories `AzureAd:Tenants` lists: its `role_mapping_source` is
+`src/Host/EntraRoleClaims.cs` (the app roles in `roles` into
+`ClaimTypes.Role`), `unstarted_host_settings` sets `AzureAd:Instance`,
+`AzureAd:Audience` and one directory under `AzureAd:Tenants`,
+`test_user_token` reads the token endpoint from the stand-in's discovery
+document (`/organizations/v2.0/.well-known/openid-configuration`),
+`short_lived_test_user_token` asks the stand-in's password grant for a
+`lifetime` (its own parameter, not Entra ID's) through a
+`ShortLivedTokenAsync` member, `browser_sign_in` fills the stand-in's form
+(`Username`, `Password`, `Sign in`), `browser_authority` is
+`http://localhost:8080/organizations/v2.0`, `id_token_roles roles` is
+`roles: [roles]`, `role_mapping_provider` is `Microsoft Entra ID`, and
+`tenant_claim user` maps the token's one `tid` to the tenant through
+`AzureAd:Tenants:<tenant> = <directory id>`, read from the request's
+`IConfiguration`. Its local provider is `src/IdentityStandIn`, an
+in-process issuer named `identity` in the AppHost while it runs, never when it
+publishes (Testcontainers runs the built project in a container); its users and the directories of
+`tenant-a` and `tenant-b` are in its `appsettings.json`.
 
 | Function | Returns (oidc-client-ts) |
 |---|---|

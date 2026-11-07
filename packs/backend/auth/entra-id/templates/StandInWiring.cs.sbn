@@ -1,0 +1,40 @@
+namespace Aspire.Hosting;
+
+/// <summary>
+/// Points the host and the browser at the local stand-in for Microsoft Entra ID while it runs. Without it, as when the
+/// AppHost publishes, they get none of its settings: a deployment configures them for Entra ID itself.
+/// </summary>
+public static class StandInWiring
+{
+    /// <summary>The host accepts the stand-in's tokens for the audience, from its two directories.</summary>
+    public static IResourceBuilder<ProjectResource> WithStandIn(this IResourceBuilder<ProjectResource> host, IResourceBuilder<ProjectResource>? identity, string audience)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+
+        if (identity is null)
+        {
+            return host;
+        }
+
+        return host.WaitFor(identity)
+            .WithEnvironment("AzureAd__Instance", identity.GetEndpoint("http"))
+            .WithEnvironment("AzureAd__Audience", audience)
+            .WithEnvironment("AzureAd__Tenants__tenant-a", "00000000-0000-0000-0000-00000000000a")
+            .WithEnvironment("AzureAd__Tenants__tenant-b", "00000000-0000-0000-0000-00000000000b");
+    }
+
+    /// <summary>The browser signs in at the stand-in, for any of its directories.</summary>
+    public static IResourceBuilder<T> WithStandInAuthority<T>(this IResourceBuilder<T> web, IResourceBuilder<ProjectResource>? identity)
+        where T : IResourceWithEnvironment, IResourceWithWaitSupport
+    {
+        ArgumentNullException.ThrowIfNull(web);
+
+        if (identity is null)
+        {
+            return web;
+        }
+
+        return web.WaitFor(identity)
+            .WithEnvironment("VITE_OIDC_AUTHORITY", ReferenceExpression.Create($"{identity.GetEndpoint("http")}/organizations/v2.0"));
+    }
+}

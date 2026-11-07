@@ -1,0 +1,25 @@
+using {{ namespace }}.IdentityStandIn;
+
+// A stand-in for Microsoft Entra ID's endpoints, run by the AppHost in development and by the integration tests: it
+// signs the local users in and issues the tokens Entra ID would. It is never deployed (docs/adr).
+var builder = WebApplication.CreateBuilder(args);
+var settings = builder.Configuration.GetSection("StandIn").Get<StandInSettings>()
+    ?? throw new InvalidOperationException("The stand-in's settings (StandIn in appsettings.json) are missing.");
+
+builder.Services.AddSingleton(TimeProvider.System)
+    .AddSingleton(settings)
+    .AddSingleton<SigningKey>()
+    .AddSingleton<AuthorizationCodes>()
+    .AddSingleton<TokenIssuer>()
+    .AddCors(cors => cors.AddDefaultPolicy(policy => policy.WithOrigins(settings.RedirectOrigin).AllowAnyHeader().AllowAnyMethod()));
+
+var app = builder.Build();
+if (!app.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException("The identity stand-in runs in Development only; elsewhere users sign in at Microsoft Entra ID.");
+}
+
+app.UseCors();
+app.MapStandInEndpoints();
+
+await app.RunAsync();

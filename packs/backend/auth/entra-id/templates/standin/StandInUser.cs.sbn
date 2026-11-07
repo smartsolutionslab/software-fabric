@@ -1,0 +1,11 @@
+namespace {{ namespace }}.IdentityStandIn;
+
+/// <summary>A local user: the directory they belong to, their app roles and, where the claims need one, their department.</summary>
+public sealed class StandInUser
+{
+    public string Directory { get; init; } = string.Empty;
+
+    public IReadOnlyList<string> Roles { get; init; } = [];
+
+    public string? Department { get; init; }
+}
