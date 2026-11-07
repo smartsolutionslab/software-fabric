@@ -56,10 +56,10 @@ use (`TypedId<Customer>`). A value object with more than one value (`Money`) is 
 property.
 
 {{~ if object.has_key(slots, "event-store.json-converters") ~}}
-**Event store.** An event-sourced module may be strict too. Marten serialises its events and documents with
-System.Text.Json, and a converter registered with every module's store writes a value object as its backing value and
-reads it back through `From`, so no value object carries a `[JsonConverter]` attribute and a value read from the store
-passes the same guards as one a caller sends. An event-sourced aggregate's identity is a value object over a `Guid` that
+**Event store.** An event-sourced module may be strict too. The event store (Marten or KurrentDB) serialises its
+events, and Marten its documents, with System.Text.Json, and a converter registered with every module's store writes a
+value object as its backing value and reads it back through `From`, so no value object carries a `[JsonConverter]`
+attribute and a value read from the store passes the same guards as one a caller sends. An event-sourced aggregate's identity is a value object over a `Guid` that
 is also its `IAggregateId`. A JSON `null` for a value object that is not declared nullable fails to read
 (`RespectNullableAnnotations`), so it never skips `From`; one declared nullable (`InvoiceNumber?`) may be null. A
 constructor member missing from the JSON fails to read too (`RespectRequiredConstructorParameters`). So that this covers

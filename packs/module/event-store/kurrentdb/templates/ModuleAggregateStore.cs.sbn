@@ -1,0 +1,15 @@
+using {{ namespace }}.BuildingBlocks.EventStore;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application;
+using KurrentDB.Client;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.EventStore;
+
+public sealed class {{ module.namespace }}AggregateStore(KurrentDBClient client, ModuleEventStore events)
+    : KurrentDbAggregateStore(client, events), I{{ module.namespace }}AggregateStore
+{
+    /// <summary>
+    /// The module's streams are &lt;category&gt;-&lt;aggregate id&gt;. KurrentDB's category ends at the first hyphen, so the
+    /// module's own hyphens become underscores.
+    /// </summary>
+    public const string Category = "{{ module.name | string.replace "-" "_" }}";
+}

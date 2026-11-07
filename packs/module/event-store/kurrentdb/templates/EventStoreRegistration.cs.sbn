@@ -1,0 +1,47 @@
+{{~ if project["backend.tenancy"] != "none" ~}}
+{{~ # KurrentDB's streams are not separated by tenant yet; rendering them would leak (ADR-0006: fail loudly). ~}}
+{{ kurrentdb_event_store_needs_backend_tenancy_none }}
+{{~ end ~}}
+using {{ namespace }}.BuildingBlocks.EventStore;
+using {{ namespace }}.BuildingBlocks.Modules;
+using KurrentDB.Client;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class EventStoreRegistration
+{
+    /// <summary>
+    /// Gives the module its part of KurrentDB when its Infrastructure project has adapters over it: classes whose
+    /// constructor takes a <see cref="ModuleEventStore"/> (among other services). Each adapter is registered as the
+    /// module's Application interfaces it implements (I&lt;Module&gt;AggregateStore, ...). Every module shares one
+    /// <see cref="KurrentDBClient"/>, over the connection string Aspire gives the host.
+    /// </summary>
+    public static IServiceCollection AddModuleEventStore<TModule>(this IServiceCollection services, IConfiguration configuration)
+        where TModule : IModule
+    {
+        {{ not_null "configuration" }}
+
+        var module = ModuleEventStore.Of(ModuleAssemblies.Of<TModule>("Infrastructure"));
+        if (module is null)
+        {
+            return services;
+        }
+
+        services.TryAddSingleton(_ => new KurrentDBClient(KurrentDBClientSettings.Create(ModuleEventStore.ConnectionString(configuration))));
+        var key = typeof(TModule).FullName!;
+        services.AddKeyedSingleton(key, module);
+
+        var application = ModuleAssemblies.Of<TModule>("Application");
+        foreach (var adapter in module.Adapters)
+        {
+            foreach (var contract in adapter.GetInterfaces().Where(contract => contract.Assembly == application))
+            {
+                services.AddScoped(contract, provider => ActivatorUtilities.CreateInstance(provider, adapter, provider.GetRequiredKeyedService<ModuleEventStore>(key)));
+            }
+        }
+
+        return services;
+    }
+}

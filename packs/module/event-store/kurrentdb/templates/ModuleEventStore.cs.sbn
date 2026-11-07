@@ -1,0 +1,125 @@
+using System.Reflection;
+using System.Text.Json;
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+using KurrentDB.Client;
+using Microsoft.Extensions.Configuration;
+
+namespace {{ namespace }}.BuildingBlocks.EventStore;
+
+/// <summary>
+/// One module's part of KurrentDB, found from its Infrastructure assembly: its streams, named
+/// &lt;category&gt;-&lt;aggregate id&gt; after the module, and its domain events, each stored as JSON under its type's name.
+/// </summary>
+public sealed class ModuleEventStore
+{
+    private const string ConnectionStringName = "eventstore";
+
+    // <Module>AggregateStore.Category, rendered from the module's name.
+    private const string CategoryConstant = "Category";
+
+    private const string ContentType = "application/json";
+
+    private readonly string category;
+    private readonly IReadOnlyDictionary<string, Type> domainEvents;
+    private readonly JsonSerializerOptions json = SerializerOptions();
+
+    private ModuleEventStore(string category, IReadOnlyList<Type> adapters, IReadOnlyDictionary<string, Type> domainEvents)
+    {
+        this.category = category;
+        Adapters = adapters;
+        this.domainEvents = domainEvents;
+    }
+
+    /// <summary>
+    /// The module's classes over its event store: those with a constructor taking a <see cref="ModuleEventStore"/>,
+    /// whatever else it takes (the container supplies the rest, the <see cref="KurrentDBClient"/> among it).
+    /// </summary>
+    public IReadOnlyList<Type> Adapters { get; }
+
+    /// <summary>The module's event store, or null when its Infrastructure project has no adapter over one.</summary>
+    public static ModuleEventStore? Of(Assembly infrastructure)
+    {
+        {{ not_null "infrastructure" }}
+
+        var adapters = infrastructure.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false }
+                && type.GetConstructors().Any(constructor => constructor.GetParameters().Any(parameter => parameter.ParameterType == typeof(ModuleEventStore))))
+            .ToList();
+        if (adapters.Count == 0)
+        {
+            return null;
+        }
+
+        // <Namespace>.Modules.<Module>.Infrastructure: the module's Domain assembly follows from the name.
+        var name = infrastructure.GetName().Name!;
+        var domain = Assembly.Load(name[..name.LastIndexOf('.')] + ".Domain");
+        var category = adapters
+            .Select(adapter => adapter.GetField(CategoryConstant, BindingFlags.Public | BindingFlags.Static)?.GetRawConstantValue())
+            .OfType<string>()
+            .FirstOrDefault()
+            ?? throw new InvalidOperationException($"{name} has no adapter declaring the module's category ({CategoryConstant}).");
+        var events = domain.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(IDomainEvent).IsAssignableFrom(type))
+            .ToList();
+
+        // An event is stored under its type's name; two events of one module may not share it.
+        var shared = events.GroupBy(type => type.Name, StringComparer.Ordinal).FirstOrDefault(group => group.Count() > 1);
+        if (shared is not null)
+        {
+            throw new InvalidOperationException($"{string.Join(" and ", shared.Select(type => type.FullName))} share the name {shared.Key}, under which KurrentDB stores an event.");
+        }
+
+        return new ModuleEventStore(category, adapters, events.ToDictionary(type => type.Name, StringComparer.Ordinal));
+    }
+
+    public static string ConnectionString(IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        return configuration.GetConnectionString(ConnectionStringName)
+            ?? throw new InvalidOperationException($"Connection string '{ConnectionStringName}' is missing; Aspire provides it.");
+    }
+
+    /// <summary>The aggregate's stream: &lt;category&gt;-&lt;id&gt;.</summary>
+    public string StreamOf(IAggregateId id)
+    {
+        {{ not_null "id" }}
+
+        return $"{category}-{id.Value}";
+    }
+
+    public EventData ToEventData(IDomainEvent domainEvent)
+    {
+        {{ not_null "domainEvent" }}
+
+        var type = domainEvent.GetType();
+        return new EventData(Uuid.NewUuid(), type.Name, JsonSerializer.SerializeToUtf8Bytes(domainEvent, type, json), contentType: ContentType);
+    }
+
+    public IDomainEvent FromRecord(EventRecord record)
+    {
+        {{ not_null "record" }}
+
+        var type = domainEvents.GetValueOrDefault(record.EventType)
+            ?? throw new InvalidOperationException($"{record.EventStreamId} holds an event {record.EventType}, which is no domain event of the module.");
+        return (IDomainEvent)(JsonSerializer.Deserialize(record.Data.Span, type, json)
+            ?? throw new InvalidOperationException($"{record.EventStreamId} holds a null {record.EventType}."));
+    }
+{{~ if slots["event-store.json-converters"] == "" ~}}
+
+    private static JsonSerializerOptions SerializerOptions() => new();
+{{~ else ~}}
+
+    private static JsonSerializerOptions SerializerOptions()
+    {
+        JsonSerializerOptions options = new();
+        Configure(options);
+        return options;
+
+        static void Configure(JsonSerializerOptions json)
+        {
+{{ slots["event-store.json-converters"] }}
+        }
+    }
+{{~ end ~}}
+}

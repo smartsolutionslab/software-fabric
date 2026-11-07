@@ -1,0 +1,3 @@
+// KurrentDB keeps the events of the event-sourced modules; the host receives it as the connection string "eventstore".
+var eventstore = builder.AddKurrentDB("eventstore")
+    .WithDataVolume();
