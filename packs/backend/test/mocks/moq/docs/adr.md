@@ -12,10 +12,10 @@ pass the base's `FakeTimeProvider` where code takes a `TimeProvider`.
 Moq is licensed under the BSD 3-Clause licence (the licence expression of the pinned version, 4.21.0, published
 2026-09-24 on NuGet), and so is Moq.Analyzers (0.4.2). Moq 4.20.0 shipped SponsorLink, a closed-source analyzer that
 read the developer's git e-mail address during the build and sent a hash of it to a remote service; 4.20.2 removed it,
-those versions are unlisted, and the maintainers deleted the data it had collected. The pinned version was checked for
-it: the package holds no analyzer and nothing named SponsorLink, and depends on nothing but Castle.Core (Apache-2.0)
-and System.Threading.Tasks.Extensions. A version change rechecks the package's contents, not only its licence. Both
-versions are pinned in `Directory.Packages.props`.
+and the versions from 4.20.0 to 4.20.2 are unlisted on NuGet. The pinned version was checked for it: the package holds
+no analyzer and nothing named SponsorLink, and depends on nothing but Castle.Core (Apache-2.0) and
+System.Threading.Tasks.Extensions. A version change rechecks the package's contents, not only its licence. Both versions
+are pinned in `Directory.Packages.props`.
 
 ## Consequences
 
