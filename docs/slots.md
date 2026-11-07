@@ -136,7 +136,7 @@ pack fill a slot of a choice it can be combined with but does not need
 
 | Slot | File | Filled by |
 |---|---|---|
-| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11); the integration pack (the integration-fixture vocabulary below, M3-12) |
+| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11); the integration pack (the integration-fixture vocabulary below, M3-12); the identity-provider and auth-client packs (the identity-provider vocabulary below, M3-13) |
 | `dotnet.build-items` *(added with the kernel options)* | `Directory.Build.props` | ensure-that (ban list), typed-outcomes (`using static Outcome`) |
 | `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
@@ -232,6 +232,7 @@ the integration option, so they are not the fixture's.
 | `integration_fixture` | `AspireFixture aspire`: the constructor parameter of a test class against the running application |
 | `host_client` | `aspire.CreateHostClient()`: an `HttpClient` calling the host anonymously |
 | `signed_in_host_client user` | `aspire.CreateHostClientAsync(user)`: awaitable, a client calling the host as the identity provider's local user `user` (a C# string) |
+| `running_application` | `aspire.App`: the running Aspire application, which the identity provider's test-user functions take (*M3-13*) |
 | `integration_fixture_attributes` | `test_takes_run_fixture "AspireFixture"`: written right above every class taking `integration_fixture` (*#256*) |
 | `database_fixture` | `AspireDatabase database`: the constructor parameter of a test class against the application's database alone, migrated, with nothing else running |
 | `database_fixture_attributes` | `test_takes_run_fixture "AspireDatabase"`: written right above every class taking `database_fixture` (*#256*) |
@@ -239,11 +240,72 @@ the integration option, so they are not the fixture's.
 | `database_fixture_file namespace` | the C# file declaring that database fixture in `namespace` (rag's `tests/Rag.Tests/AspireDatabase.cs`) |
 | `database_fixture_package_references`, `database_fixture_project_references` | the `PackageReference` and `ProjectReference` items a test project needs for the database fixture |
 
-Signalr's Keycloak-only helpers still reach the Keycloak resource through
-the Aspire application (`aspire.App`); that is the identity-provider
-vocabulary's to replace (M3-13). A database fixture of another option
-lands in rag's file `AspireDatabase.cs` until rag's target is renamed,
-which would move the file in every rag project.
+A database fixture of another option lands in rag's file `AspireDatabase.cs`
+until rag's target is renamed, which would move the file in every rag
+project.
+
+#### The identity-provider vocabulary *(M3-13)*
+
+A pack never names the identity provider either: where its roles sit in
+the token, how a test user signs in, its login page and the shape of its
+ID token come from `templates.functions` of the `backend.auth` pack, and
+how the browser holds its access token from those of the
+`frontend.auth-client` pack, so generic-oidc (#251), entra-id (#252) and
+msal (#266) plug in by defining the same functions instead of editing
+roles, claims, signalr, ag-ui, the micro-frontends, the MCP server and the
+base's policy rule. `backend.auth` `none` defines none of them: a template
+calls them only when `backend.auth` is not `none`, and a provider pack that
+lacks one fails generation naming it. `IdentityVocabularyTests` fails when a
+provider or auth-client pack defines more or fewer functions, when a
+template refuses another provider or auth client with `#error` or
+`throw new Error(...)`, or when a project rendered with stand-in
+vocabularies names Keycloak (`keycloak`, `/realms/`, `realm_access`,
+`admin-cli`, its login form) or oidc-client-ts's token storage outside their
+own files, the composition root and the host's shared files. Comments are
+prose and still describe Keycloak where it is the only provider. A
+multi-line result called after other text on its line is indented by the
+caller: `{{ accept_query_token ... | string.replace "\n" "\n        " }}`.
+
+An identity provider pack also brings, as its own files and slot
+contributions: the host's authentication (`host.services`,
+`host.middleware`), `GET /me` answering `CurrentUser` (the frontend's
+OpenAPI copy starts with it whenever `backend.auth` is not `none`), the
+architecture tests' host references (`tests.architecture.references`), the
+mapping of its token's roles to `ClaimTypes.Role` when
+`backend.authorization` has `roles`, and the local test users the tests
+sign in as, passwords equal to their names: `developer` (and `developer-b`
+with tenancy), plus `visitor`, `clerk` and `analyst` as the roles and
+claims ADRs describe.
+
+| Function | Returns (keycloak) |
+|---|---|
+| `role_mapping_source` | `src/Host/KeycloakRoleClaims.cs`: the source that puts the token's roles into `ClaimTypes.Role`, which `OnlyModulePoliciesCheckRoles` exempts |
+| `unstarted_host_settings` | `builder.UseSetting("Authentication:Authority", ...)`: what a host started with `WebApplicationFactory` and no provider reachable needs (`builder` an `IWebHostBuilder`) |
+| `test_user_token app user` | statements, run in an async method, that leave in `token` the access token (`token.AccessToken`) of the local user `user` (a C# string); `app` is the running Aspire application (`running_application`, or the fixture's `App`) |
+| `test_user_token_types` | the private types those statements need, members of the same class |
+| `short_lived_test_user_token app user lifespan` | the same with a token that expires after `lifespan` seconds (a C# `int`), other users' tokens untouched; `cancellationToken` in scope |
+| `short_lived_test_user_token_members app`, `short_lived_test_user_token_types` | the private methods and types those statements need |
+| `short_lived_test_user_token_namespaces` | the namespaces they need, separated by spaces, for the caller's sorted `using`s |
+| `accept_query_token services path` | an expression on `services` that makes the host accept a browser's token from the `access_token` query parameter on `path` (a C# string) only, where a WebSocket or EventSource cannot send a header |
+| `accept_query_token_namespaces` | the namespaces that expression needs, separated by spaces |
+| `browser_sign_in page user` | Playwright statements that sign the local user `user` (a TS string) in on the provider's login page |
+| `browser_authority` | the provider's local authority URL (`http://localhost:8080/realms/<name>`), the browser's fallback when `VITE_OIDC_AUTHORITY` is unset |
+| `id_token_roles roles` | the ID token property holding the roles `roles` (TS array items), for test tokens |
+| `id_token_has_role profile role` | TS statements returning whether the ID token claims `profile` hold `role` |
+
+| Function | Returns (oidc-client-ts) |
+|---|---|
+| `browser_access_token_import` | the TS import that `browser_access_token` needs |
+| `browser_access_token` | `accessToken()`: the signed-in user's access token, or `undefined` |
+| `stored_access_token page` | awaitable, in Playwright: the access token the app in `page` signed in with |
+| `store_access_token_import`, `store_access_token token` | in a unit test, the import and the statement that store `token` (a TS string) as the signed-in user's access token, where `browser_access_token` finds it |
+
+The integration-fixture vocabulary gains `running_application`
+(`aspire.App`), the running application the provider's test users sign in
+against. A test user's token for another integration option, and the
+Mailpit gate Keycloak keeps in the integration pack's `HostTests.cs`, are
+#260's and Keycloak's to move; the column tenancy pack still reads Keycloak's
+group paths (`groups`, `/tenants/<tenant>`) from the token.
 
 **One package, one owner.** A `PackageVersion` is declared by exactly
 one pack; others only reference it. Two packs declaring the same version

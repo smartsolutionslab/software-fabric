@@ -1,0 +1,22 @@
+func browser_access_token_import
+  ret "import { accessToken } from '@/auth/accessToken';"
+end
+func browser_access_token
+  ret "accessToken()"
+end
+func stored_access_token(page)
+  ret page + `.evaluate(() => {
+  const key = Object.keys(sessionStorage).find((name) => name.startsWith('oidc.user:'));
+  const user: unknown = JSON.parse((key && sessionStorage.getItem(key)) || '{}');
+  return typeof user === 'object' && user && 'access_token' in user ? String(user.access_token) : '';
+})`
+end
+func store_access_token_import
+  ret "import { oidcConfig } from '@/auth/oidcConfig';"
+end
+func store_access_token(token)
+  ret `sessionStorage.setItem(
+  ` + "`" + `oidc.user:${oidcConfig.authority}:${oidcConfig.client_id}` + "`" + `,
+  JSON.stringify({ access_token: ` + token + `, token_type: 'Bearer', profile: { sub: 'developer' } }),
+)`
+end

@@ -1,2 +1,2 @@
-{{~ # Without keycloak the document starts with no paths (openapi.json.sbn), and the client generated from it leaves endpoints' build parameter unused. Excluded, it is checked once something imports it. ~}}
-{{ if project["backend.auth"] != "keycloak" }}"src/api/generated.ts"{{ end }}
+{{~ # Without an identity provider the document starts with no paths (openapi.json.sbn), and the client generated from it leaves endpoints' build parameter unused. Excluded, it is checked once something imports it. ~}}
+{{ if project["backend.auth"] == "none" }}"src/api/generated.ts"{{ end }}

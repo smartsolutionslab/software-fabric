@@ -1,6 +1,3 @@
-{{~ if project["backend.auth"] != "keycloak" && project["backend.auth"] != "none" ~}}
-throw new Error('This test knows Keycloak\'s login page only so far (docs/adr/0006 of the generator).');
-{{~ end ~}}
 import { expect, test } from '@playwright/test';
 
 test("{{ module.name }}'s page comes from its own remote", async ({ page }) => {
@@ -12,10 +9,8 @@ test("{{ module.name }}'s page comes from its own remote", async ({ page }) => {
   });
 
   await page.goto('/');
-{{~ if project["backend.auth"] == "keycloak" ~}}
-  await page.getByLabel('Username or email').fill('developer');
-  await page.getByLabel('Password', { exact: true }).fill('developer');
-  await page.getByRole('button', { name: 'Sign In' }).click();
+{{~ if project["backend.auth"] != "none" ~}}
+  {{ browser_sign_in "page" "'developer'" }}
   await expect(page.getByText('Signed in as developer')).toBeVisible();
 {{~ end ~}}
 
@@ -37,10 +32,8 @@ test("{{ module.name }}'s page loads again once its remote is back, without a re
   );
 
   await page.goto('/');
-{{~ if project["backend.auth"] == "keycloak" ~}}
-  await page.getByLabel('Username or email').fill('developer');
-  await page.getByLabel('Password', { exact: true }).fill('developer');
-  await page.getByRole('button', { name: 'Sign In' }).click();
+{{~ if project["backend.auth"] != "none" ~}}
+  {{ browser_sign_in "page" "'developer'" }}
   await expect(page.getByText('Signed in as developer')).toBeVisible();
 {{~ end ~}}
 
@@ -65,10 +58,8 @@ test("{{ module.name }}'s page loads again once its failed module is back", asyn
   );
 
   await page.goto('/');
-{{~ if project["backend.auth"] == "keycloak" ~}}
-  await page.getByLabel('Username or email').fill('developer');
-  await page.getByLabel('Password', { exact: true }).fill('developer');
-  await page.getByRole('button', { name: 'Sign In' }).click();
+{{~ if project["backend.auth"] != "none" ~}}
+  {{ browser_sign_in "page" "'developer'" }}
   await expect(page.getByText('Signed in as developer')).toBeVisible();
 {{~ end ~}}
 

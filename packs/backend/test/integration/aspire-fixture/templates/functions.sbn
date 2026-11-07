@@ -7,6 +7,9 @@ end
 func signed_in_host_client(user)
   ret "aspire.CreateHostClientAsync(" + user + ")"
 end
+func running_application
+  ret "aspire.App"
+end
 func integration_fixture_attributes
   ret test_takes_run_fixture "AspireFixture"
 end

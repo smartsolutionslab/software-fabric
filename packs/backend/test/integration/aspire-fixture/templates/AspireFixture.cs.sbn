@@ -40,23 +40,12 @@ public sealed class AspireFixture : {{ test_lifetime }}
     }
 
     public HttpClient CreateHostClient() => App.CreateHttpClient("host");
-{{~ if project["backend.auth"] == "keycloak" ~}}
+{{~ if project["backend.auth"] != "none" ~}}
 
     /// <summary>A client calling the host as a realm user; local users' passwords equal their names.</summary>
     public async Task<HttpClient> CreateHostClientAsync(string user)
     {
-        using var identity = new HttpClient { BaseAddress = App.GetEndpoint("keycloak", "http") };
-        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["grant_type"] = "password",
-            ["client_id"] = "{{ name }}-web",
-            ["username"] = user,
-            ["password"] = user,
-        });
-        using var response = await identity.PostAsync(new Uri("/realms/{{ name }}/protocol/openid-connect/token", UriKind.Relative), form);
-        response.EnsureSuccessStatusCode();
-        var token = await response.Content.ReadFromJsonAsync<TokenResponse>()
-            ?? throw new InvalidOperationException("The realm returned no token.");
+        {{ test_user_token "App" "user" }}
 
         var client = CreateHostClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
@@ -71,8 +60,8 @@ public sealed class AspireFixture : {{ test_lifetime }}
             await app.DisposeAsync();
         }
     }
-{{~ if project["backend.auth"] == "keycloak" ~}}
+{{~ if project["backend.auth"] != "none" ~}}
 
-    private sealed record TokenResponse([property: JsonPropertyName("access_token")] string AccessToken);
+    {{ test_user_token_types }}
 {{~ end ~}}
 }

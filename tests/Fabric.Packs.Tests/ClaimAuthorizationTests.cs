@@ -187,18 +187,6 @@ public sealed class ClaimAuthorizationTests
         output.ShouldContain("GET /billing/foreign requires the policy orders.manage, which the module Billing does not register.");
     }
 
-    [Fact]
-    public void Claims_with_an_identity_provider_the_pack_does_not_handle_fail_the_build_saying_why()
-    {
-        using var project = new GeneratedProject(Profile, "backend.auth=entra-id", Claims);
-        project.AddModule("billing");
-
-        var (exitCode, output) = project.TryBuild();
-
-        exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("The claims pack's sample users and their department come from the Keycloak realm");
-    }
-
     [Theory]
     [InlineData(Claims, "A_user_in_another_department_is_forbidden")]
     [InlineData(RolesAndClaims, "A_user_with_only_the_manager_role_is_forbidden")]
