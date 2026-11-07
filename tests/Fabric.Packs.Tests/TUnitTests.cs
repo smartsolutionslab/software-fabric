@@ -101,7 +101,8 @@ public sealed partial class TUnitTests
 
     /// <summary>
     /// TUnit registers the tests of every test assembly a test project loads; the evals' gate references tests/Evals,
-    /// whose own test calls the real model, and must never run it.
+    /// whose own test calls the real model, and must never run it. TUnit has no way to leave a loaded assembly's test
+    /// out of a run, so it is reported skipped.
     /// </summary>
     [Fact]
     public void A_test_project_referencing_another_test_project_runs_only_its_own_tests()
@@ -114,7 +115,8 @@ public sealed partial class TUnitTests
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
         output.ShouldNotContain("succeeded: 0");
-        output.ShouldContain("skipped: 0");
+        output.ShouldNotContain("OpenAI:ApiKey");
+        output.ShouldContain("skipped: 1");
     }
 
     /// <summary>The coverage gate is the test framework's, the same with any: TUnit's pack carries xUnit's files unchanged.</summary>
