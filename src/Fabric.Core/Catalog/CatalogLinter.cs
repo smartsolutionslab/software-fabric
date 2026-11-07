@@ -55,13 +55,7 @@ public static class CatalogLinter
 
         if (dimension.ActiveWhen is { } activeWhen)
         {
-            var subject = $"{dimension.Id} active-when";
-            if (activeWhen.Dimension == dimension.Id)
-            {
-                problems.Add($"{subject}: condition '{activeWhen}' refers to its own dimension.");
-            }
-
-            CheckCondition(catalog, subject, activeWhen, problems);
+            CheckCondition(catalog, $"{dimension.Id} active-when", activeWhen, problems);
         }
 
         foreach (var option in dimension.Options.Values)

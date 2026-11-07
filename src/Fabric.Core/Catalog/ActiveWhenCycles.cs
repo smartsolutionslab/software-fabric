@@ -1,15 +1,15 @@
 namespace Fabric.Core.Catalog;
 
 /// <summary>
-/// Dimensions each active only if the next one is, around to the first: none can be decided. The linter reports them,
-/// and the matrix refuses a catalog with one before it searches, since its search would follow them without end.
+/// Dimensions each active only if the next one is, around to the first: none can be decided. A dimension active only if
+/// it is itself is the cycle of one. The linter reports them, and the matrix refuses a catalog with one before it searches,
+/// since its search would follow them without end.
 /// </summary>
 public static class ActiveWhenCycles
 {
     /// <summary>
     /// Each dimension has at most one active-when, so following them from a dimension either ends or returns to a dimension
-    /// already passed. A cycle is reported once, from its member that comes first in the catalog; a self-reference is left to
-    /// the linter's own check.
+    /// already passed. A cycle is reported once, from its member that comes first in the catalog.
     /// </summary>
     public static IReadOnlyList<string> Find(CatalogModel catalog)
     {
@@ -24,11 +24,16 @@ public static class ActiveWhenCycles
                 continue;
             }
 
+            if (catalog.Dimensions[start].ActiveWhen is { } own && own.Dimension == start)
+            {
+                cycles.Add($"{start} active-when: condition '{own}' refers to its own dimension.");
+                continue;
+            }
+
             List<string> path = [start];
             var current = start;
             while (catalog.Dimensions.TryGetValue(current, out var dimension)
                 && dimension.ActiveWhen is { } activeWhen
-                && activeWhen.Dimension != current
                 && !path.Contains(activeWhen.Dimension, StringComparer.Ordinal))
             {
                 current = activeWhen.Dimension;
