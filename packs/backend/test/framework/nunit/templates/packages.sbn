@@ -1,0 +1,4 @@
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit3TestAdapter" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+    <Compile Include="$(MSBuildThisFileDirectory)TestRun/*.cs" Link="TestRun/%(Filename)%(Extension)" Condition="'$(IsTestProject)' != 'false'" />

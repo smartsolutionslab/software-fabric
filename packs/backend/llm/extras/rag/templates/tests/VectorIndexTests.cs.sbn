@@ -11,6 +11,7 @@ namespace {{ namespace }}.Rag.Tests;
 /// A module's index in the AppHost's database: records indexed with a stand-in embeddings model come back from a
 /// search nearest first. No test calls a real model.
 /// </summary>
+{{~ database_fixture_attributes ~}}
 public sealed class VectorIndexTests({{ database_fixture }}) : {{ test_lifetime }}
 {
     private readonly FakeEmbeddingGenerator generator = new(VectorTables.Dimensions);

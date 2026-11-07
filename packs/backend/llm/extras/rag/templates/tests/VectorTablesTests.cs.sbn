@@ -11,6 +11,7 @@ namespace {{ namespace }}.Rag.Tests;
 {{~ else ~}}
 /// <summary>The vector tables the MigrationRunner made: one per module schema, of the embeddings model's size, with an HNSW cosine index.</summary>
 {{~ end ~}}
+{{~ database_fixture_attributes ~}}
 public sealed class VectorTablesTests({{ database_fixture }})
 {
     {{ test_attribute }}

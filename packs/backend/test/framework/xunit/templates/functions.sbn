@@ -25,3 +25,6 @@ end
 func test_teardown
   ret "public async ValueTask DisposeAsync()"
 end
+func test_takes_run_fixture(type)
+  ret ""
+end

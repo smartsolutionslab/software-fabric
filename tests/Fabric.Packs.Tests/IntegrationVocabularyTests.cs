@@ -22,6 +22,8 @@ public sealed partial class IntegrationVocabularyTests
         "database_fixture_file",
         "database_fixture_package_references",
         "database_fixture_project_references",
+        "integration_fixture_attributes",
+        "database_fixture_attributes",
     ];
 
     private static readonly string[] FrameworkVocabulary =
@@ -35,6 +37,7 @@ public sealed partial class IntegrationVocabularyTests
         "test_lifetime",
         "test_setup",
         "test_teardown",
+        "test_takes_run_fixture",
     ];
 
     /// <summary>
@@ -100,6 +103,37 @@ public sealed partial class IntegrationVocabularyTests
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "tests/Integration.Tests/ListEndpointsArePagedTests.cs"))
             .ShouldContain("using var client = host_client();");
     }
+
+    /// <summary>
+    /// A framework that does not inject a run fixture into a test class's constructor by itself (NUnit) needs an
+    /// attribute on the class: every class taking a fixture carries the fixture's attributes, which the stand-in
+    /// vocabulary renders right before the declaration.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Generations))]
+    public void Every_test_class_taking_a_fixture_carries_the_fixtures_attributes(string profile, string[] overrides)
+    {
+        using var integration = new VocabularyProbe(Repository.Packs.Packs["backend.test.integration.aspire-fixture"], IntegrationVocabulary);
+        using var project = new GeneratedProject(profile, [integration.Manifest], overrides);
+        project.AddModule("billing");
+
+        var declarations = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "tests"), "*.cs", SearchOption.AllDirectories)
+            .SelectMany(path => File.ReadLines(path).Select((line, index) => (path, line, index)))
+            .Select(entry => (entry.path, entry.line, entry.index, declaration: FixtureTakingClass().Match(entry.line)))
+            .Where(entry => entry.declaration.Success)
+            .ToList();
+
+        declarations.ShouldNotBeEmpty();
+        var bare = declarations
+            .Where(entry => !entry.line.StartsWith($"{entry.declaration.Groups[1].Value}_attributes()public ", StringComparison.Ordinal))
+            .Select(entry => $"{Path.GetRelativePath(project.ProjectDirectory, entry.path)}:{entry.index + 1}: {entry.line.Trim()}")
+            .ToList();
+
+        bare.ShouldBeEmpty(string.Join(Environment.NewLine, bare));
+    }
+
+    [GeneratedRegex(@"\bclass \w+\((integration_fixture|database_fixture)\(\)\)")]
+    private static partial Regex FixtureTakingClass();
 
     [GeneratedRegex(@"aspire-fixture|Aspire fixture|xUnit only|for xUnit and")]
     private static partial Regex FixtureOnly();

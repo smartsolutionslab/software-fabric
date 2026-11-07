@@ -10,6 +10,7 @@ namespace {{ namespace }}.Integration.Tests;
 /// AG-UI events, its text in several chunks, after a tool call its query ran through the dispatcher. The host answers
 /// with its stand-in model, which the fixture switches on; no test calls a model.
 /// </summary>
+{{~ integration_fixture_attributes ~}}
 public class AgentUiTests({{ integration_fixture }})
 {
     private const string Run = """
