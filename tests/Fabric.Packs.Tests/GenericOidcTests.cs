@@ -161,6 +161,24 @@ public sealed partial class GenericOidcTests
             .ShouldContain("A_token_from_the_realm_identifies_the_user");
     }
 
+    /// <summary>
+    /// The same gate on Testcontainers (#260): the local provider in a container of its own, the host in process, a
+    /// test user signing in at the token endpoint the provider's discovery document names.
+    /// </summary>
+    [Fact]
+    public void A_test_user_signs_in_and_the_integration_tests_pass_on_testcontainers()
+    {
+        using var project = NewProject(GenericOidc, RolesAndClaims, SignalR, "backend.test.integration=testcontainers");
+        project.AddModule("billing");
+        project.Build();
+
+        var (_, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+
+        FailedCount().Match(output).Groups[1].Value.ShouldBe("1", customMessage: output);
+        FailedTest().Matches(output).Select(match => match.Groups[1].Value)
+            .ShouldBe(["Shop.Integration.Tests.OpenApiDocumentTests.The_frontends_copy_of_the_openapi_document_is_current"], customMessage: output);
+    }
+
     private static Dictionary<string, string> Files(params string[] overrides)
     {
         var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", Profile, overrides);
