@@ -1,0 +1,13 @@
+option: frontend.pwa.yes
+files:
+  - { template: templates/icon.svg.sbn, target: web/app/public/icon.svg }
+  - { template: templates/offline.spec.ts.sbn, target: web/app/e2e/offline.spec.ts }
+slots:
+  - { slot: web.dev-dependencies, template: templates/dev-dependencies.sbn }
+  - { slot: web.vite-imports, template: templates/vite-import.sbn, order: 70 }
+  - { slot: web.vite-plugins, template: templates/vite-plugin.sbn, order: 70 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: end-to-end-test, describes: "A signed-in browser reloads offline once the service worker has the app shell and still sees the app, and an /api answer it had online is unreachable offline, never served from the worker's cache (e2e/offline.spec.ts, run against the running AppHost).", file: templates/offline.spec.ts.sbn }

@@ -1,0 +1,1 @@
+import { VitePWA } from 'vite-plugin-pwa';
