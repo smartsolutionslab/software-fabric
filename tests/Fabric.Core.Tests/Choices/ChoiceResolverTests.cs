@@ -456,8 +456,8 @@ public class ChoiceResolverTests
     [Fact]
     public void Rejects_setting_an_inactive_dimension_and_says_why()
     {
-        SingleError(RepositoryCatalog, "lean-crud", "backend.bus.library=masstransit").ShouldBe(
-            "backend.bus.library is set to masstransit, but it only applies when backend.bus.transport != none, and backend.bus.transport is none.");
+        SingleError(RepositoryCatalog, "lean-crud", "frontend.mfe-mixed-frameworks=yes").ShouldBe(
+            "frontend.mfe-mixed-frameworks is set to yes, but it only applies when frontend.architecture == micro-frontends, and frontend.architecture is spa.");
     }
 
     [Fact]
