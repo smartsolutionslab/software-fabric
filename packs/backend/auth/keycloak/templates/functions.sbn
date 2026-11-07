@@ -118,3 +118,18 @@ if (typeof realmAccess !== 'object' || realmAccess === null || !('roles' in real
 const { roles } = realmAccess;
 return Array.isArray(roles) && roles.includes(` + role + `);`
 end
+func tenant_claim(user)
+  ret `var tenants = ` + user + `.FindAll("groups")
+    .Select(claim => claim.Value)
+    .Where(group => group.StartsWith(TenantGroupPrefix, StringComparison.Ordinal))
+    .Select(group => group[TenantGroupPrefix.Length..])
+    .ToList();
+
+return tenants is [var tenant] ? tenant : null;`
+end
+func tenant_claim_members
+  ret `private const string TenantGroupPrefix = "/tenants/";`
+end
+func tenant_claim_description
+  ret "the user's one group under /tenants/"
+end
