@@ -145,7 +145,7 @@ pack fill a slot of a choice it can be combined with but does not need
 | `modules.packages.domain` | `src/Modules/Directory.Build.props` | — (Domain stays dependency-free) |
 | `modules.packages.application` | 〃 | wolverine, mediator, agent-framework (`Microsoft.Agents.AI`: an agent lives in Application, ADR-0011) |
 | `modules.packages.infrastructure` | 〃 | ef-core, postgres, wolverine |
-| `modules.packages.api` | 〃 | minimal-apis |
+| `modules.packages.api` | 〃 | minimal-apis; api-protocols grpc (`Grpc.AspNetCore`, and the `Protobuf` item that compiles the Api project's `Protos/**/*.proto`, added for #250) |
 | `buildingblocks.packages` | `src/BuildingBlocks/BuildingBlocks.csproj` | ef-core, wolverine, result |
 | `tests.build-properties` *(added in M1-02)* | `tests/Directory.Build.props` | xunit (`OutputType Exe` for xUnit v3); nunit (`OutputType Exe` and `EnableNUnitRunner`); tunit (`OutputType Exe`, and `TUnitImplicitUsings` false) |
 | `tests.packages` | `tests/Directory.Build.props` | xunit, nunit or tunit, shouldly or awesome-assertions, nsubstitute or moq, aspire-fixture; nunit and tunit also compile `tests/TestRun/*.cs` into every test project; tunit references `TUnit.Engine` from test projects only; awesome-assertions compiles `tests/Assertions/*.cs` into every project under `tests/` |
