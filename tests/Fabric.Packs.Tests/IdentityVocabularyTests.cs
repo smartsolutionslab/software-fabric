@@ -139,9 +139,8 @@ public sealed partial class IdentityVocabularyTests
     [Fact]
     public void An_identity_provider_without_the_vocabulary_fails_generation_naming_what_it_lacks()
     {
-        using var standIns = new StandIns();
-        string[] overrides = ["backend.auth=entra-id", "backend.authorization=roles,claims", "frontend.realtime=signalr"];
-        var packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, "lean-crud", overrides);
+        string[] overrides = ["backend.auth=generic-oidc", "backend.authorization=roles,claims", "frontend.realtime=signalr"];
+        var packs = WithoutVocabulary(Repository.Packs.Packs["backend.auth.generic-oidc"]);
 
         var generated = Generator.New(Repository.Catalog, packs, "shop", "lean-crud", overrides);
 
@@ -154,9 +153,8 @@ public sealed partial class IdentityVocabularyTests
     [Fact]
     public void An_identity_provider_without_the_vocabulary_fails_generation_of_column_tenancy_naming_the_tenant_claim()
     {
-        using var standIns = new StandIns();
-        string[] overrides = ["backend.auth=entra-id"];
-        var packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, "saas-standard-react", overrides);
+        string[] overrides = ["backend.auth=generic-oidc"];
+        var packs = WithoutVocabulary(Repository.Packs.Packs["backend.auth.generic-oidc"]);
 
         var generated = Generator.New(Repository.Catalog, packs, "shop", "saas-standard-react", overrides);
 
@@ -203,6 +201,17 @@ public sealed partial class IdentityVocabularyTests
         named.ShouldBeEmpty(string.Join(Environment.NewLine, named));
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "tests/Integration.Tests/AspireFixture.cs"))
             .ShouldContain("test_user_token(App, user)");
+    }
+
+    /// <summary>
+    /// The real packs, but the given identity provider's defines nothing in <c>templates.functions</c>: it stands in
+    /// for a provider that lacks the vocabulary, so the test needs no option that is still without a pack.
+    /// </summary>
+    private static Dictionary<string, Core.Packs.PackManifest> WithoutVocabulary(Core.Packs.PackManifest provider)
+    {
+        var packs = Repository.Packs.Packs.ToDictionary();
+        packs[provider.Option] = VocabularyProbe.WithoutFunctions(provider);
+        return packs;
     }
 
     /// <summary>
