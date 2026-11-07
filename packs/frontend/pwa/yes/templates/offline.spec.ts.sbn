@@ -15,21 +15,21 @@ test('the app shell loads offline, and /api is never answered from the service w
 {{~ if project["backend.auth"] != "none" ~}}
   // An /api answer the browser has had once, with the token the app signed in with.
   const token = await {{ stored_access_token "page" | string.replace "\n" "\n  " }};
-  const authorization = `Bearer ${token}`;
+  const request = { path: '/api/me', authorization: `Bearer ${token}` };
 {{~ else ~}}
-  // An /api answer the browser has had once.
-  const authorization = '';
+  // An /api answer the browser has had once: without an identity provider there is no /me, so the host's liveness.
+  const request = { path: '/api/alive', authorization: '' };
 {{~ end ~}}
-  const me = (header: string) =>
-    fetch('/api/me', { headers: header ? { Authorization: header } : {} }).then(
+  const status = ({ path, authorization }: { path: string; authorization: string }) =>
+    fetch(path, { headers: authorization ? { Authorization: authorization } : {} }).then(
       (response) => response.status,
       () => 'unreachable',
     );
-  expect(await page.evaluate(me, authorization)).toBe(200);
+  expect(await page.evaluate(status, request)).toBe(200);
 
   await context.setOffline(true);
   await page.reload();
 
   await expect(page.getByRole('heading', { name: '{{ name }}' })).toBeVisible();
-  expect(await page.evaluate(me, authorization)).toBe('unreachable');
+  expect(await page.evaluate(status, request)).toBe('unreachable');
 });

@@ -41,6 +41,21 @@ public sealed partial class PwaEndToEndTests
         broken.ShouldContain("Received: 200");
     }
 
+    [Fact]
+    public void Without_an_identity_provider_the_shell_loads_offline_end_to_end()
+    {
+        using var project = new GeneratedProject("saas-standard-react", "frontend.pwa=yes", "backend.auth=none", "backend.tenancy=none");
+        project.Build();
+
+        var (installExitCode, install) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "install");
+        installExitCode.ShouldBe(0, install);
+
+        var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
+        e2eExitCode.ShouldBe(0, e2eOutput);
+        e2eOutput.ShouldContain(OfflineTest);
+        e2eOutput.ShouldNotContain("failed");
+    }
+
     [GeneratedRegex(@"urlPattern: [\s\S]*?,\n(?<indent>\s*)handler:")]
     private static partial Regex UrlPattern();
 }

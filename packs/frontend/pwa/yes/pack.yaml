@@ -10,4 +10,4 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: end-to-end-test, describes: "A signed-in browser reloads offline once the service worker has the app shell and still sees the app, and an /api answer it had online is unreachable offline, never served from the worker's cache (e2e/offline.spec.ts, run against the running AppHost).", file: templates/offline.spec.ts.sbn }
+  - { kind: end-to-end-test, describes: "A browser (signed in, with an identity provider) reloads offline once the service worker has the app shell and still sees the app, and an /api answer it had online (/me, or /alive without an identity provider) is unreachable offline, never served from the worker's cache (e2e/offline.spec.ts, run against the running AppHost).", file: templates/offline.spec.ts.sbn }
