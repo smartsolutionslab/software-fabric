@@ -77,16 +77,16 @@ private static async Task<string> AdminTokenAsync(HttpClient identity, Cancellat
     return token?.AccessToken ?? throw new InvalidOperationException("The master realm returned no token.");
 }`
   end
-  ret `/// <summary>A token of the master realm's administrator; Aspire names it "admin" unless the AppHost passes a user name.</summary>
+  ret `/// <summary>A token of the master realm's administrator: "admin", with the password the AppHost generated for it.</summary>
 private async Task<string> AdminTokenAsync(HttpClient identity, CancellationToken cancellationToken)
 {
-    var keycloak = ` + app + `.Services.GetRequiredService<DistributedApplicationModel>().Resources.OfType<KeycloakResource>().Single();
+    var password = ` + app + `.Services.GetRequiredService<DistributedApplicationModel>().Resources.OfType<ParameterResource>().Single(parameter => parameter.Name == "identity-password");
     using var form = new FormUrlEncodedContent(new Dictionary<string, string>
     {
         ["grant_type"] = "password",
         ["client_id"] = "admin-cli",
-        ["username"] = keycloak.AdminUserNameParameter is { } name ? await name.GetValueAsync(cancellationToken) ?? string.Empty : "admin",
-        ["password"] = await keycloak.AdminPasswordParameter.GetValueAsync(cancellationToken) ?? string.Empty,
+        ["username"] = "admin",
+        ["password"] = await password.GetValueAsync(cancellationToken) ?? string.Empty,
     });
     using var response = await identity.PostAsync(new Uri("/realms/master/protocol/openid-connect/token", UriKind.Relative), form, cancellationToken);
     response.EnsureSuccessStatusCode();
