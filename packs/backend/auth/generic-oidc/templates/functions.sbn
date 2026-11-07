@@ -60,6 +60,23 @@ var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken)
     ?? throw new InvalidOperationException("The realm returned no token.");`
 end
 func short_lived_test_user_token_members(app)
+  if project["backend.test.integration"] == "testcontainers"
+    ret `/// <summary>A token of the master realm's administrator, as the fixture's Keycloak container starts with.</summary>
+private static async Task<string> AdminTokenAsync(HttpClient identity, CancellationToken cancellationToken)
+{
+    using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+    {
+        ["grant_type"] = "password",
+        ["client_id"] = "admin-cli",
+        ["username"] = "admin",
+        ["password"] = "admin",
+    });
+    using var response = await identity.PostAsync(new Uri("/realms/master/protocol/openid-connect/token", UriKind.Relative), form, cancellationToken);
+    response.EnsureSuccessStatusCode();
+    var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken);
+    return token?.AccessToken ?? throw new InvalidOperationException("The master realm returned no token.");
+}`
+  end
   ret `/// <summary>A token of the master realm's administrator; Aspire names it "admin" unless the AppHost passes a user name.</summary>
 private async Task<string> AdminTokenAsync(HttpClient identity, CancellationToken cancellationToken)
 {
@@ -81,6 +98,9 @@ func short_lived_test_user_token_types
   ret `private sealed record Token([property: JsonPropertyName("access_token")] string AccessToken);`
 end
 func short_lived_test_user_token_namespaces
+  if project["backend.test.integration"] == "testcontainers"
+    ret "System.Net System.Net.Http.Headers System.Net.Http.Json System.Text.Json.Nodes System.Text.Json.Serialization"
+  end
   ret "System.Net System.Net.Http.Headers System.Net.Http.Json System.Text.Json.Nodes System.Text.Json.Serialization Aspire.Hosting.ApplicationModel Aspire.Hosting.Testing Microsoft.Extensions.DependencyInjection"
 end
 func accept_query_token(services, path)
