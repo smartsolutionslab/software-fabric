@@ -1,0 +1,14 @@
+option: frontend.test.extras.screenshot-tests
+files:
+  - { template: templates/start-page.screenshot.ts.sbn, target: web/app/e2e/start-page.screenshot.ts }
+  - { template: templates/screenshots.config.ts.sbn, target: web/app/e2e/screenshots.config.ts }
+  - { template: templates/screenshots.sh.sbn, target: ".github/scripts/screenshots.sh" }
+slots:
+  - { slot: web.scripts, template: templates/scripts.sbn }
+  - { slot: e2e.after-tests, template: templates/e2e-after-tests.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: end-to-end-test, describes: "A start page that renders differently from its committed baseline (web/app/e2e/__screenshots__) fails .github/scripts/e2e.sh and the e2e job.", file: templates/start-page.screenshot.ts.sbn }
+  - { kind: ci-step, describes: "The screenshots render only in Playwright's container pinned by digest, and .github/scripts/screenshots.sh refuses to run when @playwright/test is another version than the image's.", file: templates/screenshots.sh.sbn }
