@@ -1,0 +1,39 @@
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
+
+namespace {{ namespace }}.IdentityStandIn;
+
+/// <summary>The authorization codes issued and not yet redeemed; each is redeemed once, within a minute.</summary>
+public sealed class AuthorizationCodes(TimeProvider time)
+{
+    private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(1);
+
+    private readonly ConcurrentDictionary<string, PendingCode> pending = new(StringComparer.Ordinal);
+
+    public string Issue(string user, string redirectUri, string challenge, string? nonce)
+    {
+        var code = Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(32));
+        pending[code] = new PendingCode(user, redirectUri, challenge, nonce, time.GetUtcNow() + Lifetime);
+        return code;
+    }
+
+    /// <summary>
+    /// The sign-in the code stands for, when the redirect URI is the one it was issued for and the PKCE verifier meets
+    /// its challenge; once redeemed, the code stands for nothing. None for an unknown or expired code, or a mismatch,
+    /// which leaves the code as it was.
+    /// </summary>
+    public PendingCode? Redeem(string code, string redirectUri, string verifier)
+    {
+        if (!pending.TryGetValue(code, out var sign)
+            || sign.Expires <= time.GetUtcNow()
+            || !string.Equals(redirectUri, sign.RedirectUri, StringComparison.Ordinal)
+            || !string.Equals(Base64UrlEncoder.Encode(SHA256.HashData(Encoding.ASCII.GetBytes(verifier))), sign.Challenge, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return pending.TryRemove(code, out _) ? sign : null;
+    }
+}

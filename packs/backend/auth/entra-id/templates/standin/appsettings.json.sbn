@@ -1,0 +1,52 @@
+{{~
+  roles = project["backend.authorization"] | array.contains "roles"
+  claims = project["backend.authorization"] | array.contains "claims"
+  tenancy = project["backend.tenancy"] != "none"
+  developers_department = null
+  if claims
+    developers_department = "finance"
+  end
+  users = [{ name: "developer", roles: roles, department: developers_department, directory: "tenant-a" }]
+  if tenancy
+    users = users | array.add { name: "developer-b", roles: roles, department: developers_department, directory: "tenant-b" }
+  end
+  # A second user of the first tenant: without roles or claims, the one dashboards show they are their owner's alone.
+  dashboards = object.has_key(project, "frontend.dashboards") && array.size(project["frontend.dashboards"]) > 0
+  if roles || claims || dashboards
+    users = users | array.add { name: "visitor", roles: false, department: null, directory: "tenant-a" }
+  end
+  if claims
+    users = users | array.add { name: "clerk", roles: roles, department: "sales", directory: "tenant-a" }
+    users = users | array.add { name: "analyst", roles: false, department: "finance", directory: "tenant-a" }
+  end
+  # A user of a directory the AppHost does not give the host: their tokens are refused.
+  users = users | array.add { name: "outsider", roles: false, department: null, directory: "elsewhere" }
+~}}
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.EntityFrameworkCore.Database.Command": "Warning"
+    }
+  },
+  "StandIn": {
+    "Audience": "api://{{ name }}-api",
+    "Client": "{{ name }}-web",
+    "RedirectOrigin": "http://localhost:5173",
+    "Directories": {
+      "tenant-a": "00000000-0000-0000-0000-00000000000a",
+      "tenant-b": "00000000-0000-0000-0000-00000000000b",
+      "elsewhere": "00000000-0000-0000-0000-0000000000ee"
+    },
+    "Users": {
+{{~ for user in users ~}}
+      "{{ user.name }}": {
+        "Directory": "{{ user.directory }}",
+        "Roles": [{{ if user.roles }}"manager"{{ end }}]{{ if user.department }},
+        "Department": "{{ user.department }}"{{ end }}
+      }{{ if !for.last }},{{ end }}
+{{~ end ~}}
+    }
+  }
+}

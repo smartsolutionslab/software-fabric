@@ -1,0 +1,72 @@
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
+
+namespace {{ namespace }}.IdentityStandIn;
+
+/// <summary>Issues tokens shaped like Entra ID's v2.0 tokens, issued by the user's directory.</summary>
+public sealed class TokenIssuer(StandInSettings settings, SigningKey key, TimeProvider time)
+{
+    private static readonly JsonWebTokenHandler Handler = new() { SetDefaultTimesOnTokenCreation = false };
+
+    /// <summary>The issuer of a directory's tokens at the stand-in's address, as Entra ID's is at login.microsoftonline.com.</summary>
+    public static string Issuer(string authority, string directory) => $"{authority}/{directory}/v2.0";
+
+    /// <summary>An access token for the API, and the user's ID token for the web app.</summary>
+    public TokenResponse Issue(string authority, string name, TimeSpan lifetime, string? nonce)
+    {
+        {{ not_null "authority" }}
+        {{ not_null "name" }}
+
+        return new TokenResponse(
+            Create(authority, name, settings.Audience, lifetime, nonce: null),
+            Create(authority, name, settings.Client, lifetime, nonce),
+            "Bearer",
+            (int)lifetime.TotalSeconds,
+            "openid profile");
+    }
+
+    private string Create(string authority, string name, string audience, TimeSpan lifetime, string? nonce)
+    {
+        var user = settings.Users[name];
+        var directory = settings.Directories[user.Directory];
+        var objectId = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(name)).AsSpan(0, 16)).ToString();
+        Dictionary<string, object> claims = new(StringComparer.Ordinal)
+        {
+            ["ver"] = "2.0",
+            ["tid"] = directory,
+            ["oid"] = objectId,
+            ["sub"] = objectId,
+            ["azp"] = settings.Client,
+            ["name"] = name,
+            ["preferred_username"] = name,
+        };
+        if (user.Roles.Count > 0)
+        {
+            claims["roles"] = user.Roles.ToArray();
+        }
+
+        if (user.Department is { } department)
+        {
+            claims["department"] = department;
+        }
+
+        if (nonce is not null)
+        {
+            claims["nonce"] = nonce;
+        }
+
+        var now = time.GetUtcNow().UtcDateTime;
+        return Handler.CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = Issuer(authority, directory),
+            Audience = audience,
+            IssuedAt = now,
+            NotBefore = now,
+            Expires = now + lifetime,
+            Claims = claims,
+            SigningCredentials = new SigningCredentials(key.Key, SecurityAlgorithms.RsaSha256),
+        });
+    }
+}

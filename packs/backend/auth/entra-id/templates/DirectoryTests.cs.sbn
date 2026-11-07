@@ -1,0 +1,19 @@
+using System.Net;
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>The host accepts tokens of the Entra ID directories AzureAd:Tenants lists, and of no other.</summary>
+{{~ integration_fixture_attributes ~}}
+public class DirectoryTests({{ integration_fixture }})
+{
+    {{ test_attribute }}
+    public async Task A_token_from_a_directory_the_host_does_not_list_is_refused()
+    {
+        // The stand-in's user outsider belongs to a directory of its own, which the AppHost does not give the host.
+        using var client = await {{ signed_in_host_client "\"outsider\"" }};
+
+        using var response = await client.GetAsync(new Uri("/me", UriKind.Relative), {{ test_cancellation_token }});
+
+        {{ should_be "response.StatusCode" "HttpStatusCode.Unauthorized" }};
+    }
+}

@@ -1,0 +1,4 @@
+// The local stand-in for Microsoft Entra ID (src/IdentityStandIn), in development and tests only: it issues tokens
+// for two directories, one per tenant, as Entra ID would. The host and the browser know only its address.
+var identity = builder.AddProject<Projects.IdentityStandIn>("identity")
+    .WithHttpHealthCheck("/organizations/v2.0/.well-known/openid-configuration");

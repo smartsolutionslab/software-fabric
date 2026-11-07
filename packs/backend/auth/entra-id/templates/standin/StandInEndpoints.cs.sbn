@@ -1,0 +1,171 @@
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.IdentityModel.Tokens;
+
+namespace {{ namespace }}.IdentityStandIn;
+
+/// <summary>
+/// Entra ID's v2.0 endpoints under the paths Entra ID serves them at, below a directory: a directory's ID, or
+/// <c>organizations</c> or <c>common</c> for any directory, the user's deciding which one issues their token.
+/// </summary>
+public static class StandInEndpoints
+{
+    private const string AnyDirectory = "{tenantid}";
+
+    private static readonly TimeSpan TokenLifetime = TimeSpan.FromHours(1);
+
+    private static readonly string[] AnyDirectoryNames = ["organizations", "common"];
+
+    private static readonly Dictionary<string, string[]> Supported = new(StringComparer.Ordinal)
+    {
+        ["response_types_supported"] = ["code"],
+        ["response_modes_supported"] = ["query"],
+        ["grant_types_supported"] = ["authorization_code", "password"],
+        ["subject_types_supported"] = ["pairwise"],
+        ["id_token_signing_alg_values_supported"] = [SecurityAlgorithms.RsaSha256],
+        ["code_challenge_methods_supported"] = ["S256"],
+        ["scopes_supported"] = ["openid", "profile", "email", "offline_access"],
+    };
+
+    public static WebApplication MapStandInEndpoints(this WebApplication app)
+    {
+        {{ not_null "app" }}
+
+        app.MapGet("/{directory}/v2.0/.well-known/openid-configuration", Metadata);
+        app.MapGet("/{directory}/discovery/v2.0/keys", (SigningKey key) => Results.Json(key.KeySet()));
+        app.MapGet("/{directory}/oauth2/v2.0/authorize", Authorize);
+        app.MapPost("/{directory}/oauth2/v2.0/authorize", SignInAsync);
+        app.MapPost("/{directory}/oauth2/v2.0/token", TokenAsync);
+        app.MapGet("/{directory}/oauth2/v2.0/logout", SignOut);
+        return app;
+    }
+
+    private static IResult Metadata(string directory, HttpRequest request, StandInSettings settings)
+    {
+        var known = settings.Directories.Values.Contains(directory, StringComparer.OrdinalIgnoreCase);
+        if (!known && !AnyDirectoryNames.Contains(directory, StringComparer.Ordinal))
+        {
+            return Results.NotFound();
+        }
+
+        var authority = Authority(request);
+        var endpoints = $"{authority}/{directory}";
+        Dictionary<string, object> metadata = new(StringComparer.Ordinal)
+        {
+            // Like Entra ID's, the metadata for any directory names its issuer with a placeholder for the directory.
+            ["issuer"] = TokenIssuer.Issuer(authority, known ? directory : AnyDirectory),
+            ["authorization_endpoint"] = $"{endpoints}/oauth2/v2.0/authorize",
+            ["token_endpoint"] = $"{endpoints}/oauth2/v2.0/token",
+            ["end_session_endpoint"] = $"{endpoints}/oauth2/v2.0/logout",
+            ["jwks_uri"] = $"{endpoints}/discovery/v2.0/keys",
+        };
+        foreach (var (name, values) in Supported)
+        {
+            metadata[name] = values;
+        }
+
+        return Results.Json(metadata);
+    }
+
+    private static IResult Authorize(HttpRequest request, StandInSettings settings) =>
+        Rejection(request.Query, settings) ?? Results.Content(SignInPage.Render(failed: false), "text/html");
+
+    private static async Task<IResult> SignInAsync(HttpRequest request, StandInSettings settings, AuthorizationCodes codes, CancellationToken cancellationToken)
+    {
+        var query = request.Query;
+        if (Rejection(query, settings) is { } rejection)
+        {
+            return rejection;
+        }
+
+        var form = await request.ReadFormAsync(cancellationToken);
+        var user = (string?)form["username"];
+        if (!SignsIn(settings, user, form["password"]))
+        {
+            return Results.Content(SignInPage.Render(failed: true), "text/html");
+        }
+
+        var redirectUri = query["redirect_uri"].ToString();
+        var code = codes.Issue(user!, redirectUri, query["code_challenge"].ToString(), query["nonce"]);
+        Dictionary<string, string?> answer = new(StringComparer.Ordinal) { ["code"] = code };
+        if (query["state"] is [{ } state])
+        {
+            answer["state"] = state;
+        }
+
+        return Results.Redirect(QueryHelpers.AddQueryString(redirectUri, answer));
+    }
+
+    private static async Task<IResult> TokenAsync(HttpRequest request, StandInSettings settings, AuthorizationCodes codes, TokenIssuer issuer, CancellationToken cancellationToken)
+    {
+        var form = await request.ReadFormAsync(cancellationToken);
+        if (form["client_id"] != settings.Client)
+        {
+            return Error("invalid_client");
+        }
+
+        var authority = Authority(request);
+        switch ((string?)form["grant_type"])
+        {
+            case "password":
+                var user = (string?)form["username"];
+                if (!SignsIn(settings, user, form["password"]))
+                {
+                    return Error("invalid_grant");
+                }
+
+                // Not Entra ID's: the tests ask for a token that expires soon, to see what happens when it does.
+                var lifetime = int.TryParse(form["lifetime"], out var seconds) && seconds is > 0 and <= 3600
+                    ? TimeSpan.FromSeconds(seconds)
+                    : TokenLifetime;
+                return Results.Json(issuer.Issue(authority, user!, lifetime, nonce: null));
+            case "authorization_code":
+                var sign = codes.Redeem(form["code"].ToString(), form["redirect_uri"].ToString(), form["code_verifier"].ToString());
+                if (sign is null)
+                {
+                    return Error("invalid_grant");
+                }
+
+                return Results.Json(issuer.Issue(authority, sign.User, TokenLifetime, sign.Nonce));
+            default:
+                return Error("unsupported_grant_type");
+        }
+    }
+
+    private static IResult SignOut(HttpRequest request, StandInSettings settings) =>
+        request.Query["post_logout_redirect_uri"] is [{ } target] && IsOurs(target, settings)
+            ? Results.Redirect(target)
+            : Results.Content("Signed out.", "text/plain");
+
+    /// <summary>Why the authorization request cannot go on, as the answer; none for a request it can.</summary>
+    private static IResult? Rejection(IQueryCollection query, StandInSettings settings)
+    {
+        if (query["client_id"] != settings.Client)
+        {
+            return Results.BadRequest($"Unknown client; the stand-in signs users in to {settings.Client} only.");
+        }
+
+        if (query["redirect_uri"] is not [{ } redirectUri] || !IsOurs(redirectUri, settings))
+        {
+            return Results.BadRequest($"The stand-in redirects to {settings.RedirectOrigin} only.");
+        }
+
+        if (query["response_type"] != "code" || query["code_challenge_method"] != "S256" || query["code_challenge"] is not [{ Length: > 0 }])
+        {
+            return Results.BadRequest("The stand-in answers the authorization code flow with PKCE (S256) only.");
+        }
+
+        return null;
+    }
+
+    private static bool SignsIn(StandInSettings settings, string? user, string? password) =>
+        user is not null && settings.Users.ContainsKey(user) && string.Equals(password, user, StringComparison.Ordinal);
+
+    private static bool IsOurs(string redirectUri, StandInSettings settings) =>
+        Uri.TryCreate(redirectUri, UriKind.Absolute, out var uri)
+            && string.Equals(uri.GetLeftPart(UriPartial.Authority), settings.RedirectOrigin, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The stand-in's address as the caller reaches it, which its tokens' issuer names.</summary>
+    private static string Authority(HttpRequest request) => $"{request.Scheme}://{request.Host}";
+
+    private static IResult Error(string error) => Results.BadRequest(new Dictionary<string, string>(StringComparer.Ordinal) { ["error"] = error });
+}

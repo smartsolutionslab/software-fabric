@@ -1,0 +1,38 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+
+namespace {{ namespace }}.Host;
+
+/// <summary>
+/// Entra ID lists the user's app roles in the token's <c>roles</c> claim; ASP.NET reads roles from
+/// <c>ClaimTypes.Role</c>. This copies them there, so a module's policies can <c>RequireRole</c>.
+/// </summary>
+public sealed class EntraRoleClaims : IClaimsTransformation
+{
+    private const string RolesClaim = "roles";
+
+    public Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
+    {
+        {{ not_null "principal" }}
+
+        if (principal.Identity is not ClaimsIdentity { IsAuthenticated: true } identity)
+        {
+            return Task.FromResult(principal);
+        }
+
+        // ASP.NET may transform the same principal more than once per request; a role already there is not added again.
+        var missing = identity.FindAll(RolesClaim)
+            .Select(claim => claim.Value)
+            .Distinct(StringComparer.Ordinal)
+            .Where(role => !identity.HasClaim(ClaimTypes.Role, role))
+            .ToList();
+        if (missing.Count == 0)
+        {
+            return Task.FromResult(principal);
+        }
+
+        var transformed = principal.Clone();
+        ((ClaimsIdentity)transformed.Identity!).AddClaims(missing.Select(role => new Claim(ClaimTypes.Role, role)));
+        return Task.FromResult(transformed);
+    }
+}

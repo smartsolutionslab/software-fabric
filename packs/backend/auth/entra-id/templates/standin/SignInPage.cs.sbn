@@ -1,0 +1,31 @@
+namespace {{ namespace }}.IdentityStandIn;
+
+/// <summary>The stand-in's sign-in form; it posts back to the address it was shown at, the authorization request's.</summary>
+public static class SignInPage
+{
+    private const string Failure = """<p role="alert">Unknown user or wrong password.</p>""";
+
+    public static string Render(bool failed) => $"""
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <title>Sign in: local stand-in for Microsoft Entra ID</title>
+        </head>
+        <body>
+          <main>
+            <h1>Sign in</h1>
+            <p>The local stand-in for Microsoft Entra ID, for development and tests only. A user's password is their name.</p>
+            {(failed ? Failure : string.Empty)}
+            <form method="post">
+              <label for="username">Username</label>
+              <input id="username" name="username" autocomplete="username" required>
+              <label for="password">Password</label>
+              <input id="password" name="password" type="password" autocomplete="current-password" required>
+              <button type="submit">Sign in</button>
+            </form>
+          </main>
+        </body>
+        </html>
+        """;
+}
