@@ -8,9 +8,9 @@ Assertions use AwesomeAssertions (`total.Should().Be(42)`), whose failure messag
 the reason given (`because:`). The test framework's own `Assert` is banned in test projects by the Banned API analyzer,
 so there is one way to assert.
 
-AwesomeAssertions is the community fork of FluentAssertions 7, under the Apache License 2.0, as is every version of it;
-FluentAssertions itself is under a commercial licence from version 8 on. The version is pinned in
-`Directory.Packages.props`.
+AwesomeAssertions is the community fork of FluentAssertions 7 and is licensed under the Apache License 2.0 (the licence
+expression of the pinned version, 9.6.0, on NuGet), so it may be used and shipped without a fee; FluentAssertions
+itself is under a commercial licence from version 8 on. The version is pinned in `Directory.Packages.props`.
 
 ## Consequences
 
