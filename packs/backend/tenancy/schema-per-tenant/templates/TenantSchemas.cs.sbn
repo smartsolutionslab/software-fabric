@@ -14,6 +14,9 @@ public static partial class TenantSchemas
     /// <summary>The configuration key of the tenants, one entry each; the AppHost sets it on the MigrationRunner and the host.</summary>
     public const string Tenants = "Tenancy:Tenants";
 
+    /// <summary>The longest schema name PostgreSQL keeps whole (63 bytes); a longer one is cut short, and two could meet.</summary>
+    public const int MaximumLength = 63;
+
     /// <summary>The schema of a module's context: its tenant's, for a listed tenant, otherwise the module's own.</summary>
     public static string Of(string schema, IServiceProvider services)
     {
@@ -23,8 +26,23 @@ public static partial class TenantSchemas
         var tenant = services.GetService<ITenantContext>()?.TenantId ?? TenantScope.TenantId;
         var configuration = services.GetService<IConfiguration>();
         return tenant is not null && configuration is not null && Listed(configuration).Contains(tenant, StringComparer.Ordinal)
-            ? $"{schema}_{tenant.Replace('-', '_')}"
+            ? For(schema, tenant)
             : schema;
+    }
+
+    /// <summary>A module's schema for one tenant; a name past <see cref="MaximumLength"/> fails instead of being cut short.</summary>
+    public static string For(string schema, string tenant)
+    {
+        {{ not_blank "schema" }}
+        {{ not_blank "tenant" }}
+
+        var name = $"{schema}_{tenant.Replace('-', '_')}";
+        if (name.Length > MaximumLength)
+        {
+            throw new InvalidOperationException($"Tenant '{tenant}' would give module schema '{schema}' the schema '{name}', longer than the {MaximumLength} characters the database keeps; choose a shorter tenant name.");
+        }
+
+        return name;
     }
 
     /// <summary>The listed tenants. A name that is not lower-case letters and digits, joined by single hyphens, fails.</summary>

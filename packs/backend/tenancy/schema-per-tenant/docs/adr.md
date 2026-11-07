@@ -13,6 +13,6 @@ The current tenant comes from the user's token: {{ if project["backend.auth"] !=
 ## Consequences
 
 - A tenant's rows cannot be read by another tenant's query: they are in another schema, not behind a filter.
-- Adding a tenant means adding it to `Tenancy:Tenants` in the AppHost and running the MigrationRunner again; a tenant the token names but the list does not sees nothing until then. A tenant name is lower-case letters and digits joined by hyphens; any other name in the list fails the runner and the host.
+- Adding a tenant means adding it to `Tenancy:Tenants` in the AppHost and running the MigrationRunner again; a tenant the token names but the list does not sees nothing until then. A tenant name is lower-case letters and digits joined by hyphens; any other name in the list fails the runner and the host. So does a tenant whose schema would be longer than the 63 characters PostgreSQL keeps, and the runner fails before migrating any tenant when two module and tenant pairs, or a pair and another module, would share a schema name (module `billing` with tenant `a-b` and module `billing-a` with tenant `b` are both `billing_a_b`).
 - Every migration runs once per tenant, so a migration's time grows with the number of tenants. Raw SQL in a migration (`migrationBuilder.Sql`) runs as written, in whatever schema it names, so it must not name the module's schema.
 - Reading across tenants means opening each tenant's schema in turn; there is no query over all of them.
