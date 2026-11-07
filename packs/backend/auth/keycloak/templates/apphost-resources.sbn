@@ -1,6 +1,6 @@
 // Keycloak runs as a plain container, development only (see docs/adr). Its administrator is "admin", with a password
 // Aspire generates once and keeps in the AppHost's user secrets; the realm in ./realms is imported on first start.
-var keycloakPassword = builder.AddParameter("keycloak-password", new GenerateParameterDefault { MinLength = 22, Special = false }, secret: true, persist: true);
+var keycloakPassword = builder.AddResource(ParameterResourceBuilderExtensions.CreateDefaultPasswordParameter(builder, "keycloak-password"));
 var keycloak = builder.AddContainer("keycloak", "quay.io/keycloak/keycloak", "26.6")
     .WithArgs("start-dev", "--import-realm")
     .WithEnvironment("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
