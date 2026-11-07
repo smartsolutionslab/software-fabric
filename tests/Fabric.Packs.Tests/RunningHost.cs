@@ -12,6 +12,13 @@ internal sealed class RunningHost(Process process, Uri address) : IDisposable
         return await client.PostAsync(new Uri(path, UriKind.Relative), null);
     }
 
+    /// <summary>Once the host is alive, a GET that returns as soon as the headers arrive, for a stream that does not end.</summary>
+    public async Task<HttpResponseMessage> OpenStreamAsync(string path)
+    {
+        (await GetAsync("/alive")).Dispose();
+        return await client.GetAsync(new Uri(path, UriKind.Relative), HttpCompletionOption.ResponseHeadersRead);
+    }
+
     /// <summary>Waits until /alive answers, or fails with the host's output.</summary>
     public async Task<HttpResponseMessage> GetAsync(string path)
     {

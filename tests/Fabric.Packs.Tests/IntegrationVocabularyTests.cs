@@ -52,6 +52,7 @@ public sealed partial class IntegrationVocabularyTests
         { "saas-ai-react", ["backend.tenancy=none"] },
         { "saas-standard-vue", [] },
         { "lean-crud", ["frontend.realtime=signalr", "backend.auth=none", "backend.tenancy=none"] },
+        { "saas-standard-react", ["frontend.realtime=sse"] },
     };
 
     [Fact]

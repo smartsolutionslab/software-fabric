@@ -79,12 +79,14 @@ public sealed partial class IdentityVocabularyTests
 
     /// <summary>
     /// Every user of the vocabulary: roles and claims with their tests, the MCP server, signalr and ag-ui on React, the
-    /// Vue sign-in, and the micro-frontends' end-to-end tests.
+    /// Vue sign-in, sse's query token on React and Vue, and the micro-frontends' end-to-end tests.
     /// </summary>
     public static TheoryData<string, string[]> Generations => new()
     {
         { "saas-ai-react", ["backend.authorization=roles,claims", "backend.mcp=client,server", "frontend.realtime=signalr"] },
         { "saas-standard-vue", ["backend.authorization=roles", "frontend.realtime=signalr"] },
+        { "saas-standard-react", ["frontend.realtime=sse"] },
+        { "saas-standard-vue", ["frontend.realtime=sse"] },
         { "industrial-event-driven-mfe", [] },
     };
 

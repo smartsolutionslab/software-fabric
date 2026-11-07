@@ -56,6 +56,7 @@ public sealed partial class TestVocabularyTests
         { "saas-ai-react", ["backend.authorization=roles,claims", "frontend.realtime=signalr", "module.ddd-depth=strict", "backend.mcp=client,server"] },
         { "saas-standard-vue", [] },
         { "lean-crud", [] },
+        { "saas-standard-react", ["frontend.realtime=sse"] },
     };
 
     [Theory]
