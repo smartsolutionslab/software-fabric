@@ -17,6 +17,13 @@ internal static class RetryProbe
 
     private const string ClientName = "retry-probe";
 
+    /// <summary>
+    /// Held for a whole probe. The first pipeline built in a process sets up the resilience options' RangeAttributes,
+    /// and that setup is not thread-safe: a probe beside it can fail with an InvalidCastException. A test framework that
+    /// runs the rules in parallel (TUnit) would otherwise start two probes at once.
+    /// </summary>
+    private static readonly Lock OneAtATime = new();
+
     internal enum Failure
     {
         /// <summary>The server answers 503 Service Unavailable.</summary>
@@ -31,6 +38,14 @@ internal static class RetryProbe
 
     /// <param name="client">Configures the probed client beyond the defaults (an opt-in), or returns it unchanged.</param>
     public static int Attempts(HttpMethod method, Failure failure, Func<IHttpClientBuilder, IHttpClientBuilder> client)
+    {
+        lock (OneAtATime)
+        {
+            return Probe(method, failure, client);
+        }
+    }
+
+    private static int Probe(HttpMethod method, Failure failure, Func<IHttpClientBuilder, IHttpClientBuilder> client)
     {
         // Qualified: once a rule references the host project, a bare Host names the {{ namespace }}.Host namespace.
         var builder = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(settings: null);
