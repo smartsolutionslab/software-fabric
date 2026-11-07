@@ -150,7 +150,7 @@ pack fill a slot of a choice it can be combined with but does not need
 | `tests.build-properties` *(added in M1-02)* | `tests/Directory.Build.props` | xunit (`OutputType Exe` for xUnit v3); nunit (`OutputType Exe` and `EnableNUnitRunner`); tunit (`OutputType Exe`, and `TUnitImplicitUsings` false) |
 | `tests.packages` | `tests/Directory.Build.props` | xunit, nunit or tunit, shouldly or awesome-assertions, nsubstitute or moq, aspire-fixture; nunit and tunit also compile `tests/TestRun/*.cs` into every test project; tunit references `TUnit.Engine` from test projects only; awesome-assertions compiles `tests/Assertions/*.cs` into every project under `tests/` |
 | `tests.usings` | `tests/Directory.Build.props` | xunit, nunit or tunit (test projects only: a program under `tests/` keeps `System.ComponentModel`'s `[Description]`), shouldly or awesome-assertions, nsubstitute or moq |
-| `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak (the host and `Microsoft.AspNetCore.Mvc.Testing`, for its endpoint rule) |
+| `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak, generic-oidc (the host and `Microsoft.AspNetCore.Mvc.Testing`, for the base's endpoint rule `EveryEndpointDeclaresItsAuthorization`, rendered whenever `backend.auth` is not `none`) |
 | `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides); agent-framework (`IDispatcher`, which a handler running an agent takes, and `IAgentMcpTools` with the MCP client) |
 | `integration-tests.parameters` *(added for #77, declared by aspire-fixture; contributed with `optional: true` since #260)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter); agent-ui ag-ui (`model-stand-in` true: the host's stand-in model answers the agents) |
 | `integration-tests.database` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/ContainerFixture.cs` and the database fixture alone (rag's `ApplicationDatabase.cs`), first in the setup; `settings`, `cancellationToken`, `StartAsync(container, …)` and `RunProjectAsync("src/<Project>", …)` in scope | postgres (its container, the pgvector image with rag, with the core `ContainerBuilder`, and `ConnectionStrings:database`), ef-core (runs the MigrationRunner, order 20) |
@@ -286,20 +286,21 @@ is named after its type) holds whichever one is chosen (*#260*: the file was
 #### The identity-provider vocabulary *(M3-13)*
 
 A pack never names the identity provider either: where its roles sit in
-the token, how a test user signs in, its login page and the shape of its
-ID token come from `templates.functions` of the `backend.auth` pack, and
+the token, which tenant its user belongs to, how a test user signs in, its
+login page and the shape of its ID token come from `templates.functions` of
+the `backend.auth` pack, and
 how the browser holds its access token from those of the
 `frontend.auth-client` pack, so generic-oidc (#251), entra-id (#252) and
 msal (#266) plug in by defining the same functions instead of editing
-roles, claims, signalr, sse, ag-ui, the micro-frontends, the MCP server and the
-base's policy rule. `backend.auth` `none` defines none of them: a template
-calls them only when `backend.auth` is not `none`, and a provider pack that
-lacks one fails generation naming it. `IdentityVocabularyTests` fails when a
+roles, claims, column tenancy, signalr, sse, ag-ui, the micro-frontends, the
+MCP server and the base's policy rule. `backend.auth` `none` defines none of
+them: a template calls them only when `backend.auth` is not `none`, and a
+provider pack that lacks one fails generation naming it. `IdentityVocabularyTests` fails when a
 provider or auth-client pack defines more or fewer functions, when a
 template refuses another provider or auth client with `#error` or
 `throw new Error(...)`, or when a project rendered with stand-in
 vocabularies names Keycloak (`keycloak`, `/realms/`, `realm_access`,
-`admin-cli`, its login form) or oidc-client-ts's token storage outside their
+`admin-cli`, its login form, its tenant group paths `/tenants/`) or oidc-client-ts's token storage outside their
 own files, the composition root and the host's shared files. Comments are
 prose and still describe Keycloak where it is the only provider. A
 multi-line result called after other text on its line is indented by the
@@ -331,6 +332,27 @@ claims ADRs describe.
 | `browser_authority` | the provider's local authority URL (`http://localhost:8080/realms/<name>`), the browser's fallback when `VITE_OIDC_AUTHORITY` is unset |
 | `id_token_roles roles` | the ID token property holding the roles `roles` (TS array items), for test tokens |
 | `id_token_has_role profile role` | TS statements returning whether the ID token claims `profile` hold `role` |
+| `id_token_roles_claim` | prose naming the ID token claim that holds the roles: `realm_access.roles` (*#251*) |
+| `id_token_users_comment` | the comment, TS `//` lines, above the permission tests' sample ID tokens, saying what the provider issues its local users |
+| `role_mapping_adr` | Markdown for the roles ADR: how the provider's roles become `ClaimTypes.Role` (`**Keycloak's roles become role claims.** …`) |
+| `role_mapping_provider` | the provider's name in prose: `Keycloak` |
+| `tenant_claim_adr` | Markdown for the column tenancy ADR: what in the token names the tenant (`membership of exactly one group under /tenants/ …`) |
+| `tenant_claim user` | statements, the body of a method returning `string?`, that return the tenant the claims principal `user` (a C# expression, `ClaimsPrincipal?`, which the statements continue with `.`) belongs to, or `null` when its token names none or several: the one group under `/tenants/` in `groups` (*#251*) |
+| `tenant_claim_members` | the private members those statements need, in the same class (`TenantGroupPrefix`) |
+| `tenant_claim_description` | prose for the class's summary: `the user's one group under /tenants/` |
+
+Generic OIDC (`backend.auth.generic-oidc`, *#251*) reads standard claims
+under the provider's own names (`MapInboundClaims = false`): its
+`role_mapping_source` is `src/Host/OidcRoleClaims.cs` (the top-level
+`roles` claim into `ClaimTypes.Role`), `unstarted_host_settings` sets
+`Authentication:Authority` and `Authentication:Audience`, `test_user_token`
+reads the token endpoint from the local provider's discovery document,
+`id_token_roles roles` is `roles: [roles]`, `id_token_roles_claim` is
+`roles`, `role_mapping_provider` is `generic OIDC`, and `tenant_claim user`
+returns the one value of the token's `tenant` claim. Its local provider is
+Keycloak, named `identity` in the AppHost and configured to issue those
+claims; the short-lived token, the login page and the authority are that
+local Keycloak's, as for the keycloak pack.
 
 | Function | Returns (oidc-client-ts) |
 |---|---|
@@ -344,8 +366,10 @@ The integration-fixture vocabulary gains `running_application`
 against; Testcontainers' (*#260*) is `containers.Resources`, whose
 `GetEndpoint` the same functions call. The Mailpit gate Keycloak keeps in the
 Aspire fixture's `HostTests.cs` is Keycloak's to move (Testcontainers starts
-no Mailpit); the column tenancy pack still reads Keycloak's group paths
-(`groups`, `/tenants/<tenant>`) from the token.
+no Mailpit). The column tenancy pack reads the tenant through `tenant_claim`
+(*#251*); with tenancy, the local users' tenants (`developer-b` in
+`tenant-b`, every other user in `tenant-a`) are part of the provider's
+test-user contract.
 
 **One package, one owner.** A `PackageVersion` is declared by exactly
 one pack; others only reference it. Two packs declaring the same version

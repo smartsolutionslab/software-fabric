@@ -1,5 +1,5 @@
 {{~ if project["backend.topology"] != "modular-monolith" ~}}
-#error The keycloak pack's endpoint rule starts the modular-monolith host only so far (docs/adr/0006 of the generator).
+#error The endpoint rule starts the modular-monolith host only so far (docs/adr/0006 of the generator).
 {{~ end ~}}
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;

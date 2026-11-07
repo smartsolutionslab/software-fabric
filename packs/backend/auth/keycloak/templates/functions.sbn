@@ -138,3 +138,34 @@ if (typeof realmAccess !== 'object' || realmAccess === null || !('roles' in real
 const { roles } = realmAccess;
 return Array.isArray(roles) && roles.includes(` + role + `);`
 end
+func id_token_roles_claim
+  ret "realm_access.roles"
+end
+func id_token_users_comment
+  ret `// The ID tokens Keycloak issues the realm's local users (src/AppHost/realms/realm.json); a user without a realm role has
+// no realm_access, one without a department no department.`
+end
+func role_mapping_adr
+  ret "**Keycloak's roles become role claims.** Keycloak puts realm roles in the token's `realm_access` and each client's roles in `resource_access`. `KeycloakRoleClaims` (an `IClaimsTransformation`) copies the realm roles and the roles of the API client `<name>-api` into `ClaimTypes.Role`, which `RequireRole` reads. Roles of other clients (Keycloak's own `account` client, say) are not meant for this API and are left out."
+end
+func role_mapping_provider
+  ret "Keycloak"
+end
+func tenant_claim_adr
+  ret "membership of exactly one group under `/tenants/` (Keycloak: `/tenants/tenant-a`)"
+end
+func tenant_claim(user)
+  ret `var tenants = ` + user + `.FindAll("groups")
+    .Select(claim => claim.Value)
+    .Where(group => group.StartsWith(TenantGroupPrefix, StringComparison.Ordinal))
+    .Select(group => group[TenantGroupPrefix.Length..])
+    .ToList();
+
+return tenants is [var tenant] ? tenant : null;`
+end
+func tenant_claim_members
+  ret `private const string TenantGroupPrefix = "/tenants/";`
+end
+func tenant_claim_description
+  ret "the user's one group under /tenants/"
+end
