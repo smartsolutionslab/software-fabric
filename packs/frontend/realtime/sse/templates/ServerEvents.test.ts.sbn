@@ -1,0 +1,27 @@
+import { render } from '@testing-library/vue';
+import { beforeEach, expect, test, vi } from 'vitest';
+import ServerEvents from './ServerEvents.vue';
+
+const stream = vi.hoisted(() => ({
+  start: vi.fn(),
+  stop: vi.fn(),
+  on: vi.fn(),
+  off: vi.fn(),
+}));
+vi.mock('./connection', () => ({ connectServerEvents: () => stream }));
+
+beforeEach(() => {
+  stream.start.mockReset();
+  stream.stop.mockReset();
+});
+
+test('the stream is open while the provider is mounted and closed once it unmounts', () => {
+  const { unmount } = render(ServerEvents, { slots: { default: '<p>app</p>' } });
+
+  expect(stream.start).toHaveBeenCalledOnce();
+  expect(stream.stop).not.toHaveBeenCalled();
+
+  unmount();
+
+  expect(stream.stop).toHaveBeenCalledOnce();
+});

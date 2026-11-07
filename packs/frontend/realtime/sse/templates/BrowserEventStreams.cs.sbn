@@ -1,0 +1,97 @@
+{{~ if project["backend.tenancy"] != "none" && project["backend.auth"] == "none" ~}}
+#error frontend.realtime sse with backend.tenancy {{ project["backend.tenancy"] }} needs an identity provider: a browser's tenant comes from its user's token, and backend.auth none signs nobody in (docs/adr/0009 of the generator).
+{{~ end ~}}
+{{~ if project["backend.tenancy"] != "none" && project["backend.tenancy"] != "column" ~}}
+#error The sse pack sends to a tenant's streams for backend.tenancy column only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+{{~ tenanted = project["backend.tenancy"] != "none" ~}}
+using System.Collections.Concurrent;
+using System.Net.ServerSentEvents;
+using System.Runtime.CompilerServices;
+using System.Threading.Channels;
+
+namespace {{ namespace }}.Host.Realtime;
+
+/// <summary>
+/// The browsers' open streams at /server-events{{ if tenanted }}, each with its user's tenant{{ end }}. A stream that falls
+/// <see cref="Backlog"/> events behind loses its oldest ones rather than holding the host's memory.
+/// </summary>
+public sealed class BrowserEventStreams
+{
+    private const int Backlog = 100;
+
+    private readonly ConcurrentDictionary<Listener, byte> listeners = new();
+
+{{~ if tenanted ~}}
+    /// <summary>Sends to the streams of the tenant's browsers only.</summary>
+    public void Send(string eventType, object browserEvent, string tenantId)
+    {
+        foreach (var listener in listeners.Keys.Where(listener => listener.TenantId == tenantId))
+        {
+            listener.Events.Writer.TryWrite(new SseItem<object>(browserEvent, eventType));
+        }
+    }
+
+    /// <summary>The events sent to the tenant's browsers from now on, until the token is cancelled: then the stream ends.</summary>
+    public async IAsyncEnumerable<SseItem<object>> ListenAsync(string? tenantId, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var listener = new Listener(tenantId);
+{{~ else ~}}
+    /// <summary>Sends to every open stream.</summary>
+    public void Send(string eventType, object browserEvent)
+    {
+        foreach (var listener in listeners.Keys)
+        {
+            listener.Events.Writer.TryWrite(new SseItem<object>(browserEvent, eventType));
+        }
+    }
+
+    /// <summary>The events sent from now on, until the token is cancelled: then the stream ends.</summary>
+    public async IAsyncEnumerable<SseItem<object>> ListenAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var listener = new Listener();
+{{~ end ~}}
+        listeners.TryAdd(listener, 0);
+        try
+        {
+            while (await NextAsync(listener.Events.Reader, cancellationToken))
+            {
+                // A stream with events waiting still ends once cancelled: its token may have expired.
+                while (!cancellationToken.IsCancellationRequested && listener.Events.Reader.TryRead(out var item))
+                {
+                    yield return item;
+                }
+            }
+        }
+        finally
+        {
+            listeners.TryRemove(listener, out _);
+        }
+    }
+
+    /// <summary>Whether another event can be read; false once the token is cancelled, which ends the stream rather than failing it.</summary>
+    private static async Task<bool> NextAsync(ChannelReader<SseItem<object>> reader, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await reader.WaitToReadAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
+{{~ if tenanted ~}}
+    private sealed class Listener(string? tenantId)
+    {
+        public string? TenantId { get; } = tenantId;
+
+{{~ else ~}}
+    private sealed class Listener
+    {
+{{~ end ~}}
+        public Channel<SseItem<object>> Events { get; } = Channel.CreateBounded<SseItem<object>>(
+            new BoundedChannelOptions(Backlog) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true });
+    }
+}

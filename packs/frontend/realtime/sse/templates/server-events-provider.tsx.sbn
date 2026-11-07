@@ -1,0 +1,4 @@
+import type { ReactNode } from 'react';
+import { ServerEvents } from '@/realtime/ServerEvents';
+
+export const withServerEvents = (children: ReactNode) => <ServerEvents>{children}</ServerEvents>;
