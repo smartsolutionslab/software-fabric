@@ -1,0 +1,63 @@
+using {{ namespace }}.Modules.Dashboards.Application.Queries.CountWidgets;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.GetDashboard;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.ListDashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Tests.Queries;
+
+/// <summary>Reading the caller's dashboards through the dispatcher: one, a page of them, and the widgets each holds.</summary>
+public class DashboardQueriesTests
+{
+    {{ test_attribute }}
+    public async Task A_dashboard_of_another_user_is_not_found()
+    {
+        await using var module = new DashboardsModuleUnderTest(DashboardsModuleUnderTest.OtherOwner);
+        var id = await SavedDashboards.SaveAsync(module, "Sales", 1, {{ test_cancellation_token }});
+        await using var other = new DashboardsModuleUnderTest();
+
+        var result = await other.QueryAsync(new GetDashboard(id), {{ test_cancellation_token }});
+
+        {{ `result.Error.Code` | should_be `"dashboards.dashboard-not-found"` }};
+    }
+
+    {{ test_attribute }}
+    public async Task The_callers_dashboards_are_listed_a_page_at_a_time_by_name_with_their_widget_counts()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+        await SavedDashboards.SaveAsync(module, "Costs", 2, {{ test_cancellation_token }});
+        await SavedDashboards.SaveAsync(module, "Audit", 0, {{ test_cancellation_token }});
+        await SavedDashboards.SaveAsync(module, "Sales", 1, {{ test_cancellation_token }});
+        PageSize.TryFrom(2, out var two);
+
+        var result = await module.QueryAsync(new ListDashboards(Page.First, two!), {{ test_cancellation_token }});
+
+        {{ `result.Value.TotalCount` | should_be `3` }};
+        {{ `result.Value.Items.Select(dashboard => $"{dashboard.Name} {dashboard.WidgetCount}")` | should_be `["Audit 0", "Costs 2"]` }};
+    }
+
+    {{ test_attribute }}
+    public async Task The_chart_counts_the_widgets_of_each_of_the_callers_dashboards()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+        await SavedDashboards.SaveAsync(module, "Sales", 3, {{ test_cancellation_token }});
+        await SavedDashboards.SaveAsync(module, "Costs", 1, {{ test_cancellation_token }});
+
+        var result = await module.QueryAsync(new CountWidgets(), {{ test_cancellation_token }});
+
+        {{ `result.Value.Categories` | should_be `["Costs", "Sales"]` }};
+        {{ `result.Value.Series.Single().Values` | should_be `[1m, 3m]` }};
+    }
+
+    {{ test_attribute }}
+    public async Task Without_a_signed_in_user_nothing_is_read()
+    {
+        await using var module = new DashboardsModuleUnderTest(null);
+
+        var dashboard = await module.QueryAsync(new GetDashboard(Guid.CreateVersion7()), {{ test_cancellation_token }});
+        var page = await module.QueryAsync(new ListDashboards(Page.First, PageSize.Default), {{ test_cancellation_token }});
+        var chart = await module.QueryAsync(new CountWidgets(), {{ test_cancellation_token }});
+
+        {{ `dashboard.Error.Code` | should_be `"dashboards.not-signed-in"` }};
+        {{ `page.Error.Code` | should_be `"dashboards.not-signed-in"` }};
+        {{ `chart.Error.Code` | should_be `"dashboards.not-signed-in"` }};
+    }
+}
