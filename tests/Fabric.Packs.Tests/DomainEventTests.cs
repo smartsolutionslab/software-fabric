@@ -1,6 +1,7 @@
 namespace Fabric.Packs.Tests;
 
 /// <summary>module.style.ddd: domain events reach in-process reactions after the save, and every event has one.</summary>
+[Collection(DockerPorts.Name)]
 public sealed class DomainEventTests
 {
     private const string Profile = "saas-standard-react";

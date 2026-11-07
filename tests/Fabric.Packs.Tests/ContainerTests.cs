@@ -1,5 +1,6 @@
 namespace Fabric.Packs.Tests;
 
+[Collection(DockerPorts.Name)]
 public sealed class ContainerTests
 {
     [Fact]
