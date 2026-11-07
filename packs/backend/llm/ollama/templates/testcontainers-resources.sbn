@@ -1,0 +1,4 @@
+        // No Ollama container: it would pull the model, gigabytes, and the integration tests never call the model. The host
+        // gets an endpoint nothing listens on, and the AppHost's model.
+        settings["Ollama:Endpoint"] = "http://localhost:9";
+        settings["Ollama:Model"] = "llama3.2:1b";

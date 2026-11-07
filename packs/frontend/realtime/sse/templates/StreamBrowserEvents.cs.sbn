@@ -1,0 +1,36 @@
+using {{ namespace }}.BuildingBlocks.Realtime;
+{{~ if project["backend.tenancy"] != "none" ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
+
+namespace {{ namespace }}.Host.Realtime;
+
+{{~ if project["backend.tenancy"] == "none" ~}}
+/// <summary>Sends to every open stream.</summary>
+public sealed class StreamBrowserEvents(BrowserEventStreams streams) : IBrowserEvents
+{
+    public Task SendAsync<TEvent>(TEvent browserEvent, CancellationToken cancellationToken)
+        where TEvent : class
+    {
+        {{ not_null "browserEvent" }}
+
+        streams.Send(typeof(TEvent).Name, browserEvent);
+        return Task.CompletedTask;
+    }
+}
+{{~ else ~}}
+/// <summary>Sends to the streams of the current tenant's browsers.</summary>
+public sealed class StreamBrowserEvents(BrowserEventStreams streams, ITenantContext tenant) : IBrowserEvents
+{
+    public Task SendAsync<TEvent>(TEvent browserEvent, CancellationToken cancellationToken)
+        where TEvent : class
+    {
+        {{ not_null "browserEvent" }}
+
+        var tenantId = tenant.TenantId
+            ?? throw new InvalidOperationException($"Cannot send {typeof(TEvent).Name} to the browsers without a tenant.");
+        streams.Send(typeof(TEvent).Name, browserEvent, tenantId);
+        return Task.CompletedTask;
+    }
+}
+{{~ end ~}}

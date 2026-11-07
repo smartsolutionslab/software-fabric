@@ -15,8 +15,7 @@ vi.mock('react-oidc-context', () => ({ useAuth: vi.fn() }));
 
 afterEach(cleanup);
 
-// The ID tokens Keycloak issues the realm's local users (src/AppHost/realms/realm.json); a user without a realm role has
-// no realm_access, one without a department no department.
+{{ id_token_users_comment }}
 const users = {
 {{~ if roles ~}}
   developer: {

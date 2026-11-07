@@ -1,0 +1,8 @@
+{{ if project["backend.llm"] == "ollama" ~}}
+        // Embeddings use the chat model's endpoint, given its value above; the AppHost's embedding model.
+{{~ else ~}}
+        // No Ollama container: it would pull the embedding model, and the integration tests never call it. The host gets an
+        // endpoint nothing listens on, and the AppHost's embedding model.
+        settings["Ollama:Endpoint"] = "http://localhost:9";
+{{~ end }}
+        settings["Ollama:EmbeddingModel"] = "nomic-embed-text";

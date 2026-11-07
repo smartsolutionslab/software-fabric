@@ -42,13 +42,15 @@ slots:
   - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 60 }
   - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 40 }
   - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 40 }
-  - { slot: integration-tests.parameters, template: templates/integration-tests-parameters.sbn }
+  - { slot: integration-tests.parameters, template: templates/integration-tests-parameters.sbn, optional: true }
   # AGUIServerInstrumentation.ActivitySourceName, spelled out because ServiceDefaults does not reference the SDK. Its agui.run
   # span carries a mid-stream failure, which the browser sees only as a generic RUN_ERROR; without a listener, no span.
   - { slot: service-defaults.activity-sources, template: templates/service-defaults-activity-sources.sbn }
   - { slot: e2e.apphost-arguments, template: templates/e2e-apphost-arguments.sbn, order: 90 }
   - { slot: web.dependencies, template: templates/web-dependency.sbn }
   - { slot: web.restricted-imports, template: templates/web-restricted.sbn, order: 50 }
+  # With backend.test.integration testcontainers only (ADR-0002: dropped where no pack declares the slot).
+  - { slot: integration-tests.resources, template: templates/testcontainers-resources.sbn, order: 40, optional: true }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

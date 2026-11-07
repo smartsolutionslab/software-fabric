@@ -1,0 +1,127 @@
+func integration_fixture
+  ret "ContainerFixture containers"
+end
+func host_client
+  ret "containers.CreateHostClient()"
+end
+func signed_in_host_client(user)
+  ret "containers.CreateHostClientAsync(" + user + ")"
+end
+func running_application
+  ret "containers.Resources"
+end
+func integration_fixture_attributes
+  ret test_takes_run_fixture "ContainerFixture"
+end
+func database_fixture
+  ret "ApplicationDatabase database"
+end
+func database_fixture_attributes
+  ret test_takes_run_fixture "ApplicationDatabase"
+end
+func database_connection_string
+  ret "database.ConnectionString"
+end
+func database_fixture_package_references
+  ret `<PackageReference Include="Testcontainers" />`
+end
+func database_fixture_project_references
+  ret ""
+end
+func database_fixture_file(space)
+  ret `using System.Diagnostics;
+using System.Reflection;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
+
+` + (test_run_fixture (space + ".ApplicationDatabase")) + `
+
+namespace ` + space + `;
+
+/// <summary>
+/// The application's database alone, in an empty container that Testcontainers runs, started once per test run and
+/// migrated by the MigrationRunner as before the host starts. Nothing else runs: no host, no model.
+/// </summary>
+public sealed class ApplicationDatabase : ` + test_lifetime + `
+{
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+
+    private readonly List<IContainer> containers = [];
+
+    private readonly Dictionary<string, string?> settings = new(StringComparer.Ordinal);
+
+    public string ConnectionString => settings.GetValueOrDefault("ConnectionStrings:database")
+        ?? throw new InvalidOperationException("The database has not started.");
+
+    ` + (test_setup | string.replace "\n" "\n    ") + `
+    {
+        using var timeout = new CancellationTokenSource(StartupTimeout);
+        var cancellationToken = timeout.Token;
+
+` + slots["integration-tests.database"] + `
+    }
+
+    ` + (test_teardown | string.replace "\n" "\n    ") + `
+    {
+        foreach (var container in Enumerable.Reverse(containers))
+        {
+            await container.DisposeAsync();
+        }
+    }
+
+    /// <summary>The repository's directory: the one holding build.proj, above the tests' output.</summary>
+    private static string RepositoryDirectory()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "build.proj")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new InvalidOperationException($"No build.proj above {AppContext.BaseDirectory}.");
+    }
+
+    /// <summary>Starts a container, which the fixture disposes of after the run.</summary>
+    private async Task<TContainer> StartAsync<TContainer>(TContainer container, CancellationToken cancellationToken)
+        where TContainer : IContainer
+    {
+        containers.Add(container);
+        await container.StartAsync(cancellationToken);
+        return container;
+    }
+
+    /// <summary>
+    /// Runs a project of the solution to its end, as the AppHost runs it, with the database's settings as its
+    /// environment; the project is built already, in this assembly's configuration.
+    /// </summary>
+    private async Task RunProjectAsync(string project, CancellationToken cancellationToken)
+    {
+        var configuration = typeof(ApplicationDatabase).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration ?? "Debug";
+        var start = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in (string[])["run", "--no-build", "--no-launch-profile", "--configuration", configuration, "--project", Path.Combine(RepositoryDirectory(), project)])
+        {
+            start.ArgumentList.Add(argument);
+        }
+
+        foreach (var (key, value) in settings)
+        {
+            start.Environment[key.Replace(":", "__", StringComparison.Ordinal)] = value;
+        }
+
+        using var process = Process.Start(start) ?? throw new InvalidOperationException($"dotnet run {project} did not start.");
+        var output = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var error = process.StandardError.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"{project} ended with exit code {process.ExitCode}:{Environment.NewLine}{await output}{await error}");
+        }
+    }
+}`
+end

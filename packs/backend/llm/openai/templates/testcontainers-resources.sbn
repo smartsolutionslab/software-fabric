@@ -1,0 +1,3 @@
+        // A key-shaped value OpenAI does not accept, and the AppHost's default model: the integration tests never call the model.
+        settings["OpenAI:ApiKey"] = "not-a-real-key";
+        settings["OpenAI:Model"] = "gpt-5-mini";

@@ -1,0 +1,15 @@
+using {{ namespace }}.Host;
+using Microsoft.AspNetCore.Authentication;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class RoleClaims
+{
+    /// <summary>The roles in the token's <c>roles</c> claim become <c>ClaimTypes.Role</c> claims, which <c>RequireRole</c> reads.</summary>
+    public static IServiceCollection AddOidcRoles(this IServiceCollection services)
+    {
+        {{ not_null "services" }}
+
+        return services.AddTransient<IClaimsTransformation, OidcRoleClaims>();
+    }
+}

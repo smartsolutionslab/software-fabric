@@ -7,7 +7,7 @@ files:
   - { template: templates/ModulesSearchOnlyTheirOwnVectors.cs.sbn, target: tests/Architecture.Tests/Rules/ModulesSearchOnlyTheirOwnVectors.cs }
   - { template: templates/tests/FakeEmbeddingGenerator.cs.sbn, target: tests/Fakes/FakeEmbeddingGenerator.cs }
   - { template: templates/tests/Rag.Tests.csproj.sbn, target: tests/Rag.Tests/Rag.Tests.csproj }
-  - { template: templates/tests/AspireDatabase.cs.sbn, target: tests/Rag.Tests/AspireDatabase.cs }
+  - { template: templates/tests/ApplicationDatabase.cs.sbn, target: tests/Rag.Tests/ApplicationDatabase.cs }
   - { template: templates/tests/SampleNotesDbContext.cs.sbn, target: tests/Rag.Tests/SampleNotesDbContext.cs }
   - { template: templates/tests/SampleDraftsDbContext.cs.sbn, target: tests/Rag.Tests/SampleDraftsDbContext.cs }
   - { template: templates/tests/SampleShelfDbContext.cs.sbn, target: tests/Rag.Tests/SampleShelfDbContext.cs }

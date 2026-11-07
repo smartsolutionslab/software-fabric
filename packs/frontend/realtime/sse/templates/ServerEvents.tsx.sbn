@@ -1,0 +1,17 @@
+import { type ReactNode, useEffect, useState } from 'react';
+import { connectServerEvents } from './connection';
+import { ServerEventsContext } from './ServerEventsContext';
+
+/** Holds the app's one stream from the host, open while it is mounted; useServerEvent listens on it. */
+export function ServerEvents({ children }: { children: ReactNode }) {
+  const [stream] = useState(connectServerEvents);
+
+  useEffect(() => {
+    stream.start();
+    return () => {
+      stream.stop();
+    };
+  }, [stream]);
+
+  return <ServerEventsContext value={stream}>{children}</ServerEventsContext>;
+}

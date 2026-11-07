@@ -55,6 +55,23 @@ var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken)
     ?? throw new InvalidOperationException("The realm returned no token.");`
 end
 func short_lived_test_user_token_members(app)
+  if project["backend.test.integration"] == "testcontainers"
+    ret `/// <summary>A token of the master realm's administrator, as the fixture's Keycloak container starts with.</summary>
+private static async Task<string> AdminTokenAsync(HttpClient identity, CancellationToken cancellationToken)
+{
+    using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+    {
+        ["grant_type"] = "password",
+        ["client_id"] = "admin-cli",
+        ["username"] = "admin",
+        ["password"] = "admin",
+    });
+    using var response = await identity.PostAsync(new Uri("/realms/master/protocol/openid-connect/token", UriKind.Relative), form, cancellationToken);
+    response.EnsureSuccessStatusCode();
+    var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken);
+    return token?.AccessToken ?? throw new InvalidOperationException("The master realm returned no token.");
+}`
+  end
   ret `/// <summary>A token of the master realm's administrator; Aspire names it "admin" unless the AppHost passes a user name.</summary>
 private async Task<string> AdminTokenAsync(HttpClient identity, CancellationToken cancellationToken)
 {
@@ -76,6 +93,9 @@ func short_lived_test_user_token_types
   ret `private sealed record Token([property: JsonPropertyName("access_token")] string AccessToken);`
 end
 func short_lived_test_user_token_namespaces
+  if project["backend.test.integration"] == "testcontainers"
+    ret "System.Net System.Net.Http.Headers System.Net.Http.Json System.Text.Json.Nodes System.Text.Json.Serialization"
+  end
   ret "System.Net System.Net.Http.Headers System.Net.Http.Json System.Text.Json.Nodes System.Text.Json.Serialization Aspire.Hosting.ApplicationModel Aspire.Hosting.Testing Microsoft.Extensions.DependencyInjection"
 end
 func accept_query_token(services, path)
@@ -117,4 +137,35 @@ if (typeof realmAccess !== 'object' || realmAccess === null || !('roles' in real
 
 const { roles } = realmAccess;
 return Array.isArray(roles) && roles.includes(` + role + `);`
+end
+func id_token_roles_claim
+  ret "realm_access.roles"
+end
+func id_token_users_comment
+  ret `// The ID tokens Keycloak issues the realm's local users (src/AppHost/realms/realm.json); a user without a realm role has
+// no realm_access, one without a department no department.`
+end
+func role_mapping_adr
+  ret "**Keycloak's roles become role claims.** Keycloak puts realm roles in the token's `realm_access` and each client's roles in `resource_access`. `KeycloakRoleClaims` (an `IClaimsTransformation`) copies the realm roles and the roles of the API client `<name>-api` into `ClaimTypes.Role`, which `RequireRole` reads. Roles of other clients (Keycloak's own `account` client, say) are not meant for this API and are left out."
+end
+func role_mapping_provider
+  ret "Keycloak"
+end
+func tenant_claim_adr
+  ret "membership of exactly one group under `/tenants/` (Keycloak: `/tenants/tenant-a`)"
+end
+func tenant_claim(user)
+  ret `var tenants = ` + user + `.FindAll("groups")
+    .Select(claim => claim.Value)
+    .Where(group => group.StartsWith(TenantGroupPrefix, StringComparison.Ordinal))
+    .Select(group => group[TenantGroupPrefix.Length..])
+    .ToList();
+
+return tenants is [var tenant] ? tenant : null;`
+end
+func tenant_claim_members
+  ret `private const string TenantGroupPrefix = "/tenants/";`
+end
+func tenant_claim_description
+  ret "the user's one group under /tenants/"
 end
