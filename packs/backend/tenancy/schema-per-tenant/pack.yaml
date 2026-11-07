@@ -20,6 +20,8 @@ files:
   - { template: templates/tests/CreateLedger.cs.sbn, target: tests/Tenancy.Tests/CreateLedger.cs }
   - { template: templates/tests/LedgerDbContextModelSnapshot.cs.sbn, target: tests/Tenancy.Tests/LedgerDbContextModelSnapshot.cs }
   - { template: templates/tests/TenantSchemaTests.cs.sbn, target: tests/Tenancy.Tests/TenantSchemaTests.cs }
+  - { template: templates/tests/LedgerArchiveDbContext.cs.sbn, target: tests/Tenancy.Tests/LedgerArchiveDbContext.cs }
+  - { template: templates/tests/TenantSchemaNameTests.cs.sbn, target: tests/Tenancy.Tests/TenantSchemaNameTests.cs }
 slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 10 }
   - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 20 }
@@ -37,4 +39,5 @@ agents:
 adr: docs/adr.md
 gates:
   - { kind: unit-test, describes: "Against the AppHost's database after the MigrationRunner: a listed tenant reads its own rows and none of another tenant's, each listed tenant has a schema of its own with its own migrations history for the sample context and for every module, and a tenant not listed, like no tenant, reads nothing and cannot save.", file: templates/tests/TenantSchemaTests.cs.sbn }
+  - { kind: unit-test, describes: "Schema names are one module's and one tenant's alone: module and tenant pairs that would share a schema, or a tenant's schema that is another module's own, fail the MigrationRunner before it migrates, and a name past the database's identifier limit fails instead of being cut short.", file: templates/tests/TenantSchemaNameTests.cs.sbn }
   - { kind: architecture-test, describes: "No type in a module has a TenantId: each tenant's rows are kept apart by its schema.", file: templates/NoTenantIds.cs.sbn }

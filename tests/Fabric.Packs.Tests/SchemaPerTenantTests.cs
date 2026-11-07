@@ -156,7 +156,7 @@ public sealed class SchemaPerTenantTests
 
         var (tenancyExitCode, tenancyOutput) = project.Test("tests/Tenancy.Tests/Tenancy.Tests.csproj");
         tenancyExitCode.ShouldBe(0, tenancyOutput);
-        tenancyOutput.ShouldContain("succeeded: 4");
+        tenancyOutput.ShouldContain("succeeded: 7");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);

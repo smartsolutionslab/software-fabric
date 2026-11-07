@@ -1,0 +1,60 @@
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Tenancy.Tests;
+
+/// <summary>
+/// A schema belongs to one module and one tenant, or to one module alone: names that two of them would share, or that
+/// the database would cut short at its identifier limit, fail before anything is migrated. No database is needed.
+/// </summary>
+public sealed class TenantSchemaNameTests
+{
+    {{ test_attribute }}
+    public async Task Two_module_and_tenant_pairs_that_would_share_a_schema_fail_the_migration_runner_before_it_migrates()
+    {
+        // tenancy_tests_ledger + a-b and tenancy_tests_ledger_a + b are both tenancy_tests_ledger_a_b.
+        var cancellationToken = {{ test_cancellation_token }};
+        await using var services = Services("a-b", "b");
+
+        var refusal = await {{ should_throw_async "InvalidOperationException" "() => services.MigrateTenantSchemasAsync([typeof(LedgerDbContext), typeof(LedgerArchiveDbContext)], cancellationToken)" }};
+
+        {{ `refusal.Message` | should_contain `"tenancy_tests_ledger_a_b"` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_tenants_schema_that_is_another_modules_own_fails_the_migration_runner_before_it_migrates()
+    {
+        // tenancy_tests_ledger + a is tenancy_tests_ledger_a, the other module's own schema.
+        var cancellationToken = {{ test_cancellation_token }};
+        await using var services = Services("a");
+
+        var refusal = await {{ should_throw_async "InvalidOperationException" "() => services.MigrateTenantSchemasAsync([typeof(LedgerDbContext), typeof(LedgerArchiveDbContext)], cancellationToken)" }};
+
+        {{ `refusal.Message` | should_contain `"tenancy_tests_ledger_a"` }};
+    }
+
+    {{ test_attribute }}
+    public void A_tenants_schema_longer_than_the_databases_identifier_limit_fails_instead_of_being_cut_short()
+    {
+        var tenant = new string('a', 55) + "-b";
+
+        {{ should_throw "InvalidOperationException" "() => TenantSchemas.For(LedgerDbContext.Schema, tenant)" }};
+    }
+
+    private static ServiceProvider Services(params string[] tenants)
+    {
+        Dictionary<string, string?> settings = new(StringComparer.Ordinal) { ["ConnectionStrings:database"] = "Host=localhost" };
+        for (var index = 0; index < tenants.Length; index++)
+        {
+            settings[$"{TenantSchemas.Tenants}:{index}"] = tenants[index];
+        }
+
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
+        return new ServiceCollection()
+            .AddSingleton<IConfiguration>(configuration)
+            .AddModuleDbContext(typeof(LedgerDbContext), configuration)
+            .AddModuleDbContext(typeof(LedgerArchiveDbContext), configuration)
+            .BuildServiceProvider();
+    }
+}
