@@ -75,9 +75,36 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
 
         modelBuilder.HasDefaultSchema({{ if moves }}CurrentSchema{{ else }}schema{{ end }});
         modelBuilder.ApplyConfigurationsFromAssembly(GetType().Assembly);
+{{~ if moves ~}}
+        MoveTablesNamingTheModulesSchema(modelBuilder);
+{{~ end ~}}
 {{ slots["persistence.model-conventions"] }}
         base.OnModelCreating(modelBuilder);
     }
+{{~ if moves ~}}
+
+    /// <summary>A table or view a configuration maps to the module's schema by name moves with the default schema.</summary>
+    private void MoveTablesNamingTheModulesSchema(ModelBuilder modelBuilder)
+    {
+        if (CurrentSchema == ModuleSchema)
+        {
+            return;
+        }
+
+        foreach (var entity in modelBuilder.Model.GetEntityTypes())
+        {
+            if (entity.GetSchema() == ModuleSchema)
+            {
+                entity.SetSchema(CurrentSchema);
+            }
+
+            if (entity.GetViewSchema() == ModuleSchema)
+            {
+                entity.SetViewSchema(CurrentSchema);
+            }
+        }
+    }
+{{~ end ~}}
 {{~ if slots["persistence.save-changes"] != "" ~}}
 
     private void BeforeSaving()

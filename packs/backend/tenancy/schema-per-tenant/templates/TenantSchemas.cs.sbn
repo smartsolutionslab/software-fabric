@@ -25,9 +25,22 @@ public static partial class TenantSchemas
 
         var tenant = services.GetService<ITenantContext>()?.TenantId ?? TenantScope.TenantId;
         var configuration = services.GetService<IConfiguration>();
-        return tenant is not null && configuration is not null && Listed(configuration).Contains(tenant, StringComparer.Ordinal)
-            ? For(schema, tenant)
-            : schema;
+        if (configuration is null)
+        {
+            return schema;
+        }
+
+        var tenants = Listed(configuration);
+        if (tenant is not null && tenants.Contains(tenant, StringComparer.Ordinal))
+        {
+            return For(schema, tenant);
+        }
+
+        // Module billing-a's own schema, billing_a, is module billing's schema for tenant a: it must not work there.
+        var claimed = tenants.FirstOrDefault(listed => schema.EndsWith($"_{listed.Replace('-', '_')}", StringComparison.Ordinal));
+        return claimed is null
+            ? schema
+            : throw new InvalidOperationException($"The module schema '{schema}' ends like a schema of listed tenant '{claimed}', so it could be another module's schema for that tenant; rename the module or the tenant.");
     }
 
     /// <summary>A module's schema for one tenant; a name past <see cref="MaximumLength"/> fails instead of being cut short.</summary>

@@ -136,7 +136,9 @@ public sealed class MigrationTests
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("20990101000000_Mood");
         output.ShouldContain("Npgsql:Enum:billing.mood");
-        postgres.Psql(DatabasePassword, "select count(*) from information_schema.schemata where schema_name = 'billing_one'").ShouldBe("0");
+        // EF Core creates the history table before it reads the migrations; none of them ran there.
+        postgres.Psql(DatabasePassword, "select count(*) from billing_one.\"__EFMigrationsHistory\"").ShouldBe("0");
+        postgres.Psql(DatabasePassword, "select count(*) from information_schema.tables where table_schema = 'billing_one' and table_name = 'notes'").ShouldBe("0");
     }
 
     [Fact]
