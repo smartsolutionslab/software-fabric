@@ -17,6 +17,7 @@ public sealed partial class IntegrationVocabularyTests
         "integration_fixture",
         "host_client",
         "signed_in_host_client",
+        "running_application",
         "database_fixture",
         "database_connection_string",
         "database_fixture_file",
