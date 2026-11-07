@@ -1,0 +1,34 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class Authentication
+{
+    /// <summary>
+    /// JWT bearer tokens of the OpenID Connect provider at Authentication:Authority, issued for
+    /// Authentication:Audience. Claims keep the names the provider gives them (sub, preferred_username, roles, ...):
+    /// none is renamed on the way in.
+    /// </summary>
+    public static IServiceCollection AddOidcAuthentication(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+    {
+        {{ not_null "configuration" }}
+        {{ not_null "environment" }}
+
+        var authority = configuration["Authentication:Authority"]
+            ?? throw new InvalidOperationException("Authentication:Authority is missing; the AppHost provides it in development.");
+        var audience = configuration["Authentication:Audience"]
+            ?? throw new InvalidOperationException("Authentication:Audience is missing; the AppHost provides it in development.");
+
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.Authority = authority;
+                options.Audience = audience;
+                options.RequireHttpsMetadata = !environment.IsDevelopment();
+                options.MapInboundClaims = false;
+            });
+        services.AddAuthorization();
+
+        return services;
+    }
+}

@@ -311,6 +311,19 @@ claims ADRs describe.
 | `tenant_claim_members` | the private members those statements need, in the same class (`TenantGroupPrefix`) |
 | `tenant_claim_description` | prose for the class's summary: `the user's one group under /tenants/` |
 
+Generic OIDC (`backend.auth.generic-oidc`, *#251*) reads standard claims
+under the provider's own names (`MapInboundClaims = false`): its
+`role_mapping_source` is `src/Host/OidcRoleClaims.cs` (the top-level
+`roles` claim into `ClaimTypes.Role`), `unstarted_host_settings` sets
+`Authentication:Authority` and `Authentication:Audience`, `test_user_token`
+reads the token endpoint from the local provider's discovery document,
+`id_token_roles roles` is `roles: [roles]`, `id_token_roles_claim` is
+`roles`, and `tenant_claim user` returns the one value of the token's
+`tenant` claim. Its local provider is Keycloak, named `identity` in the
+AppHost and configured to issue those claims; the short-lived token, the
+login page and the authority are that local Keycloak's, as for the keycloak
+pack.
+
 | Function | Returns (oidc-client-ts) |
 |---|---|
 | `browser_access_token_import` | the TS import that `browser_access_token` needs |

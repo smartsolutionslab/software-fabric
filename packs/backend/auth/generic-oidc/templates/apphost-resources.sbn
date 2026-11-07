@@ -1,0 +1,7 @@
+#pragma warning disable ASPIREHOSTINGKEYCLOAK001, ASPIRECERTIFICATES001 // Preview APIs, development only (see docs/adr).
+// The local OpenID Connect provider. It is Keycloak, but the host and the browser know only its authority.
+var identity = builder.AddKeycloak("identity", 8080)
+    .WithoutHttpsCertificate()
+    .WithDataVolume()
+    .WithRealmImport("./realms");
+#pragma warning restore ASPIREHOSTINGKEYCLOAK001, ASPIRECERTIFICATES001

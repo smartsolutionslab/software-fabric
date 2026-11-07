@@ -1,0 +1,2 @@
+builder.Services.AddOidcAuthentication(builder.Configuration, builder.Environment);{{ if object.has_key(project, "backend.authorization") && (project["backend.authorization"] | array.contains "roles") }}
+builder.Services.AddOidcRoles();{{ end }}
