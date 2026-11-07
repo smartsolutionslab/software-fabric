@@ -1,0 +1,169 @@
+func role_mapping_source
+  ret "src/Host/OidcRoleClaims.cs"
+end
+func unstarted_host_settings
+  ret `builder.UseSetting("Authentication:Authority", "http://localhost/unused");
+builder.UseSetting("Authentication:Audience", "unused");`
+end
+func test_user_token(app, user)
+  ret `using var identity = new HttpClient();
+var provider = await identity.GetFromJsonAsync<ProviderMetadata>(new Uri(` + app + `.GetEndpoint("identity", "http"), "/realms/` + name + `/.well-known/openid-configuration"))
+    ?? throw new InvalidOperationException("The provider published no metadata.");
+using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+{
+    ["grant_type"] = "password",
+    ["client_id"] = "` + name + `-web",
+    ["username"] = ` + user + `,
+    ["password"] = ` + user + `,
+});
+using var response = await identity.PostAsync(provider.TokenEndpoint, form);
+response.EnsureSuccessStatusCode();
+var token = await response.Content.ReadFromJsonAsync<TokenResponse>()
+    ?? throw new InvalidOperationException("The provider returned no token.");`
+end
+func test_user_token_types
+  ret `private sealed record ProviderMetadata([property: JsonPropertyName("token_endpoint")] Uri TokenEndpoint);
+
+private sealed record TokenResponse([property: JsonPropertyName("access_token")] string AccessToken);`
+end
+func short_lived_test_user_token(app, user, lifespan)
+  ret `const string ShortLivedClient = "` + name + `-short-lived";
+using var identity = new HttpClient { BaseAddress = ` + app + `.GetEndpoint("identity", "http") };
+identity.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await AdminTokenAsync(identity, cancellationToken));
+
+var clients = await identity.GetFromJsonAsync<JsonArray>(new Uri("/admin/realms/` + name + `/clients?clientId=` + name + `-web", UriKind.Relative), cancellationToken);
+var client = clients?.Single()?.AsObject() ?? throw new InvalidOperationException("The realm has no web client.");
+client.Remove("id");
+client["clientId"] = ShortLivedClient;
+client["attributes"] = new JsonObject { ["access.token.lifespan"] = ` + lifespan + `.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+foreach (var mapper in client["protocolMappers"]?.AsArray() ?? [])
+{
+    mapper?.AsObject().Remove("id");
+}
+
+using var created = await identity.PostAsJsonAsync(new Uri("/admin/realms/` + name + `/clients", UriKind.Relative), client, cancellationToken);
+if (created.StatusCode != HttpStatusCode.Conflict)
+{
+    created.EnsureSuccessStatusCode();
+}
+
+using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+{
+    ["grant_type"] = "password",
+    ["client_id"] = ShortLivedClient,
+    ["username"] = ` + user + `,
+    ["password"] = ` + user + `,
+});
+using var response = await identity.PostAsync(new Uri("/realms/` + name + `/protocol/openid-connect/token", UriKind.Relative), form, cancellationToken);
+response.EnsureSuccessStatusCode();
+var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken)
+    ?? throw new InvalidOperationException("The realm returned no token.");`
+end
+func short_lived_test_user_token_members(app)
+  if project["backend.test.integration"] == "testcontainers"
+    ret `/// <summary>A token of the master realm's administrator, as the fixture's Keycloak container starts with.</summary>
+private static async Task<string> AdminTokenAsync(HttpClient identity, CancellationToken cancellationToken)
+{
+    using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+    {
+        ["grant_type"] = "password",
+        ["client_id"] = "admin-cli",
+        ["username"] = "admin",
+        ["password"] = "admin",
+    });
+    using var response = await identity.PostAsync(new Uri("/realms/master/protocol/openid-connect/token", UriKind.Relative), form, cancellationToken);
+    response.EnsureSuccessStatusCode();
+    var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken);
+    return token?.AccessToken ?? throw new InvalidOperationException("The master realm returned no token.");
+}`
+  end
+  ret `/// <summary>A token of the master realm's administrator; Aspire names it "admin" unless the AppHost passes a user name.</summary>
+private async Task<string> AdminTokenAsync(HttpClient identity, CancellationToken cancellationToken)
+{
+    var keycloak = ` + app + `.Services.GetRequiredService<DistributedApplicationModel>().Resources.OfType<KeycloakResource>().Single();
+    using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+    {
+        ["grant_type"] = "password",
+        ["client_id"] = "admin-cli",
+        ["username"] = keycloak.AdminUserNameParameter is { } name ? await name.GetValueAsync(cancellationToken) ?? string.Empty : "admin",
+        ["password"] = await keycloak.AdminPasswordParameter.GetValueAsync(cancellationToken) ?? string.Empty,
+    });
+    using var response = await identity.PostAsync(new Uri("/realms/master/protocol/openid-connect/token", UriKind.Relative), form, cancellationToken);
+    response.EnsureSuccessStatusCode();
+    var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken);
+    return token?.AccessToken ?? throw new InvalidOperationException("The master realm returned no token.");
+}`
+end
+func short_lived_test_user_token_types
+  ret `private sealed record Token([property: JsonPropertyName("access_token")] string AccessToken);`
+end
+func short_lived_test_user_token_namespaces
+  if project["backend.test.integration"] == "testcontainers"
+    ret "System.Net System.Net.Http.Headers System.Net.Http.Json System.Text.Json.Nodes System.Text.Json.Serialization"
+  end
+  ret "System.Net System.Net.Http.Headers System.Net.Http.Json System.Text.Json.Nodes System.Text.Json.Serialization Aspire.Hosting.ApplicationModel Aspire.Hosting.Testing Microsoft.Extensions.DependencyInjection"
+end
+func accept_query_token(services, path)
+  ret services + `.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+{
+    options.Events ??= new JwtBearerEvents();
+    var received = options.Events.OnMessageReceived;
+    options.Events.OnMessageReceived = async context =>
+    {
+        await received(context);
+        if (context.Token is null
+            && context.HttpContext.Request.Path.StartsWithSegments(` + path + `, StringComparison.Ordinal)
+            && context.Request.Query["access_token"] is [{ Length: > 0 } token])
+        {
+            context.Token = token;
+        }
+    };
+})`
+end
+func accept_query_token_namespaces
+  ret "Microsoft.AspNetCore.Authentication.JwtBearer"
+end
+func browser_sign_in(page, user)
+  ret `await ` + page + `.getByLabel('Username or email').fill(` + user + `);
+await ` + page + `.getByLabel('Password', { exact: true }).fill(` + user + `);
+await ` + page + `.getByRole('button', { name: 'Sign In' }).click();`
+end
+func browser_authority
+  ret "http://localhost:8080/realms/" + name
+end
+func id_token_roles(roles)
+  ret "roles: [" + roles + "]"
+end
+func id_token_has_role(profile, role)
+  ret `const roles = ` + profile + `.roles;
+return Array.isArray(roles) && roles.includes(` + role + `);`
+end
+func id_token_roles_claim
+  ret "roles"
+end
+func id_token_users_comment
+  ret `// The ID tokens the local provider issues its users (src/AppHost/realms/realm.json): a user without a role has no
+// roles, one without a department no department.`
+end
+func role_mapping_adr
+  ret "**The provider's roles become role claims.** The provider lists the user's roles in the token's top-level `roles` claim. `OidcRoleClaims` (an `IClaimsTransformation`) copies them into `ClaimTypes.Role`, which `RequireRole` reads."
+end
+func role_mapping_provider
+  ret "generic OIDC"
+end
+func tenant_claim_adr
+  ret "exactly one value of its `tenant` claim (locally `tenant-a` or `tenant-b`)"
+end
+func tenant_claim(user)
+  ret `var tenants = ` + user + `.FindAll(TenantClaim)
+    .Select(claim => claim.Value)
+    .ToList();
+
+return tenants is [var tenant] ? tenant : null;`
+end
+func tenant_claim_members
+  ret `private const string TenantClaim = "tenant";`
+end
+func tenant_claim_description
+  ret "the user's one tenant claim"
+end

@@ -1,0 +1,53 @@
+using Microsoft.CodeAnalysis.CSharp;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// The application accepts any OpenID Connect provider, so its code names none: no source under <c>src/</c> but the
+/// AppHost, which runs the local provider, names Keycloak or a claim or path only Keycloak issues or serves. Sources
+/// are parsed, not grepped: a comment is prose.
+/// </summary>
+public sealed class ProviderNeutralHost : IArchitectureRule
+{
+    private static readonly string[] ProviderSpecific = ["keycloak", "realm_access", "resource_access", "/realms/"];
+
+    public string Description => "No source under src/ but the AppHost names a particular identity provider; the application reads standard OpenID Connect only.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var root = RepositoryRoot();
+        List<string> violations = [];
+        foreach (var path in Directory.EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
+            .Where(path => !path.StartsWith("src/AppHost/", StringComparison.Ordinal))
+            .Where(path => !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal))
+        {
+            var source = CSharpSyntaxTree.ParseText(File.ReadAllText(Path.Combine(root, path))).GetRoot();
+            foreach (var token in source.DescendantTokens())
+            {
+                var named = ProviderSpecific.FirstOrDefault(name => token.Text.Contains(name, StringComparison.OrdinalIgnoreCase));
+                if (named is not null)
+                {
+                    violations.Add($"{path}:{token.GetLocation().GetLineSpan().StartLinePosition.Line + 1}: names {named}, which only Keycloak issues or serves. With backend.auth generic-oidc the application reads standard OpenID Connect claims, so any provider can sign users in; Keycloak belongs to the AppHost, as the local provider.");
+                }
+            }
+        }
+
+        return violations;
+    }
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+}
