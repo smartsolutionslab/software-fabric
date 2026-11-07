@@ -21,6 +21,14 @@ public sealed class SharedIdentityTests
         { "entra-id", "saas-standard-vue" },
     };
 
+    public static TheoryData<string, string> ConfigurableProvidersAndFrameworks => new()
+    {
+        { "generic-oidc", "saas-standard-react" },
+        { "generic-oidc", "saas-standard-vue" },
+        { "entra-id", "saas-standard-react" },
+        { "entra-id", "saas-standard-vue" },
+    };
+
     [Fact]
     public void The_me_endpoint_and_its_response_type_are_the_bases_for_every_identity_provider()
     {
@@ -56,6 +64,37 @@ public sealed class SharedIdentityTests
 
         files["tests/Integration.Tests/HostTests.cs"].ShouldContain("public async Task A_token_from_the_identity_provider_identifies_the_user()");
         files["tests/Integration.Tests/HostTests.cs"].ShouldNotContain("A_token_from_the_realm_identifies_the_user");
+    }
+
+    [Theory]
+    [MemberData(nameof(ConfigurableProvidersAndFrameworks))]
+    public void The_browser_client_id_and_scope_come_from_configuration_with_a_provider_that_registers_its_own_client(string provider, string profile)
+    {
+        var files = Files(profile, $"backend.auth={provider}");
+
+        files["web/app/src/auth/oidcConfig.ts"].ShouldContain("  client_id: import.meta.env.VITE_OIDC_CLIENT_ID ?? 'shop-web',\n  scope: import.meta.env.VITE_OIDC_SCOPE ?? 'openid',\n");
+    }
+
+    [Theory]
+    [MemberData(nameof(ConfigurableProvidersAndFrameworks))]
+    public void The_web_app_declares_the_browser_clients_configuration_with_a_provider_that_registers_its_own_client(string provider, string profile)
+    {
+        var files = Files(profile, $"backend.auth={provider}");
+
+        files["web/app/src/vite-env.d.ts"].ShouldContain("  readonly VITE_OIDC_AUTHORITY?: string;\n  readonly VITE_OIDC_CLIENT_ID?: string;\n  readonly VITE_OIDC_SCOPE?: string;\n}");
+    }
+
+    /// <summary>Characterisation: Keycloak's realm import registers the web client, so its configuration stays as it was.</summary>
+    [Theory]
+    [InlineData("saas-standard-react")]
+    [InlineData("saas-standard-vue")]
+    public void With_keycloak_the_browser_client_is_the_realms_web_client(string profile)
+    {
+        var files = Files(profile, "backend.auth=keycloak");
+
+        files["web/app/src/auth/oidcConfig.ts"].ShouldContain("  client_id: 'shop-web',\n");
+        files["web/app/src/auth/oidcConfig.ts"].ShouldNotContain("scope");
+        files["web/app/src/vite-env.d.ts"].ShouldContain("interface ImportMetaEnv {\n  readonly VITE_OIDC_AUTHORITY?: string;\n}");
     }
 
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
