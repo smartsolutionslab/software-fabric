@@ -41,7 +41,7 @@ tests/
   Directory.Build.props         base; test packages and usings by slot
   Architecture.Tests/           base; packs add gate tests as their own files
   Integration.Tests/            backend.test.integration.aspire-fixture; the REST pack adds ListEndpointsArePagedTests
-  TestRun/                      backend.test.framework.nunit: the run fixtures; tunit: ITestLifetime; compiled into every test project
+  TestRun/                      backend.test.framework.nunit: the run fixtures; tunit: ITestLifetime, OwnTestsOnlyAttribute; compiled into every test project
   Kernel/Paging.Tests/          base; the guards, absence and result packs add their own Kernel test projects
   Modules/<Module>.Tests/       base (per module)
 web/

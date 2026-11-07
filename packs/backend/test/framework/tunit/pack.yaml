@@ -3,6 +3,7 @@ files:
   - { template: templates/ArchitectureRulesTests.cs.sbn, target: tests/Architecture.Tests/ArchitectureRulesTests.cs }
   - { template: templates/ModuleTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/{{ module.namespace }}ModuleTests.cs", per-module: true }
   - { template: templates/ITestLifetime.cs.sbn, target: tests/TestRun/ITestLifetime.cs }
+  - { template: templates/OwnTestsOnlyAttribute.cs.sbn, target: tests/TestRun/OwnTestsOnlyAttribute.cs }
   - { template: templates/coverage.props.sbn, target: tests/coverage.props }
   - { template: templates/coverage-gate.proj.sbn, target: .github/scripts/coverage-gate.proj }
   - { template: templates/test.sh.sbn, target: .github/scripts/test.sh }

@@ -12,6 +12,8 @@ The architecture rules in `tests/Architecture.Tests/Rules` run as one test with 
 
 TUnit makes **a new instance of a test class for each test**, so no test sees what another left in a field. A class whose work must be set up and torn down around each test implements `ITestLifetime` (`tests/TestRun/ITestLifetime.cs`, compiled into every test project): TUnit's `IAsyncInitializer`, whose `InitializeAsync` TUnit runs before the test, and `IAsyncDisposable`, whose `DisposeAsync` it runs after it.
 
+TUnit registers the tests of every test assembly a test project loads, so a test project that references another (the evals' gate references `tests/Evals`) would run that project's tests as well. `tests/TestRun/OwnTestsOnlyAttribute.cs`, compiled into every test project, keeps each test to its own project: elsewhere it is reported skipped, because TUnit offers no way to leave a registered test out of a run.
+
 ### Run fixtures
 
 Something expensive that every test of a project shares, such as the running application of the integration tests, is a **run fixture**: a class implementing `ITestLifetime`. A test class takes it as its constructor parameter and says so with `[ClassDataSource<T>(Shared = SharedType.PerTestSession)]` on the class. TUnit then makes one instance for the whole test session, initialises it before the first test that takes it and disposes it after the last. Nothing is named on the assembly: a fixture no class takes never starts.
@@ -36,7 +38,6 @@ The gate belongs to the test framework, not to the test discipline: it applies w
 
 - CI runs each test project; a new module's tests run without editing the workflow.
 - TUnit runs tests in parallel, those of one class included. A test that changes state another test reads must not depend on running alone; `[NotInParallel]` serialises the tests that truly cannot share.
-- A broken test class (a data source that throws, a constructor TUnit cannot satisfy) fails the build's source generation or the test's discovery, not silently skips.
 - Untested Domain or Application code fails CI with the assembly, the layer and the number: `Shop.Modules.Billing.Domain: 61.5 % line coverage, below the Domain threshold of 90 % (tests/coverage.props).`
 - The same check runs locally with `bash .github/scripts/test.sh` after `dotnet build build.proj -c Release`. Given test projects, it runs only those (`bash .github/scripts/test.sh tests/Modules/Billing.Tests/Billing.Tests.csproj`); the integration tests need Docker.
 - Coverage says which lines ran, not that anything checked them: it is a floor under the tests, not proof of them.
