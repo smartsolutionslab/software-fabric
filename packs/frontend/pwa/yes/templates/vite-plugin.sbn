@@ -14,14 +14,15 @@
         clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,svg,woff2}'],
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api\//],
+        // Everything the dev server's proxy forwards to the host starts with /api; none of it is the shell.
+        navigateFallbackDenylist: [/^\/api/],
         // What the shell loads at run time, the dev server's modules included. Only same-origin files the page loads
         // as code, style, font, image or manifest; /api calls are fetches and the identity provider is another origin.
         runtimeCaching: [
           {
             urlPattern: ({ request, sameOrigin, url }) =>
               sameOrigin &&
-              !url.pathname.startsWith('/api/') &&
+              !url.pathname.startsWith('/api') &&
               ['script', 'style', 'font', 'image', 'manifest'].includes(request.destination),
             handler: 'NetworkFirst',
             options: { cacheName: 'app-shell' },

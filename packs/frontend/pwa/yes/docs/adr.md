@@ -8,7 +8,7 @@ The app is installable and its shell loads offline. `vite-plugin-pwa` (Workbox's
 
 The worker keeps the app shell and nothing else:
 
-- The build's files (scripts, styles, HTML, SVG, fonts) are precached; a navigation is answered with `index.html`, except under `/api/`.
+- The build's files (scripts, styles, HTML, SVG, fonts) are precached; a navigation is answered with `index.html`, except for a path starting with `/api`, which is everything the dev server forwards to the host (`/api`, `/api/...`, `/api?...`).
 - At run time it keeps same-origin files the page loads as script, style, font, image or manifest, network first. In development these are the dev server's modules, which is how the end-to-end tests see the shell offline.
 - `/api` is never cached: those calls are fetches, which no route matches, so the browser sends them to the network as if there were no worker. Tenant data and anything sent with a token stay out of the cache.
 {{~ if project["backend.auth"] != "none" ~}}
