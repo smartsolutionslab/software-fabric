@@ -35,6 +35,8 @@ public sealed partial class IdentityVocabularyTests
         "browser_access_token_import",
         "browser_access_token",
         "stored_access_token",
+        "store_access_token_import",
+        "store_access_token",
     ];
 
     private static readonly string[] IntegrationVocabulary =
@@ -181,7 +183,7 @@ public sealed partial class IdentityVocabularyTests
     [GeneratedRegex(@"[Kk]eycloak|/realms/|realm_access|resource_access|admin-cli|Username or email")]
     private static partial Regex KeycloakSpecific();
 
-    [GeneratedRegex(@"oidc\.user:|@/auth/accessToken|\baccessToken\(\)")]
+    [GeneratedRegex(@"oidc\.user:|@/auth/accessToken|@/auth/oidcConfig|\baccessToken\(\)")]
     private static partial Regex AuthClientSpecific();
 
     [GeneratedRegex(@"\.(cs|csproj|ts|tsx|vue|json)$")]
