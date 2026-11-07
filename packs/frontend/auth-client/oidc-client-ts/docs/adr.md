@@ -10,11 +10,11 @@
 
 The browser signs in with the authorization-code flow and PKCE through `oidc-client-ts`'s `UserManager`, read through a small hand-written composable, `useAuth()` (`src/auth/useAuth.ts`). No Vue OIDC library: none is maintained, and the composable needs only the user, the sign-in state and the two redirects. The whole app sits behind `SignedIn.vue`: an anonymous visitor is sent to the identity provider. Every API call carries the user's access token, added in `src/api/baseApi.ts`.
 
-The identity provider's address arrives as `VITE_OIDC_AUTHORITY` (the AppHost sets it); the client id is the realm's `<project>-web` client.
+The identity provider's address arrives as `VITE_OIDC_AUTHORITY` (the AppHost sets it); {{ browser_client_adr }}
 
 ## Gates
 
-`src/auth/SignedIn.test.ts` checks, against a fake `UserManager`, that an anonymous visitor is sent to the identity provider, that the way back completes the sign-in and drops its parameters from the address, that a failed sign-in, a failed silent renewal and a redirect that cannot start are shown (a failed sign-in is not retried), that an expired access token sends the user back to the identity provider, that signing out starts no sign-in on its way out, and that a signed-in user sees who they are and the app. `e2e/sign-in.spec.ts` signs a realm user in through the running AppHost.
+`src/auth/SignedIn.test.ts` checks, against a fake `UserManager`, that an anonymous visitor is sent to the identity provider, that the way back completes the sign-in and drops its parameters from the address, that a failed sign-in, a failed silent renewal and a redirect that cannot start are shown (a failed sign-in is not retried), that an expired access token sends the user back to the identity provider, that signing out starts no sign-in on its way out, and that a signed-in user sees who they are and the app. `e2e/sign-in.spec.ts` signs {{ local_user }} in through the running AppHost.
 
 ## Consequences
 
@@ -29,16 +29,16 @@ The identity provider's address arrives as `VITE_OIDC_AUTHORITY` (the AppHost se
 
 The browser signs in with the authorization-code flow and PKCE through `oidc-client-ts`, wrapped by `react-oidc-context`. The whole app sits behind `SignedIn`: an anonymous visitor is sent to the identity provider. Every API call carries the user's access token, added in `src/api/baseApi.ts`.
 
-The identity provider's address arrives as `VITE_OIDC_AUTHORITY` (the AppHost sets it); the client id is the realm's `<project>-web` client.
+The identity provider's address arrives as `VITE_OIDC_AUTHORITY` (the AppHost sets it); {{ browser_client_adr }}
 
 {{~ if roles || claims ~}}
-**Showing and hiding by {{ if roles && claims }}role and claim{{ else if roles }}role{{ else }}claim{{ end }}.** With `backend.authorization` {{ if roles && claims }}`[roles, claims]`{{ else if roles }}`[roles]`{{ else }}`[claims]`{{ end }}, `src/auth/` has {{ if roles }}`useHasRole(role)`, {{ end }}{{ if claims }}`useHasClaim(type, value?)`, {{ end }}and `<RequirePermission{{ if roles }} role{{ end }}{{ if claims }} claim value{{ end }} fallback>`, which renders its children for a user who meets the requirement{{ if roles && claims }} (both, when `role` and `claim` are given together){{ end }} and the fallback, nothing by default, for anyone else. They read the ID token's claims (`useAuth().user.profile`) synchronously: no request, no token parsing. The Keycloak realm puts {{ if roles }}the realm roles (`realm_access.roles`, realm roles only, not the API client's roles){{ end }}{{ if roles && claims }} and {{ end }}{{ if claims }}`department`{{ end }} into the ID token for this. The source, the realm roles and the API were decided by the repository owner (2026-11-04).
+**Showing and hiding by {{ if roles && claims }}role and claim{{ else if roles }}role{{ else }}claim{{ end }}.** With `backend.authorization` {{ if roles && claims }}`[roles, claims]`{{ else if roles }}`[roles]`{{ else }}`[claims]`{{ end }}, `src/auth/` has {{ if roles }}`useHasRole(role)`, {{ end }}{{ if claims }}`useHasClaim(type, value?)`, {{ end }}and `<RequirePermission{{ if roles }} role{{ end }}{{ if claims }} claim value{{ end }} fallback>`, which renders its children for a user who meets the requirement{{ if roles && claims }} (both, when `role` and `claim` are given together){{ end }} and the fallback, nothing by default, for anyone else. They read the ID token's claims (`useAuth().user.profile`) synchronously: no request, no token parsing. {{ id_token_claims_adr roles claims }} The source, the {{ role_kind }}s and the API were decided by the repository owner (2026-11-04).
 
 Hiding is a convenience, never protection: the browser and its ID token are the user's to change, and the backend policy decides. A user who should not see a button gets a 403 from its endpoint whether or not the button is hidden. The ID token is read at sign-in, so a role or claim granted later shows once the user signs in again (or the token is renewed); the backend sees it on the next access token.
 
 ## Gates
 
-`src/auth/RequirePermission.test.tsx` shows an element to {{ if roles }}`developer` and hides it from `visitor` (role `manager`){{ end }}{{ if roles && claims }}, {{ end }}{{ if claims }}shows it to `analyst` and hides it from `clerk` (`department=finance`){{ end }}{{ if roles && claims }}, and shows one requiring both only to `developer`, not to `clerk` (only the role) or `analyst` (only the claim){{ end }}, with `useAuth` mocked to the ID token claims of the realm's local users. It cannot see whether an endpoint behind a hidden element has a policy: that is the backend's gate.
+`src/auth/RequirePermission.test.tsx` shows an element to {{ if roles }}`developer` and hides it from `visitor` (role `manager`){{ end }}{{ if roles && claims }}, {{ end }}{{ if claims }}shows it to `analyst` and hides it from `clerk` (`department=finance`){{ end }}{{ if roles && claims }}, and shows one requiring both only to `developer`, not to `clerk` (only the role) or `analyst` (only the claim){{ end }}, with `useAuth` mocked to the ID token claims of {{ local_users }}. It cannot see whether an endpoint behind a hidden element has a policy: that is the backend's gate.
 
 {{~ end ~}}
 ## Consequences

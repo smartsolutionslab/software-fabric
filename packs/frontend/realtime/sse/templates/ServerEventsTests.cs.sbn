@@ -113,8 +113,7 @@ public class ServerEventsTests({{ integration_fixture }})
 
 {{~ if signed_in ~}}
     /// <summary>
-    /// A client calling the host as a realm user with a token that lives ShortLifespan seconds: the realm gets a copy of
-    /// the web client (its mappers included) whose tokens expire that soon, so other tests' tokens are untouched.
+    {{ short_lived_test_user_token_summary }}
     /// </summary>
     private async Task<HttpClient> ShortLivedCallerAsync(string user, CancellationToken cancellationToken)
     {

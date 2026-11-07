@@ -2,7 +2,7 @@ namespace {{ namespace }}.Integration.Tests;
 
 /// <summary>
 /// The endpoints of the resources the fixture started, by the AppHost's resource and endpoint names: what a test
-/// reaches beside the host, such as the identity provider's (keycloak, http).
+/// reaches beside the host{{ if project["backend.auth"] != "none" }}, such as the identity provider's ({{ identity_resource }}, http){{ end }}.
 /// </summary>
 public sealed class ContainerResources
 {

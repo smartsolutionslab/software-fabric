@@ -301,8 +301,13 @@ template refuses another provider or auth client with `#error` or
 `throw new Error(...)`, or when a project rendered with stand-in
 vocabularies names Keycloak (`keycloak`, `/realms/`, `realm_access`,
 `admin-cli`, its login form, its tenant group paths `/tenants/`) or oidc-client-ts's token storage outside their
-own files, the composition root and the host's shared files. Comments are
-prose and still describe Keycloak where it is the only provider. A
+own files, the composition root and the host's shared files. Prose that
+differs per provider (its local users, its roles, how a claim reaches the
+token, the browser's client) comes from the vocabulary too:
+`SharedIdentityTests` generates generic-oidc and entra-id projects with the
+provider's own text stood in and fails for any line, comments, ADRs and agent
+rules included, that names Keycloak or a realm outside the AppHost and the
+provider's own files (*#322*). A
 multi-line result called after other text on its line is indented by the
 caller: `{{ accept_query_token ... | string.replace "\n" "\n        " }}`.
 
@@ -345,6 +350,25 @@ copy of it (*#322*).
 | `user_name_claim` | the access token claim `GET /me` answers as the user's name: `preferred_username` (*#322*) |
 | `browser_client_settings` | the browser OIDC client's settings for its client ID and scope, TS object-literal lines each ending in `,`: `client_id: '<name>-web',`, the realm's own client, and no scope (*#322*) |
 | `browser_client_env` | the `ImportMetaEnv` members those settings read, one per line, or nothing: nothing (*#322*) |
+| `local_provider` | prose naming the local provider: `the realm` (*#322*, as are the functions below) |
+| `local_user` | prose for one of its local users: `a realm user` |
+| `local_users` | prose for its local users as a whole: `the realm's local users` |
+| `local_users_source` | Markdown naming the file that defines them: `` `src/AppHost/realms/realm.json` `` |
+| `local_users_setup` | prose naming that local setup: `the realm import` |
+| `identity_resource` | the local provider's resource name in the AppHost and the Testcontainers fixture: `keycloak` |
+| `short_lived_test_user_token_summary` | the `///` lines summarising `ShortLivedCallerAsync`: how the provider gives one test a token that expires after `ShortLifespan` seconds |
+| `unstarted_people_resources_adr` | Markdown for the Testcontainers ADR: what the AppHost starts only for people, which the fixture does not start (Mailpit for Keycloak's email) |
+| `browser_client_adr` | Markdown ending the browser-sign-in ADR's sentence on its client: `the client id is the realm's <project>-web client.` |
+| `id_token_claims_adr roles claims` | Markdown: the sentence saying who puts the roles (`roles`, a boolean) and `department` (`claims`) into the ID token |
+| `id_token_claim_rule` | Markdown ending the agent rule "A role or claim the frontend should see must be in the ID token:": its mapper needs `id.token.claim` |
+| `role_kind` | prose for the kind of role the policies check: `realm role` |
+| `add_role_rule` | Markdown, the agent rule's sentence on adding a role: into `realm.json`'s `roles.realm` and the users' `realmRoles` |
+| `roles_production_adr` | Markdown, the roles ADR's consequence on production's roles |
+| `token_issuer` | prose naming who issues the tokens the policies read: `Keycloak` |
+| `claim_attribute_owner` | prose naming who keeps the attribute behind a claim, and who may edit it: `the realm's user profile` |
+| `claim_mapping_adr` | Markdown for the claims ADR: which claims the provider maps, how to add one, and what is development only |
+| `claim_change_adr` | Markdown, the claims ADR's consequence of a new claim |
+| `add_claim_rule` | Markdown, the agent rule on adding a claim |
 
 Generic OIDC (`backend.auth.generic-oidc`, *#251*) reads standard claims
 under the provider's own names (`MapInboundClaims = false`): its
@@ -358,7 +382,10 @@ returns the one value of the token's `tenant` claim. Its
 `browser_client_settings` read the client ID and scope from
 `VITE_OIDC_CLIENT_ID` and `VITE_OIDC_SCOPE`, falling back on `<name>-web`
 and `openid`, and `browser_client_env` declares both: production's provider
-registers its own web client (*#322*). Its local provider is
+registers its own web client (*#322*). Its prose functions describe
+production's provider as any OpenID Connect provider and the local one as
+the local provider, whose realm import holds the users, roles and claim
+mappers (*#322*). Its local provider is
 Keycloak, named `identity` in the AppHost and configured to issue those
 claims; the short-lived token, the login page and the authority are that
 local Keycloak's, as for the keycloak pack.
@@ -378,7 +405,9 @@ document (`/organizations/v2.0/.well-known/openid-configuration`),
 `http://localhost:8080/organizations/v2.0`, `id_token_roles roles` is
 `roles: [roles]`, `role_mapping_provider` is `Microsoft Entra ID`,
 `browser_client_settings` and `browser_client_env` are generic OIDC's (a
-real Entra ID needs the registration's client ID and a scope of the API), and
+real Entra ID needs the registration's client ID and a scope of the API), its
+prose functions describe app roles, optional claims of the app registration
+and the stand-in's users (*#322*), and
 `tenant_claim user` maps the token's one `tid` to the tenant through
 `AzureAd:Tenants:<tenant> = <directory id>`, read from the request's
 `IConfiguration`. Its local provider is `src/IdentityStandIn`, an

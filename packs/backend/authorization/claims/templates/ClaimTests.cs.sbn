@@ -20,7 +20,7 @@ namespace {{ namespace }}.Integration.Tests;
 
 {{~ if roles ~}}
 /// <summary>
-/// The {{ module.name }} module's sample policy {{ module.name }}.manage requires the realm role manager and the claim
+/// The {{ module.name }} module's sample policy {{ module.name }}.manage requires the {{ role_kind }} manager and the claim
 /// department=finance: developer holds both, clerk only the role, analyst only the claim.
 /// </summary>
 {{~ else ~}}

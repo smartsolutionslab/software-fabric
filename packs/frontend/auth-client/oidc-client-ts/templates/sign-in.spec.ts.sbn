@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('a realm user signs in and sees the application', async ({ page }) => {
+test('{{ local_user }} signs in and sees the application', async ({ page }) => {
   await page.goto('/');
 
   {{ browser_sign_in "page" "'developer'" }}
