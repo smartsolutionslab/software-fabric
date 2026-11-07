@@ -1,0 +1,64 @@
+{{~ auth = project["backend.auth"] != "none" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+{{~ if auth ~}}
+using Grpc.Core;
+{{~ end ~}}
+using Grpc.Net.Client;
+{{~ if auth ~}}
+using Microsoft.AspNetCore.Authentication;
+{{~ end ~}}
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+
+namespace {{ namespace }}.GrpcServices.Tests;
+
+/// <summary>
+/// The real host in process, serving this assembly's sample service beside the modules' own. Nothing it would reach is
+/// started: no hosted service runs{{ if auth }}, and a test user signs in in place of the identity provider{{ end }}.
+/// </summary>
+public sealed class GrpcHost : WebApplicationFactory<Program>
+{
+{{~ if auth ~}}
+    /// <summary>The headers of a call by the user.</summary>
+    public static Metadata SignedInAs(string user) => new() { { TestUser.Header, user } };
+
+{{~ end ~}}
+    /// <summary>A channel to the host in process; gRPC's HTTP/2 goes through the test server's handler.</summary>
+    public GrpcChannel CreateChannel() =>
+        GrpcChannel.ForAddress(Server.BaseAddress, new GrpcChannelOptions { HttpHandler = Server.CreateHandler() });
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        {{ not_null "builder" }}
+
+        builder.UseEnvironment(Environments.Development);
+        builder.UseSetting("ConnectionStrings:database", "Host=localhost;Database=unused");
+{{~ if project["backend.bus.transport"] == "kafka" ~}}
+        builder.UseSetting("ConnectionStrings:messaging", "localhost:9092");
+{{~ else if project["backend.bus.transport"] != "none" ~}}
+        builder.UseSetting("ConnectionStrings:messaging", "amqp://localhost");
+{{~ end ~}}
+{{~ if auth ~}}
+        {{ unstarted_host_settings }}
+{{~ end ~}}
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IHostedService>();
+{{~ if auth ~}}
+            services.AddAuthentication(options =>
+                {
+                    options.DefaultScheme = TestUser.SchemeName;
+                    options.DefaultAuthenticateScheme = TestUser.SchemeName;
+                    options.DefaultChallengeScheme = TestUser.SchemeName;
+                })
+                .AddScheme<AuthenticationSchemeOptions, TestUser>(TestUser.SchemeName, _ => { });
+{{~ end ~}}
+            services.AddScoped<IQueryHandler<Shout, Result<Shouted, ApiError>>, ShoutHandler>()
+                .AddGrpcServicesIn(typeof(SamplesService).Assembly);
+        });
+    }
+}

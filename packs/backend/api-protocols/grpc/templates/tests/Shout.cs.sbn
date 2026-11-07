@@ -1,0 +1,6 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.GrpcServices.Tests;
+
+/// <summary>A query, as a module's would be.</summary>
+public sealed record Shout(string Text) : IQuery<Result<Shouted, ApiError>>;

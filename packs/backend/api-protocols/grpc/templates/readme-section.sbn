@@ -1,0 +1,10 @@
+## gRPC
+
+Modules serve gRPC beside REST on the host's own HTTP/2 endpoint, `grpc` (`http://localhost:5081` outside Aspire). A service's contract is a `.proto` in its module's Api project:
+
+```text
+src/Modules/Billing/Billing.Api/Protos/billing.proto
+src/Modules/Billing/Billing.Api/GrpcServices/InvoicesService.cs
+```
+
+The build generates its base and client; the service translates each call to a command or query and sends it through `IDispatcher`, and the host maps it by itself. `tests/GrpcServices.Tests` calls the host in process with generated clients.

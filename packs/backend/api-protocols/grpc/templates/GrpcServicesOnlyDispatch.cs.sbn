@@ -1,0 +1,52 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A gRPC service translates calls to commands and queries and sends them through the dispatcher, as an endpoint does:
+/// it lives in a module's Api project and takes nothing but <c>IDispatcher</c>, so no business logic, repository or
+/// DbContext can reach it. A gRPC service is a concrete class whose base was generated from a <c>.proto</c> service.
+/// </summary>
+public sealed class GrpcServicesOnlyDispatch : IArchitectureRule
+{
+    private const string BindServiceMethod = "Grpc.Core.BindServiceMethodAttribute";
+
+    private const string Dispatcher = "{{ namespace }}.BuildingBlocks.Messaging.IDispatcher";
+
+    public string Description => "A gRPC service lives in a module's Api project and takes only IDispatcher.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var assembly in model.ModuleAssemblies)
+        {
+            var api = assembly.GetName().Name!.EndsWith(".Api", StringComparison.Ordinal);
+            foreach (var service in assembly.GetTypes().Where(IsGrpcService).OrderBy(type => type.FullName, StringComparer.Ordinal))
+            {
+                if (!api)
+                {
+                    yield return $"{service.FullName} is a gRPC service outside a module's Api project; it belongs beside the endpoints.";
+                }
+
+                foreach (var parameter in service.GetConstructors()
+                    .SelectMany(constructor => constructor.GetParameters())
+                    .Select(parameter => parameter.ParameterType.FullName)
+                    .Where(type => type != Dispatcher)
+                    .Distinct(StringComparer.Ordinal))
+                {
+                    yield return $"{service.FullName} takes {parameter}; a gRPC service takes only IDispatcher and translates calls to commands and queries.";
+                }
+            }
+        }
+    }
+
+    private static bool IsGrpcService(Type type) =>
+        type is { IsClass: true, IsAbstract: false } && Bases(type).Any(@base => @base.GetCustomAttributesData().Any(attribute => attribute.AttributeType.FullName == BindServiceMethod));
+
+    private static IEnumerable<Type> Bases(Type type)
+    {
+        for (var current = type.BaseType; current is not null; current = current.BaseType)
+        {
+            yield return current;
+        }
+    }
+}

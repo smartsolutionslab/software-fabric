@@ -116,7 +116,7 @@ declares-slots:
   - { slot: modules.packages.domain, description: "<PackageReference> lines for every module's Domain project." }
   - { slot: modules.packages.application, description: "<PackageReference> lines for every module's Application project." }
   - { slot: modules.packages.infrastructure, description: "<PackageReference> lines for every module's Infrastructure project." }
-  - { slot: modules.packages.api, description: "<PackageReference> lines for every module's Api project." }
+  - { slot: modules.packages.api, description: "<PackageReference> lines, and other items its build needs (a Protobuf glob), for every module's Api project." }
   - { slot: tests.build-properties, description: "Properties for every test project." }
   - { slot: tests.packages, description: "<PackageReference> lines for every test project." }
   - { slot: tests.usings, description: "<Using> lines for every test project." }
