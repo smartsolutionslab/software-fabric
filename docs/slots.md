@@ -41,6 +41,7 @@ tests/
   Directory.Build.props         base; test packages and usings by slot
   Architecture.Tests/           base; packs add gate tests as their own files
   Integration.Tests/            backend.test.integration.aspire-fixture; the REST pack adds ListEndpointsArePagedTests
+  TestRun/                      backend.test.framework.nunit: the run fixtures, compiled into every test project
   Kernel/Paging.Tests/          base; the guards, absence and result packs add their own Kernel test projects
   Modules/<Module>.Tests/       base (per module)
 web/
@@ -146,9 +147,9 @@ pack fill a slot of a choice it can be combined with but does not need
 | `modules.packages.infrastructure` | 〃 | ef-core, postgres, wolverine |
 | `modules.packages.api` | 〃 | minimal-apis |
 | `buildingblocks.packages` | `src/BuildingBlocks/BuildingBlocks.csproj` | ef-core, wolverine, result |
-| `tests.build-properties` *(added in M1-02)* | `tests/Directory.Build.props` | xunit (`OutputType Exe` for xUnit v3) |
-| `tests.packages` | `tests/Directory.Build.props` | xunit, shouldly, nsubstitute, aspire-fixture |
-| `tests.usings` | `tests/Directory.Build.props` | xunit, shouldly, nsubstitute |
+| `tests.build-properties` *(added in M1-02)* | `tests/Directory.Build.props` | xunit (`OutputType Exe` for xUnit v3); nunit (`OutputType Exe` and `EnableNUnitRunner`) |
+| `tests.packages` | `tests/Directory.Build.props` | xunit or nunit, shouldly, nsubstitute, aspire-fixture; nunit also compiles `tests/TestRun/*.cs` (its run fixtures) into every test project |
+| `tests.usings` | `tests/Directory.Build.props` | xunit or nunit (test projects only: a program under `tests/` keeps `System.ComponentModel`'s `[Description]`), shouldly, nsubstitute |
 | `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak (the host and `Microsoft.AspNetCore.Mvc.Testing`, for its endpoint rule) |
 | `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides); agent-framework (`IDispatcher`, which a handler running an agent takes, and `IAgentMcpTools` with the MCP client) |
 | `integration-tests.parameters` *(added for #77, declared by aspire-fixture)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter); agent-ui ag-ui (`model-stand-in` true: the host's stand-in model answers the agents) |
@@ -185,6 +186,17 @@ library directly.
 | `actual \| should_be_of_type type`, `should_be_assignable_to type` | the value as `type` |
 | `should_throw type action`, `should_throw_async type action` | the exception (awaitable for the async one) |
 | `should_not_throw action` | `Should.NotThrow(action)` |
+
+NUnit (`backend.test.framework.nunit`, *#256*) returns `[Test]` for both
+test attributes (a table's method may carry `[Test]` beside its cases),
+`[TestCase(arguments)]`, `TestContext.CurrentContext.CancellationToken`,
+`TestContext.Out.WriteLine(text)`; a run fixture is
+`[assembly: <namespace>.RunFixture(typeof(type))]`, and
+`test_takes_run_fixture type` is `[RunFixture(typeof(type))]` on its own
+line; `test_lifetime` is `ITestLifetime` (an `IAsyncDisposable`),
+`test_setup` `[SetUp]` above `public async ValueTask InitializeAsync()`,
+`test_teardown` `public async ValueTask DisposeAsync()`, which NUnit calls
+when it disposes each test's instance.
 
 Scriban indents every later line of a multi-line result by the
 indentation of the line the call starts, when nothing but whitespace
@@ -293,7 +305,7 @@ is a defect in the second pack.
 
 | Slot | File | Filled by |
 |---|---|---|
-| `ci.backend-steps` | `.github/workflows/ci.yml` | xunit (runs every test project with code coverage, then the coverage gate; the integration tests need Docker, which GitHub's runners have) |
+| `ci.backend-steps` | `.github/workflows/ci.yml` | xunit or nunit (runs every test project with code coverage, then the coverage gate; the integration tests need Docker, which GitHub's runners have) |
 | `pr-template.sections` *(added in M1-06)* | `.github/pull_request_template.md` | fabric (`## Spec and plan`), red-first (`## Tests observed failing`, `## Tests observed passing before the change`) |
 | `ci.frontend-steps` | 〃 | pnpm, react (`pnpm format:check`), rtk-query-codegen (generated client is current), accessibility |
 | `readme.first-steps` *(added for #11)* | `README.md` (`## First steps`, printed by `fabric new`) | pnpm (create and commit `web/pnpm-lock.yaml`) |
