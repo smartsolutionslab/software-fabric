@@ -23,6 +23,7 @@ using {{ name_space }};
 namespace {{ namespace }}.Integration.Tests;
 
 /// <summary>The host's event hub (/hubs/events) seen from a browser's side: what it receives, and who may connect.</summary>
+{{~ integration_fixture_attributes ~}}
 public class ServerEventsTests({{ integration_fixture }})
 {
 {{~ if signed_in ~}}

@@ -95,8 +95,7 @@ dimensions:
     active-when: "backend.bus.transport != none"
     default: wolverine
     options:
-      wolverine:   { tier: supported }
-      masstransit: { tier: experimental, note: "check the licence of the pinned major version before each release" }
+      wolverine: { tier: supported }
 
   backend.mediator:
     scope: project
@@ -323,7 +322,6 @@ dimensions:
     default: []
     options:
       mutation-testing: { tier: experimental, note: "Stryker.NET" }
-      contract-tests:   { tier: experimental }
 
   test.discipline:
     scope: project

@@ -1,0 +1,11 @@
+namespace {{ namespace }};
+
+/// <summary>
+/// A class set up and torn down around its work: a test class around each of its tests (NUnit runs its [SetUp]
+/// <see cref="InitializeAsync"/> before a test and disposes the test's instance after it), a run fixture once around
+/// the whole run (<see cref="RunFixtures"/>).
+/// </summary>
+internal interface ITestLifetime : IAsyncDisposable
+{
+    ValueTask InitializeAsync();
+}

@@ -50,6 +50,8 @@ public sealed partial class IdentityVocabularyTests
         "database_fixture_file",
         "database_fixture_package_references",
         "database_fixture_project_references",
+        "integration_fixture_attributes",
+        "database_fixture_attributes",
     ];
 
     /// <summary>

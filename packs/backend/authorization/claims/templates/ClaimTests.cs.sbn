@@ -29,6 +29,7 @@ namespace {{ namespace }}.Integration.Tests;
 /// developer and analyst hold; clerk is in sales and visitor has no department.
 /// </summary>
 {{~ end ~}}
+{{~ integration_fixture_attributes ~}}
 public class {{ module.namespace }}ClaimTests({{ integration_fixture }})
 {
     private static readonly Uri ManagePermission = new("/{{ module.name }}/permissions/manage", UriKind.Relative);

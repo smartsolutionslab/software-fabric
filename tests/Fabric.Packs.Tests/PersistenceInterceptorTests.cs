@@ -6,12 +6,12 @@ public sealed class PersistenceInterceptorTests
     [Fact]
     public void An_interceptor_another_pack_contributes_is_added_to_every_module_context_without_a_new_service_provider_each_time()
     {
-        // contract-tests has no pack yet; the probe takes its place and fills the slot.
-        using var probe = new ProbePack("backend.test.extras.contract-tests", new Dictionary<string, string>
+        // mantine is deferred and has no pack, so the probe stands in for it and fills the slot; shadcn, which it displaces, writes only under web/.
+        using var probe = new ProbePack("frontend.ui-library.mantine", new Dictionary<string, string>
         {
             ["persistence.interceptors"] = "new Shop.BuildingBlocks.Persistence.ProbeInterceptor(Services)",
         });
-        using var project = new GeneratedProject("lean-crud", [probe.Manifest], "backend.test.extras=contract-tests");
+        using var project = new GeneratedProject("lean-crud", [probe.Manifest], "frontend.ui-library=mantine");
         project.AddModule("billing");
         project.Write("src/BuildingBlocks/Persistence/ProbeInterceptor.cs", """
             using Microsoft.EntityFrameworkCore.Diagnostics;

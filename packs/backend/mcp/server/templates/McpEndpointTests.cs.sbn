@@ -6,6 +6,7 @@ using System.Text;
 namespace {{ namespace }}.Integration.Tests;
 
 /// <summary>The host's MCP endpoint, started through Aspire: a session begins with the protocol's initialize request.</summary>
+{{~ integration_fixture_attributes ~}}
 public class McpEndpointTests({{ integration_fixture }})
 {
     private const string Initialize = """

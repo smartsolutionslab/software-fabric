@@ -7,6 +7,7 @@ namespace {{ namespace }}.Integration.Tests;
 /// (docs/adr). Read from the OpenAPI document the running host serves: a GET whose success is a JSON array, or a
 /// <c>PagedResult</c>, is a list endpoint.
 /// </summary>
+{{~ integration_fixture_attributes ~}}
 public class ListEndpointsArePagedTests({{ integration_fixture }})
 {
     private const string PagedResultSchema = "#/components/schemas/PagedResultOf";

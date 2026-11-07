@@ -20,14 +20,16 @@ public sealed class CoverageGateTests
     };
 
     /// <summary>
-    /// The Kernel's packs: the defaults, and the other option of each dimension that has one with a pack; and
-    /// saas-standard-react, whose Wolverine source generator writes code into each module's Application.
+    /// The Kernel's packs: the defaults, and the other option of each dimension that has one with a pack;
+    /// saas-standard-react, whose Wolverine source generator writes code into each module's Application; and the
+    /// tests on NUnit, whose pack carries the same gate.
     /// </summary>
     public static TheoryData<string, string> FreshProjects => new()
     {
         { Profile, string.Empty },
         { Profile, "backend.guards=bcl backend.absence=nullable backend.result-style=minimal" },
         { "saas-standard-react", string.Empty },
+        { Profile, "backend.test.framework=nunit" },
     };
 
     [Theory]

@@ -58,6 +58,17 @@ public class ValidateCommandTests
         run.Error.ShouldContain("error: unknown dimension 'frontend.colour'.");
     }
 
+    [Theory]
+    [InlineData("backend.bus.library=masstransit", "error: 'masstransit' is not an option of backend.bus.library; options: wolverine.")]
+    [InlineData("backend.test.extras=contract-tests", "error: 'contract-tests' is not an option of backend.test.extras; options: mutation-testing.")]
+    public void A_dropped_option_exits_one_as_an_unknown_option(string setting, string error)
+    {
+        var run = CliRun.Of("validate", "--profile", "saas-standard-react", "--set", setting, "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain(error);
+    }
+
     [Fact]
     public void A_broken_catalog_exits_one_with_its_location()
     {

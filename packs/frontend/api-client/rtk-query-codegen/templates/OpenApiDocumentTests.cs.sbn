@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 
 namespace {{ namespace }}.Integration.Tests;
 
+{{~ integration_fixture_attributes ~}}
 public class OpenApiDocumentTests({{ integration_fixture }})
 {
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
