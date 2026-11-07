@@ -127,8 +127,9 @@ public sealed partial class GenericOidcTests
         // The new module's sample endpoint makes the frontend's OpenAPI copy stale; that test fails and rewrites it.
         var (_, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
 
-        output.ShouldContain("failed: 1", customMessage: output);
-        output.ShouldContain("failed Shop.Integration.Tests.OpenApiDocumentTests.The_frontends_copy_of_the_openapi_document_is_current", customMessage: output);
+        FailedCount().Match(output).Groups[1].Value.ShouldBe("1", customMessage: output);
+        FailedTest().Matches(output).Select(match => match.Groups[1].Value)
+            .ShouldBe(["Shop.Integration.Tests.OpenApiDocumentTests.The_frontends_copy_of_the_openapi_document_is_current"], customMessage: output);
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "tests", "Integration.Tests", "HostTests.cs"))
             .ShouldContain("A_token_from_the_realm_identifies_the_user");
     }
@@ -159,4 +160,10 @@ public sealed partial class GenericOidcTests
 
     [GeneratedRegex(@"[Kk]eycloak|/realms/|realm_access|resource_access|/tenants/")]
     private static partial Regex ProviderSpecific();
+
+    [GeneratedRegex(@"(?m)^\s*failed: (\d+)\s*$")]
+    private static partial Regex FailedCount();
+
+    [GeneratedRegex(@"(?m)^\s*failed (\S+)")]
+    private static partial Regex FailedTest();
 }
