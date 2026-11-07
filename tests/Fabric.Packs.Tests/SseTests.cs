@@ -120,6 +120,46 @@ public sealed class SseTests
         }
     }
 
+    /// <summary>
+    /// Review finding on #311: a stream with events waiting kept yielding them after its token expired. The probe drives
+    /// the host's streams directly, from the generated architecture tests, which reference the host.
+    /// </summary>
+    [Fact]
+    public void A_stream_ends_once_cancelled_even_with_events_still_waiting()
+    {
+        using var project = new GeneratedProject("lean-crud", WithoutAuthentication);
+        project.Write("tests/Architecture.Tests/StreamCancellationProbe.cs", """
+            using Shop.Host.Realtime;
+
+            namespace Shop.Architecture.Tests;
+
+            public class StreamCancellationProbe
+            {
+                [Fact]
+                public async Task A_cancelled_stream_yields_no_event_left_in_its_backlog()
+                {
+                    var streams = new BrowserEventStreams();
+                    using var expiry = new CancellationTokenSource();
+                    await using var listening = streams.ListenAsync(expiry.Token).GetAsyncEnumerator(TestContext.Current.CancellationToken);
+                    var first = listening.MoveNextAsync();
+                    streams.Send("TestEvent", new { Text = "before" });
+                    (await first).ShouldBeTrue();
+
+                    streams.Send("TestEvent", new { Text = "waiting" });
+                    await expiry.CancelAsync();
+
+                    (await listening.MoveNextAsync()).ShouldBeFalse();
+                }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+    }
+
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
     {
         var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, overrides);
