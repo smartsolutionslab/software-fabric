@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using Fabric.Core.Generation;
 
@@ -289,6 +291,22 @@ public sealed class GrpcTests
             "<ProjectReference Include=\"../../src/AppHost/AppHost.csproj\" />\n    <ProjectReference Include=\"../../src/Modules/Billing/Billing.Api/Billing.Api.csproj\" />",
             StringComparison.Ordinal));
         project.Build();
+
+        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+    }
+
+    [Fact]
+    public void With_testcontainers_the_host_in_process_keeps_to_ports_of_its_own_while_the_configured_ones_are_taken()
+    {
+        using var project = NewProject(Grpc, "backend.test.integration=testcontainers");
+        project.Build();
+        using var http = new TcpListener(IPAddress.Loopback, 5080);
+        using var grpc = new TcpListener(IPAddress.Loopback, 5081);
+        http.Start();
+        grpc.Start();
 
         var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
 
