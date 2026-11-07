@@ -1,1 +1,2 @@
-builder.Services.AddKeycloakAuthentication(builder.Configuration, builder.Environment);
+builder.Services.AddKeycloakAuthentication(builder.Configuration, builder.Environment);{{ if object.has_key(project, "backend.authorization") && (project["backend.authorization"] | array.contains "roles") }}
+builder.Services.AddKeycloakRoles();{{ end }}

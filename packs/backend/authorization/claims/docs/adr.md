@@ -34,7 +34,7 @@ Keycloak imports a realm only when it does not exist yet: remove the data volume
 
 **Sample claim and users** (development only, decided by the repository owner, 2026-11-04): `department`, with the sample value `finance`. `developer` (and `developer-b` with tenancy) is in `finance`{{ if roles }} and holds the role `manager`{{ end }}; `visitor` has no department; `clerk` / `clerk` is in `sales`{{ if roles }} and holds `manager`, so it has only the role{{ end }}; `analyst` / `analyst` is in `finance`{{ if roles }} and holds no role, so it has only the claim{{ end }}. With tenancy, `visitor`, `clerk` and `analyst` are in `tenant-a`, so a 403 is about the claim, not the tenant. Every module's sample policy `<module>.manage` requires {{ if roles }}the role `manager` and {{ end }}`department=finance`, on the endpoint `GET /<module>/permissions/manage`.
 
-**Only Keycloak so far.** Another identity provider needs its own way to put a department into the token; with one of them a module's generated claim tests do not compile (`#error`) until this pack learns it.
+**The identity provider supplies the claim and the users.** Mapping `department` into the token and giving the sample users their departments is the identity provider's: with Keycloak, the realm import above. The claim tests sign the users in by name, so they run against every provider the generator offers.
 
 ## Gates
 

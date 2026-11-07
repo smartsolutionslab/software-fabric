@@ -63,7 +63,7 @@ public sealed class McpHost : WebApplicationFactory<Program>
         builder.UseSetting("ConnectionStrings:messaging", "amqp://localhost");
 {{~ end ~}}
 {{~ if auth ~}}
-        builder.UseSetting("Authentication:Authority", "http://localhost/realms/unused");
+        {{ unstarted_host_settings }}
 {{~ end ~}}
         builder.ConfigureTestServices(services =>
         {

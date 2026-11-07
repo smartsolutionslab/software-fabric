@@ -21,7 +21,7 @@ const users = {
 {{~ if roles ~}}
   developer: {
     preferred_username: 'developer',
-    realm_access: { roles: ['manager'] },
+    {{ id_token_roles "'manager'" }},
 {{~ if claims ~}}
     department: 'finance',
 {{~ end ~}}
@@ -36,7 +36,7 @@ const users = {
   clerk: {
     preferred_username: 'clerk',
 {{~ if roles ~}}
-    realm_access: { roles: ['manager'] },
+    {{ id_token_roles "'manager'" }},
 {{~ end ~}}
     department: 'sales',
   },

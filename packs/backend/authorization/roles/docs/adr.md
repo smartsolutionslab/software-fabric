@@ -13,13 +13,13 @@ Being signed in is not enough for every endpoint: access can depend on the user'
 
 **Sample role and users** (development only, in the realm import): the realm role `manager`, held by `developer` (and `developer-b` when the project has tenancy), and the user `visitor` / `visitor` with no roles (in `tenant-a` with tenancy, so a 403 is about the role, not the tenant). `fabric add-module` gives every new module the sample policy `<module>.manage`, which requires `manager`{{ if claims }} (and, with claims, `department=finance`: see the claims ADR){{ end }}, and the endpoint `GET /<module>/permissions/manage` that requires it: 200 when the caller holds the policy, 403 when not, so a frontend can ask before it offers to manage something, and the integration tests have an endpoint to prove the policy on. The role, the users and the sample policy were decided by the repository owner (2026-11-03); the endpoint is this pack's.
 
-**Only Keycloak so far.** Other identity providers carry roles elsewhere in their tokens; with one of them the generated host does not compile (`#error`) until this pack learns where.
+**The identity provider maps its roles.** Where the roles sit in the token is the identity provider's business: its pack puts them into `ClaimTypes.Role` (with Keycloak, `KeycloakRoleClaims` above) and names that file for `OnlyModulePoliciesCheckRoles`. This pack only checks them, so it works with every provider the generator offers.
 
 ## Gates
 
 - `EveryEndpointPolicyIsRegisteredByItsModule` starts the host in Development and in Production, as `EveryEndpointDeclaresItsAuthorization` does, and fails for a module endpoint whose policy that module's `IModulePolicies` does not register, or which another module registers too (the host has one policy table; the last registration would win). An endpoint belongs to the module whose Api assembly declares its handler.
 - `EveryPolicyIsRegisteredByOneModule` fails for a policy name two modules register, naming both, whether or not an endpoint or an MCP tool names it: whichever registration came last would silently decide what everything naming it requires. The host refuses to start on the same names, because both ask `ModulePolicyOwners` in BuildingBlocks.
-- `OnlyModulePoliciesCheckRoles` parses every source under `src/` and fails, naming file and line, for `IsInRole`, `ClaimTypes.Role`, `[Authorize(Roles = ...)]` anywhere, and `RequireRole` outside a type implementing `IModulePolicies`. `src/Host/KeycloakRoleClaims.cs` is exempt: it is where the roles enter.
+- `OnlyModulePoliciesCheckRoles` parses every source under `src/` and fails, naming file and line, for `IsInRole`, `ClaimTypes.Role`, `[Authorize(Roles = ...)]` anywhere, and `RequireRole` outside a type implementing `IModulePolicies`. The identity provider's role mapping (`src/Host/KeycloakRoleClaims.cs` with Keycloak) is exempt: it is where the roles enter.
 - The integration tests (`<Module>RoleTests`) give `developer` 200, `visitor` 403 and an anonymous caller 401 on each module's sample endpoint, against the running stack.
 
 ## What the gates cannot see

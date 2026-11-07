@@ -8,12 +8,12 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 /// A role is checked in one place: the policy a module's <c>IModulePolicies</c> registers with <c>RequireRole</c>.
 /// Handlers, endpoints and services name the policy instead, so who may do what stays readable in one file per module
 /// and an endpoint cannot quietly decide for itself. Sources under <c>src/</c> are parsed, not grepped: a comment or a
-/// string that spells a role check is prose. <c>src/Host/KeycloakRoleClaims.cs</c>, which puts the token's roles into
+/// string that spells a role check is prose. <c>{{ role_mapping_source }}</c>, which puts the token's roles into
 /// <c>ClaimTypes.Role</c> in the first place, is the one exception.
 /// </summary>
 public sealed class OnlyModulePoliciesCheckRoles : IArchitectureRule
 {
-    private const string RoleMapping = "src/Host/KeycloakRoleClaims.cs";
+    private const string RoleMapping = "{{ role_mapping_source }}";
 
     private const string Registration = "IModulePolicies";
 

@@ -1,6 +1,3 @@
-{{~ if project["backend.auth"] != "keycloak" ~}}
-#error The module policy rule starts the host through the references the keycloak pack gives the architecture tests; other identity providers are not built yet (docs/adr/0006 of the generator).
-{{~ end ~}}
 {{~ if project["backend.topology"] != "modular-monolith" ~}}
 #error The module policy rule starts the modular-monolith host only so far (docs/adr/0006 of the generator).
 {{~ end ~}}
@@ -120,7 +117,7 @@ public sealed class EveryEndpointPolicyIsRegisteredByItsModule : IArchitectureRu
 {{~ else if project["backend.bus.transport"] != "none" ~}}
             builder.UseSetting("ConnectionStrings:messaging", "amqp://localhost");
 {{~ end ~}}
-            builder.UseSetting("Authentication:Authority", "http://localhost/realms/unused");
+            {{ unstarted_host_settings }}
             builder.ConfigureServices(services => services.RemoveAll<IHostedService>());
         }
     }

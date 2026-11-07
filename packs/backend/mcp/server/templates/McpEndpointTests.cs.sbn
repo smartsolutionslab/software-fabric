@@ -1,5 +1,4 @@
 {{~ auth = project["backend.auth"] != "none" ~}}
-{{~ keycloak = project["backend.auth"] == "keycloak" ~}}
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -26,7 +25,7 @@ public class McpEndpointTests({{ integration_fixture }})
         {{ `response.StatusCode` | should_be `HttpStatusCode.Unauthorized` }};
     }
 {{~ end ~}}
-{{~ if keycloak ~}}
+{{~ if auth ~}}
 
     {{ test_attribute }}
     public async Task A_signed_in_user_starts_a_session()

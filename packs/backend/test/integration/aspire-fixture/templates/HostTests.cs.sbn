@@ -76,7 +76,7 @@ public class HostTests(AspireFixture aspire)
         {{ status "response" "OK" }}
     }
 {{~ end ~}}
-{{~ if project["backend.auth"] == "keycloak" ~}}
+{{~ if project["backend.auth"] != "none" ~}}
 
     {{ test_attribute }}
     public async Task An_anonymous_caller_is_rejected()
@@ -97,6 +97,8 @@ public class HostTests(AspireFixture aspire)
 
         {{ equal "me?.Name" "\"developer\"" }}
     }
+{{~ end ~}}
+{{~ if project["backend.auth"] == "keycloak" ~}}
 
     {{ test_attribute }}
     public async Task A_reset_password_email_from_the_realm_reaches_mailpit()
@@ -113,7 +115,7 @@ public class HostTests(AspireFixture aspire)
         {{ equal "recipient" "\"developer@example.com\"" }}
     }
 {{~ end ~}}
-{{~ if project["backend.tenancy"] != "none" && project["backend.auth"] == "keycloak" ~}}
+{{~ if project["backend.tenancy"] != "none" && project["backend.auth"] != "none" ~}}
 
     {{ test_attribute }}
     public async Task Each_user_resolves_to_their_own_tenant()
