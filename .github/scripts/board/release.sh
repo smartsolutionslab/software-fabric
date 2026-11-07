@@ -6,10 +6,31 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 issue="$1"
 reason="$2"
 
-board_park "$issue" "Released: $reason" || { echo "Parking #$issue's branch failed; it is still claimed." >&2; exit 1; }
-board_unclaim "$issue"
-board_status "$issue" Todo
-board_executor "$issue" ""
+# agent:claimed comes off before the branch is parked, never after: next.sh skips a labelled issue, and a claim that
+# takes the branch the moment it is parked adds the label itself, so removing it afterwards would either hide the
+# released issue from the next agent or strip the new claim's label.
+labelled="$(board_issue "$issue" | jq 'any(.labels[]; .name == "agent:claimed")')"
+if [ "$labelled" = true ]; then
+  board_remove_label "$issue" agent:claimed
+fi
+if ! board_park "$issue" "Released: $reason"; then
+  if [ "$labelled" = true ]; then
+    board_add_label "$issue" agent:claimed
+  fi
+  echo "Parking #$issue's branch failed; it is still claimed." >&2
+  exit 1
+fi
+
+# A claim that took the parked branch meanwhile keeps its board fields.
+branch="$(board_branch_for "$issue")"
+head=""
+if [ -n "$branch" ]; then
+  head="$(board_fetch "$branch")"
+fi
+if [ -z "$head" ] || board_parked "$head"; then
+  board_status "$issue" Todo
+  board_executor "$issue" ""
+fi
 board_comment "$issue" "Released: $reason
-The work so far stays on \`$(board_branch_for "$issue")\`; the next agent resumes it."
+The work so far stays on \`$branch\`; the next agent resumes it."
 
