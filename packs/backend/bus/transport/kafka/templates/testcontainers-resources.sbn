@@ -1,0 +1,3 @@
+        // The AppHost's broker, "messaging".
+        var messaging = await StartAsync(new Testcontainers.Kafka.KafkaBuilder("confluentinc/confluent-local:8.2.0").Build(), cancellationToken);
+        settings["ConnectionStrings:messaging"] = $"{messaging.Hostname}:{messaging.GetMappedPublicPort(9092)}";

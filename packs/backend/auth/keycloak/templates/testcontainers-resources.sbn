@@ -1,0 +1,10 @@
+        // The AppHost's identity provider, "keycloak", with its realm and the realm's local users.
+        var keycloak = await StartAsync(
+            new Testcontainers.Keycloak.KeycloakBuilder("quay.io/keycloak/keycloak:26.6")
+                .WithUsername("admin")
+                .WithPassword("admin")
+                .WithRealm(Path.Combine(RepositoryDirectory(), "src/AppHost/realms/realm.json"))
+                .Build(),
+            cancellationToken);
+        Resources.Add("keycloak", "http", new Uri(keycloak.GetBaseAddress()));
+        settings["Authentication:Authority"] = new Uri(Resources.GetEndpoint("keycloak", "http"), "/realms/{{ name }}").ToString();

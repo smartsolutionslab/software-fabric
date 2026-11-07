@@ -14,10 +14,10 @@ func integration_fixture_attributes
   ret test_takes_run_fixture "AspireFixture"
 end
 func database_fixture
-  ret "AspireDatabase database"
+  ret "ApplicationDatabase database"
 end
 func database_fixture_attributes
-  ret test_takes_run_fixture "AspireDatabase"
+  ret test_takes_run_fixture "ApplicationDatabase"
 end
 func database_connection_string
   ret "database.ConnectionString"
@@ -33,7 +33,7 @@ func database_fixture_file(space)
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 
-` + (test_run_fixture (space + ".AspireDatabase")) + `
+` + (test_run_fixture (space + ".ApplicationDatabase")) + `
 
 namespace ` + space + `;
 
@@ -42,7 +42,7 @@ namespace ` + space + `;
 /// MigrationRunner as before the host starts, so every module's vector table exists. Nothing else runs: no host, no
 /// model.
 /// </summary>
-public sealed class AspireDatabase : ` + test_lifetime + `
+public sealed class ApplicationDatabase : ` + test_lifetime + `
 {
     private const string MigrationRunner = "migrations";
 
