@@ -28,7 +28,7 @@ public static partial class Renderer
 
         List<string> errors = [];
         var model = Model(catalog, choices, name);
-        var functions = Functions(composition);
+        var functions = Functions(composition, errors);
 
         var slots = new ScriptObject();
         foreach (var (slot, entries) in composition.Slots.Where(slot => slot.Key != Composer.TemplateFunctionsSlot))
@@ -67,16 +67,36 @@ public static partial class Renderer
             : new RenderedProject([.. files.OrderBy(file => file.Path, StringComparer.Ordinal)], []);
     }
 
-    /// <summary>The Scriban code packs contribute to <see cref="Composer.TemplateFunctionsSlot"/>, as a prefix that outputs nothing.</summary>
-    private static string Functions(Composition composition) =>
-        composition.Slots.TryGetValue(Composer.TemplateFunctionsSlot, out var entries) && entries.Count > 0
-            ? "{{~ " + string.Join('\n', entries.Select(entry => File.ReadAllText(Path.Combine(entry.Pack.Directory, entry.Contribution.Template)))) + " }}"
-            : string.Empty;
+    /// <summary>
+    /// The Scriban code packs contribute to <see cref="Composer.TemplateFunctionsSlot"/>, each parsed on its own so that an error names its own
+    /// file and line, and so that a template's errors are not offset by the functions evaluated in front of it.
+    /// </summary>
+    private static List<Template> Functions(Composition composition, List<string> errors)
+    {
+        List<Template> functions = [];
+        foreach (var entry in composition.Slots.GetValueOrDefault(Composer.TemplateFunctionsSlot) ?? [])
+        {
+            var path = entry.Contribution.Template;
+            var template = Template.Parse(
+                File.ReadAllText(Path.Combine(entry.Pack.Directory, path)),
+                path,
+                lexerOptions: new LexerOptions { Mode = ScriptMode.ScriptOnly });
+            if (template.HasErrors)
+            {
+                errors.Add($"{entry.Pack.Option}: {path}: {string.Join("; ", template.Messages)}");
+                continue;
+            }
 
-    private static string? RenderTemplate(PackManifest pack, string templatePath, string functions, List<string> errors, params ScriptObject[] globals)
+            functions.Add(template);
+        }
+
+        return functions;
+    }
+
+    private static string? RenderTemplate(PackManifest pack, string templatePath, IReadOnlyList<Template> functions, List<string> errors, params ScriptObject[] globals)
     {
         var label = $"{pack.Option}: {templatePath}";
-        var template = Template.Parse(functions + File.ReadAllText(Path.Combine(pack.Directory, templatePath)), templatePath);
+        var template = Template.Parse(File.ReadAllText(Path.Combine(pack.Directory, templatePath)), templatePath);
         if (template.HasErrors)
         {
             errors.Add($"{label}: {string.Join("; ", template.Messages)}");
@@ -85,7 +105,13 @@ public static partial class Renderer
 
         try
         {
-            return Tidy(template.Render(Context(globals)).Replace("\r\n", "\n", StringComparison.Ordinal));
+            var context = Context(globals);
+            foreach (var function in functions)
+            {
+                function.Evaluate(context);
+            }
+
+            return Tidy(template.Render(context).Replace("\r\n", "\n", StringComparison.Ordinal));
         }
         catch (ScriptRuntimeException exception)
         {
