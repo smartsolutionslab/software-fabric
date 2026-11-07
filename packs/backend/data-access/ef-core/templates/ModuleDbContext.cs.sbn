@@ -63,6 +63,7 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
             optionsBuilder.ReplaceService<IMigrationsAssembly, SchemaMigrationsAssembly>()
                 .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
         }
+
 {{~ end ~}}
         base.OnConfiguring(optionsBuilder);
     }

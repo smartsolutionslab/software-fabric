@@ -1,4 +1,5 @@
-{{~ tenancy = project["backend.tenancy"] != "none" ~}}
+{{~ # The tenant column pack adds a TenantId to every table; a schema per tenant keeps tenants apart without one. ~}}
+{{~ tenant_column = project["backend.tenancy"] == "column" ~}}
 using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
@@ -23,7 +24,7 @@ namespace {{ namespace }}.Modules.Dashboards.Infrastructure.Migrations
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     owner = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
                     name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-{{~ if tenancy ~}}
+{{~ if tenant_column ~}}
                     TenantId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
 {{~ end ~}}
                     widgets = table.Column<string>(type: "jsonb", nullable: true)
@@ -39,7 +40,7 @@ namespace {{ namespace }}.Modules.Dashboards.Infrastructure.Migrations
                 table: "dashboards",
                 column: "owner");
 
-{{~ if tenancy ~}}
+{{~ if tenant_column ~}}
             migrationBuilder.CreateIndex(
                 name: "IX_dashboards_TenantId",
                 schema: "dashboards",

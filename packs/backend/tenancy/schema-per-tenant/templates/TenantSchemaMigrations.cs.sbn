@@ -1,0 +1,29 @@
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class TenantSchemaMigrations
+{
+    /// <summary>
+    /// Creates and migrates every module's schema for each tenant in Tenancy:Tenants, each with its own migrations history.
+    /// The MigrationRunner calls it after migrating every module in the module's own schema, which checks each model
+    /// against its snapshot first; the host never does.
+    /// </summary>
+    public static async Task MigrateTenantSchemasAsync(this IServiceProvider services, IEnumerable<Type> contexts, CancellationToken cancellationToken = default)
+    {
+        {{ not_null "services" }}
+        {{ not_null "contexts" }}
+
+        foreach (var tenant in TenantSchemas.Listed(services.GetRequiredService<IConfiguration>()))
+        {
+            using var tenantScope = TenantScope.Begin(tenant);
+            foreach (var context in contexts)
+            {
+                await using var scope = services.CreateAsyncScope();
+                await ((DbContext)scope.ServiceProvider.GetRequiredService(context)).Database.MigrateAsync(cancellationToken);
+            }
+        }
+    }
+}

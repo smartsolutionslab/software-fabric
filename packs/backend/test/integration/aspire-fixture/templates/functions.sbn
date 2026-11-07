@@ -38,9 +38,10 @@ using Aspire.Hosting.Testing;
 namespace ` + space + `;
 
 /// <summary>
-/// The AppHost's database alone, on an empty container, started once per test run: the pgvector image, migrated by the
+` + ((object.has_key(project, "backend.llm.extras") && (array.contains project["backend.llm.extras"] "rag")) ? `/// The AppHost's database alone, on an empty container, started once per test run: the pgvector image, migrated by the
 /// MigrationRunner as before the host starts, so every module's vector table exists. Nothing else runs: no host, no
-/// model.
+/// model.` : `/// The AppHost's database alone, on an empty container, started once per test run and migrated by the MigrationRunner
+/// as before the host starts. Nothing else runs: no host.`) + `
 /// </summary>
 public sealed class ApplicationDatabase : ` + test_lifetime + `
 {

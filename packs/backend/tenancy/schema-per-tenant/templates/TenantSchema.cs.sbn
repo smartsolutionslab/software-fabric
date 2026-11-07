@@ -1,0 +1,40 @@
+using System.Linq.Expressions;
+using {{ namespace }}.BuildingBlocks.Persistence;
+using {{ namespace }}.BuildingBlocks.Tenancy;
+
+namespace Microsoft.EntityFrameworkCore;
+
+public static class TenantSchema
+{
+    /// <summary>In the module's own schema, where work without a listed tenant goes, every query finds nothing.</summary>
+    public static ModelBuilder ApplyTenantSchema(this ModelBuilder modelBuilder, ModuleDbContext context)
+    {
+        {{ not_null "modelBuilder" }}
+        {{ not_null "context" }}
+
+        if (context.CurrentSchema != context.ModuleSchema)
+        {
+            return modelBuilder;
+        }
+
+        foreach (var entity in modelBuilder.Model.GetEntityTypes().Where(entity => !entity.IsOwned() && entity.BaseType is null))
+        {
+            var row = Expression.Parameter(entity.ClrType, "row");
+            modelBuilder.Entity(entity.ClrType).HasQueryFilter(Expression.Lambda(Expression.Constant(false), row));
+        }
+
+        return modelBuilder;
+    }
+
+    /// <summary>Saving changes without a listed tenant fails: the module's own schema holds no tenant's rows.</summary>
+    public static void RequireTenantSchema(this ModuleDbContext context)
+    {
+        {{ not_null "context" }}
+
+        if (context.CurrentSchema == context.ModuleSchema
+            && context.ChangeTracker.Entries().Any(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
+        {
+            throw new InvalidOperationException($"Cannot save changes to {context.GetType().Name} without a tenant listed in {TenantSchemas.Tenants}.");
+        }
+    }
+}
