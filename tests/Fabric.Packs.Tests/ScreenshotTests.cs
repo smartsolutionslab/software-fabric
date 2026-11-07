@@ -101,6 +101,30 @@ public sealed partial class ScreenshotTests
             "(cd web/app && pnpm screenshots) || fail \"The screenshot tests failed.\"\n");
     }
 
+    [Fact]
+    public void The_script_refuses_to_run_when_playwright_test_is_another_version_than_the_image()
+    {
+        var root = Directory.CreateTempSubdirectory("fabric-screenshots-").FullName;
+        try
+        {
+            var script = Path.Combine(root, ".github", "scripts", "screenshots.sh");
+            Directory.CreateDirectory(Path.GetDirectoryName(script)!);
+            File.WriteAllText(script, Files("saas-standard-react", Screenshots)[Script]);
+            var package = Path.Combine(root, "web", "app", "node_modules", "@playwright", "test");
+            Directory.CreateDirectory(package);
+            File.WriteAllText(Path.Combine(package, "package.json"), """{ "name": "@playwright/test", "version": "9.9.9" }""");
+
+            var (exitCode, output) = Shell.Run(root, "bash", script);
+
+            exitCode.ShouldBe(1, output);
+            output.ShouldContain("@playwright/test is 9.9.9, but .github/scripts/screenshots.sh runs Playwright 1.63.0's image: change both together.");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Theory]
     [MemberData(nameof(Profiles))]
     public void The_generator_writes_no_baseline(string profile)
