@@ -96,15 +96,6 @@ public sealed partial class GenericOidcTests
     }
 
     [Fact]
-    public void The_pack_states_why_its_apphost_suppresses_the_preview_keycloak_diagnostics()
-    {
-        var adr = Files(GenericOidc).Single(file => file.Key.EndsWith("-backend-auth-generic-oidc.md", StringComparison.Ordinal)).Value;
-
-        adr.ShouldContain("ASPIREHOSTINGKEYCLOAK001");
-        adr.ShouldContain("#308");
-    }
-
-    [Fact]
     public void The_architecture_tests_pass_and_fail_once_the_host_names_keycloak()
     {
         using var project = NewProject(GenericOidc, RolesAndClaims, SignalR);

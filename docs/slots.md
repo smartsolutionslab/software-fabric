@@ -402,7 +402,7 @@ AppHost's model with it, declares it instead (*#260*).
 
 | Slot | File | Cardinality | Filled by |
 |---|---|---|---|
-| `apphost.packages` | `src/AppHost/AppHost.csproj` | 0+ | postgres, rabbitmq, keycloak, react |
+| `apphost.packages` | `src/AppHost/AppHost.csproj` | 0+ | postgres, rabbitmq, react |
 | `apphost.project-references` *(added in M1-02)* | `src/AppHost/AppHost.csproj` | 0+ | backend.topology (the host project) |
 | `apphost.resources` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak, react (Vite app), micro-frontends (a Vite app per directory of `web/modules`, `builder.AddRemotes()`), agent-ui ag-ui (the `model-stand-in` parameter, false unless a test sets it) |
 | `apphost.host` | `src/AppHost/Program.cs` | **exactly-one** | backend.topology (adds the host project) |

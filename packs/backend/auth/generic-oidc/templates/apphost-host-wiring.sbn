@@ -1,5 +1,5 @@
 
-    .WithReference(identity)
+    .WithReference(identity.GetEndpoint("http"))
     .WaitFor(identity)
     .WithEnvironment("Authentication__Authority", ReferenceExpression.Create($"{identity.GetEndpoint("http")}/realms/{{ name }}"))
     .WithEnvironment("Authentication__Audience", "{{ name }}-api")
