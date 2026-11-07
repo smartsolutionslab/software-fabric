@@ -25,8 +25,8 @@ public sealed class MigrationTests
     [Fact]
     public void A_step_another_pack_puts_in_the_migration_runner_runs_after_the_migrations_with_the_runners_services()
     {
-        // contract-tests has no pack yet; the probe takes its place and fills the slot. It reads a table only a migration creates.
-        using var probe = new ProbePack("backend.test.extras.contract-tests", new Dictionary<string, string>
+        // mantine is deferred and has no pack, so the probe stands in for it and fills the slot; shadcn, which it displaces, writes only under web/. It reads a table only a migration creates.
+        using var probe = new ProbePack("frontend.ui-library.mantine", new Dictionary<string, string>
         {
             ["migration-runner.steps"] = """
                 // Fails with 42P01 unless the migrations have created billing.notes.
@@ -40,7 +40,7 @@ public sealed class MigrationTests
                 Console.WriteLine($"probe step ran after the migrations; database configured: {configured}");
                 """,
         });
-        using var project = new GeneratedProject(Profile, [probe.Manifest], "backend.test.extras=contract-tests");
+        using var project = new GeneratedProject(Profile, [probe.Manifest], "frontend.ui-library=mantine");
         project.AddModule("billing");
         AddNotesWithAMigration(project);
 

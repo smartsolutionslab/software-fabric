@@ -121,12 +121,12 @@ public sealed partial class ServiceDefaultsTests
     [Fact]
     public void A_source_another_pack_names_through_the_slot_is_traced_by_the_service_defaults()
     {
-        // contract-tests has no pack yet; the probe takes its place and fills the slot.
-        using var probe = new ProbePack("backend.test.extras.contract-tests", new Dictionary<string, string>
+        // mantine is deferred and has no pack, so the probe stands in for it and fills the slot; shadcn, which it displaces, writes only under web/.
+        using var probe = new ProbePack("frontend.ui-library.mantine", new Dictionary<string, string>
         {
             ["service-defaults.activity-sources"] = "\"Shop.Probe\"",
         });
-        using var project = new GeneratedProject(Profile, [probe.Manifest], "backend.test.extras=contract-tests");
+        using var project = new GeneratedProject(Profile, [probe.Manifest], "frontend.ui-library=mantine");
         project.WriteTypes("tests/Architecture.Tests/Probes", TracedSourceTests);
         project.Build();
 
