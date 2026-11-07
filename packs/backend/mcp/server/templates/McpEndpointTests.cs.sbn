@@ -7,7 +7,7 @@ using System.Text;
 namespace {{ namespace }}.Integration.Tests;
 
 /// <summary>The host's MCP endpoint, started through Aspire: a session begins with the protocol's initialize request.</summary>
-public class McpEndpointTests(AspireFixture aspire)
+public class McpEndpointTests({{ integration_fixture }})
 {
     private const string Initialize = """
         {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"integration-tests","version":"1.0.0"}}}
@@ -19,7 +19,7 @@ public class McpEndpointTests(AspireFixture aspire)
     {{ test_attribute }}
     public async Task An_anonymous_caller_is_unauthorized()
     {
-        using var client = aspire.CreateHostClient();
+        using var client = {{ host_client }};
 
         using var response = await InitializeAsync(client);
 
@@ -31,7 +31,7 @@ public class McpEndpointTests(AspireFixture aspire)
     {{ test_attribute }}
     public async Task A_signed_in_user_starts_a_session()
     {
-        using var client = await aspire.CreateHostClientAsync("developer");
+        using var client = await {{ signed_in_host_client `"developer"` }};
 
         using var response = await InitializeAsync(client);
 
@@ -43,7 +43,7 @@ public class McpEndpointTests(AspireFixture aspire)
     {{ test_attribute }}
     public async Task An_anonymous_caller_starts_a_session()
     {
-        using var client = aspire.CreateHostClient();
+        using var client = {{ host_client }};
 
         using var response = await InitializeAsync(client);
 

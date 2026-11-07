@@ -6,11 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.Testing" />
+    {{ database_fixture_package_references }}
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/AppHost/AppHost.csproj" />
+    {{ database_fixture_project_references }}
     <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />
     <ProjectReference Include="../../src/Modules/*/*.Infrastructure/*.Infrastructure.csproj" />
     <Compile Include="../Fakes/*.cs" Link="Fakes/%(Filename)%(Extension)" />

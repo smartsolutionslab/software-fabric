@@ -10,8 +10,6 @@ namespace Fabric.Packs.Tests;
 /// </summary>
 public sealed partial class TestVocabularyTests
 {
-    private const string FunctionsSlot = "templates.functions";
-
     private static readonly string[] FrameworkVocabulary =
     [
         "test_attribute",
@@ -19,6 +17,10 @@ public sealed partial class TestVocabularyTests
         "test_case_attribute",
         "test_cancellation_token",
         "write_test_output",
+        "test_run_fixture",
+        "test_lifetime",
+        "test_setup",
+        "test_teardown",
     ];
 
     private static readonly string[] AssertionVocabulary =
@@ -66,7 +68,7 @@ public sealed partial class TestVocabularyTests
 
         foreach (var pack in packs)
         {
-            Functions(pack).ShouldBe(vocabulary, ignoreOrder: true, customMessage: $"{pack.Option} must define, in {FunctionsSlot}, exactly the vocabulary of docs/slots.md.");
+            VocabularyProbe.Functions(pack).ShouldBe(vocabulary, ignoreOrder: true, customMessage: $"{pack.Option} must define, in {VocabularyProbe.FunctionsSlot}, exactly the vocabulary of docs/slots.md.");
         }
     }
 
@@ -110,53 +112,10 @@ public sealed partial class TestVocabularyTests
     private static IEnumerable<string> Templates() =>
         Directory.EnumerateFiles(Path.Combine(Repository.Root, "packs"), "*.sbn", SearchOption.AllDirectories);
 
-    private static IReadOnlyList<string> Functions(PackManifest pack) =>
-    [
-        .. pack.Slots
-            .Where(contribution => contribution.Slot == FunctionsSlot)
-            .SelectMany(contribution => FunctionDefinition().Matches(File.ReadAllText(Path.Combine(pack.Directory, contribution.Template))))
-            .Select(match => match.Groups[1].Value),
-    ];
-
     [GeneratedRegex(@"Shouldly only so far")]
     private static partial Regex ShouldlyOnly();
 
-    [GeneratedRegex(@"\[(Fact|Theory|InlineData)\b|TestContext\.Current|\.Should[A-Z]\w*(<[^()]*>)?\(|\bShould\.[A-Z]")]
+    [GeneratedRegex(@"\[(Fact|Theory|InlineData)\b|\bAssemblyFixture\b|\bIAsyncLifetime\b|TestContext\.Current|\.Should[A-Z]\w*(<[^()]*>)?\(|\bShould\.[A-Z]")]
     private static partial Regex XunitOrShouldly();
 
-    [GeneratedRegex(@"(?m)^func ([a-z_]+)")]
-    private static partial Regex FunctionDefinition();
-
-    /// <summary>
-    /// A copy of a real pack whose <c>templates.functions</c> define the vocabulary as plain calls that name the function
-    /// and its arguments (<c>should_be(total, 42)</c>), standing in for another framework or assertion library.
-    /// </summary>
-    private sealed class VocabularyProbe : IDisposable
-    {
-        private readonly string directory = Directory.CreateTempSubdirectory("fabric-vocabulary-").FullName;
-
-        public VocabularyProbe(PackManifest real, IReadOnlyList<string> vocabulary)
-        {
-            foreach (var file in Directory.EnumerateFiles(real.Directory, "*", SearchOption.AllDirectories))
-            {
-                var copy = Path.Combine(directory, Path.GetRelativePath(real.Directory, file));
-                Directory.CreateDirectory(Path.GetDirectoryName(copy)!);
-                File.Copy(file, copy);
-            }
-
-            const string Functions = "templates/vocabulary-probe.sbn";
-            File.WriteAllText(
-                Path.Combine(directory, Functions),
-                string.Join('\n', vocabulary.Select(name => $"func {name}\n  ret \"{name}(\" + ($ | array.join \", \") + \")\"\nend")));
-            Manifest = real with
-            {
-                Directory = directory,
-                Slots = [.. real.Slots.Where(contribution => contribution.Slot != FunctionsSlot), new SlotContribution(FunctionsSlot, Functions, 0)],
-            };
-        }
-
-        public PackManifest Manifest { get; }
-
-        public void Dispose() => Directory.Delete(directory, recursive: true);
-    }
 }

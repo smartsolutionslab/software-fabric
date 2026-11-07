@@ -11,13 +11,13 @@ namespace {{ namespace }}.Integration.Tests;
 /// answers with its stand-in model, which calls the tool a message names with the JSON arguments the message gives.
 /// The visitor asks: no other test saves a dashboard of theirs, so their count shows that nothing was saved.
 /// </summary>
-public class GenerativeDashboardsTests(AspireFixture aspire)
+public class GenerativeDashboardsTests({{ integration_fixture }})
 {
     {{ test_attribute }}
     public async Task A_declared_widget_is_proposed_with_its_declared_title_and_nothing_is_saved()
     {
         var cancellationToken = {{ test_cancellation_token }};
-        using var visitor = await aspire.CreateHostClientAsync("visitor");
+        using var visitor = await {{ signed_in_host_client `"visitor"` }};
         var before = await CountAsync(visitor, cancellationToken);
 
         var events = await RunAsync(visitor, """propose_widget {"source":"dashboards.widget-counts","visual":"bar","replaces":null}""", null, cancellationToken);
@@ -35,7 +35,7 @@ public class GenerativeDashboardsTests(AspireFixture aspire)
     public async Task A_proposal_may_replace_a_widget_of_the_open_draft()
     {
         var cancellationToken = {{ test_cancellation_token }};
-        using var visitor = await aspire.CreateHostClientAsync("visitor");
+        using var visitor = await {{ signed_in_host_client `"visitor"` }};
         const string Draft = """{ "widgets": [{ "key": "w-1", "source": "dashboards.widget-counts", "visual": "bar" }] }""";
 
         var events = await RunAsync(visitor, """propose_widget {"source":"dashboards.widget-counts","visual":"pie","replaces":"w-1"}""", Draft, cancellationToken);
@@ -49,7 +49,7 @@ public class GenerativeDashboardsTests(AspireFixture aspire)
     public async Task A_widget_the_modules_do_not_declare_is_refused()
     {
         var cancellationToken = {{ test_cancellation_token }};
-        using var visitor = await aspire.CreateHostClientAsync("visitor");
+        using var visitor = await {{ signed_in_host_client `"visitor"` }};
 
         var events = await RunAsync(visitor, """propose_widget {"source":"billing.everything","visual":"bar","replaces":null}""", null, cancellationToken);
 
@@ -60,7 +60,7 @@ public class GenerativeDashboardsTests(AspireFixture aspire)
     public async Task A_table_proposed_as_a_chart_is_refused()
     {
         var cancellationToken = {{ test_cancellation_token }};
-        using var visitor = await aspire.CreateHostClientAsync("visitor");
+        using var visitor = await {{ signed_in_host_client `"visitor"` }};
 
         var events = await RunAsync(visitor, """propose_widget {"source":"dashboards.my-dashboards","visual":"bar","replaces":null}""", null, cancellationToken);
 
@@ -71,7 +71,7 @@ public class GenerativeDashboardsTests(AspireFixture aspire)
     public async Task The_agent_can_list_the_declared_widgets_a_page_at_a_time()
     {
         var cancellationToken = {{ test_cancellation_token }};
-        using var visitor = await aspire.CreateHostClientAsync("visitor");
+        using var visitor = await {{ signed_in_host_client `"visitor"` }};
 
         var events = await RunAsync(visitor, """list_widgets {"page":1,"pageSize":20}""", null, cancellationToken);
 
@@ -83,7 +83,7 @@ public class GenerativeDashboardsTests(AspireFixture aspire)
     public async Task A_draft_that_is_not_a_list_of_widgets_is_refused()
     {
         var cancellationToken = {{ test_cancellation_token }};
-        using var visitor = await aspire.CreateHostClientAsync("visitor");
+        using var visitor = await {{ signed_in_host_client `"visitor"` }};
 
         using var response = await PostAsync(visitor, "Show me something.", """{ "widgets": "all of them" }""", cancellationToken);
 

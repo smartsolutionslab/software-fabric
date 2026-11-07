@@ -11,7 +11,7 @@ namespace {{ namespace }}.Rag.Tests;
 /// <see cref="TenantScope"/> as in consumers and jobs, never from the caller, and each tenant finds only its own
 /// records. No test calls a real model.
 /// </summary>
-public sealed class TenantVectorIndexTests(AspireDatabase database) : IAsyncLifetime
+public sealed class TenantVectorIndexTests({{ database_fixture }}) : {{ test_lifetime }}
 {
     private const string TenantA = "tenant-a";
 
@@ -25,10 +25,10 @@ public sealed class TenantVectorIndexTests(AspireDatabase database) : IAsyncLife
 
     private Npgsql.NpgsqlDataSource DataSource => dataSource ?? throw new InvalidOperationException("The data source has not been created.");
 
-    public async ValueTask InitializeAsync()
+    {{ test_setup }}
     {
-        await VectorTables.CreateAsync(database.ConnectionString, [SampleTenantNotesDbContext.Schema, SampleTenantDraftsDbContext.Schema, SampleTenantShelfDbContext.Schema], {{ test_cancellation_token }});
-        dataSource = VectorTables.DataSource(database.ConnectionString);
+        await VectorTables.CreateAsync({{ database_connection_string }}, [SampleTenantNotesDbContext.Schema, SampleTenantDraftsDbContext.Schema, SampleTenantShelfDbContext.Schema], {{ test_cancellation_token }});
+        dataSource = VectorTables.DataSource({{ database_connection_string }});
     }
 
     {{ test_attribute }}
@@ -94,7 +94,7 @@ public sealed class TenantVectorIndexTests(AspireDatabase database) : IAsyncLife
         // Another tenant's 5,000 records lie nearer than this tenant's, more than the HNSW scan visits before it stops
         // (hnsw.max_scan_tuples, 20,000 by default, 100 here). No sequential or bitmap scan and no sort while another
         // plan exists, so the HNSW index answers rather than the key's index.
-        var crowded = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off -c enable_bitmapscan=off -c enable_sort=off -c hnsw.max_scan_tuples=100" };
+        var crowded = new Npgsql.NpgsqlConnectionStringBuilder({{ database_connection_string }}) { Options = "-c enable_seqscan=off -c enable_bitmapscan=off -c enable_sort=off -c hnsw.max_scan_tuples=100" };
         await using var indexed = VectorTables.DataSource(crowded.ConnectionString);
         await using (var crowd = indexed.CreateCommand($"INSERT INTO {VectorTables.Table(SampleTenantShelfDbContext.Schema)} (tenant_id, key, content, embedding) SELECT 'tenant-crowd', 'book-' || number, 'book', $1 FROM generate_series(1, 5000) number"))
         {
@@ -128,7 +128,7 @@ public sealed class TenantVectorIndexTests(AspireDatabase database) : IAsyncLife
         await {{ should_throw_async `InvalidOperationException` `() => notes.IndexAsync("note-none", "a record of no tenant", cancellationToken)` }};
     }
 
-    public async ValueTask DisposeAsync()
+    {{ test_teardown }}
     {
         generator.Dispose();
         if (dataSource is not null)

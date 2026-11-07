@@ -1,6 +1,3 @@
-{{~ if project["backend.test.integration"] != "aspire-fixture" ~}}
-#error The roles pack tests a module's sample policy through the aspire-fixture integration tests only so far (docs/adr/0006 of the generator).
-{{~ end ~}}
 {{~ func status(response, code)
   ret (should_be (response + ".StatusCode") ("HttpStatusCode." + code)) + ";"
 end ~}}
@@ -9,14 +6,14 @@ using System.Net;
 namespace {{ namespace }}.Integration.Tests;
 
 /// <summary>The {{ module.name }} module's sample policy {{ module.name }}.manage requires the realm role manager{{ if project["backend.authorization"] | array.contains "claims" }} (and the claim department=finance){{ end }}, which developer holds and visitor does not.</summary>
-public class {{ module.namespace }}RoleTests(AspireFixture aspire)
+public class {{ module.namespace }}RoleTests({{ integration_fixture }})
 {
     private static readonly Uri ManagePermission = new("/{{ module.name }}/permissions/manage", UriKind.Relative);
 
     {{ test_attribute }}
     public async Task A_user_with_the_manager_role_is_allowed()
     {
-        using var client = await aspire.CreateHostClientAsync("developer");
+        using var client = await {{ signed_in_host_client `"developer"` }};
 
         using var response = await client.GetAsync(ManagePermission, {{ test_cancellation_token }});
 
@@ -26,7 +23,7 @@ public class {{ module.namespace }}RoleTests(AspireFixture aspire)
     {{ test_attribute }}
     public async Task A_signed_in_user_without_the_role_is_forbidden()
     {
-        using var client = await aspire.CreateHostClientAsync("visitor");
+        using var client = await {{ signed_in_host_client `"visitor"` }};
 
         using var response = await client.GetAsync(ManagePermission, {{ test_cancellation_token }});
 
@@ -36,7 +33,7 @@ public class {{ module.namespace }}RoleTests(AspireFixture aspire)
     {{ test_attribute }}
     public async Task An_anonymous_caller_is_unauthorized()
     {
-        using var client = aspire.CreateHostClient();
+        using var client = {{ host_client }};
 
         using var response = await client.GetAsync(ManagePermission, {{ test_cancellation_token }});
 

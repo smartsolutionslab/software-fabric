@@ -10,7 +10,7 @@ namespace {{ namespace }}.Integration.Tests;
 /// AG-UI events, its text in several chunks, after a tool call its query ran through the dispatcher. The host answers
 /// with its stand-in model, which the fixture switches on; no test calls a model.
 /// </summary>
-public class AgentUiTests(AspireFixture aspire)
+public class AgentUiTests({{ integration_fixture }})
 {
     private const string Run = """
         {
@@ -53,9 +53,9 @@ public class AgentUiTests(AspireFixture aspire)
     {
         var cancellationToken = {{ test_cancellation_token }};
 {{~ if signed_in ~}}
-        using var caller = await aspire.CreateHostClientAsync("developer");
+        using var caller = await {{ signed_in_host_client `"developer"` }};
 {{~ else ~}}
-        using var caller = aspire.CreateHostClient();
+        using var caller = {{ host_client }};
 {{~ end ~}}
 
         using var response = await PostAsync(caller, "/agents/assistant", Run, cancellationToken);
@@ -81,9 +81,9 @@ public class AgentUiTests(AspireFixture aspire)
     {
         var cancellationToken = {{ test_cancellation_token }};
 {{~ if signed_in ~}}
-        using var caller = await aspire.CreateHostClientAsync("developer");
+        using var caller = await {{ signed_in_host_client `"developer"` }};
 {{~ else ~}}
-        using var caller = aspire.CreateHostClient();
+        using var caller = {{ host_client }};
 {{~ end ~}}
 
         using var response = await PostAsync(caller, "/agents/assistant", SecondTurn, cancellationToken);
@@ -105,7 +105,7 @@ public class AgentUiTests(AspireFixture aspire)
     {{ test_attribute }}
     public async Task An_anonymous_caller_is_refused()
     {
-        using var anonymous = aspire.CreateHostClient();
+        using var anonymous = {{ host_client }};
 
         using var response = await PostAsync(anonymous, "/agents/assistant", Run, {{ test_cancellation_token }});
 
@@ -118,9 +118,9 @@ public class AgentUiTests(AspireFixture aspire)
     {
         var cancellationToken = {{ test_cancellation_token }};
 {{~ if signed_in ~}}
-        using var caller = await aspire.CreateHostClientAsync("developer");
+        using var caller = await {{ signed_in_host_client `"developer"` }};
 {{~ else ~}}
-        using var caller = aspire.CreateHostClient();
+        using var caller = {{ host_client }};
 {{~ end ~}}
 
         using var response = await PostAsync(caller, "/agents/nobody", Run, cancellationToken);

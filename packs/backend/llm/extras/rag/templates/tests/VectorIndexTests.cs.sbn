@@ -11,7 +11,7 @@ namespace {{ namespace }}.Rag.Tests;
 /// A module's index in the AppHost's database: records indexed with a stand-in embeddings model come back from a
 /// search nearest first. No test calls a real model.
 /// </summary>
-public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
+public sealed class VectorIndexTests({{ database_fixture }}) : {{ test_lifetime }}
 {
     private readonly FakeEmbeddingGenerator generator = new(VectorTables.Dimensions);
 {{~ if project["backend.tenancy"] == "column" ~}}
@@ -23,14 +23,14 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
 
     private Npgsql.NpgsqlDataSource DataSource => dataSource ?? throw new InvalidOperationException("The data source has not been created.");
 
-    public async ValueTask InitializeAsync()
+    {{ test_setup }}
     {
 {{~ if project["backend.tenancy"] == "column" ~}}
-        await VectorTables.CreateAsync(database.ConnectionString, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema], {{ test_cancellation_token }});
+        await VectorTables.CreateAsync({{ database_connection_string }}, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema], {{ test_cancellation_token }});
 {{~ else ~}}
-        await VectorTables.CreateAsync(database.ConnectionString, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema, SampleLibraryDbContext.Schema], {{ test_cancellation_token }});
+        await VectorTables.CreateAsync({{ database_connection_string }}, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema, SampleLibraryDbContext.Schema], {{ test_cancellation_token }});
 {{~ end ~}}
-        dataSource = VectorTables.DataSource(database.ConnectionString);
+        dataSource = VectorTables.DataSource({{ database_connection_string }});
     }
 
     {{ test_attribute }}
@@ -71,7 +71,7 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
     public async Task A_search_the_hnsw_index_answers_returns_as_many_records_as_asked_beyond_its_default_breadth_of_40()
     {
         var cancellationToken = {{ test_cancellation_token }};
-        var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off" };
+        var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder({{ database_connection_string }}) { Options = "-c enable_seqscan=off" };
         await using var indexed = VectorTables.DataSource(indexOnly.ConnectionString);
         var shelf = new ModuleVectorIndex<SampleShelfDbContext>(indexed, generator{{ tenant_argument }});
         // Each record shares a word with the next. Records that shared only "book" would all lie at the same distance
@@ -94,7 +94,7 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
     public async Task A_search_the_hnsw_index_answers_short_ranks_every_record_exactly_and_returns_as_many_as_asked()
     {
         var cancellationToken = {{ test_cancellation_token }};
-        var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder(database.ConnectionString) { Options = "-c enable_seqscan=off" };
+        var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder({{ database_connection_string }}) { Options = "-c enable_seqscan=off" };
         await using var indexed = VectorTables.DataSource(indexOnly.ConnectionString);
         var library = new ModuleVectorIndex<SampleLibraryDbContext>(indexed, generator);
         await library.IndexAsync("novel", "a book of stories", cancellationToken);
@@ -115,7 +115,7 @@ public sealed class VectorIndexTests(AspireDatabase database) : IAsyncLifetime
     }
 {{~ end ~}}
 
-    public async ValueTask DisposeAsync()
+    {{ test_teardown }}
     {
         generator.Dispose();
         if (dataSource is not null)
