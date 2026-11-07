@@ -11,7 +11,7 @@ Being signed in is not enough for every endpoint: access can depend on the user'
 
 {{ role_mapping_adr }} The roles live in the identity provider, not in the application: there is no role table and no role-management screen.
 
-**Sample role and users** (development only, in the realm import): the realm role `manager`, held by `developer` (and `developer-b` when the project has tenancy), and the user `visitor` / `visitor` with no roles (in `tenant-a` with tenancy, so a 403 is about the role, not the tenant). `fabric add-module` gives every new module the sample policy `<module>.manage`, which requires `manager`{{ if claims }} (and, with claims, `department=finance`: see the claims ADR){{ end }}, and the endpoint `GET /<module>/permissions/manage` that requires it: 200 when the caller holds the policy, 403 when not, so a frontend can ask before it offers to manage something, and the integration tests have an endpoint to prove the policy on. The role, the users and the sample policy were decided by the repository owner (2026-11-03); the endpoint is this pack's.
+**Sample role and users** (development only, in {{ local_users_setup }}): the {{ role_kind }} `manager`, held by `developer` (and `developer-b` when the project has tenancy), and the user `visitor` / `visitor` with no roles (in `tenant-a` with tenancy, so a 403 is about the role, not the tenant). `fabric add-module` gives every new module the sample policy `<module>.manage`, which requires `manager`{{ if claims }} (and, with claims, `department=finance`: see the claims ADR){{ end }}, and the endpoint `GET /<module>/permissions/manage` that requires it: 200 when the caller holds the policy, 403 when not, so a frontend can ask before it offers to manage something, and the integration tests have an endpoint to prove the policy on. The role, the users and the sample policy were decided by the repository owner (2026-11-03); the endpoint is this pack's.
 
 **The identity provider maps its roles.** Where the roles sit in the token is the identity provider's business: its pack puts them into `ClaimTypes.Role` (with {{ role_mapping_provider }}, `{{ role_mapping_source | string.split "/" | array.last | string.replace ".cs" "" }}` above) and names that file for `OnlyModulePoliciesCheckRoles`. This pack only checks them, so it works with every provider the generator offers.
 
@@ -24,7 +24,7 @@ Being signed in is not enough for every endpoint: access can depend on the user'
 
 ## What the gates cannot see
 
-- A role read by its claim type's string (`"http://schemas.microsoft.com/ws/2008/06/identity/claims/role"`, `"realm_access"`) or through reflection; a role check in code compiled only under an `#if` the parse leaves disabled.
+- A role read by its claim type's string (`"http://schemas.microsoft.com/ws/2008/06/identity/claims/role"`, `"{{ id_token_roles_claim | string.split "." | array.first }}"`) or through reflection; a role check in code compiled only under an `#if` the parse leaves disabled.
 - `new AuthorizeAttribute { Roles = ... }` written as an object initializer rather than an attribute.
 - Whether a policy is the right one for its endpoint, or strong enough: review's to catch.
 - An endpoint mapped outside both Development and Production, or one whose handler is declared outside its module's Api assembly (it is then nobody's, and only `EveryEndpointDeclaresItsAuthorization` checks it).
@@ -35,4 +35,4 @@ Being signed in is not enough for every endpoint: access can depend on the user'
 
 - A permission is one line in the module's `<Module>Policies` and a constant in its `<Module>PolicyNames`; changing who holds it is a change in the identity provider, not in code.
 - A new module adds an endpoint (`/<module>/permissions/manage`), so the frontend's copy of the OpenAPI document is stale until the integration tests rewrite it and it is committed, as for any new endpoint.
-- Production needs the roles in the real realm and assigned to real users; the realm import is development only.
+- {{ roles_production_adr }}

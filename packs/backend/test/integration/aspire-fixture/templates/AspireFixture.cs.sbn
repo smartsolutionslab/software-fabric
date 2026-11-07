@@ -42,7 +42,7 @@ public sealed class AspireFixture : {{ test_lifetime }}
     public HttpClient CreateHostClient() => App.CreateHttpClient("host");
 {{~ if project["backend.auth"] != "none" ~}}
 
-    /// <summary>A client calling the host as a realm user; local users' passwords equal their names.</summary>
+    /// <summary>A client calling the host as {{ local_user }}; local users' passwords equal their names.</summary>
     public async Task<HttpClient> CreateHostClientAsync(string user)
     {
         {{ test_user_token "App" "user" }}

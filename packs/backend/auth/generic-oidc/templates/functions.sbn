@@ -178,3 +178,76 @@ func browser_client_env
   ret `readonly VITE_OIDC_CLIENT_ID?: string;
 readonly VITE_OIDC_SCOPE?: string;`
 end
+func local_provider
+  ret "the local provider"
+end
+func local_user
+  ret "a local user"
+end
+func local_users
+  ret "the local provider's users"
+end
+func local_users_source
+  ret "`src/AppHost/realms/realm.json`"
+end
+func local_users_setup
+  ret "the realm import"
+end
+func identity_resource
+  ret "identity"
+end
+func short_lived_test_user_token_summary
+  ret `/// A client calling the host as a local user with a token that lives ShortLifespan seconds: the local provider's realm
+/// gets a copy of the web client (its mappers included) whose tokens expire that soon, so other tests' tokens are
+/// untouched.`
+end
+func unstarted_people_resources_adr
+  ret "What the AppHost starts only for people (the Kafka and RabbitMQ consoles) is not started."
+end
+func browser_client_adr
+  ret "the client id and scope arrive as `VITE_OIDC_CLIENT_ID` and `VITE_OIDC_SCOPE`, by default `<project>-web`, the local provider's client, and `openid`."
+end
+func id_token_claims_adr(roles, claims)
+  ret "The provider puts " + (roles ? "the roles (`roles`)" : "") + (roles && claims ? " and " : "") + (claims ? "`department`" : "") + " into the ID token for this, as the local provider does."
+end
+func id_token_claim_rule
+  ret "production's provider must put it there, and locally its mapper in `src/AppHost/realms/realm.json` needs `\"id.token.claim\": \"true\"`."
+end
+func role_kind
+  ret "role"
+end
+func add_role_rule
+  ret "A new role is production's provider's to issue in the `roles` claim; locally it goes into `src/AppHost/realms/realm.json` (`roles.realm`, and `realmRoles` of the local users who should hold it)."
+end
+func roles_production_adr
+  ret "Production's provider needs the roles, in the token's `roles` claim, assigned to real users; the realm import is development only."
+end
+func token_issuer
+  ret "the identity provider"
+end
+func claim_attribute_owner
+  ret "the provider's user profile"
+end
+func claim_mapping_adr
+  ret "**Which claims the provider maps.** The application reads one sample claim, `department`, which production's provider must put into the access token, and into the ID token so the frontend can hide what the user may not use (`useHasClaim`). Locally, the realm import (`src/AppHost/realms/realm.json`) maps it:
+
+| Claim | Source | Mapper | In |
+|---|---|---|---|
+| `department` | the user attribute `department`, declared in the realm's user profile, editable by administrators only | `oidc-usermodel-attribute-mapper` named `department` on the client `<name>-web` | the access token and the ID token |
+
+Standard claims (`email`, `email_verified`, `preferred_username`, ...) can be required the same way, where the provider issues them.
+
+**How to add a claim.**
+
+1. Have production's provider issue it in the access token (and in the ID token if the frontend should see it), and document that in docs/adr.
+2. Locally, declare the attribute in the realm's user profile (`kc.user.profile.config`), with `\"edit\": [\"admin\"]` unless users may set it themselves, in which case it must not decide access; add an `oidc-usermodel-attribute-mapper` for it to `<name>-web`'s `protocolMappers` with `access.token.claim` (and `id.token.claim`) `\"true\"`; and give the local users a value under `attributes`.
+3. Require it in the module's `<Module>Policies` and test it as `<Module>ClaimTests` does.
+
+The local provider imports the realm only when it does not exist yet: remove the data volume to pick up a changed realm. The import is development only."
+end
+func claim_change_adr
+  ret "A new claim is a change in production's provider and in the local realm (user profile, mapper, users)."
+end
+func add_claim_rule
+  ret "To add a claim: have production's provider issue it, and locally declare the attribute in `src/AppHost/realms/realm.json`'s user profile (`kc.user.profile.config`, `\"edit\": [\"admin\"]`), add an `oidc-usermodel-attribute-mapper` for it to the `<name>-web` client, and give local users a value under `attributes`."
+end

@@ -15,7 +15,7 @@ type Requirement = { role: string; claim?: string; value?: string } | { role?: s
 type RequirePermissionProps = Requirement & {
 {{~ else if roles ~}}
 type RequirePermissionProps = {
-  /** The realm role the user must hold. */
+  /** The {{ role_kind }} the user must hold. */
   role: string;
 {{~ else ~}}
 type RequirePermissionProps = {

@@ -150,3 +150,75 @@ func browser_client_env
   ret `readonly VITE_OIDC_CLIENT_ID?: string;
 readonly VITE_OIDC_SCOPE?: string;`
 end
+func local_provider
+  ret "the stand-in"
+end
+func local_user
+  ret "a local user"
+end
+func local_users
+  ret "the stand-in's users"
+end
+func local_users_source
+  ret "`src/IdentityStandIn/appsettings.json`"
+end
+func local_users_setup
+  ret "the stand-in's settings"
+end
+func identity_resource
+  ret "identity"
+end
+func short_lived_test_user_token_summary
+  ret `/// A client calling the host as a local user with a token that lives ShortLifespan seconds: the stand-in issues it with
+/// that lifetime, so other tests' tokens are untouched.`
+end
+func unstarted_people_resources_adr
+  ret "What the AppHost starts only for people (the Kafka and RabbitMQ consoles) is not started."
+end
+func browser_client_adr
+  ret "the client id and scope arrive as `VITE_OIDC_CLIENT_ID` and `VITE_OIDC_SCOPE`, by default `<project>-web` and `openid`, which only the stand-in accepts: a real Entra ID needs the app registration's client ID and a scope of the API."
+end
+func id_token_claims_adr(roles, claims)
+  ret "Entra ID puts " + (roles ? "the app roles (`roles`)" : "") + (roles && claims ? " and " : "") + (claims ? "`department` (an optional claim)" : "") + " into the ID token for this, as the stand-in does."
+end
+func id_token_claim_rule
+  ret "in Entra ID an optional claim of the ID token (app roles are in it already); the stand-in puts every claim it issues there."
+end
+func role_kind
+  ret "app role"
+end
+func add_role_rule
+  ret "A new role is an app role of the API's app registration in Entra ID; locally it goes into `src/IdentityStandIn/appsettings.json` (`Roles` of the local users who should hold it)."
+end
+func roles_production_adr
+  ret "Production needs the roles as app roles of the API's app registration, assigned to real users; the stand-in's settings are development only."
+end
+func token_issuer
+  ret "Microsoft Entra ID"
+end
+func claim_attribute_owner
+  ret "the user's Entra ID profile"
+end
+func claim_mapping_adr
+  ret "**Which claims Entra ID issues.** One sample claim:
+
+| Claim | Source | Configured as | In |
+|---|---|---|---|
+| `department` | the user's `department` in Entra ID, editable by administrators only | an optional claim (or a claims-mapping policy) of the app registration | the access token, and the ID token so the frontend can hide what the user may not use (`useHasClaim`) |
+
+Locally, the stand-in issues it from each user's `Department` in `src/IdentityStandIn/appsettings.json`.
+
+**How to add a claim.**
+
+1. Have Entra ID issue it: an optional claim of the API's app registration for the access token (and of the web client's for the ID token, if the frontend should see it), or a claims-mapping policy for an attribute that is not one, and document it in docs/adr.
+2. Have the stand-in issue it: a property of `StandInUser`, set as a claim in `TokenIssuer`, and a value for the local users in `src/IdentityStandIn/appsettings.json`.
+3. Require it in the module's `<Module>Policies` and test it as `<Module>ClaimTests` does.
+
+The stand-in's settings are development only; production configures the app registration itself."
+end
+func claim_change_adr
+  ret "A new claim is a change in the app registration (an optional claim) and in the stand-in (`StandInUser`, `TokenIssuer`, its users)."
+end
+func add_claim_rule
+  ret "To add a claim: make it an optional claim of the app registration in Entra ID, and have the stand-in issue it (a property of `StandInUser`, set in `TokenIssuer`, and a value for the local users in `src/IdentityStandIn/appsettings.json`)."
+end
