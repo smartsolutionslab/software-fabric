@@ -1,0 +1,8 @@
+{{ if project["backend.llm"] == "openai" ~}}
+        // Embeddings use the chat model's key, given its value above; the AppHost's default embedding model.
+{{~ else ~}}
+        // A key-shaped value OpenAI does not accept, and the AppHost's default embedding model: the integration tests never
+        // call the embedding model.
+        settings["OpenAI:ApiKey"] = "not-a-real-key";
+{{~ end }}
+        settings["OpenAI:EmbeddingModel"] = "text-embedding-3-small";

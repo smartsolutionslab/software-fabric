@@ -1,0 +1,3 @@
+        // A key-shaped value Anthropic does not accept, and the AppHost's default model: the integration tests never call the model.
+        settings["Anthropic:ApiKey"] = "not-a-real-key";
+        settings["Anthropic:Model"] = "claude-haiku-5-5";

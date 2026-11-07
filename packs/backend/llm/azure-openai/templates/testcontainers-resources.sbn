@@ -1,0 +1,5 @@
+        // A resource that does not exist, a key-shaped value Azure does not accept, and the AppHost's default deployment: the
+        // integration tests never call the model.
+        settings["AzureOpenAI:Endpoint"] = "https://not-a-real-resource.openai.azure.com";
+        settings["AzureOpenAI:Deployment"] = "gpt-5-mini";
+        settings["AzureOpenAI:ApiKey"] = "not-a-real-key";

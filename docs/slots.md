@@ -40,7 +40,7 @@ src/
 tests/
   Directory.Build.props         base; test packages and usings by slot
   Architecture.Tests/           base; packs add gate tests as their own files
-  Integration.Tests/            backend.test.integration.aspire-fixture; the REST pack adds ListEndpointsArePagedTests
+  Integration.Tests/            backend.test.integration (aspire-fixture or testcontainers); the REST pack adds ListEndpointsArePagedTests
   TestRun/                      backend.test.framework.nunit: the run fixtures; tunit: ITestLifetime, OwnTestsOnlyAttribute; compiled into every test project
   Kernel/Paging.Tests/          base; the guards, absence and result packs add their own Kernel test projects
   Modules/<Module>.Tests/       base (per module)
@@ -141,7 +141,7 @@ pack fill a slot of a choice it can be combined with but does not need
 | `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
 | `dotnet.build-properties` | `Directory.Build.props` | packs adding analyzers or properties (result, red-first) |
-| `solution.projects` *(added in M1-02)* | `Solution.slnx` | packs owning a project: modular-monolith (Host), aspire-fixture (Integration.Tests), ensure-that, option and the result styles (their tests under `tests/Kernel/`) |
+| `solution.projects` *(added in M1-02)* | `Solution.slnx` | packs owning a project: modular-monolith (Host), aspire-fixture or testcontainers (Integration.Tests), ensure-that, option and the result styles (their tests under `tests/Kernel/`) |
 | `modules.packages.domain` | `src/Modules/Directory.Build.props` | — (Domain stays dependency-free) |
 | `modules.packages.application` | 〃 | wolverine, mediator, agent-framework (`Microsoft.Agents.AI`: an agent lives in Application, ADR-0011) |
 | `modules.packages.infrastructure` | 〃 | ef-core, postgres, wolverine |
@@ -152,7 +152,10 @@ pack fill a slot of a choice it can be combined with but does not need
 | `tests.usings` | `tests/Directory.Build.props` | xunit, nunit or tunit (test projects only: a program under `tests/` keeps `System.ComponentModel`'s `[Description]`), shouldly or awesome-assertions, nsubstitute or moq |
 | `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak, generic-oidc (the host and `Microsoft.AspNetCore.Mvc.Testing`, for the base's endpoint rule `EveryEndpointDeclaresItsAuthorization`, rendered whenever `backend.auth` is not `none`) |
 | `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides); agent-framework (`IDispatcher`, which a handler running an agent takes, and `IAgentMcpTools` with the MCP client) |
-| `integration-tests.parameters` *(added for #77, declared by aspire-fixture)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter); agent-ui ag-ui (`model-stand-in` true: the host's stand-in model answers the agents) |
+| `integration-tests.parameters` *(added for #77, declared by aspire-fixture; contributed with `optional: true` since #260)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter); agent-ui ag-ui (`model-stand-in` true: the host's stand-in model answers the agents) |
+| `integration-tests.database` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/ContainerFixture.cs` and the database fixture alone (rag's `ApplicationDatabase.cs`), first in the setup; `settings`, `cancellationToken`, `StartAsync(container, …)` and `RunProjectAsync("src/<Project>", …)` in scope | postgres (its container, the pgvector image with rag, with the core `ContainerBuilder`, and `ConnectionStrings:database`), ef-core (runs the MigrationRunner, order 20) |
+| `integration-tests.resources` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/ContainerFixture.cs`, after the database, before the host starts; also `Resources` and `RepositoryDirectory()` | rabbitmq, kafka (the broker and `ConnectionStrings:messaging`), keycloak (the realm from `src/AppHost/realms`, its endpoint `keycloak`/`http`, `Authentication:Authority`), the model providers and embeddings (what the AppHost passes as parameters: key-shaped values, the default models, an Ollama endpoint nothing listens on), agent-ui ag-ui (`Agents:ModelStandIn`) |
+| `integration-tests.packages` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/Integration.Tests.csproj` | rabbitmq, kafka, keycloak (their Testcontainers modules, whose versions testcontainers declares) |
 
 #### The test vocabulary *(M3-11)*
 
@@ -259,15 +262,26 @@ the integration option, so they are not the fixture's.
 | `signed_in_host_client user` | `aspire.CreateHostClientAsync(user)`: awaitable, a client calling the host as the identity provider's local user `user` (a C# string) |
 | `running_application` | `aspire.App`: the running Aspire application, which the identity provider's test-user functions take (*M3-13*) |
 | `integration_fixture_attributes` | `test_takes_run_fixture "AspireFixture"`: written right above every class taking `integration_fixture` (*#256*) |
-| `database_fixture` | `AspireDatabase database`: the constructor parameter of a test class against the application's database alone, migrated, with nothing else running |
-| `database_fixture_attributes` | `test_takes_run_fixture "AspireDatabase"`: written right above every class taking `database_fixture` (*#256*) |
+| `database_fixture` | `ApplicationDatabase database`: the constructor parameter of a test class against the application's database alone, migrated, with nothing else running |
+| `database_fixture_attributes` | `test_takes_run_fixture "ApplicationDatabase"`: written right above every class taking `database_fixture` (*#256*) |
 | `database_connection_string` | `database.ConnectionString` |
-| `database_fixture_file namespace` | the C# file declaring that database fixture in `namespace` (rag's `tests/Rag.Tests/AspireDatabase.cs`) |
+| `database_fixture_file namespace` | the C# file declaring that database fixture in `namespace` (rag's `tests/Rag.Tests/ApplicationDatabase.cs`) |
 | `database_fixture_package_references`, `database_fixture_project_references` | the `PackageReference` and `ProjectReference` items a test project needs for the database fixture |
 
-A database fixture of another option lands in rag's file `AspireDatabase.cs`
-until rag's target is renamed, which would move the file in every rag
-project.
+| Function | Returns (testcontainers, *#260*) |
+|---|---|
+| `integration_fixture` | `ContainerFixture containers`: the AppHost's resources in containers that Testcontainers runs, the host in the test process on Kestrel |
+| `host_client`, `signed_in_host_client user` | `containers.CreateHostClient()`, `containers.CreateHostClientAsync(user)` |
+| `running_application` | `containers.Resources`: the started resources' endpoints by the AppHost's names (`GetEndpoint("keycloak", "http")`), which the identity provider's test-user functions take; Keycloak's `short_lived_test_user_token_members` and `_namespaces` branch on the integration option for the master realm's administrator |
+| `integration_fixture_attributes`, `database_fixture_attributes` | `test_takes_run_fixture "ContainerFixture"`, `test_takes_run_fixture "ApplicationDatabase"` |
+| `database_fixture`, `database_connection_string` | `ApplicationDatabase database`, `database.ConnectionString` |
+| `database_fixture_file namespace` | the database's container and the MigrationRunner, from `integration-tests.database` alone |
+| `database_fixture_package_references`, `database_fixture_project_references` | `Testcontainers`; nothing |
+
+Every integration pack names its database fixture `ApplicationDatabase`, so
+that rag's file `tests/Rag.Tests/ApplicationDatabase.cs` (SA1649: the file
+is named after its type) holds whichever one is chosen (*#260*: the file was
+`AspireDatabase.cs` before).
 
 #### The identity-provider vocabulary *(M3-13)*
 
@@ -349,16 +363,19 @@ local Keycloak's, as for the keycloak pack.
 
 The integration-fixture vocabulary gains `running_application`
 (`aspire.App`), the running application the provider's test users sign in
-against. A test user's token for another integration option, and the
-Mailpit gate Keycloak keeps in the integration pack's `HostTests.cs`, are
-#260's and Keycloak's to move. The column tenancy pack reads the tenant
-through `tenant_claim` (*#251*); with tenancy, the local users' tenants
-(`developer-b` in `tenant-b`, every other user in `tenant-a`) are part of
-the provider's test-user contract.
+against; Testcontainers' (*#260*) is `containers.Resources`, whose
+`GetEndpoint` the same functions call. The Mailpit gate Keycloak keeps in the
+Aspire fixture's `HostTests.cs` is Keycloak's to move (Testcontainers starts
+no Mailpit). The column tenancy pack reads the tenant through `tenant_claim`
+(*#251*); with tenancy, the local users' tenants (`developer-b` in
+`tenant-b`, every other user in `tenant-a`) are part of the provider's
+test-user contract.
 
 **One package, one owner.** A `PackageVersion` is declared by exactly
 one pack; others only reference it. Two packs declaring the same version
-is a defect in the second pack.
+is a defect in the second pack. `Aspire.Hosting.Testing` is aspire-fixture's; in a
+project with another integration option the MCP client, whose tests read the
+AppHost's model with it, declares it instead (*#260*).
 
 ### Composition root and host
 
