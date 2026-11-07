@@ -148,6 +148,116 @@ public sealed class SchemaPerTenantTests
     }
 
     [Fact]
+    public void Seed_data_through_HasData_is_refused_when_its_migration_is_made_and_before_the_runner_migrates_anything()
+    {
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        WriteNoteConfiguration(project, """builder.HasData(new Note(Guid.Parse("0190f7a0-0000-7000-8000-000000000001"), "seeded"));""");
+        project.Build();
+
+        ShouldRefuse(project, "Seed", "seed data (HasData)");
+    }
+
+    [Fact]
+    public void A_quoted_reference_to_the_modules_schema_in_the_model_is_refused_when_its_migration_is_made_and_before_the_runner_migrates_anything()
+    {
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        WriteNoteConfiguration(project, """builder.Property(note => note.Text).HasDefaultValueSql("nextval('\"billing\".\"ids\"'::regclass)::text");""");
+        project.Build();
+
+        ShouldRefuse(project, "Default", "\"billing\".");
+    }
+
+    [Fact]
+    public void A_quoted_reference_to_the_modules_schema_in_a_migration_is_refused_before_the_runner_migrates_anything()
+    {
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        project.Write("src/Modules/Billing/Billing.Infrastructure/Migrations/20990101000000_Numbers.cs", """
+            using Microsoft.EntityFrameworkCore.Infrastructure;
+            using Microsoft.EntityFrameworkCore.Migrations;
+
+            namespace Shop.Modules.Billing.Infrastructure.Migrations;
+
+            [DbContext(typeof(Shop.Modules.Billing.Infrastructure.Persistence.BillingDbContext))]
+            [Migration("20990101000000_Numbers")]
+            public sealed class Numbers : Migration
+            {
+                protected override void Up(MigrationBuilder migrationBuilder)
+                {
+                    Ensure.That(migrationBuilder).IsNotNull();
+
+                    migrationBuilder.EnsureSchema(name: "billing");
+                    migrationBuilder.CreateSequence(name: "ids", schema: "billing");
+                    migrationBuilder.AddColumn<long>(
+                        name: "Number",
+                        schema: "billing",
+                        table: "notes",
+                        nullable: false,
+                        defaultValueSql: "nextval('\"billing\".\"ids\"'::regclass)");
+                }
+
+                protected override void Down(MigrationBuilder migrationBuilder)
+                {
+                    Ensure.That(migrationBuilder).IsNotNull();
+
+                    migrationBuilder.DropColumn(name: "Number", schema: "billing", table: "notes");
+                    migrationBuilder.DropSequence(name: "ids", schema: "billing");
+                }
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = RunMigrationRunner(project, postgres);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("20990101000000_Numbers");
+        output.ShouldContain("\"billing\".");
+        NothingWasMigrated(postgres);
+    }
+
+    [Fact]
+    public void HiLo_and_its_sequence_are_refused_when_their_migration_is_made_and_before_the_runner_migrates_anything()
+    {
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        project.Write("src/Modules/Billing/Billing.Domain/Counter.cs", """
+            namespace Shop.Modules.Billing.Domain;
+
+            public sealed class Counter(int id)
+            {
+                public int Id { get; private set; } = id;
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/CounterConfiguration.cs", """
+            using Microsoft.EntityFrameworkCore;
+            using Microsoft.EntityFrameworkCore.Metadata.Builders;
+            using Shop.Modules.Billing.Domain;
+
+            namespace Shop.Modules.Billing.Infrastructure.Persistence;
+
+            public sealed class CounterConfiguration : IEntityTypeConfiguration<Counter>
+            {
+                public void Configure(EntityTypeBuilder<Counter> builder)
+                {
+                    builder.ToTable("counters");
+                    builder.HasKey(counter => counter.Id);
+                    builder.Property(counter => counter.Id).UseHiLo("ids", BillingDbContext.Schema);
+                }
+            }
+            """);
+        project.Build();
+
+        ShouldRefuse(project, "Counters", "sequence billing.ids");
+    }
+
+    [Fact]
     public void The_generated_tenancy_tests_show_no_tenant_reads_another_tenants_rows_and_the_architecture_rules_pass()
     {
         using var project = new GeneratedProject(Profile, SchemaPerTenant);
@@ -160,6 +270,57 @@ public sealed class SchemaPerTenantTests
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
+    }
+
+    /// <summary>The billing notes' configuration with one more statement on the builder.</summary>
+    private static void WriteNoteConfiguration(GeneratedProject project, string statement) =>
+        project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/NoteConfiguration.cs", $$"""
+            using Microsoft.EntityFrameworkCore;
+            using Microsoft.EntityFrameworkCore.Metadata.Builders;
+            using Shop.Modules.Billing.Domain;
+
+            namespace Shop.Modules.Billing.Infrastructure.Persistence;
+
+            public sealed class NoteConfiguration : IEntityTypeConfiguration<Note>
+            {
+                public void Configure(EntityTypeBuilder<Note> builder)
+                {
+                    builder.ToTable("notes");
+                    builder.HasKey(note => note.Id);
+                    builder.Property(note => note.Text);
+                    {{statement}}
+                }
+            }
+            """);
+
+    /// <summary>
+    /// Making a migration of the model fails naming what cannot live in a tenant's schema, and so does the MigrationRunner,
+    /// before it migrates any schema.
+    /// </summary>
+    private static void ShouldRefuse(GeneratedProject project, string migration, string named)
+    {
+        var (addExitCode, addOutput) = project.DotNetCommand(
+            new Dictionary<string, string>(),
+            "ef", "migrations", "add", migration,
+            "--project", "src/Modules/Billing/Billing.Infrastructure",
+            "--startup-project", "src/MigrationRunner",
+            "--context", "BillingDbContext");
+        addExitCode.ShouldNotBe(0, addOutput);
+        addOutput.ShouldContain(named);
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = RunMigrationRunner(project, postgres);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain(named);
+        NothingWasMigrated(postgres);
+    }
+
+    /// <summary>No migration ran: EF Core may have created the module's history table, but recorded nothing in it.</summary>
+    private static void NothingWasMigrated(Container postgres)
+    {
+        postgres.Psql(DatabasePassword, "select count(*) from information_schema.schemata where schema_name like 'billing\\_%'").ShouldBe("0");
+        postgres.Psql(DatabasePassword, "select count(*) from information_schema.tables where table_schema = 'billing' and table_name = 'notes'").ShouldBe("0");
     }
 
     private static (int ExitCode, string Output) RunMigrationRunner(GeneratedProject project, Container postgres) =>
