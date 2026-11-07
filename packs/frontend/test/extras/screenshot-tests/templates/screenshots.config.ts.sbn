@@ -1,0 +1,17 @@
+import { defineConfig, devices } from '@playwright/test';
+
+/**
+ * Screenshot tests against the running application. They run only in Playwright's pinned container, through
+ * .github/scripts/screenshots.sh (pnpm screenshots), so the baselines and every comparison share browser, fonts and OS.
+ */
+export default defineConfig({
+  testDir: '.',
+  testMatch: '*.screenshot.ts',
+  outputDir: '../test-results/screenshots',
+  snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}{ext}',
+  use: {
+    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:5173',
+    trace: 'retain-on-failure',
+  },
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+});
