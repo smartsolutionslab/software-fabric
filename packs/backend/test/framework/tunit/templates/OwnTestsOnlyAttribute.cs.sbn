@@ -17,7 +17,8 @@ internal sealed class OwnTestsOnlyAttribute : Attribute, ITestRegisteredEventRec
 
     public ValueTask OnTestRegistered(TestRegisteredContext context)
     {
-        if (context.TestDetails.ClassType.Assembly != Assembly.GetEntryAssembly())
+        // Without an entry assembly there is no running project to compare with: skip nothing.
+        if (Assembly.GetEntryAssembly() is { } running && context.TestDetails.ClassType.Assembly != running)
         {
             context.SetSkipped("It belongs to another test project, which runs it.");
         }
