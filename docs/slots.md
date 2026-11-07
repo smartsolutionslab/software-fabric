@@ -259,15 +259,16 @@ the integration option, so they are not the fixture's.
 | `signed_in_host_client user` | `aspire.CreateHostClientAsync(user)`: awaitable, a client calling the host as the identity provider's local user `user` (a C# string) |
 | `running_application` | `aspire.App`: the running Aspire application, which the identity provider's test-user functions take (*M3-13*) |
 | `integration_fixture_attributes` | `test_takes_run_fixture "AspireFixture"`: written right above every class taking `integration_fixture` (*#256*) |
-| `database_fixture` | `AspireDatabase database`: the constructor parameter of a test class against the application's database alone, migrated, with nothing else running |
-| `database_fixture_attributes` | `test_takes_run_fixture "AspireDatabase"`: written right above every class taking `database_fixture` (*#256*) |
+| `database_fixture` | `ApplicationDatabase database`: the constructor parameter of a test class against the application's database alone, migrated, with nothing else running |
+| `database_fixture_attributes` | `test_takes_run_fixture "ApplicationDatabase"`: written right above every class taking `database_fixture` (*#256*) |
 | `database_connection_string` | `database.ConnectionString` |
-| `database_fixture_file namespace` | the C# file declaring that database fixture in `namespace` (rag's `tests/Rag.Tests/AspireDatabase.cs`) |
+| `database_fixture_file namespace` | the C# file declaring that database fixture in `namespace` (rag's `tests/Rag.Tests/ApplicationDatabase.cs`) |
 | `database_fixture_package_references`, `database_fixture_project_references` | the `PackageReference` and `ProjectReference` items a test project needs for the database fixture |
 
-A database fixture of another option lands in rag's file `AspireDatabase.cs`
-until rag's target is renamed, which would move the file in every rag
-project.
+Every integration pack names its database fixture `ApplicationDatabase`, so
+that rag's file `tests/Rag.Tests/ApplicationDatabase.cs` (SA1649: the file
+is named after its type) holds whichever one is chosen (*#260*: the file was
+`AspireDatabase.cs` before).
 
 #### The identity-provider vocabulary *(M3-13)*
 
