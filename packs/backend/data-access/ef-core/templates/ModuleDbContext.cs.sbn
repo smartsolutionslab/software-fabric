@@ -51,8 +51,10 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
 {{~ end ~}}
 {{~ if moves ~}}
 
-        // EF Core keeps one model per context type; a module context gets one per schema.
-        optionsBuilder.ReplaceService<IModelCacheKeyFactory, SchemaModelCacheKeyFactory>();
+        // EF Core keeps one model per context type; a module context gets one per schema. Its migrations are read
+        // through SchemaMigrationsAssembly in every schema, so one that cannot move fails before any of them runs.
+        optionsBuilder.ReplaceService<IModelCacheKeyFactory, SchemaModelCacheKeyFactory>()
+            .ReplaceService<IMigrationsAssembly, SchemaMigrationsAssembly>();
         if (CurrentSchema != ModuleSchema)
         {
             // Outside the module's schema, its migrations (which name the module's schema) and their history move to
@@ -60,8 +62,7 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
             // two against each other in the module's schema.
             var relational = RelationalOptionsExtension.Extract(optionsBuilder.Options).WithMigrationsHistoryTableSchema(CurrentSchema);
             ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(relational);
-            optionsBuilder.ReplaceService<IMigrationsAssembly, SchemaMigrationsAssembly>()
-                .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
+            optionsBuilder.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
         }
 
 {{~ end ~}}
@@ -76,12 +77,52 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
         modelBuilder.HasDefaultSchema({{ if moves }}CurrentSchema{{ else }}schema{{ end }});
         modelBuilder.ApplyConfigurationsFromAssembly(GetType().Assembly);
 {{~ if moves ~}}
+        RefuseWhatCannotMove(modelBuilder);
         MoveTablesNamingTheModulesSchema(modelBuilder);
 {{~ end ~}}
 {{ slots["persistence.model-conventions"] }}
         base.OnModelCreating(modelBuilder);
     }
 {{~ if moves ~}}
+
+    /// <summary>Whether SQL names the module's schema, quoted or not: such SQL would reach the module's own objects.</summary>
+    internal bool NamesModuleSchema(string sql) =>
+        sql.Contains($"{ModuleSchema}.", StringComparison.Ordinal) || sql.Contains($"\"{ModuleSchema}\".", StringComparison.Ordinal);
+
+    /// <summary>
+    /// What a module context cannot take to another schema fails its model wherever it is built (dotnet ef, the
+    /// MigrationRunner before it migrates anything, the host): seed data, sequences (HiLo's included) and SQL naming the
+    /// module's schema would otherwise be shared between schemas, or fail in all but one.
+    /// </summary>
+    private void RefuseWhatCannotMove(ModelBuilder modelBuilder)
+    {
+        List<string> refused = [];
+        foreach (var entity in modelBuilder.Model.GetEntityTypes())
+        {
+            if (entity.GetSeedData().Any())
+            {
+                refused.Add($"seed data (HasData) on {entity.DisplayName()}");
+            }
+
+            foreach (var property in entity.GetProperties())
+            {
+                foreach (var sql in (string?[])[property.GetDefaultValueSql(), property.GetComputedColumnSql()])
+                {
+                    if (sql is not null && NamesModuleSchema(sql))
+                    {
+                        refused.Add($"SQL of {entity.DisplayName()}.{property.Name} naming the module's schema: {sql}");
+                    }
+                }
+            }
+        }
+
+        refused.AddRange(modelBuilder.Model.GetSequences().Select(sequence => $"sequence {sequence.Schema}.{sequence.Name} (HasSequence or UseHiLo)"));
+        if (refused.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"{GetType().Name} works in a schema other than its module's, which cannot hold {string.Join("; ", refused)}. Remove them; the ADR of backend.tenancy lists what a moved context refuses.");
+        }
+    }
 
     /// <summary>A table or view a configuration maps to the module's schema by name moves with the default schema.</summary>
     private void MoveTablesNamingTheModulesSchema(ModelBuilder modelBuilder)

@@ -9,9 +9,10 @@ namespace {{ namespace }}.BuildingBlocks.Persistence;
 /// <summary>
 /// A module context's migrations, moved to the schema it works in. <c>dotnet ef</c> writes the module's schema into
 /// every operation, so each schema an operation names that is the module's becomes
-/// <see cref="ModuleDbContext.CurrentSchema"/>. A schema-qualified name anywhere else (a provider's annotation such as
-/// Npgsql's <c>Npgsql:Enum:billing.mood</c>, a column type, a default) cannot be moved, so such a migration fails
-/// instead of running in the module's schema. Raw SQL (<c>migrationBuilder.Sql</c>) is passed on as written.
+/// <see cref="ModuleDbContext.CurrentSchema"/>. A name qualified with the module's schema anywhere else, quoted or not
+/// (a provider's annotation such as Npgsql's <c>Npgsql:Enum:billing.mood</c>, a column type, a default), a sequence and
+/// seed data cannot be moved, so such a migration fails in every schema, the module's own included, before any
+/// migration runs. Raw SQL (<c>migrationBuilder.Sql</c>) is passed on as written.
 /// </summary>
 public sealed class SchemaMigrationsAssembly(ICurrentDbContext currentContext, IMigrationsIdGenerator idGenerator) : IMigrationsAssembly
 {
@@ -61,7 +62,7 @@ public sealed class SchemaMigrationsAssembly(ICurrentDbContext currentContext, I
         {
             var id = migrationClass.GetCustomAttribute<MigrationAttribute>()?.Id ?? migrationClass.Name;
             throw new InvalidOperationException(
-                $"Migration {id} names the module's schema '{context.ModuleSchema}' where it cannot be moved to '{context.CurrentSchema}': {string.Join(", ", unmovable.Distinct(StringComparer.Ordinal))}.");
+                $"Migration {id} of {context.GetType().Name} holds what cannot be moved out of the module's schema '{context.ModuleSchema}', so no migration runs: {string.Join(", ", unmovable.Distinct(StringComparer.Ordinal))}.");
         }
 
         return migration;
@@ -91,10 +92,16 @@ public sealed class SchemaMigrationsAssembly(ICurrentDbContext currentContext, I
     /// </summary>
     private void Move(MigrationOperation operation, List<string> unmovable)
     {
-        var qualified = context.ModuleSchema + ".";
+        if (operation is SequenceOperation or RenameSequenceOperation or DropSequenceOperation or RestartSequenceOperation
+            or InsertDataOperation or UpdateDataOperation or DeleteDataOperation)
+        {
+            // A sequence would be shared between schemas through the SQL that names it; seed data would be inserted once per schema.
+            unmovable.Add(operation.GetType().Name);
+        }
+
         foreach (var annotation in operation.GetAnnotations())
         {
-            if (annotation.Name.Contains(qualified, StringComparison.Ordinal) || (annotation.Value is string text && text.Contains(qualified, StringComparison.Ordinal)))
+            if (context.NamesModuleSchema(annotation.Name) || (annotation.Value is string text && context.NamesModuleSchema(text)))
             {
                 unmovable.Add(annotation.Name);
             }
@@ -117,9 +124,9 @@ public sealed class SchemaMigrationsAssembly(ICurrentDbContext currentContext, I
             {
                 property.SetValue(operation, context.CurrentSchema);
             }
-            else if (value is string text && operation is not SqlOperation && text.Contains(qualified, StringComparison.Ordinal))
+            else if (value is string text && operation is not SqlOperation && context.NamesModuleSchema(text))
             {
-                unmovable.Add($"{operation.GetType().Name}.{property.Name}");
+                unmovable.Add($"{operation.GetType().Name}.{property.Name} ({text})");
             }
             else if (value is MigrationOperation held)
             {
