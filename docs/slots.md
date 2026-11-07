@@ -420,7 +420,7 @@ AppHost's model with it, declares it instead (*#260*).
 | `web.typecheck-excludes` *(added for #126; declared by react)* | `web/app/tsconfig.json` (`exclude`, rendered only with a contribution) | `, ` | rtk-query-codegen (the generated client, without keycloak: its document starts with no paths) |
 | `web.store-imports`, `web.store-reducers`, `web.store-middleware` *(added in M1-07b; declared by redux-toolkit)* | `web/app/src/store.ts` | newline / `,` + newline / none | rtk-query-codegen |
 | `web.api-imports`, `web.api-headers` *(added in M1-07b; declared by every api-client pack)* | `web/app/src/api/baseApi.ts` | newline | oidc-client-ts (the bearer token) |
-| `web.openapi-paths`, `web.openapi-schemas` *(added for #184; role slots of `frontend.api-client`)* | `web/app/openapi.json` (`paths` after the host's own; `components.schemas`, sorted by name with the host's own) | `,` + newline / blank line | frontend.dashboards.user-editable (the dashboards module's endpoints) |
+| `web.openapi-paths`, `web.openapi-schemas` *(added for #184; role slots of `frontend.api-client`)* | `web/app/openapi.json` (`paths` after the host's own; `components.schemas`, sorted by name with the host's own) | `,` + newline / blank line | frontend.agent-ui.ag-ui (the assistant module's /permissions/manage, with authorization choices; #313), frontend.dashboards.user-editable (the dashboards module's endpoints) |
 | `web.vite-imports` *(added in M1-07)* | `web/app/vite.config.ts` | newline | tailwind |
 | `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`) |
 | `web.imports` | `web/app/src/main.tsx` | newline | redux, router, oidc |

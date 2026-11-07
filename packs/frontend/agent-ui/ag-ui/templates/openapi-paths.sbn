@@ -1,0 +1,14 @@
+{{~ # The assistant module's only described endpoint: the sample of its policy, with authorization choices (base/core's CanManage). ~}}
+{{~ if object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+    "/assistant/permissions/manage": {
+      "get": {
+        "tags": [
+          "Host"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }{{ end ~}}
