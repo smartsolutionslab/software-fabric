@@ -14,7 +14,7 @@ image="mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4
 playwright="${image#*:v}"
 playwright="${playwright%%-*}"
 
-installed="$(node -p "require('$web/app/node_modules/@playwright/test/package.json').version")"
+installed="$(node -p 'require(process.argv[1]).version' "$web/app/node_modules/@playwright/test/package.json")"
 if [ "$installed" != "$playwright" ]; then
   echo "@playwright/test is $installed, but .github/scripts/screenshots.sh runs Playwright $playwright's image: change both together."
   exit 1
