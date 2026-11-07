@@ -1,0 +1,86 @@
+using {{ namespace }}.BuildingBlocks.Dashboards;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.DescribeWidget;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.ListWidgets;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.RunWidget;
+
+namespace {{ namespace }}.Modules.Dashboards.Tests.Queries;
+
+/// <summary>The declared widgets through the dispatcher: listed, described and run for a caller who may see them, and for no one else.</summary>
+public class WidgetQueriesTests
+{
+    {{ test_attribute }}
+    public async Task The_widgets_the_caller_may_see_are_listed_a_page_at_a_time()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+        PageSize.TryFrom(1, out var one);
+
+        var result = await module.QueryAsync(new ListWidgets(Page.First, one!), {{ test_cancellation_token }});
+
+        {{ `result.Value.TotalCount` | should_be `2` }};
+        {{ `result.Value.Items.Select(widget => $"{widget.Id} {widget.Title} {widget.Kind}")` | should_be `["dashboards.my-dashboards My dashboards Table"]` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_widget_the_caller_may_not_see_is_neither_listed_described_nor_run()
+    {
+        await using var module = new DashboardsModuleUnderTest(DashboardsModuleUnderTest.Owner, "dashboards.my-dashboards");
+
+        var listed = await module.QueryAsync(new ListWidgets(Page.First, PageSize.Default), {{ test_cancellation_token }});
+        var described = await module.QueryAsync(new DescribeWidget("dashboards.my-dashboards"), {{ test_cancellation_token }});
+        var run = await module.QueryAsync(new RunWidget("dashboards.my-dashboards", Page.First, PageSize.Default), {{ test_cancellation_token }});
+
+        {{ `listed.Value.Items.Select(widget => widget.Id)` | should_be `["dashboards.widget-counts"]` }};
+        {{ `described.Error.Code` | should_be `"dashboards.widget-not-found"` }};
+        {{ `run.Error.Code` | should_be `"dashboards.widget-not-found"` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_declared_widget_is_described_by_its_title_and_kind()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+
+        var result = await module.QueryAsync(new DescribeWidget("dashboards.widget-counts"), {{ test_cancellation_token }});
+
+        {{ `result.Value.Title` | should_be `"Widgets per dashboard"` }};
+        {{ `result.Value.Kind` | should_be `WidgetKind.Chart` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_widget_the_modules_do_not_declare_is_neither_described_nor_run()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+
+        var described = await module.QueryAsync(new DescribeWidget("billing.everything"), {{ test_cancellation_token }});
+        var run = await module.QueryAsync(new RunWidget("billing.everything", Page.First, PageSize.Default), {{ test_cancellation_token }});
+
+        {{ `described.Error.Code` | should_be `"dashboards.widget-not-found"` }};
+        {{ `run.Error.Code` | should_be `"dashboards.widget-not-found"` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_chart_widget_runs_its_query_as_the_caller()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+        await SavedDashboards.SaveAsync(module, "Sales", 2, {{ test_cancellation_token }});
+
+        var result = await module.QueryAsync(new RunWidget("dashboards.widget-counts", Page.First, PageSize.Default), {{ test_cancellation_token }});
+
+        {{ `result.Value.Kind` | should_be `WidgetKind.Chart` }};
+        {{ `result.Value.Chart!.Categories` | should_be `["Sales"]` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_table_widget_runs_its_query_for_the_page_it_is_given()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+        await SavedDashboards.SaveAsync(module, "Sales", 2, {{ test_cancellation_token }});
+        await SavedDashboards.SaveAsync(module, "Costs", 1, {{ test_cancellation_token }});
+        PageSize.TryFrom(1, out var one);
+
+        var result = await module.QueryAsync(new RunWidget("dashboards.my-dashboards", Page.First, one!), {{ test_cancellation_token }});
+
+        {{ `result.Value.Kind` | should_be `WidgetKind.Table` }};
+        {{ `result.Value.Table!.TotalCount` | should_be `2` }};
+        {{ `result.Value.Table!.Rows.Single().GetProperty("name").GetString()` | should_be `"Costs"` }};
+    }
+}
