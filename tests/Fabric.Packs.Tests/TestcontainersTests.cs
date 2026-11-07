@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace Fabric.Packs.Tests;
@@ -132,6 +134,67 @@ public sealed partial class TestcontainersTests
             exitCode.ShouldBe(0, $"{tests}:{Environment.NewLine}{output}");
             output.ShouldContain("failed: 0", customMessage: tests);
             output.ShouldNotContain("succeeded: 0", customMessage: tests);
+        }
+    }
+
+    /// <summary>
+    /// A MigrationRunner that outlives the fixture's startup timeout is killed with the setup it fails, not left running
+    /// (#314): the timeout comes from INTEGRATION_TESTS_STARTUP_TIMEOUT, here seconds, and the runner stalls forever
+    /// after recording its process ID. <c>dotnet run</c> starts it as a child of its own, so only killing the whole
+    /// process tree ends it.
+    /// </summary>
+    [Fact]
+    public void A_migration_runner_that_outlives_the_startup_timeout_is_killed_when_setup_fails()
+    {
+        using var project = NewProject("lean-crud", "frontend.realtime=signalr", "backend.auth=none", "backend.tenancy=none");
+        project.Write("src/MigrationRunner/Program.cs", """
+            using System.Globalization;
+
+            // Stalls: records its process ID, then never ends.
+            var file = Environment.GetEnvironmentVariable("STALLING_RUNNER_PID_FILE") ?? throw new InvalidOperationException("No STALLING_RUNNER_PID_FILE.");
+            await File.WriteAllTextAsync(file, Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
+            await Task.Delay(Timeout.Infinite);
+
+            """);
+        project.Build();
+        var pidFile = Path.Combine(project.ProjectDirectory, "stalling-runner.pid");
+
+        var (exitCode, output) = project.Test(
+            "tests/Integration.Tests/Integration.Tests.csproj",
+            new Dictionary<string, string>
+            {
+                ["INTEGRATION_TESTS_STARTUP_TIMEOUT"] = "00:01:30",
+                ["STALLING_RUNNER_PID_FILE"] = pidFile,
+            });
+
+        exitCode.ShouldNotBe(0, output);
+        File.Exists(pidFile).ShouldBeTrue($"The stalling MigrationRunner never started:{Environment.NewLine}{output}");
+        var runner = int.Parse(File.ReadAllText(pidFile), CultureInfo.InvariantCulture);
+        try
+        {
+            IsRunning(runner).ShouldBeFalse($"The MigrationRunner (process {runner}) outlived the fixture's failed setup:{Environment.NewLine}{output}");
+        }
+        finally
+        {
+            if (IsRunning(runner))
+            {
+                using var survivor = Process.GetProcessById(runner);
+                survivor.Kill(entireProcessTree: true);
+            }
+        }
+    }
+
+    /// <summary>Whether a process runs: a killed one its parent has not reaped yet is a zombie, and runs no more.</summary>
+    private static bool IsRunning(int processId)
+    {
+        try
+        {
+            var stat = File.ReadAllText($"/proc/{processId}/stat");
+            return stat[(stat.LastIndexOf(')') + 2)..][0] != 'Z';
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return false;
         }
     }
 

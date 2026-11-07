@@ -16,5 +16,6 @@ Testcontainers is MIT-licensed; its packages are pinned in `Directory.Packages.p
 
 - The tests need Docker, locally and in CI; the first run pulls the images, and Testcontainers' resource reaper (Ryuk) removes the containers if a run is killed.
 - Build before testing (`dotnet build build.proj`): the fixture runs the built MigrationRunner (`dotnet run --no-build`) in the tests' configuration.
+- Setup gives up after five minutes, or after the time span in `INTEGRATION_TESTS_STARTUP_TIMEOUT` (`00:01:30`), and kills what it started with `dotnet run` and every process under it: a MigrationRunner that stalls does not outlive the run.
 - A resource the AppHost adds needs a container here too, or the host starts without it: the resource's pack contributes both. What the AppHost starts only for people (Mailpit for Keycloak's email, the Kafka and RabbitMQ consoles) is not started, so Keycloak's email is not tested here.
 - A module's own behaviour is tested against the same fixture: add a test class taking `ContainerFixture` to `tests/Integration.Tests/`.
