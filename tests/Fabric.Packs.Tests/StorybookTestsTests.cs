@@ -28,7 +28,9 @@ public sealed class StorybookTestsTests
         project.AddModule("billing");
         RunWeb(project, "install", "build", "lint");
 
-        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "packages", "ui"), "pnpm", "exec", "vitest", "run", "--reporter", "verbose");
+        // Without NO_COLOR, a runner that forces colour puts escape codes between the parts of a test's name.
+        var plain = new Dictionary<string, string> { ["NO_COLOR"] = "1" };
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "packages", "ui"), plain, "pnpm", "exec", "vitest", "run", "--reporter", "verbose");
 
         exitCode.ShouldBe(0, $"vitest in web/packages/ui:\n{output}");
         output.ShouldContain("Badge.stories.tsx > Accent");
