@@ -118,6 +118,9 @@ if (typeof realmAccess !== 'object' || realmAccess === null || !('roles' in real
 const { roles } = realmAccess;
 return Array.isArray(roles) && roles.includes(` + role + `);`
 end
+func id_token_roles_claim
+  ret "realm_access.roles"
+end
 func tenant_claim(user)
   ret `var tenants = ` + user + `.FindAll("groups")
     .Select(claim => claim.Value)

@@ -306,6 +306,7 @@ claims ADRs describe.
 | `browser_authority` | the provider's local authority URL (`http://localhost:8080/realms/<name>`), the browser's fallback when `VITE_OIDC_AUTHORITY` is unset |
 | `id_token_roles roles` | the ID token property holding the roles `roles` (TS array items), for test tokens |
 | `id_token_has_role profile role` | TS statements returning whether the ID token claims `profile` hold `role` |
+| `id_token_roles_claim` | prose naming the ID token claim that holds the roles: `realm_access.roles` (*#251*) |
 | `tenant_claim user` | statements, the body of a method returning `string?`, that return the tenant the claims principal `user` (a C# expression, `ClaimsPrincipal?`, which the statements continue with `.`) belongs to, or `null` when its token names none or several: the one group under `/tenants/` in `groups` (*#251*) |
 | `tenant_claim_members` | the private members those statements need, in the same class (`TenantGroupPrefix`) |
 | `tenant_claim_description` | prose for the class's summary: `the user's one group under /tenants/` |
