@@ -1,0 +1,2 @@
+    "screenshots": "bash ../../.github/scripts/screenshots.sh",
+    "screenshots:update": "bash ../../.github/scripts/screenshots.sh --update"

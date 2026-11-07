@@ -68,6 +68,7 @@ internal sealed class Container : IDisposable
     /// </summary>
     public static Container Kafka()
     {
+        DockerPorts.EnsureRunsAlone();
         var port = FreePort();
         var id = Docker(
             "run", "--detach", "--publish", $"127.0.0.1:{port}:{port}",
@@ -93,6 +94,7 @@ internal sealed class Container : IDisposable
 
     private static Container Start(string image, int containerPort, params string[] environment)
     {
+        DockerPorts.EnsureRunsAlone();
         List<string> arguments = ["run", "--detach", "--publish", $"127.0.0.1::{containerPort}"];
         foreach (var variable in environment)
         {

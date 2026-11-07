@@ -1,0 +1,8 @@
+option: frontend.test.extras.storybook-tests
+files:
+  - { template: templates/stories.test.tsx.sbn, target: web/packages/ui/src/stories.test.tsx }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "The ui package's tests render every story in src/ and run its play function; a story that throws or whose play function fails fails pnpm test.", file: templates/stories.test.tsx.sbn }
