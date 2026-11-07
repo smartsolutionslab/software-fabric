@@ -8,13 +8,13 @@ namespace {{ namespace }}.Modules.Dashboards.Tests.Queries;
 public class DashboardQueriesTests
 {
     {{ test_attribute }}
-    public async Task A_dashboard_of_another_user_is_not_found()
+    public async Task A_dashboard_of_another_user_in_the_same_table_is_not_found()
     {
-        await using var module = new DashboardsModuleUnderTest(DashboardsModuleUnderTest.OtherOwner);
-        var id = await SavedDashboards.SaveAsync(module, "Sales", 1, {{ test_cancellation_token }});
-        await using var other = new DashboardsModuleUnderTest();
+        await using var module = new DashboardsModuleUnderTest();
+        await using var other = module.SignedInAs(DashboardsModuleUnderTest.OtherOwner);
+        var id = await SavedDashboards.SaveAsync(other, "Sales", 1, {{ test_cancellation_token }});
 
-        var result = await other.QueryAsync(new GetDashboard(id), {{ test_cancellation_token }});
+        var result = await module.QueryAsync(new GetDashboard(id), {{ test_cancellation_token }});
 
         {{ `result.Error.Code` | should_be `"dashboards.dashboard-not-found"` }};
     }
@@ -23,6 +23,8 @@ public class DashboardQueriesTests
     public async Task The_callers_dashboards_are_listed_a_page_at_a_time_by_name_with_their_widget_counts()
     {
         await using var module = new DashboardsModuleUnderTest();
+        await using var other = module.SignedInAs(DashboardsModuleUnderTest.OtherOwner);
+        await SavedDashboards.SaveAsync(other, "Accounts", 4, {{ test_cancellation_token }});
         await SavedDashboards.SaveAsync(module, "Costs", 2, {{ test_cancellation_token }});
         await SavedDashboards.SaveAsync(module, "Audit", 0, {{ test_cancellation_token }});
         await SavedDashboards.SaveAsync(module, "Sales", 1, {{ test_cancellation_token }});
@@ -35,10 +37,12 @@ public class DashboardQueriesTests
     }
 
     {{ test_attribute }}
-    public async Task The_chart_counts_the_widgets_of_each_of_the_callers_dashboards()
+    public async Task The_chart_counts_the_widgets_of_each_of_the_callers_dashboards_and_of_no_one_elses()
     {
         await using var module = new DashboardsModuleUnderTest();
+        await using var other = module.SignedInAs(DashboardsModuleUnderTest.OtherOwner);
         await SavedDashboards.SaveAsync(module, "Sales", 3, {{ test_cancellation_token }});
+        await SavedDashboards.SaveAsync(other, "Accounts", 4, {{ test_cancellation_token }});
         await SavedDashboards.SaveAsync(module, "Costs", 1, {{ test_cancellation_token }});
 
         var result = await module.QueryAsync(new CountWidgets(), {{ test_cancellation_token }});

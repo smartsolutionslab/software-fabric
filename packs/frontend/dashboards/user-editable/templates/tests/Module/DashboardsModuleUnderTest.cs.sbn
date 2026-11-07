@@ -10,7 +10,8 @@ namespace {{ namespace }}.Modules.Dashboards.Tests;
 
 /// <summary>
 /// The dashboards module with what the host provides, its widget catalogue and dispatcher, for one caller; the table
-/// is <see cref="Store"/>. Each request runs through the dispatcher in a scope of its own, as an endpoint's does.
+/// is <see cref="Store"/>, which <see cref="SignedInAs"/> shares with another caller. Each request runs through the
+/// dispatcher in a scope of its own, as an endpoint's does.
 /// </summary>
 internal sealed class DashboardsModuleUnderTest : IAsyncDisposable
 {
@@ -21,7 +22,13 @@ internal sealed class DashboardsModuleUnderTest : IAsyncDisposable
     private readonly ServiceProvider services;
 
     public DashboardsModuleUnderTest(string? subject = Owner, params string[] hiddenWidgets)
+        : this(new InMemoryDashboardStore(), subject, hiddenWidgets)
     {
+    }
+
+    private DashboardsModuleUnderTest(InMemoryDashboardStore store, string? subject, string[] hiddenWidgets)
+    {
+        Store = store;
         var collection = new ServiceCollection().AddLogging();
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:database"] = "Host=localhost" })
@@ -36,7 +43,10 @@ internal sealed class DashboardsModuleUnderTest : IAsyncDisposable
         services = collection.BuildServiceProvider();
     }
 
-    public InMemoryDashboardStore Store { get; } = new();
+    public InMemoryDashboardStore Store { get; }
+
+    /// <summary>The same module and table for another caller, so one user's dashboards sit beside another's.</summary>
+    public DashboardsModuleUnderTest SignedInAs(string subject) => new(Store, subject, []);
 
     public async Task<TResult> SendAsync<TResult>(ICommand<TResult> command, CancellationToken cancellationToken)
     {
