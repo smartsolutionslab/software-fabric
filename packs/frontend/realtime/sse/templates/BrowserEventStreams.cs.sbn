@@ -56,7 +56,8 @@ public sealed class BrowserEventStreams
         {
             while (await NextAsync(listener.Events.Reader, cancellationToken))
             {
-                while (listener.Events.Reader.TryRead(out var item))
+                // A stream with events waiting still ends once cancelled: its token may have expired.
+                while (!cancellationToken.IsCancellationRequested && listener.Events.Reader.TryRead(out var item))
                 {
                     yield return item;
                 }

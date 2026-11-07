@@ -84,6 +84,9 @@ public static class ServerEventsEndpoints
         var lifetime = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, expired.Token);
         context.Response.RegisterForDispose(expired);
         context.Response.RegisterForDispose(lifetime);
+
+        // The result writes with RequestAborted, so a write to a browser that has stopped reading ends at expiry too.
+        context.RequestAborted = lifetime.Token;
         return lifetime.Token;
     }
 {{~ end ~}}
