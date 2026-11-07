@@ -232,6 +232,38 @@ public sealed partial class EntraIdTests
     }
 
     /// <summary>
+    /// The stand-in is for development and tests only (review of #320): a published AppHost has no stand-in, and gives
+    /// the host and the browser none of its settings, which production configures for Entra ID itself.
+    /// </summary>
+    [Fact]
+    public void Publishing_the_apphost_leaves_the_stand_in_and_its_settings_out()
+    {
+        using var project = new GeneratedProject("lean-crud", EntraId);
+        var (buildExitCode, buildOutput) = project.DotNetCommand(new Dictionary<string, string>(), "build", "src/AppHost/AppHost.csproj", "-c", "Release");
+        buildExitCode.ShouldBe(0, buildOutput);
+        var output = Path.Combine(project.ProjectDirectory, "publish");
+
+        var (exitCode, publishOutput) = DotNet.Run(
+            Path.Combine(project.ProjectDirectory, "src", "AppHost", "bin", "Release", "net10.0"),
+            new Dictionary<string, string> { ["DOTNET_ENVIRONMENT"] = "Development" },
+            "AppHost.dll",
+            "--operation",
+            "publish",
+            "--step",
+            "publish-manifest",
+            "--output-path",
+            output);
+        exitCode.ShouldBe(0, publishOutput);
+
+        var resources = JsonNode.Parse(File.ReadAllText(Path.Combine(output, "aspire-manifest.json")))!["resources"]!.AsObject();
+        resources.Select(resource => resource.Key).ShouldNotContain("identity");
+        var published = resources.SelectMany(resource => resource.Value!["env"]?.AsObject().Select(variable => $"{resource.Key}: {variable.Key}={variable.Value}") ?? [])
+            .Where(variable => variable.Contains("AzureAd", StringComparison.Ordinal) || variable.Contains("VITE_OIDC_AUTHORITY", StringComparison.Ordinal) || variable.Contains("identity", StringComparison.Ordinal))
+            .ToList();
+        published.ShouldBeEmpty(string.Join(Environment.NewLine, published));
+    }
+
+    /// <summary>
     /// The M3-26 gate: against the running stack, test users sign in at the stand-in, the host accepts their tokens and
     /// knows them, their tenant, roles and department decide what they may do, and a directory the host does not list is
     /// refused.
