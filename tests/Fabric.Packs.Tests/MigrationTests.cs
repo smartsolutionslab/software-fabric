@@ -53,8 +53,10 @@ public sealed class MigrationTests
         output.ShouldContain("probe step ran after the migrations; database configured: True");
     }
 
-    [Fact]
-    public void A_schema_another_pack_gives_a_module_context_holds_its_model_its_migrations_and_their_history()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_schema_another_pack_gives_a_module_context_holds_its_model_its_migrations_and_their_history(bool tableNamesTheModulesSchema)
     {
         // As above, the probe stands in for mantine. Its schema comes from AppContext, which its step sets to two schemas in
         // turn: a context's tables, its migrations and their history all follow, and each schema gets a model of its own.
@@ -75,7 +77,7 @@ public sealed class MigrationTests
         });
         using var project = new GeneratedProject(Profile, [probe.Manifest], "frontend.ui-library=mantine", "backend.tenancy=none");
         project.AddModule("billing");
-        AddNotesWithAMigration(project);
+        AddNotesWithAMigration(project, tableNamesTheModulesSchema);
 
         using var postgres = Container.Postgres(DatabasePassword);
         var (exitCode, output) = project.DotNetCommand(
@@ -88,6 +90,53 @@ public sealed class MigrationTests
         postgres.Psql(DatabasePassword, "select \"MigrationId\" from billing_one.\"__EFMigrationsHistory\"").ShouldEndWith("_Initial");
         postgres.Psql(DatabasePassword, "select \"MigrationId\" from billing_two.\"__EFMigrationsHistory\"").ShouldEndWith("_Initial");
         postgres.Psql(DatabasePassword, "select count(*) from billing.notes").ShouldBe("0");
+    }
+
+    [Fact]
+    public void A_migration_naming_the_modules_schema_in_a_provider_annotation_fails_the_move_instead_of_running_unmoved()
+    {
+        // A PostgreSQL enum lives in the module's schema; Npgsql names it in an annotation, which no schema property carries.
+        using var probe = new ProbePack("frontend.ui-library.mantine", new Dictionary<string, string>
+        {
+            ["persistence.schema"] = """AppContext.GetData("probe-schema") as string ?? schema""",
+            ["migration-runner.steps"] = """
+                AppContext.SetData("probe-schema", "billing_one");
+                await using var probeScope = host.Services.CreateAsyncScope();
+                await probeScope.ServiceProvider.GetRequiredService<Shop.Modules.Billing.Infrastructure.Persistence.BillingDbContext>().Database.MigrateAsync();
+                """,
+        });
+        using var project = new GeneratedProject(Profile, [probe.Manifest], "frontend.ui-library=mantine", "backend.tenancy=none");
+        project.AddModule("billing");
+        AddNotesWithAMigration(project);
+        project.Write("src/Modules/Billing/Billing.Infrastructure/Migrations/20990101000000_Mood.cs", """
+            using Microsoft.EntityFrameworkCore.Infrastructure;
+            using Microsoft.EntityFrameworkCore.Migrations;
+
+            namespace Shop.Modules.Billing.Infrastructure.Migrations;
+
+            [DbContext(typeof(Shop.Modules.Billing.Infrastructure.Persistence.BillingDbContext))]
+            [Migration("20990101000000_Mood")]
+            public sealed class Mood : Migration
+            {
+                protected override void Up(MigrationBuilder migrationBuilder)
+                {
+                    Ensure.That(migrationBuilder).IsNotNull();
+
+                    migrationBuilder.AlterDatabase().Annotation("Npgsql:Enum:billing.mood", "happy,sad");
+                }
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = project.DotNetCommand(
+            new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
+            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("20990101000000_Mood");
+        output.ShouldContain("Npgsql:Enum:billing.mood");
+        postgres.Psql(DatabasePassword, "select count(*) from information_schema.schemata where schema_name = 'billing_one'").ShouldBe("0");
     }
 
     [Fact]
@@ -116,7 +165,8 @@ public sealed class MigrationTests
     }
 
     /// <summary>A Note entity in billing, a migration creating its table made with the EF tool, and a build.</summary>
-    internal static void AddNotesWithAMigration(GeneratedProject project)
+    /// <param name="tableNamesTheModulesSchema">Maps the table with ToTable("notes", BillingDbContext.Schema), not by the default schema.</param>
+    internal static void AddNotesWithAMigration(GeneratedProject project, bool tableNamesTheModulesSchema = false)
     {
         project.Write("src/Modules/Billing/Billing.Domain/Note.cs", """
             using Shop.BuildingBlocks.Domain;
@@ -139,12 +189,12 @@ public sealed class MigrationTests
             {
                 public void Configure(EntityTypeBuilder<Note> builder)
                 {
-                    builder.ToTable("notes");
+                    builder.ToTable({{TABLE}});
                     builder.HasKey(note => note.Id);
                     builder.Property(note => note.Text);
                 }
             }
-            """);
+            """.Replace("{{TABLE}}", tableNamesTheModulesSchema ? "\"notes\", BillingDbContext.Schema" : "\"notes\"", StringComparison.Ordinal));
         project.Build();
 
         var none = new Dictionary<string, string>();

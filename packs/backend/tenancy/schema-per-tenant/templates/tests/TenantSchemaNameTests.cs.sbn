@@ -6,7 +6,7 @@ namespace {{ namespace }}.Tenancy.Tests;
 
 /// <summary>
 /// A schema belongs to one module and one tenant, or to one module alone: names that two of them would share, or that
-/// the database would cut short at its identifier limit, fail before anything is migrated. No database is needed.
+/// the database would cut short at its identifier limit, fail before they are migrated. No database is needed.
 /// </summary>
 public sealed class TenantSchemaNameTests
 {
@@ -32,6 +32,16 @@ public sealed class TenantSchemaNameTests
         var refusal = await {{ should_throw_async "InvalidOperationException" "() => services.MigrateTenantSchemasAsync([typeof(LedgerDbContext), typeof(LedgerArchiveDbContext)], cancellationToken)" }};
 
         {{ `refusal.Message` | should_contain `"tenancy_tests_ledger_a"` }};
+    }
+
+    {{ test_attribute }}
+    public void A_module_whose_own_schema_is_a_listed_tenants_schema_fails_before_its_own_migrations_run()
+    {
+        // tenancy_tests_ledger_a is the ledger's schema for tenant a: the other module must not work, or migrate, there.
+        using var services = Services("a");
+        using var scope = services.CreateScope();
+
+        {{ should_throw "InvalidOperationException" "() => scope.ServiceProvider.GetRequiredService<LedgerArchiveDbContext>()" }};
     }
 
     {{ test_attribute }}
