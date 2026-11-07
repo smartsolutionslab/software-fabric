@@ -1,0 +1,111 @@
+func should_be(actual, expected, message = null)
+  if message == null
+    ret actual + ".Should().Be(" + expected + ")"
+  end
+  ret actual + ".Should().Be(" + expected + ", because: " + message + ")"
+end
+func should_be_ignoring_order(actual, expected, message = null)
+  if message == null
+    ret actual + ".Should().BeEquivalentTo(" + expected + ")"
+  end
+  ret actual + ".Should().BeEquivalentTo(" + expected + ", because: " + message + ")"
+end
+func should_be_true(actual, message = null)
+  if message == null
+    ret actual + ".Should().BeTrue()"
+  end
+  ret actual + ".Should().BeTrue(because: " + message + ")"
+end
+func should_be_false(actual, message = null)
+  if message == null
+    ret actual + ".Should().BeFalse()"
+  end
+  ret actual + ".Should().BeFalse(because: " + message + ")"
+end
+func should_be_null(actual, message = null)
+  if message == null
+    ret actual + ".Should().BeNull()"
+  end
+  ret actual + ".Should().BeNull(because: " + message + ")"
+end
+func should_not_be_null(actual, message = null)
+  if message == null
+    ret actual + ".Should().NotBeNull().And.Value()"
+  end
+  ret actual + ".Should().NotBeNull(because: " + message + ").And.Value()"
+end
+func should_be_empty(actual, message = null)
+  if message == null
+    ret actual + ".Should().BeEmpty()"
+  end
+  ret actual + ".Should().BeEmpty(because: " + message + ")"
+end
+func should_not_be_empty(actual, message = null)
+  if message == null
+    ret actual + ".Should().NotBeEmpty()"
+  end
+  ret actual + ".Should().NotBeEmpty(because: " + message + ")"
+end
+func should_contain(actual, expected, message = null)
+  if message == null
+    ret actual + ".Should().Contain(" + expected + ")"
+  end
+  ret actual + ".Should().Contain(" + expected + ", because: " + message + ")"
+end
+func should_not_contain(actual, expected, message = null)
+  if message == null
+    ret actual + ".Should().NotContain(" + expected + ")"
+  end
+  ret actual + ".Should().NotContain(" + expected + ", because: " + message + ")"
+end
+func should_start_with(actual, expected, message = null)
+  if message == null
+    ret actual + ".Should().StartWith(" + expected + ")"
+  end
+  ret actual + ".Should().StartWith(" + expected + ", because: " + message + ")"
+end
+func should_be_greater_than(actual, expected, message = null)
+  if message == null
+    ret actual + ".Should().BeGreaterThan(" + expected + ")"
+  end
+  ret actual + ".Should().BeGreaterThan(" + expected + ", because: " + message + ")"
+end
+func should_be_in_range(actual, from, to)
+  ret actual + ".Should().BeInRange(" + from + ", " + to + ")"
+end
+func should_all_be(actual, predicate, message = null)
+  if message == null
+    ret actual + ".Should().OnlyContain(" + predicate + ")"
+  end
+  ret actual + ".Should().OnlyContain(" + predicate + ", because: " + message + ")"
+end
+func should_be_in_order(actual)
+  ret actual + ".Should().BeInAscendingOrder()"
+end
+func should_be_subset_of(actual, expected)
+  ret actual + ".Should().BeSubsetOf(" + expected + ")"
+end
+func should_be_same_as(actual, expected)
+  ret actual + ".Should().BeSameAs(" + expected + ")"
+end
+func should_have_single_item(actual)
+  ret actual + ".Should().ContainSingle().Value()"
+end
+func should_be_of_type(actual, type)
+  ret actual + ".Should().BeOfType<" + type + ">().Value()"
+end
+func should_be_assignable_to(actual, type)
+  ret actual + ".Should().BeAssignableTo<" + type + ">().Value()"
+end
+func should_throw(type, action)
+  ret "FluentActions.Invoking(" + action + ").Should().Throw<" + type + ">().Value()"
+end
+func should_throw_async(type, action)
+  if (action | regex.match `^\s*(async\s+)?(\([^()]*\)|[A-Za-z_][A-Za-z0-9_]*)\s*=>` | array.size) == 0
+    ret "FluentActions.Awaiting(() => " + action + ").Should().ThrowAsync<" + type + ">().Value()"
+  end
+  ret "FluentActions.Awaiting(" + action + ").Should().ThrowAsync<" + type + ">().Value()"
+end
+func should_not_throw(action)
+  ret "FluentActions.Invoking(" + action + ").Should().NotThrow()"
+end
