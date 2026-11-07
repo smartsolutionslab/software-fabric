@@ -76,3 +76,5 @@ done
 curl -fs -o /dev/null --max-time 10 "$app" || fail "$app did not answer within five minutes."
 
 (cd web/app && pnpm e2e) || fail "The end-to-end tests failed."
+{{ if slots["e2e.after-tests"] != "" }}{{ slots["e2e.after-tests"] }}
+{{ end }}
