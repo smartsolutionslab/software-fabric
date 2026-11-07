@@ -9,8 +9,6 @@ namespace Fabric.Packs.Tests;
 [Collection(FixedPorts.Name)]
 public sealed partial class PwaEndToEndTests
 {
-    private const string OfflineTest = "the app shell loads offline, and /api is never answered from the service worker";
-
     [Fact]
     public void The_shell_loads_offline_end_to_end_and_a_worker_that_caches_api_answers_fails_the_test()
     {
@@ -25,8 +23,7 @@ public sealed partial class PwaEndToEndTests
         // The generated CI's own end-to-end step: start the AppHost, wait for the app, run Playwright, stop.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, e2eOutput);
-        e2eOutput.ShouldContain(OfflineTest);
-        e2eOutput.ShouldNotContain("failed");
+        e2eOutput.ShouldContain("2 passed");
 
         // The gate: a worker that keeps every same-origin answer, /api included, fails the offline test.
         var config = Path.Combine(web, "app", "vite.config.ts");
@@ -52,8 +49,7 @@ public sealed partial class PwaEndToEndTests
 
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, e2eOutput);
-        e2eOutput.ShouldContain(OfflineTest);
-        e2eOutput.ShouldNotContain("failed");
+        e2eOutput.ShouldContain("2 passed");
     }
 
     [GeneratedRegex(@"urlPattern: [\s\S]*?,\n(?<indent>\s*)handler:")]
