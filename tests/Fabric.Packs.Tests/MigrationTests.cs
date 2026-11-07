@@ -116,7 +116,7 @@ public sealed class MigrationTests
     }
 
     /// <summary>A Note entity in billing, a migration creating its table made with the EF tool, and a build.</summary>
-    private static void AddNotesWithAMigration(GeneratedProject project)
+    internal static void AddNotesWithAMigration(GeneratedProject project)
     {
         project.Write("src/Modules/Billing/Billing.Domain/Note.cs", """
             using Shop.BuildingBlocks.Domain;
