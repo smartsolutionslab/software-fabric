@@ -9,6 +9,7 @@ namespace Fabric.Packs.Tests;
 /// each module's model against its snapshot in the module's own schema; the host never creates one. A tenant not in the
 /// list, like no tenant, works in the module's own schema, where it reads nothing and cannot save.
 /// </summary>
+[Collection(DockerPorts.Name)]
 public sealed class SchemaPerTenantTests
 {
     private const string Profile = "saas-standard-react";
