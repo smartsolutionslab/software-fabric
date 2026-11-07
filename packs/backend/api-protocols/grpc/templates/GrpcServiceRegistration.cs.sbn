@@ -1,0 +1,32 @@
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Modules;
+using {{ namespace }}.Host.GrpcServices;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class GrpcServiceRegistration
+{
+    /// <summary>gRPC, serving every service a module's Api project implements; <c>MapModuleGrpcServices</c> maps them.</summary>
+    public static IServiceCollection AddModuleGrpcServices(this IServiceCollection services, IReadOnlyList<IModule> modules)
+    {
+        {{ not_null "services" }}
+        {{ not_null "modules" }}
+
+        services.AddGrpc();
+        foreach (var module in modules)
+        {
+            services.AddGrpcServicesIn(module.GetType().Assembly);
+        }
+
+        return services;
+    }
+
+    /// <summary>Serves the gRPC services one assembly implements, as <see cref="AddModuleGrpcServices"/> does for each module's Api.</summary>
+    public static IServiceCollection AddGrpcServicesIn(this IServiceCollection services, Assembly assembly)
+    {
+        {{ not_null "services" }}
+        {{ not_null "assembly" }}
+
+        return services.AddSingleton(new GrpcServiceAssembly(assembly));
+    }
+}

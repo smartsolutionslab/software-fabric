@@ -6,5 +6,13 @@
 {{ slots["host.log-levels"] }}{{ end }}
     }
   },
-  "AllowedHosts": "*"
+  "AllowedHosts": "*"{{ if slots["host.kestrel-endpoints"] != "" }},
+  "Kestrel": {
+    "Endpoints": {
+      "http": {
+        "Url": "http://localhost:5080"
+      },
+{{ slots["host.kestrel-endpoints"] }}
+    }
+  }{{ end }}
 }

@@ -1,0 +1,59 @@
+{{~ auth = project["backend.auth"] != "none" ~}}
+using Grpc.Core;
+
+namespace {{ namespace }}.GrpcServices.Tests;
+
+/// <summary>
+/// The host's gRPC services through a client generated from the <c>.proto</c>: a call reaches its handler through the
+/// dispatcher, and a failed result is an <see cref="RpcException"/> carrying the error{{ if auth }}; a caller who is not
+/// signed in is refused{{ end }}.
+/// </summary>
+public sealed class GrpcServiceTests : IDisposable
+{
+    private readonly GrpcHost host = new();
+
+    {{ test_attribute }}
+    public async Task A_query_answers_with_its_handlers_result_through_the_dispatcher()
+    {
+        using var channel = host.CreateChannel();
+        var client = new Samples.SamplesClient(channel);
+
+        var reply = await client.ShoutAsync(new ShoutRequest { Text = "hello" }, Caller(), cancellationToken: {{ test_cancellation_token }});
+
+        {{ `reply.Text` | should_be `"HELLO"` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_failed_result_is_an_rpc_error_with_the_errors_status_message_and_code()
+    {
+        using var channel = host.CreateChannel();
+        var client = new Samples.SamplesClient(channel);
+
+        var error = await {{ should_throw_async `RpcException` (`async () => await client.ShoutAsync(new ShoutRequest(), Caller(), cancellationToken: ` + test_cancellation_token + `)`) }};
+
+        {{ `error.StatusCode` | should_be `StatusCode.InvalidArgument` }};
+        {{ `error.Status.Detail` | should_be `"There is nothing to shout."` }};
+        {{ `error.Trailers.GetValue(ResultGrpcExtensions.ErrorCodeTrailer)` | should_be `"samples.nothing-to-shout"` }};
+    }
+{{~ if auth ~}}
+
+    {{ test_attribute }}
+    public async Task An_anonymous_caller_is_refused()
+    {
+        using var channel = host.CreateChannel();
+        var client = new Samples.SamplesClient(channel);
+
+        var error = await {{ should_throw_async `RpcException` (`async () => await client.ShoutAsync(new ShoutRequest { Text = "hello" }, cancellationToken: ` + test_cancellation_token + `)`) }};
+
+        {{ `error.StatusCode` | should_be `StatusCode.Unauthenticated` }};
+    }
+{{~ end ~}}
+
+    public void Dispose() => host.Dispose();
+
+{{~ if auth ~}}
+    private static Metadata Caller() => GrpcHost.SignedInAs("alice");
+{{~ else ~}}
+    private static Metadata Caller() => [];
+{{~ end ~}}
+}

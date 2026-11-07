@@ -1,0 +1,2 @@
+    <PackageReference Include="Grpc.AspNetCore" />
+    <Protobuf Include="Protos/**/*.proto" GrpcServices="Both" />
