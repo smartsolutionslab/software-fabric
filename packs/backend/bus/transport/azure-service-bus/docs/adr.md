@@ -20,6 +20,7 @@ Running the emulator accepts both images' licences (`ACCEPT_EULA=Y`): Aspire set
 
 ## Consequences
 
-- The emulator is for development and tests only: it keeps at most 50 queues and topics per namespace and has no portal; queues it creates live as long as its container.
+- The emulator is for development and tests only: it has no portal, and the queues created in it live as long as its container.
+- The emulator holds at most 50 queues and topics. The messaging library creates one queue per integration event plus a few of its own, so a project with more than about 45 integration events outgrows the emulator, though not Azure.
 - The emulator and its SQL Server take about 2.7 GB of images, and SQL Server wants 2 GB of memory; the emulator takes about half a minute to become healthy.
 - Deploying to Azure needs a Service Bus namespace whose connection string may manage entities, since the messaging library creates its queues at startup.
