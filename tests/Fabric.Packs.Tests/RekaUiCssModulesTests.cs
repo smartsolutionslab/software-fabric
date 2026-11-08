@@ -50,8 +50,8 @@ public sealed partial class RekaUiCssModulesTests
 
         var test = files[ButtonTest];
         test.ShouldContain("import styles from './BaseButton.module.css';");
-        test.ShouldContain("toHaveClass(styles.variantDefault)");
-        test.ShouldContain("toHaveClass(styles.variantOutline)");
+        test.ShouldContain("classList).toContain(styles.variantDefault);");
+        test.ShouldContain("classList).toContain(styles.variantOutline);");
         test.ShouldNotContain("slate");
 
         var utils = files[Utils];
