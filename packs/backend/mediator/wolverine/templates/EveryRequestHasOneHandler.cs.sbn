@@ -7,7 +7,7 @@ public sealed class EveryRequestHasOneHandler : IArchitectureRule
     private static readonly string[] Requests = ["{{ namespace }}.BuildingBlocks.Messaging.ICommand`1", "{{ namespace }}.BuildingBlocks.Messaging.IQuery`1"];
     private static readonly string[] Handlers = ["{{ namespace }}.BuildingBlocks.Messaging.ICommandHandler`2", "{{ namespace }}.BuildingBlocks.Messaging.IQueryHandler`2"];
 
-    public string Description => "Every command and query in an Application assembly has exactly one handler there, a public class with a public HandleAsync for each request it handles, which Wolverine invokes.";
+    public string Description => "Every command and query in an Application assembly has exactly one handler there, a public concrete class whose public HandleAsync for each request it handles is that contract's, which Wolverine invokes.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -16,27 +16,36 @@ public sealed class EveryRequestHasOneHandler : IArchitectureRule
         foreach (var assembly in model.ModuleAssemblies.Where(assembly => assembly.GetName().Name!.EndsWith(".Application", StringComparison.Ordinal)))
         {
             var types = assembly.GetTypes();
-            var handled = types
-                .SelectMany(type => type.GetInterfaces())
-                .Where(IsHandlerContract)
-                .Select(contract => contract.GetGenericArguments()[0])
+            var implementations = types
+                .SelectMany(type => type.GetInterfaces().Where(IsHandlerContract).Select(contract => (Type: type, Request: contract.GetGenericArguments()[0])))
                 .ToList();
 
             foreach (var request in types.Where(type => !type.IsInterface && type.GetInterfaces().Any(contract => contract.IsGenericType && Requests.Contains(contract.GetGenericTypeDefinition().FullName))))
             {
-                var count = handled.Count(type => type == request);
+                var count = implementations.Count(implementation => implementation.Request == request && IsHandler(implementation.Type));
                 if (count != 1)
                 {
                     yield return $"{request.FullName} has {count} handlers.";
                 }
+
+                if (count == 0)
+                {
+                    foreach (var implementation in implementations.Where(implementation => implementation.Request == request))
+                    {
+                        yield return $"{implementation.Type.FullName} implements a handler contract of {request.FullName} but is not a concrete class; Wolverine invokes only concrete classes.";
+                    }
+                }
             }
 
-            foreach (var violation in types.Where(type => type is { IsClass: true, IsAbstract: false } && type.GetInterfaces().Any(IsHandlerContract)).SelectMany(Uninvokable))
+            foreach (var violation in types.Where(type => IsHandler(type) && type.GetInterfaces().Any(IsHandlerContract)).SelectMany(Uninvokable))
             {
                 yield return violation;
             }
         }
     }
+
+    // RequestHandlerDiscovery and AddModuleHandlers take only concrete classes; a struct or an abstract class is no handler.
+    private static bool IsHandler(Type type) => type is { IsClass: true, IsAbstract: false };
 
     private static bool IsHandlerContract(Type contract) =>
         contract.IsGenericType && Handlers.Contains(contract.GetGenericTypeDefinition().FullName);
@@ -50,15 +59,32 @@ public sealed class EveryRequestHasOneHandler : IArchitectureRule
         }
         else
         {
-            var methods = handler.GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(method => method.Name == "HandleAsync").ToList();
+            var methods = handler.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static).Where(method => method.Name == "HandleAsync").ToList();
             foreach (var contract in handler.GetInterfaces().Where(IsHandlerContract))
             {
                 var request = contract.GetGenericArguments()[0];
-                if (!methods.Any(method => method.GetParameters() is [var first, ..] && first.ParameterType == request))
+                var kind = contract.Name[..contract.Name.IndexOf('`', StringComparison.Ordinal)];
+                var implementation = handler.GetInterfaceMap(contract).TargetMethods.Single();
+                var others = methods.Where(method => method.MethodHandle != implementation.MethodHandle && method.GetParameters() is [var first, ..] && first.ParameterType == request).ToList();
+                if (!implementation.IsPublic && others.Count == 0)
                 {
-                    yield return $"{handler.FullName} has no public HandleAsync for its {contract.Name[..contract.Name.IndexOf('`', StringComparison.Ordinal)]} of {request.FullName}; Wolverine does not invoke an explicit interface implementation.";
+                    yield return $"{handler.FullName} has no public HandleAsync for its {kind} of {request.FullName}; Wolverine does not invoke an explicit interface implementation.";
+                }
+
+                // Wolverine finds handler methods by name and first parameter, not by the contract, so it would invoke these as well, static ones included.
+                foreach (var other in others)
+                {
+                    yield return $"{handler.FullName} has a public {Signature(other)} that does not implement its {kind} of {request.FullName}; Wolverine would invoke it, and the contract is {Signature(contract.GetMethod("HandleAsync")!)}.";
                 }
             }
         }
     }
+
+    private static string Signature(MethodInfo method) =>
+        $"{Display(method.ReturnType)} {method.Name}({string.Join(", ", method.GetParameters().Select(parameter => Display(parameter.ParameterType)))})";
+
+    private static string Display(Type type) =>
+        type.IsGenericType
+            ? $"{type.Name[..type.Name.IndexOf('`', StringComparison.Ordinal)]}<{string.Join(", ", type.GetGenericArguments().Select(Display))}>"
+            : type.Name;
 }
