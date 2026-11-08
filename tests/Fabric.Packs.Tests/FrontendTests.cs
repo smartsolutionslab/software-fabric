@@ -1,3 +1,5 @@
+using Fabric.Core.Generation;
+
 namespace Fabric.Packs.Tests;
 
 public sealed class FrontendTests
@@ -261,5 +263,27 @@ public sealed class FrontendTests
         ci.ShouldContain("web/pnpm-lock.yaml is missing");
         ci.ShouldNotContain("run: pnpm install\n");
         ci.ShouldContain("run: pnpm install --frozen-lockfile");
+    }
+
+    public static TheoryData<string, string> ProfilesAndTestExtras { get; } = new()
+    {
+        { "saas-standard-react", "" },
+        { "saas-standard-react", "screenshot-tests" },
+        { "saas-standard-vue", "" },
+        { "saas-standard-vue", "screenshot-tests" },
+    };
+
+    /// <summary>Prettier ends a file with exactly one newline, so a web file ending in a blank line fails <c>format:check</c>.</summary>
+    [Theory]
+    [MemberData(nameof(ProfilesAndTestExtras))]
+    public void Without_the_accessibility_extra_no_web_file_ends_with_a_blank_line(string profile, string extras)
+    {
+        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, [$"frontend.test.extras={extras}"]);
+        generated.Errors.ShouldBeEmpty();
+
+        generated.Files
+            .Where(file => file.Path.StartsWith("web/", StringComparison.Ordinal) && file.Content.EndsWith("\n\n", StringComparison.Ordinal))
+            .Select(file => file.Path)
+            .ShouldBeEmpty();
     }
 }
