@@ -259,6 +259,127 @@ public sealed class SchemaPerTenantTests
     }
 
     [Fact]
+    public void Entity_splitting_is_refused_when_its_migration_is_made_and_before_the_runner_migrates_anything()
+    {
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        WriteNoteConfiguration(project, """builder.SplitToTable("note_details", BillingDbContext.Schema, table => table.Property(note => note.Text));""");
+        project.Build();
+
+        ShouldRefuse(project, "Split", "entity splitting (SplitToTable or SplitToView) of Note");
+    }
+
+    [Fact]
+    public void A_string_literal_that_reads_like_the_modules_schema_is_no_reference_to_it_and_migrates_into_every_tenants_schema()
+    {
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        WriteNoteConfiguration(project, """builder.Property(note => note.Text).HasDefaultValueSql("'billing.example'");""");
+        project.Build();
+
+        var (addExitCode, addOutput) = AddMigration(project, "Example");
+        addExitCode.ShouldBe(0, addOutput);
+        project.Build();
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = RunMigrationRunner(project, postgres);
+
+        exitCode.ShouldBe(0, output);
+        foreach (var schema in (string[])["billing_tenant_a", "billing_tenant_b"])
+        {
+            postgres.Psql(DatabasePassword, $"select column_default from information_schema.columns where table_schema = '{schema}' and table_name = 'notes' and column_name = 'Text'").ShouldStartWith("'billing.example'", customMessage: schema);
+        }
+    }
+
+    [Fact]
+    public void A_reference_to_the_modules_schema_split_by_a_comment_and_whitespace_is_refused_when_its_migration_is_made_and_before_the_runner_migrates_anything()
+    {
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        WriteNoteConfiguration(project, """builder.Property(note => note.Text).HasDefaultValueSql("billing /* c */ . shared_value()");""");
+        project.Build();
+
+        ShouldRefuse(project, "Comment", "billing /* c */ . shared_value()");
+    }
+
+    [Fact]
+    public void A_provider_annotation_naming_the_modules_schema_is_refused_when_its_migration_is_made_and_before_the_runner_migrates_anything()
+    {
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/BillingDbContext.cs", """
+            using Microsoft.EntityFrameworkCore;
+            using Shop.BuildingBlocks.Persistence;
+
+            namespace Shop.Modules.Billing.Infrastructure.Persistence;
+
+            public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options, IServiceProvider services)
+                : ModuleDbContext(options, services, Schema)
+            {
+                /// <summary>The module's tables and its migrations history live in this schema.</summary>
+                public const string Schema = "billing";
+
+                protected override void OnModelCreating(ModelBuilder modelBuilder)
+                {
+                    Ensure.That(modelBuilder).IsNotNull();
+
+                    base.OnModelCreating(modelBuilder);
+                    modelBuilder.HasPostgresEnum(Schema, "mood", ["happy", "sad"]);
+                }
+            }
+            """);
+        project.Build();
+
+        ShouldRefuse(project, "Mood", "Npgsql:Enum:billing.mood");
+    }
+
+    [Fact]
+    public void A_module_that_cannot_move_fails_the_runner_before_any_other_module_migrates()
+    {
+        // Billing, a valid module with its migration, comes before zeta, whose seed data is refused.
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        project.AddModule("zeta");
+        MigrationTests.AddNotesWithAMigration(project);
+        project.Write("src/Modules/Zeta/Zeta.Domain/Tally.cs", """
+            namespace Shop.Modules.Zeta.Domain;
+
+            public sealed class Tally(int id)
+            {
+                public int Id { get; private set; } = id;
+            }
+            """);
+        project.Write("src/Modules/Zeta/Zeta.Infrastructure/Persistence/TallyConfiguration.cs", """
+            using Microsoft.EntityFrameworkCore;
+            using Microsoft.EntityFrameworkCore.Metadata.Builders;
+            using Shop.Modules.Zeta.Domain;
+
+            namespace Shop.Modules.Zeta.Infrastructure.Persistence;
+
+            public sealed class TallyConfiguration : IEntityTypeConfiguration<Tally>
+            {
+                public void Configure(EntityTypeBuilder<Tally> builder)
+                {
+                    builder.ToTable("tallies");
+                    builder.HasKey(tally => tally.Id);
+                    builder.HasData(new Tally(1));
+                }
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = RunMigrationRunner(project, postgres);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("seed data (HasData) on Tally");
+        NothingWasMigrated(postgres);
+    }
+
+    [Fact]
     public void The_generated_tenancy_tests_show_no_tenant_reads_another_tenants_rows_and_the_architecture_rules_pass()
     {
         using var project = new GeneratedProject(Profile, SchemaPerTenant);
@@ -300,12 +421,7 @@ public sealed class SchemaPerTenantTests
     /// </summary>
     private static void ShouldRefuse(GeneratedProject project, string migration, string named)
     {
-        var (addExitCode, addOutput) = project.DotNetCommand(
-            new Dictionary<string, string>(),
-            "ef", "migrations", "add", migration,
-            "--project", "src/Modules/Billing/Billing.Infrastructure",
-            "--startup-project", "src/MigrationRunner",
-            "--context", "BillingDbContext");
+        var (addExitCode, addOutput) = AddMigration(project, migration);
         addExitCode.ShouldNotBe(0, addOutput);
         addOutput.ShouldContain(named);
 
@@ -316,6 +432,14 @@ public sealed class SchemaPerTenantTests
         output.ShouldContain(named);
         NothingWasMigrated(postgres);
     }
+
+    private static (int ExitCode, string Output) AddMigration(GeneratedProject project, string migration) =>
+        project.DotNetCommand(
+            new Dictionary<string, string>(),
+            "ef", "migrations", "add", migration,
+            "--project", "src/Modules/Billing/Billing.Infrastructure",
+            "--startup-project", "src/MigrationRunner",
+            "--context", "BillingDbContext");
 
     /// <summary>No migration ran: EF Core may have created the module's history table, but recorded nothing in it.</summary>
     private static void NothingWasMigrated(Container postgres)
