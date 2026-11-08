@@ -1,14 +1,26 @@
-{{~ if project["frontend.ui-library"] != "shadcn-vue" || (project["frontend.forms"] != "vee-validate" && project["frontend.forms"] != "tanstack-form") || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+{{~ if project["frontend.ui-library"] != "shadcn-vue" || (project["frontend.forms"] != "vee-validate" && project["frontend.forms"] != "tanstack-form" && project["frontend.forms"] != "formkit") || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate or TanStack Form and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate, TanStack Form or FormKit and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
+{{~ formkit = project["frontend.forms"] == "formkit" ~}}
 <script setup lang="ts">
 import { contentToText } from '@ag-ui/client';
-{{~ if tanstack ~}}
+{{~ if formkit ~}}
+import { FormKit } from '@formkit/vue';
+{{~ if valibot ~}}
+import * as v from 'valibot';
+import { computed } from 'vue';
+{{~ else ~}}
+import { computed } from 'vue';
+import { z } from 'zod';
+{{~ end ~}}
+import { Button } from '@/components/ui/button';
+import { schemaSubmit } from '@/forms/schemaSubmit';
+{{~ else if tanstack ~}}
 import { revalidateLogic, useForm } from '@tanstack/vue-form';
 {{~ if valibot ~}}
 import * as v from 'valibot';
@@ -27,7 +39,7 @@ import { useForm } from 'vee-validate';
 import { computed, useId } from 'vue';
 import { z } from 'zod';
 {{~ end ~}}
-{{~ if !tanstack ~}}
+{{~ if !tanstack && !formkit ~}}
 import { Button } from '@/components/ui/button';
 import { toTypedSchema } from '@/forms/toTypedSchema';
 {{~ end ~}}
@@ -48,7 +60,13 @@ const messageSchema = z.object({ message: z.string().trim().min(1, 'Write a mess
 {{~ end ~}}
 
 const { messages, running, failure, send } = useAgent(agent);
-{{~ if tanstack ~}}
+{{~ if formkit ~}}
+// The run is started, not awaited: FormKit would hold the form disabled until it ended.
+const submit = schemaSubmit(messageSchema, ({ message }, form) => {
+  form.reset();
+  void send(message);
+});
+{{~ else if tanstack ~}}
 const form = useForm({
   defaultValues: { message: '' },
   validationLogic: revalidateLogic(),
@@ -67,14 +85,16 @@ const { defineField, errors, handleSubmit, resetForm } = useForm({
 });
 const [message, messageAttributes] = defineField('message');
 {{~ end ~}}
+{{~ if tanstack ~}}
 const field = useId();
 
-{{~ if tanstack ~}}
 function submit(event: Event) {
   event.preventDefault();
   void form.handleSubmit();
 }
-{{~ else ~}}
+{{~ else if !formkit ~}}
+const field = useId();
+
 const submit = handleSubmit(async (values) => {
   resetForm();
   await send(values.message);
@@ -138,6 +158,12 @@ const entries = computed(() => {
     </ol>
     <p role="status" class="text-sm text-muted-foreground">{{ "{{" }} running ? 'Answering…' : '' {{ "}}" }}</p>
     <p v-if="failure" role="alert" class="text-sm text-destructive">The agent could not answer: {{ "{{" }} failure {{ "}}" }}</p>
+{{~ if formkit ~}}
+    <FormKit type="form" :actions="false" :value="{ message: '' }" form-class="flex flex-col gap-2" @submit="submit">
+      <FormKit type="textarea" name="message" label="Message" rows="3" />
+      <Button type="submit" :disabled="running" class="self-end">Send</Button>
+    </FormKit>
+{{~ else ~}}
     <form novalidate class="flex flex-col gap-2" @submit="submit">
       <label :for="field" class="text-sm font-medium">Message</label>
 {{~ if tanstack ~}}
@@ -170,5 +196,6 @@ const entries = computed(() => {
       </p>
       <Button type="submit" :disabled="running" class="self-end">Send</Button>
     </form>
+{{~ end ~}}
   </section>
 </template>

@@ -1,14 +1,24 @@
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
-{{~ if project["frontend.ui-library"] != "shadcn-vue" || (project["frontend.forms"] != "vee-validate" && project["frontend.forms"] != "tanstack-form") || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+{{~ formkit = project["frontend.forms"] == "formkit" ~}}
+{{~ if project["frontend.ui-library"] != "shadcn-vue" || (project["frontend.forms"] != "vee-validate" && project["frontend.forms"] != "tanstack-form" && project["frontend.forms"] != "formkit") || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate or TanStack Form and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
 {%{<script setup lang="ts">
 import { contentToText } from '@ag-ui/client';
-}%}{{~ if tanstack ~}}
+}%}{{~ if formkit ~}}
+import { FormKit } from '@formkit/vue';
+{{~ if valibot ~}}
+import * as v from 'valibot';
+import { computed, watch } from 'vue';
+{{~ else ~}}
+import { computed, watch } from 'vue';
+import { z } from 'zod';
+{{~ end ~}}
+{{~ else if tanstack ~}}
 import { revalidateLogic, useForm } from '@tanstack/vue-form';
 {{~ if valibot ~}}
 import * as v from 'valibot';
@@ -28,7 +38,9 @@ import { z } from 'zod';
 {{~ end ~}}
 {%{import { useAgent } from '@/agents/useAgent';
 import { Button } from '@/components/ui/button';
-}%}{{~ if !tanstack ~}}
+}%}{{~ if formkit ~}}
+import { schemaSubmit } from '@/forms/schemaSubmit';
+{{~ else if !tanstack ~}}
 import { toTypedSchema } from '@/forms/toTypedSchema';
 {{~ end ~}}
 {%{import type { Placement } from './layout';
@@ -57,7 +69,13 @@ const questionSchema = z.object({ question: z.string().trim().min(1, 'Ask for a 
 {{~ end ~}}
 {%{
 const { messages, running, failure, send } = useAgent('dashboards', () => draftState(widgets));
-}%}{{~ if tanstack ~}}
+}%}{{~ if formkit ~}}
+{%{// The run is started, not awaited: FormKit would hold the form disabled until it ended.
+const submit = schemaSubmit(questionSchema, ({ question }, form) => {
+  form.reset();
+  void send(question);
+});
+}%}{{~ else if tanstack ~}}
 const form = useForm({
   defaultValues: { question: '' },
   validationLogic: revalidateLogic(),
@@ -76,15 +94,17 @@ const errors = form.useStore((state) => ({ question: state.fieldMeta.question?.e
 });
 const [question, questionAttributes] = defineField('question');
 }%}{{~ end ~}}
+{{~ if tanstack ~}}
 {%{const field = useId();
 
-}%}{{~ if tanstack ~}}
-function submit(event: Event) {
+}%}function submit(event: Event) {
   event.preventDefault();
   void form.handleSubmit();
 }
-{{~ else ~}}
-{%{const submit = handleSubmit(async (values) => {
+{{~ else if !formkit ~}}
+{%{const field = useId();
+
+const submit = handleSubmit(async (values) => {
   resetForm();
   await send(values.question);
 });
@@ -148,7 +168,15 @@ const entries = computed(() =>
     </ol>
     <p aria-live="polite" class="text-sm text-muted-foreground">{{ running ? 'Answering…' : '' }}</p>
     <p v-if="failure" role="alert" class="text-sm text-destructive">The assistant could not answer: {{ failure }}</p>
-    <form novalidate class="flex flex-col gap-2" @submit="submit">
+}%}{{~ if formkit ~}}
+{%{    <FormKit type="form" :actions="false" :value="{ question: '' }" form-class="flex flex-col gap-2" @submit="submit">
+      <FormKit type="textarea" name="question" label="Ask the assistant" rows="2" />
+      <Button type="submit" variant="secondary" :disabled="running" class="self-end">Ask</Button>
+    </FormKit>
+  </section>
+</template>
+}%}{{~ else ~}}
+{%{    <form novalidate class="flex flex-col gap-2" @submit="submit">
       <label :for="field" class="text-sm font-medium">Ask the assistant</label>
 }%}{{~ if tanstack ~}}
       <form.Field v-slot="{ field: question }" name="question">
@@ -182,4 +210,4 @@ const entries = computed(() =>
     </form>
   </section>
 </template>
-}%}
+}%}{{~ end ~}}

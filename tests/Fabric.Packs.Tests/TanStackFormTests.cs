@@ -337,9 +337,9 @@ public sealed partial class TanStackFormTests
     {
         var files = Files(Vue, [TanStackForm, "frontend.ui-library=reka-ui", .. VueAgentAndDashboards]);
 
-        files["web/app/src/agents/AgentConversation.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate or TanStack Form and zod or valibot only so far; frontend.ui-library is reka-ui, frontend.forms is tanstack-form");
-        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate or TanStack Form and zod or valibot only so far; frontend.ui-library is reka-ui, frontend.forms is tanstack-form");
-        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate or TanStack Form and zod or valibot only so far; frontend.ui-library is reka-ui, frontend.forms is tanstack-form");
+        files["web/app/src/agents/AgentConversation.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate, TanStack Form or FormKit and zod or valibot only so far; frontend.ui-library is reka-ui, frontend.forms is tanstack-form");
+        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate, TanStack Form or FormKit and zod or valibot only so far; frontend.ui-library is reka-ui, frontend.forms is tanstack-form");
+        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit and zod or valibot only so far; frontend.ui-library is reka-ui, frontend.forms is tanstack-form");
     }
 
     [Fact]
