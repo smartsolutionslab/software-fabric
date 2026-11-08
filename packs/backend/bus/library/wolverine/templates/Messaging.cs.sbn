@@ -91,6 +91,9 @@ public static class Messaging
             {
                 options.Discovery.IncludeAssembly(ModuleAssemblies.Of(module, "Application"));
             }
+{{~ if slots["messaging.wolverine-options"] != "" ~}}
+{{ slots["messaging.wolverine-options"] }}
+{{~ end ~}}
         });
 
         return services;
