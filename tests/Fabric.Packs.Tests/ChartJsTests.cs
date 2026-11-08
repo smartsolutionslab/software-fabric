@@ -87,6 +87,38 @@ public sealed partial class ChartJsTests
         });
         """;
 
+    /// <summary>
+    /// vue-chartjs creates its chart once, when it is mounted, and afterwards follows only the data and the options, so a
+    /// widget switched from bar to pie would keep its bars. jsdom has no canvas, so the test counts the charts created.
+    /// </summary>
+    private const string DataChartTypeTest = """
+        import { render } from '@testing-library/vue';
+        import { expect, test, vi } from 'vitest';
+        import { defineComponent, h, onMounted } from 'vue';
+        import DataChart from '@/components/DataChart.vue';
+
+        const created = vi.hoisted((): string[] => []);
+
+        vi.mock('vue-chartjs', () => ({
+          Chart: defineComponent({
+            props: { type: { type: String, required: true }, data: Object, options: Object },
+            setup: (props) => {
+              onMounted(() => created.push(props.type));
+              return () => h('canvas');
+            },
+          }),
+        }));
+
+        test('a chart whose type changes is created again as the new type', async () => {
+          const data = { labels: ['Monday'], datasets: [{ label: 'Notes', data: [3] }] };
+          const { rerender } = render(DataChart, { props: { config: { type: 'bar', data }, label: 'Notes per day' } });
+
+          await rerender({ config: { type: 'pie', data }, label: 'Notes per day' });
+
+          expect(created).toEqual(['bar', 'pie']);
+        });
+        """;
+
     private const string OtherReactChartLibraries = """
         import * as echarts from 'echarts';
         import ReactECharts from 'echarts-for-react';
@@ -226,6 +258,18 @@ public sealed partial class ChartJsTests
         exitCode.ShouldNotBe(0, lintOutput);
         lintOutput.ShouldContain("'echarts' import is restricted from being used by a pattern. Use DataChart from src/components/DataChart.vue (docs/adr)");
         lintOutput.ShouldContain("'vue-echarts' import is restricted from being used by a pattern. Use DataChart from src/components/DataChart.vue (docs/adr)");
+    }
+
+    [Fact]
+    public void A_vue_chart_whose_type_changes_is_created_again_as_the_new_type()
+    {
+        using var project = new GeneratedProject(Vue, ChartJs);
+        project.Write("web/app/src/pages/DataChartType.test.ts", DataChartTypeTest);
+
+        var testOutput = InstallBuildLintAndTest(project);
+
+        Escapes().Replace(testOutput, string.Empty)
+            .ShouldContain("✓ src/pages/DataChartType.test.ts > a chart whose type changes is created again as the new type", customMessage: testOutput);
     }
 
     [Fact]
