@@ -1,0 +1,12 @@
+import type { ReactNode } from 'react';
+import { createMsal } from '@/auth/msal';
+import { SignedIn } from '@/auth/SignedIn';
+import { Started } from '@/auth/Started';
+
+const msal = createMsal();
+
+export const withAuth = (children: ReactNode) => (
+  <Started client={msal}>
+    <SignedIn>{children}</SignedIn>
+  </Started>
+);

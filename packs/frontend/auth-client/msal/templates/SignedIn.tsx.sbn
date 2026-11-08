@@ -1,0 +1,78 @@
+import { EventType, InteractionStatus } from '@azure/msal-browser';
+import { useMsal } from '@azure/msal-react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { accessToken, accessTokenExpiresOn } from './accessToken';
+import { loginRequest } from './msalConfig';
+
+const asError = (failure: unknown) => (failure instanceof Error ? failure : new Error(String(failure)));
+
+/** Renders its children for a signed-in user and sends everyone else to the identity provider. */
+export function SignedIn({ children }: { children: ReactNode }) {
+  const { instance, inProgress, accounts } = useMsal();
+  const [error, setError] = useState<Error | null>(null);
+  const [expired, setExpired] = useState(false);
+  // Started once: StrictMode runs effects twice, and MSAL refuses a second sign-in while one is under way.
+  const started = useRef(false);
+  // The active account is the one the kept access token was issued to (src/auth/msal.ts); others may be cached.
+  const account = accounts.length > 0 ? (instance.getActiveAccount() ?? undefined) : undefined;
+  const signedIn = account !== undefined && !expired && accessToken() !== undefined;
+  const mustSignIn = !signedIn && inProgress === InteractionStatus.None && !error;
+
+  // A sign-in that failed on the way back from the identity provider is shown, not retried.
+  useEffect(() => {
+    const callback = instance.addEventCallback(({ eventType, error: failure }) => {
+      if (eventType === EventType.ACQUIRE_TOKEN_FAILURE && failure) {
+        setError(failure);
+      }
+    });
+    return () => {
+      if (callback) {
+        instance.removeEventCallback(callback);
+      }
+    };
+  }, [instance]);
+
+  // The access token is not renewed silently (the stand-in issues no refresh token): once it expires, sign in again.
+  const accountId = account?.homeAccountId;
+  useEffect(() => {
+    const expiresOn = accessTokenExpiresOn();
+    if (accountId === undefined || expiresOn === undefined) {
+      return;
+    }
+    const timer = setTimeout(() => setExpired(true), Math.max(0, expiresOn - Date.now()));
+    return () => clearTimeout(timer);
+  }, [accountId]);
+
+  useEffect(() => {
+    if (mustSignIn && !started.current) {
+      started.current = true;
+      instance.loginRedirect(loginRequest).catch((failure: unknown) => setError(asError(failure)));
+    }
+  }, [mustSignIn, instance]);
+
+  const signOut = () => {
+    instance.logoutRedirect().catch((failure: unknown) => setError(asError(failure)));
+  };
+
+  if (error) {
+    return <p role="alert">Sign-in failed: {error.message}</p>;
+  }
+  if (inProgress === InteractionStatus.Logout) {
+    return <p>Signing out…</p>;
+  }
+  if (!signedIn) {
+    return <p>Signing in…</p>;
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-end gap-3 p-2 text-sm">
+        <span>Signed in as {account.username}</span>
+        <button type="button" onClick={signOut}>
+          Sign out
+        </button>
+      </div>
+      {children}
+    </>
+  );
+}

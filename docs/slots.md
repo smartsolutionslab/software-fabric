@@ -413,7 +413,12 @@ and the stand-in's users (*#322*), and
 `IConfiguration`. Its local provider is `src/IdentityStandIn`, an
 in-process issuer named `identity` in the AppHost while it runs, never when it
 publishes (Testcontainers runs the built project in a container); its users and the directories of
-`tenant-a` and `tenant-b` are in its `appsettings.json`.
+`tenant-a` and `tenant-b` are in its `appsettings.json`. With
+`frontend.auth-client` `msal` (*#266*) its `browser_authority` is
+`https://localhost:8443/organizations/v2.0`: msal-common accepts an https
+authority only, so the stand-in also serves https with the ASP.NET Core
+development certificate, and the host accepts the issuers at that address
+too (`AzureAd:BrowserInstance`).
 
 | Function | Returns (oidc-client-ts) |
 |---|---|
@@ -421,6 +426,12 @@ publishes (Testcontainers runs the built project in a container); its users and 
 | `browser_access_token` | `accessToken()`: the signed-in user's access token, or `undefined` |
 | `stored_access_token page` | awaitable, in Playwright: the access token the app in `page` signed in with |
 | `store_access_token_import`, `store_access_token token` | in a unit test, the import and the statement that store `token` (a TS string) as the signed-in user's access token, where `browser_access_token` finds it |
+
+msal (*#266*) defines the same functions over its own copy of the token:
+`createMsal()` keeps every token MSAL acquires in session storage under
+`app.access-token` (`src/auth/accessToken.ts`), where `accessToken()` and
+`stored_access_token` read it, and `store_access_token token` is
+`rememberAccessToken({ accessToken: token, expiresOn: ... })`.
 
 The integration-fixture vocabulary gains `running_application`
 (`aspire.App`), the running application the provider's test users sign in
