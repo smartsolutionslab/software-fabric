@@ -42,9 +42,10 @@ public sealed partial class IntegrationVocabularyTests
     ];
 
     /// <summary>
-    /// Every pack with an integration test, and rag's database tests with and without a tenant column. Signalr's and
-    /// sse's short-lived test token still reaches the Keycloak resource through the Aspire application (M3-13, the
-    /// identity-provider vocabulary), so they come without an identity provider here.
+    /// Every pack with an integration test, rag's database tests with and without a tenant column, and dapper reads'
+    /// database tests on SQL Server. Signalr's and sse's short-lived test token still reaches the Keycloak resource
+    /// through the Aspire application (M3-13, the identity-provider vocabulary), so they come without an identity
+    /// provider here.
     /// </summary>
     public static TheoryData<string, string[]> Generations => new()
     {
@@ -53,6 +54,7 @@ public sealed partial class IntegrationVocabularyTests
         { "saas-standard-vue", [] },
         { "lean-crud", ["frontend.realtime=signalr", "backend.auth=none", "backend.tenancy=none"] },
         { "lean-crud", ["frontend.realtime=sse", "backend.auth=none", "backend.tenancy=none"] },
+        { "lean-crud", ["backend.data-access.reads=dapper", "backend.database=sqlserver"] },
     };
 
     [Fact]

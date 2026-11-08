@@ -1,4 +1,4 @@
-{{~ if module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains project["frontend.dashboards"] "user-editable" && project["frontend.api-client"] == "orval" && project["frontend.architecture"] == "spa" ~}}
+{{~ if module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains project["frontend.dashboards"] "user-editable" && project["frontend.api-client"] == "orval" && (!object.has_key(project, "frontend.state") || project["frontend.state"] != "pinia") && project["frontend.architecture"] == "spa" ~}}
 <script setup lang="ts">
 // The module the dashboards choice brings; its screen is that choice's dashboard editor (docs/adr).
 import DashboardEditor from '@/dashboards/DashboardEditor.vue';

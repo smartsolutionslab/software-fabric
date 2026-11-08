@@ -2,7 +2,7 @@
 {{ slots["web.api-imports"] }}
 
 {{~ end ~}}
-/** A response outside 2xx; the generated hooks report it as their error. */
+/** A response outside 2xx; {{ if project["frontend.framework"] == "vue" && project["frontend.state"] == "pinia" }}the generated functions reject with it{{ else }}the generated hooks report it as their error{{ end }}. */
 export class ApiError extends Error {
   readonly status: number;
 
