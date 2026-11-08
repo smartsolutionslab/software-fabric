@@ -25,9 +25,14 @@ The frontend is a **shell** and one **remote** per backend module.
 - The shell never imports a remote: lint fails on a remote's package name, and the shell's build, dev server and tests
   fail when any import path, relative ones included, loads a remote's file (`web/app/remoteBoundary.ts`). A remote
   reaches other modules only through the backend's API and events, never through another remote's code.
+{{~ if project["frontend.styling"] == "css-modules" ~}}
+- A remote styles its screens with CSS modules beside its components, as the shell does; the shell's stylesheet reads
+  none of a remote's sources.
+{{~ else ~}}
 - The shell's Tailwind reads the remotes' sources (`@source '../../modules'`), so a remote's utilities are styled. A
   remote ships no stylesheet of its own: a utility no file used before appears only once the shell is built again, so
   a remote that starts using one is deployed together with a new build of the shell.
+{{~ end ~}}
 
 ## Consequences
 

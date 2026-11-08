@@ -1,0 +1,20 @@
+/* Without a utility framework's reset: padding and borders stay inside a box's size, and text brings no margins. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body,
+h1,
+h2,
+p,
+ol,
+ul {
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}

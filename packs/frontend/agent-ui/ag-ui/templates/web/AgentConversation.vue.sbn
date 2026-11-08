@@ -1,6 +1,32 @@
-{{~ if project["frontend.ui-library"] != "shadcn-vue" || project["frontend.forms"] != "vee-validate" || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ if ui == "reka-ui"
+  button = "BaseButton"
+  button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
+  secondary = "outline"
+else
+  button = "Button"
+  button_import = "import { Button } from '@/components/ui/button';"
+  secondary = "secondary"
+end ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  ret 'class="' + tailwind + '"'
+end ~}}
+{{~ func themed(shadcn, palette, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  if ui == "reka-ui"
+    ret 'class="' + palette + '"'
+  end
+  ret 'class="' + shadcn + '"'
+end ~}}
+{{~ if (ui != "shadcn-vue" && ui != "reka-ui") || project["frontend.forms"] != "vee-validate" || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue or reka-ui with vee-validate and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
@@ -16,9 +42,12 @@ import { useForm } from 'vee-validate';
 import { computed, useId } from 'vue';
 import { z } from 'zod';
 {{~ end ~}}
-import { Button } from '@/components/ui/button';
+{{ button_import }}
 import { toTypedSchema } from '@/forms/toTypedSchema';
 import { useAgent } from './useAgent';
+{{~ if css_modules ~}}
+import styles from './AgentConversation.module.css';
+{{~ end ~}}
 
 /** What the panel shows of one message: the user's text, or the agent's text and tool calls; tool results go with their calls. */
 type Entry =
@@ -79,21 +108,21 @@ const entries = computed(() => {
 </script>
 
 <template>
-  <section :aria-label="`Conversation with ${agent}`" class="flex max-w-3xl flex-col gap-4 p-4">
-    <ol aria-label="Messages" class="flex flex-col gap-3">
+  <section :aria-label="`Conversation with ${agent}`" {{ class_of "flex max-w-3xl flex-col gap-4 p-4" "conversation" }}>
+    <ol aria-label="Messages" {{ class_of "flex flex-col gap-3" "messages" }}>
       <template v-for="entry in entries" :key="entry.key">
-        <li v-if="entry.kind === 'user'" class="self-end rounded-md bg-primary px-3 py-2 text-primary-foreground">
-          <p class="text-xs font-medium">You</p>
-          <p class="whitespace-pre-wrap">{{ "{{" }} entry.text {{ "}}" }}</p>
+        <li v-if="entry.kind === 'user'" {{ themed "self-end rounded-md bg-primary px-3 py-2 text-primary-foreground" "self-end rounded-md bg-slate-900 px-3 py-2 text-white" "user" }}>
+          <p {{ class_of "text-xs font-medium" "speaker" }}>You</p>
+          <p {{ class_of "whitespace-pre-wrap" "text" }}>{{ "{{" }} entry.text {{ "}}" }}</p>
         </li>
-        <li v-else-if="entry.kind === 'answer'" class="rounded-md bg-muted px-3 py-2">
-          <p class="text-xs font-medium text-muted-foreground">{{ "{{" }} agent {{ "}}" }}</p>
-          <p class="whitespace-pre-wrap">{{ "{{" }} entry.text {{ "}}" }}</p>
+        <li v-else-if="entry.kind === 'answer'" {{ themed "rounded-md bg-muted px-3 py-2" "rounded-md bg-slate-100 px-3 py-2" "answer" }}>
+          <p {{ themed "text-xs font-medium text-muted-foreground" "text-xs font-medium text-slate-500" "answerSpeaker" }}>{{ "{{" }} agent {{ "}}" }}</p>
+          <p {{ class_of "whitespace-pre-wrap" "text" }}>{{ "{{" }} entry.text {{ "}}" }}</p>
         </li>
-        <li v-else class="rounded-md border px-3 py-2 text-sm">
-          <p class="text-xs font-medium text-muted-foreground">Tool call</p>
+        <li v-else {{ class_of "rounded-md border px-3 py-2 text-sm" "toolCall" }}>
+          <p {{ themed "text-xs font-medium text-muted-foreground" "text-xs font-medium text-slate-500" "answerSpeaker" }}>Tool call</p>
           <p>
-            <code>{{ "{{" }} entry.name {{ "}}" }}</code> <code class="break-all">{{ "{{" }} entry.arguments {{ "}}" }}</code>
+            <code>{{ "{{" }} entry.name {{ "}}" }}</code> <code {{ class_of "break-all" "arguments" }}>{{ "{{" }} entry.arguments {{ "}}" }}</code>
           </p>
           <p v-if="entry.result === undefined">Running…</p>
           <p v-else>
@@ -102,10 +131,10 @@ const entries = computed(() => {
         </li>
       </template>
     </ol>
-    <p role="status" class="text-sm text-muted-foreground">{{ "{{" }} running ? 'Answering…' : '' {{ "}}" }}</p>
-    <p v-if="failure" role="alert" class="text-sm text-destructive">The agent could not answer: {{ "{{" }} failure {{ "}}" }}</p>
-    <form novalidate class="flex flex-col gap-2" @submit="submit">
-      <label :for="field" class="text-sm font-medium">Message</label>
+    <p role="status" {{ themed "text-sm text-muted-foreground" "text-sm text-slate-500" "status" }}>{{ "{{" }} running ? 'Answering…' : '' {{ "}}" }}</p>
+    <p v-if="failure" role="alert" {{ themed "text-sm text-destructive" "text-sm text-red-600" "error" }}>The agent could not answer: {{ "{{" }} failure {{ "}}" }}</p>
+    <form novalidate {{ class_of "flex flex-col gap-2" "form" }} @submit="submit">
+      <label :for="field" {{ class_of "text-sm font-medium" "label" }}>Message</label>
       <textarea
         :id="field"
         v-model="message"
@@ -113,12 +142,12 @@ const entries = computed(() => {
         rows="3"
         :aria-invalid="errors.message ? true : undefined"
         :aria-describedby="errors.message ? `${field}-error` : undefined"
-        class="flex field-sizing-content min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+        {{ themed "flex field-sizing-content min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40" "flex field-sizing-content min-h-16 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-slate-500 focus-visible:border-slate-400 focus-visible:ring-[3px] focus-visible:ring-slate-400/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-red-600 aria-invalid:ring-red-600/20 md:text-sm" "input" }}
       />
-      <p v-if="errors.message" :id="`${field}-error`" role="alert" class="text-sm text-destructive">
+      <p v-if="errors.message" :id="`${field}-error`" role="alert" {{ themed "text-sm text-destructive" "text-sm text-red-600" "error" }}>
         {{ "{{" }} errors.message {{ "}}" }}
       </p>
-      <Button type="submit" :disabled="running" class="self-end">Send</Button>
+      <{{ button }} type="submit" :disabled="running" {{ class_of "self-end" "send" }}>Send</{{ button }}>
     </form>
   </section>
 </template>
