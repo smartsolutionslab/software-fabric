@@ -106,7 +106,7 @@ public class RuleEvaluatorTests
         "frontend.styling=library-theme conflicts with frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless).")]
     [InlineData("saas-standard-react", new[] { "backend.data-access.reads=dapper" },
         "backend.data-access.reads=dapper requires backend.tenancy == none, but backend.tenancy is column.")]
-    [InlineData("lean-crud", new[] { "backend.database=sqlserver", "backend.tenancy=schema-per-tenant" },
+    [InlineData("lean-crud", new[] { "backend.database=sqlserver", "backend.bus.transport=rabbitmq", "backend.tenancy=schema-per-tenant" },
         "backend.tenancy=schema-per-tenant requires backend.database == postgres, but backend.database is sqlserver.")]
     [InlineData("lean-crud", new[] { "backend.tenancy=schema-per-tenant" },
         "backend.tenancy=schema-per-tenant requires backend.bus.transport != none, but backend.bus.transport is none.")]
