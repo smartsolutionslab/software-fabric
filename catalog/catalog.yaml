@@ -69,8 +69,7 @@ dimensions:
     scope: project
     default: ef-core
     options:
-      ef-core:             { tier: supported }
-      ef-core-dapper-read: { tier: experimental, note: "EF Core for writes, Dapper in query handlers" }
+      ef-core: { tier: supported }
 
   backend.topology:
     scope: project
@@ -621,3 +620,19 @@ dimensions:
         requires: ["frontend.design-system == tokens-and-components"]
       screenshot-tests: { tier: experimental }
       accessibility:    { tier: supported, note: "axe in component and e2e tests" }
+
+  # ─────────────────────────── Backend · data access add-ons ─────────────────
+  # Last in the catalog (owner decision on #247): a dimension active in every profile renumbers no profile's ADRs here.
+
+  backend.data-access.reads:
+    scope: project
+    active-when: "backend.data-access == ef-core"
+    default: ef-core
+    note: "How query handlers read. EF Core keeps the model, the writes and the migrations either way."
+    options:
+      ef-core: { tier: supported, note: "query handlers read through EF Core, as the rest of the module does" }
+      dapper:
+        tier: experimental
+        note: "query handlers read with Dapper over IReadConnection, in SQL for the project's one database"
+        # Reason: Dapper's SQL bypasses the tenant column's EF Core query filter, so any tenancy would read every tenant's rows.
+        requires: ["backend.tenancy == none"]

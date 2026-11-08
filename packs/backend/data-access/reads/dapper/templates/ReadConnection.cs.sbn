@@ -1,0 +1,13 @@
+using System.Data.Common;
+
+namespace {{ namespace }}.BuildingBlocks.Persistence;
+
+/// <summary>Opens connections from one data source of the database's driver, which it owns and disposes.</summary>
+public sealed class ReadConnection(DbDataSource dataSource) : IReadConnection, IDisposable, IAsyncDisposable
+{
+    public ValueTask<DbConnection> OpenAsync(CancellationToken cancellationToken) => dataSource.OpenConnectionAsync(cancellationToken);
+
+    public void Dispose() => dataSource.Dispose();
+
+    public ValueTask DisposeAsync() => dataSource.DisposeAsync();
+}

@@ -1,0 +1,21 @@
+using Dapper;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.BuildingBlocks.Persistence;
+
+namespace {{ namespace }}.Reads.Tests;
+
+/// <summary>A query handler reading with Dapper, as a module's would: SQL for the project's database, values as parameters.</summary>
+public sealed class SampleNotesHandler(IReadConnection reads) : IQueryHandler<SampleNotes, IReadOnlyList<SampleNote>>
+{
+    public async Task<IReadOnlyList<SampleNote>> HandleAsync(SampleNotes query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        await using var connection = await reads.OpenAsync(cancellationToken);
+        var notes = await connection.QueryAsync<SampleNote>(new CommandDefinition(
+            "SELECT id, title FROM reads_tests.notes WHERE id <= @Last ORDER BY id",
+            new { query.Last },
+            cancellationToken: cancellationToken));
+        return [.. notes];
+    }
+}
