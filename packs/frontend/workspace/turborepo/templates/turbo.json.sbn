@@ -7,7 +7,14 @@
       "env": ["VITE_*", "REMOTE_*"],
       "outputs": ["dist/**", "storybook-static/**"]
     },
-    "lint": {},
-    "test": {}
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
+    "lint": {
+      "dependsOn": ["transit"]
+    },
+    "test": {
+      "dependsOn": ["transit"]
+    }
   }
 }
