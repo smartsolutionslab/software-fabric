@@ -1,0 +1,32 @@
+import type { ChartConfiguration } from 'chart.js';
+import type { ChartSeries } from '@/api/generated';
+
+/** How a chart widget looks: bar, line or pie. */
+export type ChartVisual = 'bar' | 'line' | 'pie';
+
+/** The Chart.js configuration for a widget's series: the categories as labels, one dataset per series, or, for a pie, the first series, one slice per category. */
+export function chartConfig(chart: ChartSeries, visual: ChartVisual): ChartConfiguration {
+  if (visual === 'pie') {
+    const [first] = chart.series;
+    return {
+      type: 'pie',
+      data: {
+        labels: chart.categories,
+        datasets: [
+          {
+            label: first?.name ?? '',
+            data: chart.categories.map((_, index) => Number(first?.values[index] ?? 0)),
+          },
+        ],
+      },
+    };
+  }
+
+  return {
+    type: visual,
+    data: {
+      labels: chart.categories,
+      datasets: chart.series.map((values) => ({ label: values.name, data: values.values.map(Number) })),
+    },
+  };
+}

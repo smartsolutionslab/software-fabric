@@ -9,12 +9,12 @@ import { axe } from 'vitest-axe';
 import type { DashboardDto, SaveDashboardRequest, WidgetData, WidgetDescriptionDto } from '@/api/generated';
 import DashboardEditor from './DashboardEditor.vue';
 
-// ECharts draws on a canvas jsdom does not have; the chart's accessible name is what the page decides.
+// {{ if project["frontend.charts"] == "chartjs" }}Chart.js{{ else }}ECharts{{ end }} draws on a canvas jsdom does not have; the chart's accessible name is what the page decides.
 vi.mock('@/components/DataChart.vue', async () => {
   const { defineComponent, h } = await import('vue');
   return {
     default: defineComponent({
-      props: { option: { type: Object, required: true }, label: { type: String, required: true }, height: Number },
+      props: { {{ if project["frontend.charts"] == "chartjs" }}config{{ else }}option{{ end }}: { type: Object, required: true }, label: { type: String, required: true }, height: Number },
       setup: (props) => () => h('div', { role: 'img', 'aria-label': props.label }),
     }),
   };
