@@ -1,6 +1,7 @@
             {
               group: [
                 '@tanstack/vue-query',
+                '@tanstack/query-core',
                 '@pinia/colada',
                 'swrv',
                 '@apollo/*',
