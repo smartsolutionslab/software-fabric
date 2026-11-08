@@ -9,7 +9,7 @@
     "build": "tsc -b && storybook build --quiet",
     "storybook": "pnpm --filter @{{ name }}/tokens build && storybook dev --port 6006",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "pnpm --filter @{{ name }}/tokens build && vitest run"
   },
   "peerDependencies": {
     "react": "^19.0.0",
