@@ -172,7 +172,10 @@ dimensions:
     options:
       none:                { tier: supported }
       column:              { tier: supported }
-      schema-per-tenant:   { tier: experimental }
+      schema-per-tenant:
+        tier: experimental
+        # Reason: the schema-per-tenant pack creates and migrates tenant schemas with PostgreSQL's SQL; SQL Server support is a later issue.
+        requires: ["backend.database == postgres"]
       database-per-tenant: { tier: experimental }
 
   backend.llm:
