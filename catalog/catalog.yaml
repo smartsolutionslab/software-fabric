@@ -101,7 +101,16 @@ dimensions:
     default: hand-rolled
     options:
       hand-rolled: { tier: supported }
-      wolverine:   { tier: experimental }
+      wolverine:
+        tier: experimental
+        requires: ["backend.bus.library == wolverine"]
+        # Their generated tests send requests through IDispatcher in a container without Wolverine's bus, or in a host
+        # whose hosted services are removed, so Wolverine never starts.
+        conflicts:
+          - "backend.llm.agents == agent-framework"
+          - "frontend.dashboards has user-editable"
+          - "backend.api-protocols has grpc"
+          - "backend.mcp has server"
 
   backend.api-style:
     scope: project
@@ -399,6 +408,9 @@ dimensions:
   frontend.workspace:
     scope: project
     default: pnpm-workspaces
+    # Role slots (ADR-0008): every workspace tool's pack owns pnpm-workspace.yaml; architecture and design-system fill it.
+    role-slots:
+      web.workspace-packages: { description: "Lines of pnpm-workspace.yaml's packages list ('  - app')." }
     options:
       pnpm-workspaces: { tier: supported }
       nx:              { tier: experimental }
