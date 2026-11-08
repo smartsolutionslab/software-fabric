@@ -1,0 +1,32 @@
+import type { ChartSeries } from '@/api/generated';
+
+/** How a chart widget looks: bar, line or pie. */
+export type ChartVisual = 'bar' | 'line' | 'pie';
+
+/** One category of a bar or line chart: each series' value under its position (`s0`, `s1`, …), so no series name can clash with `category`. */
+export type ChartRow = { category: string } & Record<`s${number}`, number>;
+
+/** One slice of a pie chart. */
+export interface PieSlice {
+  name: string;
+  value: number;
+}
+
+/** The Recharts data for a widget's bar or line chart: one row per category, one value per series. */
+export function chartRows(chart: ChartSeries): ChartRow[] {
+  return chart.categories.map((category, index) => {
+    const row: ChartRow = { category };
+    chart.series.forEach((series, position) => {
+      if (index < series.values.length) {
+        row[`s${position}`] = Number(series.values[index]);
+      }
+    });
+    return row;
+  });
+}
+
+/** The Recharts data for a widget's pie chart: the first series, one slice per category. */
+export function pieSlices(chart: ChartSeries): PieSlice[] {
+  const [first] = chart.series;
+  return chart.categories.map((category, index) => ({ name: category, value: Number(first?.values[index] ?? 0) }));
+}
