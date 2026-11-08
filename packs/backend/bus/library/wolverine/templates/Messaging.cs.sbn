@@ -7,6 +7,9 @@ using Wolverine.Postgresql;
 {{~ else ~}}
 using Wolverine.SqlServer;
 {{~ end ~}}
+{{~ if project["backend.mediator"] == "wolverine" && project["backend.bus.transport"] != "kafka" ~}}
+using {{ namespace }}.Contracts;
+{{~ end ~}}
 {{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
 using Wolverine.RabbitMQ;
 {{~ else if project["backend.bus.transport"] == "azure-service-bus" ~}}
@@ -62,9 +65,21 @@ public static class Messaging
                 TimeSpan.FromSeconds(16),
                 TimeSpan.FromSeconds(32));
 {{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
+{{~ if project["backend.mediator"] == "wolverine" ~}}
+            // Commands and queries are Wolverine messages too, invoked in process by the mediator; only integration
+            // events are routed to the broker.
+            options.UseRabbitMq(new Uri(broker)).AutoProvision().UseConventionalRouting(convention => convention.IncludeTypes(IsIntegrationEvent));
+{{~ else ~}}
             options.UseRabbitMq(new Uri(broker)).AutoProvision().UseConventionalRouting();
+{{~ end ~}}
 {{~ else if project["backend.bus.transport"] == "azure-service-bus" ~}}
+{{~ if project["backend.mediator"] == "wolverine" ~}}
+            // Commands and queries are Wolverine messages too, invoked in process by the mediator; only integration
+            // events are routed to the broker.
+            options.UseAzureServiceBus(broker).AutoProvision().UseConventionalRouting(convention => convention.IncludeTypes(IsIntegrationEvent));
+{{~ else ~}}
             options.UseAzureServiceBus(broker).AutoProvision().UseConventionalRouting();
+{{~ end ~}}
             options.Transports.GetOrCreate<AzureServiceBusTransport>().ManagementConnectionString = management;
 {{~ else if project["backend.bus.transport"] == "kafka" ~}}
             // Kafka has no conventional routing: every integration event has a topic named after its type, and the
@@ -98,10 +113,12 @@ public static class Messaging
 
         return services;
     }
-{{~ if project["backend.bus.transport"] == "kafka" ~}}
+{{~ if project["backend.bus.transport"] == "kafka" || project["backend.mediator"] == "wolverine" ~}}
 
     private static bool IsIntegrationEvent(Type type) =>
         type is { IsClass: true, IsAbstract: false } && typeof(IIntegrationEvent).IsAssignableFrom(type);
+{{~ end ~}}
+{{~ if project["backend.bus.transport"] == "kafka" ~}}
 
     /// <summary>The integration events the consumers (<c>*Consumer</c>) of one Application assembly handle.</summary>
     private static IEnumerable<Type> ConsumedEvents(Assembly application) =>
