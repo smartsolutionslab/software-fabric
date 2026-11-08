@@ -62,6 +62,10 @@ public class PairwiseMatrixTests
               marten: { tier: supported, requires: ["backend.database == postgres"] }
         """;
 
+    private const string NoValidChoiceSet =
+        "no valid choice set contains a pair of options with a pack, so the matrix would have no combination; " +
+        "look for a rule no choice set can meet, or an active dimension none of whose options has a pack.";
+
     private static readonly CatalogModel Catalog = CatalogReader.Read(new StringReader(CatalogText), "catalog.yaml");
 
     /// <summary>Every option has a pack except backend.database.oracle.</summary>
@@ -247,6 +251,37 @@ public class PairwiseMatrixTests
         var matrix = PairwiseMatrix.Build(Catalog, domain.Split(' ', StringSplitOptions.RemoveEmptyEntries), []);
 
         matrix.Errors.ShouldBe([error]);
+        matrix.Combinations.ShouldBeEmpty();
+    }
+
+    /// <summary>
+    /// The reviewers' reproductions: enough factors for a pair, but no valid choice set contains one. An empty matrix
+    /// would look like success and, written over build/matrix.json, drop every row.
+    /// </summary>
+    [Theory]
+    [InlineData("always-active dimension without a pack")]
+    [InlineData("every pair breaks a rule")]
+    public void A_domain_no_valid_choice_set_contains_a_pair_of_is_an_error_instead_of_an_empty_matrix(string reproduction)
+    {
+        var (catalog, domain) = reproduction == "always-active dimension without a pack"
+            ? (CatalogReader.Read(
+                new StringReader(CatalogText + """
+
+                      x.required: { scope: project, default: on, options: { on: { tier: experimental } } }
+                    """),
+                "catalog.yaml"), Domain)
+            : (CatalogReader.Read(
+                new StringReader("""
+                    version: 1
+                    dimensions:
+                      x.a: { scope: project, default: p, options: { p: { tier: supported, requires: ["x.b == q"] } } }
+                      x.b: { scope: project, default: p, options: { p: { tier: supported }, q: { tier: supported } } }
+                    """),
+                "catalog.yaml"), ["x.a.p", "x.b.p"]);
+
+        var matrix = PairwiseMatrix.Build(catalog, domain, []);
+
+        matrix.Errors.ShouldBe([NoValidChoiceSet]);
         matrix.Combinations.ShouldBeEmpty();
     }
 
