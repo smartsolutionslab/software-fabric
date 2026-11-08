@@ -1,0 +1,1 @@
+    "@tanstack/{{ if project["frontend.framework"] == "vue" }}vue{{ else }}react{{ end }}-form": "1.33.5"
