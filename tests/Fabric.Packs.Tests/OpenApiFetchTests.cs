@@ -165,7 +165,7 @@ public sealed class OpenApiFetchTests
 
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("src/api/unknown.ts");
-        output.ShouldContain("'/billing/notes'");
+        output.ShouldContain("error TS2345: Argument of type '\"/billing/notes\"' is not assignable");
     }
 
     [Fact]
