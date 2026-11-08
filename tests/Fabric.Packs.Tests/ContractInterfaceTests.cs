@@ -164,7 +164,7 @@ public sealed class ContractInterfaceTests
     }
 
     [Fact]
-    public void A_new_module_gets_its_api_in_contracts_and_the_implementation_in_its_api_project_and_nothing_shared()
+    public void A_new_module_gets_its_api_in_contracts_and_the_implementation_in_its_api_project_and_no_line_elsewhere()
     {
         var created = AddModule(ContractInterface);
 
@@ -173,10 +173,8 @@ public sealed class ContractInterfaceTests
         created["src/Contracts/Billing/IBillingApi.cs"].ShouldContain("public interface IBillingApi;");
         created.Keys.ShouldContain("src/Modules/Billing/Billing.Api/BillingApi.cs");
         created["src/Modules/Billing/Billing.Api/BillingApi.cs"].ShouldContain("public sealed class BillingApi : IBillingApi;");
-        created.Keys.ShouldAllBe(path =>
-            path.StartsWith("src/Modules/Billing/", StringComparison.Ordinal)
-            || path.StartsWith("src/Contracts/Billing/", StringComparison.Ordinal)
-            || path.StartsWith("tests/Modules/Billing.Tests/", StringComparison.Ordinal));
+        created.Where(file => file.Value.Contains("BillingApi", StringComparison.Ordinal)).Select(file => file.Key).Order(StringComparer.Ordinal)
+            .ShouldBe(["src/Contracts/Billing/IBillingApi.cs", "src/Modules/Billing/Billing.Api/BillingApi.cs"]);
     }
 
     [Fact]
