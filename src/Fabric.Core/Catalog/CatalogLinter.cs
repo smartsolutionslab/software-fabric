@@ -19,6 +19,8 @@ public static class CatalogLinter
             CheckDimension(catalog, dimension, problems);
         }
 
+        problems.AddRange(ActiveWhenCycles.Find(catalog));
+
         foreach (var profile in catalog.Profiles.Keys)
         {
             CheckProfile(catalog, profile, problems);
@@ -53,13 +55,7 @@ public static class CatalogLinter
 
         if (dimension.ActiveWhen is { } activeWhen)
         {
-            var subject = $"{dimension.Id} active-when";
-            if (activeWhen.Dimension == dimension.Id)
-            {
-                problems.Add($"{subject}: condition '{activeWhen}' refers to its own dimension.");
-            }
-
-            CheckCondition(catalog, subject, activeWhen, problems);
+            CheckCondition(catalog, $"{dimension.Id} active-when", activeWhen, problems);
         }
 
         foreach (var condition in dimension.Requires)

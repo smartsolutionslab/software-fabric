@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "neverConnectToCloud": true,
+  "targetDefaults": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["default", "^default", { "runtime": "node -e \"Object.keys(process.env).filter(k => /^(VITE|REMOTE)_/.test(k)).sort().forEach(k => console.log(k + '=' + process.env[k]))\"" }],
+      "outputs": ["{projectRoot}/dist", "{projectRoot}/storybook-static"],
+      "cache": true
+    },
+    "lint": {
+      "cache": true
+    },
+    "test": {
+      "cache": true
+    }
+  }
+}

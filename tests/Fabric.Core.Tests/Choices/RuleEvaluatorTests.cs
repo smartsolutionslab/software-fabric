@@ -110,6 +110,10 @@ public class RuleEvaluatorTests
         "backend.tenancy=schema-per-tenant requires backend.database == postgres, but backend.database is sqlserver.")]
     [InlineData("lean-crud", new[] { "module.communication=contract-interface" },
         "module defaults: module.communication requires module.communication has integration-events, but module.communication is contract-interface.")]
+    [InlineData("saas-standard-react", new[] { "backend.mediator=wolverine", "backend.api-protocols=rest,grpc" },
+        "backend.mediator=wolverine conflicts with backend.api-protocols has grpc.")]
+    [InlineData("saas-standard-react", new[] { "backend.mediator=wolverine", "backend.mcp=server" },
+        "backend.mediator=wolverine conflicts with backend.mcp has server.")]
     public void Rejects_a_combination_the_packs_refuse_in_one_sentence(string profile, string[] settings, string violation)
     {
         Violations(profile, settings).ShouldBe([violation]);

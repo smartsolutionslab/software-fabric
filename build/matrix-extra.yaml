@@ -1,0 +1,11 @@
+# Combinations the pairwise matrix contains besides its covering set (ADR-0003): a defect that needs three options,
+# or a second module style, together is covered by adding that combination here, with the reason it is needed.
+# `fabric matrix` fills the dimensions a combination leaves out as it fills a pairwise row, and fails when no valid
+# choice set contains the choices it pins. Regenerate build/matrix.json after changing this file.
+#
+# combinations:
+#   - reason: <the defect, and the issue that found it>
+#     choices:
+#       backend.database: postgres
+#       backend.api-protocols: [rest]
+combinations: []
