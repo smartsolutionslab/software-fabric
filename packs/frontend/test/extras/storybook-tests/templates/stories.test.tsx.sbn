@@ -1,0 +1,15 @@
+import { composeStories, setProjectAnnotations, type Meta, type StoryObj } from '@storybook/react-vite';
+import { beforeAll, describe, test } from 'vitest';
+import * as preview from '../.storybook/preview';
+
+// Every story file in the package, found by glob: a new story is tested without a line here.
+const storyFiles = import.meta.glob<{ default: Meta } & Record<string, StoryObj>>('./**/*.stories.tsx', { eager: true });
+
+const project = setProjectAnnotations([preview]);
+beforeAll(project.beforeAll);
+
+describe.each(Object.entries(storyFiles))('%s', (_, storyFile) => {
+  test.each(Object.entries(composeStories(storyFile)))('%s renders and its play function passes', async (_, story) => {
+    await story.run();
+  });
+});

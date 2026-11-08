@@ -9,6 +9,7 @@ namespace Fabric.Packs.Tests;
 /// resources start in containers that Testcontainers runs, the host in the test process, and no test reaches the
 /// application through Aspire's testing host. The AppHost stays the composition root for running the application.
 /// </summary>
+[Collection(DockerPorts.Name)]
 public sealed partial class TestcontainersTests
 {
     private const string Testcontainers = "backend.test.integration=testcontainers";
@@ -130,6 +131,7 @@ public sealed partial class TestcontainersTests
         }
 
         project.Build();
+        DockerPorts.EnsureRunsAlone();
 
         foreach (var tests in ContainerTests.Where(path => File.Exists(Path.Combine(project.ProjectDirectory, path))))
         {
@@ -163,6 +165,7 @@ public sealed partial class TestcontainersTests
 
             """);
         project.Build();
+        DockerPorts.EnsureRunsAlone();
         var pidFile = Path.Combine(project.ProjectDirectory, "stalling-runner.pid");
 
         var (exitCode, output) = project.Test(
