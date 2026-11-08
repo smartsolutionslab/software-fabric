@@ -1,0 +1,3 @@
+var database = builder.AddSqlServer("sqlserver")
+    .WithDataVolume()
+    .AddDatabase("database");

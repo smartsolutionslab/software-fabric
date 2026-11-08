@@ -1,0 +1,38 @@
+import { expect, test } from '@playwright/test';
+
+test('a server event reaches the {{ if project["backend.auth"] == "none" }}browser{{ else }}signed-in browser{{ end }} over its own stream', async ({ page }) => {
+  // Records what the app's own EventSource receives, without changing what it does.
+  await page.addInitScript(() => {
+    const received: string[] = [];
+    Object.assign(window, { serverEventsReceived: received });
+    window.EventSource = class extends window.EventSource {
+      constructor(url: string | URL, init?: EventSourceInit) {
+        super(url, init);
+        this.addEventListener('TestEvent', (event: MessageEvent<string>) => received.push(event.data));
+      }
+    };
+  });
+
+  await page.goto('/');
+{{~ if project["backend.auth"] != "none" ~}}
+  {{ browser_sign_in "page" "'developer'" }}
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+
+  // The token the app signed in with, from where {{ if project["frontend.auth-client"] == "msal" }}src/auth/accessToken.ts{{ else if project["frontend.framework"] == "vue" }}oidc-client-ts{{ else }}react-oidc-context{{ end }} keeps it.
+  const token = await {{ stored_access_token "page" | string.replace "\n" "\n  " }};
+  const headers = { Authorization: `Bearer ${token}` };
+{{~ else ~}}
+  const headers = {};
+{{~ end ~}}
+
+  // The stream listens only once the host has started it, so the event is sent until it arrives.
+  const text = `hello from the host ${Date.now()}`;
+  await expect(async () => {
+    const sent = await page.request.post('/api/server-events/test', { headers, data: { text } });
+    expect(sent.status()).toBe(204);
+    const received = await page.evaluate(
+      () => (window as unknown as { serverEventsReceived: string[] }).serverEventsReceived,
+    );
+    expect(received.some((data) => data.includes(text))).toBe(true);
+  }).toPass({ timeout: 30_000 });
+});

@@ -1,0 +1,11 @@
+        // The AppHost's local OpenID Connect provider, "identity", with its realm and the realm's local users.
+        var identity = await StartAsync(
+            new Testcontainers.Keycloak.KeycloakBuilder("quay.io/keycloak/keycloak:26.6")
+                .WithUsername("admin")
+                .WithPassword("admin")
+                .WithRealm(Path.Combine(RepositoryDirectory(), "src/AppHost/realms/realm.json"))
+                .Build(),
+            cancellationToken);
+        Resources.Add("identity", "http", new Uri(identity.GetBaseAddress()));
+        settings["Authentication:Authority"] = new Uri(Resources.GetEndpoint("identity", "http"), "/realms/{{ name }}").ToString();
+        settings["Authentication:Audience"] = "{{ name }}-api";

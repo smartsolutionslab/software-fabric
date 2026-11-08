@@ -1,0 +1,77 @@
+{{~ func status(response, code)
+  ret (should_be (response + ".StatusCode") ("HttpStatusCode." + code)) + ";"
+end
+func equal(actual, expected)
+  ret (should_be actual expected) + ";"
+end ~}}
+using System.Net;
+using System.Net.Http.Json;
+
+namespace {{ namespace }}.Integration.Tests;
+
+{{~ integration_fixture_attributes ~}}
+public class HostTests(ContainerFixture containers)
+{
+    {{ test_attribute }}
+    public async Task The_host_reports_itself_healthy()
+    {
+        using var client = containers.CreateHostClient();
+
+        using var response = await client.GetAsync(new Uri("/health", UriKind.Relative), {{ test_cancellation_token }});
+
+        {{ status "response" "OK" }}
+    }
+{{~ if project["backend.api-protocols"] | array.contains "rest" ~}}
+
+    {{ test_attribute }}
+    public async Task The_api_is_described_by_an_openapi_document()
+    {
+        using var client = containers.CreateHostClient();
+
+        using var response = await client.GetAsync(new Uri("/openapi/v1.json", UriKind.Relative), {{ test_cancellation_token }});
+
+        {{ status "response" "OK" }}
+    }
+{{~ end ~}}
+{{~ if project["backend.auth"] != "none" ~}}
+
+    {{ test_attribute }}
+    public async Task An_anonymous_caller_is_rejected()
+    {
+        using var client = containers.CreateHostClient();
+
+        using var response = await client.GetAsync(new Uri("/me", UriKind.Relative), {{ test_cancellation_token }});
+
+        {{ status "response" "Unauthorized" }}
+    }
+
+    {{ test_attribute }}
+    public async Task A_token_from_the_identity_provider_identifies_the_user()
+    {
+        using var client = await containers.CreateHostClientAsync("developer");
+
+        var me = await client.GetFromJsonAsync<Me>(new Uri("/me", UriKind.Relative), {{ test_cancellation_token }});
+
+        {{ equal "me?.Name" "\"developer\"" }}
+    }
+{{~ end ~}}
+{{~ if project["backend.tenancy"] != "none" && project["backend.auth"] != "none" ~}}
+
+    {{ test_attribute }}
+    public async Task Each_user_resolves_to_their_own_tenant()
+    {
+        using var first = await containers.CreateHostClientAsync("developer");
+        using var second = await containers.CreateHostClientAsync("developer-b");
+
+        var firstTenant = await first.GetFromJsonAsync<Tenant>(new Uri("/me/tenant", UriKind.Relative), {{ test_cancellation_token }});
+        var secondTenant = await second.GetFromJsonAsync<Tenant>(new Uri("/me/tenant", UriKind.Relative), {{ test_cancellation_token }});
+
+        {{ equal "firstTenant?.TenantId" "\"tenant-a\"" }}
+        {{ equal "secondTenant?.TenantId" "\"tenant-b\"" }}
+    }
+{{~ end ~}}
+
+    private sealed record Me(string? Name);
+
+    private sealed record Tenant(string? TenantId);
+}

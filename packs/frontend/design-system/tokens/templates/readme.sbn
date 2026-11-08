@@ -1,0 +1,3 @@
+## Design tokens
+
+The project's colours, radii and spacing are design tokens in `web/packages/tokens/src` (W3C design tokens, compiled by Style Dictionary). {{ if project["frontend.styling"] == "tailwind" }}The app reads them through Tailwind's theme (`bg-primary`, `rounded-md`, `p-4`){{ else }}The app reads them as CSS custom properties (`var(--ds-color-primary)`){{ end }}; `pnpm dev`, `build` and `test` compile them first.

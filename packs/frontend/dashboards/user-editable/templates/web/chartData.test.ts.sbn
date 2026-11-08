@@ -1,0 +1,24 @@
+import { expect, test } from 'vitest';
+import { chartRows, pieSlices } from './chartData';
+
+const series = {
+  categories: ['January', 'February'],
+  series: [
+    { name: 'Revenue', values: [3, '4'] },
+    { name: 'Costs', values: [1] },
+  ],
+};
+
+test('a bar or line chart has one row per category, each series by its position, a missing value left out', () => {
+  expect(chartRows(series)).toEqual([
+    { category: 'January', s0: 3, s1: 1 },
+    { category: 'February', s0: 4 },
+  ]);
+});
+
+test('a pie chart shows the first series, one slice per category', () => {
+  expect(pieSlices(series)).toEqual([
+    { name: 'January', value: 3 },
+    { name: 'February', value: 4 },
+  ]);
+});

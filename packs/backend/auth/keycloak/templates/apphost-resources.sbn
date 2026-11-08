@@ -1,9 +1,16 @@
-#pragma warning disable ASPIREHOSTINGKEYCLOAK001, ASPIRECERTIFICATES001 // Preview APIs, development only (see docs/adr).
-var keycloak = builder.AddKeycloak("keycloak", 8080)
-    .WithoutHttpsCertificate()
-    .WithDataVolume()
-    .WithRealmImport("./realms");
-#pragma warning restore ASPIREHOSTINGKEYCLOAK001, ASPIRECERTIFICATES001
+// Keycloak runs as a plain container, development only (see docs/adr). Its administrator is "admin", with a password
+// Aspire generates once and keeps in the AppHost's user secrets; the realm in ./realms is imported on first start.
+var keycloakPassword = builder.AddResource(ParameterResourceBuilderExtensions.CreateDefaultPasswordParameter(builder, "keycloak-password"));
+var keycloak = builder.AddContainer("keycloak", "quay.io/keycloak/keycloak", "26.6")
+    .WithArgs("start-dev", "--import-realm")
+    .WithEnvironment("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
+    .WithEnvironment("KC_BOOTSTRAP_ADMIN_PASSWORD", keycloakPassword)
+    .WithEnvironment("KC_HEALTH_ENABLED", "true")
+    .WithHttpEndpoint(port: 8080, targetPort: 8080)
+    .WithHttpEndpoint(targetPort: 9000, name: "management")
+    .WithHttpHealthCheck("/health/ready", endpointName: "management")
+    .WithBindMount("./realms", "/opt/keycloak/data/import", isReadOnly: true);
+keycloak.WithVolume(VolumeNameGenerator.Generate(keycloak, "data"), "/opt/keycloak/data");
 
 if (builder.ExecutionContext.IsRunMode)
 {

@@ -5,10 +5,10 @@ namespace Fabric.Packs.Tests;
 
 /// <summary>
 /// The identity-provider vocabulary (docs/slots.md, M3-13): what depends on the identity provider (where its roles sit
-/// in the token, how a test user signs in, its login page, the shape of its ID token) comes from
-/// <c>templates.functions</c> of the <c>backend.auth</c> pack, and how the browser holds its access token from those of
-/// the <c>frontend.auth-client</c> pack, so generic-oidc, entra-id and msal plug in by defining the same functions
-/// instead of editing roles, claims, signalr, ag-ui, the micro-frontends and the base's policy rule.
+/// in the token, which tenant its user belongs to, how a test user signs in, its login page, the shape of its ID token)
+/// comes from <c>templates.functions</c> of the <c>backend.auth</c> pack, and how the browser holds its access token
+/// from those of the <c>frontend.auth-client</c> pack, so generic-oidc, entra-id and msal plug in by defining the same
+/// functions instead of editing roles, claims, tenancy, signalr, ag-ui, the micro-frontends and the base's policy rule.
 /// </summary>
 public sealed partial class IdentityVocabularyTests
 {
@@ -28,6 +28,36 @@ public sealed partial class IdentityVocabularyTests
         "browser_authority",
         "id_token_roles",
         "id_token_has_role",
+        "id_token_roles_claim",
+        "id_token_users_comment",
+        "role_mapping_adr",
+        "role_mapping_provider",
+        "tenant_claim_adr",
+        "tenant_claim",
+        "tenant_claim_members",
+        "tenant_claim_description",
+        "user_name_claim",
+        "browser_client_settings",
+        "browser_client_env",
+        "local_provider",
+        "local_user",
+        "local_users",
+        "local_users_source",
+        "local_users_setup",
+        "identity_resource",
+        "short_lived_test_user_token_summary",
+        "unstarted_people_resources_adr",
+        "browser_client_adr",
+        "id_token_claims_adr",
+        "id_token_claim_rule",
+        "role_kind",
+        "add_role_rule",
+        "roles_production_adr",
+        "token_issuer",
+        "claim_attribute_owner",
+        "claim_mapping_adr",
+        "claim_change_adr",
+        "add_claim_rule",
     ];
 
     private static readonly string[] AuthClientVocabulary =
@@ -78,14 +108,25 @@ public sealed partial class IdentityVocabularyTests
     ];
 
     /// <summary>
-    /// Every user of the vocabulary: roles and claims with their tests, the MCP server, signalr and ag-ui on React, the
-    /// Vue sign-in, and the micro-frontends' end-to-end tests.
+    /// Every user of the vocabulary: roles and claims with their tests, column tenancy, the MCP server, signalr and ag-ui
+    /// on React, the Vue sign-in, sse's query token on React and Vue, and the micro-frontends' end-to-end tests.
     /// </summary>
     public static TheoryData<string, string[]> Generations => new()
     {
         { "saas-ai-react", ["backend.authorization=roles,claims", "backend.mcp=client,server", "frontend.realtime=signalr"] },
         { "saas-standard-vue", ["backend.authorization=roles", "frontend.realtime=signalr"] },
+        { "saas-standard-react", ["frontend.realtime=sse"] },
+        { "saas-standard-vue", ["frontend.realtime=sse"] },
         { "industrial-event-driven-mfe", [] },
+    };
+
+    /// <summary>The same users of the auth client's vocabulary with msal (#266), which needs Entra ID.</summary>
+    public static TheoryData<string, string[]> MsalGenerations => new()
+    {
+        { "saas-ai-react", ["backend.auth=entra-id", "frontend.auth-client=msal", "backend.authorization=roles,claims", "backend.mcp=client,server", "frontend.realtime=signalr"] },
+        { "saas-standard-vue", ["backend.auth=entra-id", "frontend.auth-client=msal", "backend.authorization=roles", "frontend.realtime=signalr"] },
+        { "saas-standard-react", ["backend.auth=entra-id", "frontend.auth-client=msal", "frontend.realtime=sse"] },
+        { "saas-standard-vue", ["backend.auth=entra-id", "frontend.auth-client=msal", "frontend.realtime=sse"] },
     };
 
     [Theory]
@@ -129,9 +170,8 @@ public sealed partial class IdentityVocabularyTests
     [Fact]
     public void An_identity_provider_without_the_vocabulary_fails_generation_naming_what_it_lacks()
     {
-        using var standIns = new StandIns();
-        string[] overrides = ["backend.auth=entra-id", "backend.authorization=roles,claims", "frontend.realtime=signalr"];
-        var packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, "lean-crud", overrides);
+        string[] overrides = ["backend.auth=generic-oidc", "backend.authorization=roles,claims", "frontend.realtime=signalr"];
+        var packs = WithoutVocabulary(Repository.Packs.Packs["backend.auth.generic-oidc"]);
 
         var generated = Generator.New(Repository.Catalog, packs, "shop", "lean-crud", overrides);
 
@@ -139,6 +179,30 @@ public sealed partial class IdentityVocabularyTests
         errors.ShouldContain("role_mapping_source", customMessage: errors);
         errors.ShouldContain("test_user_token", customMessage: errors);
         errors.ShouldContain("accept_query_token", customMessage: errors);
+    }
+
+    [Fact]
+    public void An_identity_provider_without_the_vocabulary_fails_generation_of_column_tenancy_naming_the_tenant_claim()
+    {
+        string[] overrides = ["backend.auth=generic-oidc"];
+        var packs = WithoutVocabulary(Repository.Packs.Packs["backend.auth.generic-oidc"]);
+
+        var generated = Generator.New(Repository.Catalog, packs, "shop", "saas-standard-react", overrides);
+
+        var errors = string.Join(Environment.NewLine, generated.Errors);
+        errors.ShouldContain("tenant_claim", customMessage: errors);
+    }
+
+    [Fact]
+    public void The_endpoint_rule_is_the_bases_for_every_identity_provider()
+    {
+        const string Rule = "tests/Architecture.Tests/Rules/EveryEndpointDeclaresItsAuthorization.cs";
+        var owners = Repository.Packs.Packs.Values
+            .Where(pack => pack.Files.Any(file => file.Target == Rule))
+            .Select(pack => pack.Option)
+            .ToList();
+
+        owners.ShouldBe(["base.core"]);
     }
 
     [Theory]
@@ -171,6 +235,40 @@ public sealed partial class IdentityVocabularyTests
     }
 
     /// <summary>
+    /// msal keeps the token its own way (src/auth/accessToken.ts): with its vocabulary stood in, no file but its own, the
+    /// API client's headers and the dependencies it adds names MSAL or where the token is kept.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(MsalGenerations))]
+    public void A_project_generated_with_msals_vocabulary_stood_in_names_msal_only_in_its_own_files(string profile, string[] overrides)
+    {
+        var msal = Repository.Packs.Packs["frontend.auth-client.msal"];
+        using var authClient = new VocabularyProbe(msal, AuthClientVocabulary);
+        using var project = new GeneratedProject(profile, [authClient.Manifest], overrides);
+
+        var ownFiles = msal.Files.Select(file => file.Target).Concat(AuthClientFiles).Append("web/app/package.json").ToHashSet(StringComparer.Ordinal);
+        var named = Code(project)
+            .Where(entry => !ownFiles.Contains(entry.relative))
+            .Where(entry => MsalSpecific().IsMatch(entry.line))
+            .Select(entry => $"{entry.relative}:{entry.number}: {entry.line.Trim()}")
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        named.ShouldBeEmpty(string.Join(Environment.NewLine, named));
+    }
+
+    /// <summary>
+    /// The real packs, but the given identity provider's defines nothing in <c>templates.functions</c>: it stands in
+    /// for a provider that lacks the vocabulary, so the test needs no option that is still without a pack.
+    /// </summary>
+    private static Dictionary<string, Core.Packs.PackManifest> WithoutVocabulary(Core.Packs.PackManifest provider)
+    {
+        var packs = Repository.Packs.Packs.ToDictionary();
+        packs[provider.Option] = VocabularyProbe.WithoutFunctions(provider);
+        return packs;
+    }
+
+    /// <summary>
     /// The code lines of the project's sources, tests and web app with their 1-based line numbers. Comments are prose:
     /// they still describe Keycloak where it is the only provider, and change with the first other provider's output.
     /// </summary>
@@ -186,11 +284,14 @@ public sealed partial class IdentityVocabularyTests
     [GeneratedRegex(@"Keycloak|keycloak|oidc-client-ts only|realm_access")]
     private static partial Regex IdentityOnly();
 
-    [GeneratedRegex(@"[Kk]eycloak|/realms/|realm_access|resource_access|admin-cli|Username or email")]
+    [GeneratedRegex(@"[Kk]eycloak|/realms/|realm_access|resource_access|admin-cli|Username or email|/tenants/")]
     private static partial Regex KeycloakSpecific();
 
     [GeneratedRegex(@"oidc\.user:|@/auth/accessToken|@/auth/oidcConfig|\baccessToken\(\)")]
     private static partial Regex AuthClientSpecific();
+
+    [GeneratedRegex(@"@azure/msal|app\.access-token|rememberAccessToken|@/auth/accessToken|@/auth/msal|\baccessToken\(\)")]
+    private static partial Regex MsalSpecific();
 
     [GeneratedRegex(@"\.(cs|csproj|ts|tsx|vue|json)$")]
     private static partial Regex Source();

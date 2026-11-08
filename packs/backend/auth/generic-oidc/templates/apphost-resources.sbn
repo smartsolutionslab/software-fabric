@@ -1,0 +1,14 @@
+// The local OpenID Connect provider: Keycloak as a plain container, development only (see docs/adr). The host and the
+// browser know only its authority. Its administrator is "admin", with a password Aspire generates once and keeps in
+// the AppHost's user secrets; the realm in ./realms is imported on first start.
+var identityPassword = builder.AddResource(ParameterResourceBuilderExtensions.CreateDefaultPasswordParameter(builder, "identity-password"));
+var identity = builder.AddContainer("identity", "quay.io/keycloak/keycloak", "26.6")
+    .WithArgs("start-dev", "--import-realm")
+    .WithEnvironment("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
+    .WithEnvironment("KC_BOOTSTRAP_ADMIN_PASSWORD", identityPassword)
+    .WithEnvironment("KC_HEALTH_ENABLED", "true")
+    .WithHttpEndpoint(port: 8080, targetPort: 8080)
+    .WithHttpEndpoint(targetPort: 9000, name: "management")
+    .WithHttpHealthCheck("/health/ready", endpointName: "management")
+    .WithBindMount("./realms", "/opt/keycloak/data/import", isReadOnly: true);
+identity.WithVolume(VolumeNameGenerator.Generate(identity, "data"), "/opt/keycloak/data");

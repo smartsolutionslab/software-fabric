@@ -1,0 +1,18 @@
+option: backend.database.sqlserver
+files: []
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: apphost.packages, template: templates/apphost-package.sbn }
+  - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 10 }
+  - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 10 }
+  - { slot: buildingblocks.packages, template: templates/buildingblocks-package.sbn }
+  - { slot: persistence.options, template: templates/persistence-options.sbn }
+  # With backend.test.integration testcontainers only (ADR-0002: dropped where no pack declares the slot).
+  - { slot: integration-tests.database, template: templates/testcontainers-database.sbn, order: 10, optional: true }
+  # With backend.data-access.reads dapper only, which declares the slot (ADR-0002: dropped where no pack declares it).
+  - { slot: read-connection.data-source, template: templates/read-connection-data-source.sbn, optional: true }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "/health reports every module's database context healthy against SQL Server; checked by the integration tests of the aspire-fixture pack against the running stack." }

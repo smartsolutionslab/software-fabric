@@ -1,0 +1,102 @@
+{{~ if project["frontend.framework"] != "react" && project["frontend.framework"] != "vue" ~}}
+throw new Error('The sse pack has a React and a Vue client only so far (docs/adr/0006 of the generator).');
+{{~ end ~}}
+{{~ if object.has_key(project, "frontend.auth-client") ~}}
+{{ browser_access_token_import }}
+
+{{~ end ~}}
+type Handler = (payload: unknown) => void;
+
+/** The app's stream from the host: components listen on it, and its holder starts and stops it. */
+export interface ServerEventsStream {
+  on(name: string, handler: Handler): void;
+  off(name: string, handler: Handler): void;
+  start(): void;
+  stop(): void;
+}
+
+/** How long to wait before opening the stream again after it failed: a second, doubling up to thirty. */
+const retryDelay = (attempt: number) => Math.min(30_000, 1_000 * 2 ** attempt);
+
+{{~ if object.has_key(project, "frontend.auth-client") ~}}
+/**
+ * The host's event stream, through /api like every other call. An EventSource cannot send a header, so the access
+ * token goes in the query; it is read each time the stream opens, as it may have been renewed meanwhile.
+ */
+const streamUrl = () => {
+  const token = {{ browser_access_token }};
+  return token ? `/api/server-events?access_token=${encodeURIComponent(token)}` : '/api/server-events';
+};
+{{~ else ~}}
+/** The host's event stream, through /api like every other call. */
+const streamUrl = () => '/api/server-events';
+{{~ end ~}}
+
+/** The app's one stream from the host, an EventSource; not open until started. */
+export function connectServerEvents(): ServerEventsStream {
+  const handlers = new Map<string, Set<Handler>>();
+  let source: EventSource | undefined;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  let attempt = 0;
+
+  const deliver = (event: MessageEvent<string>) => {
+    const payload: unknown = JSON.parse(event.data);
+    handlers.get(event.type)?.forEach((handler) => {
+      handler(payload);
+    });
+  };
+
+  const open = () => {
+    const opened = new EventSource(streamUrl());
+    opened.onopen = () => {
+      attempt = 0;
+    };
+    // An EventSource would try again by itself, with the URL it has; the host ends a stream when its token expires, so
+    // a failed one is opened anew instead{{ if object.has_key(project, "frontend.auth-client") }}, with the current token{{ end }}.
+    opened.onerror = () => {
+      opened.close();
+      source = undefined;
+      retry = setTimeout(() => {
+        retry = undefined;
+        open();
+      }, retryDelay(attempt));
+      attempt += 1;
+    };
+    for (const name of handlers.keys()) {
+      opened.addEventListener(name, deliver);
+    }
+    source = opened;
+  };
+
+  return {
+    on(name, handler) {
+      let named = handlers.get(name);
+      if (!named) {
+        named = new Set();
+        handlers.set(name, named);
+        source?.addEventListener(name, deliver);
+      }
+      named.add(handler);
+    },
+    off(name, handler) {
+      const named = handlers.get(name);
+      named?.delete(handler);
+      if (named?.size === 0) {
+        handlers.delete(name);
+        source?.removeEventListener(name, deliver);
+      }
+    },
+    start() {
+      if (!source && retry === undefined) {
+        open();
+      }
+    },
+    stop() {
+      clearTimeout(retry);
+      retry = undefined;
+      source?.close();
+      source = undefined;
+      attempt = 0;
+    },
+  };
+}

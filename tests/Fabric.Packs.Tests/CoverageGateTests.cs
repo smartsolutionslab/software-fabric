@@ -88,6 +88,31 @@ public sealed class CoverageGateTests
         output.ShouldContain("Shop.Kernel: ");
     }
 
+    /// <summary>
+    /// The dashboards module's Domain and Application meet the gate through the module's own tests, without the
+    /// integration tests: with the user-editable pack alone, and with the generative pack beside it (saas-ai-react).
+    /// </summary>
+    public static TheoryData<string, string> DashboardProjects => new()
+    {
+        { "saas-standard-react", "frontend.dashboards=user-editable" },
+        { "saas-ai-react", string.Empty },
+    };
+
+    [Theory]
+    [MemberData(nameof(DashboardProjects))]
+    public void The_dashboards_module_passes_the_gate_on_its_own_tests_without_the_integration_tests(string profile, string overrides)
+    {
+        using var project = new GeneratedProject(profile, overrides.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        project.AddModule("billing");
+        project.Build();
+
+        var (exitCode, output) = RunTests(project);
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("Shop.Modules.Dashboards.Domain: ");
+        output.ShouldContain("Shop.Modules.Dashboards.Application: ");
+    }
+
     [Fact]
     public void Test_after_generates_from_the_real_packs_with_the_coverage_gate_and_without_the_red_first_check()
     {
@@ -105,7 +130,7 @@ public sealed class CoverageGateTests
 
     /// <summary>
     /// Runs the script the backend CI's test step runs, on every test project but the integration tests, which need
-    /// Docker and measure the host in its own process, not the layers the gate checks.
+    /// Docker. Their coverage of the host is measured too, but a module must meet the gate through its own tests.
     /// </summary>
     private static (int ExitCode, string Output) RunTests(GeneratedProject project)
     {

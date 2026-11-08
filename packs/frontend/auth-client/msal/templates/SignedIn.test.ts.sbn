@@ -1,0 +1,134 @@
+import type { AccountInfo, AuthenticationResult } from '@azure/msal-browser';
+import { render, screen } from '@testing-library/vue';
+import userEvent from '@testing-library/user-event';
+import { afterEach, expect, test, vi } from 'vitest';
+import { rememberAccessToken } from './accessToken';
+import SignedIn from './SignedIn.vue';
+import { type AuthClient, authKey, createAuth } from './useAuth';
+
+afterEach(() => {
+  sessionStorage.clear();
+});
+
+const developer = {
+  homeAccountId: 'developer-id',
+  environment: 'localhost',
+  tenantId: '00000000-0000-0000-0000-00000000000a',
+  username: 'developer',
+  localAccountId: 'developer-id',
+  idTokenClaims: { preferred_username: 'developer' },
+} as AccountInfo;
+
+const signedIn = (expiresIn = 300_000) =>
+  rememberAccessToken({ accessToken: 'access-token', expiresOn: new Date(Date.now() + expiresIn) });
+
+/** MSAL's PublicClientApplication as SignedIn sees it: its start, the way back, its accounts and the redirects. */
+function client(overrides: Partial<AuthClient> = {}): AuthClient {
+  return {
+    initialize: vi.fn<AuthClient['initialize']>(() => Promise.resolve()),
+    handleRedirectPromise: vi.fn<AuthClient['handleRedirectPromise']>(() => Promise.resolve(null)),
+    getActiveAccount: vi.fn<AuthClient['getActiveAccount']>(() => null),
+    getAllAccounts: vi.fn<AuthClient['getAllAccounts']>(() => []),
+    loginRedirect: vi.fn<AuthClient['loginRedirect']>(() => Promise.resolve()),
+    logoutRedirect: vi.fn<AuthClient['logoutRedirect']>(() => Promise.resolve()),
+    ...overrides,
+  };
+}
+
+function renderSignedIn(fake: AuthClient) {
+  return render(SignedIn, {
+    global: { provide: { [authKey]: createAuth(fake) } },
+    slots: { default: '<h1>{{ name }}</h1>' },
+  });
+}
+
+test('an anonymous visitor is sent to the identity provider', async () => {
+  const fake = client();
+
+  renderSignedIn(fake);
+
+  await vi.waitFor(() => expect(fake.loginRedirect).toHaveBeenCalledOnce());
+  expect(screen.getByText('Signing in…')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: '{{ name }}' })).not.toBeInTheDocument();
+});
+
+test('a signed-in user sees who they are and the application', async () => {
+  signedIn();
+  const fake = client({ getActiveAccount: vi.fn<AuthClient['getActiveAccount']>(() => developer) });
+
+  renderSignedIn(fake);
+
+  expect(await screen.findByText('Signed in as developer')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '{{ name }}' })).toBeInTheDocument();
+  expect(fake.loginRedirect).not.toHaveBeenCalled();
+});
+
+test('a cached account that is not the active one does not count as signed in', async () => {
+  signedIn();
+  const fake = client({ getAllAccounts: vi.fn<AuthClient['getAllAccounts']>(() => [developer]) });
+
+  renderSignedIn(fake);
+
+  await vi.waitFor(() => expect(fake.loginRedirect).toHaveBeenCalledOnce());
+  expect(screen.queryByRole('heading', { name: '{{ name }}' })).not.toBeInTheDocument();
+});
+
+test('coming back from the identity provider completes the sign-in', async () => {
+  const fake = client({
+    // MSAL keeps the new token through createMsal's callback before the way back resolves.
+    handleRedirectPromise: vi.fn<AuthClient['handleRedirectPromise']>(() => {
+      signedIn();
+      return Promise.resolve({ account: developer } as AuthenticationResult);
+    }),
+  });
+
+  renderSignedIn(fake);
+
+  expect(await screen.findByText('Signed in as developer')).toBeInTheDocument();
+  expect(fake.initialize).toHaveBeenCalledOnce();
+  expect(fake.loginRedirect).not.toHaveBeenCalled();
+});
+
+test('a failed sign-in is shown, not retried', async () => {
+  const fake = client({
+    handleRedirectPromise: vi.fn<AuthClient['handleRedirectPromise']>(() => Promise.reject(new Error('access_denied'))),
+  });
+
+  renderSignedIn(fake);
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in failed: access_denied');
+  expect(fake.loginRedirect).not.toHaveBeenCalled();
+});
+
+test('a redirect to the identity provider that fails is shown', async () => {
+  const fake = client({
+    loginRedirect: vi.fn<AuthClient['loginRedirect']>(() => Promise.reject(new Error('endpoints_resolution_error'))),
+  });
+
+  renderSignedIn(fake);
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in failed: endpoints_resolution_error');
+});
+
+test('a session whose access token expires sends the user back to the identity provider', async () => {
+  signedIn(50);
+  const fake = client({ getActiveAccount: vi.fn<AuthClient['getActiveAccount']>(() => developer) });
+
+  renderSignedIn(fake);
+  expect(await screen.findByText('Signed in as developer')).toBeInTheDocument();
+
+  await vi.waitFor(() => expect(fake.loginRedirect).toHaveBeenCalledOnce());
+  expect(screen.queryByRole('heading', { name: '{{ name }}' })).not.toBeInTheDocument();
+});
+
+test('signing out does not start a sign-in while the identity provider signs the user out', async () => {
+  signedIn();
+  const fake = client({ getActiveAccount: vi.fn<AuthClient['getActiveAccount']>(() => developer) });
+  renderSignedIn(fake);
+
+  await userEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
+
+  await vi.waitFor(() => expect(fake.logoutRedirect).toHaveBeenCalledOnce());
+  expect(await screen.findByText('Signing out…')).toBeInTheDocument();
+  expect(fake.loginRedirect).not.toHaveBeenCalled();
+});

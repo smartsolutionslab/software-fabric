@@ -1,0 +1,20 @@
+import { type ChartConfiguration, Chart as ChartJs } from 'chart.js/auto';
+import { Chart as ReactChart } from 'react-chartjs-2';
+
+// A chart fills its container, which is as high as the height it is given, rather than keeping its own aspect ratio.
+ChartJs.defaults.maintainAspectRatio = false;
+
+interface ChartProps {
+  config: ChartConfiguration;
+  label: string;
+  height?: number;
+}
+
+/** A Chart.js chart; label names it for screen readers. */
+export function Chart({ config, label, height = 320 }: ChartProps) {
+  return (
+    <div style={{ "{{" }} height {{ "}}" }}>
+      <ReactChart type={config.type} data={config.data} options={config.options} role="img" aria-label={label} />
+    </div>
+  );
+}

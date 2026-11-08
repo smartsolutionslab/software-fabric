@@ -1,0 +1,17 @@
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>
+/// The endpoints of the resources the fixture started, by the AppHost's resource and endpoint names: what a test
+/// reaches beside the host{{ if project["backend.auth"] != "none" }}, such as the identity provider's ({{ identity_resource }}, http){{ end }}.
+/// </summary>
+public sealed class ContainerResources
+{
+    private readonly Dictionary<(string Resource, string Endpoint), Uri> endpoints = [];
+
+    public Uri GetEndpoint(string resource, string endpoint) =>
+        endpoints.TryGetValue((resource, endpoint), out var address)
+            ? address
+            : throw new InvalidOperationException($"The fixture started no resource {resource} with an endpoint {endpoint}.");
+
+    internal void Add(string resource, string endpoint, Uri address) => endpoints[(resource, endpoint)] = address;
+}

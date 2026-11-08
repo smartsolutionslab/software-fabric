@@ -1,0 +1,1 @@
+            { group: ['@tanstack/*-table'], message: 'Use DataTable from src/components/ui (docs/adr).' }

@@ -1,0 +1,6 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+
+namespace {{ namespace }}.Reads.Tests;
+
+/// <summary>A sample query, as a module's Application project would declare it: the notes up to <paramref name="Last"/>.</summary>
+public sealed record SampleNotes(int Last) : IQuery<IReadOnlyList<SampleNote>>;

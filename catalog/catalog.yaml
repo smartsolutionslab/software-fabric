@@ -69,8 +69,7 @@ dimensions:
     scope: project
     default: ef-core
     options:
-      ef-core:             { tier: supported }
-      ef-core-dapper-read: { tier: experimental, note: "EF Core for writes, Dapper in query handlers" }
+      ef-core: { tier: supported }
 
   backend.topology:
     scope: project
@@ -248,12 +247,18 @@ dimensions:
     scope: module
     active-when: "module.style == event-sourced"
     default: marten
+    # Role slots (ADR-0008): every event store's pack declares them; strict DDD depth writes value objects through them.
+    role-slots:
+      event-store.json-converters: { description: "Statements on JsonSerializerOptions json, the System.Text.Json options the event store writes and reads every module's events with, each indented twelve spaces: json.Converters.Add(new SomeConverter()). Rendered only with a contribution." }
     options:
       marten:
         tier: supported
         # Reason: the Marten pack keeps no tenant apart in its event streams, so any tenancy would leak one tenant's events to another.
         requires: ["backend.database == postgres", "backend.tenancy == none"]
-      kurrentdb: { tier: experimental }
+      kurrentdb:
+        tier: experimental
+        # Reason: the KurrentDB pack keeps no tenant apart in its streams, so any tenancy would leak one tenant's events to another.
+        requires: ["backend.tenancy == none"]
 
   module.ddd-depth:
     scope: module
@@ -279,6 +284,8 @@ dimensions:
     scope: module
     multi: true
     default: [integration-events]
+    # Reason: every module gets the unit of work and the messaging wiring of the bus, built on types only integration-events supplies.
+    requires: ["module.communication has integration-events"]
     options:
       contract-interface:
         tier: experimental
@@ -352,6 +359,7 @@ dimensions:
       web.providers: { description: "Wrappers around the app, outermost first, in the framework's own form.", separator: ",\n" }
       web.styles: { description: "Lines of the global stylesheet." }
       e2e.apphost-arguments: { description: "Arguments .github/scripts/e2e.sh starts the AppHost with, after '--': values only the end-to-end tests give its parameters (--Parameters:<name>=<value>), never a real secret.", separator: " " }
+      e2e.after-tests: { description: "Commands .github/scripts/e2e.sh runs once the end-to-end tests have passed, while the application it started still runs; a failing one ends the script with fail." }
     options:
       react: { tier: supported }
       vue:   { tier: experimental }
@@ -429,7 +437,10 @@ dimensions:
         tier: supported
         requires: ["frontend.state == redux-toolkit"]
       orval:         { tier: supported }
-      openapi-fetch: { tier: experimental }
+      # A plain typed client: TanStack Query's caches wrap its calls; Redux Toolkit's server data is RTK Query (#264).
+      openapi-fetch:
+        tier: experimental
+        requires: ["frontend.state != redux-toolkit"]
 
   frontend.routing:
     scope: project
@@ -504,7 +515,7 @@ dimensions:
         requires: ["frontend.framework == react"]
       reka-ui:
         tier: experimental
-        requires: ["frontend.framework == vue", "frontend.styling == tailwind"]
+        requires: ["frontend.framework == vue"]
       vuetify:
         tier: experimental
         requires: ["frontend.framework == vue"]
@@ -609,3 +620,19 @@ dimensions:
         requires: ["frontend.design-system == tokens-and-components"]
       screenshot-tests: { tier: experimental }
       accessibility:    { tier: supported, note: "axe in component and e2e tests" }
+
+  # ─────────────────────────── Backend · data access add-ons ─────────────────
+  # Last in the catalog (owner decision on #247): a dimension active in every profile renumbers no profile's ADRs here.
+
+  backend.data-access.reads:
+    scope: project
+    active-when: "backend.data-access == ef-core"
+    default: ef-core
+    note: "How query handlers read. EF Core keeps the model, the writes and the migrations either way."
+    options:
+      ef-core: { tier: supported, note: "query handlers read through EF Core, as the rest of the module does" }
+      dapper:
+        tier: experimental
+        note: "query handlers read with Dapper over IReadConnection, in SQL for the project's one database"
+        # Reason: Dapper's SQL bypasses the tenant column's EF Core query filter, so any tenancy would read every tenant's rows.
+        requires: ["backend.tenancy == none"]

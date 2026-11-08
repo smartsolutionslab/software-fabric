@@ -1,0 +1,9 @@
+using {{ namespace }}.Contracts.{{ module.namespace }};
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Api;
+
+/// <summary>
+/// The {{ module.name }} module's answers to <see cref="I{{ module.namespace }}Api"/>: each method dispatches one of the
+/// module's own queries or commands and holds no business logic. Registered by convention, like the module's handlers.
+/// </summary>
+public sealed class {{ module.namespace }}Api : I{{ module.namespace }}Api;

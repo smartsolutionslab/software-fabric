@@ -1,0 +1,15 @@
+        // The AppHost's broker, "messaging": the Azure Service Bus emulator and the SQL Server it keeps its entities in,
+        // the images the AppHost runs. The emulator's licence is accepted for the tests, as the AppHost accepts it.
+        var serviceBusNetwork = new NetworkBuilder().Build();
+        var serviceBusDatabase = new Testcontainers.MsSql.MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
+            .WithNetwork(serviceBusNetwork)
+            .WithNetworkAliases("messaging-database")
+            .Build();
+        var messaging = await StartAsync(
+            new Testcontainers.ServiceBus.ServiceBusBuilder("mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.0")
+                .WithAcceptLicenseAgreement(true)
+                .WithMsSqlContainer(serviceBusNetwork, serviceBusDatabase, "messaging-database")
+                .Build(),
+            cancellationToken);
+        settings["ConnectionStrings:messaging"] = messaging.GetConnectionString();
+        settings["ConnectionStrings:messaging-management"] = messaging.GetHttpConnectionString();

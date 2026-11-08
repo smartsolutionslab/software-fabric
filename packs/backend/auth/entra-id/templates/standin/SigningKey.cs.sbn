@@ -1,0 +1,40 @@
+using System.Security.Cryptography;
+using Microsoft.IdentityModel.Tokens;
+
+namespace {{ namespace }}.IdentityStandIn;
+
+/// <summary>The key the stand-in signs with, made when it starts; its JWKS publishes the public half.</summary>
+public sealed class SigningKey : IDisposable
+{
+    private readonly RSA rsa = RSA.Create(2048);
+
+    public SigningKey()
+    {
+        Key = new RsaSecurityKey(rsa) { KeyId = Guid.CreateVersion7().ToString("N") };
+    }
+
+    public RsaSecurityKey Key { get; }
+
+    /// <summary>The public key as a JSON Web Key Set.</summary>
+    public object KeySet()
+    {
+        var parameters = rsa.ExportParameters(includePrivateParameters: false);
+        return new
+        {
+            keys = new[]
+            {
+                new
+                {
+                    kty = "RSA",
+                    use = "sig",
+                    alg = SecurityAlgorithms.RsaSha256,
+                    kid = Key.KeyId,
+                    n = Base64UrlEncoder.Encode(parameters.Modulus),
+                    e = Base64UrlEncoder.Encode(parameters.Exponent),
+                },
+            },
+        };
+    }
+
+    public void Dispose() => rsa.Dispose();
+}

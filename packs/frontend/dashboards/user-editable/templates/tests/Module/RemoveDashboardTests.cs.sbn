@@ -1,0 +1,53 @@
+using {{ namespace }}.Modules.Dashboards.Application.Commands.RemoveDashboard;
+
+namespace {{ namespace }}.Modules.Dashboards.Tests.Commands;
+
+/// <summary>Removing a dashboard through the dispatcher: the caller's own, and nobody else's.</summary>
+public class RemoveDashboardTests
+{
+    {{ test_attribute }}
+    public async Task The_callers_dashboard_is_removed()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+        var id = await SavedDashboards.SaveAsync(module, "Sales", 1, {{ test_cancellation_token }});
+
+        var result = await module.SendAsync(new RemoveDashboard(id), {{ test_cancellation_token }});
+
+        {{ `result.IsSuccess` | should_be_true }};
+        {{ `module.Store.Stored` | should_be_empty }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_dashboard_the_caller_does_not_have_is_not_found()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+
+        var result = await module.SendAsync(new RemoveDashboard(Guid.CreateVersion7()), {{ test_cancellation_token }});
+
+        {{ `result.Error.Code` | should_be `"dashboards.dashboard-not-found"` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_dashboard_of_another_user_in_the_same_table_is_not_found_and_stays()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+        await using var other = module.SignedInAs(DashboardsModuleUnderTest.OtherOwner);
+        var id = await SavedDashboards.SaveAsync(other, "Sales", 1, {{ test_cancellation_token }});
+
+        var result = await module.SendAsync(new RemoveDashboard(id), {{ test_cancellation_token }});
+
+        {{ `result.Error.Code` | should_be `"dashboards.dashboard-not-found"` }};
+        {{ `module.Store.Stored.Single().Owner` | should_be `DashboardsModuleUnderTest.OtherOwner` }};
+    }
+
+    {{ test_attribute }}
+    public async Task Without_a_signed_in_user_nothing_is_removed()
+    {
+        await using var module = new DashboardsModuleUnderTest(null);
+
+        var result = await module.SendAsync(new RemoveDashboard(Guid.CreateVersion7()), {{ test_cancellation_token }});
+
+        {{ `result.Error.Code` | should_be `"dashboards.not-signed-in"` }};
+        {{ `module.Store.Saves` | should_be `0` }};
+    }
+}

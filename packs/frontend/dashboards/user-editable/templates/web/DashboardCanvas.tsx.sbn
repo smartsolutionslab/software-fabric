@@ -1,10 +1,29 @@
 {{~ generative = array.contains project["frontend.dashboards"] "generative" ~}}
-{%{import { zodResolver } from '@hookform/resolvers/zod';
+{{~ valibot = project["frontend.validation"] == "valibot" ~}}
+{{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
+{{~ if tanstack ~}}
+import { revalidateLogic, useForm, useStore } from '@tanstack/react-form';
+import { useMemo, useState } from 'react';
+import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
+{{~ if valibot ~}}
+import * as v from 'valibot';
+{{~ else ~}}
+import { z } from 'zod';
+{{~ end ~}}
+{{~ else if valibot ~}}
+import { valibotResolver } from '@hookform/resolvers/valibot';
+import { useMemo, useState } from 'react';
+import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
+import { useForm, useWatch } from 'react-hook-form';
+import * as v from 'valibot';
+{{~ else ~}}
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState } from 'react';
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
-import { useGetDashboardsWidgetsQuery, usePutDashboardsByIdMutation, type WidgetDescriptionDto } from '@/api/generated';
+{{~ end ~}}
+{%{import { useGetDashboardsWidgetsQuery, usePutDashboardsByIdMutation, type WidgetDescriptionDto } from '@/api/generated';
 import { Button } from '@/components/ui/button';
 import { Failure } from './Failure';
 import { applyLayout, columns, hasRoom, lowest, nextPlacement, type Placement, toLayout, withinReach } from './layout';
@@ -24,6 +43,21 @@ const maximumWidgets = 50;
 const catalogPageSize = 100;
 const noWidgets: WidgetDescriptionDto[] = [];
 
+}%}{{~ if valibot ~}}
+const nameSchema = v.object({
+  name: v.pipe(
+    v.string(),
+    v.trim(),
+    v.minLength(1, 'A dashboard needs a name of 1 to 100 characters.'),
+    v.maxLength(100, 'A dashboard needs a name of 1 to 100 characters.'),
+  ),
+});
+
+const widgetSchema = v.object({
+  source: v.pipe(v.string(), v.minLength(1, 'Choose a widget.')),
+  visual: v.pipe(v.string(), v.minLength(1, 'Choose how to show it.')),
+});
+{{~ else ~}}
 const nameSchema = z.object({
   name: z
     .string()
@@ -36,7 +70,8 @@ const widgetSchema = z.object({
   source: z.string().min(1, 'Choose a widget.'),
   visual: z.string().min(1, 'Choose how to show it.'),
 });
-
+{{~ end ~}}
+{%{
 export interface DraftDashboard {
   id: string;
   name: string;
@@ -101,18 +136,64 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
     decide(call);
   };
 {{~ end ~}}
-{%{
+
+{{~ if tanstack ~}}
+  const naming = useForm({
+    defaultValues: { name: dashboard.name },
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: nameSchema },
+    onSubmit: async ({ value }) => {
+      const { name } = {{ if valibot }}v.parse(nameSchema, value){{ else }}nameSchema.parse(value){{ end }};
+      const submitted = revision;
+      try {
+        await save({ id: dashboard.id, saveDashboardRequest: { name, widgets: placements } }).unwrap();
+        setSavedRevision(submitted);
+        setFailed(false);
+        setSaves((count) => count + 1);
+        onSaved();
+      } catch {
+        setFailed(true);
+      }
+    },
+  });
+  const adding = useForm({
+    defaultValues: { source: '', visual: '' },
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: widgetSchema },
+    onSubmit: ({ value: { source, visual }, formApi }) => {
+      const choice = checkChoice(catalog, source, visual);
+      if (!choice.ok) {
+        formApi.setFieldMeta(choice.field, (meta) => ({
+          ...meta,
+          errorMap: { ...meta.errorMap, onSubmit: [{ message: choice.message }] },
+        }));
+        return;
+      }
+
+      change((current) => [...current, nextPlacement(current, uuidV7(), source, visual)]);
+      formApi.reset();
+    },
+  });
+  const chosen = listed.get(useStore(adding.store, (state) => state.values.source));
+{{~ else if valibot ~}}
+  const naming = useForm({ resolver: valibotResolver(nameSchema), defaultValues: { name: dashboard.name } });
+  const adding = useForm({ resolver: valibotResolver(widgetSchema), defaultValues: { source: '', visual: '' } });
+{{~ else ~}}
   const naming = useForm({ resolver: zodResolver(nameSchema), defaultValues: { name: dashboard.name } });
   const adding = useForm({ resolver: zodResolver(widgetSchema), defaultValues: { source: '', visual: '' } });
-  const chosen = listed.get(useWatch({ control: adding.control, name: 'source' }));
-
+{{~ end ~}}
+{{~ if !tanstack ~}}
+{%{  const chosen = listed.get(useWatch({ control: adding.control, name: 'source' }));
+}%}{{~ end ~}}
+{%{
   // Another page of the picker lists other widgets: a choice from this one would be added with the next page's visual.
   const pickerPage = (page: number) => {
     setCatalogPage(page);
     adding.reset();
   };
 
-  const add = adding.handleSubmit(({ source, visual }) => {
+}%}{{~ if !tanstack ~}}
+{%{  const add = adding.handleSubmit(({ source, visual }) => {
     const choice = checkChoice(catalog, source, visual);
     if (!choice.ok) {
       adding.setError(choice.field, { message: choice.message });
@@ -136,9 +217,118 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
     }
   });
 
-  return (
+}%}{{~ end ~}}
+{%{  return (
     <section aria-label="Dashboard" className="flex flex-col gap-4">
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
+}%}{{~ if tanstack ~}}
+{%{      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void naming.handleSubmit();
+        }}
+        className="flex flex-wrap items-end gap-2"
+      >
+        <label className="flex flex-col gap-1 text-sm">
+          Dashboard name
+          <naming.Field name="name" listeners={{ onChange: edited }}>
+            {({ name, state, handleBlur, handleChange }) => (
+              <input
+                className="rounded border px-2 py-1"
+                name={name}
+                value={state.value}
+                onBlur={handleBlur}
+                onChange={(event) => handleChange(event.target.value)}
+              />
+            )}
+          </naming.Field>
+        </label>
+        <Button type="submit" disabled={saving}>
+          Save dashboard
+        </Button>
+        <naming.Subscribe selector={(state) => state.fieldMeta.name?.errors[0]?.message}>
+          {(message) => message && <p role="alert">{message}</p>}
+        </naming.Subscribe>
+        {savedRevision === revision && <p role="status">Saved.</p>}
+        {failed && <p role="alert">The dashboard could not be saved.</p>}
+      </form>
+
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void adding.handleSubmit();
+        }}
+        className="flex flex-wrap items-end gap-2"
+      >
+        <label className="flex flex-col gap-1 text-sm">
+          Widget
+          <adding.Field
+            name="source"
+            listeners={{
+              onChange: ({ value }) =>
+                adding.setFieldValue('visual', visuals[listed.get(value)?.kind ?? 'Chart'][0].value),
+            }}
+          >
+            {({ name, state, handleBlur, handleChange }) => (
+              <select
+                className="rounded border px-2 py-1"
+                disabled={loading}
+                name={name}
+                value={state.value}
+                onBlur={handleBlur}
+                onChange={(event) => handleChange(event.target.value)}
+              >
+                <option value="">Choose a widget</option>
+                {catalog.map((widget) => (
+                  <option key={widget.id} value={widget.id}>
+                    {widget.title}
+                  </option>
+                ))}
+              </select>
+            )}
+          </adding.Field>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Shown as
+          <adding.Field name="visual">
+            {({ name, state, handleBlur, handleChange }) => (
+              <select
+                className="rounded border px-2 py-1"
+                disabled={loading}
+                name={name}
+                value={state.value}
+                onBlur={handleBlur}
+                onChange={(event) => handleChange(event.target.value)}
+              >
+                {visuals[chosen?.kind ?? 'Chart'].map((visual) => (
+                  <option key={visual.value} value={visual.value}>
+                    {visual.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </adding.Field>
+        </label>
+        <Button type="submit" variant="secondary" disabled={loading || full || !roomLeft}>
+          Add widget
+        </Button>
+        {full && <p>A dashboard holds at most {maximumWidgets} widgets.</p>}
+        {!full && !roomLeft && <p>There is no room for another widget: a dashboard reaches down to row {lowest}.</p>}
+        <adding.Subscribe selector={(state) => state.fieldMeta.source?.errors[0]?.message}>
+          {(message) => message && <p role="alert">{message}</p>}
+        </adding.Subscribe>
+        <adding.Subscribe selector={(state) => state.fieldMeta.visual?.errors[0]?.message}>
+          {(message) => message && <p role="alert">{message}</p>}
+        </adding.Subscribe>
+        <Pager
+          label="widgets"
+          page={catalogPage}
+          pageSize={catalogPageSize}
+          total={loading ? undefined : widgets.currentData?.totalCount}
+          onPage={pickerPage}
+        />
+      </form>
+}%}{{~ else ~}}
+{%{      <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1 text-sm">
           Dashboard name
           <input className="rounded border px-2 py-1" {...naming.register('name', { onChange: edited })} />
@@ -195,7 +385,8 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
           onPage={pickerPage}
         />
       </form>
-      {widgets.isError && (
+}%}{{~ end ~}}
+{%{      {widgets.isError && (
         <Failure
           message="The widgets could not be loaded."
           retry="Try loading the widgets again"

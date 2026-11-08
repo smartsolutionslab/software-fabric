@@ -1,0 +1,11 @@
+using System.Text.Json.Serialization;
+
+namespace {{ namespace }}.IdentityStandIn;
+
+/// <summary>The token endpoint's answer, under OAuth's names.</summary>
+public sealed record TokenResponse(
+    [property: JsonPropertyName("access_token")] string AccessToken,
+    [property: JsonPropertyName("id_token")] string IdToken,
+    [property: JsonPropertyName("token_type")] string TokenType,
+    [property: JsonPropertyName("expires_in")] int ExpiresIn,
+    [property: JsonPropertyName("scope")] string Scope);

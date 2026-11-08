@@ -1,0 +1,2 @@
+    <PackageVersion Include="Moq" Version="4.21.0" />
+    <PackageVersion Include="Moq.Analyzers" Version="0.4.2" />

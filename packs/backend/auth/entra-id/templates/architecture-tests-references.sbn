@@ -1,0 +1,2 @@
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <ProjectReference Include="../../src/Host/Host.csproj" />

@@ -1,0 +1,76 @@
+using System.Xml.Linq;
+using Microsoft.CodeAnalysis.CSharp;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// The local stand-in for Microsoft Entra ID (<c>src/IdentityStandIn</c>) is the AppHost's, for development and tests:
+/// no other project references it, and no source under <c>src/</c> but the AppHost's and its own names it or Keycloak.
+/// Sources are parsed, not grepped: a comment is prose.
+/// </summary>
+public sealed class OnlyTheAppHostRunsTheStandIn : IArchitectureRule
+{
+    private const string StandIn = "IdentityStandIn";
+
+    private static readonly string[] Checked = ["src", "tests"];
+
+    private static readonly string[] Knowing = ["src/AppHost/", $"src/{StandIn}/"];
+
+    private static readonly string[] ProviderSpecific = [StandIn, "keycloak", "realm_access", "resource_access", "/realms/"];
+
+    public string Description => "Only the AppHost references the local stand-in for Entra ID, and no source under src/ but the AppHost's and the stand-in's names it or another identity provider.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var root = RepositoryRoot();
+        List<string> violations = [];
+        foreach (var path in Files(root, "*.csproj").Where(path => path != "src/AppHost/AppHost.csproj"))
+        {
+            var references = XDocument.Load(Path.Combine(root, path)).Descendants("ProjectReference")
+                .Select(reference => ((string?)reference.Attribute("Include") ?? string.Empty).Replace('\\', '/'));
+            if (references.Any(reference => reference.EndsWith($"{StandIn}/{StandIn}.csproj", StringComparison.Ordinal)))
+            {
+                violations.Add($"{path} references src/{StandIn}, the local stand-in for Microsoft Entra ID. Only the AppHost runs it, in development and tests; production signs users in at Entra ID itself.");
+            }
+        }
+
+        foreach (var path in Files(root, "*.cs").Where(path => path.StartsWith("src/", StringComparison.Ordinal) && !Knowing.Any(owner => path.StartsWith(owner, StringComparison.Ordinal))))
+        {
+            var source = CSharpSyntaxTree.ParseText(File.ReadAllText(Path.Combine(root, path))).GetRoot();
+            foreach (var token in source.DescendantTokens())
+            {
+                var named = ProviderSpecific.FirstOrDefault(name => token.Text.Contains(name, StringComparison.OrdinalIgnoreCase));
+                if (named is not null)
+                {
+                    violations.Add($"{path}:{token.GetLocation().GetLineSpan().StartLinePosition.Line + 1}: names {named}. With backend.auth entra-id the application reads Microsoft Entra ID's tokens, configured under AzureAd; the stand-in that issues them locally belongs to the AppHost.");
+                }
+            }
+        }
+
+        return violations;
+    }
+
+    /// <summary>The files under src/ and tests/ matching the pattern, relative to the root, build output left out.</summary>
+    private static IEnumerable<string> Files(string root, string pattern) =>
+        Checked
+            .Select(directory => Path.Combine(root, directory))
+            .Where(Directory.Exists)
+            .SelectMany(directory => Directory.EnumerateFiles(directory, pattern, SearchOption.AllDirectories))
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
+            .Where(path => !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal);
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+}

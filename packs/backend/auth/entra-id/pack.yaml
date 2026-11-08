@@ -1,0 +1,48 @@
+option: backend.auth.entra-id
+files:
+  - { template: templates/Authentication.cs.sbn, target: src/Host/Wiring/Authentication.cs }
+  - { template: templates/StandInWiring.cs.sbn, target: src/AppHost/Wiring/StandInWiring.cs }
+  - { template: templates/OnlyTheAppHostRunsTheStandIn.cs.sbn, target: tests/Architecture.Tests/Rules/OnlyTheAppHostRunsTheStandIn.cs }
+  - { template: templates/DirectoryTests.cs.sbn, target: tests/Integration.Tests/DirectoryTests.cs }
+  # With msal the browser signs in at the stand-in's https address (owner decision on #266); Testcontainers runs the stand-in on http alone.
+  - { template: templates/BrowserIssuerTests.cs.sbn, target: tests/Integration.Tests/BrowserIssuerTests.cs, when: 'project["frontend.auth-client"] == "msal" && project["backend.test.integration"] != "testcontainers"' }
+  # With backend.authorization roles: the token's app roles become ClaimTypes.Role (ADR-0009: the provider decides what the token carries).
+  - { template: templates/EntraRoleClaims.cs.sbn, target: src/Host/EntraRoleClaims.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles")' }
+  - { template: templates/RoleClaims.cs.sbn, target: src/Host/Wiring/RoleClaims.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles")' }
+  # The local stand-in for Entra ID: an in-process issuer the AppHost runs in development and the tests run, never deployed.
+  - { template: templates/standin/IdentityStandIn.csproj.sbn, target: src/IdentityStandIn/IdentityStandIn.csproj }
+  - { template: templates/standin/Program.cs.sbn, target: src/IdentityStandIn/Program.cs }
+  - { template: templates/standin/appsettings.json.sbn, target: src/IdentityStandIn/appsettings.json }
+  - { template: templates/standin/launchSettings.json.sbn, target: src/IdentityStandIn/Properties/launchSettings.json }
+  - { template: templates/standin/StandInSettings.cs.sbn, target: src/IdentityStandIn/StandInSettings.cs }
+  - { template: templates/standin/StandInUser.cs.sbn, target: src/IdentityStandIn/StandInUser.cs }
+  - { template: templates/standin/SigningKey.cs.sbn, target: src/IdentityStandIn/SigningKey.cs }
+  - { template: templates/standin/TokenIssuer.cs.sbn, target: src/IdentityStandIn/TokenIssuer.cs }
+  - { template: templates/standin/TokenResponse.cs.sbn, target: src/IdentityStandIn/TokenResponse.cs }
+  - { template: templates/standin/PendingCode.cs.sbn, target: src/IdentityStandIn/PendingCode.cs }
+  - { template: templates/standin/AuthorizationCodes.cs.sbn, target: src/IdentityStandIn/AuthorizationCodes.cs }
+  - { template: templates/standin/SignInPage.cs.sbn, target: src/IdentityStandIn/SignInPage.cs }
+  - { template: templates/standin/StandInEndpoints.cs.sbn, target: src/IdentityStandIn/StandInEndpoints.cs }
+slots:
+  - { slot: templates.functions, template: templates/functions.sbn }
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: solution.projects, template: templates/solution-project.sbn }
+  - { slot: apphost.project-references, template: templates/apphost-project-reference.sbn }
+  - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 20 }
+  - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 20 }
+  - { slot: apphost.web-wiring, template: templates/apphost-web-wiring.sbn, order: 20 }
+  - { slot: host.packages, template: templates/host-package.sbn }
+  - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: host.middleware, template: templates/host-middleware.sbn, order: -10 }
+  - { slot: modules.endpoints, template: templates/module-endpoints.sbn, order: -10 }
+  - { slot: tests.architecture.references, template: templates/architecture-tests-references.sbn }
+  # With backend.test.integration testcontainers only (ADR-0002: dropped where no pack declares the slot).
+  - { slot: integration-tests.resources, template: templates/testcontainers-resources.sbn, order: 20, optional: true }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Only the AppHost references the local stand-in for Entra ID (src/IdentityStandIn), and no source under src/ but the AppHost's and the stand-in's names it or Keycloak: the application reads Entra ID's tokens only.", file: templates/OnlyTheAppHostRunsTheStandIn.cs.sbn }
+  - { kind: unit-test, describes: "A token from an Entra directory the host does not list in AzureAd:Tenants is refused, against the running stack with the stand-in.", file: templates/DirectoryTests.cs.sbn }
+  - { kind: unit-test, describes: "With frontend.auth-client msal, a token the stand-in issues at its https address, where MSAL signs the browser in, is accepted by the host, against the running stack.", file: templates/BrowserIssuerTests.cs.sbn }
+  - { kind: ci-step, describes: "A module endpoint answers 401 without a token, and a test user signs in at the stand-in and is known to the host, in their tenant; checked by the integration tests against the running stack." }

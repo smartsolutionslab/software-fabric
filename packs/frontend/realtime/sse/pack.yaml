@@ -1,0 +1,41 @@
+option: frontend.realtime.sse
+files:
+  - { template: templates/IBrowserEvents.cs.sbn, target: src/BuildingBlocks/Realtime/IBrowserEvents.cs }
+  - { template: templates/BrowserEventStreams.cs.sbn, target: src/Host/Realtime/BrowserEventStreams.cs }
+  - { template: templates/StreamBrowserEvents.cs.sbn, target: src/Host/Realtime/StreamBrowserEvents.cs }
+  - { template: templates/TestEvent.cs.sbn, target: src/Host/Realtime/TestEvent.cs }
+  - { template: templates/ServerEventsRegistration.cs.sbn, target: src/Host/Wiring/ServerEventsRegistration.cs }
+  - { template: templates/ServerEventsEndpoints.cs.sbn, target: src/Host/Wiring/ServerEventsEndpoints.cs }
+  - { template: templates/ServerEventsTests.cs.sbn, target: tests/Integration.Tests/ServerEventsTests.cs }
+  # The stream is the browser's own EventSource, the same for both frameworks; its holder is a React context provider or
+  # a Vue component, and useServerEvent a hook or a composable, branched in its template (ADR-0006).
+  - { template: templates/connection.ts.sbn, target: web/app/src/realtime/connection.ts }
+  - { template: templates/connection.test.ts.sbn, target: web/app/src/realtime/connection.test.ts }
+  - { template: templates/ServerEventsContext.ts.sbn, target: web/app/src/realtime/ServerEventsContext.ts, when: 'project["frontend.framework"] != "vue"' }
+  - { template: templates/ServerEvents.tsx.sbn, target: web/app/src/realtime/ServerEvents.tsx, when: 'project["frontend.framework"] != "vue"' }
+  - { template: templates/ServerEvents.test.tsx.sbn, target: web/app/src/realtime/ServerEvents.test.tsx, when: 'project["frontend.framework"] != "vue"' }
+  - { template: templates/useServerEvent.ts.sbn, target: web/app/src/realtime/useServerEvent.ts }
+  - { template: templates/useServerEvent.test.tsx.sbn, target: web/app/src/realtime/useServerEvent.test.tsx, when: 'project["frontend.framework"] != "vue"' }
+  - { template: templates/server-events-provider.tsx.sbn, target: web/app/src/providers/serverEvents.tsx, when: 'project["frontend.framework"] != "vue"' }
+  - { template: templates/serverEventsKey.ts.sbn, target: web/app/src/realtime/serverEventsKey.ts, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/ServerEvents.vue.sbn, target: web/app/src/realtime/ServerEvents.vue, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/ServerEvents.test.ts.sbn, target: web/app/src/realtime/ServerEvents.test.ts, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/useServerEvent.test.ts.sbn, target: web/app/src/realtime/useServerEvent.test.ts, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/server-events-provider.ts.sbn, target: web/app/src/providers/serverEvents.ts, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/server-events.spec.ts.sbn, target: web/app/e2e/server-events.spec.ts }
+slots:
+  - { slot: host.services, template: templates/host-services.sbn, order: 30 }
+  - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 30 }
+  - { slot: web.imports, template: templates/import.sbn, order: 3 }
+  - { slot: web.providers, template: templates/provider.sbn, order: 3 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "Against the running application, a browser of the sender's tenant receives a server event and one of another tenant does not, a stream without a token is refused unless backend.auth is none, and one whose token expires is ended (tests/Integration.Tests/ServerEventsTests.cs).", file: templates/ServerEventsTests.cs.sbn }
+  - { kind: unit-test, describes: "The app's EventSource hands a listener the events of its name until it stops listening, and opens a failed stream anew, with the current access token, until stopped (src/realtime/connection.test.ts).", file: templates/connection.test.ts.sbn }
+  - { kind: unit-test, describes: "useServerEvent hands a component the events it subscribes to and unsubscribes when it unmounts (src/realtime/useServerEvent.test.tsx).", file: templates/useServerEvent.test.tsx.sbn }
+  - { kind: unit-test, describes: "ServerEvents keeps the stream open while mounted and closes it once unmounted (src/realtime/ServerEvents.test.tsx).", file: templates/ServerEvents.test.tsx.sbn }
+  - { kind: unit-test, describes: "With Vue, useServerEvent hands a component the events it subscribes to and unsubscribes when it unmounts (src/realtime/useServerEvent.test.ts).", file: templates/useServerEvent.test.ts.sbn }
+  - { kind: unit-test, describes: "With Vue, ServerEvents keeps the stream open while mounted and closes it once unmounted (src/realtime/ServerEvents.test.ts).", file: templates/ServerEvents.test.ts.sbn }
+  - { kind: end-to-end-test, describes: "A signed-in browser's own EventSource receives a server event (e2e/server-events.spec.ts, run against the running AppHost).", file: templates/server-events.spec.ts.sbn }

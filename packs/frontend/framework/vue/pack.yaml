@@ -18,6 +18,7 @@ files:
 # Every role slot of frontend.framework (catalog, ADR-0008), with the catalog's separators.
 declares-slots:
   - { slot: e2e.apphost-arguments, description: "Arguments .github/scripts/e2e.sh starts the AppHost with, after '--': values only the end-to-end tests give its parameters (--Parameters:<name>=<value>), never a real secret.", separator: " " }
+  - { slot: e2e.after-tests, description: "Commands .github/scripts/e2e.sh runs once the end-to-end tests have passed, while the application it started still runs; a failing one ends the script with fail." }
   - { slot: web.scripts, description: "Entries of web/app's scripts ('\"codegen\": \"...\"').", separator: ",\n" }
   - { slot: web.prepare, description: "Commands run before dev, build and test (code generators), joined with ' && '.", separator: " && " }
   - { slot: web.env, description: "Members of ImportMetaEnv: the VITE_ variables the app reads." }

@@ -1,0 +1,19 @@
+option: backend.test.integration.testcontainers
+files:
+  - { template: templates/Integration.Tests.csproj.sbn, target: tests/Integration.Tests/Integration.Tests.csproj }
+  - { template: templates/ContainerFixture.cs.sbn, target: tests/Integration.Tests/ContainerFixture.cs }
+  - { template: templates/ContainerResources.cs.sbn, target: tests/Integration.Tests/ContainerResources.cs }
+  - { template: templates/HostTests.cs.sbn, target: tests/Integration.Tests/HostTests.cs }
+declares-slots:
+  - { slot: integration-tests.database, description: "Statements in a container fixture's setup, each line indented eight spaces, that start the application's database and migrate it as the AppHost does: await StartAsync(container, cancellationToken) starts a container (DotNet.Testcontainers.Builders and .Containers are imported, and the core Testcontainers package is all a database's test project references), settings[\"ConnectionStrings:<name>\"] = ... gives the host its connection string, and await RunProjectAsync(\"src/<Project>\", cancellationToken) runs a project of the solution to its end with the settings so far as its environment. Rendered into the application's fixture and into the database fixture alone (rag's)." }
+  - { slot: integration-tests.resources, description: "Statements in the application's fixture setup, after the database's, each line indented eight spaces, that start another of the AppHost's resources with Testcontainers (await StartAsync(container, cancellationToken); a module's types written with their namespace), record what tests reach on it (Resources.Add(\"<resource>\", \"<endpoint>\", address), the AppHost's names), and give the host the settings the AppHost gives it (settings[\"Section:Key\"] = \"...\"; never a real secret). RepositoryDirectory() is the solution's directory." }
+  - { slot: integration-tests.packages, description: "<PackageReference> lines of the application's integration tests for the Testcontainers modules the integration-tests.resources statements use; this pack declares their versions." }
+slots:
+  - { slot: templates.functions, template: templates/functions.sbn }
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: solution.projects, template: templates/solution-project.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "The application on Testcontainers: the host healthy in front of its containers, and the gates of the chosen API, identity and tenancy options.", file: templates/HostTests.cs.sbn }

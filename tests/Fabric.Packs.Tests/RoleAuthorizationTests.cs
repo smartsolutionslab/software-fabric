@@ -163,6 +163,42 @@ public sealed class RoleAuthorizationTests
         output.ShouldContain("src/Modules/Billing/Billing.Api/Endpoints/RoleChecks.cs:16: checks a role (RequireRole)");
     }
 
+    /// <summary>
+    /// Every module a project is generated with gets the sample endpoint GET /&lt;module&gt;/permissions/manage once it has
+    /// authorization choices, so the frontend's copy of the OpenAPI document lists it, in the order the host maps modules
+    /// (by name), or the generated OpenApiDocumentTests fails on a project nobody has touched (#313).
+    /// </summary>
+    [Theory]
+    [InlineData("saas-ai-react", new[] { Roles })]
+    [InlineData("saas-ai-react", new[] { "backend.authorization=claims" })]
+    [InlineData("saas-ai-react", new[] { "backend.authorization=roles,claims" })]
+    [InlineData("saas-standard-vue", new[] { Roles, "backend.llm=openai", "backend.llm.agents=agent-framework", "frontend.agent-ui=ag-ui", "frontend.dashboards=user-editable" })]
+    public void The_frontends_openapi_copy_lists_every_generated_modules_permission_endpoint_in_the_hosts_order(string profile, string[] overrides)
+    {
+        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, overrides);
+        generated.Errors.ShouldBeEmpty();
+        var files = generated.Files.ToDictionary(file => file.Path, file => file.Content);
+        List<string> expected = [.. files.Keys
+            .Select(path => System.Text.RegularExpressions.Regex.Match(path, "^src/Modules/(?<module>[^/]+)/[^/]+\\.Api/Endpoints/CanManage\\.cs$"))
+            .Where(match => match.Success)
+            .Select(match => match.Groups["module"].Value)
+            .Order(StringComparer.Ordinal)
+            .Select(module => $"/{module.ToLowerInvariant()}/permissions/manage")];
+        expected.Count.ShouldBeGreaterThan(1);
+
+        var paths = System.Text.Json.Nodes.JsonNode.Parse(files["web/app/openapi.json"])!["paths"]!.AsObject()
+            .Select(path => path.Key)
+            .ToList();
+
+        paths.Where(path => path.EndsWith("/permissions/manage", StringComparison.Ordinal)).ShouldBe(expected);
+        foreach (var (module, next) in expected.Zip(expected.Skip(1)))
+        {
+            var prefix = module[..module.IndexOf("/permissions/", StringComparison.Ordinal)];
+            paths.FindLastIndex(path => path.StartsWith(prefix + "/", StringComparison.Ordinal) || path == prefix)
+                .ShouldBeLessThan(paths.IndexOf(next), $"{prefix}'s paths come before {next}, as the host maps modules by name.");
+        }
+    }
+
     [Fact]
     public void The_generated_integration_tests_give_a_manager_200_a_visitor_403_and_an_anonymous_caller_401()
     {

@@ -28,6 +28,17 @@ public class RuleEvaluatorTests
         Violations(profile).ShouldBeEmpty();
     }
 
+    /// <summary>openapi-fetch is a plain typed client: it pairs with TanStack Query's caches, not with Redux Toolkit, whose server data is RTK Query (#264).</summary>
+    [Theory]
+    [InlineData("saas-standard-react", "frontend.state=tanstack-query")]
+    [InlineData("lean-crud", "frontend.state=tanstack-query")]
+    [InlineData("saas-standard-vue", "frontend.state=pinia-tanstack-query")]
+    [InlineData("saas-standard-vue", "frontend.state=tanstack-query")]
+    public void The_openapi_fetch_client_is_allowed_with_tanstack_query(string profile, string state)
+    {
+        Violations(profile, "frontend.api-client=openapi-fetch", state).ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("saas-standard-react")]
     [InlineData("industrial-event-driven-mfe")]
@@ -39,6 +50,12 @@ public class RuleEvaluatorTests
     [Theory]
     [InlineData("saas-standard-vue", "frontend.state=redux-toolkit",
         "frontend.state=redux-toolkit requires frontend.framework == react, but frontend.framework is vue.")]
+    [InlineData("saas-standard-vue", "frontend.state=zustand-tanstack-query",
+        "frontend.state=zustand-tanstack-query requires frontend.framework == react, but frontend.framework is vue.")]
+    [InlineData("lean-crud", "frontend.state=pinia",
+        "frontend.state=pinia requires frontend.framework == vue, but frontend.framework is react.")]
+    [InlineData("saas-standard-react", "frontend.state=zustand-tanstack-query",
+        "frontend.api-client=rtk-query-codegen requires frontend.state == redux-toolkit, but frontend.state is zustand-tanstack-query.")]
     [InlineData("saas-standard-react", "frontend.styling=css-modules",
         "frontend.ui-library=shadcn requires frontend.styling == tailwind, but frontend.styling is css-modules.")]
     [InlineData("saas-standard-react", "frontend.ui-library=mui",
@@ -53,6 +70,8 @@ public class RuleEvaluatorTests
         "frontend.test.extras=storybook-tests requires frontend.design-system == tokens-and-components, but frontend.design-system is none.")]
     [InlineData("lean-crud", "frontend.api-client=rtk-query-codegen",
         "frontend.api-client=rtk-query-codegen requires frontend.state == redux-toolkit, but frontend.state is tanstack-query.")]
+    [InlineData("saas-standard-react", "frontend.api-client=openapi-fetch",
+        "frontend.api-client=openapi-fetch requires frontend.state != redux-toolkit, but frontend.state is redux-toolkit.")]
     [InlineData("lean-crud", "backend.topology=services",
         "backend.topology=services requires backend.bus.transport != none, but backend.bus.transport is none.")]
     [InlineData("saas-standard-react", "backend.api-protocols=grpc",
@@ -77,15 +96,74 @@ public class RuleEvaluatorTests
         "module defaults: module.cqrs=physical requires module.event-store == marten, but module.event-store is not set.")]
     [InlineData("industrial-event-driven-mfe", new[] { "module.event-store=kurrentdb" },
         "module defaults: module.cqrs=physical requires module.event-store == marten, but module.event-store is kurrentdb.")]
+    [InlineData("industrial-event-driven-mfe", new[] { "module.event-store=kurrentdb", "module.cqrs=logical", "backend.tenancy=column" },
+        "module defaults: module.event-store=kurrentdb requires backend.tenancy == none, but backend.tenancy is column.")]
     [InlineData("saas-standard-vue", new[] { "frontend.design-system=tokens-and-components" },
         "frontend.design-system=tokens-and-components requires frontend.framework == react, but frontend.framework is vue.")]
     [InlineData("saas-standard-vue", new[] { "frontend.architecture=micro-frontends", "frontend.design-system=tokens" },
         "frontend.mfe-technique=module-federation requires frontend.framework == react, but frontend.framework is vue.")]
     [InlineData("saas-standard-react", new[] { "frontend.styling=library-theme", "frontend.ui-library=radix-headless" },
         "frontend.styling=library-theme conflicts with frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless).")]
+    [InlineData("saas-standard-react", new[] { "backend.data-access.reads=dapper" },
+        "backend.data-access.reads=dapper requires backend.tenancy == none, but backend.tenancy is column.")]
+    [InlineData("lean-crud", new[] { "module.communication=contract-interface" },
+        "module defaults: module.communication requires module.communication has integration-events, but module.communication is contract-interface.")]
     public void Rejects_a_combination_the_packs_refuse_in_one_sentence(string profile, string[] settings, string violation)
     {
         Violations(profile, settings).ShouldBe([violation]);
+    }
+
+    [Theory]
+    [InlineData("lean-crud", "backend.data-access.reads=dapper")]
+    [InlineData("lean-crud", "backend.data-access.reads=dapper", "backend.database=sqlserver")]
+    public void Dapper_reads_are_allowed_without_tenancy_on_either_database(string profile, params string[] settings)
+    {
+        Violations(profile, settings).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void An_empty_communication_set_is_refused_in_one_sentence()
+    {
+        Violations("lean-crud", "module.communication=")
+            .ShouldBe(["module defaults: module.communication requires module.communication has integration-events, but module.communication is empty."]);
+    }
+
+    [Fact]
+    public void A_module_dimension_requirement_is_checked_per_module_and_names_the_module()
+    {
+        var choices = ChoiceResolver.Resolve(RepositoryCatalog, "lean-crud", []).Choices.ShouldNotBeNull();
+        Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> modules = new()
+        {
+            ["billing"] = new Dictionary<string, IReadOnlyList<string>> { ["module.communication"] = ["integration-events"] },
+            ["shipping"] = new Dictionary<string, IReadOnlyList<string>> { ["module.communication"] = [] },
+        };
+
+        RuleEvaluator.Check(RepositoryCatalog, choices.Project, modules)
+            .ShouldBe(["module 'shipping': module.communication requires module.communication has integration-events, but module.communication is empty."]);
+    }
+
+    [Fact]
+    public void A_project_dimension_requirement_is_checked_whenever_the_dimension_is_set()
+    {
+        var catalog = CatalogReader.Read(
+            new StringReader("""
+                version: 1
+                dimensions:
+                  x.y: { scope: project, requires: ["x.z == p"], default: o, options: { o: { tier: supported } } }
+                  x.z: { scope: project, default: q, options: { p: { tier: supported }, q: { tier: supported } } }
+                """),
+            "test.yaml");
+
+        RuleEvaluator.Check(catalog, Values(("x.y", "o"), ("x.z", "q")), new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>())
+            .ShouldBe(["x.y requires x.z == p, but x.z is q."]);
+        RuleEvaluator.Check(catalog, Values(("x.z", "q")), new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>())
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Contract_interfaces_beside_integration_events_are_allowed()
+    {
+        Violations("lean-crud", "module.communication=integration-events,contract-interface").ShouldBeEmpty();
     }
 
     [Theory]
@@ -104,6 +182,12 @@ public class RuleEvaluatorTests
     public void A_library_with_its_own_theming_may_use_it(string profile, string library)
     {
         Violations(profile, "frontend.styling=library-theme", $"frontend.ui-library={library}").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Reka_ui_is_headless_so_it_may_be_styled_with_css_modules()
+    {
+        Violations("saas-standard-vue", "frontend.styling=css-modules", "frontend.ui-library=reka-ui").ShouldBeEmpty();
     }
 
     [Fact]
@@ -139,7 +223,7 @@ public class RuleEvaluatorTests
     [Fact]
     public void A_module_option_conflicting_with_a_project_option_is_reported()
     {
-        Violations("saas-standard-react", "backend.topology=services", "module.communication=contract-interface")
+        Violations("saas-standard-react", "backend.topology=services", "module.communication=integration-events,contract-interface")
             .ShouldBe(["module defaults: module.communication=contract-interface conflicts with backend.topology == services."]);
     }
 

@@ -1,8 +1,24 @@
+{{~ valibot = project["frontend.validation"] == "valibot" ~}}
 import { contentToText, type Message } from '@ag-ui/client';
+{{~ if valibot ~}}
+import * as v from 'valibot';
+{{~ else ~}}
 import { z } from 'zod';
+{{~ end ~}}
 import { nextPlacement, type Placement } from './layout';
 
 /** What propose_widget answers: a declared widget the user may see, as a visual its kind can show, under its title. */
+{{~ if valibot ~}}
+const proposalSchema = v.object({
+  source: v.string(),
+  title: v.string(),
+  visual: v.string(),
+  /** The key of the draft's widget it takes the place of, or null for a new widget. */
+  replaces: v.nullable(v.string()),
+});
+
+export type WidgetProposal = v.InferOutput<typeof proposalSchema>;
+{{~ else ~}}
 const proposalSchema = z.object({
   source: z.string(),
   title: z.string(),
@@ -12,6 +28,7 @@ const proposalSchema = z.object({
 });
 
 export type WidgetProposal = z.infer<typeof proposalSchema>;
+{{~ end ~}}
 
 /** A proposal the user has neither accepted nor discarded yet, by the tool call that made it. */
 export interface PendingProposal {
@@ -31,8 +48,13 @@ export function readProposal(content: string): WidgetProposal | undefined {
     return undefined;
   }
 
+{{~ if valibot ~}}
+  const read = v.safeParse(proposalSchema, value);
+  return read.success ? read.output : undefined;
+{{~ else ~}}
   const read = proposalSchema.safeParse(value);
   return read.success ? read.data : undefined;
+{{~ end ~}}
 }
 
 /** Each tool call's result in the conversation, by the call's id. */

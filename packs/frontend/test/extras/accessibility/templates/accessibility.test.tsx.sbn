@@ -1,3 +1,18 @@
+{{~ if project["frontend.routing"] == "tanstack-router" ~}}
+import { render, screen } from '@testing-library/react';
+import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
+import { expect, test } from 'vitest';
+import { axe } from 'vitest-axe';
+import { App } from './App';
+import { createAppRouter } from './router';
+
+test('the start page has no accessibility violations axe can find', async () => {
+  const { container } = render(<RouterProvider router={createAppRouter(createMemoryHistory(), <App />)} />);
+  await screen.findByRole('heading', { name: '{{ name }}' });
+
+  expect(await axe(container)).toHaveNoViolations();
+});
+{{~ else ~}}
 import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { expect, test } from 'vitest';
@@ -13,3 +28,4 @@ test('the start page has no accessibility violations axe can find', async () => 
 
   expect(await axe(container)).toHaveNoViolations();
 });
+{{~ end ~}}

@@ -1,7 +1,7 @@
 import { useAuth } from 'react-oidc-context';
 
 /**
- * Whether the signed-in user holds the realm role, as the ID token says (`realm_access.roles`). Hiding an element is a
+ * Whether the signed-in user holds the {{ role_kind }}, as the ID token says (`{{ id_token_roles_claim }}`). Hiding an element is a
  * convenience, never protection: the backend policy decides.
  */
 export function useHasRole(role: string): boolean {

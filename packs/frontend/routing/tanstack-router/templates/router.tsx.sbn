@@ -1,0 +1,27 @@
+import { createRoute, createRouter, type RouterHistory } from '@tanstack/react-router';
+import type { ReactNode } from 'react';
+import { moduleRoutes } from '@/modules';
+import { Home } from '@/pages/Home';
+import { rootRoute } from '@/rootRoute';
+
+const home = createRoute({ getParentRoute: () => rootRoute, path: '/', component: Home });
+
+/**
+ * The app as the root route's page, the start page, then every module's route with the routes below it. Tests pass
+ * createMemoryHistory() and <App />; the app passes createBrowserHistory() and what the providers wrap.
+ */
+export function createAppRouter(history: RouterHistory, app: ReactNode) {
+  return createRouter({ history, routeTree: rootRoute.addChildren([home, ...moduleRoutes]), context: { app } });
+}
+
+declare module '@tanstack/react-router' {
+  /** Links and route lookups are checked against this router's routes, every module's included. */
+  interface Register {
+    router: ReturnType<typeof createAppRouter>;
+  }
+
+  interface StaticDataRouteOption {
+    /** A module's name in the navigation. */
+    title?: string;
+  }
+}

@@ -1,0 +1,63 @@
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+using KurrentDB.Client;
+
+namespace {{ namespace }}.BuildingBlocks.EventStore;
+
+/// <summary>A module's aggregate store over KurrentDB: one stream per aggregate, in the module's category.</summary>
+public abstract class KurrentDbAggregateStore(KurrentDBClient client, ModuleEventStore events) : IAggregateStore
+{
+{{~ if project["backend.absence"] == "option" ~}}
+    public async Task<Option<TAggregate>> LoadAsync<TAggregate>(IAggregateId id, CancellationToken cancellationToken)
+{{~ else ~}}
+    public async Task<TAggregate?> LoadAsync<TAggregate>(IAggregateId id, CancellationToken cancellationToken)
+{{~ end ~}}
+        where TAggregate : class, IEventSourced
+    {
+        {{ not_null "id" }}
+
+        var stream = client.ReadStreamAsync(Direction.Forwards, events.StreamOf(id), StreamPosition.Start, cancellationToken: cancellationToken);
+        if (await stream.ReadState == ReadState.StreamNotFound)
+        {
+{{~ if project["backend.absence"] == "option" ~}}
+            return Option<TAggregate>.None;
+{{~ else ~}}
+            return null;
+{{~ end ~}}
+        }
+
+        List<IDomainEvent> history = [];
+        await foreach (var stored in stream)
+        {
+            history.Add(events.FromRecord(stored.Event));
+        }
+
+        // Aggregates keep their parameterless constructor private: only loading may create an empty one.
+        var aggregate = (TAggregate)Activator.CreateInstance(typeof(TAggregate), nonPublic: true)!;
+        aggregate.Replay(history);
+{{~ if project["backend.absence"] == "option" ~}}
+        return Option<TAggregate>.Some(aggregate);
+{{~ else ~}}
+        return aggregate;
+{{~ end ~}}
+    }
+
+    public async Task SaveAsync(IEventSourced aggregate, CancellationToken cancellationToken)
+    {
+        {{ not_null "aggregate" }}
+
+        if (aggregate.PendingEvents.Count == 0)
+        {
+            return;
+        }
+
+        // The revision the stream must still be at, its last event's number: KurrentDB rejects the append
+        // (WrongExpectedVersionException) if another one appended in between.
+        var expected = aggregate.Version == 0 ? StreamState.NoStream : StreamState.StreamRevision((ulong)aggregate.Version - 1);
+        await client.AppendToStreamAsync(
+            events.StreamOf(aggregate.Id),
+            expected,
+            aggregate.PendingEvents.Select(events.ToEventData),
+            cancellationToken: cancellationToken);
+        aggregate.MarkStored();
+    }
+}

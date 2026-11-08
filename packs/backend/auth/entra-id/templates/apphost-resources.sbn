@@ -1,0 +1,8 @@
+// The local stand-in for Microsoft Entra ID (src/IdentityStandIn) runs with the AppHost, in development and tests, and
+// is never published: it issues tokens for two directories, one per tenant, as Entra ID would. The host and the
+// browser know only its address; a deployment configures them for Entra ID itself (docs/adr).{{ if project["frontend.auth-client"] == "msal" }} It also serves https
+// with the ASP.NET Core development certificate, for MSAL, which signs in at an https authority only.{{ end }}
+var identity = builder.ExecutionContext.IsRunMode
+    ? builder.AddProject<Projects.IdentityStandIn>("identity")
+        .WithHttpHealthCheck("/organizations/v2.0/.well-known/openid-configuration"{{ if project["frontend.auth-client"] == "msal" }}, endpointName: "http"{{ end }})
+    : null;

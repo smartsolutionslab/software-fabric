@@ -61,10 +61,11 @@ public class ConditionParserTests
         var conditions = catalog.Dimensions.Values
             .SelectMany(dimension => dimension.Options.Values
                 .SelectMany(option => option.Requires.Concat(option.Conflicts))
+                .Concat(dimension.Requires)
                 .Concat(dimension.ActiveWhen is { } activeWhen ? [activeWhen] : []))
             .ToList();
 
-        conditions.Count.ShouldBe(60);
+        conditions.Count.ShouldBe(64);
     }
 
     [Fact]

@@ -1,0 +1,95 @@
+import type { AccountInfo, PublicClientApplication } from '@azure/msal-browser';
+import { computed, type ComputedRef, inject, type InjectionKey, shallowRef } from 'vue';
+import { accessToken, accessTokenExpiresOn, forgetAccessToken } from './accessToken';
+import { loginRequest } from './msalConfig';
+
+/** What the app needs of MSAL's PublicClientApplication; tests hand createAuth a fake of it. */
+export type AuthClient = Pick<
+  PublicClientApplication,
+  'initialize' | 'handleRedirectPromise' | 'getActiveAccount' | 'getAllAccounts' | 'loginRedirect' | 'logoutRedirect'
+>;
+
+/** The signed-in account and the two ways out of and into the app; read it with useAuth(). */
+export interface Auth {
+  account: ComputedRef<AccountInfo | null>;
+  isAuthenticated: ComputedRef<boolean>;
+  isLoading: ComputedRef<boolean>;
+  error: ComputedRef<Error | null>;
+  /** The redirect under way, until the browser leaves for the identity provider. */
+  activeNavigator: ComputedRef<'loginRedirect' | 'logoutRedirect' | null>;
+  loginRedirect: () => Promise<void>;
+  logoutRedirect: () => Promise<void>;
+}
+
+export const authKey: InjectionKey<Auth> = Symbol('auth');
+
+const asError = (failure: unknown) => (failure instanceof Error ? failure : new Error(String(failure)));
+
+/**
+ * Starts MSAL, completes a sign-in when the identity provider has just answered, and reads the signed-in account, whose
+ * access token src/auth/msal.ts keeps. The token is not renewed silently (the stand-in issues no refresh token): once it
+ * expires, the user signs in again. Created once, by src/providers/auth.ts.
+ */
+export function createAuth(client: AuthClient): Auth {
+  const account = shallowRef<AccountInfo | null>(null);
+  const isLoading = shallowRef(true);
+  const error = shallowRef<Error | null>(null);
+  const activeNavigator = shallowRef<'loginRedirect' | 'logoutRedirect' | null>(null);
+
+  // A redirect that cannot start (the identity provider unreachable, say) is shown, never left to reject unseen. While
+  // one is under way no other starts: signing out must not start a sign-in on its way out.
+  const redirect = async (navigator: 'loginRedirect' | 'logoutRedirect') => {
+    activeNavigator.value = navigator;
+    try {
+      if (navigator === 'loginRedirect') {
+        await client.loginRedirect(loginRequest);
+      } else {
+        forgetAccessToken();
+        await client.logoutRedirect();
+      }
+    } catch (failure) {
+      activeNavigator.value = null;
+      error.value = asError(failure);
+    }
+  };
+
+  const load = async () => {
+    try {
+      await client.initialize();
+      const result = await client.handleRedirectPromise();
+      // The active account is the one the kept access token was issued to (src/auth/msal.ts); others may be cached.
+      const signedIn = result?.account ?? client.getActiveAccount();
+      const expiresOn = accessTokenExpiresOn();
+      if (signedIn && accessToken() !== undefined && expiresOn !== undefined && expiresOn > Date.now()) {
+        account.value = signedIn;
+        setTimeout(() => {
+          account.value = null;
+        }, expiresOn - Date.now());
+      }
+    } catch (failure) {
+      error.value = asError(failure);
+    } finally {
+      isLoading.value = false;
+    }
+  };
+  void load();
+
+  return {
+    account: computed(() => account.value),
+    isAuthenticated: computed(() => account.value !== null),
+    isLoading: computed(() => isLoading.value),
+    error: computed(() => error.value),
+    activeNavigator: computed(() => activeNavigator.value),
+    loginRedirect: () => redirect('loginRedirect'),
+    logoutRedirect: () => redirect('logoutRedirect'),
+  };
+}
+
+/** The signed-in account and sign-in state; never parse tokens yourself. */
+export function useAuth(): Auth {
+  const auth = inject(authKey);
+  if (auth === undefined) {
+    throw new Error('useAuth() needs withAuth (src/providers/auth.ts) installed in the app.');
+  }
+  return auth;
+}

@@ -1,0 +1,18 @@
+func browser_access_token_import
+  ret "import { accessToken } from '@/auth/accessToken';"
+end
+func browser_access_token
+  ret "accessToken()"
+end
+func stored_access_token(page)
+  ret page + `.evaluate(() => {
+  const stored: unknown = JSON.parse(sessionStorage.getItem('app.access-token') || '{}');
+  return typeof stored === 'object' && stored && 'accessToken' in stored ? String(stored.accessToken) : '';
+})`
+end
+func store_access_token_import
+  ret "import { rememberAccessToken } from '@/auth/accessToken';"
+end
+func store_access_token(token)
+  ret "rememberAccessToken({ accessToken: " + token + ", expiresOn: new Date(Date.now() + 300_000) })"
+end

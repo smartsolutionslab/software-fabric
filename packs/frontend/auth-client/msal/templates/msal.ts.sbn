@@ -1,0 +1,21 @@
+import { EventType, PublicClientApplication } from '@azure/msal-browser';
+import { forgetAccessToken, rememberAccessToken } from './accessToken';
+import { msalConfig } from './msalConfig';
+
+/**
+ * The app's one MSAL client. Every token it acquires, the sign-in's included, is kept (src/auth/accessToken.ts) and its
+ * account becomes the active one; signing out forgets the token. Created once, by src/providers/auth.
+ */
+export function createMsal(): PublicClientApplication {
+  const msal = new PublicClientApplication(msalConfig);
+  msal.addEventCallback(({ eventType, payload }) => {
+    if (eventType === EventType.ACQUIRE_TOKEN_SUCCESS && payload && 'accessToken' in payload) {
+      msal.setActiveAccount(payload.account);
+      rememberAccessToken(payload);
+    }
+    if (eventType === EventType.LOGOUT_START) {
+      forgetAccessToken();
+    }
+  });
+  return msal;
+}

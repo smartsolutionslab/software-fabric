@@ -1,0 +1,228 @@
+func role_mapping_source
+  ret "src/Host/EntraRoleClaims.cs"
+end
+func unstarted_host_settings
+  ret `builder.UseSetting("AzureAd:Instance", "http://localhost/unused");
+builder.UseSetting("AzureAd:Audience", "unused");
+builder.UseSetting("AzureAd:Tenants:unused", "00000000-0000-0000-0000-000000000000");`
+end
+func test_user_token(app, user)
+  ret `using var identity = new HttpClient();
+var provider = await identity.GetFromJsonAsync<ProviderMetadata>(new Uri(` + app + `.GetEndpoint("identity", "http"), "/organizations/v2.0/.well-known/openid-configuration"))
+    ?? throw new InvalidOperationException("The stand-in published no metadata.");
+using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+{
+    ["grant_type"] = "password",
+    ["client_id"] = "` + name + `-web",
+    ["username"] = ` + user + `,
+    ["password"] = ` + user + `,
+});
+using var response = await identity.PostAsync(provider.TokenEndpoint, form);
+response.EnsureSuccessStatusCode();
+var token = await response.Content.ReadFromJsonAsync<TokenResponse>()
+    ?? throw new InvalidOperationException("The stand-in returned no token.");`
+end
+func test_user_token_types
+  ret `private sealed record ProviderMetadata([property: JsonPropertyName("token_endpoint")] Uri TokenEndpoint);
+private sealed record TokenResponse([property: JsonPropertyName("access_token")] string AccessToken);`
+end
+func short_lived_test_user_token(app, user, lifespan)
+  ret `var token = await ShortLivedTokenAsync(` + user + `, ` + lifespan + `, cancellationToken);`
+end
+func short_lived_test_user_token_members(app)
+  ret `/// <summary>
+/// A token of the stand-in that expires after lifespan seconds: its password grant takes a lifetime, which Entra ID's
+/// token endpoint does not, so other users' tokens are untouched.
+/// </summary>
+private async Task<Token> ShortLivedTokenAsync(string user, int lifespan, CancellationToken cancellationToken)
+{
+    using var identity = new HttpClient();
+    var provider = await identity.GetFromJsonAsync<StandInMetadata>(new Uri(` + app + `.GetEndpoint("identity", "http"), "/organizations/v2.0/.well-known/openid-configuration"), cancellationToken)
+        ?? throw new InvalidOperationException("The stand-in published no metadata.");
+    using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+    {
+        ["grant_type"] = "password",
+        ["client_id"] = "` + name + `-web",
+        ["username"] = user,
+        ["password"] = user,
+        ["lifetime"] = lifespan.ToString(CultureInfo.InvariantCulture),
+    });
+    using var response = await identity.PostAsync(provider.TokenEndpoint, form, cancellationToken);
+    response.EnsureSuccessStatusCode();
+    return await response.Content.ReadFromJsonAsync<Token>(cancellationToken)
+        ?? throw new InvalidOperationException("The stand-in returned no token.");
+}`
+end
+func short_lived_test_user_token_types
+  ret `private sealed record StandInMetadata([property: JsonPropertyName("token_endpoint")] Uri TokenEndpoint);
+
+private sealed record Token([property: JsonPropertyName("access_token")] string AccessToken);`
+end
+func short_lived_test_user_token_namespaces
+  if project["backend.test.integration"] == "testcontainers"
+    ret "System.Globalization System.Net.Http.Json System.Text.Json.Serialization"
+  end
+  ret "System.Globalization System.Net.Http.Json System.Text.Json.Serialization Aspire.Hosting.Testing"
+end
+func accept_query_token(services, path)
+  ret services + `.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+{
+    options.Events ??= new JwtBearerEvents();
+    var received = options.Events.OnMessageReceived;
+    options.Events.OnMessageReceived = async context =>
+    {
+        await received(context);
+        if (context.Token is null
+            && context.HttpContext.Request.Path.StartsWithSegments(` + path + `, StringComparison.Ordinal)
+            && context.Request.Query["access_token"] is [{ Length: > 0 } token])
+        {
+            context.Token = token;
+        }
+    };
+})`
+end
+func accept_query_token_namespaces
+  ret "Microsoft.AspNetCore.Authentication.JwtBearer"
+end
+func browser_sign_in(page, user)
+  ret `await ` + page + `.getByLabel('Username').fill(` + user + `);
+await ` + page + `.getByLabel('Password').fill(` + user + `);
+await ` + page + `.getByRole('button', { name: 'Sign in' }).click();`
+end
+func browser_authority
+  # MSAL accepts an https authority only: with it the stand-in also serves https (docs/adr).
+  if project["frontend.auth-client"] == "msal"
+    ret "https://localhost:8443/organizations/v2.0"
+  end
+  ret "http://localhost:8080/organizations/v2.0"
+end
+func id_token_roles(roles)
+  ret "roles: [" + roles + "]"
+end
+func id_token_has_role(profile, role)
+  ret `const roles = ` + profile + `.roles;
+return Array.isArray(roles) && roles.includes(` + role + `);`
+end
+func id_token_roles_claim
+  ret "roles"
+end
+func id_token_users_comment
+  ret `// The ID tokens the local stand-in for Entra ID issues its users (src/IdentityStandIn/appsettings.json): a user
+// without an app role has no roles, one without a department no department.`
+end
+func role_mapping_adr
+  ret "**Entra ID's app roles become role claims.** Entra ID lists the app roles assigned to the user in the token's `roles` claim. `EntraRoleClaims` (an `IClaimsTransformation`) copies them into `ClaimTypes.Role`, which `RequireRole` reads."
+end
+func role_mapping_provider
+  ret "Microsoft Entra ID"
+end
+func tenant_claim_adr
+  ret "the Entra ID directory that issued it, its `tid` claim, which `AzureAd:Tenants:<tenant> = <directory id>` maps to the tenant (locally `tenant-a` or `tenant-b`); one directory per tenant"
+end
+func tenant_claim(user)
+  ret `var directories = ` + user + `.FindAll(DirectoryClaim)
+    .Select(claim => claim.Value)
+    .ToList();
+
+return directories is [var directory] ? TenantOf(directory) : null;`
+end
+func tenant_claim_members
+  ret `private const string DirectoryClaim = "tid";
+
+private const string Tenants = "AzureAd:Tenants";
+
+/// <summary>The tenant whose Entra ID directory this is: AzureAd:Tenants:&lt;tenant&gt; = &lt;directory id&gt;.</summary>
+private string? TenantOf(string directory) =>
+    (accessor.HttpContext?.RequestServices.GetService(typeof(Microsoft.Extensions.Configuration.IConfiguration)) as Microsoft.Extensions.Configuration.IConfiguration)?
+        .GetSection(Tenants)
+        .GetChildren()
+        .Where(tenant => string.Equals(tenant.Value, directory, StringComparison.OrdinalIgnoreCase))
+        .Select(tenant => tenant.Key)
+        .SingleOrDefault();`
+end
+func tenant_claim_description
+  ret "the tenant whose Entra ID directory issued the user's token (tid)"
+end
+func user_name_claim
+  ret "preferred_username"
+end
+func browser_client_settings
+  ret `client_id: import.meta.env.VITE_OIDC_CLIENT_ID ?? '` + name + `-web',
+scope: import.meta.env.VITE_OIDC_SCOPE ?? 'openid',`
+end
+func browser_client_env
+  ret `readonly VITE_OIDC_CLIENT_ID?: string;
+readonly VITE_OIDC_SCOPE?: string;`
+end
+func local_provider
+  ret "the stand-in"
+end
+func local_user
+  ret "a local user"
+end
+func local_users
+  ret "the stand-in's users"
+end
+func local_users_source
+  ret "`src/IdentityStandIn/appsettings.json`"
+end
+func local_users_setup
+  ret "the stand-in's settings"
+end
+func identity_resource
+  ret "identity"
+end
+func short_lived_test_user_token_summary
+  ret `/// A client calling the host as a local user with a token that lives ShortLifespan seconds: the stand-in issues it
+/// with that lifetime, so other tests' tokens are untouched.`
+end
+func unstarted_people_resources_adr
+  ret "What the AppHost starts only for people (the Kafka and RabbitMQ consoles) is not started."
+end
+func browser_client_adr
+  ret "the client id and scope arrive as `VITE_OIDC_CLIENT_ID` and `VITE_OIDC_SCOPE`, by default `<project>-web` and `openid`, which only the stand-in accepts: a real Entra ID needs the app registration's client ID and a scope of the API."
+end
+func id_token_claims_adr(roles, claims)
+  ret "Entra ID puts " + (roles ? "the app roles (`roles`)" : "") + (roles && claims ? " and " : "") + (claims ? "`department` (an optional claim)" : "") + " into the ID token for this, as the stand-in does."
+end
+func id_token_claim_rule
+  ret "in Entra ID an optional claim of the ID token (app roles are in it already); the stand-in puts every claim it issues there."
+end
+func role_kind
+  ret "app role"
+end
+func add_role_rule
+  ret "A new role is an app role of the API's app registration in Entra ID; locally it goes into `src/IdentityStandIn/appsettings.json` (`Roles` of the local users who should hold it)."
+end
+func roles_production_adr
+  ret "Production needs the roles as app roles of the API's app registration, assigned to real users; the stand-in's settings are development only."
+end
+func token_issuer
+  ret "Microsoft Entra ID"
+end
+func claim_attribute_owner
+  ret "the user's Entra ID profile"
+end
+func claim_mapping_adr
+  ret "**Which claims Entra ID issues.** One sample claim:
+
+| Claim | Source | Configured as | In |
+|---|---|---|---|
+| `department` | the user's `department` in Entra ID, editable by administrators only | an optional claim (or a claims-mapping policy) of the app registration | the access token, and the ID token so the frontend can hide what the user may not use (`useHasClaim`) |
+
+Locally, the stand-in issues it from each user's `Department` in `src/IdentityStandIn/appsettings.json`.
+
+**How to add a claim.**
+
+1. Have Entra ID issue it: an optional claim of the API's app registration for the access token (and of the web client's for the ID token, if the frontend should see it), or a claims-mapping policy for an attribute that is not one, and document it in docs/adr.
+2. Have the stand-in issue it: a property of `StandInUser`, set as a claim in `TokenIssuer`, and a value for the local users in `src/IdentityStandIn/appsettings.json`.
+3. Require it in the module's `<Module>Policies` and test it as `<Module>ClaimTests` does.
+
+The stand-in's settings are development only; production configures the app registration itself."
+end
+func claim_change_adr
+  ret "A new claim is a change in the app registration (an optional claim) and in the stand-in (`StandInUser`, `TokenIssuer`, its users)."
+end
+func add_claim_rule
+  ret "To add a claim: make it an optional claim of the app registration in Entra ID, and have the stand-in issue it (a property of `StandInUser`, set in `TokenIssuer`, and a value for the local users in `src/IdentityStandIn/appsettings.json`)."
+end

@@ -157,8 +157,8 @@ public sealed class GenerativeDashboardsTests
         moduleExitCode.ShouldBe(0, moduleOutput);
         moduleOutput.ShouldContain("failed: 0");
 
-        // The module's own test and the sample model test, then the agent's 8 and the proposal's 9.
-        moduleOutput.ShouldContain("succeeded: 19");
+        // The module's own test and the sample model test, the agent's 8 and the proposal's 9, then the user-editable pack's 37.
+        moduleOutput.ShouldContain("succeeded: 56");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
@@ -175,7 +175,7 @@ public sealed class GenerativeDashboardsTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 19");
+        output.ShouldContain("succeeded: 56");
     }
 
     [Fact]
@@ -279,7 +279,7 @@ public sealed class GenerativeDashboardsTests
     {
         var files = Files(Vue, Anthropic, AgentFramework, AgUi, Generative, "frontend.ui-library=reka-ui");
 
-        files[$"{Page}/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate and zod only so far; frontend.ui-library is reka-ui");
+        files[$"{Page}/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate or TanStack Form and zod or valibot only so far; frontend.ui-library is reka-ui");
     }
 
     [Fact]

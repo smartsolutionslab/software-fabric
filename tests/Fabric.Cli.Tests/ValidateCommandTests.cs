@@ -37,6 +37,24 @@ public class ValidateCommandTests
     }
 
     [Fact]
+    public void Contract_interfaces_without_integration_events_exit_one_and_print_the_sentence()
+    {
+        var run = CliRun.Of("validate", "--profile", "lean-crud", "--set", "module.communication=contract-interface", "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: module defaults: module.communication requires module.communication has integration-events, but module.communication is contract-interface.");
+    }
+
+    [Fact]
+    public void An_empty_communication_set_exits_one_and_prints_the_sentence()
+    {
+        var run = CliRun.Of("validate", "--profile", "lean-crud", "--set", "module.communication=", "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: module defaults: module.communication requires module.communication has integration-events, but module.communication is empty.");
+    }
+
+    [Fact]
     public void Several_overrides_are_applied()
     {
         var run = CliRun.Of(

@@ -1,0 +1,2 @@
+    <PackageReference Include="Moq" />
+    <PackageReference Include="Moq.Analyzers" PrivateAssets="all" />

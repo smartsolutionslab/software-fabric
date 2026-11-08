@@ -1,0 +1,20 @@
+namespace {{ namespace }}.IdentityStandIn;
+
+/// <summary>What the stand-in issues, from the StandIn section of appsettings.json.</summary>
+public sealed class StandInSettings
+{
+    /// <summary>The API's application ID URI: the access tokens' audience.</summary>
+    public string Audience { get; init; } = string.Empty;
+
+    /// <summary>The web app's client ID: the ID tokens' audience, and the only client that signs in.</summary>
+    public string Client { get; init; } = string.Empty;
+
+    /// <summary>The web app's origin: the only one a sign-in redirects to.</summary>
+    public string RedirectOrigin { get; init; } = string.Empty;
+
+    /// <summary>The directories' IDs (tid) by name.</summary>
+    public IReadOnlyDictionary<string, string> Directories { get; init; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>The local users by name; each one's password is their name.</summary>
+    public IReadOnlyDictionary<string, StandInUser> Users { get; init; } = new Dictionary<string, StandInUser>(StringComparer.Ordinal);
+}

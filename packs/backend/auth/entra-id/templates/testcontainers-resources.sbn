@@ -1,0 +1,19 @@
+        // The AppHost's stand-in for Microsoft Entra ID, "identity": the built src/IdentityStandIn in a container of its
+        // own, with its two directories, one per tenant.
+        var standInConfiguration = typeof(ContainerFixture).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration ?? "Debug";
+        var identity = await StartAsync(
+            new ContainerBuilder("mcr.microsoft.com/dotnet/aspnet:10.0")
+                .WithResourceMapping(new DirectoryInfo(Path.Combine(RepositoryDirectory(), "src/IdentityStandIn/bin", standInConfiguration, "net10.0")), "/app/")
+                .WithWorkingDirectory("/app")
+                .WithEntrypoint("dotnet", "IdentityStandIn.dll")
+                .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
+                .WithEnvironment("ASPNETCORE_HTTP_PORTS", "8080")
+                .WithPortBinding(8080, true)
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request => request.ForPort(8080).ForPath("/organizations/v2.0/.well-known/openid-configuration")))
+                .Build(),
+            cancellationToken);
+        Resources.Add("identity", "http", new UriBuilder(Uri.UriSchemeHttp, identity.Hostname, identity.GetMappedPublicPort(8080)).Uri);
+        settings["AzureAd:Instance"] = Resources.GetEndpoint("identity", "http").ToString();
+        settings["AzureAd:Audience"] = "api://{{ name }}-api";
+        settings["AzureAd:Tenants:tenant-a"] = "00000000-0000-0000-0000-00000000000a";
+        settings["AzureAd:Tenants:tenant-b"] = "00000000-0000-0000-0000-00000000000b";

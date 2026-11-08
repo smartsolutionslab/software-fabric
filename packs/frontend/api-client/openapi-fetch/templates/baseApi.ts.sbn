@@ -1,0 +1,43 @@
+import createClient from 'openapi-fetch';
+{{~ if slots["web.api-imports"] != "" ~}}
+{{ slots["web.api-imports"] }}
+{{~ end ~}}
+import type { paths } from './generated';
+
+/** A response outside 2xx; every call through api rejects with it. */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, body: string) {
+    super(`The API answered ${status}: ${body}`);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+/** The typed client for every call to the host, over the paths openapi-typescript generates (src/api/generated.ts); /api reaches the host. */
+export const api = createClient<paths>({
+  baseUrl: `${globalThis.location.origin}/api`,
+  // fetch is looked up for every call, not once here, so a test that stubs it reaches this client too.
+  fetch: (request) => fetch(request),
+});
+{{~ if slots["web.api-headers"] != "" ~}}
+
+/** Sets what every request carries. */
+function prepareHeaders(headers: Headers) {
+{{ slots["web.api-headers"] }}
+}
+{{~ end ~}}
+
+api.use({
+{{~ if slots["web.api-headers"] != "" ~}}
+  onRequest({ request }) {
+    prepareHeaders(request.headers);
+  },
+{{~ end ~}}
+  async onResponse({ response }) {
+    if (!response.ok) {
+      throw new ApiError(response.status, await response.text());
+    }
+  },
+});

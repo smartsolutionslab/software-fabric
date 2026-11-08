@@ -162,18 +162,6 @@ public sealed class VueFrontendTests
         output.ShouldContain("'yup' import is restricted from being used by a pattern. Use zod (docs/adr)");
     }
 
-    [Fact]
-    public void A_client_generated_for_vue_without_tanstack_query_fails_loudly()
-    {
-        using var project = Generate("frontend.state=pinia");
-        RunWeb(project, "install");
-
-        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "build");
-
-        exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("The orval pack generates TanStack Query hooks for Vue with frontend.state tanstack-query or pinia-tanstack-query only so far");
-    }
-
     private static GeneratedProject Generate(params string[] overrides) => new(Profile, overrides);
 
     private static void RunWeb(GeneratedProject project, params string[] steps)

@@ -1,0 +1,59 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class Authentication
+{
+    private const string Tenants = "AzureAd:Tenants";
+
+    /// <summary>
+    /// Microsoft Entra ID access tokens (v2.0) for AzureAd:Audience, from the directories AzureAd:Tenants lists, one per
+    /// tenant (AzureAd:Tenants:&lt;tenant&gt; = &lt;directory id&gt;), at the Entra ID instance AzureAd:Instance. A token
+    /// of any other directory has an issuer the host does not accept. Claims keep the names Entra ID gives them (tid,
+    /// preferred_username, roles, ...): none is renamed on the way in.
+    /// </summary>
+    public static IServiceCollection AddEntraIdAuthentication(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+    {
+        {{ not_null "configuration" }}
+        {{ not_null "environment" }}
+
+        var instance = configuration["AzureAd:Instance"]?.TrimEnd('/')
+            ?? throw new InvalidOperationException("AzureAd:Instance is missing; the AppHost provides it in development.");
+        var audience = configuration["AzureAd:Audience"]
+            ?? throw new InvalidOperationException("AzureAd:Audience is missing; the AppHost provides it in development.");
+{{~ if project["frontend.auth-client"] == "msal" ~}}
+        // Where the browser signs in, when not at the instance: locally the stand-in's https address, which MSAL needs,
+        // while the host reads its keys over http. Unset in production, where both are Entra ID's.
+        string[] instances = configuration["AzureAd:BrowserInstance"]?.TrimEnd('/') is { } browserInstance
+            ? [instance, browserInstance]
+            : [instance];
+        List<string> issuers = [.. configuration.GetSection(Tenants).GetChildren()
+            .Select(tenant => tenant.Value)
+            .OfType<string>()
+            .SelectMany(directory => instances.Select(issuedAt => $"{issuedAt}/{directory}/v2.0"))];
+{{~ else ~}}
+        List<string> issuers = [.. configuration.GetSection(Tenants).GetChildren()
+            .Select(tenant => tenant.Value)
+            .OfType<string>()
+            .Select(directory => $"{instance}/{directory}/v2.0")];
+{{~ end ~}}
+        if (issuers.Count == 0)
+        {
+            throw new InvalidOperationException($"{Tenants} lists no directory; the AppHost provides them in development.");
+        }
+
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                // Entra ID signs every directory's tokens with the same keys; which directories are accepted is the
+                // issuers' list, not the metadata's.
+                options.MetadataAddress = $"{instance}/organizations/v2.0/.well-known/openid-configuration";
+                options.Audience = audience;
+                options.RequireHttpsMetadata = !environment.IsDevelopment();
+                options.MapInboundClaims = false;
+                options.TokenValidationParameters.ValidIssuers = issuers;
+            });
+        services.AddAuthorization();
+        return services;
+    }
+}

@@ -1,0 +1,2 @@
+
+    .WithStandIn(identity, "api://{{ name }}-api")

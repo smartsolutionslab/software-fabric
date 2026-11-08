@@ -1,0 +1,25 @@
+option: backend.data-access.reads.dapper
+files:
+  - { template: templates/IReadConnection.cs.sbn, target: src/BuildingBlocks/Persistence/IReadConnection.cs }
+  - { template: templates/ReadConnection.cs.sbn, target: src/BuildingBlocks/Persistence/ReadConnection.cs }
+  - { template: templates/ReadConnectionRegistration.cs.sbn, target: src/BuildingBlocks/Persistence/Wiring/ReadConnectionRegistration.cs }
+  - { template: templates/DapperReadsOnlyInQueryHandlers.cs.sbn, target: tests/Architecture.Tests/Rules/DapperReadsOnlyInQueryHandlers.cs }
+  - { template: templates/tests/Reads.Tests.csproj.sbn, target: tests/Reads.Tests/Reads.Tests.csproj }
+  - { template: templates/tests/ApplicationDatabase.cs.sbn, target: tests/Reads.Tests/ApplicationDatabase.cs }
+  - { template: templates/tests/SampleNote.cs.sbn, target: tests/Reads.Tests/SampleNote.cs }
+  - { template: templates/tests/SampleNotes.cs.sbn, target: tests/Reads.Tests/SampleNotes.cs }
+  - { template: templates/tests/SampleNotesHandler.cs.sbn, target: tests/Reads.Tests/SampleNotesHandler.cs }
+  - { template: templates/tests/ReadConnectionTests.cs.sbn, target: tests/Reads.Tests/ReadConnectionTests.cs }
+declares-slots:
+  - { slot: read-connection.data-source, description: "One C# expression creating the System.Data.Common.DbDataSource of the database's driver, given string connectionString (Aspire's 'database'); IReadConnection opens query handlers' connections from it.", cardinality: exactly-one }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-version.sbn }
+  - { slot: modules.packages.application, template: templates/application-package.sbn }
+  - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn }
+  - { slot: solution.projects, template: templates/solution-projects.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Only a module's Application project references Dapper, and no command handler takes IReadConnection: Dapper reads are queries. A module's Domain, Infrastructure or Api project referencing Dapper, or a command handler taking the read connection, fails the build, naming the project or the handler.", file: templates/DapperReadsOnlyInQueryHandlers.cs.sbn }
+  - { kind: unit-test, describes: "Against the AppHost's database after the MigrationRunner: IReadConnection, registered as the modules register it, opens a connection through the database's driver, and a sample query handler reads a table with Dapper, in SQL both databases accept, filtering by a parameter and in order.", file: templates/tests/ReadConnectionTests.cs.sbn }

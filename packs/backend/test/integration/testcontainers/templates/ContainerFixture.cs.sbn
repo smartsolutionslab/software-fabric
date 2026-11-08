@@ -1,0 +1,156 @@
+using System.Diagnostics;
+using System.Globalization;
+{{~ if project["backend.auth"] != "none" ~}}
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+{{~ end ~}}
+using System.Reflection;
+{{~ if project["backend.auth"] != "none" ~}}
+using System.Text.Json.Serialization;
+{{~ end ~}}
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+
+{{ test_run_fixture (namespace + ".Integration.Tests.ContainerFixture") }}
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>
+/// The application under test, started once per test run: the AppHost's resources in empty containers that
+/// Testcontainers runs, and the host in this process on a port of its own, given the settings the AppHost would give it.
+/// </summary>
+public sealed class ContainerFixture : {{ test_lifetime }}
+{
+    /// <summary>How long setup may take: five minutes, or the time span in INTEGRATION_TESTS_STARTUP_TIMEOUT.</summary>
+    private static readonly TimeSpan StartupTimeout = Environment.GetEnvironmentVariable("INTEGRATION_TESTS_STARTUP_TIMEOUT") is { } startupTimeout
+        ? TimeSpan.Parse(startupTimeout, CultureInfo.InvariantCulture)
+        : TimeSpan.FromMinutes(5);
+
+    private readonly List<IContainer> containers = [];
+
+    private readonly Dictionary<string, string?> settings = new(StringComparer.Ordinal);
+
+    private WebApplicationFactory<Program>? host;
+
+    /// <summary>The started resources' endpoints, by the AppHost's resource names.</summary>
+    public ContainerResources Resources { get; } = new();
+
+    {{ test_setup }}
+    {
+        using var timeout = new CancellationTokenSource(StartupTimeout);
+        var cancellationToken = timeout.Token;
+
+{{ slots["integration-tests.database"] }}
+
+{{ slots["integration-tests.resources"] }}
+
+        host = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            foreach (var (key, value) in settings)
+            {
+                builder.UseSetting(key, value);
+            }
+        });
+        host.UseKestrel(0);
+        host.StartServer();
+    }
+
+    public HttpClient CreateHostClient() => (host ?? throw new InvalidOperationException("The host has not started.")).CreateClient();
+{{~ if project["backend.auth"] != "none" ~}}
+
+    /// <summary>A client calling the host as {{ local_user }}; local users' passwords equal their names.</summary>
+    public async Task<HttpClient> CreateHostClientAsync(string user)
+    {
+        {{ test_user_token "Resources" "user" }}
+
+        var client = CreateHostClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+        return client;
+    }
+{{~ end ~}}
+
+    {{ test_teardown }}
+    {
+        if (host is not null)
+        {
+            await host.DisposeAsync();
+        }
+
+        foreach (var container in Enumerable.Reverse(containers))
+        {
+            await container.DisposeAsync();
+        }
+    }
+
+    /// <summary>The repository's directory: the one holding build.proj, above the tests' output.</summary>
+    private static string RepositoryDirectory()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "build.proj")))
+            {
+                return directory.FullName;
+            }
+        }
+
+        throw new InvalidOperationException($"No build.proj above {AppContext.BaseDirectory}.");
+    }
+
+    /// <summary>Starts a container, which the fixture disposes of after the run.</summary>
+    private async Task<TContainer> StartAsync<TContainer>(TContainer container, CancellationToken cancellationToken)
+        where TContainer : IContainer
+    {
+        containers.Add(container);
+        await container.StartAsync(cancellationToken);
+        return container;
+    }
+
+    /// <summary>
+    /// Runs a project of the solution to its end, as the AppHost runs it, with the host's settings so far as its
+    /// environment; the project is built already, in this assembly's configuration.
+    /// </summary>
+    private async Task RunProjectAsync(string project, CancellationToken cancellationToken)
+    {
+        var configuration = typeof(ContainerFixture).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration ?? "Debug";
+        var start = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in (string[])["run", "--no-build", "--no-launch-profile", "--configuration", configuration, "--project", Path.Combine(RepositoryDirectory(), project)])
+        {
+            start.ArgumentList.Add(argument);
+        }
+
+        foreach (var (key, value) in settings)
+        {
+            start.Environment[key.Replace(":", "__", StringComparison.Ordinal)] = value;
+        }
+
+        using var process = Process.Start(start) ?? throw new InvalidOperationException($"dotnet run {project} did not start.");
+        var output = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var error = process.StandardError.ReadToEndAsync(cancellationToken);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Cancelling the wait stops only the waiting: the project, and what dotnet run started, would run on.
+            process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(CancellationToken.None);
+            throw;
+        }
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"{project} ended with exit code {process.ExitCode}:{Environment.NewLine}{await output}{await error}");
+        }
+    }
+{{~ if project["backend.auth"] != "none" ~}}
+
+    {{ test_user_token_types }}
+{{~ end ~}}
+}

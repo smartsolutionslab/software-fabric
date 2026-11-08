@@ -1,0 +1,4 @@
+namespace {{ namespace }}.IdentityStandIn;
+
+/// <summary>A sign-in the browser has yet to redeem: who signed in, where to, and the PKCE challenge its code must meet.</summary>
+public sealed record PendingCode(string User, string RedirectUri, string Challenge, string? Nonce, DateTimeOffset Expires);

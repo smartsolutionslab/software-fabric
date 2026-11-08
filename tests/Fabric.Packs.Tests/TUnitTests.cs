@@ -119,6 +119,61 @@ public sealed partial class TUnitTests
         output.ShouldContain("skipped: 1");
     }
 
+    /// <summary>
+    /// TUnit runs the architecture rules in parallel, and two of them probe the resilience pipeline (#331). The first
+    /// pipeline built in a process sets up the options' <c>RangeAttribute</c>s, and that setup is not thread-safe: a
+    /// probe running beside it can fail with an InvalidCastException. So probes started together run one at a time.
+    /// </summary>
+    [Fact]
+    public void Retry_probes_started_together_run_one_at_a_time()
+    {
+        using var project = NewProject("lean-crud");
+        project.Write("tests/Architecture.Tests/RetryProbeConcurrency.cs", """
+            using System.Collections.Concurrent;
+
+            namespace Shop.Architecture.Tests;
+
+            public class RetryProbeConcurrency
+            {
+                [Test]
+                public void Retry_probes_started_together_run_one_at_a_time()
+                {
+                    const int Probes = 8;
+                    var inside = 0;
+                    ConcurrentBag<int> seen = [];
+                    using var start = new Barrier(Probes);
+                    List<Thread> threads = [.. Enumerable.Range(0, Probes).Select(_ => new Thread(() =>
+                    {
+                        start.SignalAndWait();
+                        Rules.RetryProbe.Attempts(HttpMethod.Get, Rules.RetryProbe.Failure.BadRequest, client =>
+                        {
+                            seen.Add(Interlocked.Increment(ref inside));
+                            Thread.Sleep(TimeSpan.FromMilliseconds(50));
+                            Interlocked.Decrement(ref inside);
+                            return client;
+                        });
+                    }))];
+                    threads.ForEach(thread => thread.Start());
+                    threads.ForEach(thread => thread.Join());
+
+                    if (seen.Max() != 1)
+                    {
+                        throw new InvalidOperationException($"{seen.Max()} retry probes ran at once.");
+                    }
+                }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.DotNetCommand(
+            new Dictionary<string, string>(),
+            "test", "--project", "tests/Architecture.Tests/Architecture.Tests.csproj", "-c", "Release", "--no-build", "--no-ansi",
+            "--treenode-filter", "/*/*/RetryProbeConcurrency/*");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("succeeded: 1");
+    }
+
     /// <summary>The coverage gate is the test framework's, the same with any: TUnit's pack carries xUnit's files unchanged.</summary>
     [Theory]
     [InlineData("coverage.props.sbn")]

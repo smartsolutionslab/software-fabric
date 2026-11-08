@@ -1,0 +1,253 @@
+func role_mapping_source
+  ret "src/Host/OidcRoleClaims.cs"
+end
+func unstarted_host_settings
+  ret `builder.UseSetting("Authentication:Authority", "http://localhost/unused");
+builder.UseSetting("Authentication:Audience", "unused");`
+end
+func test_user_token(app, user)
+  ret `using var identity = new HttpClient();
+var provider = await identity.GetFromJsonAsync<ProviderMetadata>(new Uri(` + app + `.GetEndpoint("identity", "http"), "/realms/` + name + `/.well-known/openid-configuration"))
+    ?? throw new InvalidOperationException("The provider published no metadata.");
+using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+{
+    ["grant_type"] = "password",
+    ["client_id"] = "` + name + `-web",
+    ["username"] = ` + user + `,
+    ["password"] = ` + user + `,
+});
+using var response = await identity.PostAsync(provider.TokenEndpoint, form);
+response.EnsureSuccessStatusCode();
+var token = await response.Content.ReadFromJsonAsync<TokenResponse>()
+    ?? throw new InvalidOperationException("The provider returned no token.");`
+end
+func test_user_token_types
+  ret `private sealed record ProviderMetadata([property: JsonPropertyName("token_endpoint")] Uri TokenEndpoint);
+
+private sealed record TokenResponse([property: JsonPropertyName("access_token")] string AccessToken);`
+end
+func short_lived_test_user_token(app, user, lifespan)
+  ret `const string ShortLivedClient = "` + name + `-short-lived";
+using var identity = new HttpClient { BaseAddress = ` + app + `.GetEndpoint("identity", "http") };
+identity.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", await AdminTokenAsync(identity, cancellationToken));
+
+var clients = await identity.GetFromJsonAsync<JsonArray>(new Uri("/admin/realms/` + name + `/clients?clientId=` + name + `-web", UriKind.Relative), cancellationToken);
+var client = clients?.Single()?.AsObject() ?? throw new InvalidOperationException("The realm has no web client.");
+client.Remove("id");
+client["clientId"] = ShortLivedClient;
+client["attributes"] = new JsonObject { ["access.token.lifespan"] = ` + lifespan + `.ToString(System.Globalization.CultureInfo.InvariantCulture) };
+foreach (var mapper in client["protocolMappers"]?.AsArray() ?? [])
+{
+    mapper?.AsObject().Remove("id");
+}
+
+using var created = await identity.PostAsJsonAsync(new Uri("/admin/realms/` + name + `/clients", UriKind.Relative), client, cancellationToken);
+if (created.StatusCode != HttpStatusCode.Conflict)
+{
+    created.EnsureSuccessStatusCode();
+}
+
+using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+{
+    ["grant_type"] = "password",
+    ["client_id"] = ShortLivedClient,
+    ["username"] = ` + user + `,
+    ["password"] = ` + user + `,
+});
+using var response = await identity.PostAsync(new Uri("/realms/` + name + `/protocol/openid-connect/token", UriKind.Relative), form, cancellationToken);
+response.EnsureSuccessStatusCode();
+var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken)
+    ?? throw new InvalidOperationException("The realm returned no token.");`
+end
+func short_lived_test_user_token_members(app)
+  if project["backend.test.integration"] == "testcontainers"
+    ret `/// <summary>A token of the master realm's administrator, as the fixture's Keycloak container starts with.</summary>
+private static async Task<string> AdminTokenAsync(HttpClient identity, CancellationToken cancellationToken)
+{
+    using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+    {
+        ["grant_type"] = "password",
+        ["client_id"] = "admin-cli",
+        ["username"] = "admin",
+        ["password"] = "admin",
+    });
+    using var response = await identity.PostAsync(new Uri("/realms/master/protocol/openid-connect/token", UriKind.Relative), form, cancellationToken);
+    response.EnsureSuccessStatusCode();
+    var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken);
+    return token?.AccessToken ?? throw new InvalidOperationException("The master realm returned no token.");
+}`
+  end
+  ret `/// <summary>A token of the master realm's administrator: "admin", with the password the AppHost generated for it.</summary>
+private async Task<string> AdminTokenAsync(HttpClient identity, CancellationToken cancellationToken)
+{
+    var password = ` + app + `.Services.GetRequiredService<DistributedApplicationModel>().Resources.OfType<ParameterResource>().Single(parameter => parameter.Name == "identity-password");
+    using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+    {
+        ["grant_type"] = "password",
+        ["client_id"] = "admin-cli",
+        ["username"] = "admin",
+        ["password"] = await password.GetValueAsync(cancellationToken) ?? string.Empty,
+    });
+    using var response = await identity.PostAsync(new Uri("/realms/master/protocol/openid-connect/token", UriKind.Relative), form, cancellationToken);
+    response.EnsureSuccessStatusCode();
+    var token = await response.Content.ReadFromJsonAsync<Token>(cancellationToken);
+    return token?.AccessToken ?? throw new InvalidOperationException("The master realm returned no token.");
+}`
+end
+func short_lived_test_user_token_types
+  ret `private sealed record Token([property: JsonPropertyName("access_token")] string AccessToken);`
+end
+func short_lived_test_user_token_namespaces
+  if project["backend.test.integration"] == "testcontainers"
+    ret "System.Net System.Net.Http.Headers System.Net.Http.Json System.Text.Json.Nodes System.Text.Json.Serialization"
+  end
+  ret "System.Net System.Net.Http.Headers System.Net.Http.Json System.Text.Json.Nodes System.Text.Json.Serialization Aspire.Hosting.ApplicationModel Aspire.Hosting.Testing Microsoft.Extensions.DependencyInjection"
+end
+func accept_query_token(services, path)
+  ret services + `.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+{
+    options.Events ??= new JwtBearerEvents();
+    var received = options.Events.OnMessageReceived;
+    options.Events.OnMessageReceived = async context =>
+    {
+        await received(context);
+        if (context.Token is null
+            && context.HttpContext.Request.Path.StartsWithSegments(` + path + `, StringComparison.Ordinal)
+            && context.Request.Query["access_token"] is [{ Length: > 0 } token])
+        {
+            context.Token = token;
+        }
+    };
+})`
+end
+func accept_query_token_namespaces
+  ret "Microsoft.AspNetCore.Authentication.JwtBearer"
+end
+func browser_sign_in(page, user)
+  ret `await ` + page + `.getByLabel('Username or email').fill(` + user + `);
+await ` + page + `.getByLabel('Password', { exact: true }).fill(` + user + `);
+await ` + page + `.getByRole('button', { name: 'Sign In' }).click();`
+end
+func browser_authority
+  ret "http://localhost:8080/realms/" + name
+end
+func id_token_roles(roles)
+  ret "roles: [" + roles + "]"
+end
+func id_token_has_role(profile, role)
+  ret `const roles = ` + profile + `.roles;
+return Array.isArray(roles) && roles.includes(` + role + `);`
+end
+func id_token_roles_claim
+  ret "roles"
+end
+func id_token_users_comment
+  ret `// The ID tokens the local provider issues its users (src/AppHost/realms/realm.json): a user without a role has no
+// roles, one without a department no department.`
+end
+func role_mapping_adr
+  ret "**The provider's roles become role claims.** The provider lists the user's roles in the token's top-level `roles` claim. `OidcRoleClaims` (an `IClaimsTransformation`) copies them into `ClaimTypes.Role`, which `RequireRole` reads."
+end
+func role_mapping_provider
+  ret "generic OIDC"
+end
+func tenant_claim_adr
+  ret "exactly one value of its `tenant` claim (locally `tenant-a` or `tenant-b`)"
+end
+func tenant_claim(user)
+  ret `var tenants = ` + user + `.FindAll(TenantClaim)
+    .Select(claim => claim.Value)
+    .ToList();
+
+return tenants is [var tenant] ? tenant : null;`
+end
+func tenant_claim_members
+  ret `private const string TenantClaim = "tenant";`
+end
+func tenant_claim_description
+  ret "the user's one tenant claim"
+end
+func user_name_claim
+  ret "preferred_username"
+end
+func browser_client_settings
+  ret `client_id: import.meta.env.VITE_OIDC_CLIENT_ID ?? '` + name + `-web',
+scope: import.meta.env.VITE_OIDC_SCOPE ?? 'openid',`
+end
+func browser_client_env
+  ret `readonly VITE_OIDC_CLIENT_ID?: string;
+readonly VITE_OIDC_SCOPE?: string;`
+end
+func local_provider
+  ret "the local provider"
+end
+func local_user
+  ret "a local user"
+end
+func local_users
+  ret "the local provider's users"
+end
+func local_users_source
+  ret "`src/AppHost/realms/realm.json`"
+end
+func local_users_setup
+  ret "the realm import"
+end
+func identity_resource
+  ret "identity"
+end
+func short_lived_test_user_token_summary
+  ret `/// A client calling the host as a local user with a token that lives ShortLifespan seconds: the local provider's
+/// realm gets a copy of the web client (its mappers included) whose tokens expire that soon, so other tests' tokens
+/// are untouched.`
+end
+func unstarted_people_resources_adr
+  ret "What the AppHost starts only for people (the Kafka and RabbitMQ consoles) is not started."
+end
+func browser_client_adr
+  ret "the client id and scope arrive as `VITE_OIDC_CLIENT_ID` and `VITE_OIDC_SCOPE`, by default `<project>-web`, the local provider's client, and `openid`."
+end
+func id_token_claims_adr(roles, claims)
+  ret "The provider puts " + (roles ? "the roles (`roles`)" : "") + (roles && claims ? " and " : "") + (claims ? "`department`" : "") + " into the ID token for this, as the local provider does."
+end
+func id_token_claim_rule
+  ret "production's provider must put it there, and locally its mapper in `src/AppHost/realms/realm.json` needs `\"id.token.claim\": \"true\"`."
+end
+func role_kind
+  ret "role"
+end
+func add_role_rule
+  ret "A new role is production's provider's to issue in the `roles` claim; locally it goes into `src/AppHost/realms/realm.json` (`roles.realm`, and `realmRoles` of the local users who should hold it)."
+end
+func roles_production_adr
+  ret "Production's provider needs the roles, in the token's `roles` claim, assigned to real users; the realm import is development only."
+end
+func token_issuer
+  ret "the identity provider"
+end
+func claim_attribute_owner
+  ret "the provider's user profile"
+end
+func claim_mapping_adr
+  ret "**Which claims the provider maps.** The application reads one sample claim, `department`, which production's provider must put into the access token, and into the ID token so the frontend can hide what the user may not use (`useHasClaim`). Locally, the realm import (`src/AppHost/realms/realm.json`) maps it:
+
+| Claim | Source | Mapper | In |
+|---|---|---|---|
+| `department` | the user attribute `department`, declared in the realm's user profile, editable by administrators only | `oidc-usermodel-attribute-mapper` named `department` on the client `<name>-web` | the access token and the ID token |
+
+Standard claims (`email`, `email_verified`, `preferred_username`, ...) can be required the same way, where the provider issues them.
+
+**How to add a claim.**
+
+1. Have production's provider issue it in the access token (and in the ID token if the frontend should see it), and document that in docs/adr.
+2. Locally, declare the attribute in the realm's user profile (`kc.user.profile.config`), with `\"edit\": [\"admin\"]` unless users may set it themselves, in which case it must not decide access; add an `oidc-usermodel-attribute-mapper` for it to `<name>-web`'s `protocolMappers` with `access.token.claim` (and `id.token.claim`) `\"true\"`; and give the local users a value under `attributes`.
+3. Require it in the module's `<Module>Policies` and test it as `<Module>ClaimTests` does.
+
+The local provider imports the realm only when it does not exist yet: remove the data volume to pick up a changed realm. The import is development only."
+end
+func claim_change_adr
+  ret "A new claim is a change in production's provider and in the local realm (user profile, mapper, users)."
+end
+func add_claim_rule
+  ret "To add a claim: have production's provider issue it, and locally declare the attribute in `src/AppHost/realms/realm.json`'s user profile (`kc.user.profile.config`, `\"edit\": [\"admin\"]`), add an `oidc-usermodel-attribute-mapper` for it to the `<name>-web` client, and give local users a value under `attributes`."
+end

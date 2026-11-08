@@ -1,0 +1,7 @@
+import { type App, type Component, h } from 'vue';
+import ServerEvents from '@/realtime/ServerEvents.vue';
+
+/** Renders the app inside ServerEvents, which holds the app's one stream from the host. */
+export const withServerEvents = (_app: App, root: Component): Component => ({
+  render: () => h(ServerEvents, null, { default: () => h(root) }),
+});

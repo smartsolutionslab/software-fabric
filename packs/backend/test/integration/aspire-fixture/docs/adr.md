@@ -6,7 +6,7 @@
 
 Integration tests start the real application — the AppHost with its containers and the host — through `Aspire.Hosting.Testing`, once per test run (`AspireFixture`), and talk to it over HTTP like any client. Containers start empty: the fixture drops data volumes, so a test never sees a developer's data and never depends on it.
 
-The generated tests check what each choice promises at runtime: every resource becomes healthy, the host's `/health` is healthy, the OpenAPI document is served, anonymous calls are rejected and a token from the realm is accepted, each user resolves to their own tenant.
+The generated tests check what each choice promises at runtime: every resource becomes healthy, the host's `/health` is healthy, the OpenAPI document is served, {{ if project["backend.auth"] != "none" }}anonymous calls are rejected and a token from {{ local_provider }} is accepted, {{ end }}each user resolves to their own tenant.
 
 ## Consequences
 

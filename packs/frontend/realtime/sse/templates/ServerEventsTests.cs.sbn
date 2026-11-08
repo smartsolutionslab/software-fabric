@@ -1,0 +1,221 @@
+{{~ if project["backend.tenancy"] != "none" && project["backend.auth"] == "none" ~}}
+#error frontend.realtime sse with backend.tenancy {{ project["backend.tenancy"] }} needs an identity provider: a browser's tenant comes from its user's token, and backend.auth none signs nobody in (docs/adr/0009 of the generator).
+{{~ end ~}}
+{{~ tenanted = project["backend.tenancy"] != "none"
+   signed_in = project["backend.auth"] != "none"
+   usings = ["System.Collections.Concurrent", "System.Net.Http.Json", "System.Net.ServerSentEvents", "System.Text.Json"]
+   if signed_in
+     usings = array.concat (usings | array.add "System.Net" | array.add "System.Net.Http.Headers") (short_lived_test_user_token_namespaces | string.split " ")
+   end
+   system = []
+   others = []
+   for name_space in usings | array.uniq
+     if name_space | string.starts_with "System"
+       system = system | array.add name_space
+     else
+       others = others | array.add name_space
+     end
+   end ~}}
+{{~ for name_space in array.concat (system | array.sort) (others | array.sort) ~}}
+using {{ name_space }};
+{{~ end ~}}
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>The host's event stream (/server-events) seen from a browser's side: what it receives, and who may open it.</summary>
+{{~ integration_fixture_attributes ~}}
+public class ServerEventsTests({{ integration_fixture }})
+{
+{{~ if signed_in ~}}
+    private const int ShortLifespan = 10;
+
+{{~ end ~}}
+    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(30);
+{{~ if tenanted ~}}
+
+    {{ test_attribute }}
+    public async Task A_test_event_reaches_the_browsers_of_the_senders_tenant_only()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        using var first = await {{ signed_in_host_client `"developer"` }};
+        using var second = await {{ signed_in_host_client `"developer-b"` }};
+        await using var firstBrowser = await Browser.OpenAsync({{ host_client }}, first, cancellationToken);
+        await using var secondBrowser = await Browser.OpenAsync({{ host_client }}, second, cancellationToken);
+
+        // Each browser first receives an event of its own tenant, so both are known to listen before either is checked.
+        var secondText = await SendUntilReceivedAsync(second, secondBrowser, cancellationToken);
+        var firstText = await SendUntilReceivedAsync(first, firstBrowser, cancellationToken);
+
+        {{ `firstBrowser.Received` | should_not_contain `secondText` }};
+        {{ `secondBrowser.Received` | should_not_contain `firstText` }};
+    }
+{{~ else ~}}
+
+    {{ test_attribute }}
+    public async Task A_test_event_reaches_every_open_stream()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+{{~ if signed_in ~}}
+        using var sender = await {{ signed_in_host_client `"developer"` }};
+{{~ else ~}}
+        using var sender = {{ host_client }};
+{{~ end ~}}
+        await using var browser = await Browser.OpenAsync({{ host_client }}, sender, cancellationToken);
+
+        var text = await SendUntilReceivedAsync(sender, browser, cancellationToken);
+
+        {{ `browser.Received` | should_contain `text` }};
+    }
+{{~ end ~}}
+{{~ if signed_in ~}}
+
+    {{ test_attribute }}
+    public async Task An_anonymous_stream_is_refused()
+    {
+        using var anonymous = {{ host_client }};
+
+        var refusal = await {{ should_throw_async `HttpRequestException` (`Browser.OpenAsync(` + host_client + `, anonymous, ` + test_cancellation_token + `)`) }};
+
+        {{ `refusal.StatusCode` | should_be `HttpStatusCode.Unauthorized` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_stream_is_closed_once_its_access_token_expires()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        using var caller = await ShortLivedCallerAsync("developer", cancellationToken);
+        await using var browser = await Browser.OpenAsync({{ host_client }}, caller, cancellationToken);
+
+        var closed = await browser.ClosesWithinAsync(TimeSpan.FromMinutes(1), cancellationToken);
+
+        {{ `closed` | should_be_true `"a stream whose token expired must end, so that opening it again checks the user and their tenant"` }};
+    }
+{{~ end ~}}
+
+    /// <summary>
+    /// Sends test events until the browser has received one, and returns its text: a stream is listening only once the
+    /// host has started it, so an event sent at once may reach nobody.
+    /// </summary>
+    private static async Task<string> SendUntilReceivedAsync(HttpClient sender, Browser browser, CancellationToken cancellationToken)
+    {
+        var text = $"test event {Guid.CreateVersion7()}";
+        using var patience = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        patience.CancelAfter(Patience);
+        while (!browser.Received.Contains(text))
+        {
+            using var sent = await sender.PostAsJsonAsync(new Uri("/server-events/test", UriKind.Relative), new { text }, patience.Token);
+            sent.EnsureSuccessStatusCode();
+            await Task.Delay(TimeSpan.FromMilliseconds(200), patience.Token);
+        }
+
+        return text;
+    }
+
+{{~ if signed_in ~}}
+    /// <summary>
+    {{ short_lived_test_user_token_summary }}
+    /// </summary>
+    private async Task<HttpClient> ShortLivedCallerAsync(string user, CancellationToken cancellationToken)
+    {
+        {{ short_lived_test_user_token running_application "user" "ShortLifespan" }}
+
+        var caller = {{ host_client }};
+        caller.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+        return caller;
+    }
+
+    {{ short_lived_test_user_token_members running_application }}
+
+{{~ end ~}}
+    /// <summary>
+    /// A browser's EventSource on the stream. It sends no header, as a browser's cannot: the caller's access token, if it
+    /// has one, goes in the access_token query parameter.
+    /// </summary>
+    private sealed class Browser : IAsyncDisposable
+    {
+        private readonly ConcurrentQueue<string> received = new();
+        private readonly CancellationTokenSource stop = new();
+        private readonly HttpClient client;
+        private readonly HttpResponseMessage stream;
+        private Task reading = Task.CompletedTask;
+
+        private Browser(HttpClient client, HttpResponseMessage stream)
+        {
+            this.client = client;
+            this.stream = stream;
+        }
+
+        public IReadOnlyCollection<string> Received => received;
+
+        /// <summary>Opens the stream on a client of its own, which it disposes, with the caller's token.</summary>
+        public static async Task<Browser> OpenAsync(HttpClient client, HttpClient caller, CancellationToken cancellationToken)
+        {
+            var token = caller.DefaultRequestHeaders.Authorization?.Parameter;
+            var path = token is null ? "/server-events" : $"/server-events?access_token={Uri.EscapeDataString(token)}";
+            HttpResponseMessage? stream = null;
+            try
+            {
+                stream = await client.GetAsync(new Uri(path, UriKind.Relative), HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                stream.EnsureSuccessStatusCode();
+                var browser = new Browser(client, stream);
+                browser.reading = browser.ReadAsync();
+                return browser;
+            }
+            catch
+            {
+                stream?.Dispose();
+                client.Dispose();
+                throw;
+            }
+        }
+
+        /// <summary>Whether the host ends the stream within the time given.</summary>
+        public async Task<bool> ClosesWithinAsync(TimeSpan time, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await reading.WaitAsync(time, cancellationToken);
+                return true;
+            }
+            catch (TimeoutException)
+            {
+                return false;
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await stop.CancelAsync();
+            try
+            {
+                await reading;
+            }
+            catch (OperationCanceledException)
+            {
+                // Stopped by this disposal.
+            }
+
+            stream.Dispose();
+            client.Dispose();
+            stop.Dispose();
+        }
+
+        private async Task ReadAsync()
+        {
+            await using var body = await stream.Content.ReadAsStreamAsync(stop.Token);
+            await foreach (var item in SseParser.Create(body).EnumerateAsync(stop.Token))
+            {
+                if (item.EventType == "TestEvent" && JsonSerializer.Deserialize<TestEventReceived>(item.Data, JsonSerializerOptions.Web) is { } testEvent)
+                {
+                    received.Enqueue(testEvent.Text);
+                }
+            }
+        }
+    }
+
+    private sealed record TestEventReceived(string Text);
+{{~ if signed_in ~}}
+
+    {{ short_lived_test_user_token_types }}
+{{~ end ~}}
+}

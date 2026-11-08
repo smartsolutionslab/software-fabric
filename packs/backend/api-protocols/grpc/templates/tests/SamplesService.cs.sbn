@@ -1,0 +1,17 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+using Grpc.Core;
+
+namespace {{ namespace }}.GrpcServices.Tests;
+
+/// <summary>A gRPC service as a module's would be: each call becomes a query sent through the dispatcher.</summary>
+public sealed class SamplesService(IDispatcher dispatcher) : Samples.SamplesBase
+{
+    public override async Task<ShoutReply> Shout(ShoutRequest request, ServerCallContext context)
+    {
+        {{ not_null "request" }}
+        {{ not_null "context" }}
+
+        var result = await dispatcher.QueryAsync(new Shout(request.Text), context.CancellationToken);
+        return result.ToGrpcReply(shouted => new ShoutReply { Text = shouted.Text });
+    }
+}

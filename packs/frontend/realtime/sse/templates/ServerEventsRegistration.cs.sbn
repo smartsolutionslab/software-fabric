@@ -1,0 +1,33 @@
+using {{ namespace }}.BuildingBlocks.Realtime;
+using {{ namespace }}.Host.Realtime;
+{{~ if project["backend.auth"] != "none" ~}}
+{{~ for name_space in accept_query_token_namespaces | string.split " " ~}}
+using {{ name_space }};
+{{~ end ~}}
+{{~ end ~}}
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class ServerEventsRegistration
+{
+{{~ if project["backend.auth"] == "none" ~}}
+    /// <summary>The browsers' open streams and <see cref="IBrowserEvents"/>, which sends to them.</summary>
+    public static IServiceCollection AddServerEvents(this IServiceCollection services)
+    {
+        services.AddSingleton<BrowserEventStreams>();
+        return services.AddScoped<IBrowserEvents, StreamBrowserEvents>();
+    }
+{{~ else ~}}
+    /// <summary>
+    /// The browsers' open streams and <see cref="IBrowserEvents"/>, which sends to them. A browser's EventSource cannot
+    /// send a header, so the client puts the access token in the access_token query parameter; the bearer handler reads
+    /// it for the stream's path only.
+    /// </summary>
+    public static IServiceCollection AddServerEvents(this IServiceCollection services)
+    {
+        services.AddSingleton<BrowserEventStreams>();
+        services.AddScoped<IBrowserEvents, StreamBrowserEvents>();
+        return {{ accept_query_token "services" `"/server-events"` | string.replace "\n" "\n        " }};
+    }
+{{~ end ~}}
+}
