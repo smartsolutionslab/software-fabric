@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace {{ namespace }}.Architecture.Tests.Rules;
 
 public sealed class EveryRequestHasOneHandler : IArchitectureRule
@@ -5,7 +7,7 @@ public sealed class EveryRequestHasOneHandler : IArchitectureRule
     private static readonly string[] Requests = ["{{ namespace }}.BuildingBlocks.Messaging.ICommand`1", "{{ namespace }}.BuildingBlocks.Messaging.IQuery`1"];
     private static readonly string[] Handlers = ["{{ namespace }}.BuildingBlocks.Messaging.ICommandHandler`2", "{{ namespace }}.BuildingBlocks.Messaging.IQueryHandler`2"];
 
-    public string Description => "Every command and query in an Application assembly has exactly one handler there.";
+    public string Description => "Every command and query in an Application assembly has exactly one handler there, a public class with a public HandleAsync, which Wolverine invokes.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -16,7 +18,7 @@ public sealed class EveryRequestHasOneHandler : IArchitectureRule
             var types = assembly.GetTypes();
             var handled = types
                 .SelectMany(type => type.GetInterfaces())
-                .Where(contract => contract.IsGenericType && Handlers.Contains(contract.GetGenericTypeDefinition().FullName))
+                .Where(IsHandlerContract)
                 .Select(contract => contract.GetGenericArguments()[0])
                 .ToList();
 
@@ -28,6 +30,27 @@ public sealed class EveryRequestHasOneHandler : IArchitectureRule
                     yield return $"{request.FullName} has {count} handlers.";
                 }
             }
+
+            foreach (var violation in types.Where(type => type is { IsClass: true, IsAbstract: false } && type.GetInterfaces().Any(IsHandlerContract)).SelectMany(Uninvokable))
+            {
+                yield return violation;
+            }
+        }
+    }
+
+    private static bool IsHandlerContract(Type contract) =>
+        contract.IsGenericType && Handlers.Contains(contract.GetGenericTypeDefinition().FullName);
+
+    // Wolverine finds handlers among public types and calls them through public, conventionally named methods.
+    private static IEnumerable<string> Uninvokable(Type handler)
+    {
+        if (!handler.IsPublic)
+        {
+            yield return $"{handler.FullName} is not public; Wolverine invokes only public handlers.";
+        }
+        else if (!handler.GetMethods(BindingFlags.Public | BindingFlags.Instance).Any(method => method.Name == "HandleAsync"))
+        {
+            yield return $"{handler.FullName} has no public HandleAsync; Wolverine does not invoke an explicit interface implementation.";
         }
     }
 }
