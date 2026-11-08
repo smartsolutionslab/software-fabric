@@ -14,4 +14,4 @@ Every story of the design system is a test. `web/packages/ui/src/stories.test.ts
 
 - A new story is tested without a line in the test file.
 - Interactions are play functions with `expect`, `within` and `userEvent` from `storybook/test`; the same function runs in Storybook's interactions panel and in CI.
-- The stories import the tokens' CSS through `.storybook/preview.ts`, so the tokens are built before the ui package's tests: `pnpm build` does that, and CI runs it first.
+- The stories import the tokens' CSS through `.storybook/preview.ts`, so the tokens are built before the ui package's tests: its `test` script builds them first, so the tests pass on a fresh clone without `pnpm build`.
