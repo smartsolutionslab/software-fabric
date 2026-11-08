@@ -54,6 +54,33 @@ public sealed class MigrationTests
         output.ShouldContain("probe step ran after the migrations; database configured: True");
     }
 
+    [Fact]
+    public void A_preflight_another_pack_puts_in_the_migration_runner_runs_before_any_module_migrates()
+    {
+        // As above, the probe stands in for mantine. Its preflight refuses, so no module may have migrated by then.
+        using var probe = new ProbePack("frontend.ui-library.mantine", new Dictionary<string, string>
+        {
+            ["migration-runner.preflight"] = """
+                if (contexts.Count > 0 && host.Services.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>().GetConnectionString("database") is not null)
+                {
+                    throw new InvalidOperationException($"probe preflight refused {contexts.Count} contexts");
+                }
+                """,
+        });
+        using var project = new GeneratedProject(Profile, [probe.Manifest], "frontend.ui-library=mantine");
+        project.AddModule("billing");
+        AddNotesWithAMigration(project);
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = project.DotNetCommand(
+            new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
+            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("probe preflight refused 1 contexts");
+        postgres.Psql(DatabasePassword, "select count(*) from information_schema.tables where table_schema = 'billing'").ShouldBe("0");
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -159,7 +186,9 @@ public sealed class MigrationTests
     {
         using var project = new GeneratedProject(Profile);
 
-        File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "MigrationRunner", "Program.cs")).ShouldEndWith("""
+        var runner = File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "MigrationRunner", "Program.cs"));
+        runner.ShouldContain("using var host = builder.Build();\nforeach (var context in contexts)");
+        runner.ShouldEndWith("""
                 await ((DbContext)scope.ServiceProvider.GetRequiredService(context)).Database.MigrateAsync();
             }
 
