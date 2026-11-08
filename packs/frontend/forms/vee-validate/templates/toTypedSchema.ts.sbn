@@ -1,6 +1,47 @@
-{{~ if project["frontend.validation"] != "zod" ~}}
-throw new Error('The vee-validate pack adapts zod schemas only so far; frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+{{~ if project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot" ~}}
+throw new Error('The vee-validate pack adapts zod and valibot schemas only so far; frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 {{~ end ~}}
+{{~ if project["frontend.validation"] == "valibot" ~}}
+import * as v from 'valibot';
+import type { TypedSchema } from 'vee-validate';
+
+/**
+ * Lets vee-validate validate a form with a Valibot schema: each message goes to the field its issue names, and a valid
+ * form hands over what the schema puts out (trimmed, transformed, defaulted), typed as its output.
+ */
+export function toTypedSchema<TSchema extends v.GenericSchema | v.GenericSchemaAsync>(
+  schema: TSchema,
+): TypedSchema<v.InferInput<TSchema>, v.InferOutput<TSchema>> {
+  return {
+    __type: 'VVTypedSchema',
+    async parse(values) {
+      const result = await v.safeParseAsync(schema, values);
+      if (result.success) {
+        return { value: result.output, errors: [] };
+      }
+
+      const messages = new Map<string, string[]>();
+      for (const issue of result.issues) {
+        const path = fieldPath(issue.path ?? []);
+        messages.set(path, [...(messages.get(path) ?? []), issue.message]);
+      }
+
+      return { errors: [...messages].map(([path, errors]) => ({ path, errors })) };
+    },
+  };
+}
+
+/** The field a Valibot issue path names, in vee-validate's form: keys joined by dots, indexes in brackets (lines[1].quantity). */
+function fieldPath(path: readonly v.IssuePathItem[]): string {
+  return path.reduce<string>((joined, { key }) => {
+    if (typeof key === 'number') {
+      return `${joined}[${key}]`;
+    }
+
+    return joined === '' ? String(key) : `${joined}.${String(key)}`;
+  }, '');
+}
+{{ else ~}}
 import type { TypedSchema } from 'vee-validate';
 import type { z } from 'zod';
 
@@ -40,3 +81,4 @@ function fieldPath(path: readonly PropertyKey[]): string {
     return joined === '' ? String(segment) : `${joined}.${String(segment)}`;
   }, '');
 }
+{{ end ~}}
