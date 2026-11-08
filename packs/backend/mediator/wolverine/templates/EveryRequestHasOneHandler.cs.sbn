@@ -59,7 +59,7 @@ public sealed class EveryRequestHasOneHandler : IArchitectureRule
         }
         else
         {
-            var methods = handler.GetMethods(BindingFlags.Public | BindingFlags.Instance).Where(method => method.Name == "HandleAsync").ToList();
+            var methods = handler.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static).Where(method => method.Name == "HandleAsync").ToList();
             foreach (var contract in handler.GetInterfaces().Where(IsHandlerContract))
             {
                 var request = contract.GetGenericArguments()[0];
@@ -71,7 +71,7 @@ public sealed class EveryRequestHasOneHandler : IArchitectureRule
                     yield return $"{handler.FullName} has no public HandleAsync for its {kind} of {request.FullName}; Wolverine does not invoke an explicit interface implementation.";
                 }
 
-                // Wolverine finds handler methods by name and first parameter, not by the contract, so it would invoke these as well.
+                // Wolverine finds handler methods by name and first parameter, not by the contract, so it would invoke these as well, static ones included.
                 foreach (var other in others)
                 {
                     yield return $"{handler.FullName} has a public {Signature(other)} that does not implement its {kind} of {request.FullName}; Wolverine would invoke it, and the contract is {Signature(contract.GetMethod("HandleAsync")!)}.";
