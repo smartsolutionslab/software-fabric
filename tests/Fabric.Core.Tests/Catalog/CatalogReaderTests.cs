@@ -50,7 +50,7 @@ public class CatalogReaderTests
         var catalog = ReadRepositoryCatalog();
 
         catalog.Dimensions.Keys.First().ShouldBe("backend.database");
-        catalog.Dimensions.Keys.Last().ShouldBe("frontend.test.extras");
+        catalog.Dimensions.Keys.Last().ShouldBe("backend.data-access.reads");
     }
 
     [Fact]
