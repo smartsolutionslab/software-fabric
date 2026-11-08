@@ -1,17 +1,20 @@
 namespace Fabric.Packs.Tests;
 
 /// <summary>
-/// frontend.architecture=micro-frontends with module federation and a single framework: the shell in web/app, one
+/// frontend.architecture=micro-frontends with a single framework, by each federation technique: the shell in web/app, one
 /// remote per module in web/modules/&lt;module&gt;, created by add-module, and the rules that keep them apart.
 /// </summary>
 public sealed class MicroFrontendsTests
 {
     private const string Profile = "industrial-event-driven-mfe";
 
-    [Fact]
-    public void A_micro_frontends_project_generates_from_the_real_packs_alone_and_add_module_creates_the_modules_remote()
+    [Theory]
+    [InlineData("module-federation")]
+    [InlineData("native-federation")]
+    public void A_micro_frontends_project_generates_from_the_real_packs_alone_and_add_module_creates_the_modules_remote(string technique)
     {
-        using var project = new GeneratedProject(Profile);
+        var remoteEntry = RemoteEntryOf(technique);
+        using var project = new GeneratedProject(Profile, Technique(technique));
         project.AddModule("billing");
 
         foreach (var file in new[] { "package.json", "vite.config.ts", "tsconfig.json", "eslint.config.js", "src/BillingPage.tsx" })
@@ -20,6 +23,7 @@ public sealed class MicroFrontendsTests
         }
 
         File.Exists(Path.Combine(project.ProjectDirectory, "web", "app", "federation.ts")).ShouldBeTrue("the shell's federation configuration");
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", "federation.ts")).ShouldContain($"/{remoteEntry}");
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "pnpm-workspace.yaml")).ShouldContain("  - modules/*");
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "AppHost", "AppHost.cs")).ShouldContain(".WithRemotes(remotes)");
 
@@ -28,10 +32,13 @@ public sealed class MicroFrontendsTests
             .ShouldContain("<Remote module=\"billing\" />");
     }
 
-    [Fact]
-    public void The_shell_and_a_remote_per_module_install_build_lint_and_pass_their_tests_and_format_check()
+    [Theory]
+    [InlineData("module-federation")]
+    [InlineData("native-federation")]
+    public void The_shell_and_a_remote_per_module_install_build_lint_and_pass_their_tests_and_format_check(string technique)
     {
-        using var project = new GeneratedProject(Profile);
+        var remoteEntry = RemoteEntryOf(technique);
+        using var project = new GeneratedProject(Profile, Technique(technique));
         project.AddModule("billing");
         project.AddModule("order-handling");
 
@@ -58,13 +65,13 @@ public sealed class MicroFrontendsTests
 
         foreach (var module in new[] { "billing", "order-handling" })
         {
-            File.Exists(Path.Combine(project.ProjectDirectory, "web", "modules", module, "dist", "remoteEntry.js")).ShouldBeTrue($"{module}'s remote builds its remoteEntry.js");
+            File.Exists(Path.Combine(project.ProjectDirectory, "web", "modules", module, "dist", remoteEntry)).ShouldBeTrue($"{module}'s remote builds its {remoteEntry}");
         }
 
         // Built, the shell finds each remote where a deployment serves it, next to the shell.
         var shell = string.Concat(Directory.GetFiles(Path.Combine(project.ProjectDirectory, "web", "app", "dist"), "*.js", SearchOption.AllDirectories).Select(File.ReadAllText));
-        shell.ShouldContain("/modules/billing/remoteEntry.js");
-        shell.ShouldContain("/modules/order-handling/remoteEntry.js");
+        shell.ShouldContain($"/modules/billing/{remoteEntry}");
+        shell.ShouldContain($"/modules/order-handling/{remoteEntry}");
 
         var styles = string.Concat(Directory.GetFiles(Path.Combine(project.ProjectDirectory, "web", "app", "dist"), "*.css", SearchOption.AllDirectories).Select(File.ReadAllText));
         styles.ShouldContain(".decoration-wavy{");
@@ -74,10 +81,12 @@ public sealed class MicroFrontendsTests
         remote.ShouldContain("<h1>Billing</h1>");
     }
 
-    [Fact]
-    public void The_shell_importing_a_remote_a_remote_importing_another_framework_or_a_banned_library_a_counted_test_and_an_unformatted_remote_fail_lint()
+    [Theory]
+    [InlineData("module-federation")]
+    [InlineData("native-federation")]
+    public void The_shell_importing_a_remote_a_remote_importing_another_framework_or_a_banned_library_a_counted_test_and_an_unformatted_remote_fail_lint(string technique)
     {
-        using var project = new GeneratedProject(Profile);
+        using var project = new GeneratedProject(Profile, Technique(technique));
         project.AddModule("billing");
         RunWeb(project, "install");
 
@@ -147,10 +156,12 @@ public sealed class MicroFrontendsTests
         formatOutput.ShouldContain("src/unformatted.ts");
     }
 
-    [Fact]
-    public void The_shell_bundling_a_remotes_file_or_a_remote_bundling_another_remotes_file_fails_the_build_whatever_the_import_path()
+    [Theory]
+    [InlineData("module-federation")]
+    [InlineData("native-federation")]
+    public void The_shell_bundling_a_remotes_file_or_a_remote_bundling_another_remotes_file_fails_the_build_whatever_the_import_path(string technique)
     {
-        using var project = new GeneratedProject(Profile);
+        using var project = new GeneratedProject(Profile, Technique(technique));
         project.AddModule("billing");
         project.AddModule("order-handling");
         RunWeb(project, "install");
@@ -181,18 +192,78 @@ public sealed class MicroFrontendsTests
         remoteOutput.ShouldContain("A remote bundles only its own files and packages");
     }
 
-    [Fact]
-    public void A_remote_for_a_design_system_the_pack_does_not_build_fails_loudly()
+    [Theory]
+    [InlineData("module-federation")]
+    [InlineData("native-federation")]
+    public void A_remote_for_a_design_system_the_pack_does_not_build_fails_loudly(string technique)
     {
         using var project = new GeneratedProject(
             "saas-standard-react",
             "frontend.architecture=micro-frontends",
-            "frontend.design-system=tokens");
+            "frontend.design-system=tokens",
+            Technique(technique));
         project.AddModule("billing");
 
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "modules", "billing", "vite.config.ts"))
-            .ShouldStartWith("throw new Error('The module-federation pack builds React remotes on the tokens-and-components design system only so far; frontend.framework is react, frontend.design-system is tokens (docs/adr/0006 of the generator).');");
+            .ShouldStartWith($"throw new Error('The {technique} pack builds React remotes on the tokens-and-components design system only so far; frontend.framework is react, frontend.design-system is tokens (docs/adr/0006 of the generator).');");
     }
+
+    /// <summary>
+    /// Native federation shares a package only when the package's own package.json names its version; the design system's
+    /// ui package gets one from native federation, and keeps none otherwise.
+    /// </summary>
+    [Theory]
+    [InlineData("native-federation", true)]
+    [InlineData("module-federation", false)]
+    public void The_ui_package_names_a_version_only_for_native_federation(string technique, bool versioned)
+    {
+        using var project = new GeneratedProject(Profile, Technique(technique));
+
+        var package = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "packages", "ui", "package.json"));
+
+        if (versioned)
+        {
+            package.ShouldContain("""
+                  "private": true,
+                  "version": "0.0.0",
+                  "type": "module",
+                """);
+        }
+        else
+        {
+            package.ShouldNotContain("\"version\"");
+        }
+    }
+
+    /// <summary>
+    /// Each remote shares the shell's singletons with strict versions, and the shell runs native federation's orchestrator
+    /// with its own instances as the host's (docs/adr).
+    /// </summary>
+    [Fact]
+    public void With_native_federation_a_remote_shares_the_shells_singletons_with_strict_versions()
+    {
+        using var project = new GeneratedProject(Profile, Technique("native-federation"));
+        project.AddModule("billing");
+
+        var remote = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "modules", "billing", "federation.config.js"));
+        foreach (var package in new[] { "react", "'react-dom'", "'@shop/ui'" })
+        {
+            remote.ShouldContain($"{package}: {{ singleton: true, strictVersion: true, requiredVersion: 'auto' }}");
+        }
+
+        var shell = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", "package.json"));
+        shell.ShouldContain("\"@softarc/native-federation-orchestrator\": \"4.9.0\"");
+        shell.ShouldNotContain("@module-federation");
+
+        var remotePackage = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "modules", "billing", "package.json"));
+        remotePackage.ShouldContain("\"native-federation-vite\": \"0.2.0\"");
+        remotePackage.ShouldNotContain("@module-federation");
+    }
+
+    private static string Technique(string technique) => $"frontend.mfe-technique={technique}";
+
+    /// <summary>The file each remote's build writes for the shell to load.</summary>
+    private static string RemoteEntryOf(string technique) => technique == "native-federation" ? "remoteEntry.json" : "remoteEntry.js";
 
     private static void RunWeb(GeneratedProject project, params string[] steps)
     {

@@ -4,13 +4,16 @@ namespace Fabric.Packs.Tests;
 [Collection(FixedPorts.Name)]
 public sealed class MicroFrontendsEndToEndTests
 {
-    [Fact]
-    public void A_modules_page_comes_from_its_own_remote_under_aspire()
+    [Theory]
+    [InlineData("module-federation")]
+    [InlineData("native-federation")]
+    public void A_modules_page_comes_from_its_own_remote_under_aspire(string technique)
     {
         using var project = new GeneratedProject(
             "saas-standard-react",
             "frontend.architecture=micro-frontends",
-            "frontend.design-system=tokens-and-components");
+            "frontend.design-system=tokens-and-components",
+            $"frontend.mfe-technique={technique}");
         project.AddModule("billing");
         project.Build();
 
