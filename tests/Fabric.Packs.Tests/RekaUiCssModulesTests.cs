@@ -39,6 +39,12 @@ public sealed partial class RekaUiCssModulesTests
             styles.ShouldContain(rule);
         }
 
+        var focus = styles[styles.IndexOf(".button:focus-visible {", StringComparison.Ordinal)..];
+        focus = focus[..(focus.IndexOf('}', StringComparison.Ordinal) + 1)];
+        focus.ShouldContain("outline: 2px solid #64748b;", customMessage: "focus must stay visible whatever the variant's text colour");
+        focus.ShouldNotContain("currentColor");
+        focus.ShouldNotContain("outline: none");
+
         styles.ShouldNotContain("@apply");
         styles.ShouldNotContain("@tailwind");
     }
