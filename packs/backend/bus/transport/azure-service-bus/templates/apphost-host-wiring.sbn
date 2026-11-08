@@ -1,0 +1,4 @@
+
+    .WithReference(messaging)
+    .WaitFor(messaging)
+    .WithEnvironment("ConnectionStrings__messaging-management", messagingManagement)
