@@ -228,7 +228,7 @@ public sealed partial class FormKitTests
         testOutput.ShouldContain("✓ src/pages/SignUpForm.test.ts > a valid FormKit sign-up submits the values the schema puts out");
         testOutput.ShouldContain("✓ src/forms/schemaSubmit.test.ts > a schema's messages land on the fields they belong to, nested and listed ones too");
         testOutput.ShouldContain("✓ src/forms/schemaSubmit.test.ts > a valid form hands the handler the schema's output");
-        FormatCheck(project);
+        FormatCheck(project, "src/forms");
         var lintOutput = LintRefuses(project, OtherVueFormLibraries);
         const string Message = "import is restricted from being used by a pattern. Use FormKit with schemaSubmit from src/forms/schemaSubmit (docs/adr)";
         lintOutput.ShouldContain($"'@tanstack/vue-form' {Message}");
@@ -303,6 +303,13 @@ public sealed partial class FormKitTests
     private static void FormatCheck(GeneratedProject project)
     {
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "format:check");
+        exitCode.ShouldBe(0, output);
+    }
+
+    /// <summary>Checks the format of the generated files under one path only, leaving out a test's own fixtures.</summary>
+    private static void FormatCheck(GeneratedProject project, string path)
+    {
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "exec", "prettier", "--check", path);
         exitCode.ShouldBe(0, output);
     }
 
