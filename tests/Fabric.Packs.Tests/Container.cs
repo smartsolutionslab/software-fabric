@@ -35,6 +35,16 @@ internal sealed class Container : IDisposable
         return container;
     }
 
+    /// <summary>SQL Server, the image the AppHost runs; ready once sqlcmd can sign in as sa. The licence is accepted for this test only.</summary>
+    public static Container SqlServer(string password)
+    {
+        var container = Start(SqlServerImage, 1433, "ACCEPT_EULA=Y", $"MSSQL_SA_PASSWORD={password}");
+        container.WaitUntil("mssql", [.. SqlCmd(password, "master"), "-Q", "select 1"]);
+        return container;
+    }
+
+    public const string SqlServerImage = "mcr.microsoft.com/mssql/server:2022-latest";
+
     public static Container RabbitMq()
     {
         var container = Start("rabbitmq:4.3-management", 5672);
@@ -174,6 +184,13 @@ internal sealed class Container : IDisposable
     /// <summary>Runs one SQL statement as the postgres user and returns its unaligned, tuples-only output.</summary>
     public string Psql(string password, string sql) =>
         Docker("exec", "--env", $"PGPASSWORD={password}", id, "psql", "-U", "postgres", "-d", "postgres", "-tAc", sql).Trim();
+
+    /// <summary>Runs one T-SQL batch as sa in <paramref name="database"/> and returns its output without headers, padding or row counts.</summary>
+    public string Sql(string password, string sql, string database = "shop") =>
+        Docker(["exec", "--user", "mssql", id, .. SqlCmd(password, database), "-h", "-1", "-W", "-b", "-Q", $"set nocount on; {sql}"]).Trim();
+
+    private static string[] SqlCmd(string password, string database) =>
+        ["/opt/mssql-tools18/bin/sqlcmd", "-C", "-S", "localhost", "-U", "sa", "-P", password, "-d", database];
 
     /// <summary>Removes the container with the anonymous volumes its image declares; without --volumes they outlive it.</summary>
     public void Dispose()
