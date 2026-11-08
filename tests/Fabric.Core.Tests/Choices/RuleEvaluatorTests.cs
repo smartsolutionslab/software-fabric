@@ -52,6 +52,8 @@ public class RuleEvaluatorTests
         "frontend.state=redux-toolkit requires frontend.framework == react, but frontend.framework is vue.")]
     [InlineData("saas-standard-vue", "frontend.state=zustand-tanstack-query",
         "frontend.state=zustand-tanstack-query requires frontend.framework == react, but frontend.framework is vue.")]
+    [InlineData("lean-crud", "frontend.state=pinia",
+        "frontend.state=pinia requires frontend.framework == vue, but frontend.framework is react.")]
     [InlineData("saas-standard-react", "frontend.state=zustand-tanstack-query",
         "frontend.api-client=rtk-query-codegen requires frontend.state == redux-toolkit, but frontend.state is zustand-tanstack-query.")]
     [InlineData("saas-standard-react", "frontend.styling=css-modules",
@@ -102,11 +104,25 @@ public class RuleEvaluatorTests
         "frontend.mfe-technique=module-federation requires frontend.framework == react, but frontend.framework is vue.")]
     [InlineData("saas-standard-react", new[] { "frontend.styling=library-theme", "frontend.ui-library=radix-headless" },
         "frontend.styling=library-theme conflicts with frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless).")]
+    [InlineData("saas-standard-react", new[] { "backend.data-access.reads=dapper" },
+        "backend.data-access.reads=dapper requires backend.tenancy == none, but backend.tenancy is column.")]
     [InlineData("lean-crud", new[] { "module.communication=contract-interface" },
         "module defaults: module.communication requires module.communication has integration-events, but module.communication is contract-interface.")]
+    [InlineData("saas-standard-react", new[] { "backend.mediator=wolverine", "backend.api-protocols=rest,grpc" },
+        "backend.mediator=wolverine conflicts with backend.api-protocols has grpc.")]
+    [InlineData("saas-standard-react", new[] { "backend.mediator=wolverine", "backend.mcp=server" },
+        "backend.mediator=wolverine conflicts with backend.mcp has server.")]
     public void Rejects_a_combination_the_packs_refuse_in_one_sentence(string profile, string[] settings, string violation)
     {
         Violations(profile, settings).ShouldBe([violation]);
+    }
+
+    [Theory]
+    [InlineData("lean-crud", "backend.data-access.reads=dapper")]
+    [InlineData("lean-crud", "backend.data-access.reads=dapper", "backend.database=sqlserver")]
+    public void Dapper_reads_are_allowed_without_tenancy_on_either_database(string profile, params string[] settings)
+    {
+        Violations(profile, settings).ShouldBeEmpty();
     }
 
     [Fact]

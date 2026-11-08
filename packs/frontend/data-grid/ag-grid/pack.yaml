@@ -1,0 +1,15 @@
+option: frontend.data-grid.ag-grid
+files:
+  - { template: templates/data-table.tsx.sbn, target: web/app/src/components/ui/data-table.tsx, when: 'project["frontend.framework"] == "react"' }
+  - { template: templates/data-table-columns.ts.sbn, target: web/app/src/components/ui/data-table-columns.ts }
+  - { template: templates/data-table.test.tsx.sbn, target: web/app/src/components/ui/data-table.test.tsx, when: 'project["frontend.framework"] == "react"' }
+  - { template: templates/DataTable.vue.sbn, target: web/app/src/components/ui/DataTable.vue, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/DataTable.test.ts.sbn, target: web/app/src/components/ui/DataTable.test.ts, when: 'project["frontend.framework"] == "vue"' }
+slots:
+  - { slot: web.dependencies, template: templates/dependency.sbn }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 50 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing TanStack Table (@tanstack/react-table, @tanstack/vue-table) fails lint.", file: templates/restricted.sbn }

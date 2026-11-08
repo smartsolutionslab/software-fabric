@@ -1,0 +1,8 @@
+import { createPinia } from 'pinia';
+import type { App, Component } from 'vue';
+
+/** All state lives in Pinia stores (src/stores/): client state, and the server data they load through src/api/generated.ts. */
+export const withPinia = (app: App, root: Component) => {
+  app.use(createPinia());
+  return root;
+};

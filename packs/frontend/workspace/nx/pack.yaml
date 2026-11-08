@@ -1,0 +1,18 @@
+option: frontend.workspace.nx
+files:
+  - { template: templates/package.json.sbn, target: web/package.json }
+  - { template: templates/pnpm-workspace.yaml.sbn, target: web/pnpm-workspace.yaml }
+  - { template: templates/nx.json.sbn, target: web/nx.json }
+  - { template: templates/gitignore.sbn, target: web/.gitignore }
+declares-slots:
+  - { slot: web.workspace-packages, description: "Lines of pnpm-workspace.yaml's packages list ('  - app')." }
+slots:
+  - { slot: ci.frontend-steps, template: templates/ci-steps.sbn, order: 10 }
+  - { slot: readme.sections, template: templates/readme.sbn, order: 20 }
+  - { slot: readme.first-steps, template: templates/first-steps.sbn }
+  - { slot: dependabot.updates, template: templates/dependabot-updates.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "The frontend job installs the workspace and runs build, lint and test in every package through nx run-many, dependencies' builds first; CI keeps no Nx cache, so every package runs and any failure fails CI.", file: templates/ci-steps.sbn }

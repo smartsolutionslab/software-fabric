@@ -1,0 +1,7 @@
+{{~ if project["frontend.framework"] == "vue" ~}}
+    "chart.js": "4.6.1",
+    "vue-chartjs": "5.3.4"
+{{- else ~}}
+    "chart.js": "4.6.1",
+    "react-chartjs-2": "5.3.1"
+{{- end }}

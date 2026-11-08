@@ -434,7 +434,7 @@ public class ChoiceResolverTests
         var choices = ResolveSuccessfully("saas-standard-vue");
 
         choices.Project.Keys.First().ShouldBe("backend.database");
-        choices.Project.Keys.Last().ShouldBe("frontend.test.extras");
+        choices.Project.Keys.Last().ShouldBe("backend.data-access.reads");
     }
 
     [Fact]
@@ -447,6 +447,7 @@ public class ChoiceResolverTests
     [InlineData("frontend.colour=red", "unknown dimension 'frontend.colour'.")]
     [InlineData("frontend.framework=svelte", "'svelte' is not an option of frontend.framework; options: react, vue.")]
     [InlineData("frontend.framework=react,vue", "frontend.framework takes one option, got 2: react, vue.")]
+    [InlineData("backend.data-access=ef-core-dapper-read", "'ef-core-dapper-read' is not an option of backend.data-access; options: ef-core.")]
     [InlineData("frontend.framework", "override 'frontend.framework' must look like <dimension>=<option>.")]
     public void Rejects_an_invalid_override(string setting, string error)
     {

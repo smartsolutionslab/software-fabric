@@ -25,15 +25,25 @@ end ~}}
   ret 'class="' + shadcn + '"'
 end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
-{{~ if (ui != "shadcn-vue" && ui != "reka-ui") || project["frontend.forms"] != "vee-validate" || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+{{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
+{{~ if !((ui == "shadcn-vue" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form")) || (ui == "reka-ui" && project["frontend.forms"] == "vee-validate")) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue or reka-ui with vee-validate and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate or TanStack Form, or reka-ui with vee-validate, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
 {%{<script setup lang="ts">
 import { contentToText } from '@ag-ui/client';
-}%}{{~ if valibot ~}}
+}%}{{~ if tanstack ~}}
+import { revalidateLogic, useForm } from '@tanstack/vue-form';
+{{~ if valibot ~}}
+import * as v from 'valibot';
+import { computed, useId, watch } from 'vue';
+{{~ else ~}}
+import { computed, useId, watch } from 'vue';
+import { z } from 'zod';
+{{~ end ~}}
+{{~ else if valibot ~}}
 import * as v from 'valibot';
 import { useForm } from 'vee-validate';
 import { computed, useId, watch } from 'vue';
@@ -43,9 +53,11 @@ import { computed, useId, watch } from 'vue';
 import { z } from 'zod';
 {{~ end ~}}
 {%{import { useAgent } from '@/agents/useAgent';
-}%}{{ button_import }}{%{
+}%}{{ button_import }}
+{{~ if !tanstack ~}}
 import { toTypedSchema } from '@/forms/toTypedSchema';
-import type { Placement } from './layout';
+{{~ end ~}}
+{%{import type { Placement } from './layout';
 import { draftState, type PendingProposal, proposalsOf, toolOutcome, toolResults } from './proposal';
 }%}{{~ if css_modules ~}}
 import styles from './DashboardAssistant.module.css';
@@ -74,18 +86,39 @@ const questionSchema = z.object({ question: z.string().trim().min(1, 'Ask for a 
 {{~ end ~}}
 {%{
 const { messages, running, failure, send } = useAgent('dashboards', () => draftState(widgets));
-const { defineField, errors, handleSubmit, resetForm } = useForm({
+}%}{{~ if tanstack ~}}
+const form = useForm({
+  defaultValues: { question: '' },
+  validationLogic: revalidateLogic(),
+  validators: { onDynamic: questionSchema },
+  onSubmit: async ({ value, formApi }) => {
+    const { question } = {{ if valibot }}v.parse(questionSchema, value){{ else }}questionSchema.parse(value){{ end }};
+    formApi.reset();
+    await send(question);
+  },
+});
+const errors = form.useStore((state) => ({ question: state.fieldMeta.question?.errors[0]?.message }));
+{{~ else ~}}
+{%{const { defineField, errors, handleSubmit, resetForm } = useForm({
   validationSchema: toTypedSchema(questionSchema),
   initialValues: { question: '' },
 });
 const [question, questionAttributes] = defineField('question');
-const field = useId();
+}%}{{~ end ~}}
+{%{const field = useId();
 
-const submit = handleSubmit(async (values) => {
+}%}{{~ if tanstack ~}}
+function submit(event: Event) {
+  event.preventDefault();
+  void form.handleSubmit();
+}
+{{~ else ~}}
+{%{const submit = handleSubmit(async (values) => {
   resetForm();
   await send(values.question);
 });
-
+}%}{{~ end ~}}
+{%{
 const results = computed(() => toolResults(messages.value));
 
 // Each proposal goes to the canvas once, in the order the agent made them: a decided one does not come back when the
@@ -146,7 +179,22 @@ const entries = computed(() =>
     <p v-if="failure" role="alert" }%}{{ themed "text-sm text-destructive" "text-sm text-red-600" "error" }}{%{>The assistant could not answer: {{ failure }}</p>
     <form novalidate }%}{{ class_of "flex flex-col gap-2" "form" }}{%{ @submit="submit">
       <label :for="field" }%}{{ class_of "text-sm font-medium" "heading" }}{%{>Ask the assistant</label>
-      <textarea
+}%}{{~ if tanstack ~}}
+      <form.Field v-slot="{ field: question }" name="question">
+        <textarea
+          :id="field"
+          :name="question.name"
+          :value="question.state.value"
+          rows="2"
+          :aria-invalid="errors.question ? true : undefined"
+          :aria-describedby="errors.question ? `${field}-error` : undefined"
+          class="flex field-sizing-content min-h-12 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+          @blur="question.handleBlur"
+          @input="question.handleChange(($event.target as HTMLTextAreaElement).value)"
+        />
+      </form.Field>
+{{~ else ~}}
+{%{      <textarea
         :id="field"
         v-model="question"
         v-bind="questionAttributes"
@@ -155,7 +203,8 @@ const entries = computed(() =>
         :aria-describedby="errors.question ? `${field}-error` : undefined"
         }%}{{ themed "flex field-sizing-content min-h-12 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40" "flex field-sizing-content min-h-12 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-slate-500 focus-visible:border-slate-400 focus-visible:ring-[3px] focus-visible:ring-slate-400/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-red-600 aria-invalid:ring-red-600/20 md:text-sm" "input" }}{%{
       />
-      <p v-if="errors.question" :id="`${field}-error`" role="alert" }%}{{ themed "text-sm text-destructive" "text-sm text-red-600" "error" }}{%{>
+}%}{{~ end ~}}
+{%{      <p v-if="errors.question" :id="`${field}-error`" role="alert" }%}{{ themed "text-sm text-destructive" "text-sm text-red-600" "error" }}{%{>
         {{ errors.question }}
       </p>
       <}%}{{ button }}{%{ type="submit" variant="}%}{{ secondary }}{%{" :disabled="running" }%}{{ class_of "self-end" "ask" }}{%{>Ask</}%}{{ button }}{%{>

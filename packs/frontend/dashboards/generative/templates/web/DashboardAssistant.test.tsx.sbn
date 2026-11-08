@@ -1,3 +1,4 @@
+{{~ cell = project["frontend.data-grid"] == "ag-grid" ? "gridcell" : "cell" ~}}
 {{~ axe = array.contains(project["frontend.test.extras"], "accessibility") ~}}
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -62,7 +63,7 @@ vi.mock('@/api/generated', () => ({
 }));
 
 {{~ if project["frontend.charts"] != "recharts" ~}}
-// ECharts draws on a canvas jsdom does not have; the chart's accessible name is what the page decides.
+// {{ if project["frontend.charts"] == "chartjs" }}Chart.js{{ else }}ECharts{{ end }} draws on a canvas jsdom does not have; the chart's accessible name is what the page decides.
 vi.mock('@/components/chart', () => ({
   Chart: ({ label }: { label: string }) => <div role="img" aria-label={label} />,
 }));
@@ -168,7 +169,7 @@ test('a proposed widget shows on the grid as pending with its data, and Accept o
 
   const pending = await screen.findByRole('region', { name: 'Proposed: My dashboards' });
   expect(pending.closest('.react-grid-layout')).not.toBeNull();
-  expect(within(pending).getByRole('cell', { name: 'Sales' })).toBeInTheDocument();
+  expect({{ if cell == 'gridcell' }}await within(pending).findByRole{{ else }}within(pending).getByRole{{ end }}('{{ cell }}', { name: 'Sales' })).toBeInTheDocument();
   expect(screen.queryByRole('region', { name: 'My dashboards' })).not.toBeInTheDocument();
 
   await user.click(within(pending).getByRole('button', { name: 'Accept' }));

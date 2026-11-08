@@ -1,9 +1,18 @@
-{{~ if project["frontend.ui-library"] != "shadcn" || project["frontend.forms"] != "react-hook-form" || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
-throw new Error('The ag-ui pack builds the agent panel from shadcn/ui with React Hook Form and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+{{~ if project["frontend.ui-library"] != "shadcn" || (project["frontend.forms"] != "react-hook-form" && project["frontend.forms"] != "tanstack-form") || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+throw new Error('The ag-ui pack builds the agent panel from shadcn/ui with React Hook Form or TanStack Form and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 {{~ end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
+{{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
 import { contentToText, type Message } from '@ag-ui/client';
+{{~ if tanstack ~}}
+import { revalidateLogic, useForm } from '@tanstack/react-form';
+import { useId } from 'react';
 {{~ if valibot ~}}
+import * as v from 'valibot';
+{{~ else ~}}
+import { z } from 'zod';
+{{~ end ~}}
+{{~ else if valibot ~}}
 import { valibotResolver } from '@hookform/resolvers/valibot';
 import { useId } from 'react';
 import { useForm } from 'react-hook-form';
@@ -19,12 +28,16 @@ import { useAgent } from './useAgent';
 
 {{~ if valibot ~}}
 const messageSchema = v.object({ message: v.pipe(v.string(), v.trim(), v.minLength(1, 'Write a message first.')) });
+{{~ if !tanstack ~}}
 
 type MessageForm = v.InferOutput<typeof messageSchema>;
+{{~ end ~}}
 {{~ else ~}}
 const messageSchema = z.object({ message: z.string().trim().min(1, 'Write a message first.') });
+{{~ if !tanstack ~}}
 
 type MessageForm = z.infer<typeof messageSchema>;
+{{~ end ~}}
 {{~ end ~}}
 
 /**
@@ -38,6 +51,19 @@ export function AgentPanel({ agent }: { agent: string }) {
 
 function Conversation({ agent }: { agent: string }) {
   const { messages, running, failure, send } = useAgent(agent);
+{{~ if tanstack ~}}
+  const form = useForm({
+    defaultValues: { message: '' },
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: messageSchema },
+    onSubmit: async ({ value, formApi }) => {
+      const { message } = {{ if valibot }}v.parse(messageSchema, value){{ else }}messageSchema.parse(value){{ end }};
+      formApi.reset();
+      await send(message);
+    },
+  });
+  const field = useId();
+{{~ else ~}}
   const {
     register,
     handleSubmit,
@@ -50,6 +76,7 @@ function Conversation({ agent }: { agent: string }) {
     reset();
     await send(message);
   });
+{{~ end ~}}
 
   const results = new Map(
     messages.flatMap((message) =>
@@ -70,6 +97,41 @@ function Conversation({ agent }: { agent: string }) {
           The agent could not answer: {failure}
         </p>
       )}
+{{~ if tanstack ~}}
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void form.handleSubmit();
+        }}
+        noValidate
+        className="flex flex-col gap-2"
+      >
+        <label htmlFor={field} className="text-sm font-medium">
+          Message
+        </label>
+        <form.Field name="message">
+          {({ name, state: { value, meta }, handleBlur, handleChange }) => (
+            <>
+              <textarea
+                id={field}
+                name={name}
+                rows={3}
+                value={value}
+                onBlur={handleBlur}
+                onChange={(event) => handleChange(event.target.value)}
+                aria-invalid={meta.errors.length > 0 ? true : undefined}
+                aria-describedby={meta.errors.length > 0 ? `${field}-error` : undefined}
+                className="flex field-sizing-content min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+              />
+              {meta.errors.length > 0 && (
+                <p id={`${field}-error`} role="alert" className="text-sm text-destructive">
+                  {meta.errors[0]?.message}
+                </p>
+              )}
+            </>
+          )}
+        </form.Field>
+{{~ else ~}}
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-2">
         <label htmlFor={field} className="text-sm font-medium">
           Message
@@ -87,6 +149,7 @@ function Conversation({ agent }: { agent: string }) {
             {errors.message.message}
           </p>
         )}
+{{~ end ~}}
         <Button type="submit" disabled={running} className="self-end">
           Send
         </Button>

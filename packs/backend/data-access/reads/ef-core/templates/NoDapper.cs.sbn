@@ -1,0 +1,24 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class NoDapper : IArchitectureRule
+{
+    private const string Dapper = "Dapper";
+
+    public string Description => "No module references Dapper: this project's query handlers read through EF Core.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var assembly in model.ModuleAssemblies)
+        {
+            foreach (var reference in assembly.GetReferencedAssemblies().Select(reference => reference.Name!).Where(IsDapper).Order(StringComparer.Ordinal))
+            {
+                yield return $"{assembly.GetName().Name} references {reference}, but this project reads through EF Core (backend.data-access.reads: ef-core).";
+            }
+        }
+    }
+
+    private static bool IsDapper(string reference) =>
+        reference == Dapper || reference.StartsWith(Dapper + ".", StringComparison.Ordinal);
+}

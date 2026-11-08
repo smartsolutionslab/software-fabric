@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The read connection against the AppHost's database alone, after the MigrationRunner: no host. -->
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Reads.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    {{ database_fixture_package_references }}
+    <PackageReference Include="Dapper" />
+  </ItemGroup>
+
+  <ItemGroup>
+    {{ database_fixture_project_references }}
+    <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />
+  </ItemGroup>
+
+</Project>

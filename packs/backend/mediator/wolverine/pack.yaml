@@ -1,0 +1,20 @@
+option: backend.mediator.wolverine
+files:
+  - { template: templates/ICommand.cs.sbn, target: src/BuildingBlocks/Messaging/ICommand.cs }
+  - { template: templates/IQuery.cs.sbn, target: src/BuildingBlocks/Messaging/IQuery.cs }
+  - { template: templates/ICommandHandler.cs.sbn, target: src/BuildingBlocks/Messaging/ICommandHandler.cs }
+  - { template: templates/IQueryHandler.cs.sbn, target: src/BuildingBlocks/Messaging/IQueryHandler.cs }
+  - { template: templates/IDispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/IDispatcher.cs }
+  - { template: templates/Dispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/Dispatcher.cs }
+  - { template: templates/MessagingRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/MessagingRegistration.cs }
+  - { template: templates/RequestHandlerDiscovery.cs.sbn, target: src/Host/Wiring/RequestHandlerDiscovery.cs }
+  - { template: templates/EveryRequestHasOneHandler.cs.sbn, target: tests/Architecture.Tests/Rules/EveryRequestHasOneHandler.cs }
+slots:
+  - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn }
+  - { slot: messaging.wolverine-options, template: templates/wolverine-options.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Every command and query in an Application assembly has exactly one handler there.", file: templates/EveryRequestHasOneHandler.cs.sbn }

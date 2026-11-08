@@ -17,15 +17,25 @@ end ~}}
 end ~}}
 {{~ generative = array.contains project["frontend.dashboards"] "generative" ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
-{{~ if (ui != "shadcn-vue" && ui != "reka-ui") || project["frontend.forms"] != "vee-validate" || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+{{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
+{{~ if !((ui == "shadcn-vue" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form")) || (ui == "reka-ui" && project["frontend.forms"] == "vee-validate")) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue or reka-ui with vee-validate and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate or TanStack Form, or reka-ui with vee-validate, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
 {%{<script setup lang="ts">
 import { GridItem, GridLayout, type Layout } from 'grid-layout-plus';
-}%}{{~ if valibot ~}}
+}%}{{~ if tanstack ~}}
+import { revalidateLogic, useForm } from '@tanstack/vue-form';
+{{~ if valibot ~}}
+import * as v from 'valibot';
+import { computed, ref, watch } from 'vue';
+{{~ else ~}}
+import { computed, ref, watch } from 'vue';
+import { z } from 'zod';
+{{~ end ~}}
+{{~ else if valibot ~}}
 import * as v from 'valibot';
 import { useForm } from 'vee-validate';
 import { computed, ref, watch } from 'vue';
@@ -35,9 +45,11 @@ import { computed, ref, watch } from 'vue';
 import { z } from 'zod';
 {{~ end ~}}
 {%{import { useGetDashboardsWidgets, usePutDashboardsId, type WidgetDescriptionDto } from '@/api/generated';
-}%}{{ button_import }}{%{
+}%}{{ button_import }}
+{{~ if !tanstack ~}}
 import { toTypedSchema } from '@/forms/toTypedSchema';
-import Failure from './Failure.vue';
+{{~ end ~}}
+{%{import Failure from './Failure.vue';
 import {
   applyLayout,
   columns,
@@ -152,7 +164,73 @@ const change = (next: (current: Placement[]) => Placement[]) => {
   edited();
 };
 
-const {
+}%}{{~ if tanstack ~}}
+{%{const naming = useForm({
+  defaultValues: { name: dashboard.name },
+  validationLogic: revalidateLogic(),
+  validators: { onDynamic: nameSchema },
+  onSubmit: async ({ value }) => {
+    const { name } = }%}{{ if valibot }}v.parse(nameSchema, value){{ else }}nameSchema.parse(value){{ end }}{%{;
+    const submitted = revision.value;
+    try {
+      await save({ id: dashboard.id, data: { name, widgets: placements.value } });
+      savedRevision.value = submitted;
+      failed.value = false;
+      saves.value += 1;
+      emit('saved');
+    } catch {
+      failed.value = true;
+    }
+  },
+});
+const nameErrors = naming.useStore((state) => ({ name: state.fieldMeta.name?.errors[0]?.message }));
+
+const adding = useForm({
+  defaultValues: { source: '', visual: '' },
+  validationLogic: revalidateLogic(),
+  validators: { onDynamic: widgetSchema },
+  onSubmit: ({ value: { source: chosenSource, visual: chosenVisual }, formApi }) => {
+    const choice = checkChoice(catalog.value, chosenSource, chosenVisual);
+    if (!choice.ok) {
+      formApi.setFieldMeta(choice.field, (meta) => ({
+        ...meta,
+        errorMap: { ...meta.errorMap, onSubmit: [{ message: choice.message }] },
+      }));
+      return;
+    }
+
+    change((current) => [...current, nextPlacement(current, uuidV7(), chosenSource, chosenVisual)]);
+    formApi.reset();
+  },
+});
+const widgetErrors = adding.useStore((state) => ({
+  source: state.fieldMeta.source?.errors[0]?.message,
+  visual: state.fieldMeta.visual?.errors[0]?.message,
+}));
+const source = adding.useStore((state) => state.values.source);
+const chosen = computed(() => listed.value.get(source.value));
+
+/** A widget chosen: show it the first way its kind can be shown. */
+const choose = ({ value }: { value: string }) =>
+  adding.setFieldValue('visual', visuals[listed.value.get(value)?.kind ?? 'Chart'][0].value);
+
+// Another page of the picker lists other widgets: a choice from this one would be added with the next page's visual.
+const pickerPage = (page: number) => {
+  catalogPage.value = page;
+  adding.reset();
+};
+
+function add(event: Event) {
+  event.preventDefault();
+  void adding.handleSubmit();
+}
+
+function submit(event: Event) {
+  event.preventDefault();
+  void naming.handleSubmit();
+}
+}%}{{~ else ~}}
+{%{const {
   defineField: nameField,
   errors: nameErrors,
   handleSubmit: handleSave,
@@ -207,7 +285,8 @@ const submit = handleSave(async (values) => {
     failed.value = true;
   }
 });
-
+}%}{{~ end ~}}
+{%{
 /** The grid reports its layout after every change, its own compaction included; only real moves change the draft. */
 function placed(reported: Layout) {
   const moved = applyLayout(
@@ -294,8 +373,20 @@ const tiles = computed(() =>
     <form novalidate }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{ @submit="submit">
       <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
         Dashboard name
-        <input v-model="name" v-bind="nameAttributes" }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{ @input="edited" />
-      </label>
+}%}{{~ if tanstack ~}}
+{%{        <naming.Field v-slot="{ field }" name="name" :listeners="{ onChange: edited }">
+          <input
+            :name="field.name"
+            :value="field.state.value"
+            class="rounded border px-2 py-1"
+            @blur="field.handleBlur"
+            @input="field.handleChange(($event.target as HTMLInputElement).value)"
+          />
+        </naming.Field>
+}%}{{~ else ~}}
+{%{        <input v-model="name" v-bind="nameAttributes" }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{ @input="edited" />
+}%}{{~ end ~}}
+{%{      </label>
       <}%}{{ button }}{%{ type="submit" :disabled="saving">Save dashboard</}%}{{ button }}{%{>
       <p v-if="nameErrors.name" role="alert">{{ nameErrors.name }}</p>
       <p v-if="savedRevision === revision" role="status">Saved.</p>
@@ -305,17 +396,39 @@ const tiles = computed(() =>
     <form novalidate }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{ @submit="add">
       <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
         Widget
-}%}{{~ if css_modules ~}}
+}%}{{~ if tanstack ~}}
+{%{        <adding.Field v-slot="{ field }" name="source" :listeners="{ onChange: choose }">
+          <select
+            :name="field.name"
+            :value="field.state.value"
+            class="rounded border px-2 py-1"
+            :disabled="loading"
+            @blur="field.handleBlur"
+            @change="field.handleChange(($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">Choose a widget</option>
+            <option v-for="widget in catalog" :key="widget.id" :value="widget.id">{{ widget.title }}</option>
+          </select>
+        </adding.Field>
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        Shown as
+        <adding.Field v-slot="{ field }" name="visual">
+          <select
+            :name="field.name"
+            :value="field.state.value"
+            class="rounded border px-2 py-1"
+            :disabled="loading"
+            @blur="field.handleBlur"
+            @change="field.handleChange(($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="shown in visuals[chosen?.kind ?? 'Chart']" :key="shown.value" :value="shown.value">
+              {{ shown.label }}
+            </option>
+          </select>
+        </adding.Field>
+}%}{{~ else if css_modules ~}}
         <select v-model="source" v-bind="sourceAttributes" :class="styles.input" :disabled="loading" @change="choose">
-{{~ else ~}}
-        <select
-          v-model="source"
-          v-bind="sourceAttributes"
-          class="rounded border px-2 py-1"
-          :disabled="loading"
-          @change="choose"
-        >
-{{~ end ~}}
 {%{          <option value="">Choose a widget</option>
           <option v-for="widget in catalog" :key="widget.id" :value="widget.id">{{ widget.title }}</option>
         </select>
@@ -327,7 +440,27 @@ const tiles = computed(() =>
             {{ shown.label }}
           </option>
         </select>
+}%}{{~ else ~}}
+{%{        <select
+          v-model="source"
+          v-bind="sourceAttributes"
+          class="rounded border px-2 py-1"
+          :disabled="loading"
+          @change="choose"
+        >
+          <option value="">Choose a widget</option>
+          <option v-for="widget in catalog" :key="widget.id" :value="widget.id">{{ widget.title }}</option>
+        </select>
       </label>
+      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
+        Shown as
+        <select v-model="visual" v-bind="visualAttributes" }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{ :disabled="loading">
+          <option v-for="shown in visuals[chosen?.kind ?? 'Chart']" :key="shown.value" :value="shown.value">
+            {{ shown.label }}
+          </option>
+        </select>
+}%}{{~ end ~}}
+{%{      </label>
       <}%}{{ button }}{%{ type="submit" variant="}%}{{ secondary }}{%{" :disabled="loading || full || !roomLeft">Add widget</}%}{{ button }}{%{>
       <p v-if="full">A dashboard holds at most {{ maximumWidgets }} widgets.</p>
       <p v-if="!full && !roomLeft">

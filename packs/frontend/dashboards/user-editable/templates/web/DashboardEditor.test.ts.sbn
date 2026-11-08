@@ -1,3 +1,4 @@
+{{~ cell = project["frontend.data-grid"] == "ag-grid" ? "gridcell" : "cell" ~}}
 {{~ axe = array.contains(project["frontend.test.extras"], "accessibility") ~}}
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
 import userEvent from '@testing-library/user-event';
@@ -16,12 +17,12 @@ import type {
 } from '@/api/generated';
 import DashboardEditor from './DashboardEditor.vue';
 
-// ECharts draws on a canvas jsdom does not have; the chart's accessible name is what the editor decides.
+// {{ if project["frontend.charts"] == "chartjs" }}Chart.js{{ else }}ECharts{{ end }} draws on a canvas jsdom does not have; the chart's accessible name is what the editor decides.
 vi.mock('@/components/DataChart.vue', async () => {
   const { defineComponent, h } = await import('vue');
   return {
     default: defineComponent({
-      props: { option: { type: Object, required: true }, label: { type: String, required: true }, height: Number },
+      props: { {{ if project["frontend.charts"] == "chartjs" }}config{{ else }}option{{ end }}: { type: Object, required: true }, label: { type: String, required: true }, height: Number },
       setup: (props) => () => h('div', { role: 'img', 'aria-label': props.label }),
     }),
   };
@@ -174,7 +175,7 @@ test('a user opens a dashboard, adds a widget, removes one, renames it and saves
   await user.selectOptions(screen.getByLabelText('Shown as'), 'table');
   await user.click(screen.getByRole('button', { name: 'Add widget' }));
   const added = await screen.findByRole('region', { name: 'My dashboards' });
-  expect(await within(added).findByRole('cell', { name: 'Sales' })).toBeInTheDocument();
+  expect(await within(added).findByRole('{{ cell }}', { name: 'Sales' })).toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: 'Remove Widgets per dashboard' }));
   expect(screen.queryByRole('img', { name: 'Widgets per dashboard' })).not.toBeInTheDocument();
@@ -301,11 +302,11 @@ test('a table widget pages through its rows', async () => {
   renderEditor();
   await user.click(await screen.findByRole('button', { name: 'Sales' }));
   const widget = await screen.findByRole('region', { name: 'Widgets per dashboard' });
-  expect(await within(widget).findByRole('cell', { name: 'Row 1' })).toBeInTheDocument();
+  expect(await within(widget).findByRole('{{ cell }}', { name: 'Row 1' })).toBeInTheDocument();
 
   await user.click(within(widget).getByRole('button', { name: 'Next page of Widgets per dashboard' }));
 
-  expect(await within(widget).findByRole('cell', { name: 'Row 2' })).toBeInTheDocument();
+  expect(await within(widget).findByRole('{{ cell }}', { name: 'Row 2' })).toBeInTheDocument();
 });
 
 test('a table widget whose rows shrink to fewer pages goes back to its last page instead of an empty one', async () => {
@@ -326,12 +327,12 @@ test('a table widget whose rows shrink to fewer pages goes back to its last page
   await user.click(await screen.findByRole('button', { name: 'Sales' }));
   const widget = await screen.findByRole('region', { name: 'Widgets per dashboard' });
   await user.click(await within(widget).findByRole('button', { name: 'Next page of Widgets per dashboard' }));
-  expect(await within(widget).findByRole('cell', { name: 'Row 2' })).toBeInTheDocument();
+  expect(await within(widget).findByRole('{{ cell }}', { name: 'Row 2' })).toBeInTheDocument();
 
   totalCount = 20;
   await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
 
-  expect(await within(widget).findByRole('cell', { name: 'Row 1' })).toBeInTheDocument();
+  expect(await within(widget).findByRole('{{ cell }}', { name: 'Row 1' })).toBeInTheDocument();
 });
 
 test('any change after saving takes the saved notice away', async () => {

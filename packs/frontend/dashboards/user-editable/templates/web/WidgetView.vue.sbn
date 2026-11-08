@@ -4,8 +4,12 @@ import { useGetDashboardsWidgetsId } from '@/api/generated';
 import DataChart from '@/components/DataChart.vue';
 import DataTable from '@/components/ui/DataTable.vue';
 import { columnsOf } from '@/components/ui/data-table-columns';
+}%}{{~ if project["frontend.charts"] == "chartjs" ~}}
+import { chartConfig, type ChartVisual } from './chartConfig';
+{{~ else ~}}
 import { chartOption, type ChartVisual } from './chartOption';
-import Pager from './Pager.vue';
+{{~ end ~}}
+{%{import Pager from './Pager.vue';
 
 type Row = Record<string, unknown>;
 
@@ -41,10 +45,16 @@ watch(
   },
 );
 
+}%}{{~ if project["frontend.charts"] == "chartjs" ~}}
+const config = computed(() =>
+  data.value?.chart && visual !== 'table' ? chartConfig(data.value.chart, visual as ChartVisual) : undefined,
+);
+{{~ else ~}}
 const option = computed(() =>
   data.value?.chart && visual !== 'table' ? chartOption(data.value.chart, visual as ChartVisual) : undefined,
 );
-const table = computed(() => data.value?.table ?? undefined);
+{{~ end ~}}
+{%{const table = computed(() => data.value?.table ?? undefined);
 const columns = computed(() =>
   rows.columns(
     (table.value?.columns ?? []).map((column) =>
@@ -70,7 +80,11 @@ function display(value: unknown): string {
     <DataTable :key="table.columns.join('\n')" :columns="columns" :data="tableRows" />
     <Pager :label="title" :page="page" :page-size="pageSize" :total="table.totalCount" @page="page = $event" />
   </template>
+}%}{{~ if project["frontend.charts"] == "chartjs" ~}}
+  <DataChart v-else-if="config" :config="config" :label="title" :height="height" />
+{{~ else ~}}
   <DataChart v-else-if="option" :option="option" :label="title" :height="height" />
-  <p v-else>Loading…</p>
+{{~ end ~}}
+{%{  <p v-else>Loading…</p>
 </template>
 }%}

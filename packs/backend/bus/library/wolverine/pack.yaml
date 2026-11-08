@@ -5,6 +5,8 @@ files:
   - { template: templates/UnitOfWorkRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/UnitOfWorkRegistration.cs }
   - { template: templates/ModuleUnitOfWork.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/{{ module.namespace }}UnitOfWork.cs", per-module: true }
   - { template: templates/ConsumersHandleIntegrationEvents.cs.sbn, target: tests/Architecture.Tests/Rules/ConsumersHandleIntegrationEvents.cs }
+declares-slots:
+  - { slot: messaging.wolverine-options, description: "Statements on WolverineOptions options in src/Host/Wiring/Messaging.cs, after the consumers' discovery, each indented twelve spaces; IReadOnlyList<IModule> modules is in scope. Rendered only with a contribution." }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
   - { slot: buildingblocks.packages, template: templates/buildingblocks-packages.sbn }

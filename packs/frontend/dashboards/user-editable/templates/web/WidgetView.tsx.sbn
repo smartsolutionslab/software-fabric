@@ -13,6 +13,8 @@ import { DataTable } from '@/components/ui/data-table';
 import { columnsOf } from '@/components/ui/data-table-columns';
 {{~ if project["frontend.charts"] == "recharts" ~}}
 import { chartRows, type ChartVisual, pieSlices } from './chartData';
+{{~ else if project["frontend.charts"] == "chartjs" ~}}
+import { chartConfig, type ChartVisual } from './chartConfig';
 {{~ else ~}}
 import { chartOption, type ChartVisual } from './chartOption';
 {{~ end ~}}
@@ -49,6 +51,11 @@ export function WidgetView({ source, visual, title, height, refresh }: WidgetVie
     () => (data?.chart && visual !== 'table' ? drawChart(data.chart, visual as ChartVisual) : undefined),
     [data, visual],
   );
+{{~ else if project["frontend.charts"] == "chartjs" ~}}
+  const config = useMemo(
+    () => (data?.chart && visual !== 'table' ? chartConfig(data.chart, visual as ChartVisual) : undefined),
+    [data, visual],
+  );
 {{~ else ~}}
   const option = useMemo(
     () => (data?.chart && visual !== 'table' ? chartOption(data.chart, visual as ChartVisual) : undefined),
@@ -76,6 +83,10 @@ export function WidgetView({ source, visual, title, height, refresh }: WidgetVie
         {drawn}
       </Chart>
     );
+  }
+{{~ else if project["frontend.charts"] == "chartjs" ~}}
+  if (config) {
+    return <Chart config={config} label={title} height={height} />;
   }
 {{~ else ~}}
   if (option) {

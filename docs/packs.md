@@ -14,6 +14,15 @@ Until its pack exists an option is `tier: experimental` in the catalog. The
 pack's PR moves it to `supported`; a test fails the build when a `supported`
 option has no pack (ADR-0003).
 
+A new pack puts its option into the pairwise matrix (ADR-0003), so the PR
+that adds it also regenerates `build/matrix.json`; a test fails while the
+file is stale:
+
+```bash
+dotnet run --project src/Fabric.Cli -- matrix --catalog catalog/catalog.yaml --packs packs \
+  --extra build/matrix-extra.yaml --output build/matrix.json
+```
+
 Packs under `packs/base/` are the **base**: always part of every project,
 no catalog entry. The base declares the slots the other packs fill.
 
