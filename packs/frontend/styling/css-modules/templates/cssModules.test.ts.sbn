@@ -8,12 +8,19 @@ import { expect, test } from 'vitest';
 const source = dirname(fileURLToPath(import.meta.url));
 const moduleImport = /import (\w+) from '(\.{1,2}\/[^']+\.module\.css)';/g;
 
-/** The classes a stylesheet gives at least one declaration, in any selector of a rule. */
+/** What of a selector the module scopes and exports: neither `:global(...)` nor what follows a bare `:global`. */
+const local = (selector: string) =>
+  selector
+    .split(',')
+    .map((part) => part.replace(/:global\([^)]*\)/g, '').replace(/:global\b.*$/, ''))
+    .join(',');
+
+/** The classes a stylesheet exports with at least one declaration, in any selector of a flat rule. */
 function styledClasses(css: string) {
   const styled = new Set<string>();
   for (const [, selector = '', body = ''] of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (/[\w-]+\s*:\s*[^;\s]/.test(body)) {
-      for (const [, name = ''] of selector.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) {
+      for (const [, name = ''] of local(selector).matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) {
         styled.add(name);
       }
     }

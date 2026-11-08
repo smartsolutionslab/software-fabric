@@ -17,3 +17,5 @@ otherwise give: box sizing, and the page's margin and font.
   `styles.<name>` a component under `src/` uses needs a rule with at least one declaration in the module it imports.
 - The check sees class names written out (`styles.button`); one looked up by a computed name (`styles[name]`) is not
   checked, so write them out.
+- A class only under `:global` is not the module's, so the check does not count it. The check reads flat rules: a
+  class styled only through native nesting (`.a { &:hover { … } }`) is reported unstyled, so keep module rules flat.
