@@ -5,7 +5,8 @@ namespace Fabric.Core.Matrix;
 
 /// <summary>
 /// Extends a partial assignment of the factors to a valid choice set, or proves that none exists. A rule is checked
-/// as soon as the dimension it names is decided, with <see cref="ConditionEvaluator"/>. After each step every open
+/// as soon as the dimension it names is decided, with <see cref="ConditionEvaluator"/>: a dimension's own <c>requires</c>
+/// once the dimension is active, since an active dimension is always set, and an option's once it is chosen. After each step every open
 /// factor must still have a value that breaks no decided rule (forward checking), and a factor left with a single
 /// value is filled next; otherwise factors are filled in catalog order, each after the dimension its
 /// <c>active-when</c> names. A complete assignment counts only once <see cref="ChoiceResolver"/> and
@@ -48,7 +49,7 @@ internal sealed class MatrixSearch
         for (var watcher = 0; watcher < dimensions.Count; watcher++)
         {
             var dimension = dimensions[watcher];
-            IEnumerable<Condition> conditions = dimension.Options.Values.SelectMany(option => option.Requires.Concat(option.Conflicts));
+            var conditions = dimension.Requires.Concat(dimension.Options.Values.SelectMany(option => option.Requires.Concat(option.Conflicts)));
             if (dimension.ActiveWhen is { } activeWhen)
             {
                 conditions = conditions.Append(activeWhen);
@@ -210,7 +211,10 @@ internal sealed class MatrixSearch
     /// <summary>The checks a change to <paramref name="dimension"/> can affect: its own, and those of every dimension whose rules name it.</summary>
     private bool CheckAround(int dimension) => watchers[dimension].All(Check);
 
-    /// <summary>The dimension's activity matches its factors, and no chosen option breaks a decided requires or conflicts rule.</summary>
+    /// <summary>
+    /// The dimension's activity matches its factors, and neither the dimension, once active, nor a chosen option breaks a
+    /// decided requires or conflicts rule.
+    /// </summary>
     private bool Check(int dimension)
     {
         var own = factorsOf[dimension];
@@ -220,6 +224,11 @@ internal sealed class MatrixSearch
         if ((inactive > 0 && chosen > 0)
             || (active == false && (chosen > 0 || pinned.Contains(dimension)))
             || (active == true && (inactive > 0 || (own.Count == 0 && !dimensions[dimension].Multi))))
+        {
+            return false;
+        }
+
+        if (active == true && dimensions[dimension].Requires.Any(condition => Holds(condition) == false))
         {
             return false;
         }
