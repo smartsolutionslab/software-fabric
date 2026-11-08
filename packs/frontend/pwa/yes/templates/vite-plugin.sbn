@@ -1,0 +1,37 @@
+    // The service worker keeps the app shell, never /api or the identity provider (docs/adr).
+    VitePWA({
+      // A script the plugin writes into index.html registers the worker; nothing in src does.
+      injectRegister: 'script',
+      manifest: {
+        name: '{{ name }}',
+        short_name: '{{ name }}',
+        start_url: '/',
+        display: 'standalone',
+        icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' }],
+      },
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        navigateFallback: 'index.html',
+        // Everything the dev server's proxy forwards to the host starts with /api; none of it is the shell.
+        navigateFallbackDenylist: [/^\/api/],
+        // What the shell loads at run time, the dev server's modules included. Only same-origin files the page loads
+        // as code, style, font, image or manifest; /api calls are fetches and the identity provider is another origin.
+        runtimeCaching: [
+          {
+            urlPattern: ({ request, sameOrigin, url }) =>
+              sameOrigin &&
+              !url.pathname.startsWith('/api') &&
+              ['script', 'style', 'font', 'image', 'manifest'].includes(request.destination),
+            handler: 'NetworkFirst',
+            options: { cacheName: 'app-shell' },
+          },
+        ],
+      },
+      // In development too, so the end-to-end tests see the worker; its files go under node_modules, not into git.
+      devOptions: {
+        enabled: true,
+        resolveTempFolder: () => fileURLToPath(new URL('./node_modules/.vite-pwa', import.meta.url)),
+      },
+    })
