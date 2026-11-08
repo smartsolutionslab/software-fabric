@@ -9,7 +9,7 @@ Server data lives in TanStack Query's cache (`@tanstack/vue-query`, one `QueryCl
 
 ## Consequences
 
-- After a mutation, invalidate the queries it changes (`queryClient.invalidateQueries({ queryKey: getGetBillingNotesQueryKey() })`) instead of patching a copy of the data.
+- After a mutation, invalidate the queries it changes ({{ if project["frontend.api-client"] == "openapi-fetch" }}`queryClient.invalidateQueries({ queryKey: ['/billing/notes'] })`{{ else }}`queryClient.invalidateQueries({ queryKey: getGetBillingNotesQueryKey() })`{{ end }}) instead of patching a copy of the data.
 - Component tests that render a screen using a generated hook install `VueQueryPlugin` with a fresh `QueryClient`.
 - The gate is a lint rule: importing a store library (Pinia, Vuex, MobX) or another server-data cache (swrv, Apollo) fails `pnpm lint`. It sees imports only. It does not see server data copied into a `ref` or a provided value, nor a cache that is hand-written; those are for review.
 {{~ else ~}}
@@ -23,7 +23,7 @@ Server data lives in TanStack Query's cache, one `QueryClient` provided around t
 
 ## Consequences
 
-- After a mutation, invalidate the queries it changes (`queryClient.invalidateQueries({ queryKey: getGetBillingNotesQueryKey() })`) instead of patching a copy of the data.
+- After a mutation, invalidate the queries it changes ({{ if project["frontend.api-client"] == "openapi-fetch" }}`queryClient.invalidateQueries({ queryKey: ['/billing/notes'] })`{{ else }}`queryClient.invalidateQueries({ queryKey: getGetBillingNotesQueryKey() })`{{ end }}) instead of patching a copy of the data.
 - Component tests that render a screen using a generated hook wrap it in a `QueryClientProvider` with a fresh `QueryClient`.
 - The gate is a lint rule: importing a store library (Redux, Zustand, MobX, Jotai, Recoil, Valtio) or another server-data cache (SWR, Apollo) fails `pnpm lint`. It sees imports only. It does not see server data copied into `useState` or a context, nor a cache that is hand-written; those are for review.
 {{~ end ~}}

@@ -8,6 +8,6 @@ Two kinds of state, two places. Server data lives in TanStack Query's cache (`@t
 
 ## Consequences
 
-- A store never holds a copy of server data: after a mutation, invalidate the queries it changes (`queryClient.invalidateQueries({ queryKey: getGetBillingNotesQueryKey() })`).
+- A store never holds a copy of server data: after a mutation, invalidate the queries it changes ({{ if project["frontend.api-client"] == "openapi-fetch" }}`queryClient.invalidateQueries({ queryKey: ['/billing/notes'] })`{{ else }}`queryClient.invalidateQueries({ queryKey: getGetBillingNotesQueryKey() })`{{ end }}).
 - Component tests install the plugins they need: `VueQueryPlugin` for a screen using a generated hook, `createPinia()` for one using a store.
 - The gate is a lint rule: importing another store library (Vuex, MobX) or another server-data cache (swrv, Apollo, Pinia Colada) fails `pnpm lint`. It sees imports only; server data copied into a store is for review.
