@@ -15,11 +15,16 @@ public sealed class ModuleApisBelongToTheirModule : IArchitectureRule
     {
         {{ not_null "model" }}
 
+        var contracts = Assembly.Load("Contracts");
+
+        // Contracts and BuildingBlocks too: every module may reference them, so an implementation there is outside the module.
         var classes = model.ModuleAssemblies
+            .Append(contracts)
+            .Append(typeof(ModuleApis).Assembly)
             .SelectMany(assembly => assembly.GetTypes())
             .Where(type => type is { IsClass: true, IsAbstract: false })
             .ToList();
-        var apis = Assembly.Load("Contracts").GetTypes()
+        var apis = contracts.GetTypes()
             .Where(ModuleApis.IsModuleApi)
             .OrderBy(api => api.FullName, StringComparer.Ordinal);
 
