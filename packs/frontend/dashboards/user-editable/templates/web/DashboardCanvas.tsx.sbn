@@ -1,10 +1,19 @@
 {{~ generative = array.contains project["frontend.dashboards"] "generative" ~}}
-{%{import { zodResolver } from '@hookform/resolvers/zod';
+{{~ valibot = project["frontend.validation"] == "valibot" ~}}
+{{~ if valibot ~}}
+import { valibotResolver } from '@hookform/resolvers/valibot';
+import { useMemo, useState } from 'react';
+import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
+import { useForm, useWatch } from 'react-hook-form';
+import * as v from 'valibot';
+{{~ else ~}}
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState } from 'react';
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
-import { useGetDashboardsWidgetsQuery, usePutDashboardsByIdMutation, type WidgetDescriptionDto } from '@/api/generated';
+{{~ end ~}}
+{%{import { useGetDashboardsWidgetsQuery, usePutDashboardsByIdMutation, type WidgetDescriptionDto } from '@/api/generated';
 import { Button } from '@/components/ui/button';
 import { Failure } from './Failure';
 import { applyLayout, columns, hasRoom, lowest, nextPlacement, type Placement, toLayout, withinReach } from './layout';
@@ -24,6 +33,21 @@ const maximumWidgets = 50;
 const catalogPageSize = 100;
 const noWidgets: WidgetDescriptionDto[] = [];
 
+}%}{{~ if valibot ~}}
+const nameSchema = v.object({
+  name: v.pipe(
+    v.string(),
+    v.trim(),
+    v.minLength(1, 'A dashboard needs a name of 1 to 100 characters.'),
+    v.maxLength(100, 'A dashboard needs a name of 1 to 100 characters.'),
+  ),
+});
+
+const widgetSchema = v.object({
+  source: v.pipe(v.string(), v.minLength(1, 'Choose a widget.')),
+  visual: v.pipe(v.string(), v.minLength(1, 'Choose how to show it.')),
+});
+{{~ else ~}}
 const nameSchema = z.object({
   name: z
     .string()
@@ -36,7 +60,8 @@ const widgetSchema = z.object({
   source: z.string().min(1, 'Choose a widget.'),
   visual: z.string().min(1, 'Choose how to show it.'),
 });
-
+{{~ end ~}}
+{%{
 export interface DraftDashboard {
   id: string;
   name: string;
@@ -101,10 +126,15 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
     decide(call);
   };
 {{~ end ~}}
-{%{
+
+{{~ if valibot ~}}
+  const naming = useForm({ resolver: valibotResolver(nameSchema), defaultValues: { name: dashboard.name } });
+  const adding = useForm({ resolver: valibotResolver(widgetSchema), defaultValues: { source: '', visual: '' } });
+{{~ else ~}}
   const naming = useForm({ resolver: zodResolver(nameSchema), defaultValues: { name: dashboard.name } });
   const adding = useForm({ resolver: zodResolver(widgetSchema), defaultValues: { source: '', visual: '' } });
-  const chosen = listed.get(useWatch({ control: adding.control, name: 'source' }));
+{{~ end ~}}
+{%{  const chosen = listed.get(useWatch({ control: adding.control, name: 'source' }));
 
   // Another page of the picker lists other widgets: a choice from this one would be added with the next page's visual.
   const pickerPage = (page: number) => {

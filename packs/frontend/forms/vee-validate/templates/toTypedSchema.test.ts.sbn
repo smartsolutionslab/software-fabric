@@ -1,3 +1,14 @@
+{{~ if project["frontend.validation"] == "valibot" ~}}
+import * as v from 'valibot';
+import { expect, test } from 'vitest';
+import { toTypedSchema } from './toTypedSchema';
+
+const orderSchema = v.object({
+  customer: v.object({ name: v.pipe(v.string(), v.minLength(1, 'Enter a name')) }),
+  lines: v.array(v.object({ quantity: v.pipe(v.number(), v.integer(), v.minValue(1, 'Order at least one')) })),
+  note: v.pipe(v.string(), v.trim()),
+});
+{{ else ~}}
 import { expect, test } from 'vitest';
 import { z } from 'zod';
 import { toTypedSchema } from './toTypedSchema';
@@ -7,6 +18,7 @@ const orderSchema = z.object({
   lines: z.array(z.object({ quantity: z.number().int().min(1, 'Order at least one') })),
   note: z.string().trim(),
 });
+{{ end ~}}
 
 test("a schema's messages reach the fields they belong to, nested and listed ones too", async () => {
   const result = await toTypedSchema(orderSchema).parse({

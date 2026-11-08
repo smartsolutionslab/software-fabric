@@ -1,0 +1,35 @@
+import type { IPublicClientApplication } from '@azure/msal-browser';
+import { MsalProvider } from '@azure/msal-react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+
+const asError = (failure: unknown) => (failure instanceof Error ? failure : new Error(String(failure)));
+
+/**
+ * Starts MSAL, then hands it to MsalProvider. MsalProvider would start it too, but swallows a start that fails and stays
+ * signing in for good; this shows the failure instead.
+ */
+export function Started({ client, children }: { client: IPublicClientApplication; children: ReactNode }) {
+  const [state, setState] = useState<'starting' | 'started' | Error>('starting');
+  // Started once: StrictMode runs effects twice, and two starts at once would run MSAL's set-up twice.
+  const start = useRef<Promise<void> | null>(null);
+
+  useEffect(() => {
+    let current = true;
+    start.current ??= client.initialize();
+    start.current.then(
+      () => current && setState('started'),
+      (failure: unknown) => current && setState(asError(failure)),
+    );
+    return () => {
+      current = false;
+    };
+  }, [client]);
+
+  if (state instanceof Error) {
+    return <p role="alert">Sign-in failed: {state.message}</p>;
+  }
+  if (state === 'starting') {
+    return <p>Signing in…</p>;
+  }
+  return <MsalProvider instance={client}>{children}</MsalProvider>;
+}

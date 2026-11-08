@@ -1,0 +1,1 @@
+            { group: ['yup', 'joi', 'zod'], message: 'Use valibot (docs/adr).' }
