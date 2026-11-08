@@ -19,8 +19,8 @@
 }
 
 .button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px currentColor;
+  outline: 2px solid #64748b;
+  outline-offset: 2px;
 }
 
 .button:disabled {
