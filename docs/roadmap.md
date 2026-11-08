@@ -137,7 +137,7 @@ green, in addition to what its row says.
 | # | Task | Done when |
 |---|---|---|
 | M3-20 | Lane `packs-backend`, after M3-04. `backend.database.sqlserver`: Aspire SQL Server, the EF provider, unique-constraint codes, Wolverine envelope storage, the transport-none outbox, tenancy column | `profile-ci.sh lean-crud --set backend.database=sqlserver` green |
-| M3-21 | Lane `packs-backend`, after M3-20. `backend.data-access.ef-core-dapper-read`: Dapper in query handlers, on both databases | Matrix rows green |
+| M3-21 | Lane `packs-backend`, after M3-20. `backend.data-access.reads.dapper` (was `ef-core-dapper-read`; owner decisions on #247): Dapper in query handlers, on both databases | Matrix rows green |
 | M3-22 | Lane `packs-backend`, after M3-04. `backend.bus.transport.azure-service-bus` on the Aspire emulator | An integration event crosses two modules over the emulator |
 | M3-23 | Lane `packs-backend`, after M3-04. `backend.mediator.wolverine`: `IDispatcher` over Wolverine's bus | Matrix rows green |
 | M3-24 | Lane `packs-backend`, after M3-04. `backend.api-protocols.grpc` beside REST | A module's query answers over gRPC in an integration test |
