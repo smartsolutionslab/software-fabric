@@ -102,6 +102,26 @@ public sealed class WolverineMediatorTests
         var shoutedBody = await shouted.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         shouted.StatusCode.ShouldBe(HttpStatusCode.OK, shoutedBody);
         shoutedBody.ShouldBe("\"FABRIC\"");
+
+        // Invoked inline: a command or a query never reaches the broker, so RabbitMQ has no queue named after one.
+        var queues = RabbitMqQueues(rabbitMq);
+        queues.Contains("CountLetters", StringComparison.OrdinalIgnoreCase).ShouldBeFalse(queues);
+        queues.Contains("Shout", StringComparison.OrdinalIgnoreCase).ShouldBeFalse(queues);
+    }
+
+    private static string RabbitMqQueues(Container rabbitMq)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo("docker") { RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var argument in new[] { "exec", rabbitMq.Id, "rabbitmqctl", "list_queues", "name" })
+        {
+            start.ArgumentList.Add(argument);
+        }
+
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        process.ExitCode.ShouldBe(0, output);
+        return output;
     }
 
     [Fact]
