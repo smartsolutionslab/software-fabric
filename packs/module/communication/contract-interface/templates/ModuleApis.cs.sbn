@@ -1,0 +1,42 @@
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.BuildingBlocks.Modules;
+
+/// <summary>
+/// The modules' synchronous APIs: an interface I&lt;Module&gt;Api in Contracts, which any module may call in-process,
+/// implemented once, in the module's own Api project. Modules still reference only Contracts, never each other.
+/// </summary>
+public static class ModuleApis
+{
+    /// <summary>Whether the type is a module's API: an interface in Contracts named I&lt;Module&gt;Api.</summary>
+    public static bool IsModuleApi(Type type)
+    {
+        {{ not_null "type" }}
+
+        return type.IsInterface
+            && type.Assembly.GetName().Name == "Contracts"
+            && type.Name.Length > "IApi".Length
+            && type.Name.StartsWith('I')
+            && type.Name.EndsWith("Api", StringComparison.Ordinal);
+    }
+
+    /// <summary>Registers every class in the module's Api project that implements a module API, scoped, for that API.</summary>
+    public static IServiceCollection AddModuleApis<TModule>(this IServiceCollection services)
+        where TModule : IModule
+    {
+        {{ not_null "services" }}
+
+        var implementations = typeof(TModule).Assembly.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false })
+            .OrderBy(type => type.FullName, StringComparer.Ordinal);
+        foreach (var implementation in implementations)
+        {
+            foreach (var api in implementation.GetInterfaces().Where(IsModuleApi))
+            {
+                services.AddScoped(api, implementation);
+            }
+        }
+
+        return services;
+    }
+}

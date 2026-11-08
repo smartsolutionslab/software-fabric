@@ -1,0 +1,14 @@
+option: module.communication.contract-interface
+files:
+  - { template: templates/ModuleApis.cs.sbn, target: src/BuildingBlocks/Modules/ModuleApis.cs }
+  - { template: templates/ModuleApisBelongToTheirModule.cs.sbn, target: tests/Architecture.Tests/Rules/ModuleApisBelongToTheirModule.cs }
+  - { template: templates/IModuleApi.cs.sbn, target: "src/Contracts/{{ module.namespace }}/I{{ module.namespace }}Api.cs", per-module: true }
+  - { template: templates/ModuleApi.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}Api.cs", per-module: true }
+slots:
+  - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn }
+  - { slot: tests.module-host-services, template: templates/module-host-services.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Every module API (an interface I<Module>Api in Contracts) lies in Contracts.<Module> and has exactly one implementation, in that module's Api project; no other module implements it.", file: templates/ModuleApisBelongToTheirModule.cs.sbn }

@@ -1,0 +1,7 @@
+        // The host provides the dispatcher a module's API sends its queries and commands through, and registers every
+        // module's API; this test starts one module, so the others' APIs are stand-ins it never calls.
+        services.AddDispatcher();
+        foreach (var api in System.Reflection.Assembly.Load("Contracts").GetExportedTypes().Where({{ namespace }}.BuildingBlocks.Modules.ModuleApis.IsModuleApi))
+        {
+            services.AddScoped(api, _ => throw new InvalidOperationException($"{api.Name} belongs to a module this test does not start."));
+        }

@@ -288,6 +288,7 @@ dimensions:
     options:
       contract-interface:
         tier: experimental
+        requires: ["module.communication has integration-events"]
         conflicts: ["backend.topology == services"]
       integration-events: { tier: supported }
 
