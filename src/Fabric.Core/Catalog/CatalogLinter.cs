@@ -5,7 +5,7 @@ namespace Fabric.Core.Catalog;
 
 /// <summary>
 /// Checks that the catalog is consistent with itself: every condition names real dimensions and options with an
-/// operator that fits, every default is an option, every default-from can give one, and every profile resolves and satisfies every rule.
+/// operator that fits (a dimension's own requires included), every default is an option, every default-from can give one, and every profile resolves and satisfies every rule.
 /// </summary>
 public static class CatalogLinter
 {
@@ -60,6 +60,17 @@ public static class CatalogLinter
             }
 
             CheckCondition(catalog, subject, activeWhen, problems);
+        }
+
+        foreach (var condition in dimension.Requires)
+        {
+            var subject = $"{dimension.Id} requires";
+            if (condition.Dimension == dimension.Id && !dimension.Multi)
+            {
+                problems.Add($"{subject}: condition '{condition}' refers to its own single-valued dimension; remove the options it refuses instead.");
+            }
+
+            CheckCondition(catalog, subject, condition, problems);
         }
 
         foreach (var option in dimension.Options.Values)
