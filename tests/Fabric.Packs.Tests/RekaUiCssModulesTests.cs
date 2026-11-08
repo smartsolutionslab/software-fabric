@@ -39,6 +39,10 @@ public sealed partial class RekaUiCssModulesTests
             styles.ShouldContain(rule);
         }
 
+        var root = styles[..(styles.IndexOf('}', StringComparison.Ordinal) + 1)];
+        root.ShouldStartWith(".button {");
+        root.ShouldContain("box-sizing: border-box;", customMessage: "a button and an as-child link must size alike without Tailwind's reset");
+
         var focus = styles[styles.IndexOf(".button:focus-visible {", StringComparison.Ordinal)..];
         focus = focus[..(focus.IndexOf('}', StringComparison.Ordinal) + 1)];
         focus.ShouldContain("outline: 2px solid #64748b;", customMessage: "focus must stay visible whatever the variant's text colour");
