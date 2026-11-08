@@ -217,9 +217,11 @@ public sealed class TurborepoTests
         var radius = Path.Combine(web, "packages", "tokens", "src", "radius.tokens.json");
         File.WriteAllText(radius, File.ReadAllText(radius).Replace("\"value\": 0.5,", "\"value\": 0.75,", StringComparison.Ordinal));
 
+        // On GitHub Actions turbo's default log order groups each task's output and drops the "<package>:<task>: " prefix;
+        // stream order prints the prefix everywhere.
         foreach (var task in new[] { "lint", "test" })
         {
-            var (exitCode, output) = Shell.Run(web, "pnpm", task);
+            var (exitCode, output) = Shell.Run(web, "pnpm", task, "--log-order=stream");
             exitCode.ShouldBe(0, $"pnpm {task}, after the tokens changed:\n{output}");
             output.ShouldContain($"app:{task}: cache miss", customMessage: output);
             output.ShouldContain($"@shop/ui:{task}: cache miss", customMessage: output);
