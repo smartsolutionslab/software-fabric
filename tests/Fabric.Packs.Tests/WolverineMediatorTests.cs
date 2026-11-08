@@ -158,4 +158,22 @@ public sealed class WolverineMediatorTests
         unhandledExitCode.ShouldNotBe(0, unhandledOutput);
         unhandledOutput.ShouldContain("Shop.Modules.Billing.Application.Commands.Whisper.Whisper has 0 handlers.");
     }
+
+    /// <summary>Wolverine invokes only public handler types through public, conventionally named methods.</summary>
+    [Fact]
+    public void A_handler_wolverine_cannot_invoke_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Mediator);
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/CountLetters", Query.Replace(
+            "public sealed class CountLettersHandler", "internal sealed class CountLettersHandler", StringComparison.Ordinal));
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/Shout", Command.Replace(
+            "public Task<Result<string, ApiError>> HandleAsync(", "Task<Result<string, ApiError>> ICommandHandler<Shout, Result<string, ApiError>>.HandleAsync(", StringComparison.Ordinal));
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application.Queries.CountLetters.CountLettersHandler is not public; Wolverine invokes only public handlers.");
+        output.ShouldContain("Shop.Modules.Billing.Application.Commands.Shout.ShoutHandler has no public HandleAsync; Wolverine does not invoke an explicit interface implementation.");
+    }
 }
