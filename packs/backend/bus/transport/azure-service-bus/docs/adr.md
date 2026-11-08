@@ -4,7 +4,7 @@
 
 ## Decision
 
-Azure Service Bus carries messages between modules (and later between services). In development Aspire runs the Azure Service Bus emulator (`RunAsEmulator()`) with the SQL Server it keeps its entities in; the host receives the emulator's address as the connection string `messaging`. Queues follow the messaging library's conventions and are created on startup through the management API. The emulator answers management requests on a port of its own, so the AppHost also passes `messaging-management`; against Azure the one connection string serves both, and the host uses `messaging` for management when `messaging-management` is not set.
+Azure Service Bus carries messages between modules (and later between services). In development Aspire runs the Azure Service Bus emulator (`RunAsEmulator()`) with the SQL Server it keeps its entities in; the host receives the emulator's address as the connection string `messaging`. Queues follow the messaging library's conventions and are created on startup through the management API. The emulator answers management requests on a port of its own, so in run mode the AppHost also passes `messaging-management`. A published AppHost runs no emulator and passes no management address: against Azure the one connection string serves both, and the host uses `messaging` for management when `messaging-management` is not set.
 
 Versions and licences, checked on 2026-11-08; each version had been published for more than a week:
 

@@ -1,5 +1,8 @@
 var messaging = builder.AddAzureServiceBus("messaging")
     .RunAsEmulator();
-// The emulator answers management requests, through which the messaging library creates its queues, on a port of its own.
-var messagingManagement = ReferenceExpression.Create(
-    $"Endpoint=sb://{messaging.GetEndpoint("emulatorhealth").Property(EndpointProperty.HostAndPort)};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;");
+// The emulator, which runs with the AppHost and is never published, answers management requests, through which the
+// messaging library creates its queues, on a port of its own. Against Azure the messaging connection string serves both.
+var messagingManagement = builder.ExecutionContext.IsRunMode
+    ? ReferenceExpression.Create(
+        $"Endpoint=sb://{messaging.GetEndpoint("emulatorhealth").Property(EndpointProperty.HostAndPort)};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;")
+    : null;

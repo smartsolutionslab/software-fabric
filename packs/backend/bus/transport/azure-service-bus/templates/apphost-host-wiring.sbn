@@ -1,4 +1,10 @@
 
     .WithReference(messaging)
     .WaitFor(messaging)
-    .WithEnvironment("ConnectionStrings__messaging-management", messagingManagement)
+    .WithEnvironment(context =>
+    {
+        if (messagingManagement is not null)
+        {
+            context.EnvironmentVariables["ConnectionStrings__messaging-management"] = messagingManagement;
+        }
+    })
