@@ -75,10 +75,13 @@ public sealed partial class ValibotTests
         """;
 
     private const string ReactSignUpFormTest = """
-        import { render, screen, waitFor } from '@testing-library/react';
+        import { cleanup, render, screen, waitFor } from '@testing-library/react';
         import userEvent from '@testing-library/user-event';
-        import { expect, test, vi } from 'vitest';
+        import { afterEach, expect, test, vi } from 'vitest';
         import { SignUpForm } from './SignUpForm';
+
+        // Vitest runs without globals, so Testing Library cannot register its own cleanup.
+        afterEach(cleanup);
 
         test('an empty valibot sign-up shows the schema messages next to its fields', async () => {
           render(<SignUpForm onSubmitted={vi.fn()} />);
