@@ -1,9 +1,7 @@
 namespace {{ namespace }}.Kernel;
 
-#pragma warning disable CA1040 // A marker: the architecture rule exempts a value object's own backing values by it.
 /// <summary>
 /// A value object: a value with rules and meaning of its own, compared by value. Its own backing values are the only
 /// place a strict module (module.ddd-depth: strict) holds a primitive.
 /// </summary>
 public interface IValueObject;
-#pragma warning restore CA1040
