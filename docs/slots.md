@@ -141,9 +141,9 @@ pack fill a slot of a choice it can be combined with but does not need
 | `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
 | `dotnet.build-properties` | `Directory.Build.props` | packs adding analyzers or properties (result, red-first) |
-| `solution.projects` *(added in M1-02)* | `Solution.slnx` | packs owning a project: modular-monolith (Host), aspire-fixture or testcontainers (Integration.Tests), ensure-that, option and the result styles (their tests under `tests/Kernel/`) |
+| `solution.projects` *(added in M1-02)* | `Solution.slnx` | packs owning a project: modular-monolith (Host), aspire-fixture or testcontainers (Integration.Tests), reads dapper (Reads.Tests), ensure-that, option and the result styles (their tests under `tests/Kernel/`) |
 | `modules.packages.domain` | `src/Modules/Directory.Build.props` | — (Domain stays dependency-free) |
-| `modules.packages.application` | 〃 | wolverine, mediator, agent-framework (`Microsoft.Agents.AI`: an agent lives in Application, ADR-0011) |
+| `modules.packages.application` | 〃 | wolverine, mediator, agent-framework (`Microsoft.Agents.AI`: an agent lives in Application, ADR-0011), reads dapper (`Dapper`: query handlers live in Application) |
 | `modules.packages.infrastructure` | 〃 | ef-core, postgres, wolverine |
 | `modules.packages.api` | 〃 | minimal-apis; api-protocols grpc (`Grpc.AspNetCore`, and the `Protobuf` item that compiles the Api project's `Protos/**/*.proto`, added for #250) |
 | `buildingblocks.packages` | `src/BuildingBlocks/BuildingBlocks.csproj` | ef-core, wolverine, result |
@@ -467,7 +467,7 @@ AppHost's model with it, declares it instead (*#260*).
 | `host.endpoints` *(added in M1-06)* | `src/Host/Program.cs` | 0+ | the base with an identity provider (`/me`), tenancy (`/me/tenant`), agent-ui ag-ui (`POST /agents/{name}`) |
 | `host.log-levels` | `src/Host/appsettings.json`, under `Logging:LogLevel` | 0+ | ef-core (SQL commands at `Warning`) |
 | `host.kestrel-endpoints` *(added for #250; separator `,` + newline)* | `src/Host/appsettings.json`, under `Kestrel:Endpoints` beside the host's own `http` (`http://localhost:5080`, launchSettings' URL); rendered only with a contribution | 0+ | api-protocols grpc (`grpc`, HTTP/2 only on `http://localhost:5081`: Kestrel speaks HTTP/2 without TLS only on an endpoint that speaks nothing else). Aspire turns every Kestrel endpoint into an endpoint of the host resource, by its name |
-| `modules.infrastructure` | `src/BuildingBlocks/Modules/ModuleInfrastructure.cs` | 0+ | ef-core, wolverine, tenancy, agent-ui ag-ui (registers the module's `IAgentConversation<TSelf>` queries by their agents' names), contract-interface (registers the module's implementations of a module API, `I<Module>Api` in Contracts) |
+| `modules.infrastructure` | `src/BuildingBlocks/Modules/ModuleInfrastructure.cs` | 0+ | ef-core, wolverine, tenancy, reads dapper (`AddReadConnection`, once for the project), agent-ui ag-ui (registers the module's `IAgentConversation<TSelf>` queries by their agents' names), contract-interface (registers the module's implementations of a module API, `I<Module>Api` in Contracts) |
 | `modules.endpoints` *(added in M1-02)* | `src/BuildingBlocks/Modules/ModuleEndpoints.cs` | 0+ | minimal-apis (maps `IEndpoint`s), keycloak (`group.RequireAuthorization()`) |
 | `persistence.options` *(added in M1-03)* | `PersistenceRegistration.cs` and each module's design-time factory (owned and declared by ef-core); `options`, `connectionString` and `schema` in scope | **exactly-one** | postgres (`options.UseNpgsql(connectionString, ...)` with the history table in `schema`) |
 | `persistence.model-conventions` | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` (owned and declared by ef-core) | 0+ | tenancy column |

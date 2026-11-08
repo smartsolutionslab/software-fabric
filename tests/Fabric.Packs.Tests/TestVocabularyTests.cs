@@ -57,6 +57,7 @@ public sealed partial class TestVocabularyTests
         { "saas-standard-vue", [] },
         { "lean-crud", [] },
         { "saas-standard-react", ["frontend.realtime=sse"] },
+        { "lean-crud", ["backend.data-access.reads=dapper", "backend.database=sqlserver"] },
     };
 
     [Theory]

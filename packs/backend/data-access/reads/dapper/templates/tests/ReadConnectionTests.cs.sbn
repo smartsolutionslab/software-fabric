@@ -1,0 +1,52 @@
+using Dapper;
+using {{ namespace }}.BuildingBlocks.Persistence;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Reads.Tests;
+
+/// <summary>
+/// The read connection, registered as the modules register it, against the AppHost's database: a query handler reads a
+/// table with Dapper. The SQL here is what PostgreSQL and SQL Server both accept; a module's own is for its database.
+/// </summary>
+{{~ database_fixture_attributes ~}}
+public sealed class ReadConnectionTests({{ database_fixture }})
+{
+    {{ test_attribute }}
+    public async Task The_read_connection_opens_on_the_applications_database()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        await using var services = Services();
+
+        await using var connection = await services.GetRequiredService<IReadConnection>().OpenAsync(cancellationToken);
+
+        {{ `connection.State` | should_be `System.Data.ConnectionState.Open` }};
+        {{ `(await connection.ExecuteScalarAsync<int>(new CommandDefinition("SELECT 1", cancellationToken: cancellationToken)))` | should_be `1` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_query_handler_reads_a_table_with_dapper_filtered_by_a_parameter_and_in_order()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        await using var services = Services();
+        var reads = services.GetRequiredService<IReadConnection>();
+        await using (var connection = await reads.OpenAsync(cancellationToken))
+        {
+            await connection.ExecuteAsync(new CommandDefinition("CREATE SCHEMA reads_tests", cancellationToken: cancellationToken));
+            await connection.ExecuteAsync(new CommandDefinition("CREATE TABLE reads_tests.notes (id integer NOT NULL PRIMARY KEY, title varchar(100) NOT NULL)", cancellationToken: cancellationToken));
+            await connection.ExecuteAsync(new CommandDefinition("INSERT INTO reads_tests.notes (id, title) VALUES (3, 'third'), (1, 'first'), (2, 'second')", cancellationToken: cancellationToken));
+        }
+
+        var notes = await new SampleNotesHandler(reads).HandleAsync(new SampleNotes(2), cancellationToken);
+
+        {{ `notes` | should_be `[new SampleNote(1, "first"), new SampleNote(2, "second")]` }};
+    }
+
+    private ServiceProvider Services()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:database"] = {{ database_connection_string }} })
+            .Build();
+        return new ServiceCollection().AddReadConnection(configuration).BuildServiceProvider();
+    }
+}
