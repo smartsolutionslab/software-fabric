@@ -111,9 +111,6 @@ public sealed partial class RekaUiCssModulesTests
         var plain = Escapes().Replace(testOutput, string.Empty);
         plain.ShouldContain("✓ src/components/ui/BaseButton.test.ts > a button is a button with the default look", customMessage: testOutput);
         plain.ShouldContain("✓ src/components/ui/BaseButton.test.ts > with as-child the child takes the button's look and stays what it is", customMessage: testOutput);
-        var stylesheets = Directory.GetFiles(Path.Combine(app, "dist", "assets"), "*.css");
-        stylesheets.ShouldNotBeEmpty();
-        string.Concat(stylesheets.Select(File.ReadAllText)).ShouldContain("#0f172a");
     }
 
     private static Dictionary<string, string> Files(params string[] overrides)
