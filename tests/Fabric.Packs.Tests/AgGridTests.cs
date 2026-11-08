@@ -153,6 +153,51 @@ public sealed partial class AgGridTests
         files["AGENTS.md"].ShouldContain("`DataTable` (`@/components/ui/DataTable.vue`)");
     }
 
+    private const string BoundTheme = """
+        export const theme = themeQuartz.withParams({
+          fontFamily: 'inherit',
+          backgroundColor: 'var(--background)',
+          foregroundColor: 'var(--foreground)',
+          borderColor: 'var(--border)',
+          headerBackgroundColor: 'var(--muted)',
+          accentColor: 'var(--primary)',
+        });
+        """;
+
+    [Theory]
+    [InlineData(React, "web/app/src/components/ui/data-table.tsx", "theme={theme}")]
+    [InlineData(Vue, "web/app/src/components/ui/DataTable.vue", ":theme=\"theme\"")]
+    public void With_shadcn_the_grid_is_quartz_bound_to_the_theme_variables_of_index_css(string profile, string table, string themeProperty)
+    {
+        var files = Files(profile, AgGrid);
+
+        files["web/app/src/components/ui/data-table-columns.ts"].ShouldContain(BoundTheme);
+        files[table].ShouldContain(themeProperty);
+        files["AGENTS.md"].ShouldContain("The grid's colours, borders and font come from the theme variables in `src/index.css`");
+        Adr(files).ShouldContain("Quartz theme bound to the theme variables in `src/index.css`");
+    }
+
+    [Theory]
+    [InlineData(React, "radix-headless", "web/app/src/components/ui/data-table.tsx", "theme={theme}")]
+    [InlineData(Vue, "reka-ui", "web/app/src/components/ui/DataTable.vue", ":theme=\"theme\"")]
+    public void With_another_ui_library_the_grid_is_quartz_as_shipped_and_the_adr_records_the_exception(string profile, string library, string table, string themeProperty)
+    {
+        // Stands in for a library whose pack does not exist yet (radix-headless is M3-49); a real pack takes no part here.
+        using var probe = new ProbePack($"frontend.ui-library.{library}", new Dictionary<string, string>());
+        var packs = Repository.Packs.Packs.ToDictionary();
+        packs.TryAdd(probe.Manifest.Option, probe.Manifest);
+        var generated = Generator.New(Repository.Catalog, packs, "shop", profile, [AgGrid, $"frontend.ui-library={library}"]);
+        generated.Errors.ShouldBeEmpty();
+        var files = generated.Files.ToDictionary(file => file.Path, file => file.Content);
+
+        var columns = files["web/app/src/components/ui/data-table-columns.ts"];
+        columns.ShouldContain("export const theme = themeQuartz;");
+        columns.ShouldNotContain("var(--");
+        files[table].ShouldContain(themeProperty);
+        files["AGENTS.md"].ShouldContain("The grid uses AG Grid's Quartz theme as shipped");
+        Adr(files).ShouldContain("the exception to changing colours in one place");
+    }
+
     [Fact]
     public void A_react_screen_with_an_ag_grid_table_builds_lints_passes_its_tests_and_lint_refuses_tanstack_table()
     {
@@ -226,6 +271,9 @@ public sealed partial class AgGridTests
         generated.Errors.ShouldBeEmpty($"{profile} {string.Join(' ', overrides)}");
         return generated.Files.ToDictionary(file => file.Path, file => file.Content);
     }
+
+    private static string Adr(Dictionary<string, string> files) =>
+        files.Single(file => file.Key.EndsWith("-frontend-data-grid-ag-grid.md", StringComparison.Ordinal)).Value;
 
     private static IEnumerable<KeyValuePair<string, string>> WebSources(Dictionary<string, string> files) =>
         files.Where(file => file.Key.StartsWith("web/app/src/", StringComparison.Ordinal) && Regex.IsMatch(file.Key, @"\.(ts|tsx|vue)$"));
