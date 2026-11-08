@@ -34,7 +34,7 @@ public sealed class NxTests
 
         nx.ShouldContain("\"neverConnectToCloud\": true");
         nx.ShouldContain("\"dependsOn\": [\"^build\"]");
-        nx.ShouldContain("\"outputs\": [\"{projectRoot}/dist\"]");
+        nx.ShouldContain("\"outputs\": [\"{projectRoot}/dist\", \"{projectRoot}/storybook-static\"]");
         foreach (var target in new[] { "build", "lint", "test" })
         {
             nx.ShouldContain($"\"{target}\": {{");
@@ -43,6 +43,18 @@ public sealed class NxTests
         nx.Split("\"cache\": true").Length.ShouldBe(4, "build, lint and test are cached");
         nx.ShouldNotContain("plugins");
         nx.ShouldNotContain("nxCloud");
+    }
+
+    // A build bakes in VITE_* (the sign-in authority) and REMOTE_* (module federation's remote URLs); both are part of its key.
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void The_build_is_keyed_on_its_files_its_dependencies_and_every_vite_and_remote_variable(string profile)
+    {
+        var nx = Files(profile, Nx)["web/nx.json"];
+
+        nx.ShouldContain("\"inputs\": [\"default\", \"^default\", { \"runtime\": ");
+        nx.ShouldContain("VITE|REMOTE");
+        nx.ShouldContain(".sort()");
     }
 
     [Theory]
@@ -111,6 +123,53 @@ public sealed class NxTests
         var (againExitCode, againOutput) = Shell.Run(web, "pnpm", "build");
         againExitCode.ShouldBe(0, $"pnpm build, again:\n{againOutput}");
         againOutput.ShouldContain("1/1 hit (100%)", customMessage: againOutput);
+    }
+
+    /// <summary>
+    /// The review's first finding on #372: a rebuild against another sign-in authority, with no file changed, must build a
+    /// bundle that signs in there, not replay the previous one from the cache.
+    /// </summary>
+    [Fact]
+    public void A_build_against_another_sign_in_authority_is_not_read_from_the_cache()
+    {
+        using var project = new GeneratedProject("saas-standard-react", Nx);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, $"pnpm install:\n{installOutput}");
+
+        foreach (var authority in new[] { "https://first.example/realms/shop", "https://second.example/realms/shop" })
+        {
+            var (exitCode, output) = Shell.Run(web, new Dictionary<string, string> { ["VITE_OIDC_AUTHORITY"] = authority }, "pnpm", "build");
+            exitCode.ShouldBe(0, $"pnpm build with {authority}:\n{output}");
+        }
+
+        var bundle = string.Concat(Directory.GetFiles(Path.Combine(web, "app", "dist"), "*.js", SearchOption.AllDirectories).Select(File.ReadAllText));
+        bundle.ShouldContain("https://second.example/realms/shop", customMessage: "the second build's bundle signs in at the second authority");
+    }
+
+    /// <summary>
+    /// The review's second finding on #372: with tokens-and-components the ui package builds Storybook into
+    /// storybook-static/; a build read from the cache restores it.
+    /// </summary>
+    [Fact]
+    public void A_build_read_from_the_cache_restores_the_storybook()
+    {
+        using var project = new GeneratedProject("saas-standard-react", Nx, "frontend.design-system=tokens-and-components");
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var storybook = Path.Combine(web, "packages", "ui", "storybook-static");
+        foreach (var step in new[] { "install", "build" })
+        {
+            var (exitCode, output) = Shell.Run(web, "pnpm", step);
+            exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
+        }
+
+        File.Exists(Path.Combine(storybook, "index.html")).ShouldBeTrue("the first build writes the storybook");
+        Directory.Delete(storybook, recursive: true);
+
+        var (againExitCode, againOutput) = Shell.Run(web, "pnpm", "build");
+        againExitCode.ShouldBe(0, $"pnpm build, again:\n{againOutput}");
+        againOutput.ShouldContain("hit (100%)", customMessage: againOutput);
+        File.Exists(Path.Combine(storybook, "index.html")).ShouldBeTrue("the cached build restores the storybook");
     }
 
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
