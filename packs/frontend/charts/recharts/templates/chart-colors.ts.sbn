@@ -1,0 +1,17 @@
+/** One palette for every chart in the project: Recharts brings none of its own (docs/adr). */
+const palette = [
+  '#5470c6',
+  '#91cc75',
+  '#fac858',
+  '#ee6666',
+  '#73c0de',
+  '#3ba272',
+  '#fc8452',
+  '#9a60b4',
+  '#ea7ccc',
+] as const;
+
+/** The colour of a chart's series, or of a pie's slice, at a position; after the last colour the palette starts again. */
+export function chartColor(position: number): string {
+  return palette[position % palette.length] ?? palette[0];
+}

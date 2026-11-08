@@ -3,6 +3,7 @@ files:
   - { template: templates/utils.ts.sbn, target: web/app/src/lib/utils.ts }
   - { template: templates/BaseButton.vue.sbn, target: web/app/src/components/ui/BaseButton.vue }
   - { template: templates/BaseButton.test.ts.sbn, target: web/app/src/components/ui/BaseButton.test.ts }
+  - { template: templates/BaseButton.module.css.sbn, target: web/app/src/components/ui/BaseButton.module.css, when: 'project["frontend.styling"] == "css-modules"' }
 slots:
   - { slot: web.dependencies, template: templates/dependencies.sbn }
   - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 20 }
@@ -11,4 +12,4 @@ agents:
 adr: docs/adr.md
 gates:
   - { kind: lint-rule, describes: "Importing another Vue component library (PrimeVue, Vuetify, Quasar, Element Plus, Ant Design Vue, Naive UI, Headless UI, Radix Vue) fails lint.", file: templates/restricted.sbn }
-  - { kind: unit-test, describes: "BaseButton renders a button, and with as-child gives its child the button's look instead (src/components/ui/BaseButton.test.ts).", file: templates/BaseButton.test.ts.sbn }
+  - { kind: unit-test, describes: "BaseButton renders a button, and with as-child gives its child the button's look instead, the look coming from BaseButton.module.css with CSS Modules (src/components/ui/BaseButton.test.ts).", file: templates/BaseButton.test.ts.sbn }
