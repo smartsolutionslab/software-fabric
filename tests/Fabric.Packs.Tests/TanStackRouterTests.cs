@@ -150,6 +150,26 @@ public sealed class TanStackRouterTests
         output.ShouldNotContain("Type '\"/billing\"' is not assignable");
     }
 
+    /// <summary>Before the first module, links are checked too: the start page is the only path (#333, review of #352).</summary>
+    [Fact]
+    public void Without_a_module_a_link_to_a_path_no_route_has_fails_the_build()
+    {
+        using var project = new GeneratedProject(Profile, TanStackRouter);
+        project.Write("web/app/src/links.tsx", """
+            import { Link } from '@tanstack/react-router';
+
+            export const toHome = <Link to="/">Home</Link>;
+            export const toNowhere = <Link to="/no-such-route">Nowhere</Link>;
+            """);
+        RunWeb(project, "install");
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "build");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Type '\"/no-such-route\"' is not assignable to type");
+        output.ShouldNotContain("Type '\"/\"' is not assignable");
+    }
+
     /// <summary>A module routes below itself (#333): its routes.tsx gives its route children, which the router mounts.</summary>
     [Fact]
     public void A_route_below_a_module_renders_inside_the_modules_page_through_a_checked_link()
