@@ -89,10 +89,12 @@ public sealed partial class FormKitTests
     private const string OtherVueFormLibraries = """
         import { useForm as useTanStackForm } from '@tanstack/vue-form';
         import { createZodPlugin } from '@formkit/zod';
+        import { generateClasses } from '@formkit/themes';
+        import '@formkit/themes/genesis';
         import { toTypedSchema } from '@vee-validate/zod';
         import { useForm } from 'vee-validate';
 
-        export const others = [useTanStackForm, createZodPlugin, toTypedSchema, useForm];
+        export const others = [useTanStackForm, createZodPlugin, generateClasses, toTypedSchema, useForm];
         """;
 
     [Fact]
@@ -122,6 +124,8 @@ public sealed partial class FormKitTests
         files.Keys.ShouldContain("web/app/src/forms/schemaSubmit.test.ts");
         files["web/app/eslint.config.js"].ShouldContain("group: ['vee-validate', '@vee-validate/*', '@tanstack/vue-form', '@formkit/zod'],");
         files["web/app/eslint.config.js"].ShouldContain("message: 'Use FormKit with schemaSubmit from src/forms/schemaSubmit (docs/adr).'");
+        files["web/app/eslint.config.js"].ShouldContain("group: ['@formkit/themes', '@formkit/themes/*'],");
+        files["web/app/eslint.config.js"].ShouldContain("message: 'Style FormKit in src/forms/formkit.config.ts (docs/adr).'");
         files["web/app/eslint.config.js"].ShouldNotContain("Use vee-validate");
         files["web/app/src/main.ts"].ShouldContain("import { withFormKit } from './providers/formkit';");
         files["web/app/src/main.ts"].ShouldContain("withFormKit");
@@ -228,11 +232,14 @@ public sealed partial class FormKitTests
         testOutput.ShouldContain("✓ src/pages/SignUpForm.test.ts > a valid FormKit sign-up submits the values the schema puts out");
         testOutput.ShouldContain("✓ src/forms/schemaSubmit.test.ts > a schema's messages land on the fields they belong to, nested and listed ones too");
         testOutput.ShouldContain("✓ src/forms/schemaSubmit.test.ts > a valid form hands the handler the schema's output");
+        testOutput.ShouldContain("✓ src/forms/schemaSubmit.test.ts > fields named like an object's own properties get their messages too");
         FormatCheck(project, "src/forms");
         var lintOutput = LintRefuses(project, OtherVueFormLibraries);
         const string Message = "import is restricted from being used by a pattern. Use FormKit with schemaSubmit from src/forms/schemaSubmit (docs/adr)";
         lintOutput.ShouldContain($"'@tanstack/vue-form' {Message}");
         lintOutput.ShouldContain($"'@formkit/zod' {Message}");
+        lintOutput.ShouldContain("'@formkit/themes' import is restricted from being used by a pattern. Style FormKit in src/forms/formkit.config.ts (docs/adr)");
+        lintOutput.ShouldContain("'@formkit/themes/genesis' import is restricted from being used by a pattern. Style FormKit in src/forms/formkit.config.ts (docs/adr)");
         lintOutput.ShouldContain($"'@vee-validate/zod' {Message}");
         lintOutput.ShouldContain($"'vee-validate' {Message}");
     }
