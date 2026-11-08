@@ -1,0 +1,13 @@
+import type { ColDef } from 'ag-grid-community';
+import { AgGridReact } from 'ag-grid-react';
+import { modules } from './data-table-columns';
+
+interface DataTableProps<TRow> {
+  columns: ColDef<TRow>[];
+  data: TRow[];
+}
+
+/** A plain table over AG Grid (community), as high as its rows; keep columns and data stable (module scope or memoised). */
+export function DataTable<TRow>({ columns, data }: DataTableProps<TRow>) {
+  return <AgGridReact<TRow> modules={modules} columnDefs={columns} rowData={data} domLayout="autoHeight" />;
+}
