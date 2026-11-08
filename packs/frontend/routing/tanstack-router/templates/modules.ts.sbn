@@ -1,4 +1,4 @@
-import type { AnyRoute } from '@tanstack/react-router';
+import type { rootRoute } from '@/rootRoute';
 
 /**
  * Every module's route, by module name. Each src/modules/<module>/routes.tsx adds its own entry
@@ -9,9 +9,9 @@ export interface ModuleRoutes {}
 
 /**
  * What src/modules/<module>/routes.tsx exports as `route`: a child of the root route, with routes below it as its
- * children. Until the first module exists it is any route, and there is no module path to check.
+ * children. Until the first module exists the list is empty and its type is the root route's, which adds no path.
  */
-export type ModuleRoute = [keyof ModuleRoutes] extends [never] ? AnyRoute : ModuleRoutes[keyof ModuleRoutes];
+export type ModuleRoute = [keyof ModuleRoutes] extends [never] ? typeof rootRoute : ModuleRoutes[keyof ModuleRoutes];
 
 export const moduleRoutes = Object.values(
   import.meta.glob<ModuleRoute>('./*/routes.tsx', { eager: true, import: 'route' }),
