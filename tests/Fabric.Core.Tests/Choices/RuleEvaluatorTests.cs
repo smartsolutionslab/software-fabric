@@ -86,10 +86,49 @@ public class RuleEvaluatorTests
     [InlineData("saas-standard-react", new[] { "frontend.styling=library-theme", "frontend.ui-library=radix-headless" },
         "frontend.styling=library-theme conflicts with frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless).")]
     [InlineData("lean-crud", new[] { "module.communication=contract-interface" },
-        "module defaults: module.communication=contract-interface requires module.communication has integration-events, but module.communication is contract-interface.")]
+        "module defaults: module.communication requires module.communication has integration-events, but module.communication is contract-interface.")]
     public void Rejects_a_combination_the_packs_refuse_in_one_sentence(string profile, string[] settings, string violation)
     {
         Violations(profile, settings).ShouldBe([violation]);
+    }
+
+    [Fact]
+    public void An_empty_communication_set_is_refused_in_one_sentence()
+    {
+        Violations("lean-crud", "module.communication=")
+            .ShouldBe(["module defaults: module.communication requires module.communication has integration-events, but module.communication is empty."]);
+    }
+
+    [Fact]
+    public void A_module_dimension_requirement_is_checked_per_module_and_names_the_module()
+    {
+        var choices = ChoiceResolver.Resolve(RepositoryCatalog, "lean-crud", []).Choices.ShouldNotBeNull();
+        Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> modules = new()
+        {
+            ["billing"] = new Dictionary<string, IReadOnlyList<string>> { ["module.communication"] = ["integration-events"] },
+            ["shipping"] = new Dictionary<string, IReadOnlyList<string>> { ["module.communication"] = [] },
+        };
+
+        RuleEvaluator.Check(RepositoryCatalog, choices.Project, modules)
+            .ShouldBe(["module 'shipping': module.communication requires module.communication has integration-events, but module.communication is empty."]);
+    }
+
+    [Fact]
+    public void A_project_dimension_requirement_is_checked_whenever_the_dimension_is_set()
+    {
+        var catalog = CatalogReader.Read(
+            new StringReader("""
+                version: 1
+                dimensions:
+                  x.y: { scope: project, requires: ["x.z == p"], default: o, options: { o: { tier: supported } } }
+                  x.z: { scope: project, default: q, options: { p: { tier: supported }, q: { tier: supported } } }
+                """),
+            "test.yaml");
+
+        RuleEvaluator.Check(catalog, Values(("x.y", "o"), ("x.z", "q")), new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>())
+            .ShouldBe(["x.y requires x.z == p, but x.z is q."]);
+        RuleEvaluator.Check(catalog, Values(("x.z", "q")), new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>>())
+            .ShouldBeEmpty();
     }
 
     [Fact]

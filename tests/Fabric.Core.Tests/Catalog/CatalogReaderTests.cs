@@ -73,6 +73,16 @@ public class CatalogReaderTests
     }
 
     [Fact]
+    public void Reads_the_requirement_on_module_communication_and_none_on_its_options()
+    {
+        var communication = ReadRepositoryCatalog().Dimensions["module.communication"];
+
+        communication.Requires.Select(condition => condition.ToString()).ShouldBe(["module.communication has integration-events"]);
+        communication.Options.Values.ShouldAllBe(option => option.Requires.Count == 0);
+        ReadRepositoryCatalog().Dimensions["module.style"].Requires.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Reads_option_tier_requires_and_conflicts()
     {
         var catalog = ReadRepositoryCatalog();

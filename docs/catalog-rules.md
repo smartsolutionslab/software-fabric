@@ -20,6 +20,7 @@ catalog agree.
 | `active-when` | The dimension exists only when this condition holds. When it does not, the dimension **must not** be set; when it does, it **must** be set (or take its `default`). |
 | `default` | Value used when the dimension is active and not chosen. |
 | `default-from` | Another single-valued dimension whose value is the default when it is also one of this dimension's options (`default-from: backend.llm`: the embeddings provider is the LLM provider when that provider has embeddings). When it is not, the dimension has no default, and an active one must be set; the error names the followed dimension and its value. Only on a single-valued dimension, never beside `default`, and the followed dimension must share at least one option with it (ADR-0012). |
+| `requires` | List of conditions, **all** of which must hold whenever the dimension is set, whichever of its options are chosen, an empty set included. A module dimension's are checked per module, so `fabric add-module` refuses a module that breaks them and names it. For a rule no option can carry because it must also fire when none is chosen (`module.communication: requires: ["module.communication has integration-events"]`). It may name its own dimension only when that is multi-valued, with `has`; a single-valued dimension that refuses one of its own values should not offer it. An inactive dimension is not checked. The rejection names the dimension, not an option: `module.communication requires module.communication has integration-events, but module.communication is empty.` |
 | `options` | Map of option id → option. |
 
 ## Options
@@ -67,12 +68,14 @@ A condition is a single string:
 
 - `has` is only for multi-valued dimensions; `==`, `!=` and `in` only for
   single-valued ones. The catalog self-check rejects any other pairing.
-- A condition may not refer to its own dimension in `active-when`.
+- A condition may not refer to its own dimension in `active-when`, nor in a
+  single-valued dimension's `requires`.
 - A dimension that is **inactive** never satisfies `==`, `in` or `has`, and
   always satisfies `!=`.
-- Module-scoped conditions are evaluated **per module**. A project-scoped
-  option that refers to a module dimension holds if it holds for **any**
-  module.
+- Module-scoped conditions are evaluated **per module**: a module option's
+  rules and a module dimension's `requires` against that module's values and
+  the project's. A project-scoped option or dimension that refers to a module
+  dimension holds if it holds for **any** module.
 - No `or`, no nesting. If a rule needs more, it is two options or a
   different dimension cut — keeping the grammar this small is deliberate,
   so the generator can explain every rejection in one sentence.

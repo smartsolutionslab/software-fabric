@@ -285,10 +285,11 @@ dimensions:
     scope: module
     multi: true
     default: [integration-events]
+    # Reason: every module gets the unit of work and the messaging wiring of the bus, built on types only integration-events supplies.
+    requires: ["module.communication has integration-events"]
     options:
       contract-interface:
         tier: experimental
-        requires: ["module.communication has integration-events"]
         conflicts: ["backend.topology == services"]
       integration-events: { tier: supported }
 
