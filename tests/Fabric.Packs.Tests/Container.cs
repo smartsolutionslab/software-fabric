@@ -102,15 +102,31 @@ internal sealed class Container : IDisposable
         DockerPorts.EnsureRunsAlone();
         const string password = "Fabric-tests-1";
         var network = Docker("network", "create", $"fabric-servicebus-{Guid.NewGuid():N}").Trim();
-        var sqlServer = Docker(
-            "run", "--detach", "--network", network, "--network-alias", "sqlserver",
-            "--env", "ACCEPT_EULA=Y", "--env", $"MSSQL_SA_PASSWORD={password}",
-            "mcr.microsoft.com/mssql/server:2022-latest").Trim();
-        var emulator = Docker(
-            "run", "--detach", "--network", network, "--publish", "127.0.0.1::5672", "--publish", "127.0.0.1::5300",
-            "--env", "ACCEPT_EULA=Y", "--env", "SQL_SERVER=sqlserver", "--env", $"MSSQL_SA_PASSWORD={password}",
-            "mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.0").Trim();
-        var container = new Container(emulator, PublishedPort(emulator, 5672), [sqlServer], network, PublishedPort(emulator, 5300));
+        List<string> started = [];
+        Container container;
+        try
+        {
+            started.Add(Docker(
+                "run", "--detach", "--network", network, "--network-alias", "sqlserver",
+                "--env", "ACCEPT_EULA=Y", "--env", $"MSSQL_SA_PASSWORD={password}",
+                "mcr.microsoft.com/mssql/server:2022-latest").Trim());
+            started.Add(Docker(
+                "run", "--detach", "--network", network, "--publish", "127.0.0.1::5672", "--publish", "127.0.0.1::5300",
+                "--env", "ACCEPT_EULA=Y", "--env", "SQL_SERVER=sqlserver", "--env", $"MSSQL_SA_PASSWORD={password}",
+                "mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.0").Trim());
+            container = new Container(started[1], PublishedPort(started[1], 5672), [started[0]], network, PublishedPort(started[1], 5300));
+        }
+        catch (Exception)
+        {
+            // What started is removed with the network before the failure goes on: no Container owns it yet.
+            if (started.Count > 0)
+            {
+                Run(["rm", "--force", "--volumes", .. started]);
+            }
+
+            Run(["network", "rm", network]);
+            throw;
+        }
 
         using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         for (var attempt = 0; attempt < 180; attempt++)
@@ -134,7 +150,7 @@ internal sealed class Container : IDisposable
             Thread.Sleep(1000);
         }
 
-        var logs = Run(["logs", "--tail", "40", emulator]);
+        var logs = Run(["logs", "--tail", "40", container.Id]);
         container.Dispose();
         throw new InvalidOperationException($"The Service Bus emulator did not become healthy:{Environment.NewLine}{logs.Output}{logs.Error}");
     }
