@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/turbo/schema.json",
+  "remoteCache": { "enabled": false },
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "env": ["VITE_*", "REMOTE_*"],
+      "outputs": ["dist/**", "storybook-static/**"]
+    },
+    "lint": {},
+    "test": {}
+  }
+}
