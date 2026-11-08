@@ -77,7 +77,7 @@ public sealed partial class RechartsTests
 
         files["web/app/package.json"].ShouldContain("\"recharts\": \"3.10.1\"");
         files["web/app/package.json"].ShouldContain("\"react-is\": \"19.3.1\"");
-        files["web/app/package.json"].ShouldNotContain("echarts");
+        NamesECharts().IsMatch(files["web/app/package.json"]).ShouldBeFalse("package.json names no ECharts package");
         files["web/app/eslint.config.js"].ShouldContain("group: ['echarts', 'echarts-for-react', 'chart.js', 'react-chartjs-2'],");
         files["web/app/eslint.config.js"].ShouldContain("message: 'Use Chart from src/components/chart (docs/adr).',");
         files["web/app/eslint.config.js"].ShouldNotContain("'recharts'");
@@ -87,10 +87,10 @@ public sealed partial class RechartsTests
         files["web/app/src/components/chart-colors.ts"].ShouldContain("export function chartColor(position: number): string {");
         files["AGENTS.md"].ShouldContain("## Charts: Recharts");
         files["AGENTS.md"].ShouldContain("`chartColor(position)` from `@/components/chart-colors`");
-        files["AGENTS.md"].ShouldNotContain("ECharts");
+        NamesECharts().IsMatch(files["AGENTS.md"]).ShouldBeFalse("AGENTS.md names no ECharts");
         files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("-frontend-charts-recharts.md", StringComparison.Ordinal));
         files.Keys.ShouldNotContain(path => path.EndsWith("-frontend-charts-echarts.md", StringComparison.Ordinal));
-        WebSources(files).ShouldNotContain(source => source.Value.Contains("echarts", StringComparison.OrdinalIgnoreCase), "no web source names echarts");
+        WebSources(files).ShouldNotContain(source => NamesECharts().IsMatch(source.Value), "no web source names echarts");
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public sealed partial class RechartsTests
         files.Keys.ShouldNotContain("web/app/src/dashboards/chartOption.test.ts");
         files["web/app/src/dashboards/DashboardEditor.test.tsx"].ShouldNotContain("vi.mock('@/components/chart'");
         files["web/app/src/dashboards/DashboardAssistant.test.tsx"].ShouldNotContain("vi.mock('@/components/chart'");
-        WebSources(files).ShouldNotContain(source => source.Value.Contains("echarts", StringComparison.OrdinalIgnoreCase), "no web source names echarts");
+        WebSources(files).ShouldNotContain(source => NamesECharts().IsMatch(source.Value), "no web source names echarts");
     }
 
     [Fact]
@@ -182,6 +182,10 @@ public sealed partial class RechartsTests
         testExitCode.ShouldBe(0, $"pnpm test:\n{testOutput}");
         return testOutput;
     }
+
+    /// <summary>ECharts by name, not the "echarts" inside "recharts".</summary>
+    [GeneratedRegex("(?<![a-z])echarts", RegexOptions.IgnoreCase)]
+    private static partial Regex NamesECharts();
 
     [GeneratedRegex(@"\x1B\[[0-9;]*m")]
     private static partial Regex Escapes();
