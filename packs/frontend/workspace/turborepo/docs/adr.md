@@ -10,6 +10,10 @@ Turborepo caches `build`, `lint` and `test` locally, in `web/.turbo/cache`. A ta
 
 CI runs the same three on every pull request and keeps no Turborepo cache between runs, so every package is built, linted and tested from scratch on every run; a cached success can never stand in for a check.
 
+## Telemetry
+
+Turborepo's default is kept: `turbo` sends anonymous usage telemetry unless it is turned off, and the generated project neither turns it off nor changes CI for it. To opt out, run `turbo telemetry disable` once on a machine, or set `TURBO_TELEMETRY_DISABLED=1` or `DO_NOT_TRACK=1` in the environment, for example in CI.
+
 ## Consequences
 
 - Commit `web/pnpm-lock.yaml` once `pnpm install` has created it; CI then installs exactly what you tested.

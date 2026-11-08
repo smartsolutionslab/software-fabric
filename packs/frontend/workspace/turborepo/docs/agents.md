@@ -5,5 +5,6 @@
 - `transit` keys `lint` and `test` on the package's workspace dependencies; keep it, and give a new cached task that reads its dependencies `"dependsOn": ["transit"]`.
 - A task sees only the environment variables `turbo.json` names. A build reads `VITE_*` and `REMOTE_*`; a new variable a task needs goes into its `env` there.
 - Unchanged tasks are read from the local cache in `web/.turbo/`; never commit it. `pnpm build --force` runs everything again.
+- Turborepo's telemetry stays at its default; to opt out, `turbo telemetry disable`, `TURBO_TELEMETRY_DISABLED=1` or `DO_NOT_TRACK=1`. Do not change it in the project or in CI.
 - Add a dependency with `pnpm add <name> --filter <package>`; never edit versions by hand without installing.
 - Commit `pnpm-lock.yaml`.
