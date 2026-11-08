@@ -14,6 +14,40 @@ public sealed class AzureServiceBusTests
     private const string Transport = "backend.bus.transport=azure-service-bus";
     private const string DatabasePassword = "fabric-tests";
 
+    /// <summary>
+    /// Publishing the AppHost runs no emulator, so the host gets no emulator address: against Azure, Wolverine manages
+    /// its queues through the messaging connection string itself.
+    /// </summary>
+    private const string PublishModeTests = """
+        using Aspire.Hosting;
+        using Aspire.Hosting.ApplicationModel;
+        using Aspire.Hosting.Testing;
+
+        namespace Shop.Integration.Tests;
+
+        public class PublishModeTests
+        {
+            [Fact]
+            public async Task Publishing_the_apphost_gives_the_host_no_emulator_management_address()
+            {
+                await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AppHost>(
+                    ["--operation", "publish", "--publisher", "manifest", "--output-path", Path.GetTempPath()],
+                    TestContext.Current.CancellationToken);
+
+                builder.ExecutionContext.IsPublishMode.ShouldBeTrue();
+                var host = builder.Resources.Single(resource => resource.Name == "host");
+                var environment = new EnvironmentCallbackContext(builder.ExecutionContext, host, [], TestContext.Current.CancellationToken);
+                foreach (var callback in host.Annotations.OfType<EnvironmentCallbackAnnotation>())
+                {
+                    await callback.Callback(environment);
+                }
+
+                environment.EnvironmentVariables.Keys.ShouldContain("ConnectionStrings__messaging");
+                environment.EnvironmentVariables.Keys.ShouldNotContain("ConnectionStrings__messaging-management");
+            }
+        }
+        """;
+
     [Fact]
     public void The_apphost_runs_the_emulator_and_the_host_reaches_it_through_wolverines_transport()
     {
@@ -86,11 +120,13 @@ public sealed class AzureServiceBusTests
         serviceBus.ServiceBusQueues().ShouldContain("<title type=\"text\">shop.contracts.billing.invoicepaidv1</title>");
     }
 
+    /// <summary>The generated integration tests, and a publish of the AppHost (<see cref="PublishModeTests"/>), pass.</summary>
     [Fact]
     public void The_generated_integration_tests_pass_against_the_running_aspire_stack_with_the_emulator()
     {
         using var project = new GeneratedProject(Profile, Transport);
         project.AddModule("billing");
+        project.Write("tests/Integration.Tests/PublishModeTests.cs", PublishModeTests);
         project.Build();
         DockerPorts.EnsureRunsAlone();
 
@@ -98,6 +134,6 @@ public sealed class AzureServiceBusTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldNotContain("succeeded: 0");
+        output.ShouldContain("succeeded: 10");
     }
 }
