@@ -1,0 +1,28 @@
+import type { Configuration, RedirectRequest } from '@azure/msal-browser';
+
+// The web client's ID and scope, as the identity provider names them.
+const client = {
+  {{ browser_client_settings }}
+};
+
+const authority = import.meta.env.VITE_OIDC_AUTHORITY ?? '{{ browser_authority }}';
+
+/**
+ * MSAL's configuration. msal-common accepts an https authority only, so locally the AppHost gives the browser the
+ * stand-in's https address (src/auth/msalConfig.test.ts fails for any other).
+ */
+export const msalConfig = {
+  auth: {
+    clientId: client.client_id,
+    authority,
+    // Trusted as it is: MSAL reads the authority's own discovery document instead of asking Entra ID about its host.
+    knownAuthorities: [authority],
+    redirectUri: window.location.origin,
+    postLogoutRedirectUri: window.location.origin,
+    // The stand-in answers in the query, as Entra ID can; MSAL's default is the fragment.
+    OIDCOptions: { responseMode: 'query' },
+  },
+} satisfies Configuration;
+
+/** What a sign-in asks for: the scopes of VITE_OIDC_SCOPE. */
+export const loginRequest = { scopes: client.scope.split(' ') } satisfies RedirectRequest;

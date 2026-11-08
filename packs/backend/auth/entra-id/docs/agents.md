@@ -8,3 +8,6 @@
 - Authorisation rules are policies registered by the module, not role checks inside handlers.
 - There are no end-to-end tests of the sign-in; prove sign-in behaviour with an integration test against the stand-in.
 - Local login: user `developer`, password `developer`, at the stand-in (run by the AppHost, development only).
+{{~ if project["frontend.auth-client"] == "msal" ~}}
+- MSAL signs the browser in at the stand-in's https address (`https://localhost:8443`): run `dotnet dev-certs https --trust` once on your machine. The host accepts tokens issued there through `AzureAd:BrowserInstance`, which only the AppHost sets; never set it in production.
+{{~ end ~}}

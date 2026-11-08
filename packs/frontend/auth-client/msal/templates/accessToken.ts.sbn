@@ -1,0 +1,40 @@
+import type { AuthenticationResult } from '@azure/msal-browser';
+
+/** Where the access token of the signed-in user is kept: this tab's session storage, as MSAL keeps its own cache. */
+export const accessTokenKey = 'app.access-token';
+
+interface StoredToken {
+  accessToken: string;
+  expiresOn: number;
+}
+
+type Acquired = Pick<AuthenticationResult, 'accessToken' | 'expiresOn'>;
+
+/** Keeps a token MSAL acquired, the sign-in's included (src/auth/msal.ts), for the API client and code outside components. */
+export function rememberAccessToken({ accessToken, expiresOn }: Acquired) {
+  const stored: StoredToken = { accessToken, expiresOn: expiresOn?.getTime() ?? 0 };
+  sessionStorage.setItem(accessTokenKey, JSON.stringify(stored));
+}
+
+export function forgetAccessToken() {
+  sessionStorage.removeItem(accessTokenKey);
+}
+
+function stored(): StoredToken | undefined {
+  const value: unknown = JSON.parse(sessionStorage.getItem(accessTokenKey) ?? 'null');
+  if (typeof value !== 'object' || value === null || !('accessToken' in value) || !('expiresOn' in value)) {
+    return undefined;
+  }
+  const { accessToken, expiresOn } = value;
+  return typeof accessToken === 'string' && typeof expiresOn === 'number' ? { accessToken, expiresOn } : undefined;
+}
+
+/** The signed-in user's access token, for code that MSAL's hooks do not reach (the API client, connections). */
+export function accessToken(): string | undefined {
+  return stored()?.accessToken;
+}
+
+/** When the kept access token expires, in milliseconds since the epoch; undefined without one. */
+export function accessTokenExpiresOn(): number | undefined {
+  return stored()?.expiresOn;
+}

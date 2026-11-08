@@ -90,6 +90,10 @@ await ` + page + `.getByLabel('Password').fill(` + user + `);
 await ` + page + `.getByRole('button', { name: 'Sign in' }).click();`
 end
 func browser_authority
+  # MSAL accepts an https authority only: with it the stand-in also serves https (docs/adr).
+  if project["frontend.auth-client"] == "msal"
+    ret "https://localhost:8443/organizations/v2.0"
+  end
   ret "http://localhost:8080/organizations/v2.0"
 end
 func id_token_roles(roles)

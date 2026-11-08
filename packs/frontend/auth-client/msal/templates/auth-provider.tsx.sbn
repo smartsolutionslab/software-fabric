@@ -1,0 +1,12 @@
+import { MsalProvider } from '@azure/msal-react';
+import type { ReactNode } from 'react';
+import { createMsal } from '@/auth/msal';
+import { SignedIn } from '@/auth/SignedIn';
+
+const msal = createMsal();
+
+export const withAuth = (children: ReactNode) => (
+  <MsalProvider instance={msal}>
+    <SignedIn>{children}</SignedIn>
+  </MsalProvider>
+);
