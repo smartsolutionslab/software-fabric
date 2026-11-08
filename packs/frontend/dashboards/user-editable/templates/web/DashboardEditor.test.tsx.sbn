@@ -103,7 +103,7 @@ vi.mock('@/api/generated', () => ({
 }));
 
 {{~ if project["frontend.charts"] != "recharts" ~}}
-// ECharts draws on a canvas jsdom does not have; the chart's accessible name is what the editor decides.
+// {{ if project["frontend.charts"] == "chartjs" }}Chart.js{{ else }}ECharts{{ end }} draws on a canvas jsdom does not have; the chart's accessible name is what the editor decides.
 vi.mock('@/components/chart', () => ({
   Chart: ({ label }: { label: string }) => <div role="img" aria-label={label} />,
 }));

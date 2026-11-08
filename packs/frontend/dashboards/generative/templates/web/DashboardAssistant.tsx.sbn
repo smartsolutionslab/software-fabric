@@ -1,5 +1,15 @@
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
+{{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
+{{~ if tanstack ~}}
+import { contentToText, type Message } from '@ag-ui/client';
+import { revalidateLogic, useForm } from '@tanstack/react-form';
+import { useEffect, useId, useMemo, useRef } from 'react';
 {{~ if valibot ~}}
+import * as v from 'valibot';
+{{~ else ~}}
+import { z } from 'zod';
+{{~ end ~}}
+{{~ else if valibot ~}}
 import { contentToText, type Message } from '@ag-ui/client';
 import { valibotResolver } from '@hookform/resolvers/valibot';
 import { useEffect, useId, useMemo, useRef } from 'react';
@@ -19,12 +29,16 @@ import { draftState, type PendingProposal, proposalsOf, toolOutcome, toolResults
 
 {{~ if valibot ~}}
 const questionSchema = v.object({ question: v.pipe(v.string(), v.trim(), v.minLength(1, 'Ask for a widget first.')) });
+{{~ if !tanstack ~}}
 
 type QuestionForm = v.InferOutput<typeof questionSchema>;
+{{~ end ~}}
 {{~ else ~}}
 const questionSchema = z.object({ question: z.string().trim().min(1, 'Ask for a widget first.') });
+{{~ if !tanstack ~}}
 
 type QuestionForm = z.infer<typeof questionSchema>;
+{{~ end ~}}
 {{~ end ~}}
 
 interface DashboardAssistantProps {
@@ -40,12 +54,25 @@ interface DashboardAssistantProps {
  */
 export function DashboardAssistant({ widgets, onProposal }: DashboardAssistantProps) {
   const { messages, running, failure, send } = useAgent('dashboards', () => draftState(widgets));
+{{~ if tanstack ~}}
+  const form = useForm({
+    defaultValues: { question: '' },
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: questionSchema },
+    onSubmit: async ({ value, formApi }) => {
+      const { question } = {{ if valibot }}v.parse(questionSchema, value){{ else }}questionSchema.parse(value){{ end }};
+      formApi.reset();
+      await send(question);
+    },
+  });
+{{~ else ~}}
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<QuestionForm>({ resolver: {{ if valibot }}valibotResolver{{ else }}zodResolver{{ end }}(questionSchema), defaultValues: { question: '' } });
+{{~ end ~}}
   const field = useId();
 
   const results = useMemo(() => toolResults(messages), [messages]);
@@ -62,11 +89,13 @@ export function DashboardAssistant({ widgets, onProposal }: DashboardAssistantPr
       }
     }
   }, [proposals, onProposal]);
+{{~ if !tanstack ~}}
 
   const onSubmit = handleSubmit(async ({ question }) => {
     reset();
     await send(question);
   });
+{{~ end ~}}
 
   return (
     <section aria-label="Dashboard assistant" className="flex flex-col gap-2 rounded border p-2">
@@ -82,6 +111,41 @@ export function DashboardAssistant({ widgets, onProposal }: DashboardAssistantPr
           The assistant could not answer: {failure}
         </p>
       )}
+{{~ if tanstack ~}}
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void form.handleSubmit();
+        }}
+        noValidate
+        className="flex flex-col gap-2"
+      >
+        <label htmlFor={field} className="text-sm font-medium">
+          Ask the assistant
+        </label>
+        <form.Field name="question">
+          {({ name, state: { value, meta }, handleBlur, handleChange }) => (
+            <>
+              <textarea
+                id={field}
+                name={name}
+                rows={2}
+                value={value}
+                onBlur={handleBlur}
+                onChange={(event) => handleChange(event.target.value)}
+                aria-invalid={meta.errors.length > 0 ? true : undefined}
+                aria-describedby={meta.errors.length > 0 ? `${field}-error` : undefined}
+                className="flex field-sizing-content min-h-12 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+              />
+              {meta.errors.length > 0 && (
+                <p id={`${field}-error`} role="alert" className="text-sm text-destructive">
+                  {meta.errors[0]?.message}
+                </p>
+              )}
+            </>
+          )}
+        </form.Field>
+{{~ else ~}}
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-2">
         <label htmlFor={field} className="text-sm font-medium">
           Ask the assistant
@@ -99,6 +163,7 @@ export function DashboardAssistant({ widgets, onProposal }: DashboardAssistantPr
             {errors.question.message}
           </p>
         )}
+{{~ end ~}}
         <Button type="submit" variant="secondary" disabled={running} className="self-end">
           Ask
         </Button>

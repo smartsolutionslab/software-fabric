@@ -1,0 +1,10 @@
+option: frontend.forms.tanstack-form
+files: []
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 30 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing another form library (React Hook Form, Formik, React Final Form on React; vee-validate, FormKit on Vue) fails lint.", file: templates/restricted.sbn }

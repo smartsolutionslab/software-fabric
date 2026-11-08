@@ -1,0 +1,19 @@
+import { expect, test } from 'vitest';
+import { chartConfig } from './chartConfig';
+
+const series = { categories: ['January', 'February'], series: [{ name: 'Revenue', values: [3, '4'] }] };
+
+test('a bar or line chart labels the categories and has one dataset per named series', () => {
+  expect(chartConfig(series, 'bar')).toEqual({
+    type: 'bar',
+    data: { labels: ['January', 'February'], datasets: [{ label: 'Revenue', data: [3, 4] }] },
+  });
+  expect(chartConfig(series, 'line')).toMatchObject({ type: 'line' });
+});
+
+test('a pie chart shows the first series, one slice per category', () => {
+  expect(chartConfig(series, 'pie')).toEqual({
+    type: 'pie',
+    data: { labels: ['January', 'February'], datasets: [{ label: 'Revenue', data: [3, 4] }] },
+  });
+});
