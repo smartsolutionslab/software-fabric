@@ -52,6 +52,8 @@ public class RuleEvaluatorTests
         "frontend.state=redux-toolkit requires frontend.framework == react, but frontend.framework is vue.")]
     [InlineData("saas-standard-vue", "frontend.state=zustand-tanstack-query",
         "frontend.state=zustand-tanstack-query requires frontend.framework == react, but frontend.framework is vue.")]
+    [InlineData("lean-crud", "frontend.state=pinia",
+        "frontend.state=pinia requires frontend.framework == vue, but frontend.framework is react.")]
     [InlineData("saas-standard-react", "frontend.state=zustand-tanstack-query",
         "frontend.api-client=rtk-query-codegen requires frontend.state == redux-toolkit, but frontend.state is zustand-tanstack-query.")]
     [InlineData("saas-standard-react", "frontend.styling=css-modules",
