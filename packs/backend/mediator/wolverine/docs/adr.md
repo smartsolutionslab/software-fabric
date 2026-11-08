@@ -14,6 +14,8 @@ The option needs the Wolverine messaging library (`backend.bus.library == wolver
 
 It is not offered with agents (`backend.llm.agents.agent-framework`, and with it `frontend.agent-ui.ag-ui`) or with dashboards (`frontend.dashboards.user-editable`, and with it `generative`): their generated tests send requests through `IDispatcher` in a container of their own, without Wolverine's bus. Offering them needs those tests to start Wolverine, a change to those packs.
 
+Nor is it offered with gRPC (`backend.api-protocols.grpc`) or an MCP server (`backend.mcp.server`): their generated tests run the host with every hosted service removed, so Wolverine never starts and `IDispatcher` fails with `WolverineHasNotStartedException`. Offering them needs those tests to start Wolverine, a change to those packs.
+
 ## Consequences
 
 - Pipeline behaviours (logging, validation, transactions) can be Wolverine middleware and policies instead of hand-written decorators.
