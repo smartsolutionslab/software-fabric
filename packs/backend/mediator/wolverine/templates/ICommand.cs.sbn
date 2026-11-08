@@ -1,0 +1,6 @@
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+#pragma warning disable CA1040 // Marker interfaces: the result type is the only thing a request declares.
+/// <summary>A request that changes state.</summary>
+public interface ICommand<TResult>;
+#pragma warning restore CA1040

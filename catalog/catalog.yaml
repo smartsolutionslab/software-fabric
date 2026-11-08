@@ -102,7 +102,7 @@ dimensions:
     default: hand-rolled
     options:
       hand-rolled: { tier: supported }
-      wolverine:   { tier: experimental }
+      wolverine:   { tier: experimental, requires: ["backend.bus.library == wolverine"] }
 
   backend.api-style:
     scope: project

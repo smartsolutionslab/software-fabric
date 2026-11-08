@@ -1,0 +1,22 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+using Wolverine;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class RequestHandlerDiscovery
+{
+    private static readonly Type[] HandlerDefinitions = [typeof(ICommandHandler<,>), typeof(IQueryHandler<,>)];
+
+    /// <summary>Makes every command and query handler in the modules' Application projects a Wolverine handler, so IDispatcher invokes it on the bus.</summary>
+    public static WolverineOptions DiscoverRequestHandlers(this WolverineOptions options)
+    {
+        {{ not_null "options" }}
+
+        options.Discovery.CustomizeHandlerDiscovery(query => query.Includes.WithCondition("command and query handlers", IsRequestHandler));
+        return options;
+    }
+
+    private static bool IsRequestHandler(Type type) =>
+        type is { IsClass: true, IsAbstract: false }
+        && type.GetInterfaces().Any(contract => contract.IsGenericType && HandlerDefinitions.Contains(contract.GetGenericTypeDefinition()));
+}
