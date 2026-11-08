@@ -1,0 +1,49 @@
+import { type ColDef, type ColDefField, ClientSideRowModelModule, type Module, themeQuartz } from 'ag-grid-community';
+
+/** Core modules only; register sorting, filtering or paging modules here when a screen needs them. */
+export const modules: Module[] = [ClientSideRowModelModule];
+
+{{~ if project["frontend.ui-library"] == "shadcn" || project["frontend.ui-library"] == "shadcn-vue" ~}}
+/** Quartz drawn with the theme variables of src/index.css, so the grid follows the app's colours and dark mode. */
+export const theme = themeQuartz.withParams({
+  fontFamily: 'inherit',
+  backgroundColor: 'var(--background)',
+  foregroundColor: 'var(--foreground)',
+  borderColor: 'var(--border)',
+  headerBackgroundColor: 'var(--muted)',
+  accentColor: 'var(--primary)',
+});
+{{~ else ~}}
+/** Quartz as AG Grid ships it: this UI library defines no theme variables for the grid to follow (docs/adr). */
+export const theme = themeQuartz;
+{{~ end ~}}
+
+interface Column {
+  header: string;
+}
+
+interface ComputedColumn extends Column {
+  id: string;
+}
+
+/** Columns of rows of TRow, made the same way whatever the table: `accessor` per column, `columns` for the list. */
+export interface Columns<TRow> {
+  /** A column showing one field of the row: `accessor('name', { header: 'Name' })`. */
+  accessor(field: ColDefField<TRow>, column: Column): ColDef<TRow>;
+  /** A column computed from the row: `accessor((row) => row.total, { id: 'total', header: 'Total' })`. */
+  accessor(read: (row: TRow) => unknown, column: ComputedColumn): ColDef<TRow>;
+  columns(definitions: ColDef<TRow>[]): ColDef<TRow>[];
+}
+
+/** The column helper for rows of TRow: `const notes = columnsOf<Note>()`, then `notes.columns([notes.accessor('text', ...)])`. */
+export const columnsOf = <TRow>(): Columns<TRow> => ({
+  accessor: (source: ColDefField<TRow> | ((row: TRow) => unknown), column: Column & { id?: string }): ColDef<TRow> =>
+    typeof source === 'function'
+      ? {
+          colId: column.id,
+          headerName: column.header,
+          valueGetter: ({ data }) => (data === undefined ? undefined : source(data)),
+        }
+      : { field: source, headerName: column.header },
+  columns: (definitions) => definitions,
+});
