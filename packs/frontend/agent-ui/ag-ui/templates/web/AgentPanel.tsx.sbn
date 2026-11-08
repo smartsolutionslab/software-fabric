@@ -1,17 +1,31 @@
-{{~ if project["frontend.ui-library"] != "shadcn" || project["frontend.forms"] != "react-hook-form" || project["frontend.validation"] != "zod" ~}}
-throw new Error('The ag-ui pack builds the agent panel from shadcn/ui with React Hook Form and zod only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+{{~ if project["frontend.ui-library"] != "shadcn" || project["frontend.forms"] != "react-hook-form" || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+throw new Error('The ag-ui pack builds the agent panel from shadcn/ui with React Hook Form and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 {{~ end ~}}
+{{~ valibot = project["frontend.validation"] == "valibot" ~}}
 import { contentToText, type Message } from '@ag-ui/client';
+{{~ if valibot ~}}
+import { valibotResolver } from '@hookform/resolvers/valibot';
+import { useId } from 'react';
+import { useForm } from 'react-hook-form';
+import * as v from 'valibot';
+{{~ else ~}}
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+{{~ end ~}}
 import { Button } from '@/components/ui/button';
 import { useAgent } from './useAgent';
 
+{{~ if valibot ~}}
+const messageSchema = v.object({ message: v.pipe(v.string(), v.trim(), v.minLength(1, 'Write a message first.')) });
+
+type MessageForm = v.InferOutput<typeof messageSchema>;
+{{~ else ~}}
 const messageSchema = z.object({ message: z.string().trim().min(1, 'Write a message first.') });
 
 type MessageForm = z.infer<typeof messageSchema>;
+{{~ end ~}}
 
 /**
  * A conversation with one of the host's agents, over AG-UI (POST /api/agents/{name}): the user's messages, each tool
@@ -29,7 +43,7 @@ function Conversation({ agent }: { agent: string }) {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<MessageForm>({ resolver: zodResolver(messageSchema), defaultValues: { message: '' } });
+  } = useForm<MessageForm>({ resolver: {{ if valibot }}valibotResolver{{ else }}zodResolver{{ end }}(messageSchema), defaultValues: { message: '' } });
   const field = useId();
 
   const onSubmit = handleSubmit(async ({ message }) => {

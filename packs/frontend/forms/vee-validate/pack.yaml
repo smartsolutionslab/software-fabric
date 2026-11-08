@@ -1,6 +1,7 @@
 option: frontend.forms.vee-validate
 files:
-  # @vee-validate/zod 4.15.1 peers zod 3; the pack adapts the shared zod 4 itself (owner decision on #23).
+  # @vee-validate/zod 4.15.1 peers zod 3; the pack adapts the shared zod 4 itself (owner decision on #23), and valibot
+  # the same way, so the import stays @/forms/toTypedSchema (owner decision on #267).
   - { template: templates/toTypedSchema.ts.sbn, target: web/app/src/forms/toTypedSchema.ts }
   - { template: templates/toTypedSchema.test.ts.sbn, target: web/app/src/forms/toTypedSchema.test.ts }
 slots:
@@ -10,5 +11,5 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: lint-rule, describes: "Importing another form library (FormKit, TanStack Form) or @vee-validate/zod fails lint.", file: templates/restricted.sbn }
-  - { kind: unit-test, describes: "toTypedSchema puts a zod schema's messages on the fields they belong to, nested and listed ones too, and hands a valid form the schema's output (src/forms/toTypedSchema.test.ts).", file: templates/toTypedSchema.test.ts.sbn }
+  - { kind: lint-rule, describes: "Importing another form library (FormKit, TanStack Form) or the published adapter for the schema library (@vee-validate/zod, @vee-validate/valibot) fails lint.", file: templates/restricted.sbn }
+  - { kind: unit-test, describes: "toTypedSchema puts a zod or valibot schema's messages on the fields they belong to, nested and listed ones too, and hands a valid form the schema's output (src/forms/toTypedSchema.test.ts).", file: templates/toTypedSchema.test.ts.sbn }
