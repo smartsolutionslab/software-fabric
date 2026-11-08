@@ -3,6 +3,7 @@ files:
   - { template: templates/App.tsx.sbn, target: web/app/src/App.tsx }
   - { template: templates/App.test.tsx.sbn, target: web/app/src/App.test.tsx }
   - { template: templates/router.tsx.sbn, target: web/app/src/router.tsx }
+  - { template: templates/rootRoute.ts.sbn, target: web/app/src/rootRoute.ts }
   - { template: templates/router-provider.tsx.sbn, target: web/app/src/providers/router.tsx }
   - { template: templates/AppRouter.tsx.sbn, target: web/app/src/providers/AppRouter.tsx }
   - { template: templates/modules.ts.sbn, target: web/app/src/modules/index.ts }
@@ -19,3 +20,4 @@ adr: docs/adr.md
 gates:
   - { kind: unit-test, describes: "The start page renders through the router and names the application (src/App.test.tsx).", file: templates/App.test.tsx.sbn }
   - { kind: lint-rule, describes: "Importing react-router or react-router-dom, or TanStack's file-based routing (@tanstack/router-plugin), fails lint: routes are declared in src/router.tsx and each module's routes.tsx.", file: templates/restricted.sbn }
+  - { kind: analyzer, describes: "The router is registered for TypeScript, so a <Link> to a path no route has, a module's or a route below it, fails the type check of pnpm build.", file: templates/router.tsx.sbn }

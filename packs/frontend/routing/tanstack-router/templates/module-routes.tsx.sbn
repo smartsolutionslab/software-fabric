@@ -1,4 +1,17 @@
-import type { ModuleRoute } from '@/modules';
+import { createRoute } from '@tanstack/react-router';
+import { rootRoute } from '@/rootRoute';
 import { {{ module.namespace }}Page } from './{{ module.namespace }}Page';
 
-export const route: ModuleRoute = { path: '{{ module.name }}', title: '{{ module.namespace }}', component: {{ module.namespace }}Page };
+/** The module's route; a route below it is a child (`getParentRoute: () => …`, then `.addChildren([...])`). */
+export const route = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '{{ module.name }}',
+  staticData: { title: '{{ module.namespace }}' },
+  component: {{ module.namespace }}Page,
+});
+
+declare module '@/modules' {
+  interface ModuleRoutes {
+    {{ if string.contains module.name "-" }}'{{ module.name }}'{{ else }}{{ module.name }}{{ end }}: typeof route;
+  }
+}

@@ -1,11 +1,17 @@
-import type { RouteComponent } from '@tanstack/react-router';
+import type { AnyRoute } from '@tanstack/react-router';
 
-/** What src/modules/<module>/routes.tsx exports as `route`; the app finds every module's file by itself (no list to edit). */
-export interface ModuleRoute {
-  path: string;
-  title: string;
-  component: RouteComponent;
-}
+/**
+ * Every module's route, by module name. Each src/modules/<module>/routes.tsx adds its own entry
+ * (`declare module '@/modules'`), so the router's types know every module path without a list to edit.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- filled by each module's declaration merging
+export interface ModuleRoutes {}
+
+/**
+ * What src/modules/<module>/routes.tsx exports as `route`: a child of the root route, with routes below it as its
+ * children. Until the first module exists it is any route, and there is no module path to check.
+ */
+export type ModuleRoute = [keyof ModuleRoutes] extends [never] ? AnyRoute : ModuleRoutes[keyof ModuleRoutes];
 
 export const moduleRoutes = Object.values(
   import.meta.glob<ModuleRoute>('./*/routes.tsx', { eager: true, import: 'route' }),

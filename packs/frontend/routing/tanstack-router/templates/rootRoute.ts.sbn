@@ -1,0 +1,14 @@
+import { createRootRouteWithContext } from '@tanstack/react-router';
+import type { ReactNode } from 'react';
+
+/** What createAppRouter hands the routes: the app, which the root route renders as its page. */
+export interface RouterContext {
+  app: ReactNode;
+}
+
+/** The parent of the start page and of every module's route; src/router.tsx gives it its children. */
+export const rootRoute = createRootRouteWithContext<RouterContext>()({
+  component: function Root(): ReactNode {
+    return rootRoute.useRouteContext().app;
+  },
+});
