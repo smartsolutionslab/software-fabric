@@ -438,7 +438,10 @@ dimensions:
         tier: supported
         requires: ["frontend.state == redux-toolkit"]
       orval:         { tier: supported }
-      openapi-fetch: { tier: experimental }
+      # A plain typed client: TanStack Query's caches wrap its calls; Redux Toolkit's server data is RTK Query (#264).
+      openapi-fetch:
+        tier: experimental
+        requires: ["frontend.state != redux-toolkit"]
 
   frontend.routing:
     scope: project
