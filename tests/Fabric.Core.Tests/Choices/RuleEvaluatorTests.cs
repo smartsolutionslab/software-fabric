@@ -106,6 +106,8 @@ public class RuleEvaluatorTests
         "frontend.styling=library-theme conflicts with frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless).")]
     [InlineData("saas-standard-react", new[] { "backend.data-access.reads=dapper" },
         "backend.data-access.reads=dapper requires backend.tenancy == none, but backend.tenancy is column.")]
+    [InlineData("lean-crud", new[] { "backend.database=sqlserver", "backend.tenancy=schema-per-tenant" },
+        "backend.tenancy=schema-per-tenant requires backend.database == postgres, but backend.database is sqlserver.")]
     [InlineData("lean-crud", new[] { "module.communication=contract-interface" },
         "module defaults: module.communication requires module.communication has integration-events, but module.communication is contract-interface.")]
     public void Rejects_a_combination_the_packs_refuse_in_one_sentence(string profile, string[] settings, string violation)
