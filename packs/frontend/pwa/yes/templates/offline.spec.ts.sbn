@@ -8,7 +8,10 @@ test('the app shell loads offline, and /api is never answered from the service w
 {{~ end ~}}
 
   // The worker claims the page that registered it; a reload under its control lets it keep what the shell loads.
-  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+  // In development the dev server registers it over its websocket, then it installs: seconds on a loaded runner.
+  await expect
+    .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null), { timeout: 30_000 })
+    .toBe(true);
   await page.reload();
   await expect(page.getByRole('heading', { name: '{{ name }}' })).toBeVisible();
 
