@@ -11,6 +11,7 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 0;
+  list-style: none;
 }
 
 .user {
@@ -27,15 +28,15 @@
   padding: 0.5rem 0.75rem;
 }
 
-.speaker,
-.answerSpeaker {
+.answerSpeaker,
+.speaker {
   font-size: 0.75rem;
   line-height: 1rem;
   font-weight: 500;
 }
 
 .answerSpeaker {
-  color: #64748b;
+  color: #475569;
 }
 
 .text {
