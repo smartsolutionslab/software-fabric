@@ -16,7 +16,8 @@ const { config, label, height = 320 } = defineProps<ChartProps>();
 </script>
 
 <template>
-  <div :style="{ height: `${height}px` }">
+  <!-- vue-chartjs follows a change of data or options, not of type: another type is another chart. -->
+  <div :key="config.type" :style="{ height: `${height}px` }">
     <Chart :type="config.type" :data="config.data" :options="config.options" role="img" :aria-label="label" />
   </div>
 </template>
