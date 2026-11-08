@@ -45,7 +45,7 @@ public sealed class NewCommandTests : IDisposable
         run.Output.ShouldNotContain("Not a first step.");
     }
 
-    private static void CopyDirectory(string source, string target)
+    internal static void CopyDirectory(string source, string target)
     {
         foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
         {
