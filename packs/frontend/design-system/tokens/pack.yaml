@@ -1,0 +1,20 @@
+option: frontend.design-system.tokens
+files:
+  - { template: templates/tokens/package.json.sbn, target: web/packages/tokens/package.json }
+  - { template: templates/tokens/build.mjs.sbn, target: web/packages/tokens/build.mjs }
+  - { template: templates/tokens/color.tokens.json.sbn, target: web/packages/tokens/src/color.tokens.json }
+  - { template: templates/tokens/radius.tokens.json.sbn, target: web/packages/tokens/src/radius.tokens.json }
+  - { template: templates/tokens/spacing.tokens.json.sbn, target: web/packages/tokens/src/spacing.tokens.json }
+slots:
+  - { slot: web.workspace-packages, template: templates/workspace-packages.sbn, order: 10 }
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.prepare, template: templates/prepare.sbn }
+  # After the UI library's theme (shadcn 15, shadcn-vue 20), so the tokens' theme variables win; before CSS Modules'
+  # rules (90), since an @import after a rule is dropped.
+  - { slot: web.styles, template: templates/styles.sbn, order: 25 }
+  - { slot: readme.sections, template: templates/readme.sbn, order: 25 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: ci-step, describes: "The token build fails on a token that references one that does not exist (Style Dictionary throws on broken references); pnpm build, dev and test run it first.", file: templates/tokens/build.mjs.sbn }
