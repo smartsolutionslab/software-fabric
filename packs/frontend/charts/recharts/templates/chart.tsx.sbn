@@ -1,0 +1,20 @@
+import type { ReactElement } from 'react';
+import { ResponsiveContainer } from 'recharts';
+
+interface ChartProps {
+  /** One Recharts chart (BarChart, LineChart, PieChart, …), drawn as wide as the container and as high as height. */
+  children: ReactElement;
+  label: string;
+  height?: number;
+}
+
+/** A Recharts chart; label names it for screen readers. */
+export function Chart({ children, label, height = 320 }: ChartProps) {
+  return (
+    <div role="img" aria-label={label}>
+      <ResponsiveContainer width="100%" height={height}>
+        {children}
+      </ResponsiveContainer>
+    </div>
+  );
+}

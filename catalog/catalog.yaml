@@ -525,7 +525,7 @@ dimensions:
         requires: ["frontend.framework == react"]
       reka-ui:
         tier: experimental
-        requires: ["frontend.framework == vue", "frontend.styling == tailwind"]
+        requires: ["frontend.framework == vue"]
       vuetify:
         tier: experimental
         requires: ["frontend.framework == vue"]
