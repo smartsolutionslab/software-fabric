@@ -60,6 +60,7 @@ public sealed class ZustandTanStackQueryTests
     {
         using var project = new GeneratedProject(Profile, Zustand);
         project.AddModule("billing");
+        // Each source ends with a newline, as Prettier writes it, so the format check sees the files a developer would commit.
         project.Write("web/app/src/stores/selection.ts", """
             import { create } from 'zustand';
 
@@ -72,6 +73,7 @@ public sealed class ZustandTanStackQueryTests
               noteId: null,
               select: (noteId) => set({ noteId }),
             }));
+
             """);
         project.Write("web/app/src/stores/selection.test.ts", """
             import { expect, test } from 'vitest';
@@ -82,6 +84,7 @@ public sealed class ZustandTanStackQueryTests
 
               expect(useSelection.getState().noteId).toBe('note-1');
             });
+
             """);
 
         var web = Path.Combine(project.ProjectDirectory, "web");
