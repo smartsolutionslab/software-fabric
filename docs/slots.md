@@ -154,8 +154,8 @@ pack fill a slot of a choice it can be combined with but does not need
 | `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides); agent-framework (`IDispatcher`, which a handler running an agent takes, and `IAgentMcpTools` with the MCP client) |
 | `integration-tests.parameters` *(added for #77, declared by aspire-fixture; contributed with `optional: true` since #260)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter); agent-ui ag-ui (`model-stand-in` true: the host's stand-in model answers the agents) |
 | `integration-tests.database` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/ContainerFixture.cs` and the database fixture alone (rag's `ApplicationDatabase.cs`), first in the setup; `settings`, `cancellationToken`, `StartAsync(container, …)` and `RunProjectAsync("src/<Project>", …)` in scope | postgres (its container, the pgvector image with rag, with the core `ContainerBuilder`, and `ConnectionStrings:database`), ef-core (runs the MigrationRunner, order 20) |
-| `integration-tests.resources` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/ContainerFixture.cs`, after the database, before the host starts; also `Resources` and `RepositoryDirectory()` | rabbitmq, kafka (the broker and `ConnectionStrings:messaging`), kurrentdb (the AppHost's image and `ConnectionStrings:eventstore`), keycloak (the realm from `src/AppHost/realms`, its endpoint `keycloak`/`http`, `Authentication:Authority`), the model providers and embeddings (what the AppHost passes as parameters: key-shaped values, the default models, an Ollama endpoint nothing listens on), agent-ui ag-ui (`Agents:ModelStandIn`) |
-| `integration-tests.packages` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/Integration.Tests.csproj` | rabbitmq, kafka, keycloak (their Testcontainers modules, whose versions testcontainers declares) |
+| `integration-tests.resources` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/ContainerFixture.cs`, after the database, before the host starts; also `Resources` and `RepositoryDirectory()` | rabbitmq, kafka (the broker and `ConnectionStrings:messaging`), azure-service-bus (the emulator with its SQL Server, `ConnectionStrings:messaging` and `ConnectionStrings:messaging-management`), kurrentdb (the AppHost's image and `ConnectionStrings:eventstore`), keycloak (the realm from `src/AppHost/realms`, its endpoint `keycloak`/`http`, `Authentication:Authority`), the model providers and embeddings (what the AppHost passes as parameters: key-shaped values, the default models, an Ollama endpoint nothing listens on), agent-ui ag-ui (`Agents:ModelStandIn`) |
+| `integration-tests.packages` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/Integration.Tests.csproj` | rabbitmq, kafka, azure-service-bus, keycloak (their Testcontainers modules, whose versions testcontainers declares) |
 
 #### The test vocabulary *(M3-11)*
 
@@ -442,11 +442,11 @@ AppHost's model with it, declares it instead (*#260*).
 
 | Slot | File | Cardinality | Filled by |
 |---|---|---|---|
-| `apphost.packages` | `src/AppHost/AppHost.csproj` | 0+ | postgres, rabbitmq, react |
+| `apphost.packages` | `src/AppHost/AppHost.csproj` | 0+ | postgres, rabbitmq, azure-service-bus, react |
 | `apphost.project-references` *(added in M1-02)* | `src/AppHost/AppHost.csproj` | 0+ | backend.topology (the host project) |
-| `apphost.resources` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak, react (Vite app), micro-frontends (a Vite app per directory of `web/modules`, `builder.AddRemotes()`), agent-ui ag-ui (the `model-stand-in` parameter, false unless a test sets it) |
+| `apphost.resources` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, azure-service-bus (the emulator, and its management address as `messagingManagement`, null outside run mode), keycloak, react (Vite app), micro-frontends (a Vite app per directory of `web/modules`, `builder.AddRemotes()`), agent-ui ag-ui (the `model-stand-in` parameter, false unless a test sets it) |
 | `apphost.host` | `src/AppHost/Program.cs` | **exactly-one** | backend.topology (adds the host project) |
-| `apphost.host-wiring` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak (`.WithReference(...).WaitFor(...)`), agent-ui ag-ui (`model-stand-in` as `Agents__ModelStandIn`) |
+| `apphost.host-wiring` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak (`.WithReference(...).WaitFor(...)`), azure-service-bus (also `ConnectionStrings__messaging-management`, in run mode only), agent-ui ag-ui (`model-stand-in` as `Agents__ModelStandIn`) |
 | `apphost.web` *(added in M1-07)* | `src/AppHost/Program.cs` | at-most-one | react (`AddViteApp("web", "../../web/app").WithPnpm()`) |
 | `apphost.web-wiring` *(added in M1-07)* | `src/AppHost/Program.cs` | 0+ | keycloak, the host (`.WithReference(...)`), micro-frontends (`.WithRemotes(remotes)`: each remote's address) |
 | `service-defaults.activity-sources` *(added for #205; separator `, `)* | `src/ServiceDefaults/Wiring/Extensions.cs`, one more `.AddSource(...)` on the tracer, rendered only with a contribution | 0+ | C# string expressions naming a library's `ActivitySource`, whose spans exist only while something listens: agent-ui ag-ui (`"Experimental.AGUI.Server"`, the AG-UI run spans that carry a mid-stream failure) |
@@ -473,7 +473,7 @@ AppHost's model with it, declares it instead (*#260*).
 |---|---|---|---|
 | `web.workspace-packages` *(added in M1-07)* | `web/pnpm-workspace.yaml` | newline | spa (`  - app`), micro-frontends (`app`, `modules/*`), design-system tokens-and-components (`packages/tokens`, `packages/ui`) |
 | `web.dependencies` | `web/app/package.json` | `,` + newline | react, redux, rtk, router, rhf, zod, tailwind, shadcn, tanstack-table, echarts, oidc, agent-ui ag-ui (`@ag-ui/client`) |
-| `web.dev-dependencies` | 〃 | `,` + newline | vitest, testing-library, playwright, axe, rtk codegen |
+| `web.dev-dependencies` | 〃 | `,` + newline | vitest, testing-library, playwright, axe, rtk codegen, pwa yes (`vite-plugin-pwa`) |
 | `web.scripts` | 〃 | `,` + newline | rtk-query-codegen (`codegen`) |
 | `web.prepare` *(added in M1-07b)* | 〃 (`dev`, `build`, `test`) | ` && ` | rtk-query-codegen (`pnpm codegen`), design-system tokens-and-components (builds the tokens) |
 | `web.env` *(added in M1-07b)* | `web/app/src/vite-env.d.ts` | newline | oidc-client-ts (`VITE_OIDC_AUTHORITY`) |
@@ -484,8 +484,8 @@ AppHost's model with it, declares it instead (*#260*).
 | `web.store-imports`, `web.store-reducers`, `web.store-middleware` *(added in M1-07b; declared by redux-toolkit)* | `web/app/src/store.ts` | newline / `,` + newline / none | rtk-query-codegen |
 | `web.api-imports`, `web.api-headers` *(added in M1-07b; declared by every api-client pack)* | `web/app/src/api/baseApi.ts` | newline | oidc-client-ts (the bearer token) |
 | `web.openapi-paths`, `web.openapi-schemas` *(added for #184; role slots of `frontend.api-client`)* | `web/app/openapi.json` (`paths` after the host's own; `components.schemas`, sorted by name with the host's own) | `,` + newline / blank line | frontend.agent-ui.ag-ui (the assistant module's /permissions/manage, with authorization choices; #313), frontend.dashboards.user-editable (the dashboards module's endpoints) |
-| `web.vite-imports` *(added in M1-07)* | `web/app/vite.config.ts` | newline | tailwind |
-| `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`) |
+| `web.vite-imports` *(added in M1-07)* | `web/app/vite.config.ts` | newline | tailwind, pwa yes |
+| `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`), pwa yes (`VitePWA({...})`, the service worker and manifest) |
 | `web.imports` | `web/app/src/main.tsx` | newline | redux, router, oidc |
 | `web.providers` | `web/app/src/main.tsx` | `,` + newline | redux, oidc, router — wrappers composed in order |
 | `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn, design-system tokens-and-components (the tokens' Tailwind theme, `@source` for the ui package), micro-frontends (`@source` for the remotes) |

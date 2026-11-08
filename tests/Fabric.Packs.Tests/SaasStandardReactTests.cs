@@ -25,7 +25,7 @@ public sealed class SaasStandardReactTests
         """;
 
     /// <summary>An endpoint that publishes InvoicePaidV1 for tenant-a through the billing module's unit of work.</summary>
-    private const string PayInvoice = """
+    internal const string PayInvoice = """
         using Microsoft.AspNetCore.Builder;
         using Microsoft.AspNetCore.Http;
         using Microsoft.AspNetCore.Routing;

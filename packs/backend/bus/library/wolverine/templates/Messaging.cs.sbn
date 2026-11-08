@@ -9,6 +9,8 @@ using Wolverine.SqlServer;
 {{~ end ~}}
 {{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
 using Wolverine.RabbitMQ;
+{{~ else if project["backend.bus.transport"] == "azure-service-bus" ~}}
+using Wolverine.AzureServiceBus;
 {{~ else if project["backend.bus.transport"] == "kafka" ~}}
 using System.Reflection;
 using {{ namespace }}.Contracts;
@@ -30,6 +32,12 @@ public static class Messaging
             ?? throw new InvalidOperationException("Connection string 'database' is missing; Aspire provides it.");
         var broker = configuration.GetConnectionString("messaging")
             ?? throw new InvalidOperationException("Connection string 'messaging' is missing; Aspire provides it.");
+{{~ if project["backend.bus.transport"] == "azure-service-bus" ~}}
+
+        // Azure Service Bus answers management requests, through which Wolverine creates its queues, at the address it
+        // takes messages on; the emulator answers them on a port of its own, which the AppHost passes as this.
+        var management = configuration.GetConnectionString("messaging-management") ?? broker;
+{{~ end ~}}
 
         services.AddWolverine(options =>
         {
@@ -55,6 +63,9 @@ public static class Messaging
                 TimeSpan.FromSeconds(32));
 {{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
             options.UseRabbitMq(new Uri(broker)).AutoProvision().UseConventionalRouting();
+{{~ else if project["backend.bus.transport"] == "azure-service-bus" ~}}
+            options.UseAzureServiceBus(broker).AutoProvision().UseConventionalRouting();
+            options.Transports.GetOrCreate<AzureServiceBusTransport>().ManagementConnectionString = management;
 {{~ else if project["backend.bus.transport"] == "kafka" ~}}
             // Kafka has no conventional routing: every integration event has a topic named after its type, and the
             // host listens to the topics of the events its modules consume.

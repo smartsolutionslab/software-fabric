@@ -52,6 +52,26 @@ public sealed partial class TestcontainersTests
         named.ShouldBeEmpty(string.Join(Environment.NewLine, named));
     }
 
+    /// <summary>
+    /// The Azure Service Bus emulator starts in a container of Testcontainers' module, the image the AppHost runs, and
+    /// the host gets both its connection strings: messages, and the management requests Wolverine creates queues with.
+    /// </summary>
+    [Fact]
+    public void The_service_bus_emulator_starts_in_a_container_and_the_host_gets_both_its_connection_strings()
+    {
+        using var project = NewProject("saas-standard-react", "backend.bus.transport=azure-service-bus");
+
+        var tests = Path.Combine(project.ProjectDirectory, "tests/Integration.Tests");
+        File.ReadAllText(Path.Combine(tests, "Integration.Tests.csproj")).ShouldContain("<PackageReference Include=\"Testcontainers.ServiceBus\" />");
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "Directory.Packages.props"))
+            .ShouldContain($"<PackageVersion Include=\"Testcontainers.ServiceBus\" Version=\"{TestcontainersVersion}\" />");
+        var fixture = File.ReadAllText(Path.Combine(tests, "ContainerFixture.cs"));
+        fixture.ShouldContain("servicebus-emulator:2.0.0");
+        fixture.ShouldContain("settings[\"ConnectionStrings:messaging\"]");
+        fixture.ShouldContain("settings[\"ConnectionStrings:messaging-management\"]");
+        fixture.ShouldNotContain("RabbitMq", Case.Insensitive);
+    }
+
     /// <summary>Every profile generates with Testcontainers, and none of its tests reaches the application through Aspire.</summary>
     [Theory]
     [MemberData(nameof(Profiles))]
@@ -111,13 +131,14 @@ public sealed partial class TestcontainersTests
     }
 
     /// <summary>
-    /// The generated integration tests pass on Testcontainers: PostgreSQL, the broker (RabbitMQ, Kafka or none) and
+    /// The generated integration tests pass on Testcontainers: PostgreSQL, the broker (RabbitMQ, Kafka, the Azure Service Bus emulator or none) and
     /// Keycloak (or no identity provider) in containers, the host in process, every pack's integration tests against
     /// them, and rag's database tests against the database alone.
     /// </summary>
     [Theory]
     [InlineData("saas-standard-react", new string[0])]
     [InlineData("industrial-event-driven-mfe", new string[0])]
+    [InlineData("saas-standard-react", new[] { "backend.bus.transport=azure-service-bus" })]
     [InlineData("lean-crud", new[] { "frontend.realtime=signalr", "backend.auth=none", "backend.tenancy=none" })]
     [InlineData("saas-ai-react", new[] { "backend.authorization=roles,claims", "backend.mcp=server" })]
     public void The_integration_tests_pass_on_testcontainers(string profile, string[] overrides)

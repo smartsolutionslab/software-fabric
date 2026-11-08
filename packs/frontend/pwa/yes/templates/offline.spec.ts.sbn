@@ -1,0 +1,38 @@
+import { expect, test } from '@playwright/test';
+
+test('the app shell loads offline, and /api is never answered from the service worker', async ({ context, page }) => {
+  await page.goto('/');
+{{~ if project["backend.auth"] != "none" ~}}
+  {{ browser_sign_in "page" "'developer'" }}
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+{{~ end ~}}
+
+  // The worker claims the page that registered it; a reload under its control lets it keep what the shell loads.
+  // In development the dev server registers it over its websocket, then it installs: seconds on a loaded runner.
+  await expect
+    .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null), { timeout: 30_000 })
+    .toBe(true);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '{{ name }}' })).toBeVisible();
+
+{{~ if project["backend.auth"] != "none" ~}}
+  // An /api answer the browser has had once, with the token the app signed in with.
+  const token = await {{ stored_access_token "page" | string.replace "\n" "\n  " }};
+  const request = { path: '/api/me', authorization: `Bearer ${token}` };
+{{~ else ~}}
+  // An /api answer the browser has had once: without an identity provider there is no /me, so the host's liveness.
+  const request = { path: '/api/alive', authorization: '' };
+{{~ end ~}}
+  const status = ({ path, authorization }: { path: string; authorization: string }) =>
+    fetch(path, { headers: authorization ? { Authorization: authorization } : {} }).then(
+      (response) => response.status,
+      () => 'unreachable',
+    );
+  expect(await page.evaluate(status, request)).toBe(200);
+
+  await context.setOffline(true);
+  await page.reload();
+
+  await expect(page.getByRole('heading', { name: '{{ name }}' })).toBeVisible();
+  expect(await page.evaluate(status, request)).toBe('unreachable');
+});
