@@ -267,6 +267,25 @@ public sealed class ContractInterfaceTests
         output.ShouldContain("Shop.Contracts.Billing.IBillingApi has 2 implementations (Shop.Modules.Billing.Api.BillingApi, Shop.Modules.Shipping.Api.BillingStandIn); it needs exactly one.");
     }
 
+    [Fact]
+    public void An_implementation_in_contracts_fails_the_architecture_tests_as_one_outside_the_module()
+    {
+        using var project = new GeneratedProject(Profile, ContractInterface);
+        project.AddModule("billing");
+        project.Write("src/Contracts/Billing/BillingStandIn.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed class BillingStandIn : IBillingApi;
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test(ArchitectureTests);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Contracts.Billing.BillingStandIn implements Shop.Contracts.Billing.IBillingApi, the Billing module's API; only Shop.Modules.Billing.Api may implement it.");
+        output.ShouldContain("Shop.Contracts.Billing.IBillingApi has 2 implementations (Shop.Contracts.Billing.BillingStandIn, Shop.Modules.Billing.Api.BillingApi); it needs exactly one.");
+    }
+
     /// <summary>What Aspire does before it starts the host: every module's migrations, then the runner's further steps.</summary>
     private static void RunMigrationRunner(GeneratedProject project, Container postgres)
     {
