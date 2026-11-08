@@ -16,6 +16,8 @@ export function schemaSubmit<TSchema extends v.GenericSchema | v.GenericSchemaAs
 ): (values: unknown, form: FormKitNode) => Promise<void> {
   return async (values, form) => {
     const result = await v.safeParseAsync(schema, values);
+    // The last submit's messages go, on every field: setErrors replaces them only on the fields it names.
+    form.clearErrors();
     if (!result.success) {
       const formMessages: string[] = [];
       // A Map, not an object: a field named toString or constructor must not read Object's own properties.
@@ -33,7 +35,6 @@ export function schemaSubmit<TSchema extends v.GenericSchema | v.GenericSchemaAs
       return;
     }
 
-    form.clearErrors();
     await handler(result.output, form);
   };
 }
@@ -52,6 +53,8 @@ export function schemaSubmit<TSchema extends z.ZodType>(
 ): (values: unknown, form: FormKitNode) => Promise<void> {
   return async (values, form) => {
     const result = await schema.safeParseAsync(values);
+    // The last submit's messages go, on every field: setErrors replaces them only on the fields it names.
+    form.clearErrors();
     if (!result.success) {
       const formMessages: string[] = [];
       // A Map, not an object: a field named toString or constructor must not read Object's own properties.
@@ -69,7 +72,6 @@ export function schemaSubmit<TSchema extends z.ZodType>(
       return;
     }
 
-    form.clearErrors();
     await handler(result.data, form);
   };
 }
