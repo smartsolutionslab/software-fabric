@@ -30,10 +30,18 @@ const developer = {
 
 type Msal = ReturnType<typeof useMsal>;
 
-/** MSAL's client as SignedIn sees it through useMsal(): the accounts, the interaction under way and the redirects. */
-function msal(accounts: AccountInfo[], inProgress: InteractionStatus = InteractionStatus.None) {
+/**
+ * MSAL's client as SignedIn sees it through useMsal(): the cached accounts, the active one (the account the kept access
+ * token was issued to), the interaction under way and the redirects.
+ */
+function msal(
+  accounts: AccountInfo[],
+  inProgress: InteractionStatus = InteractionStatus.None,
+  active: AccountInfo | null = accounts[0] ?? null,
+) {
   const callbacks: EventCallbackFunction[] = [];
   const instance = {
+    getActiveAccount: vi.fn(() => active),
     loginRedirect: vi.fn(() => Promise.resolve()),
     logoutRedirect: vi.fn(() => Promise.resolve()),
     addEventCallback: vi.fn((callback: EventCallbackFunction) => {
@@ -82,6 +90,27 @@ test('a signed-in user sees who they are and the application', () => {
   expect(screen.getByText('Signed in as developer')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '{{ name }}' })).toBeInTheDocument();
   expect(instance.loginRedirect).not.toHaveBeenCalled();
+});
+
+test('with several cached accounts, the user is the active one, whose token the app keeps', () => {
+  signedIn();
+  const other = { ...developer, homeAccountId: 'other-id', localAccountId: 'other-id', username: 'other' };
+  msal([other, developer], InteractionStatus.None, developer);
+
+  render(app());
+
+  expect(screen.getByText('Signed in as developer')).toBeInTheDocument();
+  expect(screen.queryByText('Signed in as other')).not.toBeInTheDocument();
+});
+
+test('a cached account that is not the active one does not count as signed in', async () => {
+  signedIn();
+  const { instance } = msal([developer], InteractionStatus.None, null);
+
+  render(app());
+
+  await vi.waitFor(() => expect(instance.loginRedirect).toHaveBeenCalledOnce());
+  expect(screen.queryByRole('heading', { name: '{{ name }}' })).not.toBeInTheDocument();
 });
 
 test('nothing is started while MSAL completes the way back from the identity provider', () => {

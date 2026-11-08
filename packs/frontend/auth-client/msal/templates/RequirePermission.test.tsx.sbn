@@ -45,8 +45,14 @@ const users = {
   },
 };
 
+// Another cached account, which holds everything: the hooks read the active account, the one the app's token is for.
+const someoneElse = {
+  idTokenClaims: { preferred_username: 'someone-else', {{ id_token_roles "'manager'" }}, department: 'finance' },
+};
+
 function signInAs(user: keyof typeof users) {
-  const msal = { accounts: [{ idTokenClaims: users[user] }] };
+  const active = { idTokenClaims: users[user] };
+  const msal = { instance: { getActiveAccount: () => active }, accounts: [someoneElse, active] };
   vi.mocked(useMsal).mockReturnValue(msal as unknown as ReturnType<typeof useMsal>);
 }
 {{~ if roles ~}}
