@@ -148,6 +148,27 @@ public sealed class PiniaTests
         lint.ShouldContain("'@tanstack/vue-query' import is restricted from being used by a pattern. Server data and client state: Pinia stores");
     }
 
+    /// <summary>TanStack Query's cache lives in its core package, which a project could import without the Vue adapter.</summary>
+    [Fact]
+    public void Lint_refuses_a_query_cache_imported_from_tanstack_query_core()
+    {
+        using var project = new GeneratedProject(Profile, Pinia);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, install) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, install);
+
+        project.Write("web/app/src/cache.ts", """
+            import { QueryClient } from '@tanstack/query-core';
+
+            export const cache = new QueryClient();
+            """);
+
+        var (lintExitCode, lint) = Shell.Run(web, "pnpm", "lint");
+
+        lintExitCode.ShouldNotBe(0, lint);
+        lint.ShouldContain("'@tanstack/query-core' import is restricted from being used by a pattern. Server data and client state: Pinia stores");
+    }
+
     private static Dictionary<string, string> Files(params string[] overrides)
     {
         var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", Profile, overrides);
