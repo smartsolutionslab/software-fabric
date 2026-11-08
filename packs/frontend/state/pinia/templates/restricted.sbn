@@ -1,0 +1,13 @@
+            {
+              group: [
+                '@tanstack/vue-query',
+                '@pinia/colada',
+                'swrv',
+                '@apollo/*',
+                '@vue/apollo-*',
+                'vuex',
+                'mobx',
+                'mobx-*',
+              ],
+              message: 'Server data and client state: Pinia stores calling the generated API functions (docs/adr).',
+            }

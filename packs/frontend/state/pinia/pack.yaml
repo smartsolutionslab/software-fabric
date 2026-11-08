@@ -1,0 +1,13 @@
+option: frontend.state.pinia
+files:
+  - { template: templates/pinia-provider.ts.sbn, target: web/app/src/providers/pinia.ts }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.imports, template: templates/import.sbn, order: 5 }
+  - { slot: web.providers, template: templates/provider.sbn, order: 10 }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 15 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing a server-data cache (TanStack Query, Pinia Colada, swrv, Apollo) or another store library (Vuex, MobX) fails lint.", file: templates/restricted.sbn }
