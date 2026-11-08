@@ -472,7 +472,7 @@ AppHost's model with it, declares it instead (*#260*).
 |---|---|---|---|
 | `web.workspace-packages` *(added in M1-07)* | `web/pnpm-workspace.yaml` | newline | spa (`  - app`), micro-frontends (`app`, `modules/*`), design-system tokens-and-components (`packages/tokens`, `packages/ui`) |
 | `web.dependencies` | `web/app/package.json` | `,` + newline | react, redux, rtk, router, rhf, zod, tailwind, shadcn, tanstack-table, echarts, oidc, agent-ui ag-ui (`@ag-ui/client`) |
-| `web.dev-dependencies` | 〃 | `,` + newline | vitest, testing-library, playwright, axe, rtk codegen |
+| `web.dev-dependencies` | 〃 | `,` + newline | vitest, testing-library, playwright, axe, rtk codegen, pwa yes (`vite-plugin-pwa`) |
 | `web.scripts` | 〃 | `,` + newline | rtk-query-codegen (`codegen`) |
 | `web.prepare` *(added in M1-07b)* | 〃 (`dev`, `build`, `test`) | ` && ` | rtk-query-codegen (`pnpm codegen`), design-system tokens-and-components (builds the tokens) |
 | `web.env` *(added in M1-07b)* | `web/app/src/vite-env.d.ts` | newline | oidc-client-ts (`VITE_OIDC_AUTHORITY`) |
@@ -483,8 +483,8 @@ AppHost's model with it, declares it instead (*#260*).
 | `web.store-imports`, `web.store-reducers`, `web.store-middleware` *(added in M1-07b; declared by redux-toolkit)* | `web/app/src/store.ts` | newline / `,` + newline / none | rtk-query-codegen |
 | `web.api-imports`, `web.api-headers` *(added in M1-07b; declared by every api-client pack)* | `web/app/src/api/baseApi.ts` | newline | oidc-client-ts (the bearer token) |
 | `web.openapi-paths`, `web.openapi-schemas` *(added for #184; role slots of `frontend.api-client`)* | `web/app/openapi.json` (`paths` after the host's own; `components.schemas`, sorted by name with the host's own) | `,` + newline / blank line | frontend.agent-ui.ag-ui (the assistant module's /permissions/manage, with authorization choices; #313), frontend.dashboards.user-editable (the dashboards module's endpoints) |
-| `web.vite-imports` *(added in M1-07)* | `web/app/vite.config.ts` | newline | tailwind |
-| `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`) |
+| `web.vite-imports` *(added in M1-07)* | `web/app/vite.config.ts` | newline | tailwind, pwa yes |
+| `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`), pwa yes (`VitePWA({...})`, the service worker and manifest) |
 | `web.imports` | `web/app/src/main.tsx` | newline | redux, router, oidc |
 | `web.providers` | `web/app/src/main.tsx` | `,` + newline | redux, oidc, router — wrappers composed in order |
 | `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn, design-system tokens-and-components (the tokens' Tailwind theme, `@source` for the ui package), micro-frontends (`@source` for the remotes) |
