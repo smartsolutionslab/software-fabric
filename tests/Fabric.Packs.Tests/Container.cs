@@ -143,6 +143,13 @@ internal sealed class Container : IDisposable
     public static string ServiceBusConnectionString(int port) =>
         $"Endpoint=sb://localhost:{port};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;";
 
+    /// <summary>The emulator's queues, as its management API lists them: an Atom feed with one entry, titled by name, per queue.</summary>
+    public string ServiceBusQueues()
+    {
+        using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        return client.GetStringAsync(new Uri($"http://127.0.0.1:{ManagementPort}/$Resources/queues?api-version=2021-05")).GetAwaiter().GetResult();
+    }
+
     /// <summary>The first message of a Kafka topic, read with the broker's own console consumer; empty when none arrives in time.</summary>
     public string FirstKafkaMessage(string topic) =>
         Run(["exec", "--user", "appuser", id, "kafka-console-consumer", "--bootstrap-server", "localhost:29092", "--topic", topic,
