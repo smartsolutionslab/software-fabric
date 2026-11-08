@@ -46,6 +46,10 @@ exactly.
   new address loads it once its server is back, without reloading the shell.
 - A module the page imports that failed, other than the page's own, loads again only after a reload of the shell;
   recovering it in place would need each retry served under its own path.
+- The orchestrator registers a remote once per document: once its `remoteEntry.json` has been read, it is not read
+  again (orchestrator 4.9.0 answers a second `initRemoteEntry` for a known remote with a warning). A remote redeployed
+  while the shell is open, with new content-hashed file names, is therefore picked up after a reload of the shell; until
+  then a retry asks for the file names the shell first read.
 - No type declarations are exchanged: a remote is loaded by name, and its page takes no props.
 - Each remote's `lint` runs ESLint, with the shell's library bans and test rules, and Prettier, and its tests run with
   Vitest.
