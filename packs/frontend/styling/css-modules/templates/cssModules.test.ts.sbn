@@ -8,12 +8,44 @@ import { expect, test } from 'vitest';
 const source = dirname(fileURLToPath(import.meta.url));
 const moduleImport = /import (\w+) from '(\.{1,2}\/[^']+\.module\.css)';/g;
 
-/** What of a selector the module scopes and exports: neither `:global(...)` nor what follows a bare `:global`. */
-const local = (selector: string) =>
-  selector
-    .split(',')
-    .map((part) => part.replace(/:global\([^)]*\)/g, '').replace(/:global\b.*$/, ''))
-    .join(',');
+/**
+ * What of a selector list the module scopes and exports: neither what is inside `:global(...)`, nested at any depth,
+ * nor what follows a bare `:global` up to the end of its selector. Only a comma outside parentheses ends a selector.
+ */
+function local(selector: string) {
+  let kept = '';
+  let depth = 0;
+  let inside = Infinity;
+  let after = Infinity;
+  for (let at = 0; at < selector.length; at++) {
+    const char = selector.charAt(at);
+    if (char === '(') {
+      depth++;
+    } else if (char === ')') {
+      depth--;
+      if (depth < inside) {
+        inside = Infinity;
+      }
+      if (depth < after) {
+        after = Infinity;
+      }
+    } else if (char === ',' && depth === after) {
+      after = Infinity;
+    } else if (selector.startsWith(':global', at) && !/[\w-]/.test(selector.charAt(at + 7))) {
+      if (selector.charAt(at + 7) === '(') {
+        inside = Math.min(inside, depth + 1);
+      } else {
+        after = Math.min(after, depth);
+      }
+      at += 6;
+      continue;
+    }
+    if (depth < Math.min(inside, after)) {
+      kept += char;
+    }
+  }
+  return kept;
+}
 
 /** The classes a stylesheet exports with at least one declaration, in any selector of a flat rule. */
 function styledClasses(css: string) {
