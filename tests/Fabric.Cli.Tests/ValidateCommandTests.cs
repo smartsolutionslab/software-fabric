@@ -37,6 +37,34 @@ public class ValidateCommandTests
     }
 
     [Fact]
+    public void The_wolverine_mediator_without_the_wolverine_messaging_library_exits_one_and_prints_the_sentence()
+    {
+        var run = CliRun.Of("validate", "--profile", "lean-crud", "--set", "backend.mediator=wolverine", "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: backend.mediator=wolverine requires backend.bus.library == wolverine, but backend.bus.library is not set.");
+    }
+
+    [Fact]
+    public void The_wolverine_mediator_with_the_wolverine_messaging_library_is_valid()
+    {
+        var run = CliRun.Of("validate", "--profile", "saas-standard-react", "--set", "backend.mediator=wolverine", "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+    }
+
+    /// <summary>Their generated tests send requests through IDispatcher in a container without Wolverine's bus.</summary>
+    [Fact]
+    public void The_wolverine_mediator_with_agents_or_dashboards_exits_one_and_prints_both_sentences()
+    {
+        var run = CliRun.Of("validate", "--profile", "saas-ai-react", "--set", "backend.mediator=wolverine", "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: backend.mediator=wolverine conflicts with backend.llm.agents == agent-framework.");
+        run.Error.ShouldContain("error: backend.mediator=wolverine conflicts with frontend.dashboards has user-editable.");
+    }
+
+    [Fact]
     public void Contract_interfaces_without_integration_events_exit_one_and_print_the_sentence()
     {
         var run = CliRun.Of("validate", "--profile", "lean-crud", "--set", "module.communication=contract-interface", "--catalog", Paths.RepositoryCatalog);

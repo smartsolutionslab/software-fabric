@@ -1,0 +1,6 @@
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+#pragma warning disable CA1040 // Marker interface: the result type is the only thing a request declares.
+/// <summary>A request that only reads.</summary>
+public interface IQuery<TResult>;
+#pragma warning restore CA1040
