@@ -50,6 +50,17 @@ public sealed class NxTests
     public void The_local_cache_is_not_committed(string profile) =>
         Files(profile, Nx)["web/.gitignore"].ShouldContain(".nx/");
 
+    // Nx hashes what web/.gitignore does not exclude; a build output it could see would change the next build's inputs.
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void The_builds_own_outputs_are_not_inputs_of_the_next_build(string profile)
+    {
+        var ignored = Files(profile, Nx)["web/.gitignore"].Split('\n');
+
+        ignored.ShouldContain("dist/");
+        ignored.ShouldContain("*.tsbuildinfo");
+    }
+
     // The workspace's packages, CI's steps and everything outside the workspace root are the pnpm workspace's own.
     [Theory]
     [MemberData(nameof(Profiles))]
@@ -61,7 +72,7 @@ public sealed class NxTests
         nx["web/pnpm-workspace.yaml"].ShouldBe(pnpm["web/pnpm-workspace.yaml"]);
         nx[".github/workflows/ci.yml"].ShouldBe(pnpm[".github/workflows/ci.yml"]);
 
-        string[] own = ["web/package.json", "web/nx.json", "web/.gitignore", "README.md", "AGENTS.md"];
+        string[] own = ["fabric.yaml", "web/package.json", "web/nx.json", "web/.gitignore", "README.md", "AGENTS.md"];
         var differing = nx.Keys.Union(pnpm.Keys)
             .Where(path => !own.Contains(path) && !path.StartsWith("docs/adr/", StringComparison.Ordinal))
             .Where(path => !pnpm.TryGetValue(path, out var before) || !nx.TryGetValue(path, out var after) || before != after)
@@ -99,7 +110,7 @@ public sealed class NxTests
 
         var (againExitCode, againOutput) = Shell.Run(web, "pnpm", "build");
         againExitCode.ShouldBe(0, $"pnpm build, again:\n{againOutput}");
-        againOutput.ShouldContain("Nx read the output from the cache instead of running the command for 1 out of 1 tasks", customMessage: againOutput);
+        againOutput.ShouldContain("1/1 hit (100%)", customMessage: againOutput);
     }
 
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
