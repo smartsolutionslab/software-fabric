@@ -233,6 +233,7 @@ public sealed partial class FormKitTests
         testOutput.ShouldContain("✓ src/forms/schemaSubmit.test.ts > a schema's messages land on the fields they belong to, nested and listed ones too");
         testOutput.ShouldContain("✓ src/forms/schemaSubmit.test.ts > a valid form hands the handler the schema's output");
         testOutput.ShouldContain("✓ src/forms/schemaSubmit.test.ts > fields named like an object's own properties get their messages too");
+        testOutput.ShouldContain("✓ src/forms/schemaSubmit.test.ts > a second submit takes away the messages the schema no longer gives");
         FormatCheck(project, "src/forms");
         var lintOutput = LintRefuses(project, OtherVueFormLibraries);
         const string Message = "import is restricted from being used by a pattern. Use FormKit with schemaSubmit from src/forms/schemaSubmit (docs/adr)";

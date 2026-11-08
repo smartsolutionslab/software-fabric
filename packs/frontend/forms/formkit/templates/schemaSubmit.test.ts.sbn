@@ -99,3 +99,14 @@ test("fields named like an object's own properties get their messages too", asyn
   expect(errorsOn(form, 'toString')).toEqual(['Enter a text']);
   expect(errorsOn(form, 'constructor')).toEqual(['Enter a builder']);
 });
+
+test('a second submit takes away the messages the schema no longer gives', async () => {
+  const form = orderForm();
+  const submit = schemaSubmit(orderSchema, vi.fn());
+
+  await submit({ customer: { name: '' }, lines: [{ quantity: 0 }], note: '' }, form);
+  await submit({ customer: { name: 'Ada' }, lines: [{ quantity: 0 }], note: '' }, form);
+
+  expect(errorsOn(form, 'customer.name')).toEqual([]);
+  expect(errorsOn(form, 'lines.0.quantity')).toEqual(['Order at least one']);
+});
