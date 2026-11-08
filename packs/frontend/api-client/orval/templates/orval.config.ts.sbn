@@ -1,9 +1,7 @@
 {{~ react = project["frontend.framework"] == "react" && (project["frontend.state"] == "tanstack-query" || project["frontend.state"] == "zustand-tanstack-query") ~}}
 {{~ vue = project["frontend.framework"] == "vue" && (project["frontend.state"] == "tanstack-query" || project["frontend.state"] == "pinia-tanstack-query") ~}}
 {{~ plain = project["frontend.framework"] == "vue" && project["frontend.state"] == "pinia" ~}}
-{{~ if project["frontend.framework"] == "vue" && !vue && !plain ~}}
-throw new Error('The orval pack generates TanStack Query hooks for Vue with frontend.state tanstack-query or pinia-tanstack-query, and plain functions with pinia, only so far; frontend.state is {{ project["frontend.state"] }} (docs/adr/0006 of the generator).');
-{{~ else if !react && !vue && !plain ~}}
+{{~ if !react && !vue && !plain ~}}
 throw new Error('The orval pack generates TanStack Query hooks for React only so far; frontend.state is {{ project["frontend.state"] }} (docs/adr/0006 of the generator).');
 {{~ else ~}}
 import { defineConfig } from 'orval';
