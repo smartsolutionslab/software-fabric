@@ -15,5 +15,5 @@ Fabric.Packs.Tests.SaasStandardReactTests Fabric.Packs.Tests.ClaimAuthorizationT
 Fabric.Packs.Tests.ServerEventsEndToEndTests Fabric.Packs.Tests.EmbeddingsTests Fabric.Packs.Tests.LeanCrudSignInTests Fabric.Packs.Tests.ServerEventsTests Fabric.Packs.Tests.AzureOpenAITests Fabric.Packs.Tests.PwaEndToEndTests
 Fabric.Packs.Tests.GenerativeDashboardsTests Fabric.Packs.Tests.EventDrivenBackendTests Fabric.Packs.Tests.SseEndToEndTests
 Fabric.Packs.Tests.AnthropicTests Fabric.Packs.Tests.LeanCrudBackendTests Fabric.Packs.Tests.PagingTests Fabric.Packs.Tests.ErrorHandlingTests Fabric.Packs.Tests.ServerEventsVueTests
-Fabric.Packs.Tests.TestcontainersTests Fabric.Packs.Tests.KurrentDbTests Fabric.Packs.Tests.MoqTests Fabric.Packs.Tests.TanStackRouterTests
-Fabric.Packs.Tests.AwesomeAssertionsTests Fabric.Packs.Tests.GenericOidcTests Fabric.Packs.Tests.GrpcTests Fabric.Packs.Tests.EntraIdTests Fabric.Packs.Tests.NUnitTests
+Fabric.Packs.Tests.TestcontainersTests Fabric.Packs.Tests.KurrentDbTests Fabric.Packs.Tests.MoqTests Fabric.Packs.Tests.TanStackRouterTests Fabric.Packs.Tests.OpenApiFetchTests
+Fabric.Packs.Tests.AwesomeAssertionsTests Fabric.Packs.Tests.GenericOidcTests Fabric.Packs.Tests.GrpcTests Fabric.Packs.Tests.EntraIdTests Fabric.Packs.Tests.NUnitTests Fabric.Packs.Tests.OpenApiFetchDocumentTests

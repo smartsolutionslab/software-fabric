@@ -28,6 +28,17 @@ public class RuleEvaluatorTests
         Violations(profile).ShouldBeEmpty();
     }
 
+    /// <summary>openapi-fetch is a plain typed client: it pairs with TanStack Query's caches, not with Redux Toolkit, whose server data is RTK Query (#264).</summary>
+    [Theory]
+    [InlineData("saas-standard-react", "frontend.state=tanstack-query")]
+    [InlineData("lean-crud", "frontend.state=tanstack-query")]
+    [InlineData("saas-standard-vue", "frontend.state=pinia-tanstack-query")]
+    [InlineData("saas-standard-vue", "frontend.state=tanstack-query")]
+    public void The_openapi_fetch_client_is_allowed_with_tanstack_query(string profile, string state)
+    {
+        Violations(profile, "frontend.api-client=openapi-fetch", state).ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("saas-standard-react")]
     [InlineData("industrial-event-driven-mfe")]
@@ -57,6 +68,8 @@ public class RuleEvaluatorTests
         "frontend.test.extras=storybook-tests requires frontend.design-system == tokens-and-components, but frontend.design-system is none.")]
     [InlineData("lean-crud", "frontend.api-client=rtk-query-codegen",
         "frontend.api-client=rtk-query-codegen requires frontend.state == redux-toolkit, but frontend.state is tanstack-query.")]
+    [InlineData("saas-standard-react", "frontend.api-client=openapi-fetch",
+        "frontend.api-client=openapi-fetch requires frontend.state != redux-toolkit, but frontend.state is redux-toolkit.")]
     [InlineData("lean-crud", "backend.topology=services",
         "backend.topology=services requires backend.bus.transport != none, but backend.bus.transport is none.")]
     [InlineData("saas-standard-react", "backend.api-protocols=grpc",
