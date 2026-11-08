@@ -173,6 +173,12 @@ public class RuleEvaluatorTests
     }
 
     [Fact]
+    public void Reka_ui_is_headless_so_it_may_be_styled_with_css_modules()
+    {
+        Violations("saas-standard-vue", "frontend.styling=css-modules", "frontend.ui-library=reka-ui").ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Physical_cqrs_is_refused_on_each_module_that_is_not_event_sourced_on_marten()
     {
         var choices = ChoiceResolver.Resolve(RepositoryCatalog, "industrial-event-driven-mfe", []).Choices.ShouldNotBeNull();
