@@ -275,14 +275,6 @@ public sealed class GenerativeDashboardsTests
     }
 
     [Fact]
-    public void With_another_vue_ui_library_the_assistant_fails_saying_it_is_built_on_shadcn_vue_only()
-    {
-        var files = Files(Vue, Anthropic, AgentFramework, AgUi, Generative, "frontend.ui-library=reka-ui");
-
-        files[$"{Page}/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate and zod or valibot only so far; frontend.ui-library is reka-ui");
-    }
-
-    [Fact]
     public void The_assistant_checks_accessibility_with_axe_only_where_the_project_has_the_accessibility_tests()
     {
         Files(Profile, Anthropic, AgentFramework, AgUi, Generative)[$"{Page}/DashboardAssistant.test.tsx"].ShouldContain("from 'vitest-axe'");

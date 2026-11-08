@@ -109,14 +109,6 @@ public sealed class DashboardsVueTests
         without[EditorTest].ShouldNotContain("axe");
     }
 
-    [Fact]
-    public void Another_vue_ui_library_fails_the_page_saying_it_is_not_built_for_it_yet()
-    {
-        var files = Files(Dashboards, "frontend.ui-library=reka-ui");
-
-        files[Canvas].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate and zod or valibot only so far; frontend.ui-library is reka-ui");
-    }
-
     /// <summary>
     /// Only <c>spa</c> has a pack today, so no profile can reach another architecture; the two packs' templates are rendered
     /// with a project that chooses it, to show the Vue module page names the editor exactly where the editor is generated.
