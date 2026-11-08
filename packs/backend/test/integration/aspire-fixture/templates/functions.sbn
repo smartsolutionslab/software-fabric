@@ -29,6 +29,34 @@ func database_fixture_project_references
   ret `<ProjectReference Include="../../src/AppHost/AppHost.csproj" />`
 end
 func database_fixture_file(space)
+  if project["backend.database"] == "sqlserver"
+    $summary = `The AppHost's database alone, on an empty container, started once per test run: SQL Server, migrated by the
+/// MigrationRunner as before the host starts, so every module's schema exists. Nothing else runs: no host, no model.`
+    $resources = `var sqlServer = builder.Resources.OfType<SqlServerServerResource>().Single();
+        HashSet<IResource> database =
+        [
+            sqlServer,
+            sqlServer.PasswordParameter,
+            .. builder.Resources.OfType<SqlServerDatabaseResource>(),
+            .. builder.Resources.Where(resource => resource.Name == MigrationRunner),
+        ];`
+  else
+    $summary = `The AppHost's database alone, on an empty container, started once per test run: the pgvector image, migrated by the
+/// MigrationRunner as before the host starts, so every module's vector table exists. Nothing else runs: no host, no
+/// model.`
+    $resources = `var postgres = builder.Resources.OfType<PostgresServerResource>().Single();
+        HashSet<IResource> database =
+        [
+            postgres,
+            postgres.PasswordParameter,
+            .. builder.Resources.OfType<PostgresDatabaseResource>(),
+            .. builder.Resources.Where(resource => resource.Name == MigrationRunner),
+        ];
+        if (postgres.UserNameParameter is { } user)
+        {
+            database.Add(user);
+        }`
+  end
   ret `using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
@@ -38,9 +66,7 @@ using Aspire.Hosting.Testing;
 namespace ` + space + `;
 
 /// <summary>
-/// The AppHost's database alone, on an empty container, started once per test run: the pgvector image, migrated by the
-/// MigrationRunner as before the host starts, so every module's vector table exists. Nothing else runs: no host, no
-/// model.
+/// ` + $summary + `
 /// </summary>
 public sealed class ApplicationDatabase : ` + test_lifetime + `
 {
@@ -59,18 +85,7 @@ public sealed class ApplicationDatabase : ` + test_lifetime + `
         using var timeout = new CancellationTokenSource(StartupTimeout);
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AppHost>(timeout.Token);
 
-        var postgres = builder.Resources.OfType<PostgresServerResource>().Single();
-        HashSet<IResource> database =
-        [
-            postgres,
-            postgres.PasswordParameter,
-            .. builder.Resources.OfType<PostgresDatabaseResource>(),
-            .. builder.Resources.Where(resource => resource.Name == MigrationRunner),
-        ];
-        if (postgres.UserNameParameter is { } user)
-        {
-            database.Add(user);
-        }
+        ` + $resources + `
 
         foreach (var resource in builder.Resources.Where(resource => !database.Contains(resource)).ToList())
         {
