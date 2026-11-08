@@ -1,0 +1,29 @@
+import { fileURLToPath } from 'node:url';
+import { runViteBuilder } from 'native-federation-vite';
+import type { Plugin } from 'vite';
+
+/**
+ * Makes `pnpm dev` (vite preview, which Aspire starts) build the remote with native federation in watch mode before it
+ * serves dist, and again on every change: native federation has no dev server, so the shell always loads a built
+ * remoteEntry.json and its bundles (docs/adr).
+ */
+export function serveFederation(plugins: () => Plugin[]): Plugin {
+  let close: (() => Promise<void>) | undefined;
+  return {
+    name: 'serve-federation',
+    async configurePreviewServer() {
+      const root = fileURLToPath(new URL('./', import.meta.url));
+      const build = await runViteBuilder('federation.config.js', {
+        workspaceRoot: root,
+        outputPath: `${root}dist`,
+        dev: true,
+        watch: true,
+        adapterConfig: { plugins: plugins() },
+      });
+      close = () => build.close();
+    },
+    async closePreviewServer() {
+      await close?.();
+    },
+  };
+}
