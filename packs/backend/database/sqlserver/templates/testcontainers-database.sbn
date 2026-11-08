@@ -1,0 +1,10 @@
+        // The AppHost's SQL Server; the MigrationRunner creates its database "database" as it migrates.
+        var sqlServer = await StartAsync(
+            new ContainerBuilder("mcr.microsoft.com/mssql/server:2022-latest")
+                .WithPortBinding(1433, assignRandomHostPort: true)
+                .WithEnvironment("ACCEPT_EULA", "Y")
+                .WithEnvironment("MSSQL_SA_PASSWORD", "Integration-tests-1")
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilCommandIsCompleted("/opt/mssql-tools18/bin/sqlcmd", "-C", "-S", "localhost", "-U", "sa", "-P", "Integration-tests-1", "-Q", "select 1"))
+                .Build(),
+            cancellationToken);
+        settings["ConnectionStrings:database"] = $"Server={sqlServer.Hostname},{sqlServer.GetMappedPublicPort(1433)};Database=database;User ID=sa;Password=Integration-tests-1;TrustServerCertificate=True";

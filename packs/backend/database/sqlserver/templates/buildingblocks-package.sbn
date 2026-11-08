@@ -1,0 +1,1 @@
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
