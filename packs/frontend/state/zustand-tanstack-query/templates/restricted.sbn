@@ -1,0 +1,16 @@
+            {
+              group: [
+                'redux',
+                '@reduxjs/*',
+                'react-redux',
+                'mobx',
+                'mobx-*',
+                'jotai',
+                'jotai/*',
+                'recoil',
+                'valtio',
+                'swr',
+                '@apollo/*',
+              ],
+              message: 'Server data: the generated TanStack Query hooks; client state: Zustand stores (docs/adr).',
+            }

@@ -1,5 +1,7 @@
 ## Routing: TanStack Router
 
 - {{ if project["frontend.architecture"] == "micro-frontends" }}A module's route lives in the shell, `src/modules/<module>/`: its `routes.tsx` exports `route`, the app picks it up by itself, and its page mounts the module's remote; the screens themselves live in the remote, `web/modules/<module>`.{{ else }}A module's screens live in `src/modules/<module>/`; its `routes.tsx` exports `route` and the app picks it up by itself.{{ end }} Do not list modules in `App.tsx` or `src/router.tsx`.
-- Link with `<Link>`, render the matched page with `<Outlet />`; both are imported from `@tanstack/react-router`, never `react-router`. Routes are declared in code, not with the file-based router plugin.
+- A module's `route` is `createRoute({ getParentRoute: () => rootRoute, path: '<module>', staticData: { title }, component })`, and its `routes.tsx` keeps the `declare module '@/modules'` entry that adds it to `ModuleRoutes`; without that entry, links to the module do not compile.
+- To route below a module, create child routes with `getParentRoute: () => <module route>` and export `route = <module route>.addChildren([...])`; the module's page renders `<Outlet />` where they appear.
+- Link with `<Link to="/path">` and pass path parameters in `params`; the compiler checks both against the routes. Never silence it with a cast or a computed string. Render the matched page with `<Outlet />`. Both are imported from `@tanstack/react-router`, never `react-router`. Routes are declared in code, not with the file-based router plugin.
 - Tests create the router with `createAppRouter(createMemoryHistory(), <App />)` from `@/router`, render `<RouterProvider router={router} />`, and wait for the page with `findBy*`.
