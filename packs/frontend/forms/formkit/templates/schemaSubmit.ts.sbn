@@ -18,17 +18,18 @@ export function schemaSubmit<TSchema extends v.GenericSchema | v.GenericSchemaAs
     const result = await v.safeParseAsync(schema, values);
     if (!result.success) {
       const formMessages: string[] = [];
-      const fieldMessages: Record<string, string[]> = {};
+      // A Map, not an object: a field named toString or constructor must not read Object's own properties.
+      const fieldMessages = new Map<string, string[]>();
       for (const issue of result.issues) {
         const path = (issue.path ?? []).map(({ key }) => String(key)).join('.');
         if (path === '') {
           formMessages.push(issue.message);
         } else {
-          fieldMessages[path] = [...(fieldMessages[path] ?? []), issue.message];
+          fieldMessages.set(path, [...(fieldMessages.get(path) ?? []), issue.message]);
         }
       }
 
-      form.setErrors(formMessages, fieldMessages);
+      form.setErrors(formMessages, Object.fromEntries(fieldMessages));
       return;
     }
 
@@ -53,17 +54,18 @@ export function schemaSubmit<TSchema extends z.ZodType>(
     const result = await schema.safeParseAsync(values);
     if (!result.success) {
       const formMessages: string[] = [];
-      const fieldMessages: Record<string, string[]> = {};
+      // A Map, not an object: a field named toString or constructor must not read Object's own properties.
+      const fieldMessages = new Map<string, string[]>();
       for (const issue of result.error.issues) {
         const path = issue.path.map(String).join('.');
         if (path === '') {
           formMessages.push(issue.message);
         } else {
-          fieldMessages[path] = [...(fieldMessages[path] ?? []), issue.message];
+          fieldMessages.set(path, [...(fieldMessages.get(path) ?? []), issue.message]);
         }
       }
 
-      form.setErrors(formMessages, fieldMessages);
+      form.setErrors(formMessages, Object.fromEntries(fieldMessages));
       return;
     }
 

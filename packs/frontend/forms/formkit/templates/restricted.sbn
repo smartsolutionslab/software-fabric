@@ -1,4 +1,8 @@
             {
               group: ['vee-validate', '@vee-validate/*', '@tanstack/vue-form', '@formkit/zod'],
               message: 'Use FormKit with schemaSubmit from src/forms/schemaSubmit (docs/adr).',
+            },
+            {
+              group: ['@formkit/themes', '@formkit/themes/*'],
+              message: 'Style FormKit in src/forms/formkit.config.ts (docs/adr).',
             }
