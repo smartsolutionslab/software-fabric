@@ -7,15 +7,26 @@ internal sealed class Container : IDisposable
 {
     private readonly string id;
 
-    private Container(string id, int port)
+    /// <summary>What the container needs and is removed with it: containers it depends on, then their network.</summary>
+    private readonly string[] companions;
+
+    private readonly string? network;
+
+    private Container(string id, int port, string[]? companions = null, string? network = null, int? managementPort = null)
     {
         this.id = id;
         Port = port;
+        this.companions = companions ?? [];
+        this.network = network;
+        ManagementPort = managementPort;
     }
 
     public string Id => id;
 
     public int Port { get; }
+
+    /// <summary>The port of a broker's management API, where it has one apart from <see cref="Port"/>.</summary>
+    public int? ManagementPort { get; }
 
     public static Container Postgres(string password)
     {
@@ -80,6 +91,81 @@ internal sealed class Container : IDisposable
         return container;
     }
 
+    /// <summary>
+    /// The Azure Service Bus emulator image the AppHost runs, with the SQL Server it keeps its entities in, on a network
+    /// of their own. It takes messages on <see cref="Port"/> (AMQP) and management requests on
+    /// <see cref="ManagementPort"/> (HTTP); ready once the management port reports it healthy. Both licences are
+    /// accepted for this test only.
+    /// </summary>
+    public static Container ServiceBus()
+    {
+        DockerPorts.EnsureRunsAlone();
+        const string password = "Fabric-tests-1";
+        var network = Docker("network", "create", $"fabric-servicebus-{Guid.NewGuid():N}").Trim();
+        List<string> started = [];
+        Container container;
+        try
+        {
+            started.Add(Docker(
+                "run", "--detach", "--network", network, "--network-alias", "sqlserver",
+                "--env", "ACCEPT_EULA=Y", "--env", $"MSSQL_SA_PASSWORD={password}",
+                "mcr.microsoft.com/mssql/server:2022-latest").Trim());
+            started.Add(Docker(
+                "run", "--detach", "--network", network, "--publish", "127.0.0.1::5672", "--publish", "127.0.0.1::5300",
+                "--env", "ACCEPT_EULA=Y", "--env", "SQL_SERVER=sqlserver", "--env", $"MSSQL_SA_PASSWORD={password}",
+                "mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.0").Trim());
+            container = new Container(started[1], PublishedPort(started[1], 5672), [started[0]], network, PublishedPort(started[1], 5300));
+        }
+        catch (Exception)
+        {
+            // What started is removed with the network before the failure goes on: no Container owns it yet.
+            if (started.Count > 0)
+            {
+                Run(["rm", "--force", "--volumes", .. started]);
+            }
+
+            Run(["network", "rm", network]);
+            throw;
+        }
+
+        using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+        for (var attempt = 0; attempt < 180; attempt++)
+        {
+            try
+            {
+                if (client.GetAsync(new Uri($"http://127.0.0.1:{container.ManagementPort}/health")).GetAwaiter().GetResult().IsSuccessStatusCode)
+                {
+                    return container;
+                }
+            }
+            catch (System.Net.Http.HttpRequestException)
+            {
+                // Not listening yet.
+            }
+            catch (TaskCanceledException)
+            {
+                // Listening, not answering yet.
+            }
+
+            Thread.Sleep(1000);
+        }
+
+        var logs = Run(["logs", "--tail", "40", container.Id]);
+        container.Dispose();
+        throw new InvalidOperationException($"The Service Bus emulator did not become healthy:{Environment.NewLine}{logs.Output}{logs.Error}");
+    }
+
+    /// <summary>An emulator connection string to one of the emulator's ports, in the form Aspire gives the host.</summary>
+    public static string ServiceBusConnectionString(int port) =>
+        $"Endpoint=sb://localhost:{port};SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;";
+
+    /// <summary>The emulator's queues, as its management API lists them: an Atom feed with one entry, titled by name, per queue.</summary>
+    public string ServiceBusQueues()
+    {
+        using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        return client.GetStringAsync(new Uri($"http://127.0.0.1:{ManagementPort}/$Resources/queues?api-version=2021-05")).GetAwaiter().GetResult();
+    }
+
     /// <summary>The first message of a Kafka topic, read with the broker's own console consumer; empty when none arrives in time.</summary>
     public string FirstKafkaMessage(string topic) =>
         Run(["exec", "--user", "appuser", id, "kafka-console-consumer", "--bootstrap-server", "localhost:29092", "--topic", topic,
@@ -90,7 +176,14 @@ internal sealed class Container : IDisposable
         Docker("exec", "--env", $"PGPASSWORD={password}", id, "psql", "-U", "postgres", "-d", "postgres", "-tAc", sql).Trim();
 
     /// <summary>Removes the container with the anonymous volumes its image declares; without --volumes they outlive it.</summary>
-    public void Dispose() => Docker("rm", "--force", "--volumes", id);
+    public void Dispose()
+    {
+        Docker(["rm", "--force", "--volumes", id, .. companions]);
+        if (network is not null)
+        {
+            Docker("network", "rm", network);
+        }
+    }
 
     private static Container Start(string image, int containerPort, params string[] environment)
     {
@@ -103,8 +196,14 @@ internal sealed class Container : IDisposable
 
         arguments.Add(image);
         var id = Docker([.. arguments]).Trim();
+        return new Container(id, PublishedPort(id, containerPort));
+    }
+
+    /// <summary>The local port Docker published a container's port on.</summary>
+    private static int PublishedPort(string id, int containerPort)
+    {
         var mapping = Docker("port", id, containerPort.ToString(System.Globalization.CultureInfo.InvariantCulture)).Trim().Split('\n')[0];
-        return new Container(id, int.Parse(mapping[(mapping.LastIndexOf(':') + 1)..], System.Globalization.CultureInfo.InvariantCulture));
+        return int.Parse(mapping[(mapping.LastIndexOf(':') + 1)..], System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static int FreePort()
