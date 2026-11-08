@@ -1,14 +1,21 @@
-{{~ if project["frontend.ui-library"] != "shadcn-vue" || project["frontend.forms"] != "vee-validate" || project["frontend.validation"] != "zod" ~}}
+{{~ if project["frontend.ui-library"] != "shadcn-vue" || project["frontend.forms"] != "vee-validate" || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate and zod only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
+{{~ valibot = project["frontend.validation"] == "valibot" ~}}
 <script setup lang="ts">
 import { contentToText } from '@ag-ui/client';
+{{~ if valibot ~}}
+import * as v from 'valibot';
+import { useForm } from 'vee-validate';
+import { computed, useId } from 'vue';
+{{~ else ~}}
 import { useForm } from 'vee-validate';
 import { computed, useId } from 'vue';
 import { z } from 'zod';
+{{~ end ~}}
 import { Button } from '@/components/ui/button';
 import { toTypedSchema } from '@/forms/toTypedSchema';
 import { useAgent } from './useAgent';
@@ -21,7 +28,11 @@ type Entry =
 
 const { agent } = defineProps<{ agent: string }>();
 
+{{~ if valibot ~}}
+const messageSchema = v.object({ message: v.pipe(v.string(), v.trim(), v.minLength(1, 'Write a message first.')) });
+{{~ else ~}}
 const messageSchema = z.object({ message: z.string().trim().min(1, 'Write a message first.') });
+{{~ end ~}}
 
 const { messages, running, failure, send } = useAgent(agent);
 const { defineField, errors, handleSubmit, resetForm } = useForm({

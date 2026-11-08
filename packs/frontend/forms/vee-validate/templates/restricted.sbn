@@ -1,4 +1,4 @@
             {
-              group: ['@formkit/*', '@tanstack/vue-form', '@vee-validate/zod'],
+              group: ['@formkit/*', '@tanstack/vue-form', '@vee-validate/{{ if project["frontend.validation"] == "valibot" }}valibot{{ else }}zod{{ end }}'],
               message: 'Use vee-validate with toTypedSchema from src/forms/toTypedSchema (docs/adr).',
             }
