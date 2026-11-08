@@ -21,7 +21,9 @@ exactly.
   in an Angular shell. It peers on core `~4.8.1`, so core is pinned there. Upgrade the three together, and run the
   micro-frontend end-to-end tests on every upgrade.
 - **A remote** (`web/modules/<module>/federation.config.js`) is named after its module and exposes one entry, `./Page`:
-  the module's screens as one component, the default export of `src/<Module>Page.tsx`. `pnpm build` type-checks it and
+  the module's screens as one component, the default export of `src/<Module>Page.tsx`. `pnpm build` type-checks it,
+  bundles the page once with Vite without writing it, so the remote's boundary names a file of another remote or of
+  the shell (native federation's dependency analysis would stop at it saying only that it is outside the remote), and
   runs `native-federation-vite build`, which reuses the plugins of the remote's `vite.config.ts` and writes
   `dist/remoteEntry.json` with content-hashed bundles.
 - **Under Aspire** a remote stays a Vite app: `pnpm dev` is `vite preview`, whose `serve.ts` plugin first builds the

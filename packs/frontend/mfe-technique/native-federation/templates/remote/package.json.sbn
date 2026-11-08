@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite preview",
-    "build": "tsc -b && native-federation-vite build",
+    "build": "tsc -b && vite build && native-federation-vite build",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run"

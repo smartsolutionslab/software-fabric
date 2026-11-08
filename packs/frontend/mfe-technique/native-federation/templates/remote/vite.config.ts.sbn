@@ -19,5 +19,8 @@ const plugins = (): Plugin[] => [
 // /modules/{{ module.name }}/.
 export default defineConfig({
   plugins: [...plugins(), serveFederation(plugins)],
+  // `pnpm build` first bundles the page with Vite, writing nothing, so the boundary names a file of another remote or
+  // of the shell; native federation's dependency analysis would stop at it saying only that it is outside the remote.
+  build: { rolldownOptions: { input: './src/{{ module.namespace }}Page.tsx' }, write: false },
   test: { environment: 'jsdom', include: ['src/**/*.test.{ts,tsx}'], setupFiles: ['./src/test-setup.ts'] },
 });
