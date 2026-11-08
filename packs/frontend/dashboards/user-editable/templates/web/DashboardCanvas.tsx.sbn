@@ -126,8 +126,8 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
     decide(call);
   };
 {{~ end ~}}
-{%{
-}%}{{~ if valibot ~}}
+
+{{~ if valibot ~}}
   const naming = useForm({ resolver: valibotResolver(nameSchema), defaultValues: { name: dashboard.name } });
   const adding = useForm({ resolver: valibotResolver(widgetSchema), defaultValues: { source: '', visual: '' } });
 {{~ else ~}}
