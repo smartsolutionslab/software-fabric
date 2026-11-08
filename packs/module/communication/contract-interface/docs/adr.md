@@ -22,5 +22,6 @@ An architecture rule fails the build when a module API is outside `Contracts.<Mo
 
 - A call is synchronous and in-process: it runs in the caller's request and dependency-injection scope{{ if project["backend.tenancy"] != "none" }}, so for the caller's tenant{{ end }}, and fails when the other module fails.
 - A call does not join the caller's transaction: the other module saves in its own context. Telling another module that something changed stays an integration event; the API is for asking.
+- The option is chosen beside `integration-events`, never instead of it, and the catalog refuses it alone: the unit of work and the messaging wiring every module gets come from that pack.
 - An API is a contract between modules: change a method by adding a new one beside it, never by changing its signature while another module calls it.
 - Each module's own test starts that module alone. An API of another module that it takes is a stand-in there, which throws if called; a call across modules is tested against the running host.
