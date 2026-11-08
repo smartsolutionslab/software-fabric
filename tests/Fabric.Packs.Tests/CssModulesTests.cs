@@ -156,6 +156,26 @@ public sealed partial class CssModulesTests
         output.ShouldContain("components/ui/BaseButton.vue: styles.variantGhost", customMessage: output);
     }
 
+    [Fact]
+    public void A_class_its_module_makes_global_fails_the_stylesheet_check()
+    {
+        using var project = new GeneratedProject(Vue, VueCssModules);
+        var buttonStyles = Path.Combine(project.ProjectDirectory, "web/app/src/components/ui/BaseButton.module.css");
+        var css = File.ReadAllText(buttonStyles);
+        css.ShouldContain(".sizeLg {");
+        css.ShouldContain(".sizeSm {");
+        File.WriteAllText(buttonStyles, css.Replace(".sizeLg {", ":global(.sizeLg) {", StringComparison.Ordinal).Replace(".sizeSm {", ":global .sizeSm {", StringComparison.Ordinal));
+
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, install) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, install);
+        var (exitCode, output) = Shell.Run(Path.Combine(web, "app"), new Dictionary<string, string> { ["NO_COLOR"] = "1" }, "pnpm", "test", "src/cssModules.test.ts");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("components/ui/BaseButton.vue: styles.sizeLg", customMessage: output);
+        output.ShouldContain("components/ui/BaseButton.vue: styles.sizeSm", customMessage: output);
+    }
+
     /// <summary>
     /// The web app's components that take classes from a CSS module. Fails for a component with a class attribute of
     /// its own, for a class it takes from a module that has no rule with declarations for it, and for a module with
