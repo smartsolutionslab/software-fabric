@@ -85,9 +85,17 @@ public class RuleEvaluatorTests
         "frontend.mfe-technique=module-federation requires frontend.framework == react, but frontend.framework is vue.")]
     [InlineData("saas-standard-react", new[] { "frontend.styling=library-theme", "frontend.ui-library=radix-headless" },
         "frontend.styling=library-theme conflicts with frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless).")]
+    [InlineData("lean-crud", new[] { "module.communication=contract-interface" },
+        "module defaults: module.communication=contract-interface requires module.communication has integration-events, but module.communication is contract-interface.")]
     public void Rejects_a_combination_the_packs_refuse_in_one_sentence(string profile, string[] settings, string violation)
     {
         Violations(profile, settings).ShouldBe([violation]);
+    }
+
+    [Fact]
+    public void Contract_interfaces_beside_integration_events_are_allowed()
+    {
+        Violations("lean-crud", "module.communication=integration-events,contract-interface").ShouldBeEmpty();
     }
 
     [Theory]
@@ -141,7 +149,7 @@ public class RuleEvaluatorTests
     [Fact]
     public void A_module_option_conflicting_with_a_project_option_is_reported()
     {
-        Violations("saas-standard-react", "backend.topology=services", "module.communication=contract-interface")
+        Violations("saas-standard-react", "backend.topology=services", "module.communication=integration-events,contract-interface")
             .ShouldBe(["module defaults: module.communication=contract-interface conflicts with backend.topology == services."]);
     }
 
