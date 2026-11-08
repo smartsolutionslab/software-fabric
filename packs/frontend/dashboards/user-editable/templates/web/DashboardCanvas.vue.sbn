@@ -188,11 +188,27 @@ const widgetErrors = adding.useStore((state) => ({
   visual: state.fieldMeta.visual?.errors[0]?.message,
 }));
 const source = adding.useStore((state) => state.values.source);
-const chosen = computed(() => listed.value.get(source.value ?? ''));
+const chosen = computed(() => listed.value.get(source.value));
 
 /** A widget chosen: show it the first way its kind can be shown. */
 const choose = ({ value }: { value: string }) =>
   adding.setFieldValue('visual', visuals[listed.value.get(value)?.kind ?? 'Chart'][0].value);
+
+// Another page of the picker lists other widgets: a choice from this one would be added with the next page's visual.
+const pickerPage = (page: number) => {
+  catalogPage.value = page;
+  adding.reset();
+};
+
+function add(event: Event) {
+  event.preventDefault();
+  void adding.handleSubmit();
+}
+
+function submit(event: Event) {
+  event.preventDefault();
+  void naming.handleSubmit();
+}
 }%}{{~ else ~}}
 {%{const {
   defineField: nameField,
@@ -219,26 +235,11 @@ const choose = (event: Event) =>
     'visual',
     visuals[listed.value.get((event.target as HTMLSelectElement).value)?.kind ?? 'Chart'][0].value,
   );
-}%}{{~ end ~}}
-{%{
+
 // Another page of the picker lists other widgets: a choice from this one would be added with the next page's visual.
 const pickerPage = (page: number) => {
   catalogPage.value = page;
-}%}{{~ if tanstack ~}}
-{%{  adding.reset();
-};
-
-function add(event: Event) {
-  event.preventDefault();
-  void adding.handleSubmit();
-}
-
-function submit(event: Event) {
-  event.preventDefault();
-  void naming.handleSubmit();
-}
-}%}{{~ else ~}}
-{%{  resetWidget();
+  resetWidget();
 };
 
 const add = handleAdd(({ source: chosenSource, visual: chosenVisual }) => {
