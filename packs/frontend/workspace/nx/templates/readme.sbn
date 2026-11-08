@@ -1,0 +1,9 @@
+## Frontend
+
+```bash
+cd web && pnpm install && pnpm build
+```
+
+`pnpm build`, `pnpm lint` and `pnpm test` run the target in every workspace package through Nx, dependencies' builds first. A target whose inputs have not changed is read from the local cache (`web/.nx/cache`) instead of running again.
+
+The AppHost starts the web app with everything else (`dotnet run --project src/AppHost`).

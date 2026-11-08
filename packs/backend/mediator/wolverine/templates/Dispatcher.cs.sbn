@@ -1,0 +1,30 @@
+using Microsoft.Extensions.DependencyInjection;
+using Wolverine;
+
+namespace {{ namespace }}.BuildingBlocks.Messaging;
+
+/// <summary>
+/// Sends every request through Wolverine's bus, which invokes its one handler inline and in Wolverine's pipeline. The bus
+/// is the host's (messaging is host-wide), so it is resolved on first use; a module's own registrations stay valid
+/// without a running host.
+/// </summary>
+public sealed class Dispatcher(IServiceProvider services) : IDispatcher
+{
+    private IMessageBus? bus;
+
+    private IMessageBus Bus => bus ??= services.GetRequiredService<IMessageBus>();
+
+    public Task<TResult> SendAsync<TResult>(ICommand<TResult> command, CancellationToken cancellationToken)
+    {
+        {{ not_null "command" }}
+
+        return Bus.InvokeAsync<TResult>(command, cancellationToken);
+    }
+
+    public Task<TResult> QueryAsync<TResult>(IQuery<TResult> query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        return Bus.InvokeAsync<TResult>(query, cancellationToken);
+    }
+}

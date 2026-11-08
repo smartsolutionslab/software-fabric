@@ -140,6 +140,20 @@ public sealed class PackLoaderTests : IDisposable
             .ShouldEndWith("declares the role slot 'e2e.apphost-arguments' joined by a newline; the catalog joins it by ' '.");
     }
 
+    // The workspace's package list belongs to whichever workspace tool is chosen; the architecture and design-system
+    // packs fill it with pnpm-workspaces and with nx alike (#283).
+    [Fact]
+    public void A_workspace_pack_without_the_workspace_packages_slot_is_rejected_by_the_repository_catalog()
+    {
+        packs.Add(
+            "frontend.workspace.nx",
+            FrameworkManifest("frontend.workspace.nx", Declaration("web.workspace-files", separator: null)),
+            FrameworkFiles);
+
+        PackLoader.Load(packs.Root, RepositoryCatalog).Errors.ShouldHaveSingleItem()
+            .ShouldEndWith("does not declare the role slot 'web.workspace-packages' that every frontend.workspace option declares (catalog).");
+    }
+
     private static readonly CatalogModel RepositoryCatalog = CatalogReader.ReadFile(RepositoryRoot.File("catalog", "catalog.yaml"));
 
     /// <summary>

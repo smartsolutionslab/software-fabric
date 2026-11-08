@@ -467,6 +467,7 @@ AppHost's model with it, declares it instead (*#260*).
 | `host.endpoints` *(added in M1-06)* | `src/Host/Program.cs` | 0+ | the base with an identity provider (`/me`), tenancy (`/me/tenant`), agent-ui ag-ui (`POST /agents/{name}`) |
 | `host.log-levels` | `src/Host/appsettings.json`, under `Logging:LogLevel` | 0+ | ef-core (SQL commands at `Warning`) |
 | `host.kestrel-endpoints` *(added for #250; separator `,` + newline)* | `src/Host/appsettings.json`, under `Kestrel:Endpoints` beside the host's own `http` (`http://localhost:5080`, launchSettings' URL); rendered only with a contribution | 0+ | api-protocols grpc (`grpc`, HTTP/2 only on `http://localhost:5081`: Kestrel speaks HTTP/2 without TLS only on an endpoint that speaks nothing else). Aspire turns every Kestrel endpoint into an endpoint of the host resource, by its name |
+| `messaging.wolverine-options` *(added for #249; declared by bus.library wolverine)* | `src/Host/Wiring/Messaging.cs`, inside `AddWolverine` after the consumers' discovery; `WolverineOptions options` and `modules` in scope; rendered only with a contribution | 0+ | mediator wolverine (`options.DiscoverRequestHandlers()`: command and query handlers become Wolverine handlers) |
 | `modules.infrastructure` | `src/BuildingBlocks/Modules/ModuleInfrastructure.cs` | 0+ | ef-core, wolverine, tenancy, reads dapper (`AddReadConnection`, once for the project), agent-ui ag-ui (registers the module's `IAgentConversation<TSelf>` queries by their agents' names), contract-interface (registers the module's implementations of a module API, `I<Module>Api` in Contracts) |
 | `modules.endpoints` *(added in M1-02)* | `src/BuildingBlocks/Modules/ModuleEndpoints.cs` | 0+ | minimal-apis (maps `IEndpoint`s), keycloak (`group.RequireAuthorization()`) |
 | `persistence.options` *(added in M1-03)* | `PersistenceRegistration.cs` and each module's design-time factory (owned and declared by ef-core); `options`, `connectionString` and `schema` in scope | **exactly-one** | postgres (`options.UseNpgsql(connectionString, ...)` with the history table in `schema`) |
@@ -482,11 +483,11 @@ AppHost's model with it, declares it instead (*#260*).
 
 | Slot | File | Separator | Filled by |
 |---|---|---|---|
-| `web.workspace-packages` *(added in M1-07)* | `web/pnpm-workspace.yaml` | newline | spa (`  - app`), micro-frontends (`app`, `modules/*`), design-system tokens-and-components (`packages/tokens`, `packages/ui`) |
+| `web.workspace-packages` *(added in M1-07; a role slot of `frontend.workspace` since #283, declared by pnpm-workspaces and nx)* | `web/pnpm-workspace.yaml` | newline | spa (`  - app`), micro-frontends (`app`, `modules/*`), design-system tokens-and-components (`packages/tokens`, `packages/ui`), design-system tokens (`packages/tokens`) |
 | `web.dependencies` | `web/app/package.json` | `,` + newline | react, redux, rtk, router, rhf, zod, tailwind, shadcn, tanstack-table, echarts, oidc, agent-ui ag-ui (`@ag-ui/client`), openapi-fetch |
 | `web.dev-dependencies` | 〃 | `,` + newline | vitest, testing-library, playwright, axe, rtk codegen, pwa yes (`vite-plugin-pwa`), openapi-fetch (`openapi-typescript`) |
 | `web.scripts` | 〃 | `,` + newline | rtk-query-codegen, orval, openapi-fetch (`codegen`) |
-| `web.prepare` *(added in M1-07b)* | 〃 (`dev`, `build`, `test`) | ` && ` | rtk-query-codegen, orval, openapi-fetch (`pnpm codegen`), design-system tokens-and-components (builds the tokens) |
+| `web.prepare` *(added in M1-07b)* | 〃 (`dev`, `build`, `test`) | ` && ` | rtk-query-codegen, orval, openapi-fetch (`pnpm codegen`), design-system tokens-and-components and tokens (build the tokens) |
 | `web.env` *(added in M1-07b)* | `web/app/src/vite-env.d.ts` | newline | oidc-client-ts (`VITE_OIDC_AUTHORITY`) |
 | `web.test-setup` *(added in M1-07b)* | `web/app/src/test-setup.ts` | newline | accessibility (axe matchers), formkit (installs FormKit with the project config for component tests) |
 | `web.lint-ignores` *(added in M1-07b)* | `web/app/eslint.config.js` | `,` + newline | rtk-query-codegen, orval, openapi-fetch (the generated client) |
@@ -499,7 +500,7 @@ AppHost's model with it, declares it instead (*#260*).
 | `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`), pwa yes (`VitePWA({...})`, the service worker and manifest) |
 | `web.imports` | `web/app/src/main.tsx` | newline | redux, router, oidc |
 | `web.providers` | `web/app/src/main.tsx` | `,` + newline | redux, oidc, router — wrappers composed in order |
-| `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn, design-system tokens-and-components (the tokens' Tailwind theme, `@source` for the ui package), micro-frontends (`@source` for the remotes) |
+| `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn, design-system tokens-and-components (the tokens' Tailwind theme, `@source` for the ui package), design-system tokens (the tokens' Tailwind theme, or their CSS custom properties with css-modules), micro-frontends (`@source` for the remotes) |
 | `web.restricted-imports` *(added in M1-07)* | `web/app/eslint.config.js` | `,` + newline | router, shadcn, react-hook-form, zod — each bans its alternatives; micro-frontends (the shell imports no remote); agent-ui none (no AG-UI or CopilotKit client), agent-ui ag-ui (no CopilotKit) |
 | `web.remote-restricted-imports` *(added for #156; declared by module-federation)* | `web/modules/<module>/eslint.config.js` | `,` + newline | mfe-mixed-frameworks no (bans every UI framework but the shell's) |
 
