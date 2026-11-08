@@ -56,6 +56,18 @@ public sealed class TurborepoTests
         turbo.ShouldNotContain("\"inputs\"");
     }
 
+    // Turbo hashes a workspace dependency into a task only along dependsOn; Nx's lint and test took ^default by default.
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void Lint_and_test_are_keyed_on_their_workspace_dependencies_through_a_transit_task(string profile)
+    {
+        var turbo = Files(profile, Turborepo)["web/turbo.json"];
+
+        turbo.ShouldContain("\"transit\": {\n      \"dependsOn\": [\"^transit\"]\n    }");
+        turbo.ShouldContain("\"lint\": {\n      \"dependsOn\": [\"transit\"]\n    }");
+        turbo.ShouldContain("\"test\": {\n      \"dependsOn\": [\"transit\"]\n    }");
+    }
+
     [Theory]
     [MemberData(nameof(Profiles))]
     public void The_local_cache_is_not_committed(string profile) =>
@@ -169,6 +181,37 @@ public sealed class TurborepoTests
         againExitCode.ShouldBe(0, $"pnpm build, again:\n{againOutput}");
         againOutput.ShouldContain("FULL TURBO", customMessage: againOutput);
         File.Exists(Path.Combine(storybook, "index.html")).ShouldBeTrue("the cached build restores the storybook");
+    }
+
+    /// <summary>
+    /// The review's blocking finding on #376: a change only in a workspace dependency (the tokens) must run its consumers'
+    /// lint and test again, not replay their cached successes.
+    /// </summary>
+    [Fact]
+    public void Lint_and_test_run_again_when_only_a_workspace_dependency_changed()
+    {
+        using var project = new GeneratedProject("saas-standard-react", Turborepo, "frontend.design-system=tokens-and-components");
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        foreach (var step in new[] { "install", "lint", "test" })
+        {
+            var (exitCode, output) = Shell.Run(web, "pnpm", step);
+            exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
+        }
+
+        var (warmExitCode, warmOutput) = Shell.Run(web, "pnpm", "test");
+        warmExitCode.ShouldBe(0, $"pnpm test, warm:\n{warmOutput}");
+        warmOutput.ShouldContain("FULL TURBO", customMessage: warmOutput);
+
+        var radius = Path.Combine(web, "packages", "tokens", "src", "radius.tokens.json");
+        File.WriteAllText(radius, File.ReadAllText(radius).Replace("\"value\": 0.5,", "\"value\": 0.75,", StringComparison.Ordinal));
+
+        foreach (var task in new[] { "lint", "test" })
+        {
+            var (exitCode, output) = Shell.Run(web, "pnpm", task);
+            exitCode.ShouldBe(0, $"pnpm {task}, after the tokens changed:\n{output}");
+            output.ShouldContain($"app:{task}: cache miss", customMessage: output);
+            output.ShouldContain($"@shop/ui:{task}: cache miss", customMessage: output);
+        }
     }
 
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
