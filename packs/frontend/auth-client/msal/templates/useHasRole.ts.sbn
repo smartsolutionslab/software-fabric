@@ -5,6 +5,7 @@ import { useMsal } from '@azure/msal-react';
  * convenience, never protection: the backend policy decides.
  */
 export function useHasRole(role: string): boolean {
-  const claims: Record<string, unknown> = useMsal().accounts[0]?.idTokenClaims ?? {};
+  // The active account, the one the app's access token is for; other accounts may be cached.
+  const claims: Record<string, unknown> = useMsal().instance.getActiveAccount()?.idTokenClaims ?? {};
   {{ id_token_has_role "claims" "role" }}
 }

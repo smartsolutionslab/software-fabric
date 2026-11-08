@@ -13,7 +13,8 @@ export function SignedIn({ children }: { children: ReactNode }) {
   const [expired, setExpired] = useState(false);
   // Started once: StrictMode runs effects twice, and MSAL refuses a second sign-in while one is under way.
   const started = useRef(false);
-  const account = accounts[0];
+  // The active account is the one the kept access token was issued to (src/auth/msal.ts); others may be cached.
+  const account = accounts.length > 0 ? (instance.getActiveAccount() ?? undefined) : undefined;
   const signedIn = account !== undefined && !expired && accessToken() !== undefined;
   const mustSignIn = !signedIn && inProgress === InteractionStatus.None && !error;
 
@@ -32,14 +33,15 @@ export function SignedIn({ children }: { children: ReactNode }) {
   }, [instance]);
 
   // The access token is not renewed silently (the stand-in issues no refresh token): once it expires, sign in again.
+  const accountId = account?.homeAccountId;
   useEffect(() => {
     const expiresOn = accessTokenExpiresOn();
-    if (account === undefined || expiresOn === undefined) {
+    if (accountId === undefined || expiresOn === undefined) {
       return;
     }
     const timer = setTimeout(() => setExpired(true), Math.max(0, expiresOn - Date.now()));
     return () => clearTimeout(timer);
-  }, [account]);
+  }, [accountId]);
 
   useEffect(() => {
     if (mustSignIn && !started.current) {

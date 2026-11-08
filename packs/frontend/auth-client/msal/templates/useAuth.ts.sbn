@@ -57,7 +57,8 @@ export function createAuth(client: AuthClient): Auth {
     try {
       await client.initialize();
       const result = await client.handleRedirectPromise();
-      const signedIn = result?.account ?? client.getActiveAccount() ?? client.getAllAccounts()[0] ?? null;
+      // The active account is the one the kept access token was issued to (src/auth/msal.ts); others may be cached.
+      const signedIn = result?.account ?? client.getActiveAccount();
       const expiresOn = accessTokenExpiresOn();
       if (signedIn && accessToken() !== undefined && expiresOn !== undefined && expiresOn > Date.now()) {
         account.value = signedIn;
