@@ -1,0 +1,49 @@
+using System.Net;
+using System.Net.Http.Headers;
+{{~ for space in short_lived_test_user_token_namespaces | string.split " " ~}}
+{{~ if space != "System.Globalization" ~}}
+using {{ space }};
+{{~ end ~}}
+{{~ end ~}}
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>
+/// MSAL signs the browser in at the stand-in's https address, while the host reads the stand-in's keys at its http one:
+/// a token issued at the https address names its issuer there, and the host accepts it (AzureAd:BrowserInstance).
+/// </summary>
+{{~ integration_fixture_attributes ~}}
+public class BrowserIssuerTests({{ integration_fixture }})
+{
+    {{ test_attribute }}
+    public async Task A_token_the_stand_in_issues_at_its_https_address_is_accepted_by_the_host()
+    {
+        // This test checks the issuer, not the certificate: the development certificate need not be trusted to run it.
+        using var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (request, _, _, _) => request.RequestUri is { IsLoopback: true } };
+        using var identity = new HttpClient(handler);
+        var https = {{ running_application }}.GetEndpoint("identity", "https");
+        var metadata = await identity.GetFromJsonAsync<StandInMetadata>(new Uri(https, "/organizations/v2.0/.well-known/openid-configuration"), {{ test_cancellation_token }})
+            ?? throw new InvalidOperationException("The stand-in published no metadata.");
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = "{{ name }}-web",
+            ["username"] = "developer",
+            ["password"] = "developer",
+        });
+        using var issued = await identity.PostAsync(metadata.TokenEndpoint, form, {{ test_cancellation_token }});
+        issued.EnsureSuccessStatusCode();
+        var token = await issued.Content.ReadFromJsonAsync<Token>({{ test_cancellation_token }})
+            ?? throw new InvalidOperationException("The stand-in returned no token.");
+        using var client = {{ host_client }};
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+
+        using var response = await client.GetAsync(new Uri("/me", UriKind.Relative), {{ test_cancellation_token }});
+
+        {{ should_be "response.StatusCode" "HttpStatusCode.OK" }};
+    }
+
+    private sealed record StandInMetadata([property: JsonPropertyName("token_endpoint")] Uri TokenEndpoint);
+
+    private sealed record Token([property: JsonPropertyName("access_token")] string AccessToken);
+}

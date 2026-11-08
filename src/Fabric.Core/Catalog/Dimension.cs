@@ -12,4 +12,8 @@ public sealed record Dimension(
     string? DefaultFrom,
     string? Note,
     IReadOnlyDictionary<string, CatalogOption> Options,
-    IReadOnlyDictionary<string, RoleSlot> RoleSlots);
+    IReadOnlyDictionary<string, RoleSlot> RoleSlots)
+{
+    /// <summary>Conditions that must all hold whenever the dimension is set, whichever options are chosen; checked per module for a module dimension.</summary>
+    public IReadOnlyList<Condition> Requires { get; init; } = [];
+}

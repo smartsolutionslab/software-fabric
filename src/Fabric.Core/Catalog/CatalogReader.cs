@@ -70,6 +70,7 @@ public static class CatalogReader
             "active-when",
             "default",
             "default-from",
+            "requires",
             "note",
             "role-slots",
             "options");
@@ -105,7 +106,10 @@ public static class CatalogReader
             fields.Optional("default-from") is { } defaultFrom ? source.Scalar(defaultFrom, owner) : null,
             fields.Optional("note") is { } note ? source.Scalar(note, owner) : null,
             options,
-            roleSlots);
+            roleSlots)
+        {
+            Requires = fields.Optional("requires") is { } requires ? source.Conditions(requires, owner) : [],
+        };
     }
 
     private static CatalogOption ReadOption(YamlSource source, string qualifiedId, string id, YamlNode node)

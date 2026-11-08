@@ -140,6 +140,7 @@ public sealed partial class TestcontainersTests
     [InlineData("industrial-event-driven-mfe", new string[0])]
     [InlineData("saas-standard-react", new[] { "backend.bus.transport=azure-service-bus" })]
     [InlineData("lean-crud", new[] { "frontend.realtime=signalr", "backend.auth=none", "backend.tenancy=none" })]
+    [InlineData("lean-crud", new[] { "backend.database=sqlserver" })]
     [InlineData("saas-ai-react", new[] { "backend.authorization=roles,claims", "backend.mcp=server" })]
     public void The_integration_tests_pass_on_testcontainers(string profile, string[] overrides)
     {

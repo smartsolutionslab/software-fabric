@@ -58,4 +58,29 @@ public sealed class AddModuleCommandTests : IDisposable
         run.Error.ShouldContain("error: src/billing/README.md already exists");
         File.ReadAllText(Path.Combine(project, "fabric.yaml")).ShouldBe(before);
     }
+
+    [Fact]
+    public void A_module_without_integration_events_is_refused_and_named()
+    {
+        var root = Directory.CreateTempSubdirectory("fabric-add-").FullName;
+        try
+        {
+            var shop = Path.Combine(root, "shop");
+            CliRun AddModuleToShop(params string[] extra) =>
+                CliRun.Of(["add-module", .. extra, "--project", shop, "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks]);
+            CliRun.Of("new", shop, "--profile", "lean-crud", "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks).ExitCode.ShouldBe(0);
+            AddModuleToShop("billing").ExitCode.ShouldBe(0);
+
+            var run = AddModuleToShop("shipping", "--set", "module.communication=");
+
+            run.ExitCode.ShouldBe(1);
+            run.Error.ShouldContain("error: module 'shipping': module.communication requires module.communication has integration-events, but module.communication is empty.");
+            run.Error.ShouldNotContain("module 'billing'");
+            Directory.Exists(Path.Combine(shop, "src", "Modules", "Shipping")).ShouldBeFalse();
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }

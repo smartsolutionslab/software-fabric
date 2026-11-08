@@ -1,0 +1,4 @@
+namespace {{ namespace }}.Reads.Tests;
+
+/// <summary>What the sample query returns: Dapper fills it through its constructor, by column name and type.</summary>
+public sealed record SampleNote(int Id, string Title);

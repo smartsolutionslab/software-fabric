@@ -1,0 +1,169 @@
+import {
+  type AccountInfo,
+  type EventCallbackFunction,
+  type EventMessage,
+  EventType,
+  InteractionStatus,
+} from '@azure/msal-browser';
+import { useMsal } from '@azure/msal-react';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, expect, test, vi } from 'vitest';
+import { rememberAccessToken } from './accessToken';
+import { SignedIn } from './SignedIn';
+
+vi.mock('@azure/msal-react', () => ({ useMsal: vi.fn() }));
+
+afterEach(() => {
+  cleanup();
+  sessionStorage.clear();
+});
+
+const developer = {
+  homeAccountId: 'developer-id',
+  environment: 'localhost',
+  tenantId: '00000000-0000-0000-0000-00000000000a',
+  username: 'developer',
+  localAccountId: 'developer-id',
+  idTokenClaims: { preferred_username: 'developer' },
+} as AccountInfo;
+
+type Msal = ReturnType<typeof useMsal>;
+
+/**
+ * MSAL's client as SignedIn sees it through useMsal(): the cached accounts, the active one (the account the kept access
+ * token was issued to), the interaction under way and the redirects.
+ */
+function msal(
+  accounts: AccountInfo[],
+  inProgress: InteractionStatus = InteractionStatus.None,
+  active: AccountInfo | null = accounts[0] ?? null,
+) {
+  const callbacks: EventCallbackFunction[] = [];
+  const instance = {
+    getActiveAccount: vi.fn(() => active),
+    loginRedirect: vi.fn(() => Promise.resolve()),
+    logoutRedirect: vi.fn(() => Promise.resolve()),
+    addEventCallback: vi.fn((callback: EventCallbackFunction) => {
+      callbacks.push(callback);
+      return 'callback';
+    }),
+    removeEventCallback: vi.fn(),
+  };
+  const answer = (now: InteractionStatus, signedIn = accounts) =>
+    vi.mocked(useMsal).mockReturnValue({ instance, inProgress: now, accounts: signedIn } as unknown as Msal);
+  answer(inProgress);
+  const emit = (message: Partial<EventMessage>) => {
+    for (const callback of callbacks) {
+      callback(message as EventMessage);
+    }
+  };
+  return { instance, answer, emit };
+}
+
+const signedIn = (expiresIn = 300_000) =>
+  rememberAccessToken({ accessToken: 'access-token', expiresOn: new Date(Date.now() + expiresIn) });
+
+// A new element each time: React re-renders a root given the same element again only when its state changed.
+const app = () => (
+  <SignedIn>
+    <h1>{{ name }}</h1>
+  </SignedIn>
+);
+
+test('an anonymous visitor is sent to the identity provider', async () => {
+  const { instance } = msal([]);
+
+  render(app());
+
+  await vi.waitFor(() => expect(instance.loginRedirect).toHaveBeenCalledOnce());
+  expect(screen.getByText('Signing in…')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: '{{ name }}' })).not.toBeInTheDocument();
+});
+
+test('a signed-in user sees who they are and the application', () => {
+  signedIn();
+  const { instance } = msal([developer]);
+
+  render(app());
+
+  expect(screen.getByText('Signed in as developer')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '{{ name }}' })).toBeInTheDocument();
+  expect(instance.loginRedirect).not.toHaveBeenCalled();
+});
+
+test('with several cached accounts, the user is the active one, whose token the app keeps', () => {
+  signedIn();
+  const other = { ...developer, homeAccountId: 'other-id', localAccountId: 'other-id', username: 'other' };
+  msal([other, developer], InteractionStatus.None, developer);
+
+  render(app());
+
+  expect(screen.getByText('Signed in as developer')).toBeInTheDocument();
+  expect(screen.queryByText('Signed in as other')).not.toBeInTheDocument();
+});
+
+test('a cached account that is not the active one does not count as signed in', async () => {
+  signedIn();
+  const { instance } = msal([developer], InteractionStatus.None, null);
+
+  render(app());
+
+  await vi.waitFor(() => expect(instance.loginRedirect).toHaveBeenCalledOnce());
+  expect(screen.queryByRole('heading', { name: '{{ name }}' })).not.toBeInTheDocument();
+});
+
+test('nothing is started while MSAL completes the way back from the identity provider', () => {
+  const { instance } = msal([], InteractionStatus.HandleRedirect);
+
+  render(app());
+
+  expect(screen.getByText('Signing in…')).toBeInTheDocument();
+  expect(instance.loginRedirect).not.toHaveBeenCalled();
+});
+
+test('a failed sign-in is shown, not retried', async () => {
+  const { instance, answer, emit } = msal([], InteractionStatus.HandleRedirect);
+  const { rerender } = render(app());
+
+  emit({ eventType: EventType.ACQUIRE_TOKEN_FAILURE, error: new Error('access_denied') });
+  answer(InteractionStatus.None);
+  rerender(app());
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in failed: access_denied');
+  expect(instance.loginRedirect).not.toHaveBeenCalled();
+});
+
+test('a redirect to the identity provider that fails is shown', async () => {
+  const { instance } = msal([]);
+  instance.loginRedirect.mockImplementation(() => Promise.reject(new Error('endpoints_resolution_error')));
+
+  render(app());
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in failed: endpoints_resolution_error');
+});
+
+test('a session whose access token expires sends the user back to the identity provider', async () => {
+  signedIn(50);
+  const { instance } = msal([developer]);
+
+  render(app());
+  expect(screen.getByText('Signed in as developer')).toBeInTheDocument();
+
+  await vi.waitFor(() => expect(instance.loginRedirect).toHaveBeenCalledOnce());
+  expect(screen.queryByRole('heading', { name: '{{ name }}' })).not.toBeInTheDocument();
+});
+
+test('signing out does not start a sign-in while the identity provider signs the user out', async () => {
+  signedIn();
+  const { instance, answer } = msal([developer]);
+  const { rerender } = render(app());
+
+  await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+  answer(InteractionStatus.Logout, []);
+  rerender(app());
+
+  expect(instance.logoutRedirect).toHaveBeenCalledOnce();
+  expect(screen.getByText('Signing out…')).toBeInTheDocument();
+  expect(instance.loginRedirect).not.toHaveBeenCalled();
+});

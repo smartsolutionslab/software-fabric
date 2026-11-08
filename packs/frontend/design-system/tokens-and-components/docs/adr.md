@@ -15,5 +15,5 @@ shadcn/ui stays in the app (`web/app/src/components/ui/`) for components only th
 
 ## Consequences
 
-- The app reads the tokens' CSS, so the tokens are built before it: the app's `dev`, `build` and `test` build them first.
+- The app and the ui package's Storybook read the tokens' CSS, so the tokens are built before them: the app's `dev`, `build` and `test` and the ui package's `storybook` and `test` build them first, and a fresh clone needs no prior `pnpm build`.
 - A token that references one that does not exist fails the build.

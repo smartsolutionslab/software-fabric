@@ -1,0 +1,8 @@
+namespace {{ namespace }}.Contracts.{{ module.namespace }};
+
+/// <summary>
+/// What other modules may ask the {{ module.name }} module, synchronously and in-process. Implemented once, by
+/// {{ module.namespace }}Api in the module's Api project; another module takes it in a handler's constructor. Its
+/// parameters and results are Contracts or Kernel types, never the module's own.
+/// </summary>
+public interface I{{ module.namespace }}Api;

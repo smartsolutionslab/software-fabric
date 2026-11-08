@@ -3,7 +3,7 @@ using Fabric.Core.Catalog;
 namespace Fabric.Core.Choices;
 
 /// <summary>
-/// Checks every chosen option's <c>requires</c> and <c>conflicts</c>. Module options are checked once per
+/// Checks every set dimension's <c>requires</c> and every chosen option's <c>requires</c> and <c>conflicts</c>. Module dimensions and options are checked once per
 /// module against that module's values plus the project's; a project option's condition on a module dimension
 /// holds when it holds for any module (docs/catalog-rules.md).
 /// </summary>
@@ -88,6 +88,10 @@ public static class RuleEvaluator
             {
                 continue;
             }
+
+            violations.AddRange(dimension.Requires
+                .Where(condition => !context.Holds(condition))
+                .Select(condition => $"{context.Prefix}{dimension.Id} requires {condition}, but {context.DescribeActual(condition)}."));
 
             foreach (var option in chosen.Select(id => dimension.Options[id]))
             {

@@ -1,0 +1,1 @@
+throw new Error('The msal pack shows and hides by role or claim (RequirePermission, useHasRole, useHasClaim) for React only so far; with Vue, backend.authorization {{ project["backend.authorization"] | array.join "," }} has no frontend counterpart yet (docs/adr/0006 of the generator).');

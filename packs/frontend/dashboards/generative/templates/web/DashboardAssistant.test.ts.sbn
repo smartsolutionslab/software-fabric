@@ -1,3 +1,4 @@
+{{~ cell = project["frontend.data-grid"] == "ag-grid" ? "gridcell" : "cell" ~}}
 {{~ axe = array.contains(project["frontend.test.extras"], "accessibility") ~}}
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
 import userEvent from '@testing-library/user-event';
@@ -9,12 +10,12 @@ import { axe } from 'vitest-axe';
 import type { DashboardDto, SaveDashboardRequest, WidgetData, WidgetDescriptionDto } from '@/api/generated';
 import DashboardEditor from './DashboardEditor.vue';
 
-// ECharts draws on a canvas jsdom does not have; the chart's accessible name is what the page decides.
+// {{ if project["frontend.charts"] == "chartjs" }}Chart.js{{ else }}ECharts{{ end }} draws on a canvas jsdom does not have; the chart's accessible name is what the page decides.
 vi.mock('@/components/DataChart.vue', async () => {
   const { defineComponent, h } = await import('vue');
   return {
     default: defineComponent({
-      props: { option: { type: Object, required: true }, label: { type: String, required: true }, height: Number },
+      props: { {{ if project["frontend.charts"] == "chartjs" }}config{{ else }}option{{ end }}: { type: Object, required: true }, label: { type: String, required: true }, height: Number },
       setup: (props) => () => h('div', { role: 'img', 'aria-label': props.label }),
     }),
   };
@@ -207,7 +208,7 @@ test('a proposed widget shows on the grid as pending with its data, and Accept o
 
   const pending = await screen.findByRole('region', { name: 'Proposed: My dashboards' });
   expect(container.querySelector('.vgl-layout')?.contains(pending)).toBe(true);
-  expect(await within(pending).findByRole('cell', { name: 'Sales' })).toBeInTheDocument();
+  expect(await within(pending).findByRole('{{ cell }}', { name: 'Sales' })).toBeInTheDocument();
   expect(screen.queryByRole('region', { name: 'My dashboards' })).not.toBeInTheDocument();
 
   await user.click(within(pending).getByRole('button', { name: 'Accept' }));
@@ -294,7 +295,7 @@ test("saving reads a pending widget's data again, as it does for the placed ones
   await ask(user, 'Show my dashboards as a table');
   answer();
   const pending = await screen.findByRole('region', { name: 'Proposed: My dashboards' });
-  await within(pending).findByRole('cell', { name: 'Sales' });
+  await within(pending).findByRole('{{ cell }}', { name: 'Sales' });
   const before = widgetReads('dashboards.my-dashboards');
   await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
 
@@ -442,7 +443,7 @@ test('the dashboard with a pending proposal has no accessibility violations axe 
   await ask(user, 'Show my dashboards as a table');
   answer();
   const pending = await screen.findByRole('region', { name: 'Proposed: My dashboards' });
-  await within(pending).findByRole('cell', { name: 'Sales' });
+  await within(pending).findByRole('{{ cell }}', { name: 'Sales' });
   await screen.findByText('Here it is.');
 
   expect(await axe(container)).toHaveNoViolations();

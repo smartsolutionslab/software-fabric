@@ -1,6 +1,3 @@
-{{~ if project["backend.database"] != "postgres" ~}}
-#error The in-process outbox of backend.bus.transport.none is written for PostgreSQL only; choose backend.database=postgres or add this database to the pack.
-{{~ end ~}}
 {{~ if project["backend.tenancy"] != "none" && project["backend.tenancy"] != "column" ~}}
 #error The in-process outbox of backend.bus.transport.none keeps one table per module schema, so it supports backend.tenancy none and column only so far (docs/adr/0006 of the generator): with backend.tenancy {{ project["backend.tenancy"] }} a module's integration events would go to a tenant's schema, which has no outbox table and which nothing delivers from.
 {{~ end ~}}
@@ -32,6 +29,7 @@ public static class Outbox
 
         return context.Database.ExecuteSqlRawAsync(
             Sql(SchemaOf(context), """
+{{~ if project["backend.database"] == "postgres" ~}}
                 create schema if not exists "$schema$";
                 create table if not exists "$schema$".outbox_messages (
                     id uuid primary key,
@@ -42,6 +40,22 @@ public static class Outbox
                     attempts integer not null default 0,
                     next_attempt_at timestamptz null,
                     last_error text null);
+{{~ else ~}}
+                if schema_id(N'$schema$') is null
+                    exec (N'create schema [$schema$]');
+                -- Clustered on the order rows are added in: SQL Server does not sort a version 7 uniqueidentifier by its time.
+                if object_id(N'[$schema$].outbox_messages', N'U') is null
+                    create table [$schema$].outbox_messages (
+                        [sequence] bigint identity primary key,
+                        id uniqueidentifier not null unique,
+                        type nvarchar(max) not null,
+                        payload nvarchar(max) not null,
+                        created_at datetimeoffset not null default sysdatetimeoffset(),
+                        delivered_at datetimeoffset null,
+                        attempts int not null default 0,
+                        next_attempt_at datetimeoffset null,
+                        last_error nvarchar(max) null);
+{{~ end ~}}
                 """),
             cancellationToken);
     }
@@ -52,7 +66,11 @@ public static class Outbox
         {{ not_null "context" }}
         {{ not_null "integrationEvents" }}
 
+{{~ if project["backend.database"] == "postgres" ~}}
         var insert = Sql(SchemaOf(context), """insert into "$schema$".outbox_messages (id, type, payload) values ({0}, {1}, {2})""");
+{{~ else ~}}
+        var insert = Sql(SchemaOf(context), """insert into [$schema$].outbox_messages (id, type, payload) values ({0}, {1}, {2})""");
+{{~ end ~}}
         foreach (var integrationEvent in integrationEvents)
         {
             var type = integrationEvent.GetType();
@@ -71,11 +89,17 @@ public static class Outbox
         return context.Database
             .SqlQueryRaw<OutboxMessage>(
                 Sql(SchemaOf(context), """
+{{~ if project["backend.database"] == "postgres" ~}}
                     select id as "Id", type as "Type", payload as "Payload" from "$schema$".outbox_messages
                     where delivered_at is null and attempts < {0} and (next_attempt_at is null or next_attempt_at <= now())
                     order by id
                     limit {1}
                     for update skip locked
+{{~ else ~}}
+                    select top ({1}) id as [Id], type as [Type], payload as [Payload] from [$schema$].outbox_messages with (updlock, rowlock, readpast)
+                    where delivered_at is null and attempts < {0} and (next_attempt_at is null or next_attempt_at <= sysdatetimeoffset())
+                    order by [sequence]
+{{~ end ~}}
                     """),
                 MaximumAttempts,
                 count)
@@ -87,7 +111,11 @@ public static class Outbox
         {{ not_null "context" }}
 
         return context.Database.ExecuteSqlRawAsync(
+{{~ if project["backend.database"] == "postgres" ~}}
             Sql(SchemaOf(context), """update "$schema$".outbox_messages set delivered_at = now(), attempts = attempts + 1, last_error = null where id = {0}"""),
+{{~ else ~}}
+            Sql(SchemaOf(context), """update [$schema$].outbox_messages set delivered_at = sysdatetimeoffset(), attempts = attempts + 1, last_error = null where id = {0}"""),
+{{~ end ~}}
             [id],
             cancellationToken);
     }
@@ -97,6 +125,7 @@ public static class Outbox
     {
         {{ not_null "context" }}
 
+{{~ if project["backend.database"] == "postgres" ~}}
         // attempts on the right is the value before this update: 1 s * 2^0 after the first failure. clock_timestamp(), not
         // now(): now() is when the batch's transaction began, before its consumers ran.
         return context.Database.ExecuteSqlRawAsync(
@@ -107,6 +136,18 @@ public static class Outbox
                     last_error = {1}
                 where id = {0}
                 """),
+{{~ else ~}}
+        // attempts on the right is the value before this update: 1 s * 2^0 after the first failure. sysdatetimeoffset() is
+        // the time of this statement, not of the batch's transaction, which began before its consumers ran.
+        return context.Database.ExecuteSqlRawAsync(
+            Sql(SchemaOf(context), """
+                update [$schema$].outbox_messages
+                set attempts = attempts + 1,
+                    next_attempt_at = dateadd(millisecond, cast(1000 * iif({2} * power(2e0, attempts) < {3}, {2} * power(2e0, attempts), {3}) as int), sysdatetimeoffset()),
+                    last_error = {1}
+                where id = {0}
+                """),
+{{~ end ~}}
             [id, error, FirstRetryDelay.TotalSeconds, MaximumRetryDelay.TotalSeconds],
             cancellationToken);
     }

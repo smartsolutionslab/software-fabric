@@ -20,10 +20,19 @@ public static class StandInWiring
             .WithEnvironment("AzureAd__Instance", identity.GetEndpoint("http"))
             .WithEnvironment("AzureAd__Audience", audience)
             .WithEnvironment("AzureAd__Tenants__tenant-a", "00000000-0000-0000-0000-00000000000a")
-            .WithEnvironment("AzureAd__Tenants__tenant-b", "00000000-0000-0000-0000-00000000000b");
+            .WithEnvironment("AzureAd__Tenants__tenant-b", "00000000-0000-0000-0000-00000000000b"){{ if project["frontend.auth-client"] == "msal" }}
+            // The browser signs in at the https address, so its tokens name their issuers there.
+            .WithEnvironment("AzureAd__BrowserInstance", identity.GetEndpoint("https")){{ end }};
     }
 
+{{~ if project["frontend.auth-client"] == "msal" ~}}
+    /// <summary>
+    /// The browser signs in at the stand-in, for any of its directories, at its https address: MSAL refuses any other
+    /// authority. Locally that needs the trusted development certificate (dotnet dev-certs https --trust).
+    /// </summary>
+{{~ else ~}}
     /// <summary>The browser signs in at the stand-in, for any of its directories.</summary>
+{{~ end ~}}
     public static IResourceBuilder<T> WithStandInAuthority<T>(this IResourceBuilder<T> web, IResourceBuilder<ProjectResource>? identity)
         where T : IResourceWithEnvironment, IResourceWithWaitSupport
     {
@@ -35,6 +44,6 @@ public static class StandInWiring
         }
 
         return web.WaitFor(identity)
-            .WithEnvironment("VITE_OIDC_AUTHORITY", ReferenceExpression.Create($"{identity.GetEndpoint("http")}/organizations/v2.0"));
+            .WithEnvironment("VITE_OIDC_AUTHORITY", ReferenceExpression.Create($"{identity.GetEndpoint("{{ if project["frontend.auth-client"] == "msal" }}https{{ else }}http{{ end }}")}/organizations/v2.0"));
     }
 }

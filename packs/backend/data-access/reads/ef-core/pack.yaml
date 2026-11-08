@@ -1,0 +1,8 @@
+option: backend.data-access.reads.ef-core
+files:
+  - { template: templates/NoDapper.cs.sbn, target: tests/Architecture.Tests/Rules/NoDapper.cs }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No module references Dapper: query handlers read through EF Core, like the rest of the module.", file: templates/NoDapper.cs.sbn }

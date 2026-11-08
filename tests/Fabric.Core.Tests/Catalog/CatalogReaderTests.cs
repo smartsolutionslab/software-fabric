@@ -16,8 +16,8 @@ public class CatalogReaderTests
         var catalog = ReadRepositoryCatalog();
 
         catalog.Version.ShouldBe(1);
-        catalog.Dimensions.Count.ShouldBe(52);
-        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(140);
+        catalog.Dimensions.Count.ShouldBe(53);
+        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(141);
         catalog.Profiles.Keys.ShouldBe(
             ["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud", "saas-strict-react", "saas-ai-react"],
             ignoreOrder: false);
@@ -50,7 +50,7 @@ public class CatalogReaderTests
         var catalog = ReadRepositoryCatalog();
 
         catalog.Dimensions.Keys.First().ShouldBe("backend.database");
-        catalog.Dimensions.Keys.Last().ShouldBe("frontend.test.extras");
+        catalog.Dimensions.Keys.Last().ShouldBe("backend.data-access.reads");
     }
 
     [Fact]
@@ -73,6 +73,16 @@ public class CatalogReaderTests
     }
 
     [Fact]
+    public void Reads_the_requirement_on_module_communication_and_none_on_its_options()
+    {
+        var communication = ReadRepositoryCatalog().Dimensions["module.communication"];
+
+        communication.Requires.Select(condition => condition.ToString()).ShouldBe(["module.communication has integration-events"]);
+        communication.Options.Values.ShouldAllBe(option => option.Requires.Count == 0);
+        ReadRepositoryCatalog().Dimensions["module.style"].Requires.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Reads_option_tier_requires_and_conflicts()
     {
         var catalog = ReadRepositoryCatalog();
@@ -81,7 +91,7 @@ public class CatalogReaderTests
         uiLibraries["shadcn"].Tier.ShouldBe(SupportTier.Supported);
         uiLibraries["shadcn"].Requires.Select(condition => condition.ToString()).ShouldBe(["frontend.framework == react", "frontend.styling == tailwind"]);
         uiLibraries["mui"].Conflicts.Select(condition => condition.ToString()).ShouldBe(["frontend.styling == tailwind"]);
-        uiLibraries["reka-ui"].Requires.Select(condition => condition.ToString()).ShouldBe(["frontend.framework == vue", "frontend.styling == tailwind"]);
+        uiLibraries["reka-ui"].Requires.Select(condition => condition.ToString()).ShouldBe(["frontend.framework == vue"]);
         uiLibraries.ShouldNotContainKey("primevue");
         catalog.Dimensions["module.event-store"].Options["kurrentdb"].Tier.ShouldBe(SupportTier.Experimental);
     }
@@ -153,6 +163,28 @@ public class CatalogReaderTests
         extras.Multi.ShouldBeTrue();
         extras.Default.ShouldBe([]);
         extras.Options.Keys.ShouldBe(["rag", "evals"]);
+    }
+
+    /// <summary>
+    /// Owner decisions on #247: Dapper is an add-on for query handlers on top of EF Core, not an option beside it, so
+    /// reads are their own dimension; it comes last, so no profile's ADRs are renumbered; and Dapper's SQL bypasses the
+    /// tenant column's query filter, so it requires no tenancy.
+    /// </summary>
+    [Fact]
+    public void Reads_are_a_choice_only_with_ef_core_default_to_ef_core_require_no_tenancy_for_dapper_and_come_last()
+    {
+        var catalog = ReadRepositoryCatalog();
+        var reads = catalog.Dimensions["backend.data-access.reads"];
+
+        reads.Scope.ShouldBe(DimensionScope.Project);
+        reads.ActiveWhen!.ToString().ShouldBe("backend.data-access == ef-core");
+        reads.Default.ShouldBe(["ef-core"]);
+        reads.Options.Keys.ShouldBe(["ef-core", "dapper"]);
+        reads.Options["ef-core"].Tier.ShouldBe(SupportTier.Supported);
+        reads.Options["dapper"].Tier.ShouldBe(SupportTier.Experimental);
+        reads.Options["dapper"].Requires.Select(condition => condition.ToString()).ShouldBe(["backend.tenancy == none"]);
+        catalog.Dimensions["backend.data-access"].Options.Keys.ShouldBe(["ef-core"]);
+        catalog.Dimensions.Keys.Last().ShouldBe("backend.data-access.reads");
     }
 
     [Fact]

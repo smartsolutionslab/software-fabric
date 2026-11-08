@@ -18,7 +18,7 @@ test('a server event reaches the {{ if project["backend.auth"] == "none" }}brows
   {{ browser_sign_in "page" "'developer'" }}
   await expect(page.getByText('Signed in as developer')).toBeVisible();
 
-  // The token the app signed in with, from where {{ if project["frontend.framework"] == "vue" }}oidc-client-ts{{ else }}react-oidc-context{{ end }} keeps it.
+  // The token the app signed in with, from where {{ if project["frontend.auth-client"] == "msal" }}src/auth/accessToken.ts{{ else if project["frontend.framework"] == "vue" }}oidc-client-ts{{ else }}react-oidc-context{{ end }} keeps it.
   const token = await {{ stored_access_token "page" | string.replace "\n" "\n  " }};
   const headers = { Authorization: `Bearer ${token}` };
 {{~ else ~}}

@@ -1,0 +1,12 @@
+option: frontend.charts.recharts
+files:
+  - { template: templates/chart.tsx.sbn, target: web/app/src/components/chart.tsx }
+  - { template: templates/chart-colors.ts.sbn, target: web/app/src/components/chart-colors.ts }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 60 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing ECharts (echarts, echarts-for-react) or Chart.js (chart.js, react-chartjs-2) fails lint.", file: templates/restricted.sbn }

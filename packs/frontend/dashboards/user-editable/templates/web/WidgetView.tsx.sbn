@@ -1,9 +1,23 @@
+{{~ if project["frontend.charts"] == "recharts" ~}}
+import { useEffect, useMemo, useState } from 'react';
+import { Bar, BarChart, Cell, Legend, Line, LineChart, Pie, PieChart, Tooltip, XAxis, YAxis } from 'recharts';
+import { type ChartSeries, useGetDashboardsWidgetsByIdQuery, type WidgetTable } from '@/api/generated';
+import { Chart } from '@/components/chart';
+import { chartColor } from '@/components/chart-colors';
+{{~ else ~}}
 import { useEffect, useMemo, useState } from 'react';
 import { useGetDashboardsWidgetsByIdQuery, type WidgetTable } from '@/api/generated';
 import { Chart } from '@/components/chart';
+{{~ end ~}}
 import { DataTable } from '@/components/ui/data-table';
 import { columnsOf } from '@/components/ui/data-table-columns';
+{{~ if project["frontend.charts"] == "recharts" ~}}
+import { chartRows, type ChartVisual, pieSlices } from './chartData';
+{{~ else if project["frontend.charts"] == "chartjs" ~}}
+import { chartConfig, type ChartVisual } from './chartConfig';
+{{~ else ~}}
 import { chartOption, type ChartVisual } from './chartOption';
+{{~ end ~}}
 import { Pager } from './Pager';
 
 type Row = Record<string, unknown>;
@@ -32,10 +46,22 @@ export function WidgetView({ source, visual, title, height, refresh }: WidgetVie
       void refetch();
     }
   }, [refresh, refetch]);
+{{~ if project["frontend.charts"] == "recharts" ~}}
+  const drawn = useMemo(
+    () => (data?.chart && visual !== 'table' ? drawChart(data.chart, visual as ChartVisual) : undefined),
+    [data, visual],
+  );
+{{~ else if project["frontend.charts"] == "chartjs" ~}}
+  const config = useMemo(
+    () => (data?.chart && visual !== 'table' ? chartConfig(data.chart, visual as ChartVisual) : undefined),
+    [data, visual],
+  );
+{{~ else ~}}
   const option = useMemo(
     () => (data?.chart && visual !== 'table' ? chartOption(data.chart, visual as ChartVisual) : undefined),
     [data, visual],
   );
+{{~ end ~}}
 
   if (isError) {
     return <p role="alert">This widget could not be loaded.</p>;
@@ -50,13 +76,71 @@ export function WidgetView({ source, visual, title, height, refresh }: WidgetVie
     );
   }
 
+{{~ if project["frontend.charts"] == "recharts" ~}}
+  if (drawn) {
+    return (
+      <Chart label={title} height={height}>
+        {drawn}
+      </Chart>
+    );
+  }
+{{~ else if project["frontend.charts"] == "chartjs" ~}}
+  if (config) {
+    return <Chart config={config} label={title} height={height} />;
+  }
+{{~ else ~}}
   if (option) {
     return <Chart option={option} label={title} height={height} />;
   }
+{{~ end ~}}
 
   return <p>Loading…</p>;
 }
 
+{{~ if project["frontend.charts"] == "recharts" ~}}
+/** A widget's series as a Recharts chart: categories along the x axis, or, for a pie, one slice per category. */
+function drawChart(chart: ChartSeries, visual: ChartVisual) {
+  if (visual === 'pie') {
+    return (
+      <PieChart>
+        <Tooltip />
+        <Pie data={pieSlices(chart)} dataKey="value" nameKey="name" name={chart.series[0]?.name ?? ''}>
+          {chart.categories.map((category, index) => (
+            <Cell key={category} fill={chartColor(index)} />
+          ))}
+        </Pie>
+      </PieChart>
+    );
+  }
+
+  if (visual === 'line') {
+    return (
+      <LineChart data={chartRows(chart)}>
+        <XAxis dataKey="category" />
+        <YAxis />
+        <Tooltip />
+        <Legend />
+        {chart.series.map((series, position) => (
+          <Line key={position} dataKey={`s${position}`} name={series.name} stroke={chartColor(position)} />
+        ))}
+      </LineChart>
+    );
+  }
+
+  return (
+    <BarChart data={chartRows(chart)}>
+      <XAxis dataKey="category" />
+      <YAxis />
+      <Tooltip />
+      <Legend />
+      {chart.series.map((series, position) => (
+        <Bar key={position} dataKey={`s${position}`} name={series.name} fill={chartColor(position)} />
+      ))}
+    </BarChart>
+  );
+}
+
+{{~ end ~}}
 function WidgetRows({ table }: { table: WidgetTable }) {
   const columns = useMemo(
     () =>

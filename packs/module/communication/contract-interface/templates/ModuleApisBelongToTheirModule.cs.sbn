@@ -1,0 +1,61 @@
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Modules;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class ModuleApisBelongToTheirModule : IArchitectureRule
+{
+    private const string ContractsPrefix = "{{ namespace }}.Contracts.";
+
+    private const string ModulePrefix = "{{ namespace }}.Modules.";
+
+    public string Description => "Every module API (an interface I<Module>Api in Contracts) lies in Contracts.<Module> and has exactly one implementation, in that module's Api project; no other module implements it.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var contracts = Assembly.Load("Contracts");
+
+        // Contracts and BuildingBlocks too: every module may reference them, so an implementation there is outside the module.
+        var classes = model.ModuleAssemblies
+            .Append(contracts)
+            .Append(typeof(ModuleApis).Assembly)
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type is { IsClass: true, IsAbstract: false })
+            .ToList();
+        var apis = contracts.GetTypes()
+            .Where(ModuleApis.IsModuleApi)
+            .OrderBy(api => api.FullName, StringComparer.Ordinal);
+
+        foreach (var api in apis)
+        {
+            var module = api.Name[1..^"Api".Length];
+            var owner = $"{ModulePrefix}{module}.Api";
+            if (api.Namespace != ContractsPrefix + module)
+            {
+                yield return $"{api.FullName} is the {module} module's API, so it belongs in {ContractsPrefix}{module} (src/Contracts/{module}/).";
+            }
+
+            // By name: the module assemblies are loaded from their files, so a type identity comparison could miss.
+            var implementations = classes
+                .Where(type => type.GetInterfaces().Any(contract => contract.FullName == api.FullName))
+                .Select(type => (Name: type.FullName!, Assembly: type.Assembly.GetName().Name))
+                .OrderBy(implementation => implementation.Name, StringComparer.Ordinal)
+                .ToList();
+            foreach (var stranger in implementations.Where(implementation => implementation.Assembly != owner))
+            {
+                yield return $"{stranger.Name} implements {api.FullName}, the {module} module's API; only {owner} may implement it.";
+            }
+
+            if (implementations.Count == 0)
+            {
+                yield return $"{api.FullName} has no implementation; {owner} implements it.";
+            }
+            else if (implementations.Count > 1)
+            {
+                yield return $"{api.FullName} has {implementations.Count} implementations ({string.Join(", ", implementations.Select(implementation => implementation.Name))}); it needs exactly one.";
+            }
+        }
+    }
+}

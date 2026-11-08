@@ -8,8 +8,8 @@ export function App() {
       <nav aria-label="Modules" className="flex gap-4 p-2">
         <Link to="/">Home</Link>
         {moduleRoutes.map((route) => (
-          <Link key={route.path} to={`/${route.path}`}>
-            {route.title}
+          <Link key={route.id} to={route.fullPath}>
+            {route.options.staticData?.title}
           </Link>
         ))}
       </nav>

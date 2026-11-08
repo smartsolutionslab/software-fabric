@@ -154,6 +154,49 @@ public class CatalogLinterTests
     }
 
     [Fact]
+    public void A_dimension_requirement_naming_an_unknown_dimension_is_reported()
+    {
+        Lint("""
+              x.y: { scope: project, requires: ["a.b == c"], default: o, options: { o: { tier: supported } } }
+            """).ShouldBe(["x.y requires: condition 'a.b == c' names unknown dimension 'a.b'."]);
+    }
+
+    [Fact]
+    public void A_dimension_requirement_with_the_wrong_operator_is_reported()
+    {
+        Lint("""
+              x.y: { scope: project, requires: ["x.z has p"], default: o, options: { o: { tier: supported } } }
+              x.z: { scope: project, default: p, options: { p: { tier: supported } } }
+            """).ShouldBe(["x.y requires: condition 'x.z has p' uses 'has' on single-valued x.z; use ==, != or in."]);
+    }
+
+    [Fact]
+    public void A_multi_valued_dimension_may_require_one_of_its_own_options()
+    {
+        Lint("""
+              x.y: { scope: module, multi: true, requires: ["x.y has o"], default: [o], options: { o: { tier: supported }, p: { tier: supported } } }
+            """).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_single_valued_dimension_requiring_its_own_value_is_reported()
+    {
+        Lint("""
+              x.y: { scope: project, requires: ["x.y == o"], default: o, options: { o: { tier: supported }, p: { tier: supported } } }
+            """).ShouldBe(["x.y requires: condition 'x.y == o' refers to its own single-valued dimension; remove the options it refuses instead."]);
+    }
+
+    [Fact]
+    public void A_profile_breaking_a_dimension_requirement_is_reported_with_its_name()
+    {
+        Lint(
+            """
+              x.y: { scope: module, multi: true, requires: ["x.y has o"], default: [o], options: { o: { tier: supported }, p: { tier: supported } } }
+            """,
+            "{ only-p: { x.y: [p] } }").ShouldBe(["profile 'only-p': module defaults: x.y requires x.y has o, but x.y is p."]);
+    }
+
+    [Fact]
     public void An_active_when_on_its_own_dimension_is_reported()
     {
         Lint("""

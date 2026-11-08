@@ -4,7 +4,7 @@
     "http": {
       "commandName": "Project",
       "launchBrowser": false,
-      "applicationUrl": "http://localhost:8080",
+      "applicationUrl": "{{ if project["frontend.auth-client"] == "msal" }}https://localhost:8443;{{ end }}http://localhost:8080",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }

@@ -4,6 +4,8 @@ files:
   - { template: templates/StandInWiring.cs.sbn, target: src/AppHost/Wiring/StandInWiring.cs }
   - { template: templates/OnlyTheAppHostRunsTheStandIn.cs.sbn, target: tests/Architecture.Tests/Rules/OnlyTheAppHostRunsTheStandIn.cs }
   - { template: templates/DirectoryTests.cs.sbn, target: tests/Integration.Tests/DirectoryTests.cs }
+  # With msal the browser signs in at the stand-in's https address (owner decision on #266); Testcontainers runs the stand-in on http alone.
+  - { template: templates/BrowserIssuerTests.cs.sbn, target: tests/Integration.Tests/BrowserIssuerTests.cs, when: 'project["frontend.auth-client"] == "msal" && project["backend.test.integration"] != "testcontainers"' }
   # With backend.authorization roles: the token's app roles become ClaimTypes.Role (ADR-0009: the provider decides what the token carries).
   - { template: templates/EntraRoleClaims.cs.sbn, target: src/Host/EntraRoleClaims.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles")' }
   - { template: templates/RoleClaims.cs.sbn, target: src/Host/Wiring/RoleClaims.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles")' }
@@ -42,4 +44,5 @@ adr: docs/adr.md
 gates:
   - { kind: architecture-test, describes: "Only the AppHost references the local stand-in for Entra ID (src/IdentityStandIn), and no source under src/ but the AppHost's and the stand-in's names it or Keycloak: the application reads Entra ID's tokens only.", file: templates/OnlyTheAppHostRunsTheStandIn.cs.sbn }
   - { kind: unit-test, describes: "A token from an Entra directory the host does not list in AzureAd:Tenants is refused, against the running stack with the stand-in.", file: templates/DirectoryTests.cs.sbn }
+  - { kind: unit-test, describes: "With frontend.auth-client msal, a token the stand-in issues at its https address, where MSAL signs the browser in, is accepted by the host, against the running stack.", file: templates/BrowserIssuerTests.cs.sbn }
   - { kind: ci-step, describes: "A module endpoint answers 401 without a token, and a test user signs in at the stand-in and is known to the host, in their tenant; checked by the integration tests against the running stack." }

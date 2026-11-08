@@ -141,9 +141,9 @@ pack fill a slot of a choice it can be combined with but does not need
 | `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
 | `dotnet.build-properties` | `Directory.Build.props` | packs adding analyzers or properties (result, red-first) |
-| `solution.projects` *(added in M1-02)* | `Solution.slnx` | packs owning a project: modular-monolith (Host), aspire-fixture or testcontainers (Integration.Tests), ensure-that, option and the result styles (their tests under `tests/Kernel/`) |
+| `solution.projects` *(added in M1-02)* | `Solution.slnx` | packs owning a project: modular-monolith (Host), aspire-fixture or testcontainers (Integration.Tests), reads dapper (Reads.Tests), ensure-that, option and the result styles (their tests under `tests/Kernel/`) |
 | `modules.packages.domain` | `src/Modules/Directory.Build.props` | — (Domain stays dependency-free) |
-| `modules.packages.application` | 〃 | wolverine, mediator, agent-framework (`Microsoft.Agents.AI`: an agent lives in Application, ADR-0011) |
+| `modules.packages.application` | 〃 | wolverine, mediator, agent-framework (`Microsoft.Agents.AI`: an agent lives in Application, ADR-0011), reads dapper (`Dapper`: query handlers live in Application) |
 | `modules.packages.infrastructure` | 〃 | ef-core, postgres, wolverine |
 | `modules.packages.api` | 〃 | minimal-apis; api-protocols grpc (`Grpc.AspNetCore`, and the `Protobuf` item that compiles the Api project's `Protos/**/*.proto`, added for #250) |
 | `buildingblocks.packages` | `src/BuildingBlocks/BuildingBlocks.csproj` | ef-core, wolverine, result |
@@ -151,7 +151,7 @@ pack fill a slot of a choice it can be combined with but does not need
 | `tests.packages` | `tests/Directory.Build.props` | xunit, nunit or tunit, shouldly or awesome-assertions, nsubstitute or moq, aspire-fixture; nunit and tunit also compile `tests/TestRun/*.cs` into every test project; tunit references `TUnit.Engine` from test projects only; awesome-assertions compiles `tests/Assertions/*.cs` into every project under `tests/` |
 | `tests.usings` | `tests/Directory.Build.props` | xunit, nunit or tunit (test projects only: a program under `tests/` keeps `System.ComponentModel`'s `[Description]`), shouldly or awesome-assertions, nsubstitute or moq |
 | `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak, generic-oidc, entra-id (the host and `Microsoft.AspNetCore.Mvc.Testing`, for the base's endpoint rule `EveryEndpointDeclaresItsAuthorization`, rendered whenever `backend.auth` is not `none`) |
-| `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides); agent-framework (`IDispatcher`, which a handler running an agent takes, and `IAgentMcpTools` with the MCP client) |
+| `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides); agent-framework (`IDispatcher`, which a handler running an agent takes, and `IAgentMcpTools` with the MCP client); contract-interface (`IDispatcher`, which a module's API takes, and a throwing stand-in for every other module's API) |
 | `integration-tests.parameters` *(added for #77, declared by aspire-fixture; contributed with `optional: true` since #260)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter); agent-ui ag-ui (`model-stand-in` true: the host's stand-in model answers the agents) |
 | `integration-tests.database` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/ContainerFixture.cs` and the database fixture alone (rag's `ApplicationDatabase.cs`), first in the setup; `settings`, `cancellationToken`, `StartAsync(container, …)` and `RunProjectAsync("src/<Project>", …)` in scope | postgres (its container, the pgvector image with rag, with the core `ContainerBuilder`, and `ConnectionStrings:database`), ef-core (runs the MigrationRunner, order 20) |
 | `integration-tests.resources` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/ContainerFixture.cs`, after the database, before the host starts; also `Resources` and `RepositoryDirectory()` | rabbitmq, kafka (the broker and `ConnectionStrings:messaging`), azure-service-bus (the emulator with its SQL Server, `ConnectionStrings:messaging` and `ConnectionStrings:messaging-management`), kurrentdb (the AppHost's image and `ConnectionStrings:eventstore`), keycloak (the realm from `src/AppHost/realms`, its endpoint `keycloak`/`http`, `Authentication:Authority`), the model providers and embeddings (what the AppHost passes as parameters: key-shaped values, the default models, an Ollama endpoint nothing listens on), agent-ui ag-ui (`Agents:ModelStandIn`) |
@@ -413,7 +413,12 @@ and the stand-in's users (*#322*), and
 `IConfiguration`. Its local provider is `src/IdentityStandIn`, an
 in-process issuer named `identity` in the AppHost while it runs, never when it
 publishes (Testcontainers runs the built project in a container); its users and the directories of
-`tenant-a` and `tenant-b` are in its `appsettings.json`.
+`tenant-a` and `tenant-b` are in its `appsettings.json`. With
+`frontend.auth-client` `msal` (*#266*) its `browser_authority` is
+`https://localhost:8443/organizations/v2.0`: msal-common accepts an https
+authority only, so the stand-in also serves https with the ASP.NET Core
+development certificate, and the host accepts the issuers at that address
+too (`AzureAd:BrowserInstance`).
 
 | Function | Returns (oidc-client-ts) |
 |---|---|
@@ -421,6 +426,12 @@ publishes (Testcontainers runs the built project in a container); its users and 
 | `browser_access_token` | `accessToken()`: the signed-in user's access token, or `undefined` |
 | `stored_access_token page` | awaitable, in Playwright: the access token the app in `page` signed in with |
 | `store_access_token_import`, `store_access_token token` | in a unit test, the import and the statement that store `token` (a TS string) as the signed-in user's access token, where `browser_access_token` finds it |
+
+msal (*#266*) defines the same functions over its own copy of the token:
+`createMsal()` keeps every token MSAL acquires in session storage under
+`app.access-token` (`src/auth/accessToken.ts`), where `accessToken()` and
+`stored_access_token` read it, and `store_access_token token` is
+`rememberAccessToken({ accessToken: token, expiresOn: ... })`.
 
 The integration-fixture vocabulary gains `running_application`
 (`aspire.App`), the running application the provider's test users sign in
@@ -456,7 +467,7 @@ AppHost's model with it, declares it instead (*#260*).
 | `host.endpoints` *(added in M1-06)* | `src/Host/Program.cs` | 0+ | the base with an identity provider (`/me`), tenancy (`/me/tenant`), agent-ui ag-ui (`POST /agents/{name}`) |
 | `host.log-levels` | `src/Host/appsettings.json`, under `Logging:LogLevel` | 0+ | ef-core (SQL commands at `Warning`) |
 | `host.kestrel-endpoints` *(added for #250; separator `,` + newline)* | `src/Host/appsettings.json`, under `Kestrel:Endpoints` beside the host's own `http` (`http://localhost:5080`, launchSettings' URL); rendered only with a contribution | 0+ | api-protocols grpc (`grpc`, HTTP/2 only on `http://localhost:5081`: Kestrel speaks HTTP/2 without TLS only on an endpoint that speaks nothing else). Aspire turns every Kestrel endpoint into an endpoint of the host resource, by its name |
-| `modules.infrastructure` | `src/BuildingBlocks/Modules/ModuleInfrastructure.cs` | 0+ | ef-core, wolverine, tenancy, agent-ui ag-ui (registers the module's `IAgentConversation<TSelf>` queries by their agents' names) |
+| `modules.infrastructure` | `src/BuildingBlocks/Modules/ModuleInfrastructure.cs` | 0+ | ef-core, wolverine, tenancy, reads dapper (`AddReadConnection`, once for the project), agent-ui ag-ui (registers the module's `IAgentConversation<TSelf>` queries by their agents' names), contract-interface (registers the module's implementations of a module API, `I<Module>Api` in Contracts) |
 | `modules.endpoints` *(added in M1-02)* | `src/BuildingBlocks/Modules/ModuleEndpoints.cs` | 0+ | minimal-apis (maps `IEndpoint`s), keycloak (`group.RequireAuthorization()`) |
 | `persistence.options` *(added in M1-03)* | `PersistenceRegistration.cs` and each module's design-time factory (owned and declared by ef-core); `options`, `connectionString` and `schema` in scope | **exactly-one** | postgres (`options.UseNpgsql(connectionString, ...)` with the history table in `schema`) |
 | `persistence.model-conventions` | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` (owned and declared by ef-core) | 0+ | tenancy column |
@@ -465,6 +476,7 @@ AppHost's model with it, declares it instead (*#260*).
 | `persistence.save-changes` *(added in M1-05)* | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` | 0+ | tenancy column (stamps new rows) |
 | `persistence.schema` *(added in #253)* | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` (`CurrentSchema`; with a contribution, a model per schema and, outside the module's schema, its migrations and their history moved there); `schema` and `services` in scope | **at-most-one** | tenancy schema-per-tenant (`<module>_<tenant>` for a listed tenant) |
 | `migration-runner.preflight` *(added in #253; declared by ef-core)* | `src/MigrationRunner/Program.cs`, before any module's EF Core migrations; `IHost host` and `List<Type> contexts` in scope, `await` allowed | 0+ | tenancy schema-per-tenant (checks every module before any migrates); empty, the runner is unchanged |
+| `read-connection.data-source` *(added for #247, declared by backend.data-access.reads dapper; contributions `optional: true`)* | `src/BuildingBlocks/Persistence/Wiring/ReadConnectionRegistration.cs`: one C# expression creating the `System.Data.Common.DbDataSource` that `IReadConnection` opens query handlers' connections from; `string connectionString` (Aspire's `database`) in scope | **exactly-one** | postgres (`Npgsql.NpgsqlDataSource.Create(connectionString)`), sqlserver (`Microsoft.Data.SqlClient.SqlClientFactory.Instance.CreateDataSource(connectionString)`): the drivers their EF Core providers already bring |
 | `migration-runner.steps` *(added in #29; declared by ef-core)* | `src/MigrationRunner/Program.cs`, after every module's EF Core migrations; `IHost host` in scope, `await` allowed | 0+ | an event store's schema (Marten, #28); empty, the runner is unchanged |
 | `event-store.json-converters` *(added for #121; a role slot of `module.event-store` since #254, declared by marten and kurrentdb)* | `src/BuildingBlocks/EventStore/ModuleEventStore.cs` (the System.Text.Json options of every module's Marten store, or of the events KurrentDB keeps; `JsonSerializerOptions json` in scope; rendered only with a contribution) | 0+ | module.ddd-depth.strict, `optional: true` (writes value objects as their backing values) |
 
@@ -472,15 +484,15 @@ AppHost's model with it, declares it instead (*#260*).
 
 | Slot | File | Separator | Filled by |
 |---|---|---|---|
-| `web.workspace-packages` *(added in M1-07)* | `web/pnpm-workspace.yaml` | newline | spa (`  - app`), micro-frontends (`app`, `modules/*`), design-system tokens-and-components (`packages/tokens`, `packages/ui`) |
-| `web.dependencies` | `web/app/package.json` | `,` + newline | react, redux, rtk, router, rhf, zod, tailwind, shadcn, tanstack-table, echarts, oidc, agent-ui ag-ui (`@ag-ui/client`) |
-| `web.dev-dependencies` | 〃 | `,` + newline | vitest, testing-library, playwright, axe, rtk codegen, pwa yes (`vite-plugin-pwa`) |
-| `web.scripts` | 〃 | `,` + newline | rtk-query-codegen (`codegen`) |
-| `web.prepare` *(added in M1-07b)* | 〃 (`dev`, `build`, `test`) | ` && ` | rtk-query-codegen (`pnpm codegen`), design-system tokens-and-components (builds the tokens) |
+| `web.workspace-packages` *(added in M1-07)* | `web/pnpm-workspace.yaml` | newline | spa (`  - app`), micro-frontends (`app`, `modules/*`), design-system tokens-and-components (`packages/tokens`, `packages/ui`), design-system tokens (`packages/tokens`) |
+| `web.dependencies` | `web/app/package.json` | `,` + newline | react, redux, rtk, router, rhf, zod, tailwind, shadcn, tanstack-table, echarts, oidc, agent-ui ag-ui (`@ag-ui/client`), openapi-fetch |
+| `web.dev-dependencies` | 〃 | `,` + newline | vitest, testing-library, playwright, axe, rtk codegen, pwa yes (`vite-plugin-pwa`), openapi-fetch (`openapi-typescript`) |
+| `web.scripts` | 〃 | `,` + newline | rtk-query-codegen, orval, openapi-fetch (`codegen`) |
+| `web.prepare` *(added in M1-07b)* | 〃 (`dev`, `build`, `test`) | ` && ` | rtk-query-codegen, orval, openapi-fetch (`pnpm codegen`), design-system tokens-and-components and tokens (build the tokens) |
 | `web.env` *(added in M1-07b)* | `web/app/src/vite-env.d.ts` | newline | oidc-client-ts (`VITE_OIDC_AUTHORITY`) |
 | `web.test-setup` *(added in M1-07b)* | `web/app/src/test-setup.ts` | newline | accessibility (axe matchers) |
-| `web.lint-ignores` *(added in M1-07b)* | `web/app/eslint.config.js` | `,` + newline | rtk-query-codegen (the generated client) |
-| `web.format-ignores` *(added for #38)* | `web/app/.prettierignore` | newline | rtk-query-codegen, orval (the generated client, `openapi.json`) |
+| `web.lint-ignores` *(added in M1-07b)* | `web/app/eslint.config.js` | `,` + newline | rtk-query-codegen, orval, openapi-fetch (the generated client) |
+| `web.format-ignores` *(added for #38)* | `web/app/.prettierignore` | newline | rtk-query-codegen, orval, openapi-fetch (the generated client, `openapi.json`) |
 | `web.typecheck-excludes` *(added for #126; declared by react)* | `web/app/tsconfig.json` (`exclude`, rendered only with a contribution) | `, ` | rtk-query-codegen (the generated client, without keycloak: its document starts with no paths) |
 | `web.store-imports`, `web.store-reducers`, `web.store-middleware` *(added in M1-07b; declared by redux-toolkit)* | `web/app/src/store.ts` | newline / `,` + newline / none | rtk-query-codegen |
 | `web.api-imports`, `web.api-headers` *(added in M1-07b; declared by every api-client pack)* | `web/app/src/api/baseApi.ts` | newline | oidc-client-ts (the bearer token) |
@@ -489,7 +501,7 @@ AppHost's model with it, declares it instead (*#260*).
 | `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`), pwa yes (`VitePWA({...})`, the service worker and manifest) |
 | `web.imports` | `web/app/src/main.tsx` | newline | redux, router, oidc |
 | `web.providers` | `web/app/src/main.tsx` | `,` + newline | redux, oidc, router — wrappers composed in order |
-| `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn, design-system tokens-and-components (the tokens' Tailwind theme, `@source` for the ui package), micro-frontends (`@source` for the remotes) |
+| `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn, design-system tokens-and-components (the tokens' Tailwind theme, `@source` for the ui package), design-system tokens (the tokens' Tailwind theme, or their CSS custom properties with css-modules), micro-frontends (`@source` for the remotes) |
 | `web.restricted-imports` *(added in M1-07)* | `web/app/eslint.config.js` | `,` + newline | router, shadcn, react-hook-form, zod — each bans its alternatives; micro-frontends (the shell imports no remote); agent-ui none (no AG-UI or CopilotKit client), agent-ui ag-ui (no CopilotKit) |
 | `web.remote-restricted-imports` *(added for #156; declared by module-federation)* | `web/modules/<module>/eslint.config.js` | `,` + newline | mfe-mixed-frameworks no (bans every UI framework but the shell's) |
 
