@@ -298,4 +298,29 @@ public sealed class WolverineMediatorTests
         output.ShouldContain("Shop.Modules.Billing.Application.Commands.Shout.ShoutHandler has a public Task<Result<Int32, ApiError>> HandleAsync(Shout, CancellationToken) that does not implement its ICommandHandler of Shop.Modules.Billing.Application.Commands.Shout.Shout; Wolverine would invoke it, and the contract is Task<Result<String, ApiError>> HandleAsync(Shout, CancellationToken).");
         output.ShouldNotContain("CountLettersHandler");
     }
+
+    /// <summary>Wolverine also invokes a public static HandleAsync, so one taking the request beside the contract's method fails too.</summary>
+    [Fact]
+    public void A_public_static_handle_async_beside_the_contracts_method_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Mediator);
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/CountLetters", Query);
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/Shout", Command.Replace(
+            "    public Task<Result<string, ApiError>> HandleAsync(", """
+                public static Task<Result<int, ApiError>> HandleAsync(Shout command)
+                {
+                    Ensure.That(command).IsNotNull();
+                    return Task.FromResult(Result<int, ApiError>.Success(command.Text.Length));
+                }
+
+                public Task<Result<string, ApiError>> HandleAsync(
+            """, StringComparison.Ordinal));
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application.Commands.Shout.ShoutHandler has a public Task<Result<Int32, ApiError>> HandleAsync(Shout) that does not implement its ICommandHandler of Shop.Modules.Billing.Application.Commands.Shout.Shout; Wolverine would invoke it, and the contract is Task<Result<String, ApiError>> HandleAsync(Shout, CancellationToken).");
+        output.ShouldNotContain("CountLettersHandler");
+    }
 }
