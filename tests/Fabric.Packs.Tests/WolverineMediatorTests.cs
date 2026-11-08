@@ -174,6 +174,50 @@ public sealed class WolverineMediatorTests
         var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("Shop.Modules.Billing.Application.Queries.CountLetters.CountLettersHandler is not public; Wolverine invokes only public handlers.");
-        output.ShouldContain("Shop.Modules.Billing.Application.Commands.Shout.ShoutHandler has no public HandleAsync; Wolverine does not invoke an explicit interface implementation.");
+        output.ShouldContain("Shop.Modules.Billing.Application.Commands.Shout.ShoutHandler has no public HandleAsync for its ICommandHandler of Shop.Modules.Billing.Application.Commands.Shout.Shout; Wolverine does not invoke an explicit interface implementation.");
+    }
+
+    /// <summary>A public HandleAsync for one contract does not make a class's explicit implementation of another invokable.</summary>
+    [Fact]
+    public void A_handler_contract_implemented_only_explicitly_fails_the_architecture_tests_beside_a_public_one()
+    {
+        using var project = new GeneratedProject(Profile, Mediator);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Application/Queries/Peek/Peek.cs", """
+            using Shop.BuildingBlocks.Messaging;
+
+            namespace Shop.Modules.Billing.Application.Queries.Peek;
+
+            public sealed record Peek(string Text) : IQuery<Result<int, ApiError>>;
+            """);
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/Stamp", """
+            using Shop.BuildingBlocks.Messaging;
+            using Shop.Modules.Billing.Application.Queries.Peek;
+
+            namespace Shop.Modules.Billing.Application.Commands.Stamp;
+
+            public sealed record Stamp(string Text) : ICommand<Result<int, ApiError>>;
+
+            public sealed class LettersHandler : ICommandHandler<Stamp, Result<int, ApiError>>, IQueryHandler<Peek, Result<int, ApiError>>
+            {
+                public Task<Result<int, ApiError>> HandleAsync(Stamp command, CancellationToken cancellationToken)
+                {
+                    Ensure.That(command).IsNotNull();
+                    return Task.FromResult(Result<int, ApiError>.Success(command.Text.Length));
+                }
+
+                Task<Result<int, ApiError>> IQueryHandler<Peek, Result<int, ApiError>>.HandleAsync(Peek query, CancellationToken cancellationToken)
+                {
+                    Ensure.That(query).IsNotNull();
+                    return Task.FromResult(Result<int, ApiError>.Success(query.Text.Length));
+                }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application.Commands.Stamp.LettersHandler has no public HandleAsync for its IQueryHandler of Shop.Modules.Billing.Application.Queries.Peek.Peek; Wolverine does not invoke an explicit interface implementation.");
+        output.ShouldNotContain("Shop.Modules.Billing.Application.Commands.Stamp.LettersHandler has no public HandleAsync for its ICommandHandler");
     }
 }
