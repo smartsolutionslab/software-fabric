@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="TRow">
 import type { ColDef } from 'ag-grid-community';
 import { AgGridVue } from 'ag-grid-vue3';
-import { modules } from './data-table-columns';
+import { modules, theme } from './data-table-columns';
 
 /** A plain table over AG Grid (community), as high as its rows; keep columns stable (module scope). */
 defineProps<{
@@ -11,5 +11,5 @@ defineProps<{
 </script>
 
 <template>
-  <AgGridVue :modules="modules" :column-defs="columns" :row-data="data" dom-layout="autoHeight" />
+  <AgGridVue :modules="modules" :theme="theme" :column-defs="columns" :row-data="data" dom-layout="autoHeight" />
 </template>
