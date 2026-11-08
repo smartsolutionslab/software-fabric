@@ -39,6 +39,18 @@ public sealed class StorybookTestsTests
     }
 
     [Fact]
+    public void The_ui_packages_tests_pass_on_a_fresh_clone_without_a_prior_build()
+    {
+        using var project = new GeneratedProject(Profile, Choices);
+        RunWeb(project, "install");
+        File.Exists(Path.Combine(project.ProjectDirectory, "web", "packages", "tokens", "dist", "theme.css")).ShouldBeFalse("a fresh clone has no built tokens");
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "--filter", "@shop/ui", "test");
+
+        exitCode.ShouldBe(0, $"pnpm --filter @shop/ui test:\n{output}");
+    }
+
+    [Fact]
     public void A_story_that_throws_when_it_renders_fails_the_tests()
     {
         using var project = new GeneratedProject(Profile, Choices);
