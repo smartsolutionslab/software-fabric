@@ -15,7 +15,7 @@ The client is a plain function of the document, so it pairs with TanStack Query'
 ## Consequences
 
 - Changing an endpoint means: run the integration tests (or fetch `/openapi/v1.json` from the running host), commit the rewritten `openapi.json`, run `pnpm codegen`, adapt the frontend; `tsc -b` in `pnpm build` then fails wherever a call names a path, method, parameter or field the document no longer has.
-{{~ if project["frontend.state"] != "pinia" ~}}
+{{~ if (!object.has_key(project, "frontend.state") || project["frontend.state"] != "pinia") ~}}
 - Query keys are written by hand, as the path a call names (`['/billing/notes']`, with its parameters after it); nothing generates them.
 {{~ end ~}}
 - What the gate cannot see: it compares the document only. A hand-written `fetch` to the API, or a header set outside `src/api/baseApi.ts`, passes it; those are for review.
