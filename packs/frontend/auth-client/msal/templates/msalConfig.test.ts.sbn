@@ -1,0 +1,138 @@
+import type { INavigationClient } from '@azure/msal-browser';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { accessToken } from './accessToken';
+import { createMsal } from './msal';
+import { loginRequest, msalConfig } from './msalConfig';
+
+// The stand-in's address as the app is built with it: VITE_OIDC_AUTHORITY, which the AppHost sets, or the fallback.
+const authority = new URL(msalConfig.auth.authority);
+const tokenEndpoint = `${authority.origin}/organizations/oauth2/v2.0/token`;
+
+/** The stand-in's discovery document for any directory, as it serves it: the issuer at its own address. */
+const discovery = {
+  issuer: `${authority.origin}/{tenantid}/v2.0`,
+  authorization_endpoint: `${authority.origin}/organizations/oauth2/v2.0/authorize`,
+  token_endpoint: tokenEndpoint,
+  end_session_endpoint: `${authority.origin}/organizations/oauth2/v2.0/logout`,
+  jwks_uri: `${authority.origin}/organizations/discovery/v2.0/keys`,
+  response_types_supported: ['code'],
+  response_modes_supported: ['query'],
+  scopes_supported: ['openid', 'profile', 'email', 'offline_access'],
+};
+
+const base64Url = (value: object) =>
+  btoa(JSON.stringify(value)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+/** An ID token shaped like the stand-in's; MSAL reads its claims and leaves the signature to the API. */
+function idToken(nonce: string) {
+  const now = Math.floor(Date.now() / 1000);
+  const claims = {
+    ver: '2.0',
+    iss: `${authority.origin}/00000000-0000-0000-0000-00000000000a/v2.0`,
+    aud: msalConfig.auth.clientId,
+    tid: '00000000-0000-0000-0000-00000000000a',
+    oid: 'developer-id',
+    sub: 'developer-id',
+    name: 'developer',
+    preferred_username: 'developer',
+    nonce,
+    iat: now,
+    nbf: now,
+    exp: now + 3600,
+  };
+  return `${base64Url({ alg: 'RS256', typ: 'JWT' })}.${base64Url(claims)}.signature`;
+}
+
+let navigated: string[] = [];
+let tokenRequests: URLSearchParams[] = [];
+let nonce = '';
+
+/** The browser leaves for the stand-in no further than this list; coming back is a history entry. */
+const navigation: INavigationClient = {
+  navigateExternal: (url) => {
+    navigated.push(url);
+    return Promise.resolve(true);
+  },
+  navigateInternal: (url) => {
+    window.history.replaceState({}, '', url);
+    return Promise.resolve(false);
+  },
+};
+
+beforeEach(() => {
+  navigated = [];
+  tokenRequests = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString());
+      if (url.pathname.endsWith('/.well-known/openid-configuration')) {
+        return Promise.resolve(Response.json(discovery));
+      }
+      if (`${url.origin}${url.pathname}` === tokenEndpoint) {
+        tokenRequests.push(new URLSearchParams(String(init?.body)));
+        return Promise.resolve(
+          Response.json({
+            access_token: 'access-token-of-developer',
+            id_token: idToken(nonce),
+            token_type: 'Bearer',
+            expires_in: 3600,
+            scope: 'openid profile',
+          }),
+        );
+      }
+      return Promise.resolve(new Response(null, { status: 404 }));
+    }),
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  sessionStorage.clear();
+  window.history.replaceState({}, '', '/');
+});
+
+async function started() {
+  const msal = createMsal();
+  await msal.initialize();
+  msal.setNavigationClient(navigation);
+  return msal;
+}
+
+test('the authority is https, the only kind msal-common accepts', () => {
+  expect(authority.protocol).toBe('https:');
+});
+
+test('msal-browser accepts the configuration and sends the user to the stand-in, which answers in the query', async () => {
+  const msal = await started();
+
+  await msal.loginRedirect(loginRequest);
+
+  expect(navigated).toHaveLength(1);
+  const sent = new URL(navigated[0] ?? '');
+  expect(`${sent.origin}${sent.pathname}`).toBe(discovery.authorization_endpoint);
+  expect(sent.searchParams.get('client_id')).toBe(msalConfig.auth.clientId);
+  expect(sent.searchParams.get('redirect_uri')).toBe(window.location.origin);
+  expect(sent.searchParams.get('response_type')).toBe('code');
+  expect(sent.searchParams.get('response_mode')).toBe('query');
+  expect(sent.searchParams.get('code_challenge_method')).toBe('S256');
+  expect(sent.searchParams.get('code_challenge')).toBeTruthy();
+});
+
+test('coming back from the stand-in, msal-browser signs the user in and the access token is kept', async () => {
+  const msal = await started();
+  await msal.loginRedirect(loginRequest);
+  const sent = new URL(navigated[0] ?? '');
+  nonce = sent.searchParams.get('nonce') ?? '';
+  const state = sent.searchParams.get('state') ?? '';
+  window.history.replaceState({}, '', `/?code=the-code&state=${encodeURIComponent(state)}`);
+
+  const result = await msal.handleRedirectPromise();
+
+  expect(result?.account.username).toBe('developer');
+  expect(msal.getActiveAccount()?.username).toBe('developer');
+  expect(tokenRequests[0]?.get('grant_type')).toBe('authorization_code');
+  expect(tokenRequests[0]?.get('code')).toBe('the-code');
+  expect(tokenRequests[0]?.get('code_verifier')).toBeTruthy();
+  expect(accessToken()).toBe('access-token-of-developer');
+});

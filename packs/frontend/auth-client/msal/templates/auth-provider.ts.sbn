@@ -1,0 +1,10 @@
+import { type App, type Component, h } from 'vue';
+import { createMsal } from '@/auth/msal';
+import SignedIn from '@/auth/SignedIn.vue';
+import { authKey, createAuth } from '@/auth/useAuth';
+
+/** Signs the user in through the identity provider with MSAL, and renders the app inside SignedIn. */
+export const withAuth = (app: App, root: Component): Component => {
+  app.provide(authKey, createAuth(createMsal()));
+  return { render: () => h(SignedIn, null, { default: () => h(root) }) };
+};

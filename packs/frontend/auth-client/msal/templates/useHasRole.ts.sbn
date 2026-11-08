@@ -1,0 +1,11 @@
+import { useMsal } from '@azure/msal-react';
+
+/**
+ * Whether the signed-in user holds the {{ role_kind }}, as the ID token says (`{{ id_token_roles_claim }}`). Hiding an element is a
+ * convenience, never protection: the backend policy decides.
+ */
+export function useHasRole(role: string): boolean {
+  // The active account, the one the app's access token is for; other accounts may be cached.
+  const claims: Record<string, unknown> = useMsal().instance.getActiveAccount()?.idTokenClaims ?? {};
+  {{ id_token_has_role "claims" "role" }}
+}

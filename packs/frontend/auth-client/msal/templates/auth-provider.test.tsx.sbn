@@ -1,0 +1,22 @@
+import { render, screen } from '@testing-library/react';
+import { expect, test, vi } from 'vitest';
+import { withAuth } from './auth';
+
+// The app's real MSAL client, but one that cannot start (no Web Crypto, storage refused, ...).
+vi.mock('@/auth/msal', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/auth/msal')>();
+  return {
+    createMsal: () => {
+      const msal = real.createMsal();
+      vi.spyOn(msal, 'initialize').mockRejectedValue(new Error('crypto_nonexistent'));
+      return msal;
+    },
+  };
+});
+
+test('an MSAL that cannot start is shown, not left signing in', async () => {
+  render(withAuth(<h1>{{ name }}</h1>));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in failed: crypto_nonexistent');
+  expect(screen.queryByRole('heading', { name: '{{ name }}' })).not.toBeInTheDocument();
+});

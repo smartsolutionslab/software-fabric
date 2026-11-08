@@ -120,6 +120,15 @@ public sealed partial class IdentityVocabularyTests
         { "industrial-event-driven-mfe", [] },
     };
 
+    /// <summary>The same users of the auth client's vocabulary with msal (#266), which needs Entra ID.</summary>
+    public static TheoryData<string, string[]> MsalGenerations => new()
+    {
+        { "saas-ai-react", ["backend.auth=entra-id", "frontend.auth-client=msal", "backend.authorization=roles,claims", "backend.mcp=client,server", "frontend.realtime=signalr"] },
+        { "saas-standard-vue", ["backend.auth=entra-id", "frontend.auth-client=msal", "backend.authorization=roles", "frontend.realtime=signalr"] },
+        { "saas-standard-react", ["backend.auth=entra-id", "frontend.auth-client=msal", "frontend.realtime=sse"] },
+        { "saas-standard-vue", ["backend.auth=entra-id", "frontend.auth-client=msal", "frontend.realtime=sse"] },
+    };
+
     [Theory]
     [InlineData("backend.auth")]
     [InlineData("frontend.auth-client")]
@@ -226,6 +235,29 @@ public sealed partial class IdentityVocabularyTests
     }
 
     /// <summary>
+    /// msal keeps the token its own way (src/auth/accessToken.ts): with its vocabulary stood in, no file but its own, the
+    /// API client's headers and the dependencies it adds names MSAL or where the token is kept.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(MsalGenerations))]
+    public void A_project_generated_with_msals_vocabulary_stood_in_names_msal_only_in_its_own_files(string profile, string[] overrides)
+    {
+        var msal = Repository.Packs.Packs["frontend.auth-client.msal"];
+        using var authClient = new VocabularyProbe(msal, AuthClientVocabulary);
+        using var project = new GeneratedProject(profile, [authClient.Manifest], overrides);
+
+        var ownFiles = msal.Files.Select(file => file.Target).Concat(AuthClientFiles).Append("web/app/package.json").ToHashSet(StringComparer.Ordinal);
+        var named = Code(project)
+            .Where(entry => !ownFiles.Contains(entry.relative))
+            .Where(entry => MsalSpecific().IsMatch(entry.line))
+            .Select(entry => $"{entry.relative}:{entry.number}: {entry.line.Trim()}")
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        named.ShouldBeEmpty(string.Join(Environment.NewLine, named));
+    }
+
+    /// <summary>
     /// The real packs, but the given identity provider's defines nothing in <c>templates.functions</c>: it stands in
     /// for a provider that lacks the vocabulary, so the test needs no option that is still without a pack.
     /// </summary>
@@ -257,6 +289,9 @@ public sealed partial class IdentityVocabularyTests
 
     [GeneratedRegex(@"oidc\.user:|@/auth/accessToken|@/auth/oidcConfig|\baccessToken\(\)")]
     private static partial Regex AuthClientSpecific();
+
+    [GeneratedRegex(@"@azure/msal|app\.access-token|rememberAccessToken|@/auth/accessToken|@/auth/msal|\baccessToken\(\)")]
+    private static partial Regex MsalSpecific();
 
     [GeneratedRegex(@"\.(cs|csproj|ts|tsx|vue|json)$")]
     private static partial Regex Source();
