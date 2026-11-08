@@ -100,7 +100,9 @@ public sealed partial class CssModulesTests
     [Fact]
     public void With_css_modules_the_micro_frontends_shell_does_not_read_the_remotes_for_tailwind()
     {
-        var files = Files("industrial-event-driven-mfe", ReactCssModules);
+        // The profile's design system builds Tailwind components only and fails loudly with any other styling (ADR-0006);
+        // micro-frontends need one, so the tokens alone stand in for it.
+        var files = Files("industrial-event-driven-mfe", [.. ReactCssModules, "frontend.design-system=tokens"]);
 
         files["web/app/src/index.css"].ShouldNotContain("@source");
         var agents = files["AGENTS.md"];
