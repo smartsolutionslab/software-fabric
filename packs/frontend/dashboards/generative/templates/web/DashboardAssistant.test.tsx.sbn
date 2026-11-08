@@ -61,11 +61,13 @@ vi.mock('@/api/generated', () => ({
   usePutDashboardsByIdMutation: () => [save, { isLoading: false }],
 }));
 
+{{~ if project["frontend.charts"] != "recharts" ~}}
 // ECharts draws on a canvas jsdom does not have; the chart's accessible name is what the page decides.
 vi.mock('@/components/chart', () => ({
   Chart: ({ label }: { label: string }) => <div role="img" aria-label={label} />,
 }));
 
+{{~ end ~}}
 // The host's side of a run, as POST /agents/dashboards streams it: AG-UI events, one server-sent event each.
 function eventStream() {
   const encoder = new TextEncoder();

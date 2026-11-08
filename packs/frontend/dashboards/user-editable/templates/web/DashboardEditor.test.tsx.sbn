@@ -101,11 +101,13 @@ vi.mock('@/api/generated', () => ({
   usePutDashboardsByIdMutation: () => [save, { isLoading: false }],
 }));
 
+{{~ if project["frontend.charts"] != "recharts" ~}}
 // ECharts draws on a canvas jsdom does not have; the chart's accessible name is what the editor decides.
 vi.mock('@/components/chart', () => ({
   Chart: ({ label }: { label: string }) => <div role="img" aria-label={label} />,
 }));
 
+{{~ end ~}}
 afterEach(cleanup);
 
 beforeEach(() => {
