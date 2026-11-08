@@ -28,6 +28,7 @@ slots:
   - { slot: persistence.schema, template: templates/persistence-schema.sbn }
   - { slot: persistence.model-conventions, template: templates/model-conventions.sbn }
   - { slot: persistence.save-changes, template: templates/save-changes.sbn }
+  - { slot: migration-runner.preflight, template: templates/migration-runner-preflight.sbn }
   - { slot: migration-runner.steps, template: templates/migration-runner-steps.sbn }
   - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 16 }
   - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 6 }

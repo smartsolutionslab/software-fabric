@@ -1,5 +1,7 @@
 using {{ namespace }}.BuildingBlocks.Tenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -7,9 +9,42 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class TenantSchemaMigrations
 {
     /// <summary>
+    /// Fails before the MigrationRunner migrates any module, in any schema, when one module could not be migrated into
+    /// every listed tenant's schema: a tenant's name, a schema two module and tenant pairs would share, a model that cannot
+    /// move or holds changes no migration does, a migration that cannot move. The MigrationRunner calls it first.
+    /// </summary>
+    public static void RefuseWhatCannotMigrate(this IServiceProvider services, IEnumerable<Type> contexts)
+    {
+        {{ not_null "services" }}
+        {{ not_null "contexts" }}
+
+        List<Type> modules = [.. contexts];
+        RefuseSharedSchemas(modules, TenantSchemas.Listed(services.GetRequiredService<IConfiguration>()));
+        foreach (var context in modules)
+        {
+            using var scope = services.CreateScope();
+
+            // In the module's own schema: building its model refuses what cannot move, and the model is checked against
+            // the snapshot there.
+            var module = (DbContext)scope.ServiceProvider.GetRequiredService(context);
+            if (module.Database.HasPendingModelChanges())
+            {
+                throw new InvalidOperationException(
+                    $"The model of {context.Name} has changes no migration holds (EF Core's PendingModelChangesWarning); add a migration, so that no module migrates before it has one.");
+            }
+
+            var migrations = module.GetService<IMigrationsAssembly>();
+            foreach (var migration in migrations.Migrations.Values)
+            {
+                migrations.CreateMigration(migration, module.Database.ProviderName!);
+            }
+        }
+    }
+
+    /// <summary>
     /// Creates and migrates every module's schema for each tenant in Tenancy:Tenants, each with its own migrations history,
-    /// once every schema name is known to have one owner. The MigrationRunner calls it after migrating every module in the
-    /// module's own schema, which checks each model against its snapshot first; the host never does.
+    /// once every schema name is known to have one owner. The MigrationRunner calls it after
+    /// <see cref="RefuseWhatCannotMigrate"/> and after migrating every module in the module's own schema; the host never does.
     /// </summary>
     public static async Task MigrateTenantSchemasAsync(this IServiceProvider services, IEnumerable<Type> contexts, CancellationToken cancellationToken = default)
     {
