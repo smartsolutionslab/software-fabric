@@ -68,38 +68,42 @@ public sealed class SqlServerTests
         agents.ShouldNotContain("## Database: PostgreSQL");
     }
 
+    private const string InvoicePaid = """
+        namespace Shop.Contracts.Billing;
+
+        public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
+        """;
+
+    private const string PayInvoice = """
+        using Microsoft.AspNetCore.Builder;
+        using Microsoft.AspNetCore.Http;
+        using Microsoft.AspNetCore.Routing;
+        using Shop.BuildingBlocks.Api;
+        using Shop.Contracts.Billing;
+        using Shop.Modules.Billing.Application;
+
+        namespace Shop.Modules.Billing.Api;
+
+        public sealed class PayInvoice : IEndpoint
+        {
+            public void Map(IEndpointRouteBuilder endpoints) =>
+                endpoints.MapPost("/invoices/{id}/pay", async (Guid id, IBillingUnitOfWork unitOfWork, CancellationToken cancellationToken) =>
+                {
+                    await unitOfWork.PublishAsync(new InvoicePaidV1(id));
+                    await unitOfWork.CommitAsync(cancellationToken);
+                    return Results.Accepted();
+                }).AllowAnonymous();
+        }
+        """;
+
     [Fact]
     public async Task The_migration_runner_creates_every_modules_outbox_table_and_an_integration_event_crosses_two_modules()
     {
         using var project = new GeneratedProject("lean-crud", SqlServer);
         project.AddModule("billing");
         project.AddModule("shipping");
-        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
-            namespace Shop.Contracts.Billing;
-
-            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
-            """);
-        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", """
-            using Microsoft.AspNetCore.Builder;
-            using Microsoft.AspNetCore.Http;
-            using Microsoft.AspNetCore.Routing;
-            using Shop.BuildingBlocks.Api;
-            using Shop.Contracts.Billing;
-            using Shop.Modules.Billing.Application;
-
-            namespace Shop.Modules.Billing.Api;
-
-            public sealed class PayInvoice : IEndpoint
-            {
-                public void Map(IEndpointRouteBuilder endpoints) =>
-                    endpoints.MapPost("/invoices/{id}/pay", async (Guid id, IBillingUnitOfWork unitOfWork, CancellationToken cancellationToken) =>
-                    {
-                        await unitOfWork.PublishAsync(new InvoicePaidV1(id));
-                        await unitOfWork.CommitAsync(cancellationToken);
-                        return Results.Accepted();
-                    }).AllowAnonymous();
-            }
-            """);
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", InvoicePaid);
+        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", PayInvoice);
         project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", RedeliveredEvent.Consumer(tenancy: false));
         project.Write("src/Modules/Shipping/Shipping.Api/Deliveries.cs", RedeliveredEvent.Endpoint);
         project.Build();
@@ -114,6 +118,35 @@ public sealed class SqlServerTests
         using var host = project.StartHost(Dependencies(sqlServer));
         (await host.GetAsync("/health")).StatusCode.ShouldBe(HttpStatusCode.OK);
 
+        var publishedAfter = TimeProvider.System.GetUtcNow();
+        (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        await RedeliveredEvent.ShouldHaveBeenDeliveredTwiceWithTheSameMetadataAsync(host, publishedAfter, null, attempts: 60);
+        sqlServer.Sql(DatabasePassword, "select count(*) from billing.outbox_messages where delivered_at is not null").ShouldBe("1");
+    }
+
+    /// <summary>
+    /// With READ_COMMITTED_SNAPSHOT on, as Azure SQL Database has it by default, read committed reads row versions and
+    /// takes no shared locks; the dispatcher's dequeue must still lock the rows it takes and skip the ones it cannot.
+    /// </summary>
+    [Fact]
+    public async Task An_integration_event_crosses_two_modules_on_a_database_with_read_committed_snapshot()
+    {
+        using var project = new GeneratedProject("lean-crud", SqlServer);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", InvoicePaid);
+        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", PayInvoice);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", RedeliveredEvent.Consumer(tenancy: false));
+        project.Write("src/Modules/Shipping/Shipping.Api/Deliveries.cs", RedeliveredEvent.Endpoint);
+        project.Build();
+
+        using var sqlServer = Container.SqlServer(DatabasePassword);
+        RunMigrationRunner(project, sqlServer);
+        sqlServer.Sql(DatabasePassword, "alter database shop set read_committed_snapshot on with rollback immediate", "master");
+        sqlServer.Sql(DatabasePassword, "select is_read_committed_snapshot_on from sys.databases where name = 'shop'", "master").ShouldBe("1");
+
+        using var host = project.StartHost(Dependencies(sqlServer));
         var publishedAfter = TimeProvider.System.GetUtcNow();
         (await host.PostAsync($"/billing/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
 
