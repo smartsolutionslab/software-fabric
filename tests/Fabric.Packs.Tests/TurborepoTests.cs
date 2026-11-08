@@ -115,6 +115,18 @@ public sealed class TurborepoTests
         adr.ShouldContain(".turbo/cache");
     }
 
+    [Fact]
+    public void The_adr_keeps_turborepos_telemetry_default_and_names_the_three_ways_to_opt_out()
+    {
+        var files = Files("saas-standard-react", Turborepo);
+
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-workspace-turborepo.md", StringComparison.Ordinal)).Value;
+        adr.ShouldContain("## Telemetry");
+        adr.ShouldContain("turbo telemetry disable");
+        adr.ShouldContain("TURBO_TELEMETRY_DISABLED=1");
+        adr.ShouldContain("DO_NOT_TRACK=1");
+    }
+
     /// <summary>
     /// What a developer sees: the workspace installs, builds, lints and tests through Turborepo, and a second build with
     /// nothing changed is read from the local cache instead of running again.
