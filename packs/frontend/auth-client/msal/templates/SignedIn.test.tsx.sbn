@@ -42,21 +42,22 @@ function msal(accounts: AccountInfo[], inProgress: InteractionStatus = Interacti
     }),
     removeEventCallback: vi.fn(),
   };
-  const use = (now: InteractionStatus, signedIn = accounts) =>
+  const answer = (now: InteractionStatus, signedIn = accounts) =>
     vi.mocked(useMsal).mockReturnValue({ instance, inProgress: now, accounts: signedIn } as unknown as Msal);
-  use(inProgress);
+  answer(inProgress);
   const emit = (message: Partial<EventMessage>) => {
     for (const callback of callbacks) {
       callback(message as EventMessage);
     }
   };
-  return { instance, use, emit };
+  return { instance, answer, emit };
 }
 
 const signedIn = (expiresIn = 300_000) =>
   rememberAccessToken({ accessToken: 'access-token', expiresOn: new Date(Date.now() + expiresIn) });
 
-const app = (
+// A new element each time: React re-renders a root given the same element again only when its state changed.
+const app = () => (
   <SignedIn>
     <h1>{{ name }}</h1>
   </SignedIn>
@@ -65,7 +66,7 @@ const app = (
 test('an anonymous visitor is sent to the identity provider', async () => {
   const { instance } = msal([]);
 
-  render(app);
+  render(app());
 
   await vi.waitFor(() => expect(instance.loginRedirect).toHaveBeenCalledOnce());
   expect(screen.getByText('Signing in…')).toBeInTheDocument();
@@ -76,7 +77,7 @@ test('a signed-in user sees who they are and the application', () => {
   signedIn();
   const { instance } = msal([developer]);
 
-  render(app);
+  render(app());
 
   expect(screen.getByText('Signed in as developer')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '{{ name }}' })).toBeInTheDocument();
@@ -86,19 +87,19 @@ test('a signed-in user sees who they are and the application', () => {
 test('nothing is started while MSAL completes the way back from the identity provider', () => {
   const { instance } = msal([], InteractionStatus.HandleRedirect);
 
-  render(app);
+  render(app());
 
   expect(screen.getByText('Signing in…')).toBeInTheDocument();
   expect(instance.loginRedirect).not.toHaveBeenCalled();
 });
 
 test('a failed sign-in is shown, not retried', async () => {
-  const { instance, use, emit } = msal([], InteractionStatus.HandleRedirect);
-  const { rerender } = render(app);
+  const { instance, answer, emit } = msal([], InteractionStatus.HandleRedirect);
+  const { rerender } = render(app());
 
   emit({ eventType: EventType.ACQUIRE_TOKEN_FAILURE, error: new Error('access_denied') });
-  use(InteractionStatus.None);
-  rerender(app);
+  answer(InteractionStatus.None);
+  rerender(app());
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in failed: access_denied');
   expect(instance.loginRedirect).not.toHaveBeenCalled();
@@ -108,7 +109,7 @@ test('a redirect to the identity provider that fails is shown', async () => {
   const { instance } = msal([]);
   instance.loginRedirect.mockImplementation(() => Promise.reject(new Error('endpoints_resolution_error')));
 
-  render(app);
+  render(app());
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Sign-in failed: endpoints_resolution_error');
 });
@@ -117,7 +118,7 @@ test('a session whose access token expires sends the user back to the identity p
   signedIn(50);
   const { instance } = msal([developer]);
 
-  render(app);
+  render(app());
   expect(screen.getByText('Signed in as developer')).toBeInTheDocument();
 
   await vi.waitFor(() => expect(instance.loginRedirect).toHaveBeenCalledOnce());
@@ -126,12 +127,12 @@ test('a session whose access token expires sends the user back to the identity p
 
 test('signing out does not start a sign-in while the identity provider signs the user out', async () => {
   signedIn();
-  const { instance, use } = msal([developer]);
-  const { rerender } = render(app);
+  const { instance, answer } = msal([developer]);
+  const { rerender } = render(app());
 
   await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
-  use(InteractionStatus.Logout, []);
-  rerender(app);
+  answer(InteractionStatus.Logout, []);
+  rerender(app());
 
   expect(instance.logoutRedirect).toHaveBeenCalledOnce();
   expect(screen.getByText('Signing out…')).toBeInTheDocument();

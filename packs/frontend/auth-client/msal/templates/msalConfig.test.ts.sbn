@@ -69,7 +69,7 @@ beforeEach(() => {
       if (url.pathname.endsWith('/.well-known/openid-configuration')) {
         return Promise.resolve(Response.json(discovery));
       }
-      if (url.toString() === tokenEndpoint) {
+      if (`${url.origin}${url.pathname}` === tokenEndpoint) {
         tokenRequests.push(new URLSearchParams(String(init?.body)));
         return Promise.resolve(
           Response.json({

@@ -46,7 +46,8 @@ const users = {
 };
 
 function signInAs(user: keyof typeof users) {
-  vi.mocked(useMsal).mockReturnValue({ accounts: [{ idTokenClaims: users[user] }] } as unknown as ReturnType<typeof useMsal>);
+  const msal = { accounts: [{ idTokenClaims: users[user] }] };
+  vi.mocked(useMsal).mockReturnValue(msal as unknown as ReturnType<typeof useMsal>);
 }
 {{~ if roles ~}}
 
