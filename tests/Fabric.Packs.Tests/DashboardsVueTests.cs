@@ -114,7 +114,7 @@ public sealed class DashboardsVueTests
     {
         var files = Files(Dashboards, "frontend.ui-library=reka-ui");
 
-        files[Canvas].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate and zod or valibot only so far; frontend.ui-library is reka-ui");
+        files[Canvas].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate or TanStack Form and zod or valibot only so far; frontend.ui-library is reka-ui");
     }
 
     /// <summary>
