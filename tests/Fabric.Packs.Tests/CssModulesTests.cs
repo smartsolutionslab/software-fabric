@@ -114,6 +114,26 @@ public sealed partial class CssModulesTests
     }
 
     [Fact]
+    public void The_conversations_number_no_messages_and_their_answers_name_the_speaker_legibly()
+    {
+        var files = Files(Vue, [.. VueCssModules, .. AgentsAndDashboards]);
+
+        foreach (var (stylesheet, list) in new[] { ("web/app/src/agents/AgentConversation.module.css", ".messages {"), ("web/app/src/dashboards/DashboardAssistant.module.css", ".conversation {") })
+        {
+            var css = files[stylesheet];
+            var rule = css[css.IndexOf(list, StringComparison.Ordinal)..];
+            rule[..(rule.IndexOf('}', StringComparison.Ordinal) + 1)].ShouldContain("list-style: none;", customMessage: $"{stylesheet}: without Tailwind's reset an <ol> numbers its messages");
+
+            var speaker = css[css.IndexOf(".answerSpeaker {", StringComparison.Ordinal)..];
+            speaker[..(speaker.IndexOf('}', StringComparison.Ordinal) + 1)].ShouldContain("color: #475569;", customMessage: $"{stylesheet}: slate-500 on the answer's slate-100 is 4.34:1, below WCAG AA");
+        }
+
+        var tailwind = Files(Vue, ["frontend.ui-library=reka-ui", .. AgentsAndDashboards]);
+        tailwind["web/app/src/agents/AgentConversation.vue"].ShouldContain("class=\"text-xs font-medium text-slate-600\"");
+        tailwind["web/app/src/dashboards/DashboardAssistant.vue"].ShouldContain("class=\"text-xs font-medium text-slate-600\"");
+    }
+
+    [Fact]
     public void The_vue_css_modules_web_app_with_dashboards_and_the_agent_panel_builds_lints_formats_and_passes_its_tests()
     {
         using var project = new GeneratedProject(Vue, [.. VueCssModules, .. AgentsAndDashboards]);
