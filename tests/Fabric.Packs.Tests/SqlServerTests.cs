@@ -249,7 +249,10 @@ public sealed class SqlServerTests
         var failures = int.Parse(row[0], CultureInfo.InvariantCulture);
         var nextAttempt = long.Parse(row[1], CultureInfo.InvariantCulture);
         failures.ShouldBeLessThan(10, "the message must not have been dead-lettered");
-        nextAttempt.ShouldBeGreaterThanOrEqualTo(attempts[failures - 1] + (1000L << (failures - 1)));
+        // SQL Server's clock and the host's are read apart and each cut to milliseconds; on CI they disagreed by one. The
+        // gaps between attempts above use the host's clock alone and allow nothing.
+        const long ClockSkew = 10;
+        nextAttempt.ShouldBeGreaterThanOrEqualTo(attempts[failures - 1] + (1000L << (failures - 1)) - ClockSkew);
         row[2].ShouldContain("The carrier is down");
     }
 
