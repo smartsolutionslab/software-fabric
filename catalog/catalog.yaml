@@ -101,7 +101,16 @@ dimensions:
     default: hand-rolled
     options:
       hand-rolled: { tier: supported }
-      wolverine:   { tier: experimental }
+      wolverine:
+        tier: experimental
+        requires: ["backend.bus.library == wolverine"]
+        # Their generated tests send requests through IDispatcher in a container without Wolverine's bus, or in a host
+        # whose hosted services are removed, so Wolverine never starts.
+        conflicts:
+          - "backend.llm.agents == agent-framework"
+          - "frontend.dashboards has user-editable"
+          - "backend.api-protocols has grpc"
+          - "backend.mcp has server"
 
   backend.api-style:
     scope: project
