@@ -154,41 +154,23 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
     }
 
     /// <summary>
-    /// The owner's decision on #474: before postponing, the review tries once more with another model of the same
-    /// reviewing family, which stays independent of the author's.
+    /// The owner's decision on #474 (no fallback model): Copilot's limit is account-wide, so a limited review is
+    /// postponed at once, without a second model call, and the workflow names no other model.
     /// </summary>
     [Theory]
-    [InlineData("Agent-Executor: claude-cloud/lane-backend", "REVIEW_MODEL_CODEX", "gpt-")]
-    [InlineData("Agent-Executor: codex-cloud/lane-backend", "REVIEW_MODEL_CLAUDE", "claude-")]
-    public void A_model_that_hits_the_limit_is_replaced_once_by_the_fallback_of_the_same_family(string trailer, string setting, string family)
+    [InlineData("Agent-Executor: claude-cloud/lane-backend", "REVIEW_MODEL_CODEX")]
+    [InlineData("Agent-Executor: codex-cloud/lane-backend", "REVIEW_MODEL_CLAUDE")]
+    public void A_limited_review_is_postponed_without_a_second_model_call(string trailer, string setting)
     {
-        var environment = WorkflowEnvironment();
-        var model = environment[setting];
-        var fallbackSetting = setting.Replace("REVIEW_MODEL_", "REVIEW_FALLBACK_MODEL_", StringComparison.Ordinal);
-        var fallback = environment.GetValueOrDefault(fallbackSetting, "");
-        fallback.ShouldStartWith(family, Case.Sensitive, $"{fallbackSetting} names another model of the reviewing family.");
-        fallback.ShouldNotBe(model);
+        var model = WorkflowEnvironment()[setting];
 
         var run = Review($"Change\n\n{trailer}", NoFindings, limitedModels: [model]);
 
         run.ExitCode.ShouldBe(0, run.Log);
-        CopilotModels().ShouldBe([model, fallback], ignoreOrder: false, run.Log);
-        ((string)Reviews().ShouldHaveSingleItem()!["body"]!).ShouldContain(fallback);
-        ((string)Statuses().ShouldHaveSingleItem(run.Log)!["state"]!).ShouldBe("success");
-    }
-
-    [Fact]
-    public void A_review_is_postponed_only_when_the_fallback_is_limited_too()
-    {
-        var environment = WorkflowEnvironment();
-        string[] models = [environment["REVIEW_MODEL_CODEX"], environment.GetValueOrDefault("REVIEW_FALLBACK_MODEL_CODEX", "")];
-
-        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, limitedModels: models);
-
-        run.ExitCode.ShouldBe(0, run.Log);
-        CopilotModels().ShouldBe(models, ignoreOrder: false, run.Log);
+        CopilotModels().ShouldBe([model], ignoreOrder: false, run.Log);
         Reviews().ShouldBeEmpty();
         ((string)Statuses().ShouldHaveSingleItem(run.Log)!["state"]!).ShouldBe("pending");
+        WorkflowEnvironment().Keys.ShouldNotContain(key => key.StartsWith("REVIEW_FALLBACK_MODEL_", StringComparison.Ordinal));
     }
 
     /// <summary>

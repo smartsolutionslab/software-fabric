@@ -130,10 +130,9 @@ the pull request's head, which the report job sets: `success` when nothing block
 the answer has no findings, and `pending` while the review is postponed. That status is "the review check" the
 default branch's protection requires.
 
-**The fallback model comes first.** A model that reaches the limit is replaced once by another model of the same
-reviewing family that Copilot offers, set in the workflow's `env` as `REVIEW_FALLBACK_MODEL_*` beside
-`REVIEW_MODEL_*`, so the reviewer stays independent of the author's family. The review is postponed only when the
-fallback is limited too.
+**No fallback model.** #474 first asked for one retry with another model of the reviewing family before
+postponing. The owner withdrew it in answer to the escalation on #478: the limit ("trust tier usage limit") is the
+account's, not a model's, so a limited review is postponed at once and the hourly retry takes it from there.
 
 **Postponed reviews are retried on a schedule.** The workflow `cross-model-review-retry` runs hourly and on demand.
 It finds the open pull requests whose verdict at their current head is pending as postponed and re-runs the review
@@ -154,7 +153,6 @@ jobs pass while a review is postponed, so a protection that requires them instea
 - *As built (#474):* the limit is recognised by Copilot's exit code together with its message (`usage limit`,
   `rate limit` or `too many requests`); any other failure still fails the review. The review job's outputs come from
   the job that reads the untrusted diff, so they can only hold the gate closed: a postponement leaves the status
-  pending, and the model it names is believed only when it is the configured fallback. A verdict is kept only from
-  the workflow's own reviews (`github-actions[bot]`), since anyone can post a review, and only for the same reviewing
-  family, so the family rule holds for every head. A Dependabot update that is exempt from review gets no status,
-  because Dependabot's runs get a read-only token.
+  pending. A verdict is kept only from the workflow's own reviews (`github-actions[bot]`), since anyone can post a
+  review, and only for the same reviewing family, so the family rule holds for every head. A Dependabot update that is exempt from review gets no status,
+  because Dependabot's runs get a read-only token; #480 has the scheduled retry set it.
