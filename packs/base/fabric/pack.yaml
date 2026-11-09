@@ -14,6 +14,7 @@ files:
   - { template: templates/board/dependency-update.sh.sbn, target: ".github/scripts/board/dependency-update.sh" }
   - { template: templates/board/review-status.sh.sbn, target: ".github/scripts/board/review-status.sh" }
   - { template: templates/board/retry-reviews.sh.sbn, target: ".github/scripts/board/retry-reviews.sh" }
+  - { template: templates/board/previous-verdict.sh.sbn, target: ".github/scripts/board/previous-verdict.sh" }
   - { template: templates/review-findings.schema.json.sbn, target: ".github/review-findings.schema.json" }
   - { template: templates/board.env.sbn, target: ".github/board.env" }
   - { template: templates/commit-scopes.sbn, target: ".github/commit-scopes" }

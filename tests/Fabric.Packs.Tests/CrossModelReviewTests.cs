@@ -241,6 +241,81 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         File.ReadAllText(RetryWorkflowPath).ShouldNotContain("copilot", Case.Insensitive);
     }
 
+    /// <summary>
+    /// The owner's decision on #474: a push that leaves the pull request's own diff as it was, such as merging main,
+    /// keeps the verdict of the last real review instead of spending another. The copilot stand-in answers a blocking
+    /// finding this time, so a review that ran anyway would fail.
+    /// </summary>
+    [Fact]
+    public void A_head_whose_own_diff_is_unchanged_keeps_the_verdict_without_calling_copilot()
+    {
+        var reviewed = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, change: Invoice);
+        reviewed.ExitCode.ShouldBe(0, reviewed.Log);
+
+        var merged = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", Blocking, change: Invoice, mainMoved: MainMovedByClaude);
+
+        merged.ExitCode.ShouldBe(0, merged.Log);
+        merged.CopilotArguments.ShouldBeNull(merged.Log);
+        Reviews().Count.ShouldBe(1);
+        var status = Statuses().Last()!;
+        ((string)status["state"]!).ShouldBe("success");
+        ((string)status["description"]!).ShouldContain("unchanged");
+    }
+
+    [Fact]
+    public void A_blocking_verdict_is_kept_too_while_the_diff_is_unchanged()
+    {
+        var reviewed = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", Blocking, change: Invoice);
+        reviewed.FailedJob.ShouldBe("report", reviewed.Log);
+
+        var merged = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, change: Invoice, mainMoved: MainMovedByClaude);
+
+        merged.CopilotArguments.ShouldBeNull(merged.Log);
+        merged.FailedJob.ShouldBe("report", merged.Log);
+        ((string)Statuses().Last()!["state"]!).ShouldBe("failure");
+    }
+
+    [Fact]
+    public void A_changed_diff_is_reviewed_again()
+    {
+        var reviewed = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, change: Invoice);
+        reviewed.ExitCode.ShouldBe(0, reviewed.Log);
+
+        var changed = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", Blocking, change: PaidInvoice);
+
+        changed.CopilotArguments.ShouldNotBeNull(changed.Log);
+        changed.FailedJob.ShouldBe("report", changed.Log);
+        Reviews().Count.ShouldBe(2);
+    }
+
+    /// <summary>
+    /// Anyone can post a review: only the workflow's own are verdicts. A passing review of this very diff, copied by
+    /// someone else after the workflow's last verdict (on another diff), does not spare the diff a review.
+    /// </summary>
+    [Fact]
+    public void A_verdict_copied_into_someone_else_s_review_is_not_kept()
+    {
+        Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, change: Invoice).ExitCode.ShouldBe(0);
+        Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", Blocking, change: PaidInvoice).FailedJob.ShouldBe("report");
+        var reviews = Reviews();
+        var copy = JsonNode.Parse(reviews[0]!.ToJsonString())!.AsObject();
+        copy["user"] = new JsonObject { ["login"] = "mallory" };
+        reviews.Add(copy);
+        File.WriteAllText(Path.Combine(state, "reviews.json"), reviews.ToJsonString());
+
+        var back = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", Blocking, change: Invoice);
+
+        back.CopilotArguments.ShouldNotBeNull(back.Log);
+        back.FailedJob.ShouldBe("report", back.Log);
+    }
+
+    private static readonly Dictionary<string, (string, string)> Invoice = new() { ["src/Invoice.cs"] = ("", "class Invoice;\n") };
+
+    private static readonly Dictionary<string, (string, string)> PaidInvoice = new() { ["src/Invoice.cs"] = ("", "class Invoice { void Pay() {} }\n") };
+
+    private static readonly (string MainCommit, string MergeMessage) MainMovedByClaude =
+        ("Merged on main\n\nAgent-Executor: claude-cloud/other", "Merge main\n\nAgent-Executor: claude-cloud/lane-backend");
+
     private string RetryWorkflowPath => Path.Combine(board.Project.ProjectDirectory, ".github", "workflows", "cross-model-review-retry.yml");
 
     private static JsonObject Status(string sha, string state, string context, string description, int run) => new()

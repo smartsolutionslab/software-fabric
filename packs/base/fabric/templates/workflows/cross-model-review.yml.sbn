@@ -17,6 +17,10 @@
 # not a finding (#474): it postpones the review, so no job turns red and nothing is posted, but the verdict stays
 # pending, and a postponed review is never a pass. Branch protection requires that status, not the jobs.
 #
+# A push that leaves the pull request's own diff as it was (merging the base branch, say) keeps the last verdict: each
+# review records a fingerprint of the diff it read, and choose finds it there (#474). Any change to the diff is
+# reviewed afresh.
+#
 # The gate's own files (its scripts, the findings schema, the reviewer briefs) come from the base branch, checked out
 # into .gate: a pull request must not choose its own reviewer or post its own verdict. The pull request's copies are
 # used only while the base branch has none, which is the pull request that brings the protocol. This workflow file
@@ -56,12 +60,19 @@ env:
 jobs:
   choose:
     runs-on: ubuntu-latest
+    # Reads the pull request's reviews for a verdict to keep, and writes nothing.
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       reviewer: ${{ steps.choose.outputs.reviewer }}
       model: ${{ steps.choose.outputs.model }}
       fallback: ${{ steps.choose.outputs.fallback }}
       exempt: ${{ steps.exempt.outputs.exempt }}
       note: ${{ steps.exempt.outputs.note }}
+      fingerprint: ${{ steps.previous.outputs.fingerprint }}
+      kept: ${{ steps.previous.outputs.verdict }}
+      kept-from: ${{ steps.previous.outputs.from }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -71,8 +82,13 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           path: .gate
       - name: Use the gate's files from the base branch
+        # A script the base branch does not have yet comes from the pull request that brings it, as the whole gate did
+        # while the base branch had none.
         run: |
           if [ -f .gate/.github/scripts/board/reviewer.sh ]; then gate=.gate; else gate=.; fi
+          for script in .github/scripts/board/*.sh; do
+            if [ -e "$script" ] && [ ! -e "$gate/$script" ]; then cp "$script" "$gate/$script"; fi
+          done
           echo "GATE=$gate/.github" >> "$GITHUB_ENV"
           echo "BRIEFS=$gate" >> "$GITHUB_ENV"
       - id: exempt
@@ -110,6 +126,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BASE: origin/${{ github.base_ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
+      - id: previous
+        name: A diff already reviewed keeps its verdict
+        # The pull request's own diff, against the base branch as it is now, like the review's.
+        run: |
+          if [ "$EXEMPT" = true ]; then
+            exit 0
+          fi
+          fingerprint="$(git diff --no-color --no-ext-diff "$BASE...$HEAD" | sha256sum | cut -d ' ' -f 1)"
+          previous="$(bash "$GATE/scripts/board/previous-verdict.sh" "$PR" "$fingerprint" "$REVIEWER")"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+          if [ -n "$previous" ]; then
+            echo "::notice title=cross-model review::The diff is unchanged since ${previous#* } was reviewed: its verdict stands."
+            echo "verdict=${previous%% *}" >> "$GITHUB_OUTPUT"
+            echo "from=${previous#* }" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXEMPT: ${{ steps.exempt.outputs.exempt }}
+          REVIEWER: ${{ steps.choose.outputs.reviewer }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: origin/${{ github.base_ref }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
 
   review:
     needs: choose
@@ -123,6 +161,7 @@ jobs:
       model: ${{ steps.review.outputs.model }}
     env:
       EXEMPT: ${{ needs.choose.outputs.exempt }}
+      KEPT: ${{ needs.choose.outputs.kept }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -140,6 +179,10 @@ jobs:
         run: |
           if [ "$EXEMPT" = true ]; then
             echo "Dependency update by Dependabot: not reviewed by a model."
+            exit 0
+          fi
+          if [ -n "$KEPT" ]; then
+            echo "The diff is unchanged since its last review: not reviewed again."
             exit 0
           fi
           npm install -g "@github/copilot@$REVIEWER_CLI_VERSION"
@@ -165,6 +208,10 @@ jobs:
         run: |
           if [ "$EXEMPT" = true ]; then
             echo "Dependency update by Dependabot: not reviewed by a model." | tee "$RUNNER_TEMP/answer"
+            exit 0
+          fi
+          if [ -n "$KEPT" ]; then
+            echo "The diff is unchanged since its last review: not reviewed again." | tee "$RUNNER_TEMP/answer"
             exit 0
           fi
           schema="$(jq -c . "$GATE/review-findings.schema.json")"
@@ -214,6 +261,8 @@ jobs:
       EXEMPT: ${{ needs.choose.outputs.exempt }}
       NOTE: ${{ needs.choose.outputs.note }}
       POSTPONED: ${{ needs.review.outputs.postponed }}
+      KEPT: ${{ needs.choose.outputs.kept }}
+      KEPT_FROM: ${{ needs.choose.outputs.kept-from }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -241,6 +290,7 @@ jobs:
           MODEL: ${{ needs.choose.outputs.model }}
           FALLBACK: ${{ needs.choose.outputs.fallback }}
           REVIEWED_WITH: ${{ needs.review.outputs.model }}
+          FINGERPRINT: ${{ needs.choose.outputs.fingerprint }}
           HEAD: ${{ github.event.pull_request.head.sha }}
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         # An exempt pull request posts nothing: Dependabot's token cannot write to it.
@@ -254,15 +304,24 @@ jobs:
           verdict() {
             bash "$GATE/scripts/board/review-status.sh" "$HEAD" "$1" "$2" "$RUN"
           }
+          if [ "$KEPT" = pass ]; then
+            verdict success "Kept from $KEPT_FROM: the pull request's diff is unchanged, and nothing blocked."
+            exit 0
+          elif [ -n "$KEPT" ]; then
+            echo "The review of $KEPT_FROM found blocking findings, and the pull request's diff is unchanged since." >&2
+            verdict failure "Kept from $KEPT_FROM: the pull request's diff is unchanged, and its findings block."
+            exit 1
+          fi
           if [ -n "$FALLBACK" ] && [ "$REVIEWED_WITH" = "$FALLBACK" ]; then
             MODEL="$FALLBACK"
           fi
           if [ "$POSTPONED" = true ]; then
-            echo "::warning title=cross-model review::Postponed: Copilot's usage limit was reached. The verdict stays pending."
-            verdict pending "Postponed: Copilot's usage limit was reached. The review is re-run hourly until it reaches a verdict."
+            echo "::warning title=cross-model review::Postponed: Copilot's usage limit was reached; the verdict stays pending."
+            verdict pending "Postponed: Copilot's usage limit was reached. Re-run hourly until it has a verdict."
             exit 0
           fi
-          if bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/review/answer" "$REVIEWER ($MODEL)"; then
+          if bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/review/answer" "$REVIEWER ($MODEL)" "$FINGERPRINT" \
+            "$REVIEWER" "$HEAD"; then
             verdict success "Reviewed by $REVIEWER ($MODEL): nothing blocking."
           else
             verdict failure "Reviewed by $REVIEWER ($MODEL): blocking findings, or no answer in the findings' shape."
