@@ -582,6 +582,48 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Comments(7).ShouldContain("Released: Claimed by mistake.");
     }
 
+    /// <summary>Another agent parks #7's branch at the head release.sh is about to read back, as a lapse or another release does.</summary>
+    private string Park7 =>
+        $"bash -c 'source {Path.Combine(ProjectDirectory, ".github/scripts/board/lib.sh")}; board_park 7 \"The claim lapsed.\" && board_unclaim 7 && board_status 7 Todo && board_executor 7 \"\"'";
+
+    [Fact]
+    public void A_release_whose_branch_is_parked_and_claimed_by_others_once_it_has_read_it_leaves_the_new_claim_its_label_and_fields()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10), "claude-cloud/one");
+        var concurrent = RightAfterTheGhCallWhere("true", $"{Park7} && {Claim7("claude-cloud/two")}");
+
+        var (exitCode, output) = Run("release.sh", "7", "Claimed by mistake.");
+
+        exitCode.ShouldBe(1, output);
+        var claim = File.ReadAllText(concurrent);
+        claim.ShouldStartWith("7 agent/7", Case.Sensitive, claim);
+        Head("agent/7").ShouldBe("chore(board): claim #7");
+        Executor("agent/7").ShouldBe("claude-cloud/two");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Claimed");
+        Field(7, "EXECUTOR").ShouldBe("claude-cloud/two");
+        output.ShouldContain("moved", Case.Sensitive, output);
+    }
+
+    [Fact]
+    public void A_release_whose_branch_another_agent_parks_once_it_has_read_it_leaves_the_issue_in_todo()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10), "claude-cloud/one");
+        var concurrent = RightAfterTheGhCallWhere("true", Park7);
+
+        var (exitCode, output) = Run("release.sh", "7", "Claimed by mistake.");
+
+        exitCode.ShouldBe(1, output);
+        File.ReadAllText(concurrent).ShouldBe("exit=0\n", File.ReadAllText(concurrent));
+        Head("agent/7").ShouldBe("chore(board): release #7");
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Todo");
+        Field(7, "EXECUTOR").ShouldBe("");
+        output.ShouldContain("moved", Case.Sensitive, output);
+    }
+
     [Fact]
     public void A_release_the_remote_refuses_leaves_the_issue_claimed()
     {
