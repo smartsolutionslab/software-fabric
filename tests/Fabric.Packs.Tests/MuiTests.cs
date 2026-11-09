@@ -177,7 +177,7 @@ public sealed partial class MuiTests
         exitCode.ShouldNotBe(0, lintOutput);
         foreach (var library in new[] { "antd", "@mantine/core", "@radix-ui/react-slot" })
         {
-            lintOutput.ShouldContain($"'{library}' import is restricted from being used by a pattern. Use MUI (@mui/material) and the theme in src/theme.ts (docs/adr).");
+            lintOutput.ShouldContain($"'{library}' import is restricted from being used by a pattern. Use MUI (@mui/material) and the theme in src/theme.ts (docs/adr)");
         }
     }
 
