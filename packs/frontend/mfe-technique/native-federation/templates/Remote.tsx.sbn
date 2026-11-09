@@ -1,0 +1,70 @@
+import { Component, useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { loadPage } from './federation';
+
+const pages = new Map<string, Promise<ComponentType>>();
+
+/**
+ * Loads a module's page from its remote once; every later mount gets the same component. A load that failed is
+ * forgotten, so the next mount tries again once the remote is back (federation.ts).
+ */
+function pageOf(module: string): Promise<ComponentType> {
+  const known = pages.get(module);
+  if (known) {
+    return known;
+  }
+
+  const page = loadPage(module);
+  pages.set(module, page);
+  page.catch(() => pages.delete(module));
+  return page;
+}
+
+/** Keeps the shell running when a remote's page fails to render: only that module's page says so. */
+class Unavailable extends Component<{ module: string; children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  override render() {
+    return this.state.failed ? <Failed module={this.props.module} /> : this.props.children;
+  }
+}
+
+function Failed({ module }: { module: string }) {
+  return <p role="alert">{module} could not be loaded.</p>;
+}
+
+type Loaded = { module: string; page: ComponentType } | { module: string; failed: true };
+
+/** A module's page, loaded at run time from the module's own remote, web/modules/<module> (docs/adr). */
+export function Remote({ module }: { module: string }) {
+  const [loaded, setLoaded] = useState<Loaded>();
+
+  useEffect(() => {
+    let mounted = true;
+    pageOf(module).then(
+      (page) => mounted && setLoaded({ module, page }),
+      () => mounted && setLoaded({ module, failed: true }),
+    );
+    return () => {
+      mounted = false;
+    };
+  }, [module]);
+
+  if (loaded?.module !== module) {
+    return <p>Loading {module}…</p>;
+  }
+
+  if ('failed' in loaded) {
+    return <Failed module={module} />;
+  }
+
+  const Page = loaded.page;
+  return (
+    <Unavailable module={module}>
+      <Page />
+    </Unavailable>
+  );
+}

@@ -1,6 +1,6 @@
 {%{#!/usr/bin/env bash
 # Every commit on an agent's branch says who made it (board protocol, docs/adr).
-# Usage: check-trailers.sh <branch> <base sha> <head sha>
+# Usage: check-trailers.sh <branch> <base revision> <head revision>
 set -euo pipefail
 
 branch="$1"

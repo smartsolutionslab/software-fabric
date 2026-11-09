@@ -111,9 +111,9 @@ public sealed partial class RadixHeadlessDashboardsTests
     [Fact]
     public void Another_react_ui_library_still_fails_the_agent_panel_saying_it_is_not_built_for_it()
     {
-        var files = Files(["frontend.ui-library=mui", "frontend.styling=css-modules", .. AgentsAndDashboards]);
+        var files = Files(["frontend.ui-library=mantine", "frontend.styling=css-modules", .. AgentsAndDashboards]);
 
-        files["web/app/src/agents/AgentPanel.tsx"].ShouldStartWith("throw new Error('The ag-ui pack builds the agent panel from shadcn/ui or radix-headless with React Hook Form or TanStack Form and zod or valibot only so far; frontend.ui-library is mui");
+        files["web/app/src/agents/AgentPanel.tsx"].ShouldStartWith("throw new Error('The ag-ui pack builds the agent panel from shadcn/ui, MUI or radix-headless with React Hook Form or TanStack Form and zod or valibot only so far; frontend.ui-library is mantine");
     }
 
     [Fact]

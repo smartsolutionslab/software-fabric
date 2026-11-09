@@ -1,0 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+
+namespace {{ namespace }}.BuildingBlocks.Persistence;
+
+/// <summary>
+/// One model per module context and schema. EF Core caches a model per context type, so without this every schema
+/// would get the model, and with it the tables, of the first one built.
+/// </summary>
+public sealed class SchemaModelCacheKeyFactory(ModelCacheKeyFactoryDependencies dependencies) : ModelCacheKeyFactory(dependencies)
+{
+    public override object Create(DbContext context, bool designTime) =>
+        context is ModuleDbContext module ? (context.GetType(), module.CurrentSchema, designTime) : base.Create(context, designTime);
+}

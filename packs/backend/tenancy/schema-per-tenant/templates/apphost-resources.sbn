@@ -1,0 +1,4 @@
+// Tenancy, a schema per tenant: the MigrationRunner creates and migrates every module's schema for each of these
+// tenants, and the host serves them alone. The identity provider's local users belong to them.
+string[] tenants = ["tenant-a", "tenant-b"];
+migrations.WithTenants(tenants);

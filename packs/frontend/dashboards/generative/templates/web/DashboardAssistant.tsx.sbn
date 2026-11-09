@@ -21,8 +21,12 @@ end ~}}
 end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
+{{~ mui = project["frontend.ui-library"] == "mui" ~}}
 {{~ if tanstack ~}}
 import { contentToText, type Message } from '@ag-ui/client';
+{{~ if mui ~}}
+import { Box, Button, Paper, Stack, Typography } from '@mui/material';
+{{~ end ~}}
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { useEffect, useId, useMemo, useRef } from 'react';
 {{~ if valibot ~}}
@@ -32,22 +36,30 @@ import { z } from 'zod';
 {{~ end ~}}
 {{~ else if valibot ~}}
 import { contentToText, type Message } from '@ag-ui/client';
+{{~ if mui ~}}
+import { Box, Button, Paper, Stack, Typography } from '@mui/material';
+{{~ end ~}}
 import { valibotResolver } from '@hookform/resolvers/valibot';
 import { useEffect, useId, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import * as v from 'valibot';
 {{~ else ~}}
 import { contentToText, type Message } from '@ag-ui/client';
+{{~ if mui ~}}
+import { Box, Button, Paper, Stack, Typography } from '@mui/material';
+{{~ end ~}}
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useId, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 {{~ end ~}}
 import { useAgent } from '@/agents/useAgent';
+{{~ if !mui ~}}
 import { Button } from '@/components/ui/button';
+{{~ end ~}}
 import type { Placement } from './layout';
 import { draftState, type PendingProposal, proposalsOf, toolOutcome, toolResults } from './proposal';
-{{~ if css_modules ~}}
+{{~ if css_modules && !mui ~}}
 import styles from './DashboardAssistant.module.css';
 {{~ end ~}}
 
@@ -121,6 +133,155 @@ export function DashboardAssistant({ widgets, onProposal }: DashboardAssistantPr
   });
 {{~ end ~}}
 
+{{~ if mui ~}}
+{%{  return (
+    <Paper component="section" variant="outlined" aria-label="Dashboard assistant" sx={{ p: 1 }}>
+      <Stack spacing={1}>
+        <Typography component="h2" variant="subtitle2">
+          Assistant
+        </Typography>
+        <Stack component="ol" aria-label="Conversation" spacing={1} sx={{ listStyle: 'none', m: 0, p: 0 }}>
+          {messages.flatMap((message) => entries(message, results))}
+        </Stack>
+        <Typography aria-live="polite" variant="body2" color="text.secondary">
+          {running ? 'Answering…' : ''}
+        </Typography>
+        {failure && (
+          <Typography role="alert" variant="body2" color="error">
+            The assistant could not answer: {failure}
+          </Typography>
+        )}
+}%}{{~ if tanstack ~}}
+{%{        <Stack
+          component="form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void form.handleSubmit();
+          }}
+          noValidate
+          spacing={1}
+        >
+          <Typography component="label" htmlFor={field} variant="subtitle2">
+            Ask the assistant
+          </Typography>
+          <form.Field name="question">
+            {({ name, state: { value, meta }, handleBlur, handleChange }) => (
+              <>
+                <Box
+                  component="textarea"
+                  id={field}
+                  name={name}
+                  rows={2}
+                  value={value}
+                  onBlur={handleBlur}
+                  onChange={(event) => handleChange(event.target.value)}
+                  aria-invalid={meta.errors.length > 0 ? true : undefined}
+                  aria-describedby={meta.errors.length > 0 ? `${field}-error` : undefined}
+                  sx={nativeControl}
+                />
+                {meta.errors.length > 0 && (
+                  <Typography id={`${field}-error`} role="alert" variant="body2" color="error">
+                    {meta.errors[0]?.message}
+                  </Typography>
+                )}
+              </>
+            )}
+          </form.Field>
+}%}{{~ else ~}}
+{%{        <Stack component="form" onSubmit={onSubmit} noValidate spacing={1}>
+          <Typography component="label" htmlFor={field} variant="subtitle2">
+            Ask the assistant
+          </Typography>
+          <Box
+            component="textarea"
+            id={field}
+            rows={2}
+            aria-invalid={errors.question ? true : undefined}
+            aria-describedby={errors.question ? `${field}-error` : undefined}
+            sx={nativeControl}
+            {...register('question')}
+          />
+          {errors.question && (
+            <Typography id={`${field}-error`} role="alert" variant="body2" color="error">
+              {errors.question.message}
+            </Typography>
+          )}
+}%}{{~ end ~}}
+{%{          <Button type="submit" variant="outlined" disabled={running} sx={{ alignSelf: 'flex-end' }}>
+            Ask
+          </Button>
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+}
+
+/** What the conversation shows of one message, as text: the user's, the agent's, and what each of its tools did. */
+function entries(message: Message, results: ReadonlyMap<string, string>) {
+  if (message.role === 'user') {
+    return [
+      <Box
+        component="li"
+        key={message.id}
+        sx={{
+          alignSelf: 'flex-end',
+          borderRadius: 1,
+          bgcolor: 'primary.main',
+          color: 'primary.contrastText',
+          px: 1.5,
+          py: 1,
+        }}
+      >
+        <Typography variant="caption">You</Typography>
+        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+          {contentToText(message.content)}
+        </Typography>
+      </Box>,
+    ];
+  }
+
+  if (message.role !== 'assistant') {
+    return [];
+  }
+
+  const text = contentToText(message.content);
+  return [
+    ...(text
+      ? [
+          <Box component="li" key={message.id} sx={{ borderRadius: 1, bgcolor: 'action.hover', px: 1.5, py: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Assistant
+            </Typography>
+            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+              {text}
+            </Typography>
+          </Box>,
+        ]
+      : []),
+    ...(message.toolCalls ?? []).map((call) => (
+      <Box
+        component="li"
+        key={call.id}
+        sx={{ border: 1, borderColor: 'divider', borderRadius: 1, px: 1.5, py: 1, typography: 'body2' }}
+      >
+        {toolOutcome(call.function.name, results.get(call.id))}
+      </Box>
+    )),
+  ];
+}
+
+/** The look of the form's native textarea, from the theme; it stays native so the form library registers it as it is. */
+const nativeControl = {
+  width: '100%',
+  px: 1.5,
+  py: 1,
+  border: 1,
+  borderColor: 'divider',
+  borderRadius: 1,
+  font: 'inherit',
+  '&[aria-invalid="true"]': { borderColor: 'error.main' },
+} as const;
+}%}{{~ else ~}}
   return (
     <section aria-label="Dashboard assistant" {{ class_of "flex flex-col gap-2 rounded border p-2" "assistant" }}>
       <h2 {{ class_of "text-sm font-medium" "heading" }}>Assistant</h2>
@@ -228,3 +389,4 @@ function entries(message: Message, results: ReadonlyMap<string, string>) {
     )),
   ];
 }
+{{~ end ~}}

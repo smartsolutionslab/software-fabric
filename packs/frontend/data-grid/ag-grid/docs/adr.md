@@ -23,6 +23,8 @@ The enterprise edition (`ag-grid-enterprise`) needs a commercial licence; adopti
 
 {{~ if project["frontend.ui-library"] == "shadcn" || project["frontend.ui-library"] == "shadcn-vue" }}
 The grid uses AG Grid's Quartz theme bound to the theme variables in `src/index.css` (`--background`, `--foreground`, `--border`, `--muted`, `--primary`, and the inherited font), set as `theme` in `data-table-columns.ts`. It follows the app's colours and dark mode, and changes with them in one place.
+{{~ else if project["frontend.ui-library"] == "mui" && project["frontend.styling"] == "library-theme" }}
+The grid uses AG Grid's Quartz theme bound to the MUI theme in `src/theme.ts` (its paper background, primary text, divider, hover shade as the header's background, primary colour as the accent, and its font), set as `theme` in `data-table-columns.ts`. It takes the app's colours from the same place as every MUI component, and changes with them there.
 {{~ else }}
 The grid uses AG Grid's Quartz theme as shipped (`theme` in `data-table-columns.ts`): its own colours, font and accent. This is the exception to changing colours in one place, because this UI library defines no theme variables for the grid to follow. When it does, bind Quartz to them with `themeQuartz.withParams` there.
 {{~ end ~}}

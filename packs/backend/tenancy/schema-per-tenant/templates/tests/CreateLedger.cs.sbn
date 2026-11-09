@@ -1,0 +1,40 @@
+{{~ # The store types dotnet ef writes for the chosen database. ~}}
+{{~ postgres = project["backend.database"] == "postgres" ~}}
+{{~ guid_type = postgres ? "uuid" : "uniqueidentifier" ~}}
+{{~ text_type = postgres ? "text" : "nvarchar(max)" ~}}
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+namespace {{ namespace }}.Tenancy.Tests;
+
+/// <summary>The ledger's table in the module's schema, which <c>dotnet ef</c> writes into every operation.</summary>
+[DbContext(typeof(LedgerDbContext))]
+[Migration(Id)]
+public sealed class CreateLedger : Migration
+{
+    public const string Id = "20261107000000_CreateLedger";
+
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        {{ not_null "migrationBuilder" }}
+
+        migrationBuilder.EnsureSchema(name: "tenancy_tests_ledger");
+
+        migrationBuilder.CreateTable(
+            name: "ledger_entries",
+            schema: "tenancy_tests_ledger",
+            columns: table => new
+            {
+                Id = table.Column<Guid>(type: "{{ guid_type }}", nullable: false),
+                Text = table.Column<string>(type: "{{ text_type }}", nullable: false),
+            },
+            constraints: table => table.PrimaryKey("PK_ledger_entries", entry => entry.Id));
+    }
+
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        {{ not_null "migrationBuilder" }}
+
+        migrationBuilder.DropTable(name: "ledger_entries", schema: "tenancy_tests_ledger");
+    }
+}

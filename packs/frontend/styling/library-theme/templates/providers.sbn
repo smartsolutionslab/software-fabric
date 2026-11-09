@@ -1,0 +1,1 @@
+{{ if project["frontend.ui-library"] == "mui" }}  (children) => <ThemeProvider theme={theme}>{children}</ThemeProvider>{{ end }}

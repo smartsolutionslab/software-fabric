@@ -17,6 +17,8 @@ files:
   - { template: templates/ui/Badge.stories.tsx.sbn, target: web/packages/ui/src/Badge.stories.tsx }
   - { template: templates/ui/Badge.test.tsx.sbn, target: web/packages/ui/src/Badge.test.tsx }
   - { template: templates/ui/test-setup.ts.sbn, target: web/packages/ui/src/test-setup.ts }
+declares-slots:
+  - { slot: web.ui-package-fields, description: "Fields of web/packages/ui/package.json after \"private\", each a \"key\": value pair indented two spaces.", separator: ",\n" }
 slots:
   - { slot: web.workspace-packages, template: templates/workspace-packages.sbn, order: 10 }
   - { slot: web.dependencies, template: templates/dependencies.sbn }

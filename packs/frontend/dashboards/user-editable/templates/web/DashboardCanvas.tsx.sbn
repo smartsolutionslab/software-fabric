@@ -13,6 +13,10 @@ end ~}}
 {{~ generative = array.contains project["frontend.dashboards"] "generative" ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
+{{~ mui = project["frontend.ui-library"] == "mui" ~}}
+{{~ if mui ~}}
+import { Box, Button, Stack, Typography } from '@mui/material';
+{{~ end ~}}
 {{~ if tanstack ~}}
 import { revalidateLogic, useForm, useStore } from '@tanstack/react-form';
 import { useMemo, useState } from 'react';
@@ -36,8 +40,10 @@ import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 {{~ end ~}}
 {%{import { useGetDashboardsWidgetsQuery, usePutDashboardsByIdMutation, type WidgetDescriptionDto } from '@/api/generated';
+}%}{{~ if !mui ~}}
 import { Button } from '@/components/ui/button';
-import { Failure } from './Failure';
+{{~ end ~}}
+{%{import { Failure } from './Failure';
 import { applyLayout, columns, hasRoom, lowest, nextPlacement, type Placement, toLayout, withinReach } from './layout';
 import { Pager } from './Pager';
 import { PlacedWidget } from './PlacedWidget';
@@ -48,7 +54,7 @@ import { acceptProposal, type PendingProposal, pendingOnGrid, replacedBy } from 
 {{~ end ~}}
 {%{import { uuidV7 } from './uuidV7';
 import { checkChoice, visuals } from './widgetChoice';
-}%}{{~ if css_modules ~}}
+}%}{{~ if css_modules && !mui ~}}
 import styles from './DashboardCanvas.module.css';
 {{~ end ~}}
 {%{
@@ -233,6 +239,336 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   });
 
 }%}{{~ end ~}}
+{{~ if mui ~}}
+{%{  return (
+    <Stack component="section" aria-label="Dashboard" spacing={2}>
+}%}{{~ if tanstack ~}}
+{%{      <Stack
+        component="form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void naming.handleSubmit();
+        }}
+        direction="row"
+        spacing={1}
+        useFlexGap
+        sx={{ flexWrap: 'wrap', alignItems: 'flex-end' }}
+      >
+        <Stack component="label" spacing={0.5} sx={{ typography: 'body2' }}>
+          Dashboard name
+          <naming.Field name="name" listeners={{ onChange: edited }}>
+            {({ name, state, handleBlur, handleChange }) => (
+              <Box
+                component="input"
+                sx={nativeControl}
+                name={name}
+                value={state.value}
+                onBlur={handleBlur}
+                onChange={(event) => handleChange(event.target.value)}
+              />
+            )}
+          </naming.Field>
+        </Stack>
+        <Button type="submit" variant="contained" disabled={saving}>
+          Save dashboard
+        </Button>
+        <naming.Subscribe selector={(state) => state.fieldMeta.name?.errors[0]?.message}>
+          {(message) =>
+            message && (
+              <Typography role="alert" variant="body2" color="error">
+                {message}
+              </Typography>
+            )
+          }
+        </naming.Subscribe>
+        {savedRevision === revision && (
+          <Typography role="status" variant="body2">
+            Saved.
+          </Typography>
+        )}
+        {failed && (
+          <Typography role="alert" variant="body2" color="error">
+            The dashboard could not be saved.
+          </Typography>
+        )}
+      </Stack>
+
+      <Stack
+        component="form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void adding.handleSubmit();
+        }}
+        direction="row"
+        spacing={1}
+        useFlexGap
+        sx={{ flexWrap: 'wrap', alignItems: 'flex-end' }}
+      >
+        <Stack component="label" spacing={0.5} sx={{ typography: 'body2' }}>
+          Widget
+          <adding.Field
+            name="source"
+            listeners={{
+              onChange: ({ value }) =>
+                adding.setFieldValue('visual', visuals[listed.get(value)?.kind ?? 'Chart'][0].value),
+            }}
+          >
+            {({ name, state, handleBlur, handleChange }) => (
+              <Box
+                component="select"
+                sx={nativeControl}
+                disabled={loading}
+                name={name}
+                value={state.value}
+                onBlur={handleBlur}
+                onChange={(event) => handleChange(event.target.value)}
+              >
+                <option value="">Choose a widget</option>
+                {catalog.map((widget) => (
+                  <option key={widget.id} value={widget.id}>
+                    {widget.title}
+                  </option>
+                ))}
+              </Box>
+            )}
+          </adding.Field>
+        </Stack>
+        <Stack component="label" spacing={0.5} sx={{ typography: 'body2' }}>
+          Shown as
+          <adding.Field name="visual">
+            {({ name, state, handleBlur, handleChange }) => (
+              <Box
+                component="select"
+                sx={nativeControl}
+                disabled={loading}
+                name={name}
+                value={state.value}
+                onBlur={handleBlur}
+                onChange={(event) => handleChange(event.target.value)}
+              >
+                {visuals[chosen?.kind ?? 'Chart'].map((visual) => (
+                  <option key={visual.value} value={visual.value}>
+                    {visual.label}
+                  </option>
+                ))}
+              </Box>
+            )}
+          </adding.Field>
+        </Stack>
+        <Button type="submit" variant="outlined" disabled={loading || full || !roomLeft}>
+          Add widget
+        </Button>
+        {full && <Typography variant="body2">A dashboard holds at most {maximumWidgets} widgets.</Typography>}
+        {!full && !roomLeft && (
+          <Typography variant="body2">
+            There is no room for another widget: a dashboard reaches down to row {lowest}.
+          </Typography>
+        )}
+        <adding.Subscribe selector={(state) => state.fieldMeta.source?.errors[0]?.message}>
+          {(message) =>
+            message && (
+              <Typography role="alert" variant="body2" color="error">
+                {message}
+              </Typography>
+            )
+          }
+        </adding.Subscribe>
+        <adding.Subscribe selector={(state) => state.fieldMeta.visual?.errors[0]?.message}>
+          {(message) =>
+            message && (
+              <Typography role="alert" variant="body2" color="error">
+                {message}
+              </Typography>
+            )
+          }
+        </adding.Subscribe>
+        <Pager
+          label="widgets"
+          page={catalogPage}
+          pageSize={catalogPageSize}
+          total={loading ? undefined : widgets.currentData?.totalCount}
+          onPage={pickerPage}
+        />
+      </Stack>
+}%}{{~ else ~}}
+{%{      <Stack
+        component="form"
+        onSubmit={submit}
+        direction="row"
+        spacing={1}
+        useFlexGap
+        sx={{ flexWrap: 'wrap', alignItems: 'flex-end' }}
+      >
+        <Stack component="label" spacing={0.5} sx={{ typography: 'body2' }}>
+          Dashboard name
+          <Box component="input" sx={nativeControl} {...naming.register('name', { onChange: edited })} />
+        </Stack>
+        <Button type="submit" variant="contained" disabled={saving}>
+          Save dashboard
+        </Button>
+        {naming.formState.errors.name && (
+          <Typography role="alert" variant="body2" color="error">
+            {naming.formState.errors.name.message}
+          </Typography>
+        )}
+        {savedRevision === revision && (
+          <Typography role="status" variant="body2">
+            Saved.
+          </Typography>
+        )}
+        {failed && (
+          <Typography role="alert" variant="body2" color="error">
+            The dashboard could not be saved.
+          </Typography>
+        )}
+      </Stack>
+
+      <Stack
+        component="form"
+        onSubmit={add}
+        direction="row"
+        spacing={1}
+        useFlexGap
+        sx={{ flexWrap: 'wrap', alignItems: 'flex-end' }}
+      >
+        <Stack component="label" spacing={0.5} sx={{ typography: 'body2' }}>
+          Widget
+          <Box
+            component="select"
+            sx={nativeControl}
+            disabled={loading}
+            {...adding.register('source', {
+              onChange: (event: { target: { value: string } }) =>
+                adding.setValue('visual', visuals[listed.get(event.target.value)?.kind ?? 'Chart'][0].value),
+            })}
+          >
+            <option value="">Choose a widget</option>
+            {catalog.map((widget) => (
+              <option key={widget.id} value={widget.id}>
+                {widget.title}
+              </option>
+            ))}
+          </Box>
+        </Stack>
+        <Stack component="label" spacing={0.5} sx={{ typography: 'body2' }}>
+          Shown as
+          <Box component="select" sx={nativeControl} disabled={loading} {...adding.register('visual')}>
+            {visuals[chosen?.kind ?? 'Chart'].map((visual) => (
+              <option key={visual.value} value={visual.value}>
+                {visual.label}
+              </option>
+            ))}
+          </Box>
+        </Stack>
+        <Button type="submit" variant="outlined" disabled={loading || full || !roomLeft}>
+          Add widget
+        </Button>
+        {full && <Typography variant="body2">A dashboard holds at most {maximumWidgets} widgets.</Typography>}
+        {!full && !roomLeft && (
+          <Typography variant="body2">
+            There is no room for another widget: a dashboard reaches down to row {lowest}.
+          </Typography>
+        )}
+        {adding.formState.errors.source && (
+          <Typography role="alert" variant="body2" color="error">
+            {adding.formState.errors.source.message}
+          </Typography>
+        )}
+        {adding.formState.errors.visual && (
+          <Typography role="alert" variant="body2" color="error">
+            {adding.formState.errors.visual.message}
+          </Typography>
+        )}
+        <Pager
+          label="widgets"
+          page={catalogPage}
+          pageSize={catalogPageSize}
+          total={loading ? undefined : widgets.currentData?.totalCount}
+          onPage={pickerPage}
+        />
+      </Stack>
+}%}{{~ end ~}}
+{%{      {widgets.isError && (
+        <Failure
+          message="The widgets could not be loaded."
+          retry="Try loading the widgets again"
+          onRetry={widgets.refetch}
+        />
+      )}
+
+      {tooLow && (
+        <Typography role="alert" variant="body2" color="error">
+          A widget cannot start below row {lowest}; it went back where it was.
+        </Typography>
+      )}
+      <div ref={containerRef}>
+        <ReactGridLayout
+          width={width}
+}%}{{~ if generative ~}}
+          layout={[...toLayout(placements), ...proposed.map(({ item }) => item)]}
+{{~ else ~}}
+          layout={toLayout(placements)}
+{{~ end ~}}
+{%{          gridConfig={{ cols: columns, rowHeight }}
+          dragConfig={{ cancel: 'button, select, input, table' }}
+          onLayoutChange={(layout) => {
+            const moved = applyLayout(placements, layout);
+            if (samePlaces(moved, placements)) {
+              return;
+            }
+
+            // A widget moved or grown below the lowest row snaps back: the grid is drawn from the placements.
+            if (!withinReach(moved)) {
+              setTooLow(true);
+              setPlacements((current) => [...current]);
+              return;
+            }
+
+            setTooLow(false);
+            change(() => moved);
+          }}
+        >
+          {placements.map((placement) => (
+            <div key={placement.key}>
+              <PlacedWidget
+                placement={placement}
+                rowHeight={rowHeight}
+                refresh={saves}
+                onRemove={() => change((current) => current.filter((other) => other.key !== placement.key))}
+              />
+            </div>
+          ))}
+}%}{{~ if generative ~}}
+          {proposed.map(({ proposed: proposal, item }) => {
+            const replacing = replacedBy(placements, proposal.proposal) !== undefined;
+            return (
+              <div key={item.i}>
+                <PendingWidget
+                  proposal={proposal.proposal}
+                  rows={item.h}
+                  rowHeight={rowHeight}
+                  replacing={replacing}
+                  canAccept={replacing || (!full && roomLeft)}
+                  refresh={saves}
+                  onAccept={() => accept(proposal)}
+                  onDiscard={() => decide(proposal.call)}
+                />
+              </div>
+            );
+          })}
+{{~ end ~}}
+{%{        </ReactGridLayout>
+      </div>
+}%}{{~ if generative ~}}
+      <DashboardAssistant widgets={placements} onProposal={propose} />
+{{~ end ~}}
+{%{    </Stack>
+  );
+}
+
+/** The look of the forms' native controls, from the theme: they stay native so the form library registers them as they are. */
+const nativeControl = { px: 1, py: 0.5, border: 1, borderColor: 'divider', borderRadius: 1, font: 'inherit' } as const;
+}%}{{~ else ~}}
 {%{  return (
     <section aria-label="Dashboard" }%}{{ class_of "flex flex-col gap-4" "canvas" }}{%{>
 }%}{{~ if tanstack ~}}
@@ -474,7 +810,8 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
 {%{    </section>
   );
 }
-
+}%}{{~ end ~}}
+{%{
 /** Whether the grid only re-reported the places the widgets already have, as it does after every render. */
 function samePlaces(left: readonly Placement[], right: readonly Placement[]) {
   return (

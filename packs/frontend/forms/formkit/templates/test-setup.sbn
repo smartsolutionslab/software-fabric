@@ -1,0 +1,6 @@
+import { plugin as formkit } from '@formkit/vue';
+import { config } from '@vue/test-utils';
+import formkitConfig from '@/forms/formkit.config';
+
+// A component test renders <FormKit> as the app does: with FormKit's plugin and the project's config.
+config.global.plugins.push([formkit, formkitConfig]);

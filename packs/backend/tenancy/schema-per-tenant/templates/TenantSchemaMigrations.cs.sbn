@@ -1,0 +1,99 @@
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Extensions.Configuration;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class TenantSchemaMigrations
+{
+    /// <summary>
+    /// Fails before the MigrationRunner migrates any module, in any schema, when one module could not be migrated into
+    /// every listed tenant's schema: a tenant's name, a schema two module and tenant pairs would share, a model that cannot
+    /// move or holds changes no migration does, a migration that cannot move. The MigrationRunner calls it first.
+    /// </summary>
+    public static void RefuseWhatCannotMigrate(this IServiceProvider services, IEnumerable<Type> contexts)
+    {
+        {{ not_null "services" }}
+        {{ not_null "contexts" }}
+
+        List<Type> modules = [.. contexts];
+        RefuseSharedSchemas(modules, TenantSchemas.Listed(services.GetRequiredService<IConfiguration>()));
+        foreach (var context in modules)
+        {
+            using var scope = services.CreateScope();
+
+            // In the module's own schema: building its model refuses what cannot move, and the model is checked against
+            // the snapshot there.
+            var module = (DbContext)scope.ServiceProvider.GetRequiredService(context);
+            if (module.Database.HasPendingModelChanges())
+            {
+                throw new InvalidOperationException(
+                    $"The model of {context.Name} has changes no migration holds (EF Core's PendingModelChangesWarning); add a migration, so that no module migrates before it has one.");
+            }
+
+            var migrations = module.GetService<IMigrationsAssembly>();
+            foreach (var migration in migrations.Migrations.Values)
+            {
+                migrations.CreateMigration(migration, module.Database.ProviderName!);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Creates and migrates every module's schema for each tenant in Tenancy:Tenants, each with its own migrations history,
+    /// once every schema name is known to have one owner. The MigrationRunner calls it after
+    /// <see cref="RefuseWhatCannotMigrate"/> and after migrating every module in the module's own schema; the host never does.
+    /// </summary>
+    public static async Task MigrateTenantSchemasAsync(this IServiceProvider services, IEnumerable<Type> contexts, CancellationToken cancellationToken = default)
+    {
+        {{ not_null "services" }}
+        {{ not_null "contexts" }}
+
+        var tenants = TenantSchemas.Listed(services.GetRequiredService<IConfiguration>());
+        List<Type> modules = [.. contexts];
+        RefuseSharedSchemas(modules, tenants);
+
+        foreach (var tenant in tenants)
+        {
+            using var tenantScope = TenantScope.Begin(tenant);
+            foreach (var context in modules)
+            {
+                await using var scope = services.CreateAsyncScope();
+                await ((DbContext)scope.ServiceProvider.GetRequiredService(context)).Database.MigrateAsync(cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Module names and tenant names both turn hyphens into underscores, so module billing with tenant a-b and module
+    /// billing-a with tenant b would share billing_a_b, and module billing with tenant a would land in billing-a's own
+    /// schema. Either fails here, before any tenant's schema is migrated.
+    /// </summary>
+    private static void RefuseSharedSchemas(List<Type> modules, IReadOnlyList<string> tenants)
+    {
+        Dictionary<string, string> owners = new(StringComparer.Ordinal);
+        foreach (var module in modules)
+        {
+            var schema = ModuleSchema(module);
+            Claim(owners, schema, $"module {module.Name}");
+            foreach (var tenant in tenants)
+            {
+                Claim(owners, TenantSchemas.For(schema, tenant), $"module {module.Name} for tenant {tenant}");
+            }
+        }
+    }
+
+    private static void Claim(Dictionary<string, string> owners, string schema, string owner)
+    {
+        if (!owners.TryAdd(schema, owner))
+        {
+            throw new InvalidOperationException($"The schema '{schema}' would hold both {owners[schema]} and {owner}; rename a tenant in {TenantSchemas.Tenants} so that each schema has one owner.");
+        }
+    }
+
+    private static string ModuleSchema(Type context) =>
+        context.GetField("Schema")?.GetValue(null) as string
+            ?? throw new InvalidOperationException($"{context.Name} declares no Schema constant.");
+}

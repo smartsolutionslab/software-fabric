@@ -1,0 +1,19 @@
+{{~ if project["frontend.ui-library"] != "mui" ~}}
+throw new Error('The library-theme pack builds the theme for MUI only so far; frontend.ui-library is {{ project["frontend.ui-library"] }} (docs/adr/0006 of the generator).');
+{{~ else ~}}
+import { createTheme } from '@mui/material/styles';
+
+/**
+ * The app's look in one place: the colours, shape and type every MUI component takes (docs/adr). Change them here,
+ * never per component; a screen names them through the theme (`color="text.secondary"`, `bgcolor: 'primary.main'` in `sx`).
+ */
+export const theme = createTheme({
+  palette: {
+    mode: 'light',
+    primary: { main: '#2563eb' },
+    secondary: { main: '#7c3aed' },
+    error: { main: '#dc2626' },
+  },
+  shape: { borderRadius: 4 },
+});
+{{~ end ~}}

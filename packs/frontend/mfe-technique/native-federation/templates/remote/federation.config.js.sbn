@@ -1,0 +1,15 @@
+import { share, withNativeFederation } from '@softarc/native-federation/config';
+
+// The {{ module.name }} module's remote: `pnpm build` (native-federation-vite) writes dist/remoteEntry.json and the
+// bundles the shell loads at run time (docs/adr).
+export default withNativeFederation({
+  name: '{{ module.name }}',
+  exposes: { './Page': './src/{{ module.namespace }}Page.tsx' },
+  // One instance of each, the shell's (web/app/federation.ts shares the same). 'auto' takes each version from
+  // package.json, where it is pinned exactly.
+  shared: share({
+    react: { singleton: true, strictVersion: true, requiredVersion: 'auto' },
+    'react-dom': { singleton: true, strictVersion: true, requiredVersion: 'auto' },
+    '@{{ name }}/ui': { singleton: true, strictVersion: true, requiredVersion: 'auto' },
+  }),
+});

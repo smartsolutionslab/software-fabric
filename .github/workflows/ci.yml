@@ -88,6 +88,20 @@ jobs:
           build/tests-all-ran.sh "$RUNNER_TEMP/test-results" "${assemblies[@]}"
       - run: build/profiles.sh
 
+  # The pairwise matrix's per-pull-request layer (ADR-0003 amendment, roadmap M3-03): every combination of
+  # build/matrix.json generated, one after another in this one job; a combination that fails to generate fails it,
+  # named with its first error. Building and testing the combinations is the nightly run's. Not a required check until
+  # the catalog rules and Vue branches (M3-05, M3-06) are merged.
+  matrix-generation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+      - run: dotnet build src/Fabric.Cli/Fabric.Cli.csproj -c Release
+      - run: build/matrix-generate.sh
+
   # Profile CI (ADR-0003, roadmap M1-09, M2-06): every profile in the catalog, listed by build/complete-profiles.sh so
   # a new profile is picked up without editing this file; a profile whose packs are not all written fails this job,
   # naming the packs it lacks. On a pull request it also lists the profiles the change affects (M3-09): a pull

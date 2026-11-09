@@ -15,12 +15,16 @@ end ~}}
   end
   ret 'className="' + shadcn + '"'
 end ~}}
-{{~ if (project["frontend.ui-library"] != "shadcn" && project["frontend.ui-library"] != "radix-headless") || (project["frontend.forms"] != "react-hook-form" && project["frontend.forms"] != "tanstack-form") || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
-throw new Error('The ag-ui pack builds the agent panel from shadcn/ui or radix-headless with React Hook Form or TanStack Form and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+{{~ if (project["frontend.ui-library"] != "shadcn" && project["frontend.ui-library"] != "mui" && project["frontend.ui-library"] != "radix-headless") || (project["frontend.forms"] != "react-hook-form" && project["frontend.forms"] != "tanstack-form") || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+throw new Error('The ag-ui pack builds the agent panel from shadcn/ui, MUI or radix-headless with React Hook Form or TanStack Form and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 {{~ end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
+{{~ mui = project["frontend.ui-library"] == "mui" ~}}
 import { contentToText, type Message } from '@ag-ui/client';
+{{~ if mui ~}}
+import { Box, Button, Stack, Typography } from '@mui/material';
+{{~ end ~}}
 {{~ if tanstack ~}}
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { useId } from 'react';
@@ -40,9 +44,11 @@ import { useId } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 {{~ end ~}}
+{{~ if !mui ~}}
 import { Button } from '@/components/ui/button';
+{{~ end ~}}
 import { useAgent } from './useAgent';
-{{~ if css_modules ~}}
+{{~ if css_modules && !mui ~}}
 import styles from './AgentPanel.module.css';
 {{~ end ~}}
 
@@ -104,6 +110,166 @@ function Conversation({ agent }: { agent: string }) {
     ),
   );
 
+{{~ if mui ~}}
+{%{  return (
+    <Stack component="section" aria-label={`Conversation with ${agent}`} spacing={2} sx={{ maxWidth: 768, p: 2 }}>
+      <Stack component="ol" aria-label="Messages" spacing={1.5} sx={{ listStyle: 'none', m: 0, p: 0 }}>
+        {messages.flatMap((message) => entries(message, agent, results))}
+      </Stack>
+      <Typography role="status" variant="body2" color="text.secondary">
+        {running ? 'Answering…' : ''}
+      </Typography>
+      {failure && (
+        <Typography role="alert" variant="body2" color="error">
+          The agent could not answer: {failure}
+        </Typography>
+      )}
+}%}{{~ if tanstack ~}}
+{%{      <Stack
+        component="form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void form.handleSubmit();
+        }}
+        noValidate
+        spacing={1}
+      >
+        <Typography component="label" htmlFor={field} variant="subtitle2">
+          Message
+        </Typography>
+        <form.Field name="message">
+          {({ name, state: { value, meta }, handleBlur, handleChange }) => (
+            <>
+              <Box
+                component="textarea"
+                id={field}
+                name={name}
+                rows={3}
+                value={value}
+                onBlur={handleBlur}
+                onChange={(event) => handleChange(event.target.value)}
+                aria-invalid={meta.errors.length > 0 ? true : undefined}
+                aria-describedby={meta.errors.length > 0 ? `${field}-error` : undefined}
+                sx={nativeControl}
+              />
+              {meta.errors.length > 0 && (
+                <Typography id={`${field}-error`} role="alert" variant="body2" color="error">
+                  {meta.errors[0]?.message}
+                </Typography>
+              )}
+            </>
+          )}
+        </form.Field>
+}%}{{~ else ~}}
+{%{      <Stack component="form" onSubmit={onSubmit} noValidate spacing={1}>
+        <Typography component="label" htmlFor={field} variant="subtitle2">
+          Message
+        </Typography>
+        <Box
+          component="textarea"
+          id={field}
+          rows={3}
+          aria-invalid={errors.message ? true : undefined}
+          aria-describedby={errors.message ? `${field}-error` : undefined}
+          sx={nativeControl}
+          {...register('message')}
+        />
+        {errors.message && (
+          <Typography id={`${field}-error`} role="alert" variant="body2" color="error">
+            {errors.message.message}
+          </Typography>
+        )}
+}%}{{~ end ~}}
+{%{        <Button type="submit" variant="contained" disabled={running} sx={{ alignSelf: 'flex-end' }}>
+          Send
+        </Button>
+      </Stack>
+    </Stack>
+  );
+}
+
+/** What the panel shows of one message: the user's text, or the agent's text and tool calls; tool results go with their calls. */
+function entries(message: Message, agent: string, results: ReadonlyMap<string, string>) {
+  if (message.role === 'user') {
+    return [
+      <Box
+        component="li"
+        key={message.id}
+        sx={{
+          alignSelf: 'flex-end',
+          borderRadius: 1,
+          bgcolor: 'primary.main',
+          color: 'primary.contrastText',
+          px: 1.5,
+          py: 1,
+        }}
+      >
+        <Typography variant="caption">You</Typography>
+        <Typography sx={{ whiteSpace: 'pre-wrap' }}>{contentToText(message.content)}</Typography>
+      </Box>,
+    ];
+  }
+
+  if (message.role !== 'assistant') {
+    return [];
+  }
+
+  const text = contentToText(message.content);
+  return [
+    ...(text
+      ? [
+          <Box component="li" key={message.id} sx={{ borderRadius: 1, bgcolor: 'action.hover', px: 1.5, py: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              {agent}
+            </Typography>
+            <Typography sx={{ whiteSpace: 'pre-wrap' }}>{text}</Typography>
+          </Box>,
+        ]
+      : []),
+    ...(message.toolCalls ?? []).map((call) => {
+      const result = results.get(call.id);
+      return (
+        <Box
+          component="li"
+          key={call.id}
+          sx={{ border: 1, borderColor: 'divider', borderRadius: 1, px: 1.5, py: 1, typography: 'body2' }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            Tool call
+          </Typography>
+          <Typography variant="body2">
+            <code>{call.function.name}</code>{' '}
+            <Box component="code" sx={{ wordBreak: 'break-all' }}>
+              {call.function.arguments}
+            </Box>
+          </Typography>
+          <Typography variant="body2">
+            {result === undefined ? (
+              'Running…'
+            ) : (
+              <>
+                Result: <code>{result}</code>
+              </>
+            )}
+          </Typography>
+        </Box>
+      );
+    }),
+  ];
+}
+
+/** The look of the form's native textarea, from the theme; it stays native so the form library registers it as it is. */
+const nativeControl = {
+  width: '100%',
+  px: 1.5,
+  py: 1,
+  border: 1,
+  borderColor: 'divider',
+  borderRadius: 1,
+  font: 'inherit',
+  '&[aria-invalid="true"]': { borderColor: 'error.main' },
+} as const;
+}%}{{~ else ~}}
   return (
     <section aria-label={`Conversation with ${agent}`} {{ class_of "flex max-w-3xl flex-col gap-4 p-4" "conversation" }}>
       <ol aria-label="Messages" {{ class_of "flex flex-col gap-3" "messages" }}>
@@ -225,3 +391,4 @@ function entries(message: Message, agent: string, results: ReadonlyMap<string, s
     }),
   ];
 }
+{{~ end ~}}

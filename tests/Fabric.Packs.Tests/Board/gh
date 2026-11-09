@@ -6,6 +6,11 @@ set -euo pipefail
 state="$GH_FAKE_STATE"
 echo "gh $*" >> "$state/log"
 
+# Something another agent does right after a call is answered (after-call decides when, and removes itself once it acts).
+if [ -e "$state/after-call" ]; then
+  trap 'bash "$state/after-call" > /dev/null 2>&1 || true' EXIT
+fi
+
 # Flags as an associative array; repeated flags (--label) joined by newlines; the rest positional.
 declare -A flag=()
 positional=()

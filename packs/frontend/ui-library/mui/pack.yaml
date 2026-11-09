@@ -1,0 +1,13 @@
+option: frontend.ui-library.mui
+files: []
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.imports, template: templates/imports.sbn, order: -5 }
+  # Outside every other provider but the library theme's ThemeProvider, so the baseline takes the theme's background and font.
+  - { slot: web.providers, template: templates/providers.sbn, order: -5 }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 20 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing another component library or a headless one (Ant Design, Mantine, Chakra, Fluent UI, Radix, Headless UI) fails lint.", file: templates/restricted.sbn }

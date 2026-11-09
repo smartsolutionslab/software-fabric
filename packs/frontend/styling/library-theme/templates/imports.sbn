@@ -1,0 +1,2 @@
+{{ if project["frontend.ui-library"] == "mui" }}import { ThemeProvider } from '@mui/material/styles';
+import { theme } from './theme';{{ end }}
