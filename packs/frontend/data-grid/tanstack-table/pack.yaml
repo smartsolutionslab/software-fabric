@@ -6,7 +6,7 @@ files:
   - { template: templates/DataTable.vue.sbn, target: web/app/src/components/ui/DataTable.vue, when: 'project["frontend.framework"] == "vue"' }
   - { template: templates/DataTable.test.ts.sbn, target: web/app/src/components/ui/DataTable.test.ts, when: 'project["frontend.framework"] == "vue"' }
   # CSS Modules (ADR-0006): the table's classes come from a module beside it; one stylesheet, named after each framework's component.
-  - { template: templates/data-table.module.css.sbn, target: web/app/src/components/ui/data-table.module.css, when: 'project["frontend.framework"] == "react" && project["frontend.styling"] == "css-modules"' }
+  - { template: templates/data-table.module.css.sbn, target: web/app/src/components/ui/data-table.module.css, when: 'project["frontend.framework"] == "react" && project["frontend.styling"] == "css-modules" && project["frontend.ui-library"] != "mui"' }
   - { template: templates/data-table.module.css.sbn, target: web/app/src/components/ui/DataTable.module.css, when: 'project["frontend.framework"] == "vue" && project["frontend.styling"] == "css-modules"' }
 slots:
   - { slot: web.dependencies, template: templates/dependency.sbn }

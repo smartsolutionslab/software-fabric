@@ -1,3 +1,24 @@
+{{~ if project["frontend.ui-library"] == "mui" ~}}
+{%{import { Button, Stack } from '@mui/material';
+
+interface FailureProps {
+  message: string;
+  retry: string;
+  onRetry: () => unknown;
+}
+
+/** A read that failed, said so, with a way to try it again. */
+export function Failure({ message, retry, onRetry }: FailureProps) {
+  return (
+    <Stack role="alert" direction="row" spacing={1} sx={{ alignItems: 'center', typography: 'body2' }}>
+      <span>{message}</span>
+      <Button type="button" variant="outlined" size="small" aria-label={retry} onClick={() => void onRetry()}>
+        Try again
+      </Button>
+    </Stack>
+  );
+}
+}%}{{~ else ~}}
 import { Button } from '@/components/ui/button';
 
 interface FailureProps {
@@ -17,3 +38,4 @@ export function Failure({ message, retry, onRetry }: FailureProps) {
     </div>
   );
 }
+{{~ end ~}}
