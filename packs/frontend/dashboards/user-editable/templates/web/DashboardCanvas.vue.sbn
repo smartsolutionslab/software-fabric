@@ -1,9 +1,26 @@
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ if ui == "reka-ui"
+  button = "BaseButton"
+  button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
+  secondary = "outline"
+else
+  button = "Button"
+  button_import = "import { Button } from '@/components/ui/button';"
+  secondary = "secondary"
+end ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  ret 'class="' + tailwind + '"'
+end ~}}
 {{~ generative = array.contains project["frontend.dashboards"] "generative" ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
-{{~ if project["frontend.ui-library"] != "shadcn-vue" || (project["frontend.forms"] != "vee-validate" && project["frontend.forms"] != "tanstack-form") || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+{{~ if !((ui == "shadcn-vue" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form")) || (ui == "reka-ui" && project["frontend.forms"] == "vee-validate")) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate or TanStack Form and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate or TanStack Form, or reka-ui with vee-validate, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
@@ -28,8 +45,8 @@ import { computed, ref, watch } from 'vue';
 import { z } from 'zod';
 {{~ end ~}}
 {%{import { useGetDashboardsWidgets, usePutDashboardsId, type WidgetDescriptionDto } from '@/api/generated';
-import { Button } from '@/components/ui/button';
-}%}{{~ if !tanstack ~}}
+}%}{{ button_import }}
+{{~ if !tanstack ~}}
 import { toTypedSchema } from '@/forms/toTypedSchema';
 {{~ end ~}}
 {%{import Failure from './Failure.vue';
@@ -46,7 +63,10 @@ import {
 } from './layout';
 import Pager from './Pager.vue';
 import PlacedWidget from './PlacedWidget.vue';
-}%}{{~ if generative ~}}
+}%}{{~ if css_modules ~}}
+import styles from './DashboardCanvas.module.css';
+{{~ end ~}}
+{%{}%}{{~ if generative ~}}
 import DashboardAssistant from './DashboardAssistant.vue';
 import PendingWidget from './PendingWidget.vue';
 import { acceptProposal, type PendingProposal, pendingOnGrid, replacedBy } from './proposal';
@@ -349,9 +369,9 @@ const tiles = computed(() =>
 </script>
 
 <template>
-  <section aria-label="Dashboard" class="flex flex-col gap-4">
-    <form novalidate class="flex flex-wrap items-end gap-2" @submit="submit">
-      <label class="flex flex-col gap-1 text-sm">
+  <section aria-label="Dashboard" }%}{{ class_of "flex flex-col gap-4" "canvas" }}{%{>
+    <form novalidate }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{ @submit="submit">
+      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
         Dashboard name
 }%}{{~ if tanstack ~}}
 {%{        <naming.Field v-slot="{ field }" name="name" :listeners="{ onChange: edited }">
@@ -364,17 +384,17 @@ const tiles = computed(() =>
           />
         </naming.Field>
 }%}{{~ else ~}}
-{%{        <input v-model="name" v-bind="nameAttributes" class="rounded border px-2 py-1" @input="edited" />
+{%{        <input v-model="name" v-bind="nameAttributes" }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{ @input="edited" />
 }%}{{~ end ~}}
 {%{      </label>
-      <Button type="submit" :disabled="saving">Save dashboard</Button>
+      <}%}{{ button }}{%{ type="submit" :disabled="saving">Save dashboard</}%}{{ button }}{%{>
       <p v-if="nameErrors.name" role="alert">{{ nameErrors.name }}</p>
       <p v-if="savedRevision === revision" role="status">Saved.</p>
       <p v-if="failed" role="alert">The dashboard could not be saved.</p>
     </form>
 
-    <form novalidate class="flex flex-wrap items-end gap-2" @submit="add">
-      <label class="flex flex-col gap-1 text-sm">
+    <form novalidate }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{ @submit="add">
+      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
         Widget
 }%}{{~ if tanstack ~}}
 {%{        <adding.Field v-slot="{ field }" name="source" :listeners="{ onChange: choose }">
@@ -407,6 +427,19 @@ const tiles = computed(() =>
             </option>
           </select>
         </adding.Field>
+}%}{{~ else if css_modules ~}}
+        <select v-model="source" v-bind="sourceAttributes" :class="styles.input" :disabled="loading" @change="choose">
+{%{          <option value="">Choose a widget</option>
+          <option v-for="widget in catalog" :key="widget.id" :value="widget.id">{{ widget.title }}</option>
+        </select>
+      </label>
+      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
+        Shown as
+        <select v-model="visual" v-bind="visualAttributes" }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{ :disabled="loading">
+          <option v-for="shown in visuals[chosen?.kind ?? 'Chart']" :key="shown.value" :value="shown.value">
+            {{ shown.label }}
+          </option>
+        </select>
 }%}{{~ else ~}}
 {%{        <select
           v-model="source"
@@ -419,16 +452,16 @@ const tiles = computed(() =>
           <option v-for="widget in catalog" :key="widget.id" :value="widget.id">{{ widget.title }}</option>
         </select>
       </label>
-      <label class="flex flex-col gap-1 text-sm">
+      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
         Shown as
-        <select v-model="visual" v-bind="visualAttributes" class="rounded border px-2 py-1" :disabled="loading">
+        <select v-model="visual" v-bind="visualAttributes" }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{ :disabled="loading">
           <option v-for="shown in visuals[chosen?.kind ?? 'Chart']" :key="shown.value" :value="shown.value">
             {{ shown.label }}
           </option>
         </select>
 }%}{{~ end ~}}
 {%{      </label>
-      <Button type="submit" variant="secondary" :disabled="loading || full || !roomLeft">Add widget</Button>
+      <}%}{{ button }}{%{ type="submit" variant="}%}{{ secondary }}{%{" :disabled="loading || full || !roomLeft">Add widget</}%}{{ button }}{%{>
       <p v-if="full">A dashboard holds at most {{ maximumWidgets }} widgets.</p>
       <p v-if="!full && !roomLeft">
         There is no room for another widget: a dashboard reaches down to row {{ lowest }}.

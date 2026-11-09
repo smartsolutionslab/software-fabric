@@ -1,3 +1,9 @@
+{{~ func class_of(tailwind, module)
+  if project["frontend.styling"] == "css-modules"
+    ret 'className={styles.' + module + '}'
+  end
+  ret 'className="' + tailwind + '"'
+end ~}}
 {{~ if project["frontend.ui-library"] == "mui" ~}}
 {%{import { EventType, InteractionStatus } from '@azure/msal-browser';
 import { useMsal } from '@azure/msal-react';
@@ -92,6 +98,9 @@ import { useMsal } from '@azure/msal-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { accessToken, accessTokenExpiresOn } from './accessToken';
 import { loginRequest } from './msalConfig';
+{{~ if project["frontend.styling"] == "css-modules" ~}}
+import styles from './SignedIn.module.css';
+{{~ end ~}}
 
 const asError = (failure: unknown) => (failure instanceof Error ? failure : new Error(String(failure)));
 
@@ -155,7 +164,7 @@ export function SignedIn({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <div className="flex items-center justify-end gap-3 p-2 text-sm">
+      <div {{ class_of "flex items-center justify-end gap-3 p-2 text-sm" "signedIn" }}>
         <span>Signed in as {account.username}</span>
         <button type="button" onClick={signOut}>
           Sign out

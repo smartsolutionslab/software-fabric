@@ -1,3 +1,10 @@
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  ret 'className="' + tailwind + '"'
+end ~}}
 {{~ if project["frontend.ui-library"] == "mui" ~}}
 {%{import { Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import { type ColumnDef, type RowData, useTable } from '@tanstack/react-table';
@@ -42,6 +49,9 @@ export function DataTable<TRow extends RowData>({ columns, data }: DataTableProp
 }%}{{~ else ~}}
 import { type ColumnDef, type RowData, useTable } from '@tanstack/react-table';
 import { features, type Features } from './data-table-columns';
+{{~ if css_modules ~}}
+import styles from './data-table.module.css';
+{{~ end ~}}
 
 interface DataTableProps<TRow extends RowData> {
   columns: ColumnDef<Features, TRow, unknown>[];
@@ -53,12 +63,12 @@ export function DataTable<TRow extends RowData>({ columns, data }: DataTableProp
   const table = useTable({ features, columns, data });
 
   return (
-    <table className="w-full text-sm">
+    <table {{ class_of "w-full text-sm" "table" }}>
       <thead>
         {table.getHeaderGroups().map((group) => (
           <tr key={group.id}>
             {group.headers.map((header) => (
-              <th key={header.id} className="border-b p-2 text-left font-medium">
+              <th key={header.id} {{ class_of "border-b p-2 text-left font-medium" "header" }}>
                 {header.isPlaceholder ? null : <table.FlexRender header={header} />}
               </th>
             ))}
@@ -69,7 +79,7 @@ export function DataTable<TRow extends RowData>({ columns, data }: DataTableProp
         {table.getRowModel().rows.map((row) => (
           <tr key={row.id}>
             {row.getAllCells().map((cell) => (
-              <td key={cell.id} className="border-b p-2">
+              <td key={cell.id} {{ class_of "border-b p-2" "cell" }}>
                 <table.FlexRender cell={cell} />
               </td>
             ))}

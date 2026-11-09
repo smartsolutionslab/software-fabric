@@ -1,3 +1,9 @@
+{{~ func class_of(tailwind, module)
+  if project["frontend.styling"] == "css-modules"
+    ret 'className={styles.' + module + '}'
+  end
+  ret 'className="' + tailwind + '"'
+end ~}}
 {{~ if project["frontend.ui-library"] == "mui" ~}}
 {%{import { Stack } from '@mui/material';
 import { Link, Outlet } from '@tanstack/react-router';
@@ -22,12 +28,15 @@ export function App() {
 }%}{{~ else ~}}
 import { Link, Outlet } from '@tanstack/react-router';
 import { moduleRoutes } from '@/modules';
+{{~ if project["frontend.styling"] == "css-modules" ~}}
+import styles from './App.module.css';
+{{~ end ~}}
 
 /** The root route's page: the navigation, then the matched route's page. */
 export function App() {
   return (
     <div>
-      <nav aria-label="Modules" className="flex gap-4 p-2">
+      <nav aria-label="Modules" {{ class_of "flex gap-4 p-2" "navigation" }}>
         <Link to="/">Home</Link>
         {moduleRoutes.map((route) => (
           <Link key={route.id} to={route.fullPath}>

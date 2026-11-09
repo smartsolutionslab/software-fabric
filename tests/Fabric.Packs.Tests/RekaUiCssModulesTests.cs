@@ -5,8 +5,7 @@ namespace Fabric.Packs.Tests;
 
 /// <summary>
 /// #356: Reka UI is headless, so it is not tied to Tailwind. With frontend.styling=css-modules its components are styled
-/// through a <c>*.module.css</c> beside the component instead of Tailwind classes. css-modules has no pack of its own yet
-/// (#270), so it is stood in here.
+/// through a <c>*.module.css</c> beside the component instead of Tailwind classes; css-modules' own pack is #270's.
 /// </summary>
 public sealed partial class RekaUiCssModulesTests
 {

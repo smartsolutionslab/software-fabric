@@ -1,7 +1,17 @@
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  ret 'class="' + tailwind + '"'
+end ~}}
 <script setup lang="ts" generic="TRow extends RowData">
 import { type ColumnDef, FlexRender, type RowData, useTable } from '@tanstack/vue-table';
 import { toRef } from 'vue';
 import { features, type Features } from './data-table-columns';
+{{~ if css_modules ~}}
+import styles from './DataTable.module.css';
+{{~ end ~}}
 
 /** A plain table over TanStack Table; keep columns stable (module scope). */
 const props = defineProps<{
@@ -13,17 +23,17 @@ const table = useTable({ features, columns: props.columns, data: toRef(() => pro
 </script>
 
 <template>
-  <table class="w-full text-sm">
+  <table {{ class_of "w-full text-sm" "table" }}>
     <thead>
       <tr v-for="group in table.getHeaderGroups()" :key="group.id">
-        <th v-for="header in group.headers" :key="header.id" class="border-b p-2 text-left font-medium">
+        <th v-for="header in group.headers" :key="header.id" {{ class_of "border-b p-2 text-left font-medium" "header" }}>
           <FlexRender v-if="!header.isPlaceholder" :header="header" />
         </th>
       </tr>
     </thead>
     <tbody>
       <tr v-for="row in table.getRowModel().rows" :key="row.id">
-        <td v-for="cell in row.getAllCells()" :key="cell.id" class="border-b p-2">
+        <td v-for="cell in row.getAllCells()" :key="cell.id" {{ class_of "border-b p-2" "cell" }}>
           <FlexRender :cell="cell" />
         </td>
       </tr>
