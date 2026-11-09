@@ -1,0 +1,83 @@
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.BuildingBlocks.Tenancy;
+
+/// <summary>
+/// A schema per module and tenant, <c>&lt;module&gt;_&lt;tenant&gt;</c> (<c>billing_tenant_a</c>), for the tenants in
+/// Tenancy:Tenants alone. Work for any other tenant, or for none, stays in the module's own schema, which holds no rows:
+/// there it reads nothing and cannot save.
+/// </summary>
+public static partial class TenantSchemas
+{
+    /// <summary>The configuration key of the tenants, one entry each; the AppHost sets it on the MigrationRunner and the host.</summary>
+    public const string Tenants = "Tenancy:Tenants";
+
+    /// <summary>The longest schema name PostgreSQL keeps whole (63 bytes); a longer one is cut short, and two could meet.</summary>
+    public const int MaximumLength = 63;
+
+    /// <summary>The schema of a module's context: its tenant's, for a listed tenant, otherwise the module's own.</summary>
+    public static string Of(string schema, IServiceProvider services)
+    {
+        {{ not_blank "schema" }}
+        {{ not_null "services" }}
+
+        var tenant = services.GetService<ITenantContext>()?.TenantId ?? TenantScope.TenantId;
+        var configuration = services.GetService<IConfiguration>();
+        if (configuration is null)
+        {
+            return schema;
+        }
+
+        var tenants = Listed(configuration);
+        if (tenant is not null && tenants.Contains(tenant, StringComparer.Ordinal))
+        {
+            return For(schema, tenant);
+        }
+
+        // Module billing-a's own schema, billing_a, is module billing's schema for tenant a: it must not work there.
+        var claimed = tenants.FirstOrDefault(listed => schema.EndsWith($"_{listed.Replace('-', '_')}", StringComparison.Ordinal));
+        return claimed is null
+            ? schema
+            : throw new InvalidOperationException($"The module schema '{schema}' ends like a schema of listed tenant '{claimed}', so it could be another module's schema for that tenant; rename the module or the tenant.");
+    }
+
+    /// <summary>A module's schema for one tenant; a name past <see cref="MaximumLength"/> fails instead of being cut short.</summary>
+    public static string For(string schema, string tenant)
+    {
+        {{ not_blank "schema" }}
+        {{ not_blank "tenant" }}
+
+        var name = $"{schema}_{tenant.Replace('-', '_')}";
+        if (name.Length > MaximumLength)
+        {
+            throw new InvalidOperationException($"Tenant '{tenant}' would give module schema '{schema}' the schema '{name}', longer than the {MaximumLength} characters the database keeps; choose a shorter tenant name.");
+        }
+
+        return name;
+    }
+
+    /// <summary>The listed tenants. A name that is not lower-case letters and digits, joined by single hyphens, fails.</summary>
+    public static IReadOnlyList<string> Listed(IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        List<string> tenants = [];
+        foreach (var entry in configuration.GetSection(Tenants).GetChildren())
+        {
+            var tenant = entry.Value ?? string.Empty;
+            if (!TenantName().IsMatch(tenant))
+            {
+                throw new InvalidOperationException($"{Tenants}:{entry.Key} is '{tenant}'; a tenant is lower-case letters and digits, joined by single hyphens, so that each has a schema of its own.");
+            }
+
+            tenants.Add(tenant);
+        }
+
+        return tenants;
+    }
+
+    [GeneratedRegex("^[a-z0-9]+(-[a-z0-9]+)*$", RegexOptions.CultureInvariant)]
+    private static partial Regex TenantName();
+}

@@ -41,9 +41,14 @@ func database_fixture_file(space)
             .. builder.Resources.Where(resource => resource.Name == MigrationRunner),
         ];`
   else
-    $summary = `The AppHost's database alone, on an empty container, started once per test run: the pgvector image, migrated by the
+    if object.has_key(project, "backend.llm.extras") && (array.contains project["backend.llm.extras"] "rag")
+      $summary = `The AppHost's database alone, on an empty container, started once per test run: the pgvector image, migrated by the
 /// MigrationRunner as before the host starts, so every module's vector table exists. Nothing else runs: no host, no
 /// model.`
+    else
+      $summary = `The AppHost's database alone, on an empty container, started once per test run and migrated by the MigrationRunner
+/// as before the host starts. Nothing else runs: no host.`
+    end
     $resources = `var postgres = builder.Resources.OfType<PostgresServerResource>().Single();
         HashSet<IResource> database =
         [

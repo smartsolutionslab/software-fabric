@@ -1,0 +1,31 @@
+{{~ # The store types dotnet ef writes for the chosen database. ~}}
+{{~ postgres = project["backend.database"] == "postgres" ~}}
+{{~ guid_type = postgres ? "uuid" : "uniqueidentifier" ~}}
+{{~ text_type = postgres ? "text" : "nvarchar(max)" ~}}
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+
+namespace {{ namespace }}.Tenancy.Tests;
+
+/// <summary>The ledger's model as its migration leaves it, in the module's schema.</summary>
+[DbContext(typeof(LedgerDbContext))]
+public sealed class LedgerDbContextModelSnapshot : ModelSnapshot
+{
+    protected override void BuildModel(ModelBuilder modelBuilder)
+    {
+        {{ not_null "modelBuilder" }}
+
+        modelBuilder
+            .HasDefaultSchema("tenancy_tests_ledger")
+            .HasAnnotation("ProductVersion", "10.0.14")
+            .HasAnnotation("Relational:MaxIdentifierLength", {{ postgres ? 63 : 128 }});
+
+        modelBuilder.Entity("{{ namespace }}.Tenancy.Tests.LedgerEntry", entry =>
+        {
+            entry.Property<Guid>("Id").HasColumnType("{{ guid_type }}");
+            entry.Property<string>("Text").IsRequired().HasColumnType("{{ text_type }}");
+            entry.HasKey("Id");
+            entry.ToTable("ledger_entries", "tenancy_tests_ledger");
+        });
+    }
+}

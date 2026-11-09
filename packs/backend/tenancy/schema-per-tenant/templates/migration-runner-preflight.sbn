@@ -1,0 +1,1 @@
+host.Services.RefuseWhatCannotMigrate(contexts);
