@@ -1,6 +1,26 @@
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  ret 'className="' + tailwind + '"'
+end ~}}
+{{~ func themed(shadcn, palette, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  if ui == "radix-headless"
+    ret 'className="' + palette + '"'
+  end
+  ret 'className="' + shadcn + '"'
+end ~}}
 import { Button } from '@/components/ui/button';
 import type { WidgetProposal } from './proposal';
 import { WidgetView } from './WidgetView';
+{{~ if css_modules ~}}
+import styles from './PendingWidget.module.css';
+{{~ end ~}}
 
 interface PendingWidgetProps {
   proposal: WidgetProposal;
@@ -34,13 +54,17 @@ export function PendingWidget({
   const { source, title, visual } = proposal;
 
   return (
+{{~ if css_modules ~}}
+    <section aria-label={`Proposed: ${title}`} className={styles.pending}>
+{{~ else ~}}
     <section
       aria-label={`Proposed: ${title}`}
-      className="flex h-full flex-col overflow-hidden rounded border border-dashed border-primary bg-card p-2"
+      {{ themed "flex h-full flex-col overflow-hidden rounded border border-dashed border-primary bg-card p-2" "flex h-full flex-col overflow-hidden rounded border border-dashed border-slate-900 bg-white p-2" "pending" }}
     >
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-medium">Proposed: {title}</h2>
-        <div className="flex gap-1">
+{{~ end ~}}
+      <header {{ class_of "flex flex-wrap items-center justify-between gap-2" "header" }}>
+        <h2 {{ class_of "text-sm font-medium" "title" }}>Proposed: {title}</h2>
+        <div {{ class_of "flex gap-1" "actions" }}>
           <Button type="button" size="sm" disabled={!canAccept} onClick={onAccept}>
             Accept
           </Button>
@@ -49,8 +73,8 @@ export function PendingWidget({
           </Button>
         </div>
       </header>
-      {replacing && <p className="text-xs text-muted-foreground">Replaces a widget on this dashboard.</p>}
-      <div className="min-h-0 flex-1 overflow-auto">
+      {replacing && <p {{ themed "text-xs text-muted-foreground" "text-xs text-slate-500" "note" }}>Replaces a widget on this dashboard.</p>}
+      <div {{ class_of "min-h-0 flex-1 overflow-auto" "body" }}>
         <WidgetView
           source={source}
           visual={visual}

@@ -1,7 +1,27 @@
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  ret 'className="' + tailwind + '"'
+end ~}}
+{{~ func themed(shadcn, palette, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  if ui == "radix-headless"
+    ret 'className="' + palette + '"'
+  end
+  ret 'className="' + shadcn + '"'
+end ~}}
 import { useGetDashboardsWidgetDeclarationsByIdQuery } from '@/api/generated';
 import { Button } from '@/components/ui/button';
 import type { Placement } from './layout';
 import { WidgetView } from './WidgetView';
+{{~ if css_modules ~}}
+import styles from './PlacedWidget.module.css';
+{{~ end ~}}
 
 interface PlacedWidgetProps {
   placement: Placement;
@@ -20,14 +40,14 @@ export function PlacedWidget({ placement, rowHeight, refresh, onRemove }: Placed
   const title = declaration?.title ?? placement.source;
 
   return (
-    <section aria-label={title} className="flex h-full flex-col overflow-hidden rounded border bg-card p-2">
-      <header className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-medium">{title}</h2>
+    <section aria-label={title} {{ themed "flex h-full flex-col overflow-hidden rounded border bg-card p-2" "flex h-full flex-col overflow-hidden rounded border bg-white p-2" "widget" }}>
+      <header {{ class_of "flex items-center justify-between gap-2" "header" }}>
+        <h2 {{ class_of "text-sm font-medium" "title" }}>{title}</h2>
         <Button type="button" variant="ghost" size="sm" aria-label={`Remove ${title}`} onClick={onRemove}>
           Remove
         </Button>
       </header>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div {{ class_of "min-h-0 flex-1 overflow-auto" "body" }}>
         <WidgetView
           source={placement.source}
           visual={placement.visual}

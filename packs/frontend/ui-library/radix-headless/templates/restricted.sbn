@@ -1,0 +1,4 @@
+            {
+              group: ['@mui/*', 'antd', '@mantine/*', '@chakra-ui/*', '@headlessui/react', 'react-aria-components'],
+              message: 'Use Radix primitives and the components in src/components/ui (docs/adr).',
+            }

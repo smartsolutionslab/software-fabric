@@ -1,3 +1,15 @@
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ secondary = "secondary"
+if ui == "radix-headless"
+  secondary = "outline"
+end ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  ret 'className="' + tailwind + '"'
+end ~}}
 {{~ generative = array.contains project["frontend.dashboards"] "generative" ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
@@ -36,7 +48,10 @@ import { acceptProposal, type PendingProposal, pendingOnGrid, replacedBy } from 
 {{~ end ~}}
 {%{import { uuidV7 } from './uuidV7';
 import { checkChoice, visuals } from './widgetChoice';
-
+}%}{{~ if css_modules ~}}
+import styles from './DashboardCanvas.module.css';
+{{~ end ~}}
+{%{
 const rowHeight = 40;
 /** The host refuses a dashboard with more widgets than this. */
 const maximumWidgets = 50;
@@ -219,21 +234,21 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
 
 }%}{{~ end ~}}
 {%{  return (
-    <section aria-label="Dashboard" className="flex flex-col gap-4">
+    <section aria-label="Dashboard" }%}{{ class_of "flex flex-col gap-4" "canvas" }}{%{>
 }%}{{~ if tanstack ~}}
 {%{      <form
         onSubmit={(event) => {
           event.preventDefault();
           void naming.handleSubmit();
         }}
-        className="flex flex-wrap items-end gap-2"
+        }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{
       >
-        <label className="flex flex-col gap-1 text-sm">
+        <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
           Dashboard name
           <naming.Field name="name" listeners={{ onChange: edited }}>
             {({ name, state, handleBlur, handleChange }) => (
               <input
-                className="rounded border px-2 py-1"
+                }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{
                 name={name}
                 value={state.value}
                 onBlur={handleBlur}
@@ -257,9 +272,9 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
           event.preventDefault();
           void adding.handleSubmit();
         }}
-        className="flex flex-wrap items-end gap-2"
+        }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{
       >
-        <label className="flex flex-col gap-1 text-sm">
+        <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
           Widget
           <adding.Field
             name="source"
@@ -270,7 +285,7 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
           >
             {({ name, state, handleBlur, handleChange }) => (
               <select
-                className="rounded border px-2 py-1"
+                }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{
                 disabled={loading}
                 name={name}
                 value={state.value}
@@ -287,12 +302,12 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
             )}
           </adding.Field>
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
           Shown as
           <adding.Field name="visual">
             {({ name, state, handleBlur, handleChange }) => (
               <select
-                className="rounded border px-2 py-1"
+                }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{
                 disabled={loading}
                 name={name}
                 value={state.value}
@@ -308,7 +323,7 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
             )}
           </adding.Field>
         </label>
-        <Button type="submit" variant="secondary" disabled={loading || full || !roomLeft}>
+        <Button type="submit" variant="}%}{{ secondary }}{%{" disabled={loading || full || !roomLeft}>
           Add widget
         </Button>
         {full && <p>A dashboard holds at most {maximumWidgets} widgets.</p>}
@@ -328,10 +343,10 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
         />
       </form>
 }%}{{~ else ~}}
-{%{      <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1 text-sm">
+{%{      <form onSubmit={submit} }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{>
+        <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
           Dashboard name
-          <input className="rounded border px-2 py-1" {...naming.register('name', { onChange: edited })} />
+          <input }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{ {...naming.register('name', { onChange: edited })} />
         </label>
         <Button type="submit" disabled={saving}>
           Save dashboard
@@ -341,11 +356,11 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
         {failed && <p role="alert">The dashboard could not be saved.</p>}
       </form>
 
-      <form onSubmit={add} className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1 text-sm">
+      <form onSubmit={add} }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{>
+        <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
           Widget
           <select
-            className="rounded border px-2 py-1"
+            }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{
             disabled={loading}
             {...adding.register('source', {
               onChange: (event: { target: { value: string } }) =>
@@ -360,9 +375,9 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
           Shown as
-          <select className="rounded border px-2 py-1" disabled={loading} {...adding.register('visual')}>
+          <select }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{ disabled={loading} {...adding.register('visual')}>
             {visuals[chosen?.kind ?? 'Chart'].map((visual) => (
               <option key={visual.value} value={visual.value}>
                 {visual.label}
@@ -370,7 +385,7 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
             ))}
           </select>
         </label>
-        <Button type="submit" variant="secondary" disabled={loading || full || !roomLeft}>
+        <Button type="submit" variant="}%}{{ secondary }}{%{" disabled={loading || full || !roomLeft}>
           Add widget
         </Button>
         {full && <p>A dashboard holds at most {maximumWidgets} widgets.</p>}

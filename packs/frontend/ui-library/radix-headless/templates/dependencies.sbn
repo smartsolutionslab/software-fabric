@@ -1,0 +1,4 @@
+    "@radix-ui/react-slot": "1.5.0",
+    "class-variance-authority": "0.7.1",
+{{ if project["frontend.styling"] == "css-modules" }}    "clsx": "2.1.1"{{ else }}    "clsx": "2.1.1",
+    "tailwind-merge": "3.7.0"{{ end }}
