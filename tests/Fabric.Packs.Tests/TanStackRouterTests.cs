@@ -184,11 +184,13 @@ public sealed class TanStackRouterTests
         RunWeb(project, "install", "build", "lint", "test");
     }
 
-    /// <summary>module-federation's agent rule names the router the project has (#333).</summary>
-    [Fact]
-    public void With_micro_frontends_the_agent_rules_tell_remotes_to_share_tanstack_router()
+    /// <summary>Each federation technique's agent rule names the router the project has (#333).</summary>
+    [Theory]
+    [InlineData("module-federation")]
+    [InlineData("native-federation")]
+    public void With_micro_frontends_the_agent_rules_tell_remotes_to_share_tanstack_router(string technique)
     {
-        using var project = new GeneratedProject("industrial-event-driven-mfe", TanStackRouter);
+        using var project = new GeneratedProject("industrial-event-driven-mfe", TanStackRouter, $"frontend.mfe-technique={technique}");
         var agents = File.ReadAllText(Path.Combine(project.ProjectDirectory, "AGENTS.md"));
 
         agents.ShouldContain("after sharing `@tanstack/react-router` as below");

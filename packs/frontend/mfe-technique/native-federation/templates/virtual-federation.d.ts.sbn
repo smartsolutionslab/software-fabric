@@ -1,0 +1,8 @@
+/** Written by shellFederation() in web/app/federation.ts. */
+declare module 'virtual:federation' {
+  /** Each module's remoteEntry.json, by the module's name. */
+  export const remotes: Record<string, string>;
+
+  /** The shell's version of each package it shares with the remotes, by package name. */
+  export const versions: Record<string, string>;
+}

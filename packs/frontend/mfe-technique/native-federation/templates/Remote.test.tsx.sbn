@@ -1,0 +1,39 @@
+import { render, screen } from '@testing-library/react';
+import { expect, test, vi } from 'vitest';
+import { loadPage } from './federation';
+import { Remote } from './Remote';
+
+vi.mock('./federation', () => ({ loadPage: vi.fn() }));
+
+test("a module's page is the page its remote exposes", async () => {
+  vi.mocked(loadPage).mockResolvedValue(() => <h1>Billing</h1>);
+
+  render(<Remote module="billing" />);
+
+  expect(await screen.findByRole('heading', { name: 'Billing' })).toBeInTheDocument();
+  expect(loadPage).toHaveBeenCalledWith('billing');
+});
+
+test('a remote that cannot be loaded leaves the shell running and says so', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  vi.mocked(loadPage).mockRejectedValue(new Error('remoteEntry.json did not load'));
+
+  render(<Remote module="shipping" />);
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('shipping could not be loaded.');
+});
+
+test('a remote that failed to load is loaded again the next time its page is shown', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  vi.mocked(loadPage)
+    .mockRejectedValueOnce(new Error('remoteEntry.json did not load'))
+    .mockResolvedValueOnce(() => <h1>Stock</h1>);
+
+  const { unmount } = render(<Remote module="stock" />);
+  expect(await screen.findByText('stock could not be loaded.')).toBeInTheDocument();
+  unmount();
+
+  render(<Remote module="stock" />);
+
+  expect(await screen.findByRole('heading', { name: 'Stock' })).toBeInTheDocument();
+});
