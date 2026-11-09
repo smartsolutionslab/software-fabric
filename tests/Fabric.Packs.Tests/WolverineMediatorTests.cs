@@ -109,6 +109,32 @@ public sealed class WolverineMediatorTests
         queues.Contains("Shout", StringComparison.OrdinalIgnoreCase).ShouldBeFalse(queues);
     }
 
+    /// <summary>
+    /// The test hosts of agents, dashboards, gRPC and the MCP server send requests through <c>IDispatcher</c>, so they
+    /// start Wolverine in process (#362); before, they failed with Wolverine's bus missing or not started.
+    /// </summary>
+    [Fact]
+    public void With_agents_dashboards_grpc_and_an_mcp_server_their_tests_send_requests_through_wolverine_and_pass()
+    {
+        using var project = new GeneratedProject("saas-ai-react", Mediator, "backend.api-protocols=rest,grpc", "backend.mcp=server");
+        project.Build();
+
+        foreach (var tests in new[]
+        {
+            "tests/Agents.Tests/Agents.Tests.csproj",
+            "tests/Modules/Assistant.Tests/Assistant.Tests.csproj",
+            "tests/Modules/Dashboards.Tests/Dashboards.Tests.csproj",
+            "tests/GrpcServices.Tests/GrpcServices.Tests.csproj",
+            "tests/Mcp.Server.Tests/Mcp.Server.Tests.csproj",
+            "tests/Architecture.Tests/Architecture.Tests.csproj",
+        })
+        {
+            var (exitCode, output) = project.Test(tests);
+            exitCode.ShouldBe(0, $"{tests}\n{output}");
+            output.ShouldContain("failed: 0", customMessage: tests);
+        }
+    }
+
     private static string RabbitMqQueues(Container rabbitMq)
     {
         var start = new System.Diagnostics.ProcessStartInfo("docker") { RedirectStandardOutput = true, RedirectStandardError = true };

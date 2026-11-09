@@ -1030,6 +1030,81 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Directory.Delete(repository, recursive: true);
     }
 
+    /// <summary>
+    /// The workflow's own step, run as GitHub would: main moved after the pull request opened, the agent merged it,
+    /// and the event still carries the old base SHA. Main's commits are not the branch's to sign.
+    /// </summary>
+    [Theory]
+    [InlineData("Merge main\n\nAgent-Executor: claude-cloud/a", 0)]
+    [InlineData("Merge main, forgot the trailer", 1)]
+    public void The_trailer_workflow_checks_the_branch_against_the_base_branch_tip_not_a_stale_base_sha(string mergeMessage, int expectedExitCode)
+    {
+        var repository = Repository();
+        var git = (string[] arguments) =>
+        {
+            var (code, output) = Shell.Run(repository, BoardProject.GitIdentity, "git", arguments);
+            code.ShouldBe(0, output);
+            return output.Trim();
+        };
+        git(["checkout", "--quiet", "-b", "agent/7"]);
+        git(["commit", "--quiet", "--allow-empty", "-m", "One\n\nAgent-Executor: claude-cloud/a"]);
+        git(["checkout", "--quiet", "main"]);
+        git(["commit", "--quiet", "--allow-empty", "-m", "Merge pull request #5 from acme/agent/5"]);
+        git(["update-ref", "refs/remotes/origin/main", "main"]);
+        git(["checkout", "--quiet", "agent/7"]);
+        git(["merge", "--quiet", "--no-ff", "-m", mergeMessage, "main"]);
+        var payload = new Dictionary<string, string>
+        {
+            ["github.head_ref"] = "agent/7",
+            ["github.base_ref"] = "main",
+            ["github.event.pull_request.base.ref"] = "main",
+            ["github.event.pull_request.base.sha"] = git(["rev-parse", "base"]),
+            ["github.event.pull_request.head.sha"] = git(["rev-parse", "HEAD"]),
+        };
+        var (run, environment) = WorkflowStep("agent-executor.yml", "check-trailers.sh", payload);
+
+        var (exitCode, log) = Shell.Run(
+            repository,
+            environment,
+            "bash",
+            "-e",
+            "-c",
+            run.Replace(".github/scripts/board/", Path.Combine(ProjectDirectory, ".github/scripts/board/"), StringComparison.Ordinal));
+
+        exitCode.ShouldBe(expectedExitCode, $"{run}\n{log}");
+        log.ShouldNotContain("Merge pull request #5");
+        if (expectedExitCode == 1)
+        {
+            log.ShouldContain("Merge main, forgot the trailer");
+        }
+
+        Directory.Delete(repository, recursive: true);
+    }
+
+    /// <summary>A workflow step's one-line <c>run</c> and its <c>env</c>, with each expression taken from the event.</summary>
+    private (string Run, Dictionary<string, string> Environment) WorkflowStep(string workflow, string marker, Dictionary<string, string> payload)
+    {
+        var lines = File.ReadAllLines(Path.Combine(ProjectDirectory, ".github", "workflows", workflow));
+        var run = Array.FindIndex(lines, line => line.TrimStart().StartsWith("run:", StringComparison.Ordinal) && line.Contains(marker, StringComparison.Ordinal));
+        run.ShouldBeGreaterThanOrEqualTo(0, $"{workflow} has no step running {marker}");
+        var env = Array.FindIndex(lines, run, line => line.Trim() == "env:");
+        var indent = lines[env].Length - lines[env].TrimStart().Length;
+        var environment = lines
+            .Skip(env + 1)
+            .TakeWhile(line => line.Length - line.TrimStart().Length > indent && line.Trim().Length > 0)
+            .Select(line => line.Trim().Split(':', 2))
+            .ToDictionary(
+                pair => pair[0],
+                pair => System.Text.RegularExpressions.Regex.Replace(
+                    pair[1].Trim(),
+                    @"\$\{\{\s*([^}]+?)\s*\}\}",
+                    match => payload.TryGetValue(match.Groups[1].Value, out var value)
+                        ? value
+                        : throw new InvalidOperationException($"The test's event has no '{match.Groups[1].Value}'.")));
+        environment["PATH"] = Environment.GetEnvironmentVariable("PATH")!;
+        return (lines[run].Trim()["run: ".Length..], environment);
+    }
+
     [Fact]
     public void An_agent_branch_whose_commits_all_name_their_executor_passes()
     {
