@@ -13,13 +13,18 @@ public sealed class DesignTokensTests
     private const string Choice = "frontend.design-system=tokens";
     private const string LibraryTheme = "frontend.styling=library-theme";
 
-    /// <summary>The theme takes the primary colour from its token, changed to #0b6e4f.</summary>
+    /// <summary>The theme takes the primary colour and the spacing steps from their tokens, changed in the test.</summary>
     private const string ThemeTokensTest = """
         import { expect, test } from 'vitest';
         import { theme } from './theme';
 
         test('the theme takes its primary colour from the tokens', () => {
           expect(theme.palette.primary.main).toBe('#0b6e4f');
+        });
+
+        test('the theme takes its spacing steps from the tokens', () => {
+          expect(theme.spacing(1)).toBe('0.3rem');
+          expect(theme.spacing(4)).toBe('1.25rem');
         });
 
         """;
@@ -163,11 +168,15 @@ public sealed class DesignTokensTests
     }
 
     [Fact]
-    public void The_mui_web_app_on_the_tokens_builds_lints_is_formatted_and_its_theme_takes_a_changed_token()
+    public void The_mui_web_app_on_the_tokens_builds_lints_is_formatted_and_its_theme_takes_changed_tokens()
     {
         using var project = new GeneratedProject("saas-standard-react", Choice, LibraryTheme, "frontend.ui-library=mui");
         var colours = Path.Combine(project.ProjectDirectory, "web", "packages", "tokens", "src", "color.tokens.json");
         File.WriteAllText(colours, File.ReadAllText(colours).Replace("\"#3730a3\"", "\"#0b6e4f\"", StringComparison.Ordinal));
+        var spacing = Path.Combine(project.ProjectDirectory, "web", "packages", "tokens", "src", "spacing.tokens.json");
+        File.WriteAllText(spacing, File.ReadAllText(spacing)
+            .Replace("\"1\": { \"$value\": { \"value\": 0.25,", "\"1\": { \"$value\": { \"value\": 0.3,", StringComparison.Ordinal)
+            .Replace("\"4\": { \"$value\": { \"value\": 1,", "\"4\": { \"$value\": { \"value\": 1.25,", StringComparison.Ordinal));
         project.Write("web/app/src/theme-tokens.test.ts", ThemeTokensTest);
 
         RunWeb(project, "install", "build", "lint", "test");
