@@ -521,6 +521,67 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Field(7, "EXECUTOR").ShouldBe("claude-cloud/two");
     }
 
+    /// <summary>Runs a command once, right after the first gh call that returns while a condition holds.</summary>
+    private string RightAfterTheGhCallWhere(string condition, string command)
+    {
+        var output = Path.Combine(state, "concurrent-claim");
+        File.WriteAllText(Path.Combine(state, "after-call"), $"""
+            {condition} || exit 0
+            rm "$0"
+            {command} > '{output}' 2>&1
+            echo "exit=$?" >> '{output}'
+
+            """);
+        return output;
+    }
+
+    private string Claim7(string executor) =>
+        $"bash '{Path.Combine(ProjectDirectory, ".github/scripts/board/next.sh")}' backend {executor}";
+
+    [Fact]
+    public void A_release_retried_on_a_parked_branch_leaves_a_claim_landing_once_its_label_is_off_alone()
+    {
+        // A janitor run or an earlier release parked the branch and stopped before agent:claimed came off.
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-20), "claude-cloud/one");
+        Branch("agent/7", "chore(board): release #7", Now.AddMinutes(-10), "claude-cloud/one");
+        var concurrent = RightAfterTheGhCallWhere(
+            $"! jq -e '.[] | select(.number == 7) | any(.labels[]; .name == \"agent:claimed\")' '{Path.Combine(state, "issues.json")}' > /dev/null",
+            Claim7("claude-cloud/two"));
+
+        var (exitCode, output) = Run("release.sh", "7", "Claimed by mistake.");
+
+        exitCode.ShouldBe(0, output);
+        var claim = File.ReadAllText(concurrent);
+        claim.ShouldStartWith("7 agent/7", Case.Sensitive, claim);
+        Head("agent/7").ShouldBe("chore(board): claim #7");
+        Executor("agent/7").ShouldBe("claude-cloud/two");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Claimed");
+        Field(7, "EXECUTOR").ShouldBe("claude-cloud/two");
+    }
+
+    [Fact]
+    public void A_claim_landing_after_a_release_has_parked_the_branch_and_read_it_back_keeps_its_fields()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10), "claude-cloud/one");
+        var concurrent = RightAfterTheGhCallWhere(
+            $"git --git-dir '{origin}' log -1 --format=%s refs/heads/agent/7 | grep -q '^chore(board): release #7'",
+            Claim7("claude-cloud/two"));
+
+        var (exitCode, output) = Run("release.sh", "7", "Claimed by mistake.");
+
+        exitCode.ShouldBe(0, output);
+        var claim = File.ReadAllText(concurrent);
+        claim.ShouldStartWith("7 agent/7", Case.Sensitive, claim);
+        Executor("agent/7").ShouldBe("claude-cloud/two");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Claimed");
+        Field(7, "EXECUTOR").ShouldBe("claude-cloud/two");
+        Comments(7).ShouldContain("Released: Claimed by mistake.");
+    }
+
     [Fact]
     public void A_release_the_remote_refuses_leaves_the_issue_claimed()
     {
