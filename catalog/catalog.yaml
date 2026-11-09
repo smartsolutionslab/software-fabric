@@ -177,8 +177,7 @@ dimensions:
       schema-per-tenant:
         tier: experimental
         # Reason: the schema-per-tenant pack creates and migrates tenant schemas with PostgreSQL's SQL; SQL Server support is a later issue.
-        # Reason: transport none's in-process outbox keeps one table per module schema, which a tenant's schema lacks; temporary.
-        requires: ["backend.database == postgres", "backend.bus.transport != none"]
+        requires: ["backend.database == postgres"]
       database-per-tenant: { tier: experimental }
 
   backend.llm:

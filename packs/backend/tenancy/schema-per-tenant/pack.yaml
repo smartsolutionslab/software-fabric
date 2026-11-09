@@ -22,10 +22,11 @@ files:
   - { template: templates/tests/TenantSchemaTests.cs.sbn, target: tests/Tenancy.Tests/TenantSchemaTests.cs }
   - { template: templates/tests/LedgerArchiveDbContext.cs.sbn, target: tests/Tenancy.Tests/LedgerArchiveDbContext.cs }
   - { template: templates/tests/TenantSchemaNameTests.cs.sbn, target: tests/Tenancy.Tests/TenantSchemaNameTests.cs }
-  - { template: templates/tests/LedgerEntryArrived.cs.sbn, target: tests/Tenancy.Tests/LedgerEntryArrived.cs }
-  - { template: templates/tests/LedgerConstructorConsumer.cs.sbn, target: tests/Tenancy.Tests/LedgerConstructorConsumer.cs }
-  - { template: templates/tests/LedgerParameterConsumer.cs.sbn, target: tests/Tenancy.Tests/LedgerParameterConsumer.cs }
-  - { template: templates/tests/TenantConsumerTests.cs.sbn, target: tests/Tenancy.Tests/TenantConsumerTests.cs }
+  # Wolverine's consumers, with a messaging library only: transport none delivers in-process, in each tenant's scope.
+  - { template: templates/tests/LedgerEntryArrived.cs.sbn, target: tests/Tenancy.Tests/LedgerEntryArrived.cs, when: 'project["backend.bus.transport"] != "none"' }
+  - { template: templates/tests/LedgerConstructorConsumer.cs.sbn, target: tests/Tenancy.Tests/LedgerConstructorConsumer.cs, when: 'project["backend.bus.transport"] != "none"' }
+  - { template: templates/tests/LedgerParameterConsumer.cs.sbn, target: tests/Tenancy.Tests/LedgerParameterConsumer.cs, when: 'project["backend.bus.transport"] != "none"' }
+  - { template: templates/tests/TenantConsumerTests.cs.sbn, target: tests/Tenancy.Tests/TenantConsumerTests.cs, when: 'project["backend.bus.transport"] != "none"' }
 slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 10 }
   - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 20 }

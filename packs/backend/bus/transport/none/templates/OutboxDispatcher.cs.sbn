@@ -1,6 +1,13 @@
+{{~ tenants = project["backend.tenancy"] == "schema-per-tenant" ~}}
 using System.Text.Json;
 using {{ namespace }}.Contracts;
+{{~ if tenants ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
 using Microsoft.EntityFrameworkCore;
+{{~ if tenants ~}}
+using Microsoft.Extensions.Configuration;
+{{~ end ~}}
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -8,14 +15,23 @@ using Microsoft.Extensions.Logging;
 namespace {{ namespace }}.BuildingBlocks.Messaging;
 
 /// <summary>
+{{~ if tenants ~}}
+/// Delivers committed integration events in-process: reads the outbox table of each module in each tenant's schema, for
+/// every tenant in Tenancy:Tenants, hands every message to its consumers in that tenant's <see cref="TenantScope"/> and
+/// marks it delivered. Woken by <see cref="OutboxSignal"/> after a commit, and polls in case a wake was missed.
+{{~ else ~}}
 /// Delivers committed integration events in-process: reads each module's outbox table, hands every message to its
 /// consumers and marks it delivered. Woken by <see cref="OutboxSignal"/> after a commit, and polls in case a wake was missed.
+{{~ end ~}}
 /// </summary>
 public sealed partial class OutboxDispatcher(
     IServiceScopeFactory scopes,
     OutboxContexts contexts,
     IntegrationEventConsumers consumers,
     OutboxSignal signal,
+{{~ if tenants ~}}
+    IConfiguration configuration,
+{{~ end ~}}
     ILogger<OutboxDispatcher> logger) : BackgroundService
 {
     private const int BatchSize = 20;
@@ -24,6 +40,47 @@ public sealed partial class OutboxDispatcher(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+{{~ if tenants ~}}
+        // The module's own schema holds no tenant's rows and has no outbox; each listed tenant's schema has one.
+        var tenants = TenantSchemas.Listed(configuration);
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var delivered = 0;
+            foreach (var tenant in tenants)
+            {
+                delivered += await DeliverPendingAsync(tenant, stoppingToken);
+            }
+
+            if (delivered == 0)
+            {
+                await signal.WaitAsync(PollInterval, stoppingToken);
+            }
+        }
+    }
+
+    /// <summary>Delivers one tenant's pending messages of every module, in the tenant's scope, so its consumers work in its schemas.</summary>
+    private async Task<int> DeliverPendingAsync(string tenant, CancellationToken stoppingToken)
+    {
+        using var tenantScope = TenantScope.Begin(tenant);
+        var delivered = 0;
+        foreach (var type in contexts.Types)
+        {
+            try
+            {
+                delivered += await DeliverPendingAsync(type, stoppingToken);
+            }
+#pragma warning disable CA1031 // The database may be away for a moment; the messages wait in their table until it is back.
+            // Only the host stopping ends the loop; any other cancellation (a timed-out call) is a failure like the rest.
+            catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
+#pragma warning restore CA1031
+            {
+                LogReadFailed(logger, exception, type.Name, tenant);
+            }
+        }
+
+        return delivered;
+    }
+{{~ else ~}}
         while (!stoppingToken.IsCancellationRequested)
         {
             var delivered = 0;
@@ -48,6 +105,7 @@ public sealed partial class OutboxDispatcher(
             }
         }
     }
+{{~ end ~}}
 
     private async Task<int> DeliverPendingAsync(Type contextType, CancellationToken cancellationToken)
     {
@@ -84,6 +142,11 @@ public sealed partial class OutboxDispatcher(
     [LoggerMessage(Level = LogLevel.Error, Message = "Delivering outbox message {MessageId} ({MessageType}) failed; it is retried later.")]
     private static partial void LogDeliveryFailed(ILogger logger, Exception exception, Guid messageId, string messageType);
 
+{{~ if tenants ~}}
+    [LoggerMessage(Level = LogLevel.Error, Message = "Reading the outbox of {Context} for tenant {Tenant} failed; it is read again on the next poll.")]
+    private static partial void LogReadFailed(ILogger logger, Exception exception, string context, string tenant);
+{{~ else ~}}
     [LoggerMessage(Level = LogLevel.Error, Message = "Reading the outbox of {Context} failed; it is read again on the next poll.")]
     private static partial void LogReadFailed(ILogger logger, Exception exception, string context);
+{{~ end ~}}
 }
