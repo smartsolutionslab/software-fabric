@@ -1,0 +1,2 @@
+// The design system's components. Importing @{{ name }}/ui defines their elements; the app does it once, in its entry.
+export { Badge, type BadgeTone } from './Badge';

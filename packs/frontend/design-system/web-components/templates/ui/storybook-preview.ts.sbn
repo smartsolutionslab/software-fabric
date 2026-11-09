@@ -1,0 +1,7 @@
+import type { Preview } from '@storybook/web-components-vite';
+// The tokens' --ds-* variables on :root, which the components' shadow styles read.
+import '@{{ name }}/tokens/tokens.css';
+
+const preview: Preview = {};
+
+export default preview;
