@@ -20,10 +20,23 @@ labelled="$(board_issue "$issue" | jq 'any(.labels[]; .name == "agent:claimed")'
 board_status "$issue" Todo
 board_executor "$issue" ""
 if [ "$labelled" = true ]; then
-  board_remove_label "$issue" agent:claimed
+  board_unclaim "$issue"
 fi
 outcome=0
 board_park "$issue" "Released: $reason" "$head" || outcome=$?
+# The branch moved since it was read: another agent parked it and may have claimed it, possibly before the writes above.
+# Nothing here is this agent's to restore. A claim that holds the branch now gets its label and fields written again,
+# with the values it writes itself, so whichever write lands last, they stand.
+if [ "$outcome" -eq 2 ]; then
+  head="$(board_fetch "$branch")"
+  if ! board_parked "$head"; then
+    board_add_label "$issue" agent:claimed
+    board_status "$issue" Claimed
+    board_executor "$issue" "$(board_executor_of "$head")"
+  fi
+  echo "#$issue's branch moved since it was read; another agent parked or claimed it, so this release changes nothing more." >&2
+  exit 1
+fi
 if [ "$outcome" -ne 0 ]; then
   if [ "$labelled" = true ]; then
     board_add_label "$issue" agent:claimed
