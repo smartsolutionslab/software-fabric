@@ -5,15 +5,20 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import { serveFederation } from '../serve';
 
 const builder = vi.hoisted(() => ({ close: vi.fn(() => Promise.resolve()) }));
-vi.mock('native-federation-vite', () => ({ runViteBuilder: vi.fn(() => Promise.resolve(builder)) }));
+const runViteBuilder = vi.hoisted(() => vi.fn(() => Promise.resolve(builder)));
+vi.mock('native-federation-vite', () => ({ runViteBuilder }));
 
 beforeEach(() => {
   builder.close.mockClear();
+  runViteBuilder.mockClear();
 });
 
 /** Calls one of the plugin's server hooks as Vite would, with a server whose HTTP server can close. */
-async function start(plugin: Plugin, hook: 'configureServer' | 'configurePreviewServer') {
-  const httpServer = new EventEmitter();
+async function start(
+  plugin: Plugin,
+  hook: 'configureServer' | 'configurePreviewServer',
+  httpServer: EventEmitter | null = new EventEmitter(),
+) {
   const value = plugin[hook];
   const handler = (typeof value === 'function' ? value : value?.handler) as ((server: unknown) => unknown) | undefined;
   await handler?.({ httpServer });
@@ -23,7 +28,10 @@ async function start(plugin: Plugin, hook: 'configureServer' | 'configurePreview
 test.each(['configureServer', 'configurePreviewServer'] as const)(
   'the federation watcher started by %s closes when its HTTP server closes',
   async (hook) => {
-    const httpServer = await start(serveFederation(() => []), hook);
+    const httpServer = (await start(
+      serveFederation(() => []),
+      hook,
+    )) as EventEmitter;
     expect(builder.close).not.toHaveBeenCalled();
 
     httpServer.emit('close');
@@ -31,3 +39,13 @@ test.each(['configureServer', 'configurePreviewServer'] as const)(
     expect(builder.close).toHaveBeenCalledOnce();
   },
 );
+
+test("a dev server without an HTTP server, as Vitest's, starts no federation build", async () => {
+  await start(
+    serveFederation(() => []),
+    'configureServer',
+    null,
+  );
+
+  expect(runViteBuilder).not.toHaveBeenCalled();
+});

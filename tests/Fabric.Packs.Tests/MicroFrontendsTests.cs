@@ -274,7 +274,7 @@ public sealed class MicroFrontendsTests
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "modules", "billing"), "pnpm", "exec", "vitest", "run", "src/serve.test.ts");
         exitCode.ShouldBe(0, $"vitest run src/serve.test.ts in web/modules/billing:\n{output}");
-        output.ShouldContain("2 passed");
+        output.ShouldContain("3 passed");
     }
 
     private static string Technique(string technique) => $"frontend.mfe-technique={technique}";
