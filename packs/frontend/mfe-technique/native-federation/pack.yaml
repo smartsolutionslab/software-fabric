@@ -1,0 +1,40 @@
+option: frontend.mfe-technique.native-federation
+files:
+  - { template: templates/federation.ts.sbn, target: web/app/federation.ts }
+  - { template: templates/runtime.ts.sbn, target: web/app/src/remotes/federation.ts }
+  - { template: templates/runtime.test.ts.sbn, target: web/app/src/remotes/federation.test.ts }
+  - { template: templates/virtual-federation.d.ts.sbn, target: web/app/src/remotes/virtual-federation.d.ts }
+  - { template: templates/Remote.tsx.sbn, target: web/app/src/remotes/Remote.tsx }
+  - { template: templates/Remote.test.tsx.sbn, target: web/app/src/remotes/Remote.test.tsx }
+  - { template: templates/remote.spec.ts.sbn, target: "web/app/e2e/remotes/{{ module.name }}.spec.ts", per-module: true }
+  - { template: templates/remote/package.json.sbn, target: "web/modules/{{ module.name }}/package.json", per-module: true }
+  - { template: templates/remote/federation.config.js.sbn, target: "web/modules/{{ module.name }}/federation.config.js", per-module: true }
+  - { template: templates/remote/vite.config.ts.sbn, target: "web/modules/{{ module.name }}/vite.config.ts", per-module: true }
+  - { template: templates/remote/serve.ts.sbn, target: "web/modules/{{ module.name }}/serve.ts", per-module: true }
+  - { template: templates/remote/serve.test.ts.sbn, target: "web/modules/{{ module.name }}/src/serve.test.ts", per-module: true }
+  - { template: templates/remote/tsconfig.json.sbn, target: "web/modules/{{ module.name }}/tsconfig.json", per-module: true }
+  - { template: templates/remote/eslint.config.js.sbn, target: "web/modules/{{ module.name }}/eslint.config.js", per-module: true }
+  - { template: templates/remote/prettierrc.json.sbn, target: "web/modules/{{ module.name }}/.prettierrc.json", per-module: true }
+  - { template: templates/remote/gitignore.sbn, target: "web/modules/{{ module.name }}/.gitignore", per-module: true }
+  - { template: templates/remote/test-setup.ts.sbn, target: "web/modules/{{ module.name }}/src/test-setup.ts", per-module: true }
+  - { template: templates/remote/Page.tsx.sbn, target: "web/modules/{{ module.name }}/src/{{ module.namespace }}Page.tsx", per-module: true }
+  - { template: templates/remote/Page.test.tsx.sbn, target: "web/modules/{{ module.name }}/src/{{ module.namespace }}Page.test.tsx", per-module: true }
+  - { template: templates/remote/boundary.ts.sbn, target: "web/modules/{{ module.name }}/boundary.ts", per-module: true }
+  - { template: templates/remote/boundary.test.ts.sbn, target: "web/modules/{{ module.name }}/src/boundary.test.ts", per-module: true }
+declares-slots:
+  - { slot: web.remote-restricted-imports, description: "Entries of every remote's no-restricted-imports patterns ({ group: [...], message: '...' }), indented twelve spaces as Prettier prints them.", separator: ",\n" }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.vite-imports, template: templates/vite-imports.sbn, order: 40 }
+  - { slot: web.vite-plugins, template: templates/vite-plugin.sbn, order: 40 }
+  - { slot: web.ui-package-fields, template: templates/ui-package-fields.sbn, optional: true }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "Remote shows the page a module's remote exposes and says the module is unavailable when its remote cannot be loaded (src/remotes/Remote.test.tsx).", file: templates/Remote.test.tsx.sbn }
+  - { kind: unit-test, describes: "The shell starts native federation's orchestrator as the host, its shared packages at its own versions with strict versions, and the import map sends a remote's imports of them to the shell's own instances (src/remotes/federation.test.ts).", file: templates/runtime.test.ts.sbn }
+  - { kind: unit-test, describes: "A remote's federation watcher, started with its dev or preview server, closes when that server's HTTP server closes, and a server without one, as Vitest's, starts none (web/modules/<module>/src/serve.test.ts).", file: templates/remote/serve.test.ts.sbn }
+  - { kind: ci-step, describes: "Every remote's build type-checks it and builds its remoteEntry.json with native-federation-vite, and its lint runs ESLint, with the library bans the shell has, and Prettier; the frontend job runs both for every package.", file: templates/remote/package.json.sbn }
+  - { kind: ci-step, describes: "A file of another remote or of the shell loaded into a remote, by any import path, fails the remote's build (its Vite pass before native federation) and tests.", file: templates/remote/boundary.ts.sbn }
+  - { kind: end-to-end-test, describes: "A signed-in browser opens each module and sees its page, loaded from the module's own remote with the shell's React and design system (e2e/remotes/<module>.spec.ts, run against the running AppHost).", file: templates/remote.spec.ts.sbn }

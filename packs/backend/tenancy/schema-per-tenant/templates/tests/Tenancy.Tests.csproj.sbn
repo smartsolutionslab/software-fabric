@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Schema-per-tenant tenancy against the AppHost's database alone, after the MigrationRunner: no host. -->
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Tenancy.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    {{ database_fixture_package_references }}
+  </ItemGroup>
+
+  <ItemGroup>
+    {{ database_fixture_project_references }}
+    <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />
+    <ProjectReference Include="../../src/Modules/*/*.Infrastructure/*.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

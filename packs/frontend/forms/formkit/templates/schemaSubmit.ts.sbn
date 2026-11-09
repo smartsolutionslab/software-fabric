@@ -1,0 +1,78 @@
+{{~ if project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot" ~}}
+throw new Error('The FormKit pack adapts zod and valibot schemas only so far; frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+{{~ end ~}}
+{{~ if project["frontend.validation"] == "valibot" ~}}
+import type { FormKitNode } from '@formkit/core';
+import * as v from 'valibot';
+
+/**
+ * A FormKit form's submit handler that validates with a Valibot schema: each message goes to the field its issue names
+ * (customer.name, lines.1.quantity) and one without a field to the form, and only a valid form reaches the handler, with
+ * what the schema puts out (trimmed, transformed, defaulted).
+ */
+export function schemaSubmit<TSchema extends v.GenericSchema | v.GenericSchemaAsync>(
+  schema: TSchema,
+  handler: (values: v.InferOutput<TSchema>, form: FormKitNode) => void | Promise<void>,
+): (values: unknown, form: FormKitNode) => Promise<void> {
+  return async (values, form) => {
+    const result = await v.safeParseAsync(schema, values);
+    // The last submit's messages go, on every field: setErrors replaces them only on the fields it names.
+    form.clearErrors();
+    if (!result.success) {
+      const formMessages: string[] = [];
+      // A Map, not an object: a field named toString or constructor must not read Object's own properties.
+      const fieldMessages = new Map<string, string[]>();
+      for (const issue of result.issues) {
+        const path = (issue.path ?? []).map(({ key }) => String(key)).join('.');
+        if (path === '') {
+          formMessages.push(issue.message);
+        } else {
+          fieldMessages.set(path, [...(fieldMessages.get(path) ?? []), issue.message]);
+        }
+      }
+
+      form.setErrors(formMessages, Object.fromEntries(fieldMessages));
+      return;
+    }
+
+    await handler(result.output, form);
+  };
+}
+{{ else ~}}
+import type { FormKitNode } from '@formkit/core';
+import type { z } from 'zod';
+
+/**
+ * A FormKit form's submit handler that validates with a zod schema: each message goes to the field its issue names
+ * (customer.name, lines.1.quantity) and one without a field to the form, and only a valid form reaches the handler, with
+ * what the schema puts out (trimmed, coerced, defaulted).
+ */
+export function schemaSubmit<TSchema extends z.ZodType>(
+  schema: TSchema,
+  handler: (values: z.output<TSchema>, form: FormKitNode) => void | Promise<void>,
+): (values: unknown, form: FormKitNode) => Promise<void> {
+  return async (values, form) => {
+    const result = await schema.safeParseAsync(values);
+    // The last submit's messages go, on every field: setErrors replaces them only on the fields it names.
+    form.clearErrors();
+    if (!result.success) {
+      const formMessages: string[] = [];
+      // A Map, not an object: a field named toString or constructor must not read Object's own properties.
+      const fieldMessages = new Map<string, string[]>();
+      for (const issue of result.error.issues) {
+        const path = issue.path.map(String).join('.');
+        if (path === '') {
+          formMessages.push(issue.message);
+        } else {
+          fieldMessages.set(path, [...(fieldMessages.get(path) ?? []), issue.message]);
+        }
+      }
+
+      form.setErrors(formMessages, Object.fromEntries(fieldMessages));
+      return;
+    }
+
+    await handler(result.data, form);
+  };
+}
+{{ end ~}}

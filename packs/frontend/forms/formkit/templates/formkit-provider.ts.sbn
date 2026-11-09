@@ -1,0 +1,9 @@
+import { plugin } from '@formkit/vue';
+import type { App, Component } from 'vue';
+import config from '@/forms/formkit.config';
+
+/** Every <FormKit> input takes its classes and its message markup from src/forms/formkit.config.ts. */
+export const withFormKit = (app: App, root: Component) => {
+  app.use(plugin, config);
+  return root;
+};

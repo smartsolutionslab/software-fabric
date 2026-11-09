@@ -19,6 +19,10 @@ foreach (var context in contexts)
 }
 
 using var host = builder.Build();
+{{~ if slots["migration-runner.preflight"] != "" ~}}
+{{ slots["migration-runner.preflight"] }}
+
+{{~ end ~}}
 foreach (var context in contexts)
 {
     await using var scope = host.Services.CreateAsyncScope();

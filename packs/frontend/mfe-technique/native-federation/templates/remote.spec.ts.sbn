@@ -1,0 +1,85 @@
+import { expect, test } from '@playwright/test';
+
+/** A remote's build of a package it shares, as native federation names it in dist: react.<hash>-dev.js. */
+const sharedPackage = /\/(react|react-dom|_{{ name }}_ui)\.[^/]+\.js$/;
+
+test("{{ module.name }}'s page comes from its own remote, with the shell's react and design system", async ({ page }) => {
+  const entries: string[] = [];
+  const shared: string[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.endsWith('/remoteEntry.json')) {
+      entries.push(url.origin);
+    }
+    if (sharedPackage.test(url.pathname)) {
+      shared.push(url.href);
+    }
+  });
+
+  await page.goto('/');
+{{~ if project["backend.auth"] != "none" ~}}
+  {{ browser_sign_in "page" "'developer'" }}
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+{{~ end ~}}
+
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+
+  await expect(page.getByRole('heading', { name: '{{ module.namespace }}' })).toBeVisible();
+  // Loaded from the remote's own server, not bundled into the shell.
+  const shell = new URL(page.url()).origin;
+  expect(entries.some((origin) => origin !== shell)).toBe(true);
+  // The remote's own copies of the shared packages are never loaded: it renders with the shell's instances.
+  expect(shared).toEqual([]);
+});
+
+test("{{ module.name }}'s page loads again once its remote is back, without a reload", async ({ page, baseURL }) => {
+  // The remote's server is down: the browser's request for its remoteEntry.json fails, as when it is stopped.
+  const shell = new URL(baseURL ?? 'http://localhost:5173').origin;
+  let down = true;
+  await page.route(
+    (url) => url.pathname.endsWith('/remoteEntry.json') && url.origin !== shell,
+    (route) => (down ? route.abort('connectionrefused') : route.continue()),
+  );
+
+  await page.goto('/');
+{{~ if project["backend.auth"] != "none" ~}}
+  {{ browser_sign_in "page" "'developer'" }}
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+{{~ end ~}}
+
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+  await expect(page.getByRole('alert')).toHaveText('{{ module.name }} could not be loaded.');
+
+  // Back up: leaving the page and opening it again loads the remote, in the same document.
+  down = false;
+  await page.getByRole('link', { name: 'Home' }).click();
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+
+  await expect(page.getByRole('heading', { name: '{{ module.namespace }}' })).toBeVisible();
+});
+
+test("{{ module.name }}'s page loads again once its failed module is back", async ({ page, baseURL }) => {
+  // The remote's entry loads, but the module of its page fails, as when the server stops between the two requests.
+  const shell = new URL(baseURL ?? 'http://localhost:5173').origin;
+  let down = true;
+  await page.route(
+    (url) => url.pathname.endsWith('/Page.js') && url.origin !== shell,
+    (route) => (down ? route.abort('connectionrefused') : route.continue()),
+  );
+
+  await page.goto('/');
+{{~ if project["backend.auth"] != "none" ~}}
+  {{ browser_sign_in "page" "'developer'" }}
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+{{~ end ~}}
+
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+  await expect(page.getByRole('alert')).toHaveText('{{ module.name }} could not be loaded.');
+
+  // Back up: leaving the page and opening it again imports the page's module again, in the same document.
+  down = false;
+  await page.getByRole('link', { name: 'Home' }).click();
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+
+  await expect(page.getByRole('heading', { name: '{{ module.namespace }}' })).toBeVisible();
+});

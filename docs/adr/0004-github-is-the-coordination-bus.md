@@ -34,7 +34,10 @@ commit to `agent/<issue>`; a second agent's claim, built on a
 different commit, is not a fast-forward and is rejected, so it moves to the
 next issue. The name holds nothing that can change: with the title in it, two
 agents that each saw no branch could push two locks for one issue. The winner then sets `Status` and `Executor` and posts a claim
-comment.
+comment. An agent sent to one issue names it (`next.sh <lane> <executor>
+<issue>`): it claims that issue if it is eligible, and otherwise refuses with
+the reason rather than taking another, so steering an agent never means
+taking `agent:ready` off the issues before it.
 
 **Lease.** Every push renews the claim. A scheduled janitor workflow
 returns an issue to Todo when its branch's last commit is older than the

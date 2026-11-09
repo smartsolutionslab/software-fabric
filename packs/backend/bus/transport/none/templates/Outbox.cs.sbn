@@ -1,3 +1,6 @@
+{{~ if project["backend.tenancy"] != "none" && project["backend.tenancy"] != "column" ~}}
+#error The in-process outbox of backend.bus.transport.none keeps one table per module schema, so it supports backend.tenancy none and column only so far (docs/adr/0006 of the generator): with backend.tenancy {{ project["backend.tenancy"] }} a module's integration events would go to a tenant's schema, which has no outbox table and which nothing delivers from.
+{{~ end ~}}
 using System.Text.Json;
 using {{ namespace }}.Contracts;
 using Microsoft.EntityFrameworkCore;

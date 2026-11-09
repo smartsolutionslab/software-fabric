@@ -1,0 +1,9 @@
+namespace {{ namespace }}.Tenancy.Tests;
+
+/// <summary>A row of the sample ledger: what a module's entity is to tenancy, with nothing of its own.</summary>
+public sealed class LedgerEntry(Guid id, string text)
+{
+    public Guid Id { get; private set; } = id;
+
+    public string Text { get; private set; } = text;
+}

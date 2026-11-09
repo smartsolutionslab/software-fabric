@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Picks the model family that reviews a pull request: never the family that wrote it (board protocol, docs/adr).
-# Usage: reviewer.sh <base sha> <head sha>
+# Usage: reviewer.sh <base revision> <head revision>
 # Reads the Agent-Executor trailers of the commits in base..head, and Co-Authored-By trailers naming Claude or Codex
 # (a developer working with an assistant); prints claude or codex.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

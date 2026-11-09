@@ -1,4 +1,10 @@
+{{~ moves = slots["persistence.schema"] != "" ~}}
 using Microsoft.EntityFrameworkCore;
+{{~ if moves ~}}
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+{{~ end ~}}
 using Microsoft.Extensions.DependencyInjection;
 
 namespace {{ namespace }}.BuildingBlocks.Persistence;
@@ -8,6 +14,14 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
 {
     /// <summary>The application's services, for conventions that depend on the current request.</summary>
     public IServiceProvider Services { get; } = services;
+{{~ if moves ~}}
+
+    /// <summary>The module's own schema: the one its migrations name, and the one the MigrationRunner checks its model in.</summary>
+    public string ModuleSchema { get; } = schema;
+
+    /// <summary>The schema this instance works in: its tables, and its migrations history when it migrates.</summary>
+    public string CurrentSchema { get; } = {{ slots["persistence.schema"] }};
+{{~ end ~}}
 {{ slots["persistence.context-members"] }}
 {{~ if slots["persistence.save-changes"] != "" ~}}
 
@@ -24,15 +38,36 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
     }
 {{~ end ~}}
 
-{{~ if slots["persistence.interceptors"] != "" ~}}
+{{~ if slots["persistence.interceptors"] != "" || moves ~}}
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         {{ not_null "optionsBuilder" }}
+{{~ if slots["persistence.interceptors"] != "" ~}}
 
         // Per instance: an interceptor may keep state for the context it belongs to.
         optionsBuilder.AddInterceptors(
 {{ slots["persistence.interceptors"] }});
+{{~ end ~}}
+{{~ if moves ~}}
+
+        // EF Core keeps one model per context type; a module context gets one per schema. Its migrations are read
+        // through SchemaMigrationsAssembly in every schema, so one that cannot move fails before any of them runs, and
+        // SchemaModelCustomizer refuses what its model cannot take to another schema.
+        optionsBuilder.ReplaceService<IModelCacheKeyFactory, SchemaModelCacheKeyFactory>()
+            .ReplaceService<IModelCustomizer, SchemaModelCustomizer>()
+            .ReplaceService<IMigrationsAssembly, SchemaMigrationsAssembly>();
+        if (CurrentSchema != ModuleSchema)
+        {
+            // Outside the module's schema, its migrations (which name the module's schema) and their history move to
+            // this one. The model differs from the snapshot here by its schema alone; the MigrationRunner checks the
+            // two against each other in the module's schema.
+            var relational = RelationalOptionsExtension.Extract(optionsBuilder.Options).WithMigrationsHistoryTableSchema(CurrentSchema);
+            ((IDbContextOptionsBuilderInfrastructure)optionsBuilder).AddOrUpdateExtension(relational);
+            optionsBuilder.ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning));
+        }
+
+{{~ end ~}}
         base.OnConfiguring(optionsBuilder);
     }
 {{~ end ~}}
@@ -41,11 +76,16 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
     {
         {{ not_null "modelBuilder" }}
 
-        modelBuilder.HasDefaultSchema(schema);
+        modelBuilder.HasDefaultSchema({{ if moves }}CurrentSchema{{ else }}schema{{ end }});
         modelBuilder.ApplyConfigurationsFromAssembly(GetType().Assembly);
 {{ slots["persistence.model-conventions"] }}
         base.OnModelCreating(modelBuilder);
     }
+{{~ if moves ~}}
+
+    /// <summary>Whether SQL, or a name, qualifies an object with the module's schema: such SQL would reach the module's own objects.</summary>
+    internal bool NamesModuleSchema(string sql) => SchemaReferences.Qualify(sql, ModuleSchema);
+{{~ end ~}}
 {{~ if slots["persistence.save-changes"] != "" ~}}
 
     private void BeforeSaving()

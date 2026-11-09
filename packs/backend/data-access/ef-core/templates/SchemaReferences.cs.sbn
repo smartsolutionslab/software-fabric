@@ -1,0 +1,228 @@
+namespace {{ namespace }}.BuildingBlocks.Persistence;
+
+/// <summary>
+/// Whether SQL, or a name such as a provider's annotation, qualifies an object with a schema: the schema's identifier,
+/// quoted or not, then a period, with whitespace and comments allowed between them (<c>billing.x</c>,
+/// <c>"billing"."x"</c>, <c>billing /* c */ . x</c>). An unquoted identifier is compared as the database folds it, in
+/// lower case. Comments name nothing, and neither does a string literal, unless it is an object's name: cast to an
+/// object identifier type (<c>'"billing"."ids"'::regclass</c>) or given to a function that takes one
+/// (<c>nextval('billing.ids')</c>). So <c>'billing.example'</c> is a value, not a reference.
+/// </summary>
+public static class SchemaReferences
+{
+    private static readonly HashSet<string> NameFunctions = new(
+        ["nextval", "currval", "setval", "pg_get_serial_sequence", "to_regclass", "to_regcollation", "to_regnamespace", "to_regoper", "to_regoperator", "to_regproc", "to_regprocedure", "to_regrole", "to_regtype"],
+        StringComparer.Ordinal);
+
+    private enum Kind
+    {
+        Identifier,
+        Literal,
+        Period,
+        Other,
+    }
+
+    public static bool Qualify(string sql, string schema)
+    {
+        {{ not_null "sql" }}
+        {{ not_blank "schema" }}
+
+        var tokens = Tokens(sql);
+        for (var index = 0; index < tokens.Count; index++)
+        {
+            var (kind, text) = tokens[index];
+            if (kind == Kind.Identifier && text == schema && At(tokens, index + 1, Kind.Period))
+            {
+                return true;
+            }
+
+            if (kind == Kind.Literal && NamesAnObject(tokens, index) && Qualify(text, schema))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Whether the literal at the index is an object's name: <c>'x'::regclass</c>, <c>CAST('x' AS regclass)</c>,
+    /// <c>regclass 'x'</c>, <c>nextval('x')</c>, with the type qualified or not (<c>'x'::pg_catalog.regclass</c>).
+    /// </summary>
+    private static bool NamesAnObject(List<(Kind Kind, string Text)> tokens, int index) =>
+        (At(tokens, index + 1, Kind.Other, "::") && StartsAnObjectIdentifierType(tokens, index + 2))
+        || (At(tokens, index + 1, Kind.Identifier, "as") && StartsAnObjectIdentifierType(tokens, index + 2))
+        || IsObjectIdentifierType(tokens, index - 1)
+        || (At(tokens, index - 1, Kind.Other, "(") && index >= 2 && tokens[index - 2].Kind == Kind.Identifier && NameFunctions.Contains(tokens[index - 2].Text));
+
+    /// <summary>Whether an object identifier type's name starts at the index, qualified by its schema or not.</summary>
+    private static bool StartsAnObjectIdentifierType(List<(Kind Kind, string Text)> tokens, int index) =>
+        IsObjectIdentifierType(tokens, index)
+        || (At(tokens, index, Kind.Identifier) && At(tokens, index + 1, Kind.Period) && IsObjectIdentifierType(tokens, index + 2));
+
+    private static bool IsObjectIdentifierType(List<(Kind Kind, string Text)> tokens, int index) =>
+        index >= 0 && index < tokens.Count && tokens[index].Kind == Kind.Identifier && tokens[index].Text.StartsWith("reg", StringComparison.Ordinal);
+
+    private static bool At(List<(Kind Kind, string Text)> tokens, int index, Kind kind, string? text = null) =>
+        index >= 0 && index < tokens.Count && tokens[index].Kind == kind && (text is null || tokens[index].Text == text);
+
+    /// <summary>The SQL's tokens without whitespace and comments: identifiers (folded unless quoted), literals' text, the rest.</summary>
+    private static List<(Kind Kind, string Text)> Tokens(string sql)
+    {
+        List<(Kind Kind, string Text)> tokens = [];
+        var position = 0;
+        while (position < sql.Length)
+        {
+            var skipped = SkipWhitespaceOrComment(sql, position);
+            if (skipped > position)
+            {
+                position = skipped;
+                continue;
+            }
+
+            (position, var token) = ReadToken(sql, position);
+            tokens.Add(token);
+        }
+
+        return tokens;
+    }
+
+    /// <summary>The position after whitespace or a comment at the position (block comments nest), or the position itself.</summary>
+    private static int SkipWhitespaceOrComment(string sql, int position)
+    {
+        if (char.IsWhiteSpace(sql[position]))
+        {
+            return position + 1;
+        }
+
+        if (Starts(sql, position, "--"))
+        {
+            var end = sql.IndexOf('\n', position);
+            return end < 0 ? sql.Length : end + 1;
+        }
+
+        return Starts(sql, position, "/*") ? EndOfBlockComment(sql, position) : position;
+    }
+
+    private static int EndOfBlockComment(string sql, int position)
+    {
+        var depth = 0;
+        while (position < sql.Length)
+        {
+            if (Starts(sql, position, "/*"))
+            {
+                depth++;
+                position += 2;
+            }
+            else if (Starts(sql, position, "*/"))
+            {
+                position += 2;
+                if (--depth == 0)
+                {
+                    return position;
+                }
+            }
+            else
+            {
+                position++;
+            }
+        }
+
+        return sql.Length;
+    }
+
+    /// <summary>The token at the position, and where it ends.</summary>
+    private static (int End, (Kind Kind, string Text) Token) ReadToken(string sql, int position)
+    {
+        var current = sql[position];
+        switch (current)
+        {
+            case '"':
+                var (identifierEnd, identifier) = Quoted(sql, position, '"', backslashEscapes: false);
+                return (identifierEnd, (Kind.Identifier, identifier));
+            case '\'':
+                var (literalEnd, literal) = Quoted(sql, position, '\'', backslashEscapes: false);
+                return (literalEnd, (Kind.Literal, literal));
+            case '$':
+                return DollarQuoted(sql, position);
+            case '.':
+                return (position + 1, (Kind.Period, "."));
+            case ':' when Starts(sql, position, "::"):
+                return (position + 2, (Kind.Other, "::"));
+        }
+
+        if (!char.IsLetter(current) && current != '_')
+        {
+            return (position + 1, (Kind.Other, current.ToString()));
+        }
+
+        var wordEnd = position;
+        while (wordEnd < sql.Length && (char.IsLetterOrDigit(sql[wordEnd]) || sql[wordEnd] is '_' or '$'))
+        {
+            wordEnd++;
+        }
+
+        // E'...' is a string with backslash escapes, so E'\'' does not end at its second quote.
+        if (wordEnd == position + 1 && current is 'E' or 'e' && wordEnd < sql.Length && sql[wordEnd] == '\'')
+        {
+            var (escapedEnd, escaped) = Quoted(sql, wordEnd, '\'', backslashEscapes: true);
+            return (escapedEnd, (Kind.Literal, escaped));
+        }
+
+        return (wordEnd, (Kind.Identifier, sql[position..wordEnd].ToLowerInvariant()));
+    }
+
+    /// <summary>A quoted text at the position, where a doubled quote stands for one: where it ends, and its text.</summary>
+    private static (int End, string Text) Quoted(string sql, int position, char quote, bool backslashEscapes)
+    {
+        var text = new System.Text.StringBuilder();
+        var current = position + 1;
+        while (current < sql.Length)
+        {
+            if (backslashEscapes && sql[current] == '\\' && current + 1 < sql.Length)
+            {
+                text.Append(sql[current + 1]);
+                current += 2;
+            }
+            else if (sql[current] != quote)
+            {
+                text.Append(sql[current]);
+                current++;
+            }
+            else if (current + 1 < sql.Length && sql[current + 1] == quote)
+            {
+                text.Append(quote);
+                current += 2;
+            }
+            else
+            {
+                return (current + 1, text.ToString());
+            }
+        }
+
+        return (sql.Length, text.ToString());
+    }
+
+    /// <summary>A dollar-quoted string ($$...$$, $tag$...$tag$) at the position, or the $ alone (a parameter's, $1).</summary>
+    private static (int End, (Kind Kind, string Text) Token) DollarQuoted(string sql, int position)
+    {
+        var tagEnd = position + 1;
+        while (tagEnd < sql.Length && (char.IsLetter(sql[tagEnd]) || sql[tagEnd] == '_' || (tagEnd > position + 1 && char.IsDigit(sql[tagEnd]))))
+        {
+            tagEnd++;
+        }
+
+        if (tagEnd >= sql.Length || sql[tagEnd] != '$')
+        {
+            return (position + 1, (Kind.Other, "$"));
+        }
+
+        var delimiter = sql[position..(tagEnd + 1)];
+        var closing = sql.IndexOf(delimiter, tagEnd + 1, StringComparison.Ordinal);
+        return closing < 0
+            ? (sql.Length, (Kind.Literal, sql[(tagEnd + 1)..]))
+            : (closing + delimiter.Length, (Kind.Literal, sql[(tagEnd + 1)..closing]));
+    }
+
+    private static bool Starts(string sql, int position, string text) => string.CompareOrdinal(sql, position, text, 0, text.Length) == 0;
+}

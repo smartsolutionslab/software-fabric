@@ -9,6 +9,12 @@ else
   button_import = "import { Button } from '@/components/ui/button';"
   secondary = "secondary"
 end ~}}
+{{~ func form_class(tailwind)
+  if css_modules
+    ret ':form-class="styles.form"'
+  end
+  ret 'form-class="' + tailwind + '"'
+end ~}}
 {{~ func class_of(tailwind, module)
   if css_modules
     ret ':class="styles.' + module + '"'
@@ -18,15 +24,28 @@ end ~}}
 {{~ generative = array.contains project["frontend.dashboards"] "generative" ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
-{{~ if !((ui == "shadcn-vue" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form")) || (ui == "reka-ui" && project["frontend.forms"] == "vee-validate")) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+{{~ formkit = project["frontend.forms"] == "formkit" ~}}
+{{~ if !((ui == "shadcn-vue" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form" || project["frontend.forms"] == "formkit")) || (ui == "reka-ui" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "formkit"))) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate or TanStack Form, or reka-ui with vee-validate, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
 {%{<script setup lang="ts">
-import { GridItem, GridLayout, type Layout } from 'grid-layout-plus';
-}%}{{~ if tanstack ~}}
+}%}{{~ if formkit ~}}
+import type { FormKitNode } from '@formkit/core';
+import { FormKit } from '@formkit/vue';
+{{~ end ~}}
+{%{import { GridItem, GridLayout, type Layout } from 'grid-layout-plus';
+}%}{{~ if formkit ~}}
+{{~ if valibot ~}}
+import * as v from 'valibot';
+import { computed, ref, watch } from 'vue';
+{{~ else ~}}
+import { computed, ref, watch } from 'vue';
+import { z } from 'zod';
+{{~ end ~}}
+{{~ else if tanstack ~}}
 import { revalidateLogic, useForm } from '@tanstack/vue-form';
 {{~ if valibot ~}}
 import * as v from 'valibot';
@@ -46,7 +65,9 @@ import { z } from 'zod';
 {{~ end ~}}
 {%{import { useGetDashboardsWidgets, usePutDashboardsId, type WidgetDescriptionDto } from '@/api/generated';
 }%}{{ button_import }}
-{{~ if !tanstack ~}}
+{{~ if formkit ~}}
+import { schemaSubmit } from '@/forms/schemaSubmit';
+{{~ else if !tanstack ~}}
 import { toTypedSchema } from '@/forms/toTypedSchema';
 {{~ end ~}}
 {%{import Failure from './Failure.vue';
@@ -164,7 +185,52 @@ const change = (next: (current: Placement[]) => Placement[]) => {
   edited();
 };
 
-}%}{{~ if tanstack ~}}
+}%}{{~ if formkit ~}}
+{%{const submit = schemaSubmit(nameSchema, async ({ name }) => {
+  const submitted = revision.value;
+  try {
+    await save({ id: dashboard.id, data: { name, widgets: placements.value } });
+    savedRevision.value = submitted;
+    failed.value = false;
+    saves.value += 1;
+    emit('saved');
+  } catch {
+    failed.value = true;
+  }
+});
+
+// The widget form, which another page of the picker resets.
+let adding: FormKitNode | undefined;
+const addingNode = (node: FormKitNode) => (adding = node);
+const source = ref('');
+const visual = ref('');
+const chosen = computed(() => listed.value.get(source.value));
+const sources = computed(() => [
+  { label: 'Choose a widget', value: '' },
+  ...catalog.value.map((widget) => ({ label: widget.title, value: widget.id })),
+]);
+const shownAs = computed<{ label: string; value: string }[]>(() => [...visuals[chosen.value?.kind ?? 'Chart']]);
+
+// A widget chosen: show it the first way its kind can be shown.
+watch(source, (chosenSource) => (visual.value = visuals[listed.value.get(chosenSource)?.kind ?? 'Chart'][0].value));
+
+// Another page of the picker lists other widgets: a choice from this one would be added with the next page's visual.
+const pickerPage = (page: number) => {
+  catalogPage.value = page;
+  adding?.reset();
+};
+
+const add = schemaSubmit(widgetSchema, ({ source: chosenSource, visual: chosenVisual }, form) => {
+  const choice = checkChoice(catalog.value, chosenSource, chosenVisual);
+  if (!choice.ok) {
+    form.setErrors([], { [choice.field]: [choice.message] });
+    return;
+  }
+
+  change((current) => [...current, nextPlacement(current, uuidV7(), chosenSource, chosenVisual)]);
+  form.reset();
+});
+}%}{{~ else if tanstack ~}}
 {%{const naming = useForm({
   defaultValues: { name: dashboard.name },
   validationLogic: revalidateLogic(),
@@ -370,7 +436,42 @@ const tiles = computed(() =>
 
 <template>
   <section aria-label="Dashboard" }%}{{ class_of "flex flex-col gap-4" "canvas" }}{%{>
-    <form novalidate }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{ @submit="submit">
+}%}{{~ if formkit ~}}
+{{~ if css_modules ~}}
+{%{    <FormKit type="form" :actions="false" :value="{ name: dashboard.name }" :form-class="styles.form" @submit="submit">
+}%}{{~ else ~}}
+{%{    <FormKit
+      type="form"
+      :actions="false"
+      :value="{ name: dashboard.name }"
+      form-class="flex flex-wrap items-end gap-2"
+      @submit="submit"
+    >
+}%}{{~ end ~}}
+{%{      <FormKit type="text" name="name" label="Dashboard name" @input="edited" />
+      <}%}{{ button }}{%{ type="submit" :disabled="saving">Save dashboard</}%}{{ button }}{%{>
+      <p v-if="savedRevision === revision" role="status">Saved.</p>
+      <p v-if="failed" role="alert">The dashboard could not be saved.</p>
+    </FormKit>
+
+    <FormKit type="form" :actions="false" }%}{{ form_class "flex flex-wrap items-end gap-2" }}{%{ @node="addingNode" @submit="add">
+      <FormKit type="select" name="source" label="Widget" v-model="source" :options="sources" :disabled="loading" />
+      <FormKit type="select" name="visual" label="Shown as" v-model="visual" :options="shownAs" :disabled="loading" />
+      <}%}{{ button }}{%{ type="submit" variant="}%}{{ secondary }}{%{" :disabled="loading || full || !roomLeft">Add widget</}%}{{ button }}{%{>
+      <p v-if="full">A dashboard holds at most {{ maximumWidgets }} widgets.</p>
+      <p v-if="!full && !roomLeft">
+        There is no room for another widget: a dashboard reaches down to row {{ lowest }}.
+      </p>
+      <Pager
+        label="widgets"
+        :page="catalogPage"
+        :page-size="catalogPageSize"
+        :total="loading ? undefined : widgets?.totalCount"
+        @page="pickerPage"
+      />
+    </FormKit>
+}%}{{~ else ~}}
+{%{    <form novalidate }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{ @submit="submit">
       <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
         Dashboard name
 }%}{{~ if tanstack ~}}
@@ -476,7 +577,8 @@ const tiles = computed(() =>
         @page="pickerPage"
       />
     </form>
-    <Failure
+}%}{{~ end ~}}
+{%{    <Failure
       v-if="catalogFailed"
       message="The widgets could not be loaded."
       retry="Try loading the widgets again"
