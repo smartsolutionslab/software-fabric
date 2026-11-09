@@ -441,15 +441,16 @@ dimensions:
       web.openapi-paths: { description: "Entries of the checked-in OpenAPI document's paths, after the host's own, as the running host serves them (indented four spaces), for endpoints a pack generates.", separator: ",\n" }
       web.openapi-schemas: { description: "Entries of the checked-in OpenAPI document's components.schemas, one per contribution and indented six spaces, as the running host serves them; the document sorts them by name with the host's own.", separator: "\n\n" }
     note: "Always generated from the backend's OpenAPI document; CI fails when it is stale."
+    # Each client is built from the document only the rest protocol serves (#415).
     options:
       rtk-query-codegen:
         tier: supported
-        requires: ["frontend.state == redux-toolkit"]
-      orval:         { tier: supported }
+        requires: ["frontend.state == redux-toolkit", "backend.api-protocols has rest"]
+      orval:         { tier: supported, requires: ["backend.api-protocols has rest"] }
       # A plain typed client: TanStack Query's caches wrap its calls; Redux Toolkit's server data is RTK Query (#264).
       openapi-fetch:
         tier: experimental
-        requires: ["frontend.state != redux-toolkit"]
+        requires: ["frontend.state != redux-toolkit", "backend.api-protocols has rest"]
 
   frontend.routing:
     scope: project

@@ -91,6 +91,16 @@ public class ValidateCommandTests
         run.Error.ShouldContain("error: module defaults: module.communication requires module.communication has integration-events, but module.communication is empty.");
     }
 
+    /// <summary>Every API client is generated from the OpenAPI document, which only the rest protocol serves (#415).</summary>
+    [Fact]
+    public void An_api_client_without_the_rest_protocol_exits_one_and_prints_the_sentence()
+    {
+        var run = CliRun.Of("validate", "--profile", "lean-crud", "--set", "backend.api-protocols=", "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: frontend.api-client=orval requires backend.api-protocols has rest, but backend.api-protocols is empty.");
+    }
+
     [Fact]
     public void Several_overrides_are_applied()
     {

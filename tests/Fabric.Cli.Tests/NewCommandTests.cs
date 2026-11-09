@@ -87,6 +87,27 @@ public sealed class NewCommandTests : IDisposable
         Directory.Exists(Path.Combine(root, "broken")).ShouldBeFalse();
     }
 
+    /// <summary>Every API client is generated from the OpenAPI document, which only the rest protocol serves (#415).</summary>
+    [Fact]
+    public void An_api_client_without_the_rest_protocol_writes_nothing()
+    {
+        var run = CliRun.Of(
+            "new",
+            Path.Combine(root, "broken"),
+            "--catalog",
+            Paths.RepositoryCatalog,
+            "--packs",
+            Paths.RepositoryPacks,
+            "--profile",
+            "lean-crud",
+            "--set",
+            "backend.api-protocols=");
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: frontend.api-client=orval requires backend.api-protocols has rest, but backend.api-protocols is empty.");
+        Directory.Exists(Path.Combine(root, "broken")).ShouldBeFalse();
+    }
+
     [Fact]
     public void A_profile_whose_packs_do_not_exist_yet_reports_each_missing_pack()
     {
