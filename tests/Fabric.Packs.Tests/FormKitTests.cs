@@ -15,6 +15,11 @@ public sealed partial class FormKitTests
     private const string Vue = "saas-standard-vue";
     private const string FormKit = "frontend.forms=formkit";
     private const string Valibot = "frontend.validation=valibot";
+    private const string RekaUi = "frontend.ui-library=reka-ui";
+    private const string CssModules = "frontend.styling=css-modules";
+
+    /// <summary>shadcn-vue's theme colours; Reka UI's projects define none of them.</summary>
+    private static readonly string[] ThemeColours = ["primary", "muted", "destructive", "card", "input", "ring", "accent", "background"];
 
     private static readonly string[] VueForms =
     [
@@ -210,11 +215,100 @@ public sealed partial class FormKitTests
     [Fact]
     public void With_another_vue_ui_library_the_formkit_screens_fail_saying_what_they_are_built_from()
     {
-        var files = Files(Vue, [FormKit, "frontend.ui-library=reka-ui", .. VueAgentAndDashboards]);
+        var files = FilesStandingIn([FormKit, "frontend.ui-library=vuetify", .. VueAgentAndDashboards]);
 
-        files["web/app/src/agents/AgentConversation.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate, and zod or valibot only so far; frontend.ui-library is reka-ui, frontend.forms is formkit");
-        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate, and zod or valibot only so far; frontend.ui-library is reka-ui, frontend.forms is formkit");
-        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate, and zod or valibot only so far; frontend.ui-library is reka-ui, frontend.forms is formkit");
+        files["web/app/src/agents/AgentConversation.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is formkit");
+        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is formkit");
+        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is formkit");
+        files["web/app/src/forms/formkit.config.ts"].ShouldStartWith("throw new Error('The FormKit pack styles its inputs for shadcn-vue or reka-ui only so far; frontend.ui-library is vuetify");
+    }
+
+    [Fact]
+    public void With_css_modules_the_formkit_config_takes_each_sections_class_from_a_css_module_of_its_own()
+    {
+        var files = Files(Vue, FormKit, RekaUi, CssModules);
+        var config = files["web/app/src/forms/formkit.config.ts"];
+
+        config.ShouldContain("import styles from './formkit.module.css';");
+        foreach (var section in new[] { "outer", "wrapper", "label", "input", "help", "messages", "message" })
+        {
+            config.ShouldContain($"{section}: styles.{section},");
+        }
+
+        config.ShouldContain("textarea: { input: `${styles.input} ${styles.textarea}` },");
+        config.ShouldContain("message: { $el: 'p', attrs: { role: 'alert' } }");
+        config.ShouldNotContain("throw new Error(");
+        config.ShouldNotContain("rounded-md");
+        config.ShouldNotContain("slate");
+        UnstyledClasses(files, "web/app/src/forms/formkit.config.ts").ShouldBeEmpty();
+
+        var stylesheet = files["web/app/src/forms/formkit.module.css"];
+        stylesheet.ShouldContain("[data-errors='true']", customMessage: "FormKit marks an input with errors on its outer section only");
+        stylesheet.ShouldNotContain("@apply");
+        stylesheet.ShouldNotContain("tailwind");
+        Adr(files).ShouldContain("src/forms/formkit.module.css");
+        files["AGENTS.md"].ShouldContain(":form-class=\"styles.");
+
+        Files(Vue, FormKit, RekaUi).Keys.ShouldNotContain("web/app/src/forms/formkit.module.css");
+        Files(Vue, FormKit).Keys.ShouldNotContain("web/app/src/forms/formkit.module.css");
+    }
+
+    [Theory]
+    [InlineData("tailwind")]
+    [InlineData("css-modules")]
+    public void With_reka_ui_the_formkit_screens_use_base_button_and_secondary_becomes_outline(string styling)
+    {
+        var files = Files(Vue, [FormKit, RekaUi, $"frontend.styling={styling}", .. VueAgentAndDashboards]);
+
+        foreach (var path in VueForms)
+        {
+            var content = files[path];
+            content.ShouldNotContain("throw new Error(", customMessage: path);
+            content.ShouldContain("<FormKit type=\"form\" :actions=\"false\"", customMessage: path);
+            content.ShouldContain("import BaseButton from '@/components/ui/BaseButton.vue';", customMessage: path);
+            content.ShouldNotContain("@/components/ui/button", customMessage: path);
+            content.ShouldNotContain("<Button", customMessage: path);
+            content.ShouldNotContain("variant=\"secondary\"", customMessage: path);
+        }
+
+        Regex.Count(files["web/app/src/agents/AgentConversation.vue"], "<BaseButton\\b").ShouldBe(1);
+        Regex.Count(files["web/app/src/dashboards/DashboardCanvas.vue"], "<BaseButton\\b").ShouldBe(2);
+        Regex.Count(files["web/app/src/dashboards/DashboardAssistant.vue"], "<BaseButton\\b").ShouldBe(1);
+        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldContain("variant=\"outline\" :disabled=\"loading || full || !roomLeft\">Add widget</BaseButton>");
+        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldContain("variant=\"outline\" :disabled=\"running\"");
+        Adr(files, "agent-ui-ag-ui").ShouldContain("Reka UI `BaseButton` and FormKit");
+        Adr(files, "dashboards-user-editable").ShouldContain("Reka UI `BaseButton` with FormKit and");
+    }
+
+    [Fact]
+    public void With_reka_ui_and_tailwind_the_formkit_screens_name_palette_colours_not_shadcn_vues_theme()
+    {
+        var files = Files(Vue, [FormKit, RekaUi, .. VueAgentAndDashboards]);
+
+        foreach (var path in VueForms)
+        {
+            files[path].ShouldNotContain("throw new Error(", customMessage: path);
+            var classes = string.Join(' ', ClassAttribute().Matches(files[path]).Select(match => match.Groups["classes"].Value));
+            foreach (var colour in ThemeColours)
+            {
+                Regex.IsMatch(classes, $@"\b(bg|text|border|ring|outline)-{colour}(\b|/)").ShouldBeFalse($"{path} uses shadcn-vue's {colour}: {classes}");
+            }
+        }
+    }
+
+    [Fact]
+    public void With_css_modules_the_formkit_screens_take_their_classes_from_their_modules_and_write_none_out()
+    {
+        var files = Files(Vue, [FormKit, RekaUi, CssModules, .. VueAgentAndDashboards]);
+
+        foreach (var path in VueForms)
+        {
+            var content = files[path];
+            content.ShouldContain(":form-class=\"styles.", customMessage: path);
+            ClassAttribute().Matches(content).Select(match => match.Value).ShouldBeEmpty(path);
+            Regex.Matches(content, @"(?<![:\w-])[\w-]+-class=""").Select(match => match.Value).ShouldBeEmpty(path);
+            UnstyledClasses(files, path).ShouldBeEmpty(path);
+        }
     }
 
     [Theory]
@@ -260,6 +354,28 @@ public sealed partial class FormKitTests
         FormatCheck(project);
     }
 
+    [Theory]
+    [InlineData("tailwind")]
+    [InlineData("css-modules")]
+    public void With_reka_ui_the_vue_agent_panel_and_dashboards_on_formkit_build_lint_pass_their_own_tests_and_stay_formatted(string styling)
+    {
+        using var project = new GeneratedProject(Vue, [FormKit, RekaUi, $"frontend.styling={styling}", .. VueAgentAndDashboards]);
+
+        var testOutput = Plain(InstallBuildLintAndTest(project));
+
+        testOutput.ShouldContain("✓ src/agents/AgentPanel.test.ts > ");
+        testOutput.ShouldContain("✓ src/dashboards/DashboardEditor.test.ts > a new dashboard gets a fresh time-ordered id and needs a name before it is saved");
+        testOutput.ShouldContain("✓ src/dashboards/DashboardAssistant.test.ts > ");
+        testOutput.ShouldContain("✓ src/forms/schemaSubmit.test.ts > ");
+        if (styling == "css-modules")
+        {
+            testOutput.ShouldContain("✓ src/cssModules.test.ts > every class a component takes from its CSS module has a rule with declarations there");
+        }
+
+        testOutput.ShouldNotContain(" × ");
+        FormatCheck(project);
+    }
+
     /// <summary>The sign-up form with the same rules written in Valibot.</summary>
     private static string ToValibot(string form) => form
         .Replace("import { z } from 'zod';", "import * as v from 'valibot';", StringComparison.Ordinal)
@@ -284,6 +400,45 @@ public sealed partial class FormKitTests
         var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, overrides);
         generated.Errors.ShouldBeEmpty($"{profile} {string.Join(' ', overrides)}");
         return generated.Files.ToDictionary(file => file.Path, file => file.Content);
+    }
+
+    /// <summary>The project with the overrides; options without a pack (vuetify) are stood in.</summary>
+    private static Dictionary<string, string> FilesStandingIn(string[] overrides)
+    {
+        using var standIns = new StandIns();
+        var packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, Vue, overrides);
+        var generated = Generator.New(Repository.Catalog, packs, "shop", Vue, overrides);
+        generated.Errors.ShouldBeEmpty();
+        return generated.Files.ToDictionary(file => file.Path, file => file.Content);
+    }
+
+    /// <summary>
+    /// The classes a source takes from the CSS modules it imports (<c>styles.name</c>) that have no rule with a
+    /// declaration there; a module it imports must exist.
+    /// </summary>
+    private static List<string> UnstyledClasses(Dictionary<string, string> files, string path)
+    {
+        List<string> unstyled = [];
+        var imports = ModuleImport().Matches(files[path]);
+        imports.ShouldNotBeEmpty($"{path} imports no CSS module");
+        foreach (Match import in imports)
+        {
+            var name = import.Groups["name"].Value;
+            var module = Path.GetFullPath(Path.Combine("/", Path.GetDirectoryName(path)!, import.Groups["module"].Value))[1..];
+            files.Keys.ShouldContain(module, $"{path} imports {module}");
+            HashSet<string> styled = [];
+            foreach (Match rule in Regex.Matches(files[module], @"(?<selector>[^{}]+)\{(?<body>[^{}]*)\}"))
+            {
+                if (Regex.IsMatch(rule.Groups["body"].Value, @"[\w-]+\s*:\s*[^;\s]"))
+                {
+                    styled.UnionWith(Regex.Matches(rule.Groups["selector"].Value, @"\.(?<class>-?[_a-zA-Z][\w-]*)").Select(match => match.Groups["class"].Value));
+                }
+            }
+
+            unstyled.AddRange(Regex.Matches(files[path], $@"\b{name}\.(?<class>[A-Za-z_]\w*)").Select(use => use.Groups["class"].Value).Distinct().Where(use => !styled.Contains(use)).Select(use => $"{module}: {use}"));
+        }
+
+        return unstyled;
     }
 
     /// <summary>The generated ADR of an option, by the end of its file name; the forms option's by default.</summary>
@@ -333,4 +488,10 @@ public sealed partial class FormKitTests
 
     [GeneratedRegex(@"\x1B\[[0-9;]*m")]
     private static partial Regex Escapes();
+
+    [GeneratedRegex(@"(?<![:\w-])class=""(?<classes>[^""]*)""")]
+    private static partial Regex ClassAttribute();
+
+    [GeneratedRegex(@"import (?<name>\w+) from '(?<module>\.{1,2}/[^']+\.module\.css)';")]
+    private static partial Regex ModuleImport();
 }
