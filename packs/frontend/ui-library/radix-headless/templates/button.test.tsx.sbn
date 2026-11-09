@@ -1,0 +1,50 @@
+{{~ if project["frontend.styling"] == "css-modules" ~}}
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, expect, test } from 'vitest';
+import { Button } from './button';
+import styles from './button.module.css';
+
+// Vitest runs without globals, so Testing Library cannot register its own cleanup; each test renders one button.
+afterEach(cleanup);
+
+test('a button is a button with the default look', () => {
+  render(<Button>Save</Button>);
+
+  expect(screen.getByRole('button', { name: 'Save' }).classList).toContain(styles.variantDefault);
+});
+
+test("with asChild the child takes the button's look and stays what it is", () => {
+  render(
+    <Button asChild variant="outline">
+      <a href="/billing">Billing</a>
+    </Button>,
+  );
+
+  expect(screen.getByRole('link', { name: 'Billing' }).classList).toContain(styles.variantOutline);
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+});
+{{~ else ~}}
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, expect, test } from 'vitest';
+import { Button } from './button';
+
+// Vitest runs without globals, so Testing Library cannot register its own cleanup; each test renders one button.
+afterEach(cleanup);
+
+test('a button is a button with the default look', () => {
+  render(<Button>Save</Button>);
+
+  expect(screen.getByRole('button', { name: 'Save' })).toHaveClass('bg-slate-900', 'text-white');
+});
+
+test("with asChild the child takes the button's look and stays what it is", () => {
+  render(
+    <Button asChild variant="outline">
+      <a href="/billing">Billing</a>
+    </Button>,
+  );
+
+  expect(screen.getByRole('link', { name: 'Billing' })).toHaveClass('border-slate-300');
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+});
+{{~ end ~}}

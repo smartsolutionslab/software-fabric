@@ -1,0 +1,15 @@
+option: frontend.ui-library.radix-headless
+files:
+  - { template: templates/utils.ts.sbn, target: web/app/src/lib/utils.ts }
+  - { template: templates/button.tsx.sbn, target: web/app/src/components/ui/button.tsx }
+  - { template: templates/button.test.tsx.sbn, target: web/app/src/components/ui/button.test.tsx }
+  - { template: templates/button.module.css.sbn, target: web/app/src/components/ui/button.module.css, when: 'project["frontend.styling"] == "css-modules"' }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 20 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing another React component library (MUI, Ant Design, Mantine, Chakra, Headless UI, React Aria) fails lint.", file: templates/restricted.sbn }
+  - { kind: unit-test, describes: "Button renders a button, and with asChild gives its child the button's look instead, the look coming from button.module.css with CSS Modules (src/components/ui/button.test.tsx).", file: templates/button.test.tsx.sbn }

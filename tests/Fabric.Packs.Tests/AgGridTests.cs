@@ -182,7 +182,7 @@ public sealed partial class AgGridTests
     [InlineData(Vue, "reka-ui", "web/app/src/components/ui/DataTable.vue", ":theme=\"theme\"")]
     public void With_another_ui_library_the_grid_is_quartz_as_shipped_and_the_adr_records_the_exception(string profile, string library, string table, string themeProperty)
     {
-        // Stands in for a library whose pack does not exist yet (radix-headless is M3-49); a real pack takes no part here.
+        // Stands in for the library only where it has no pack; radix-headless and reka-ui have theirs, which TryAdd keeps.
         using var probe = new ProbePack($"frontend.ui-library.{library}", new Dictionary<string, string>());
         var packs = Repository.Packs.Packs.ToDictionary();
         packs.TryAdd(probe.Manifest.Option, probe.Manifest);

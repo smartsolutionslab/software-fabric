@@ -30,8 +30,9 @@ files:
   - { template: templates/web/AgentPanel.test.tsx.sbn, target: web/app/src/agents/AgentPanel.test.tsx, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa"' }
   - { template: templates/web/AgentPanel.vue.sbn, target: web/app/src/agents/AgentPanel.vue, when: 'project["frontend.framework"] == "vue" && project["frontend.architecture"] == "spa"' }
   - { template: templates/web/AgentConversation.vue.sbn, target: web/app/src/agents/AgentConversation.vue, when: 'project["frontend.framework"] == "vue" && project["frontend.architecture"] == "spa"' }
-  # CSS Modules (ADR-0006): the Vue panel's classes come from a module beside it.
+  # CSS Modules (ADR-0006): the panel's classes come from a module beside it (AgentConversation in Vue, AgentPanel in React, one stylesheet).
   - { template: templates/web/AgentConversation.module.css.sbn, target: web/app/src/agents/AgentConversation.module.css, when: 'project["frontend.framework"] == "vue" && project["frontend.architecture"] == "spa" && project["frontend.styling"] == "css-modules"' }
+  - { template: templates/web/AgentConversation.module.css.sbn, target: web/app/src/agents/AgentPanel.module.css, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa" && project["frontend.styling"] == "css-modules" && project["frontend.ui-library"] != "mui"' }
   - { template: templates/web/agent-panel.spec.ts.sbn, target: web/app/e2e/agent-panel.spec.ts, when: '(project["frontend.framework"] == "react" || project["frontend.framework"] == "vue") && project["frontend.architecture"] == "spa"' }
   # Vue's component test; with micro-frontends, a test that fails saying the panel is not built there yet.
   - { template: templates/web/AgentPanel.test.ts.sbn, target: web/app/src/agents/AgentPanel.test.ts, when: 'project["frontend.framework"] != "react" || project["frontend.architecture"] != "spa"' }

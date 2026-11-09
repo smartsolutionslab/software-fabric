@@ -1,3 +1,10 @@
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  ret 'className="' + tailwind + '"'
+end ~}}
 {{~ if project["frontend.ui-library"] == "mui" ~}}
 {%{import { Button, Stack, Typography } from '@mui/material';
 import { useState } from 'react';
@@ -98,6 +105,9 @@ import { Failure } from './Failure';
 import { fromSaved } from './layout';
 import { Pager } from './Pager';
 import { uuidV7 } from './uuidV7';
+{{~ if css_modules ~}}
+import styles from './DashboardEditor.module.css';
+{{~ end ~}}
 
 const pageSize = 100;
 const noDashboards: DashboardSummaryDto[] = [];
@@ -127,9 +137,9 @@ export function DashboardEditor() {
   }
 
   return (
-    <main className="flex flex-col gap-4 p-4">
-      <h1 className="text-xl font-semibold">Dashboards</h1>
-      <nav aria-label="Your dashboards" className="flex flex-wrap items-center gap-2">
+    <main {{ class_of "flex flex-col gap-4 p-4" "editor" }}>
+      <h1 {{ class_of "text-xl font-semibold" "title" }}>Dashboards</h1>
+      <nav aria-label="Your dashboards" {{ class_of "flex flex-wrap items-center gap-2" "dashboards" }}>
         {dashboards.isError ? (
           <Failure
             message="Your dashboards could not be loaded."

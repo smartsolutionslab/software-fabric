@@ -100,6 +100,8 @@ public class RuleEvaluatorTests
         "module defaults: module.event-store=kurrentdb requires backend.tenancy == none, but backend.tenancy is column.")]
     [InlineData("saas-standard-vue", new[] { "frontend.design-system=tokens-and-components" },
         "frontend.design-system=tokens-and-components requires frontend.framework == react, but frontend.framework is vue.")]
+    [InlineData("saas-standard-react", new[] { "frontend.design-system=tokens-and-components", "frontend.styling=css-modules", "frontend.ui-library=radix-headless" },
+        "frontend.design-system=tokens-and-components requires frontend.styling == tailwind, but frontend.styling is css-modules.")]
     [InlineData("saas-standard-vue", new[] { "frontend.architecture=micro-frontends", "frontend.design-system=tokens" },
         "frontend.mfe-technique=module-federation requires frontend.framework == react, but frontend.framework is vue.")]
     [InlineData("saas-standard-react", new[] { "frontend.styling=library-theme", "frontend.ui-library=radix-headless" },

@@ -1,3 +1,10 @@
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  ret 'className="' + tailwind + '"'
+end ~}}
 {{~ if project["frontend.ui-library"] == "mui" ~}}
 {%{import { Button, Stack } from '@mui/material';
 import { useEffect } from 'react';
@@ -60,6 +67,9 @@ export function Pager({ label, page, pageSize, total, onPage }: PagerProps) {
 }%}{{~ else ~}}
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+{{~ if css_modules ~}}
+import styles from './Pager.module.css';
+{{~ end ~}}
 
 interface PagerProps {
   /** What is paged, for the buttons' names: "Next page of {label}". */
@@ -89,7 +99,7 @@ export function Pager({ label, page, pageSize, total, onPage }: PagerProps) {
   }
 
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <div {{ class_of "flex items-center gap-2 text-sm" "pager" }}>
       <Button
         type="button"
         variant="outline"

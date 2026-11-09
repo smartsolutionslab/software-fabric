@@ -150,16 +150,16 @@ public sealed class DesignSystemTests
         exitCode.ShouldBe(0, $"pnpm --filter @shop/ui test:\n{output}");
     }
 
+    /// <summary>
+    /// Its components are Tailwind only, so with radix-headless (#271) making CSS Modules possible on React, the catalog
+    /// refuses the combination instead of the matrix generating a project whose build fails.
+    /// </summary>
     [Fact]
-    public void A_design_system_for_another_styling_than_tailwind_fails_loudly()
+    public void A_design_system_for_another_styling_than_tailwind_is_refused_before_generating()
     {
-        using var project = new GeneratedProject(Profile, Choice, "frontend.styling=css-modules", "frontend.ui-library=radix-headless");
-        RunWeb(project, "install");
+        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", Profile, [Choice, "frontend.styling=css-modules", "frontend.ui-library=radix-headless"]);
 
-        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "build");
-
-        exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("The tokens-and-components pack builds React components styled with Tailwind only so far");
+        generated.Errors.ShouldContain(error => error.Contains("frontend.design-system=tokens-and-components requires frontend.styling == tailwind", StringComparison.Ordinal));
     }
 
     private static void RunWeb(GeneratedProject project, params string[] steps)

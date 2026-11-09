@@ -1,0 +1,16 @@
+{{~ if project["frontend.styling"] == "css-modules" ~}}
+import { type ClassValue, clsx } from 'clsx';
+
+/** Joins class names, such as a CSS module's classes with the ones a caller passes. */
+export function cn(...inputs: ClassValue[]) {
+  return clsx(inputs);
+}
+{{~ else ~}}
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+/** Joins class names and lets later Tailwind utilities win over earlier ones. */
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+{{~ end ~}}

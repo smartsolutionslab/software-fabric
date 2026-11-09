@@ -1,5 +1,22 @@
-{{~ if (project["frontend.ui-library"] != "shadcn" && project["frontend.ui-library"] != "mui") || (project["frontend.forms"] != "react-hook-form" && project["frontend.forms"] != "tanstack-form") || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
-throw new Error('The ag-ui pack builds the agent panel from shadcn/ui or MUI with React Hook Form or TanStack Form and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  ret 'className="' + tailwind + '"'
+end ~}}
+{{~ func themed(shadcn, palette, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  if ui == "radix-headless"
+    ret 'className="' + palette + '"'
+  end
+  ret 'className="' + shadcn + '"'
+end ~}}
+{{~ if (project["frontend.ui-library"] != "shadcn" && project["frontend.ui-library"] != "mui" && project["frontend.ui-library"] != "radix-headless") || (project["frontend.forms"] != "react-hook-form" && project["frontend.forms"] != "tanstack-form") || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+throw new Error('The ag-ui pack builds the agent panel from shadcn/ui, MUI or radix-headless with React Hook Form or TanStack Form and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 {{~ end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
@@ -31,6 +48,9 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 {{~ end ~}}
 import { useAgent } from './useAgent';
+{{~ if css_modules && !mui ~}}
+import styles from './AgentPanel.module.css';
+{{~ end ~}}
 
 {{~ if valibot ~}}
 const messageSchema = v.object({ message: v.pipe(v.string(), v.trim(), v.minLength(1, 'Write a message first.')) });
@@ -251,15 +271,15 @@ const nativeControl = {
 } as const;
 }%}{{~ else ~}}
   return (
-    <section aria-label={`Conversation with ${agent}`} className="flex max-w-3xl flex-col gap-4 p-4">
-      <ol aria-label="Messages" className="flex flex-col gap-3">
+    <section aria-label={`Conversation with ${agent}`} {{ class_of "flex max-w-3xl flex-col gap-4 p-4" "conversation" }}>
+      <ol aria-label="Messages" {{ class_of "flex flex-col gap-3" "messages" }}>
         {messages.flatMap((message) => entries(message, agent, results))}
       </ol>
-      <p role="status" className="text-sm text-muted-foreground">
+      <p role="status" {{ themed "text-sm text-muted-foreground" "text-sm text-slate-500" "status" }}>
         {running ? 'Answering…' : ''}
       </p>
       {failure && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" {{ themed "text-sm text-destructive" "text-sm text-red-600" "error" }}>
           The agent could not answer: {failure}
         </p>
       )}
@@ -270,9 +290,9 @@ const nativeControl = {
           void form.handleSubmit();
         }}
         noValidate
-        className="flex flex-col gap-2"
+        {{ class_of "flex flex-col gap-2" "form" }}
       >
-        <label htmlFor={field} className="text-sm font-medium">
+        <label htmlFor={field} {{ class_of "text-sm font-medium" "label" }}>
           Message
         </label>
         <form.Field name="message">
@@ -287,10 +307,10 @@ const nativeControl = {
                 onChange={(event) => handleChange(event.target.value)}
                 aria-invalid={meta.errors.length > 0 ? true : undefined}
                 aria-describedby={meta.errors.length > 0 ? `${field}-error` : undefined}
-                className="flex field-sizing-content min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+                {{ themed "flex field-sizing-content min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40" "flex field-sizing-content min-h-16 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-slate-500 focus-visible:border-slate-400 focus-visible:ring-[3px] focus-visible:ring-slate-400/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-red-600 aria-invalid:ring-red-600/20 md:text-sm" "input" }}
               />
               {meta.errors.length > 0 && (
-                <p id={`${field}-error`} role="alert" className="text-sm text-destructive">
+                <p id={`${field}-error`} role="alert" {{ themed "text-sm text-destructive" "text-sm text-red-600" "error" }}>
                   {meta.errors[0]?.message}
                 </p>
               )}
@@ -298,8 +318,8 @@ const nativeControl = {
           )}
         </form.Field>
 {{~ else ~}}
-      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-2">
-        <label htmlFor={field} className="text-sm font-medium">
+      <form onSubmit={onSubmit} noValidate {{ class_of "flex flex-col gap-2" "form" }}>
+        <label htmlFor={field} {{ class_of "text-sm font-medium" "label" }}>
           Message
         </label>
         <textarea
@@ -307,16 +327,16 @@ const nativeControl = {
           rows={3}
           aria-invalid={errors.message ? true : undefined}
           aria-describedby={errors.message ? `${field}-error` : undefined}
-          className="flex field-sizing-content min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+          {{ themed "flex field-sizing-content min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40" "flex field-sizing-content min-h-16 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-slate-500 focus-visible:border-slate-400 focus-visible:ring-[3px] focus-visible:ring-slate-400/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-red-600 aria-invalid:ring-red-600/20 md:text-sm" "input" }}
           {...register('message')}
         />
         {errors.message && (
-          <p id={`${field}-error`} role="alert" className="text-sm text-destructive">
+          <p id={`${field}-error`} role="alert" {{ themed "text-sm text-destructive" "text-sm text-red-600" "error" }}>
             {errors.message.message}
           </p>
         )}
 {{~ end ~}}
-        <Button type="submit" disabled={running} className="self-end">
+        <Button type="submit" disabled={running} {{ class_of "self-end" "send" }}>
           Send
         </Button>
       </form>
@@ -328,9 +348,9 @@ const nativeControl = {
 function entries(message: Message, agent: string, results: ReadonlyMap<string, string>) {
   if (message.role === 'user') {
     return [
-      <li key={message.id} className="self-end rounded-md bg-primary px-3 py-2 text-primary-foreground">
-        <p className="text-xs font-medium">You</p>
-        <p className="whitespace-pre-wrap">{contentToText(message.content)}</p>
+      <li key={message.id} {{ themed "self-end rounded-md bg-primary px-3 py-2 text-primary-foreground" "self-end rounded-md bg-slate-900 px-3 py-2 text-white" "user" }}>
+        <p {{ class_of "text-xs font-medium" "speaker" }}>You</p>
+        <p {{ class_of "whitespace-pre-wrap" "text" }}>{contentToText(message.content)}</p>
       </li>,
     ];
   }
@@ -343,19 +363,19 @@ function entries(message: Message, agent: string, results: ReadonlyMap<string, s
   return [
     ...(text
       ? [
-          <li key={message.id} className="rounded-md bg-muted px-3 py-2">
-            <p className="text-xs font-medium text-muted-foreground">{agent}</p>
-            <p className="whitespace-pre-wrap">{text}</p>
+          <li key={message.id} {{ themed "rounded-md bg-muted px-3 py-2" "rounded-md bg-slate-100 px-3 py-2" "answer" }}>
+            <p {{ themed "text-xs font-medium text-muted-foreground" "text-xs font-medium text-slate-600" "answerSpeaker" }}>{agent}</p>
+            <p {{ class_of "whitespace-pre-wrap" "text" }}>{text}</p>
           </li>,
         ]
       : []),
     ...(message.toolCalls ?? []).map((call) => {
       const result = results.get(call.id);
       return (
-        <li key={call.id} className="rounded-md border px-3 py-2 text-sm">
-          <p className="text-xs font-medium text-muted-foreground">Tool call</p>
+        <li key={call.id} {{ class_of "rounded-md border px-3 py-2 text-sm" "toolCall" }}>
+          <p {{ themed "text-xs font-medium text-muted-foreground" "text-xs font-medium text-slate-600" "answerSpeaker" }}>Tool call</p>
           <p>
-            <code>{call.function.name}</code> <code className="break-all">{call.function.arguments}</code>
+            <code>{call.function.name}</code> <code {{ class_of "break-all" "arguments" }}>{call.function.arguments}</code>
           </p>
           <p>
             {result === undefined ? (
