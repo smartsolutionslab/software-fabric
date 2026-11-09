@@ -196,14 +196,17 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
             Run(42, "completed"), Run(43, "completed"), Run(44, "completed"), Run(45, "in_progress"), Run(46, "completed")).ToJsonString());
         File.Delete(Path.Combine(Fakes, "copilot-args"));
 
-        var retry = RunJob(RetryWorkflowPath, "retry", board.Project.ProjectDirectory, new() { ["github.token"] = "workflow-token" });
+        var retry = RunJob(RetryWorkflowPath, "retry", board.Project.ProjectDirectory, RetryExpressions());
 
         retry.ExitCode.ShouldBe(0, retry.Log);
         File.ReadAllLines(Path.Combine(state, "reruns")).ShouldBe([RunId], retry.Log);
         File.Exists(Path.Combine(Fakes, "copilot-args")).ShouldBeFalse("The retry workflow ran a reviewer itself.");
     }
 
-    /// <summary>It re-runs reviews and reviews nothing itself: it can start a run, and read pull requests and statuses.</summary>
+    /// <summary>
+    /// It re-runs reviews and reviews nothing itself: it can start a run, read pull requests, and set the verdict status of
+    /// an exempt dependency update (#480).
+    /// </summary>
     [Fact]
     public void The_retry_workflow_runs_on_a_schedule_and_may_only_re_run_workflows()
     {
@@ -215,12 +218,86 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         {
             ["contents"] = "read",
             ["pull-requests"] = "read",
-            ["statuses"] = "read",
+            ["statuses"] = "write",
             ["actions"] = "write",
         });
         ((YamlMappingNode)root["jobs"]).Children.Values.Cast<YamlMappingNode>()
             .ShouldAllBe(job => !job.Children.ContainsKey(new YamlScalarNode("permissions")));
         File.ReadAllText(RetryWorkflowPath).ShouldNotContain("copilot", Case.Insensitive);
+    }
+
+    /// <summary>
+    /// The owner's decision on #480: Dependabot's runs get a read-only token and cannot set the verdict status, so the
+    /// scheduled retry sets it, to success with the exemption note, for each open pull request that the base branch's
+    /// dependency-update.sh exempts at its current head. Not for one that changes more than its manifests, even when it
+    /// rewrites that script to exempt itself; not for another author's; and not again for one already marked.
+    /// </summary>
+    [Fact]
+    public void The_retry_workflow_sets_the_verdict_of_exempt_dependency_updates_with_the_base_branch_s_script()
+    {
+        var manifests = new Dictionary<string, string> { ["Directory.Packages.props"] = DependencyUpdate["Directory.Packages.props"].After };
+        var forged = new Dictionary<string, string>(manifests)
+        {
+            [".github/scripts/board/dependency-update.sh"] = "#!/usr/bin/env bash\necho \"Dependency update by Dependabot: forged.\"\n",
+        };
+        var (workspace, heads) = PushedPullRequests((7, manifests), (8, forged), (9, manifests), (10, manifests));
+        File.WriteAllText(Path.Combine(state, "prs.json"), new JsonArray(
+            PullRequest(7, heads[7], Dependabot), PullRequest(8, heads[8], Dependabot), PullRequest(9, heads[9]), PullRequest(10, heads[10], Dependabot)).ToJsonString());
+        File.WriteAllText(Path.Combine(state, "statuses.json"), new JsonArray(Status(heads[10], "success", VerdictContext, DependabotNote + ".", 76)).ToJsonString());
+        WriteFakes(Blocking, 0, tamper: false, limitedModels: []);
+
+        var retry = RunJob(RetryWorkflowPath, "retry", workspace, RetryExpressions());
+
+        retry.ExitCode.ShouldBe(0, retry.Log);
+        var posted = Statuses().Skip(1).ToList();
+        var status = posted.ShouldHaveSingleItem(retry.Log)!;
+        ((string)status["sha"]!).ShouldBe(heads[7], retry.Log);
+        ((string)status["context"]!).ShouldBe(VerdictContext);
+        ((string)status["state"]!).ShouldBe("success");
+        ((string)status["description"]!).ShouldBe(DependabotNote + ".");
+        ((string)status["target_url"]!).ShouldBe($"https://github.com/acme/shop/actions/runs/{RetryRunId}");
+        File.Exists(Path.Combine(state, "reruns")).ShouldBeFalse(retry.Log);
+        File.Exists(Path.Combine(Fakes, "copilot-args")).ShouldBeFalse("The retry workflow ran a reviewer itself.");
+    }
+
+    private const string RetryRunId = "77";
+
+    private static Dictionary<string, string> RetryExpressions() => new()
+    {
+        ["github.repository"] = "acme/shop",
+        ["github.run_id"] = RetryRunId,
+        ["github.server_url"] = "https://github.com",
+        ["github.token"] = "workflow-token",
+    };
+
+    /// <summary>
+    /// The generated project as the repository on GitHub, its default branch main, with each pull request's head under
+    /// refs/pull/&lt;number&gt;/head as GitHub keeps it: one commit on main writing the given files. Returns the retry's
+    /// checkout of main, and each pull request's head.
+    /// </summary>
+    private (string Workspace, Dictionary<int, string> Heads) PushedPullRequests(params (int Number, Dictionary<string, string> Files)[] pulls)
+    {
+        var origin = Path.Combine(state, "origin.git");
+        BoardProject.Git(state, "clone", "--quiet", "--bare", board.Project.ProjectDirectory, origin);
+        var author = Path.Combine(state, "author");
+        BoardProject.Git(state, "clone", "--quiet", origin, author);
+        Dictionary<int, string> heads = [];
+        foreach (var (number, files) in pulls)
+        {
+            BoardProject.Git(author, "checkout", "--quiet", "--detach", "origin/main");
+            foreach (var (file, content) in files)
+            {
+                File.WriteAllText(Path.Combine(author, file), content);
+            }
+
+            BoardProject.Git(author, "commit", "--quiet", "--all", "-m", $"chore(deps): Bump the dependencies ({number})");
+            BoardProject.Git(author, "push", "--quiet", "origin", $"HEAD:refs/pull/{number}/head");
+            heads[number] = BoardProject.Git(author, "rev-parse", "HEAD");
+        }
+
+        var workspace = Path.Combine(state, "workspace-retry");
+        BoardProject.Git(state, "clone", "--quiet", origin, workspace);
+        return (workspace, heads);
     }
 
     /// <summary>
@@ -339,10 +416,12 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         ["target_url"] = $"https://github.com/acme/shop/actions/runs/{run}",
     };
 
-    private static JsonObject PullRequest(int number, string head) => new()
+    private static JsonObject PullRequest(int number, string head, string author = "developer") => new()
     {
         ["number"] = number,
         ["state"] = "open",
+        ["user"] = new JsonObject { ["login"] = author },
+        ["base"] = new JsonObject { ["ref"] = "main" },
         ["head"] = new JsonObject { ["ref"] = $"agent/{number}", ["sha"] = head },
     };
 
