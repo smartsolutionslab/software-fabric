@@ -115,3 +115,45 @@ before the first `-`, decides who reviews.
   branch afresh and posts it. The CLI cannot enforce the schema, so the
   findings are the last top-level object of that shape in the answer, and
   an answer without one still fails.
+
+## Amendment (2026-11-09, #474)
+
+The owner's decisions on #474, after Copilot's usage limit ("trust tier usage limit reached") crashed the review of
+every open pull request on 2026-11-09 and nothing ran them again. The text above stands; where this section differs,
+it takes precedence.
+
+**A usage limit postpones the review; it does not fail it.** A limit is not a finding. The review recognises
+Copilot's usage and rate limit errors and records the review as postponed: no job fails, and nothing is posted on the
+pull request, least of all "no findings". The gate stays closed, since a postponed review is never a pass and nothing
+merges unreviewed. So the verdict is no longer the review's jobs but the commit status `cross-model-review/verdict` on
+the pull request's head, which the report job sets: `success` when nothing blocks, `failure` when a finding blocks or
+the answer has no findings, and `pending` while the review is postponed. That status is "the review check" the
+default branch's protection requires.
+
+**The fallback model comes first.** A model that reaches the limit is replaced once by another model of the same
+reviewing family that Copilot offers, set in the workflow's `env` as `REVIEW_FALLBACK_MODEL_*` beside
+`REVIEW_MODEL_*`, so the reviewer stays independent of the author's family. The review is postponed only when the
+fallback is limited too.
+
+**Postponed reviews are retried on a schedule.** The workflow `cross-model-review-retry` runs hourly and on demand.
+It finds the open pull requests whose verdict at their current head is pending as postponed and re-runs the review
+run that status links to. It uses REST only and holds `actions: write` with read access to pull requests and
+statuses, the least that works, and reviews nothing itself.
+
+**An unchanged diff keeps its verdict.** When the pull request's own diff (`git diff origin/<base>...<head>`) is
+identical to that of the last head that received a real verdict, after a push that only merged the base branch for
+example, that verdict, pass or fail, is carried over and Copilot is not called. Each review the workflow posts
+records the diff's fingerprint (SHA-256) with its verdict in a hidden line of its body. Any change to the pull
+request's own diff is reviewed afresh.
+
+The security properties above are kept: the reviewer's job still holds no token that can write to the pull request,
+and the gate's files come from the base branch. A script the base branch does not have yet comes from the pull
+request that brings it, as the whole gate did while the base branch had none.
+
+- *As built (#474):* the limit is recognised by Copilot's exit code together with its message (`usage limit`,
+  `rate limit` or `too many requests`); any other failure still fails the review. The review job's outputs come from
+  the job that reads the untrusted diff, so they can only hold the gate closed: a postponement leaves the status
+  pending, and the model it names is believed only when it is the configured fallback. A verdict is kept only from
+  the workflow's own reviews (`github-actions[bot]`), since anyone can post a review, and only for the same reviewing
+  family, so the family rule holds for every head. A Dependabot update that is exempt from review gets no status,
+  because Dependabot's runs get a read-only token.
