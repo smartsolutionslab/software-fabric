@@ -1,0 +1,87 @@
+name: matrix
+
+# The pairwise matrix's build-and-test layer (ADR-0003 amendment, roadmap M3-04): every combination of
+# build/matrix.json, one job each, through build, unit, architecture and integration tests and the frontend's build,
+# lint and tests, without e2e. Nightly and on demand only: building the matrix on pull requests and pushes would take
+# the runners their own CI needs, so they only generate it (ci.yml's matrix-generation job).
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+
+# Never two runs at once: a dispatch while the nightly runs waits for it, so the two cannot both open an issue for the
+# same failing combination. Neither trigger is a pull request, so a run is never cancelled for a newer one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # The combinations' names, read from build/matrix.json so a regenerated matrix needs no edit here.
+  combinations:
+    runs-on: ubuntu-latest
+    outputs:
+      names: ${{ steps.list.outputs.names }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - id: list
+        run: echo "names=$(jq --compact-output '[.combinations[].name]' build/matrix.json)" >> "$GITHUB_OUTPUT"
+
+  # One job per combination. At most four at a time: runners are shared with every pull request's CI (about twenty
+  # jobs each), and a combination takes roughly as long as a profile job (5-8 min), so the nightly finishes in about
+  # an hour and a half while leaving most runners free for pull requests that arrive meanwhile.
+  combination:
+    needs: combinations
+    name: matrix-${{ matrix.combination }}
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        combination: ${{ fromJSON(needs.combinations.outputs.names) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          version: 10.0.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      # Generated AppHosts, which the integration tests start, use the Aspire CLI bundle.
+      - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
+      - run: dotnet build src/Fabric.Cli/Fabric.Cli.csproj -c Release
+      - run: build/matrix-combination.sh "${{ matrix.combination }}" "$RUNNER_TEMP/matrix-results"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: matrix-result-${{ matrix.combination }}
+          path: ${{ runner.temp }}/matrix-results
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # The run's table, and a bug issue per failing combination that holds a supported option (ADR-0003). It runs after
+  # failed combinations too, which is when it matters; a cancelled run reports nothing.
+  report:
+    needs: combination
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: matrix-result-*
+          path: ${{ runner.temp }}/matrix-results
+          merge-multiple: true
+      - run: build/matrix-report.sh "$RUNNER_TEMP/matrix-results" >> "$GITHUB_STEP_SUMMARY"
+      - run: build/matrix-issues.sh "$RUNNER_TEMP/matrix-results" "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        env:
+          GH_TOKEN: ${{ github.token }}
