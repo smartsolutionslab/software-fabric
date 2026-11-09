@@ -1,13 +1,19 @@
-{{~ column = project["backend.tenancy"] == "column" ~}}
+{{~ column = project["backend.tenancy"] == "column"
+schemas = project["backend.tenancy"] == "schema-per-tenant" ~}}
 using System.Reflection;
 using {{ namespace }}.BuildingBlocks.Persistence;
 using {{ namespace }}.BuildingBlocks.Rag;
+{{~ if schemas ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
 using Npgsql;
 
 namespace {{ namespace }}.Rag.Tests;
 
 {{~ if column ~}}
 /// <summary>The vector tables the MigrationRunner made: one per module schema, of the embeddings model's size, with an HNSW cosine index and a tenant column its key includes.</summary>
+{{~ else if schemas ~}}
+/// <summary>The vector tables the MigrationRunner made: one in each listed tenant's schema of every module, of the embeddings model's size, with an HNSW cosine index.</summary>
 {{~ else ~}}
 /// <summary>The vector tables the MigrationRunner made: one per module schema, of the embeddings model's size, with an HNSW cosine index.</summary>
 {{~ end ~}}
@@ -15,7 +21,11 @@ namespace {{ namespace }}.Rag.Tests;
 public sealed class VectorTablesTests({{ database_fixture }})
 {
     {{ test_attribute }}
+{{~ if schemas ~}}
+    public async Task Every_listed_tenants_schema_of_every_module_has_an_embeddings_table_of_the_models_size_with_an_hnsw_cosine_index()
+{{~ else ~}}
     public async Task Every_modules_schema_has_an_embeddings_table_of_the_models_size_with_an_hnsw_cosine_index()
+{{~ end ~}}
     {
         var schemas = Directory.EnumerateFiles(AppContext.BaseDirectory, "{{ namespace }}.Modules.*.Infrastructure.dll")
             .Order(StringComparer.Ordinal)
@@ -23,6 +33,10 @@ public sealed class VectorTablesTests({{ database_fixture }})
             .SelectMany(assembly => assembly.GetTypes())
             .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(ModuleDbContext).IsAssignableFrom(type))
             .Select(VectorTables.SchemaOf)
+{{~ if schemas ~}}
+            // The AppHost's tenants, which it gives the MigrationRunner as Tenancy:Tenants.
+            .SelectMany(schema => ((string[])["tenant-a", "tenant-b"]).Select(tenant => TenantSchemas.For(schema, tenant)))
+{{~ end ~}}
             .ToList();
 
         List<string> missing = [];
