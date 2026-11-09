@@ -78,8 +78,8 @@ public sealed class VueCustomElementsSlotTests
     {
         using var probe = Probe();
         using var project = new GeneratedProject(Profile, [probe.Manifest], "frontend.pwa=yes");
-        project.Write("web/app/src/components/ProbeHost.vue", ProbeHost);
-        project.Write("web/app/src/components/ProbeHost.test.ts", ProbeHostTest);
+        project.Write("web/app/src/components/ProbeHost.vue", ProbeHost + "\n");
+        project.Write("web/app/src/components/ProbeHost.test.ts", ProbeHostTest + "\n");
         var web = Path.Combine(project.ProjectDirectory, "web");
         foreach (var step in new[] { "install", "build", "test" })
         {
