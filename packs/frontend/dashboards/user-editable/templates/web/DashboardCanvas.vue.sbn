@@ -9,6 +9,12 @@ else
   button_import = "import { Button } from '@/components/ui/button';"
   secondary = "secondary"
 end ~}}
+{{~ func form_class(tailwind)
+  if css_modules
+    ret ':form-class="styles.form"'
+  end
+  ret 'form-class="' + tailwind + '"'
+end ~}}
 {{~ func class_of(tailwind, module)
   if css_modules
     ret ':class="styles.' + module + '"'
@@ -19,9 +25,9 @@ end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
 {{~ formkit = project["frontend.forms"] == "formkit" ~}}
-{{~ if !((ui == "shadcn-vue" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form" || project["frontend.forms"] == "formkit")) || (ui == "reka-ui" && project["frontend.forms"] == "vee-validate")) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+{{~ if !((ui == "shadcn-vue" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form" || project["frontend.forms"] == "formkit")) || (ui == "reka-ui" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "formkit"))) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
@@ -431,6 +437,9 @@ const tiles = computed(() =>
 <template>
   <section aria-label="Dashboard" }%}{{ class_of "flex flex-col gap-4" "canvas" }}{%{>
 }%}{{~ if formkit ~}}
+{{~ if css_modules ~}}
+{%{    <FormKit type="form" :actions="false" :value="{ name: dashboard.name }" :form-class="styles.form" @submit="submit">
+}%}{{~ else ~}}
 {%{    <FormKit
       type="form"
       :actions="false"
@@ -438,16 +447,17 @@ const tiles = computed(() =>
       form-class="flex flex-wrap items-end gap-2"
       @submit="submit"
     >
-      <FormKit type="text" name="name" label="Dashboard name" @input="edited" />
-      <Button type="submit" :disabled="saving">Save dashboard</Button>
+}%}{{~ end ~}}
+{%{      <FormKit type="text" name="name" label="Dashboard name" @input="edited" />
+      <}%}{{ button }}{%{ type="submit" :disabled="saving">Save dashboard</}%}{{ button }}{%{>
       <p v-if="savedRevision === revision" role="status">Saved.</p>
       <p v-if="failed" role="alert">The dashboard could not be saved.</p>
     </FormKit>
 
-    <FormKit type="form" :actions="false" form-class="flex flex-wrap items-end gap-2" @node="addingNode" @submit="add">
+    <FormKit type="form" :actions="false" }%}{{ form_class "flex flex-wrap items-end gap-2" }}{%{ @node="addingNode" @submit="add">
       <FormKit type="select" name="source" label="Widget" v-model="source" :options="sources" :disabled="loading" />
       <FormKit type="select" name="visual" label="Shown as" v-model="visual" :options="shownAs" :disabled="loading" />
-      <Button type="submit" variant="secondary" :disabled="loading || full || !roomLeft">Add widget</Button>
+      <}%}{{ button }}{%{ type="submit" variant="}%}{{ secondary }}{%{" :disabled="loading || full || !roomLeft">Add widget</}%}{{ button }}{%{>
       <p v-if="full">A dashboard holds at most {{ maximumWidgets }} widgets.</p>
       <p v-if="!full && !roomLeft">
         There is no room for another widget: a dashboard reaches down to row {{ lowest }}.

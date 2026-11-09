@@ -15,6 +15,12 @@ end ~}}
   end
   ret 'class="' + tailwind + '"'
 end ~}}
+{{~ func form_class(tailwind)
+  if css_modules
+    ret ':form-class="styles.form"'
+  end
+  ret 'form-class="' + tailwind + '"'
+end ~}}
 {{~ func themed(shadcn, palette, module)
   if css_modules
     ret ':class="styles.' + module + '"'
@@ -27,9 +33,9 @@ end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
 {{~ formkit = project["frontend.forms"] == "formkit" ~}}
-{{~ if !((ui == "shadcn-vue" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form" || project["frontend.forms"] == "formkit")) || (ui == "reka-ui" && project["frontend.forms"] == "vee-validate")) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+{{~ if !((ui == "shadcn-vue" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form" || project["frontend.forms"] == "formkit")) || (ui == "reka-ui" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "formkit"))) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
@@ -198,9 +204,9 @@ const entries = computed(() =>
     <p aria-live="polite" }%}{{ themed "text-sm text-muted-foreground" "text-sm text-slate-500" "status" }}{%{>{{ running ? 'Answering…' : '' }}</p>
     <p v-if="failure" role="alert" }%}{{ themed "text-sm text-destructive" "text-sm text-red-600" "error" }}{%{>The assistant could not answer: {{ failure }}</p>
 }%}{{~ if formkit ~}}
-{%{    <FormKit type="form" :actions="false" :value="{ question: '' }" form-class="flex flex-col gap-2" @submit="submit">
+{%{    <FormKit type="form" :actions="false" :value="{ question: '' }" }%}{{ form_class "flex flex-col gap-2" }}{%{ @submit="submit">
       <FormKit type="textarea" name="question" label="Ask the assistant" rows="2" />
-      <Button type="submit" variant="secondary" :disabled="running" class="self-end">Ask</Button>
+      <}%}{{ button }}{%{ type="submit" variant="}%}{{ secondary }}{%{" :disabled="running" }%}{{ class_of "self-end" "ask" }}{%{>Ask</}%}{{ button }}{%{>
     </FormKit>
   </section>
 </template>

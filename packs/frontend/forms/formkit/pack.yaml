@@ -3,6 +3,7 @@ files:
   # Owner decisions on #269: unstyled FormKit inputs, whose look the project owns in one config; a project-owned zod and
   # valibot adapter, since @formkit/zod 2.5.0 peers zod 3 and FormKit publishes no valibot one.
   - { template: templates/formkit.config.ts.sbn, target: web/app/src/forms/formkit.config.ts }
+  - { template: templates/formkit.module.css.sbn, target: web/app/src/forms/formkit.module.css, when: 'project["frontend.styling"] == "css-modules"' }
   - { template: templates/schemaSubmit.ts.sbn, target: web/app/src/forms/schemaSubmit.ts }
   - { template: templates/schemaSubmit.test.ts.sbn, target: web/app/src/forms/schemaSubmit.test.ts }
   - { template: templates/formkit-provider.ts.sbn, target: web/app/src/providers/formkit.ts }
