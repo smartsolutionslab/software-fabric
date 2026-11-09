@@ -1,8 +1,8 @@
 {{~ if project["backend.tenancy"] != "none" && project["backend.auth"] == "none" ~}}
 #error frontend.realtime signalr with backend.tenancy {{ project["backend.tenancy"] }} needs an identity provider: a browser's tenant comes from its user's token, and backend.auth none signs nobody in (docs/adr/0009 of the generator).
 {{~ end ~}}
-{{~ if project["backend.tenancy"] != "none" && project["backend.tenancy"] != "column" ~}}
-#error The signalr pack groups browsers by tenant for backend.tenancy column only so far (docs/adr/0006 of the generator).
+{{~ if project["backend.tenancy"] != "none" && project["backend.tenancy"] != "column" && project["backend.tenancy"] != "schema-per-tenant" ~}}
+#error The signalr pack groups browsers by tenant for backend.tenancy column and schema-per-tenant only so far (docs/adr/0006 of the generator).
 {{~ end ~}}
 {{~ if project["backend.tenancy"] == "none" ~}}
 using Microsoft.AspNetCore.SignalR;
