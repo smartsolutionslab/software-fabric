@@ -7,12 +7,13 @@ files:
   - { template: templates/IDispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/IDispatcher.cs }
   - { template: templates/Dispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/Dispatcher.cs }
   - { template: templates/MessagingRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/MessagingRegistration.cs }
-  - { template: templates/RequestHandlerDiscovery.cs.sbn, target: src/Host/Wiring/RequestHandlerDiscovery.cs }
+  - { template: templates/RequestHandlerDiscovery.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/RequestHandlerDiscovery.cs }
   - { template: templates/EveryRequestHasOneHandler.cs.sbn, target: tests/Architecture.Tests/Rules/EveryRequestHasOneHandler.cs }
 slots:
   - { slot: host.services, template: templates/host-services.sbn }
   - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn }
   - { slot: messaging.wolverine-options, template: templates/wolverine-options.sbn }
+  - { slot: tests.packages, template: templates/tests-packages.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

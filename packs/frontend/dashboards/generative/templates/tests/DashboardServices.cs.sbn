@@ -1,7 +1,16 @@
+{{~ wolverine = project["backend.mediator"] == "wolverine" ~}}
+{{~ if wolverine ~}}
+using {{ namespace }}.BuildingBlocks.Modules;
+{{~ end ~}}
 using {{ namespace }}.Modules.Dashboards.Api;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+{{~ if wolverine ~}}
+using Microsoft.Extensions.Hosting;
+using Wolverine;
+using Wolverine.Runtime;
+{{~ end ~}}
 
 namespace {{ namespace }}.Modules.Dashboards.Tests.Queries;
 
@@ -18,6 +27,21 @@ internal static class DashboardServices
         services.AddSingleton(model);
         services.AddDashboardWidgets([new DashboardsModule()]);
         new DashboardsModule().AddServices(services, configuration);
+{{~ if wolverine ~}}
+        services.AddWolverine(options =>
+        {
+            options.Durability.Mode = DurabilityMode.MediatorOnly;
+            options.Discovery.DisableConventionalDiscovery();
+            options.Discovery.IncludeAssembly(ModuleAssemblies.Of<DashboardsModule>("Application"));
+            options.DiscoverRequestHandlers();
+        });
+        var provider = services.BuildServiceProvider();
+
+        // Wolverine's runtime is the hosted service a host would start.
+        ((IHostedService)provider.GetRequiredService<IWolverineRuntime>()).StartAsync(CancellationToken.None).GetAwaiter().GetResult();
+        return provider;
+{{~ else ~}}
         return services.BuildServiceProvider();
+{{~ end ~}}
     }
 }
