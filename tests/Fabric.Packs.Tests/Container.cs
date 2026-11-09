@@ -89,15 +89,16 @@ internal sealed class Container : IDisposable
     /// </summary>
     internal static Container Kafka(int? hostPort = null, string? name = null)
     {
-        DockerPorts.EnsureRunsAlone();
         var port = hostPort ?? FreePort();
-        string[] naming = name is null ? [] : ["--name", name];
-        var id = Docker([
-            "run", "--detach", .. naming, "--publish", $"127.0.0.1:{port}:{port}",
-            "--env", $"KAFKA_LISTENERS=PLAINTEXT://localhost:29092,CONTROLLER://localhost:29093,PLAINTEXT_HOST://0.0.0.0:{port}",
-            "--env", $"KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:29092,PLAINTEXT_HOST://localhost:{port}",
-            "confluentinc/confluent-local:8.2.0"]).Trim();
-        var container = new Container(id, port);
+        var container = Start(
+            "confluentinc/confluent-local:8.2.0",
+            port,
+            [
+                $"KAFKA_LISTENERS=PLAINTEXT://localhost:29092,CONTROLLER://localhost:29093,PLAINTEXT_HOST://0.0.0.0:{port}",
+                $"KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:29092,PLAINTEXT_HOST://localhost:{port}",
+            ],
+            port,
+            name);
         container.WaitUntil("appuser", "kafka-topics", "--bootstrap-server", "localhost:29092", "--list");
         return container;
     }
@@ -118,15 +119,15 @@ internal sealed class Container : IDisposable
         Container container;
         try
         {
-            started.Add(Docker(
-                "run", "--detach", "--name", $"{networkName}-sqlserver", "--network", network, "--network-alias", "sqlserver",
+            started.Add(CreateAndStart(
+                "--name", $"{networkName}-sqlserver", "--network", network, "--network-alias", "sqlserver",
                 "--env", "ACCEPT_EULA=Y", "--env", $"MSSQL_SA_PASSWORD={password}",
-                "mcr.microsoft.com/mssql/server:2022-latest").Trim());
-            started.Add(Docker(
-                "run", "--detach", "--name", $"{networkName}-emulator", "--network", network,
+                "mcr.microsoft.com/mssql/server:2022-latest"));
+            started.Add(CreateAndStart(
+                "--name", $"{networkName}-emulator", "--network", network,
                 "--publish", $"127.0.0.1:{amqpHostPort}:5672", "--publish", "127.0.0.1::5300",
                 "--env", "ACCEPT_EULA=Y", "--env", "SQL_SERVER=sqlserver", "--env", $"MSSQL_SA_PASSWORD={password}",
-                "mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.0").Trim());
+                "mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.0"));
             container = new Container(started[1], PublishedPort(started[1], 5672), [started[0]], network, PublishedPort(started[1], 5300));
         }
         catch (Exception)
@@ -209,14 +210,10 @@ internal sealed class Container : IDisposable
     /// Starts <paramref name="image"/> with <paramref name="containerPort"/> published on a local port Docker picks, or on
     /// <paramref name="hostPort"/> when given.
     /// </summary>
-    /// <remarks>
-    /// Created and started apart: a start that fails, at networking for instance, leaves a created container and its
-    /// anonymous volumes, and only <c>docker create</c> says which container that is.
-    /// </remarks>
     internal static Container Start(string image, int containerPort, string[] environment, int? hostPort = null, string? name = null)
     {
         DockerPorts.EnsureRunsAlone();
-        List<string> arguments = ["create", "--publish", $"127.0.0.1:{hostPort}:{containerPort}"];
+        List<string> arguments = ["--publish", $"127.0.0.1:{hostPort}:{containerPort}"];
         if (name is not null)
         {
             arguments.AddRange(["--name", name]);
@@ -228,15 +225,35 @@ internal sealed class Container : IDisposable
         }
 
         arguments.Add(image);
-        var id = Docker([.. arguments]).Trim();
+        var id = CreateAndStart([.. arguments]);
         try
         {
-            Docker("start", id);
             return new Container(id, PublishedPort(id, containerPort));
         }
         catch (InvalidOperationException)
         {
             // No Container owns it yet, so it is removed here, with its volumes, before the failure goes on.
+            Run(["rm", "--force", "--volumes", id]);
+            throw;
+        }
+    }
+
+    /// <summary>Creates a container from <c>docker create</c>'s <paramref name="arguments"/>, image last, starts it and returns its id.</summary>
+    /// <remarks>
+    /// Created and started apart: a start that fails, at networking for instance, leaves a created container and its
+    /// anonymous volumes, and only <c>docker create</c> says which container that is. It is removed with them before
+    /// the failure goes on.
+    /// </remarks>
+    private static string CreateAndStart(params string[] arguments)
+    {
+        var id = Docker(["create", .. arguments]).Trim();
+        try
+        {
+            Docker("start", id);
+            return id;
+        }
+        catch (InvalidOperationException)
+        {
             Run(["rm", "--force", "--volumes", id]);
             throw;
         }
