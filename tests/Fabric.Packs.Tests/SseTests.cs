@@ -75,6 +75,21 @@ public sealed class SseTests
     }
 
     [Fact]
+    public void Under_schema_per_tenant_a_stream_listens_for_its_users_tenant_as_under_a_tenant_column()
+    {
+        // The tenant still comes from the signed-in user's token; only where its rows live differs, which the streams never read.
+        var column = Files(Profile, Sse);
+        var schema = Files(Profile, Sse, "backend.tenancy=schema-per-tenant");
+
+        schema["src/Host/Realtime/BrowserEventStreams.cs"].ShouldNotContain("#error");
+        schema["src/Host/Realtime/BrowserEventStreams.cs"].ShouldContain("listeners.Keys.Where(listener => listener.TenantId == tenantId)");
+        foreach (var path in (string[])["src/Host/Realtime/BrowserEventStreams.cs", "src/Host/Realtime/StreamBrowserEvents.cs", "src/BuildingBlocks/Realtime/IBrowserEvents.cs", "src/Host/Wiring/ServerEventsEndpoints.cs", "src/Host/Wiring/ServerEventsRegistration.cs", "tests/Integration.Tests/ServerEventsTests.cs"])
+        {
+            schema[path].ShouldBe(column[path], path);
+        }
+    }
+
+    [Fact]
     public void Its_rules_and_adr_describe_the_stream_and_the_query_token()
     {
         var files = Files(Profile, Sse);
