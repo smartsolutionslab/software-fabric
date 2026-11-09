@@ -309,6 +309,36 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         back.FailedJob.ShouldBe("report", back.Log);
     }
 
+    /// <summary>
+    /// The gate's scripts come from the base branch. One the base branch does not have yet is not run from the pull
+    /// request either: the pull request brings its own copies, which would keep a forged verdict and set the status.
+    /// Without them nothing is kept and no status is set, so the diff is reviewed and the gate stays closed.
+    /// </summary>
+    [Fact]
+    public void A_gate_script_the_base_branch_lacks_is_never_run_from_the_pull_request()
+    {
+        var forged = new Dictionary<string, (string, string)>(Invoice)
+        {
+            [".github/scripts/board/previous-verdict.sh"] = ("", "echo pass forged\n"),
+            [".github/scripts/board/review-status.sh"] = ("", "touch \"$FAKES/forged-status\"\n"),
+        };
+
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, change: forged, baseLacks: ["previous-verdict.sh", "review-status.sh"]);
+
+        run.CopilotArguments.ShouldNotBeNull(run.Log);
+        File.Exists(Path.Combine(Fakes, "forged-status")).ShouldBeFalse(run.Log);
+        Statuses().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_postponed_review_fails_while_the_base_branch_cannot_record_it()
+    {
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, limitedModels: ["*"], baseLacks: ["review-status.sh"]);
+
+        run.FailedJob.ShouldBe("report", run.Log);
+        Reviews().ShouldBeEmpty();
+    }
+
     private static readonly Dictionary<string, (string, string)> Invoice = new() { ["src/Invoice.cs"] = ("", "class Invoice;\n") };
 
     private static readonly Dictionary<string, (string, string)> PaidInvoice = new() { ["src/Invoice.cs"] = ("", "class Invoice { void Pay() {} }\n") };
@@ -622,7 +652,8 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         string author = "developer",
         IReadOnlyDictionary<string, (string Before, string After)>? change = null,
         (string MainCommit, string MergeMessage)? mainMoved = null,
-        string[]? limitedModels = null)
+        string[]? limitedModels = null,
+        string[]? baseLacks = null)
     {
         WriteFakes(answer, copilotExitCode, tamper, limitedModels ?? []);
 
@@ -641,7 +672,13 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         var log = "";
         foreach (var name in new[] { "choose", "review", "report" })
         {
-            var job = RunJob(WorkflowPath, name, Workspace(name, commitMessage, change ?? new Dictionary<string, (string, string)>(), mainMoved), expressions);
+            var workspace = Workspace(name, commitMessage, change ?? new Dictionary<string, (string, string)>(), mainMoved);
+            foreach (var script in baseLacks ?? [])
+            {
+                File.Delete(Path.Combine(workspace, ".gate", ".github", "scripts", "board", script));
+            }
+
+            var job = RunJob(WorkflowPath, name, workspace, expressions);
             log += job.Log;
             if (job.ExitCode != 0)
             {

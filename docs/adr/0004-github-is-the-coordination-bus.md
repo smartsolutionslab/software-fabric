@@ -147,8 +147,9 @@ records the diff's fingerprint (SHA-256) with its verdict in a hidden line of it
 request's own diff is reviewed afresh.
 
 The security properties above are kept: the reviewer's job still holds no token that can write to the pull request,
-and the gate's files come from the base branch. A script the base branch does not have yet comes from the pull
-request that brings it, as the whole gate did while the base branch had none.
+and the gate's files come from the base branch. A gate script the base branch does not have yet is not run from the
+pull request: no verdict is kept and no status is set, and a postponed review then fails the report job. The review's
+jobs pass while a review is postponed, so a protection that requires them instead of the status does not gate.
 
 - *As built (#474):* the limit is recognised by Copilot's exit code together with its message (`usage limit`,
   `rate limit` or `too many requests`); any other failure still fails the review. The review job's outputs come from

@@ -82,13 +82,8 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           path: .gate
       - name: Use the gate's files from the base branch
-        # A script the base branch does not have yet comes from the pull request that brings it, as the whole gate did
-        # while the base branch had none.
         run: |
           if [ -f .gate/.github/scripts/board/reviewer.sh ]; then gate=.gate; else gate=.; fi
-          for script in .github/scripts/board/*.sh; do
-            if [ -e "$script" ] && [ ! -e "$gate/$script" ]; then cp "$script" "$gate/$script"; fi
-          done
           echo "GATE=$gate/.github" >> "$GITHUB_ENV"
           echo "BRIEFS=$gate" >> "$GITHUB_ENV"
       - id: exempt
@@ -128,9 +123,14 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
       - id: previous
         name: A diff already reviewed keeps its verdict
-        # The pull request's own diff, against the base branch as it is now, like the review's.
+        # The pull request's own diff, against the base branch as it is now, like the review's. A base branch without
+        # previous-verdict.sh keeps no verdict; the pull request's copy is never run.
         run: |
           if [ "$EXEMPT" = true ]; then
+            exit 0
+          fi
+          if [ ! -f "$GATE/scripts/board/previous-verdict.sh" ]; then
+            echo "The base branch has no previous-verdict.sh yet: no verdict is kept."
             exit 0
           fi
           fingerprint="$(git diff --no-color --no-ext-diff "$BASE...$HEAD" | sha256sum | cut -d ' ' -f 1)"
@@ -270,13 +270,8 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           path: .gate
       - name: Use the gate's files from the base branch
-        # A script the base branch does not have yet comes from the pull request that brings it, as the whole gate did
-        # while the base branch had none.
         run: |
           if [ -f .gate/.github/scripts/board/report-review.sh ]; then gate=.gate; else gate=.; fi
-          for script in .github/scripts/board/*.sh; do
-            if [ -e "$script" ] && [ ! -e "$gate/$script" ]; then cp "$script" "$gate/$script"; fi
-          done
           echo "GATE=$gate/.github" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -296,13 +291,22 @@ jobs:
         # An exempt pull request posts nothing: Dependabot's token cannot write to it.
         # A postponed review posts nothing either: it found nothing, because it did not run.
         # The review job names the model that answered, but it is the untrusted one: only the fallback is believed.
+        # A base branch without review-status.sh sets no status (the pull request's copy is never run), and then a
+        # postponed review fails this check rather than pass it.
         run: |
           if [ "$EXEMPT" = true ]; then
             echo "::notice title=cross-model review::$NOTE"
             exit 0
           fi
           verdict() {
-            bash "$GATE/scripts/board/review-status.sh" "$HEAD" "$1" "$2" "$RUN"
+            if [ -f "$GATE/scripts/board/review-status.sh" ]; then
+              bash "$GATE/scripts/board/review-status.sh" "$HEAD" "$1" "$2" "$RUN"
+            elif [ "$1" = pending ]; then
+              echo "The review is postponed, and the base branch has no review-status.sh yet to record it." >&2
+              exit 1
+            else
+              echo "The base branch has no review-status.sh yet: no verdict status is set."
+            fi
           }
           if [ "$KEPT" = pass ]; then
             verdict success "Kept from $KEPT_FROM: the pull request's diff is unchanged, and nothing blocked."
