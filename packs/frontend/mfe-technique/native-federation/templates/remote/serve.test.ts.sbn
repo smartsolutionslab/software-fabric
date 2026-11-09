@@ -1,0 +1,33 @@
+// @vitest-environment node
+import { EventEmitter } from 'node:events';
+import type { Plugin } from 'vite';
+import { beforeEach, expect, test, vi } from 'vitest';
+import { serveFederation } from '../serve';
+
+const builder = vi.hoisted(() => ({ close: vi.fn(() => Promise.resolve()) }));
+vi.mock('native-federation-vite', () => ({ runViteBuilder: vi.fn(() => Promise.resolve(builder)) }));
+
+beforeEach(() => {
+  builder.close.mockClear();
+});
+
+/** Calls one of the plugin's server hooks as Vite would, with a server whose HTTP server can close. */
+async function start(plugin: Plugin, hook: 'configureServer' | 'configurePreviewServer') {
+  const httpServer = new EventEmitter();
+  const value = plugin[hook];
+  const handler = (typeof value === 'function' ? value : value?.handler) as ((server: unknown) => unknown) | undefined;
+  await handler?.({ httpServer });
+  return httpServer;
+}
+
+test.each(['configureServer', 'configurePreviewServer'] as const)(
+  'the federation watcher started by %s closes when its HTTP server closes',
+  async (hook) => {
+    const httpServer = await start(serveFederation(() => []), hook);
+    expect(builder.close).not.toHaveBeenCalled();
+
+    httpServer.emit('close');
+
+    expect(builder.close).toHaveBeenCalledOnce();
+  },
+);

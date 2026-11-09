@@ -260,6 +260,23 @@ public sealed class MicroFrontendsTests
         remotePackage.ShouldNotContain("@module-federation");
     }
 
+    /// <summary>
+    /// Native federation has no dev server, so a remote's plugin starts a watching federation build with Vite's dev or
+    /// preview server; Vite types and calls only its own hooks, so the watcher closes on that server's close event.
+    /// </summary>
+    [Fact]
+    public void With_native_federation_a_remotes_federation_watcher_closes_with_the_dev_or_preview_server_that_started_it()
+    {
+        using var project = new GeneratedProject(Profile, Technique("native-federation"));
+        project.AddModule("billing");
+
+        RunWeb(project, "install");
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "modules", "billing"), "pnpm", "exec", "vitest", "run", "src/serve.test.ts");
+        exitCode.ShouldBe(0, $"vitest run src/serve.test.ts in web/modules/billing:\n{output}");
+        output.ShouldContain("2 passed");
+    }
+
     private static string Technique(string technique) => $"frontend.mfe-technique={technique}";
 
     /// <summary>The file each remote's build writes for the shell to load.</summary>
