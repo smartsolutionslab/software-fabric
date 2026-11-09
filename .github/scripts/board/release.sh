@@ -6,30 +6,32 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 issue="$1"
 reason="$2"
 
-# agent:claimed comes off before the branch is parked, never after: next.sh skips a labelled issue, and a claim that
-# takes the branch the moment it is parked adds the label itself, so removing it afterwards would either hide the
-# released issue from the next agent or strip the new claim's label.
-labelled="$(board_issue "$issue" | jq 'any(.labels[]; .name == "agent:claimed")')"
-if [ "$labelled" = true ]; then
-  board_remove_label "$issue" agent:claimed
-fi
-if ! board_park "$issue" "Released: $reason"; then
-  if [ "$labelled" = true ]; then
-    board_add_label "$issue" agent:claimed
-  fi
-  echo "Parking #$issue's branch failed; it is still claimed." >&2
-  exit 1
-fi
-
-# A claim that took the parked branch meanwhile keeps its board fields.
+# Every write to the issue happens while no claim can be under way, so a claim that takes the branch afterwards is the
+# last to write. A claim needs a parked branch and, from a fresh list, an issue without agent:claimed: the board fields
+# go first, then the label, and the branch is parked last, at the head read here and never at one read later, which
+# could be the next agent's claim. A head that is parked already, from a release or lapse that stopped half-way, is
+# left as it is.
 branch="$(board_branch_for "$issue")"
 head=""
 if [ -n "$branch" ]; then
   head="$(board_fetch "$branch")"
 fi
-if [ -z "$head" ] || board_parked "$head"; then
-  board_status "$issue" Todo
-  board_executor "$issue" ""
+labelled="$(board_issue "$issue" | jq 'any(.labels[]; .name == "agent:claimed")')"
+board_status "$issue" Todo
+board_executor "$issue" ""
+if [ "$labelled" = true ]; then
+  board_remove_label "$issue" agent:claimed
+fi
+outcome=0
+board_park "$issue" "Released: $reason" "$head" || outcome=$?
+if [ "$outcome" -ne 0 ]; then
+  if [ "$labelled" = true ]; then
+    board_add_label "$issue" agent:claimed
+  fi
+  board_status "$issue" Claimed
+  board_executor "$issue" "$(board_executor_of "$head")"
+  echo "Parking #$issue's branch failed; it is still claimed." >&2
+  exit 1
 fi
 board_comment "$issue" "Released: $reason
 The work so far stays on \`$branch\`; the next agent resumes it."
