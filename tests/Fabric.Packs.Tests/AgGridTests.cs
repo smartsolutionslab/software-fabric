@@ -111,6 +111,43 @@ public sealed partial class AgGridTests
         export const others = [useTable, useVueTable];
         """;
 
+    /// <summary>
+    /// Runs the data table's test and then <see cref="AfterTeardown"/> in one worker, in that order and not isolated, so
+    /// the second file can stand in for jsdom's teardown right after the first.
+    /// </summary>
+    private const string AfterTeardownConfig = """
+        import { defineConfig, mergeConfig } from 'vitest/config';
+        import { BaseSequencer, type TestSpecification } from 'vitest/node';
+        import base from './vite.config.ts';
+
+        class ByName extends BaseSequencer {
+          async sort(files: TestSpecification[]) {
+            return [...files].sort((a, b) => a.moduleId.localeCompare(b.moduleId));
+          }
+        }
+
+        export default mergeConfig(base, defineConfig({ test: { isolate: false, maxWorkers: 1, sequence: { sequencer: ByName } } }));
+        """;
+
+    /// <summary>
+    /// Takes window away for longer than AG Grid's 500 ms scroll refresh timer, as jsdom's teardown does, so a timer a
+    /// grid left behind fires against a torn-down environment and fails the run every time rather than now and then (#414).
+    /// </summary>
+    private const string AfterTeardown = """
+        import { expect, test } from 'vitest';
+
+        test('no timer from an earlier file needs window after it is gone', async () => {
+          const window = globalThis.window;
+          Reflect.deleteProperty(globalThis, 'window');
+          try {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          } finally {
+            globalThis.window = window;
+          }
+          expect(globalThis.window).toBe(window);
+        });
+        """;
+
     [Fact]
     public void In_react_ag_grid_replaces_tanstack_table_in_the_dependencies_the_data_table_the_rules_the_adr_and_the_lint_rule()
     {
@@ -210,6 +247,7 @@ public sealed partial class AgGridTests
         var plain = Escapes().Replace(testOutput, string.Empty);
         plain.ShouldContain("✓ src/components/ui/data-table.test.tsx > the table shows a header and one row per item", customMessage: testOutput);
         plain.ShouldContain("✓ src/pages/NotesTable.test.tsx > the notes grid has a header per column, a cell per field and computed value, and no axe violations", customMessage: testOutput);
+        NoGridTimerOutlivesTheTest(project, "src/components/ui/data-table.test.tsx");
         LintRefusesTanStackTable(project);
     }
 
@@ -225,6 +263,7 @@ public sealed partial class AgGridTests
         var plain = Escapes().Replace(testOutput, string.Empty);
         plain.ShouldContain("✓ src/components/ui/DataTable.test.ts > the table shows a header and one row per item", customMessage: testOutput);
         plain.ShouldContain("✓ src/pages/NotesTable.test.ts > the notes grid has a header per column, a cell per field and computed value, and no axe violations", customMessage: testOutput);
+        NoGridTimerOutlivesTheTest(project, "src/components/ui/DataTable.test.ts");
         LintRefusesTanStackTable(project);
     }
 
@@ -248,6 +287,25 @@ public sealed partial class AgGridTests
 
         Escapes().Replace(testOutput, string.Empty).ShouldContain("✓ src/dashboards/DashboardEditor.test.ts", customMessage: testOutput);
         FormatIsClean(project);
+    }
+
+    /// <summary>Runs the data table's test with <see cref="AfterTeardown"/> after it: the grid's timers must end with the test.</summary>
+    private static void NoGridTimerOutlivesTheTest(GeneratedProject project, string dataTableTest)
+    {
+        project.Write("web/app/after-teardown.config.ts", AfterTeardownConfig);
+        project.Write("web/app/src/zz-after-teardown.test.ts", AfterTeardown);
+        var (exitCode, output) = Shell.Run(
+            Path.Combine(project.ProjectDirectory, "web", "app"),
+            "pnpm",
+            "exec",
+            "vitest",
+            "run",
+            "--config",
+            "after-teardown.config.ts",
+            dataTableTest,
+            "src/zz-after-teardown.test.ts");
+        output.ShouldNotContain("window is not defined", customMessage: output);
+        exitCode.ShouldBe(0, output);
     }
 
     private static void LintRefusesTanStackTable(GeneratedProject project)
