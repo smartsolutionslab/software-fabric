@@ -387,6 +387,197 @@ public sealed class SchemaPerTenantTests
         NothingWasMigrated(postgres);
     }
 
+    [Theory]
+    [InlineData("""modelBuilder.Entity<Note>().ToTable("notes", Schema);""")]
+    [InlineData("modelBuilder.HasDefaultSchema(Schema);")]
+    public void A_table_a_contexts_own_OnModelCreating_maps_to_the_modules_schema_after_the_base_moves_to_each_tenants_schema(string statement)
+    {
+        // #350, the round-4 review of #334: a derived context's ToTable("notes", Schema), after base.OnModelCreating,
+        // kept every tenant's rows in billing.notes; so would its HasDefaultSchema(Schema). The probe stands in for
+        // mantine and writes a note for each tenant once the runner has migrated their schemas.
+        using var probe = new ProbePack("frontend.ui-library.mantine", new Dictionary<string, string>
+        {
+            ["migration-runner.steps"] = """
+                foreach (var probeTenant in (string[])["tenant-a", "tenant-b"])
+                {
+                    using var probeTenantScope = Shop.BuildingBlocks.Tenancy.TenantScope.Begin(probeTenant);
+                    await using var probeScope = host.Services.CreateAsyncScope();
+                    var billing = probeScope.ServiceProvider.GetRequiredService<Shop.Modules.Billing.Infrastructure.Persistence.BillingDbContext>();
+                    billing.Add(new Shop.Modules.Billing.Domain.Note(Guid.CreateVersion7(), probeTenant));
+                    await billing.SaveChangesAsync();
+                }
+                """,
+        });
+        using var project = new GeneratedProject(Profile, [probe.Manifest], SchemaPerTenant, "frontend.ui-library=mantine");
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        WriteBillingContext(project, statement);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = RunMigrationRunner(project, postgres);
+
+        exitCode.ShouldBe(0, output);
+        postgres.Psql(DatabasePassword, "select \"Text\" from billing_tenant_a.notes").ShouldBe("tenant-a");
+        postgres.Psql(DatabasePassword, "select \"Text\" from billing_tenant_b.notes").ShouldBe("tenant-b");
+        postgres.Psql(DatabasePassword, "select count(*) from billing.notes").ShouldBe("0");
+    }
+
+    [Theory]
+    [InlineData("""builder.Property(note => note.Text).HasDefaultValue("billing.example");""", "select column_default from information_schema.columns where table_schema = '{0}' and table_name = 'notes' and column_name = 'Text'", "'billing.example'")]
+    [InlineData("""builder.Property(note => note.Text).HasComment("Copied from billing.notes");""", "select col_description(attrelid, attnum) from pg_attribute where attrelid = '{0}.notes'::regclass and attname = 'Text'", "Copied from billing.notes")]
+    public void A_literal_value_that_reads_like_the_modules_schema_is_data_and_migrates_into_every_tenants_schema(string statement, string query, string expected)
+    {
+        // #350, the round-4 review of #334: HasDefaultValue("billing.example") was read as SQL naming billing, in the
+        // model and in the migration's ColumnOperation.DefaultValue, so a valid literal could not be migrated.
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        WriteNoteConfiguration(project, statement);
+        project.Build();
+
+        var (addExitCode, addOutput) = AddMigration(project, "Literal");
+        addExitCode.ShouldBe(0, addOutput);
+        project.Build();
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = RunMigrationRunner(project, postgres);
+
+        exitCode.ShouldBe(0, output);
+        foreach (var schema in (string[])["billing_tenant_a", "billing_tenant_b"])
+        {
+            postgres.Psql(DatabasePassword, string.Format(System.Globalization.CultureInfo.InvariantCulture, query, schema)).ShouldStartWith(expected, customMessage: schema);
+        }
+    }
+
+    [Theory]
+    [InlineData("nextval(CAST('billing.ids' AS pg_catalog.regclass))::text")]
+    [InlineData("pg_sequence_last_value('billing.ids'::pg_catalog.regclass)::text")]
+    [InlineData("pg_sequence_last_value('billing.ids'::\"pg_catalog\" . \"regclass\")::text")]
+    public void A_reference_cast_to_a_schema_qualified_object_identifier_type_is_refused_when_its_migration_is_made_and_before_the_runner_migrates_anything(string sql)
+    {
+        // #350, the review of #334 at 468a4aa: the type after AS or :: was pg_catalog, not a reg* type, so the reference
+        // passed both checks and every tenant shared billing.ids.
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        WriteNoteConfiguration(project, $$"""builder.Property(note => note.Text).HasDefaultValueSql("{{sql.Replace("\"", "\\\"", StringComparison.Ordinal)}}");""");
+        project.Build();
+
+        ShouldRefuse(project, "Cast", sql);
+    }
+
+    [Fact]
+    public void A_reference_cast_to_a_schema_qualified_object_identifier_type_in_a_migration_is_refused_before_the_runner_migrates_anything()
+    {
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        project.Write("src/Modules/Billing/Billing.Infrastructure/Migrations/20990101000000_Numbers.cs", """
+            using Microsoft.EntityFrameworkCore.Infrastructure;
+            using Microsoft.EntityFrameworkCore.Migrations;
+
+            namespace Shop.Modules.Billing.Infrastructure.Migrations;
+
+            [DbContext(typeof(Shop.Modules.Billing.Infrastructure.Persistence.BillingDbContext))]
+            [Migration("20990101000000_Numbers")]
+            public sealed class Numbers : Migration
+            {
+                protected override void Up(MigrationBuilder migrationBuilder)
+                {
+                    Ensure.That(migrationBuilder).IsNotNull();
+
+                    migrationBuilder.AddColumn<long>(
+                        name: "Number",
+                        schema: "billing",
+                        table: "notes",
+                        nullable: false,
+                        defaultValueSql: "nextval(CAST('billing.ids' AS pg_catalog.regclass))");
+                }
+
+                protected override void Down(MigrationBuilder migrationBuilder)
+                {
+                    Ensure.That(migrationBuilder).IsNotNull();
+
+                    migrationBuilder.DropColumn(name: "Number", schema: "billing", table: "notes");
+                }
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = RunMigrationRunner(project, postgres);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("20990101000000_Numbers");
+        output.ShouldContain("CAST('billing.ids' AS pg_catalog.regclass)");
+        NothingWasMigrated(postgres);
+    }
+
+    [Fact]
+    public void A_many_to_many_relationship_with_an_implicit_join_entity_builds_its_model_and_migrates_into_every_tenants_schema()
+    {
+        // #350, the review of #334 at fa40669: the query filter of the module's own schema registered EF's shared-type
+        // join entity (Dictionary<string, object>) by its CLR type, which threw while the model was built.
+        using var project = new GeneratedProject(Profile, SchemaPerTenant);
+        project.AddModule("billing");
+        MigrationTests.AddNotesWithAMigration(project);
+        project.Write("src/Modules/Billing/Billing.Domain/Note.cs", """
+            using Shop.BuildingBlocks.Domain;
+
+            namespace Shop.Modules.Billing.Domain;
+
+            public sealed class Note(Guid id, string text) : Entity<Guid>(id)
+            {
+                public string Text { get; private set; } = text;
+
+                public ICollection<Tag> Tags { get; } = [];
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Domain/Tag.cs", """
+            using Shop.BuildingBlocks.Domain;
+
+            namespace Shop.Modules.Billing.Domain;
+
+            public sealed class Tag(Guid id, string name) : Entity<Guid>(id)
+            {
+                public string Name { get; private set; } = name;
+
+                public ICollection<Note> Notes { get; } = [];
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/TagConfiguration.cs", """
+            using Microsoft.EntityFrameworkCore;
+            using Microsoft.EntityFrameworkCore.Metadata.Builders;
+            using Shop.Modules.Billing.Domain;
+
+            namespace Shop.Modules.Billing.Infrastructure.Persistence;
+
+            public sealed class TagConfiguration : IEntityTypeConfiguration<Tag>
+            {
+                public void Configure(EntityTypeBuilder<Tag> builder)
+                {
+                    builder.ToTable("tags");
+                    builder.HasKey(tag => tag.Id);
+                    builder.Property(tag => tag.Name);
+                }
+            }
+            """);
+        WriteNoteConfiguration(project, "builder.HasMany(note => note.Tags).WithMany(tag => tag.Notes);");
+        project.Build();
+
+        var (addExitCode, addOutput) = AddMigration(project, "Tags");
+        addExitCode.ShouldBe(0, addOutput);
+        project.Build();
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = RunMigrationRunner(project, postgres);
+
+        exitCode.ShouldBe(0, output);
+        foreach (var schema in (string[])["billing_tenant_a", "billing_tenant_b"])
+        {
+            postgres.Psql(DatabasePassword, $"select count(*) from information_schema.tables where table_schema = '{schema}' and table_name = 'NoteTag'").ShouldBe("1", schema);
+        }
+    }
+
     [Fact]
     public void The_generated_tenancy_tests_show_no_tenant_reads_another_tenants_rows_and_the_architecture_rules_pass()
     {
@@ -418,6 +609,31 @@ public sealed class SchemaPerTenantTests
                     builder.ToTable("notes");
                     builder.HasKey(note => note.Id);
                     builder.Property(note => note.Text);
+                    {{statement}}
+                }
+            }
+            """);
+
+    /// <summary>The billing context with one more statement after the base's OnModelCreating.</summary>
+    private static void WriteBillingContext(GeneratedProject project, string statement) =>
+        project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/BillingDbContext.cs", $$"""
+            using Microsoft.EntityFrameworkCore;
+            using Shop.BuildingBlocks.Persistence;
+            using Shop.Modules.Billing.Domain;
+
+            namespace Shop.Modules.Billing.Infrastructure.Persistence;
+
+            public sealed class BillingDbContext(DbContextOptions<BillingDbContext> options, IServiceProvider services)
+                : ModuleDbContext(options, services, Schema)
+            {
+                /// <summary>The module's tables and its migrations history live in this schema.</summary>
+                public const string Schema = "billing";
+
+                protected override void OnModelCreating(ModelBuilder modelBuilder)
+                {
+                    Ensure.That(modelBuilder).IsNotNull();
+
+                    base.OnModelCreating(modelBuilder);
                     {{statement}}
                 }
             }
