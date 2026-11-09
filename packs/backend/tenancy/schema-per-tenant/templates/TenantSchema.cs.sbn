@@ -19,8 +19,11 @@ public static class TenantSchema
 
         foreach (var entity in modelBuilder.Model.GetEntityTypes().Where(entity => !entity.IsOwned() && entity.BaseType is null))
         {
+            // A shared-type entity, such as EF Core's implicit join entity of a many-to-many relationship (a
+            // Dictionary<string, object>), is found by its name: its CLR type names no entity of its own.
+            var builder = entity.HasSharedClrType ? modelBuilder.SharedTypeEntity(entity.Name, entity.ClrType) : modelBuilder.Entity(entity.ClrType);
             var row = Expression.Parameter(entity.ClrType, "row");
-            modelBuilder.Entity(entity.ClrType).HasQueryFilter(Expression.Lambda(Expression.Constant(false), row));
+            builder.HasQueryFilter(Expression.Lambda(Expression.Constant(false), row));
         }
 
         return modelBuilder;

@@ -5,8 +5,9 @@ using Microsoft.EntityFrameworkCore.Metadata;
 namespace {{ namespace }}.BuildingBlocks.Persistence;
 
 /// <summary>
-/// Refuses, once a module context's whole model is configured (its OnModelCreating overrides and the provider's
-/// configuration included), what it cannot take to another schema: seed data, entity splitting, sequences (HiLo's
+/// Once a module context's whole model is configured (its OnModelCreating overrides and the provider's configuration
+/// included), moves the default schema and the tables and views still naming the module's schema to the context's, and
+/// refuses what it cannot take to another schema: seed data, entity splitting, sequences (HiLo's
 /// included), and SQL or an annotation naming the module's schema. Each would be shared between schemas, or fail in all
 /// but one. It fails the model wherever it is built: dotnet ef, the MigrationRunner before it migrates anything, the host.
 /// </summary>
@@ -23,8 +24,9 @@ public sealed class SchemaModelCustomizer(ModelCustomizerDependencies dependenci
             return;
         }
 
-        List<string> refused = [];
         var model = modelBuilder.Model;
+        MoveTheModulesSchema(module, model);
+        List<string> refused = [];
         Annotations(module, model, "the model", refused);
         foreach (var entity in model.GetEntityTypes())
         {
@@ -56,11 +58,49 @@ public sealed class SchemaModelCustomizer(ModelCustomizerDependencies dependenci
         }
     }
 
-    /// <summary>An annotation, a provider's included, whose name or text names the module's schema: default or computed SQL, a column type, an index's filter, Npgsql's enums and extensions.</summary>
+    /// <summary>
+    /// The default schema, and a table or view mapped to the module's schema by name, move with the context, whether the
+    /// base's OnModelCreating or a context's own override, before or after it, named the module's schema.
+    /// </summary>
+    private static void MoveTheModulesSchema(ModuleDbContext module, IMutableModel model)
+    {
+        if (module.CurrentSchema == module.ModuleSchema)
+        {
+            return;
+        }
+
+        if (model.GetDefaultSchema() == module.ModuleSchema)
+        {
+            model.SetDefaultSchema(module.CurrentSchema);
+        }
+
+        foreach (var entity in model.GetEntityTypes())
+        {
+            if (entity.GetSchema() == module.ModuleSchema)
+            {
+                entity.SetSchema(module.CurrentSchema);
+            }
+
+            if (entity.GetViewSchema() == module.ModuleSchema)
+            {
+                entity.SetViewSchema(module.CurrentSchema);
+            }
+        }
+    }
+
+    /// <summary>
+    /// An annotation, a provider's included, whose name or text names the module's schema: default or computed SQL, a
+    /// column type, an index's filter, Npgsql's enums and extensions. A literal value (a default value, a comment) is
+    /// data, so only its annotation's name is read.
+    /// </summary>
     private static void Annotations(ModuleDbContext module, IReadOnlyAnnotatable annotatable, string owner, List<string> refused) =>
         refused.AddRange(annotatable.GetAnnotations()
-            .Where(annotation => module.NamesModuleSchema(annotation.Name) || (annotation.Value is string text && module.NamesModuleSchema(text)))
+            .Where(annotation => module.NamesModuleSchema(annotation.Name)
+                || (annotation.Value is string text && !IsLiteral(annotation.Name) && module.NamesModuleSchema(text)))
             .Select(annotation => annotation.Value is string text
                 ? $"{annotation.Name} of {owner} naming the module's schema: {text}"
                 : $"{annotation.Name} of {owner} naming the module's schema"));
+
+    private static bool IsLiteral(string annotation) =>
+        annotation is RelationalAnnotationNames.DefaultValue or RelationalAnnotationNames.Comment;
 }
