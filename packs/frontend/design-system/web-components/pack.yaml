@@ -20,6 +20,10 @@ files:
   - { template: templates/ui/test-setup.ts.sbn, target: web/packages/ui/src/test-setup.ts }
   # React renders a tag with a hyphen as a custom element by itself, but its JSX types know only HTML's tags.
   - { template: templates/design-system.d.ts.sbn, target: web/app/src/design-system.d.ts, when: 'project["frontend.framework"] == "react"' }
+  # A micro-frontend's remote renders the elements too, and type-checks on its own.
+  - { template: templates/design-system.d.ts.sbn, target: "web/modules/{{ module.name }}/src/design-system.d.ts", per-module: true, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "micro-frontends"' }
+declares-slots:
+  - { slot: web.ui-package-fields, description: "Fields of web/packages/ui/package.json after \"private\", each a \"key\": value pair indented two spaces.", separator: ",\n" }
 slots:
   - { slot: web.workspace-packages, template: templates/workspace-packages.sbn, order: 10 }
   - { slot: web.dependencies, template: templates/dependencies.sbn }
