@@ -60,6 +60,21 @@ public sealed class ServerEventsTests
     }
 
     [Fact]
+    public void Under_schema_per_tenant_a_browser_joins_its_users_tenant_group_as_under_a_tenant_column()
+    {
+        // The tenant still comes from the signed-in user's token; only where its rows live differs, which the hub never reads.
+        var column = Files(Profile, SignalR);
+        var schema = Files(Profile, SignalR, "backend.tenancy=schema-per-tenant");
+
+        schema["src/Host/Realtime/EventsHub.cs"].ShouldNotContain("#error");
+        schema["src/Host/Realtime/EventsHub.cs"].ShouldContain("Groups.AddToGroupAsync(Context.ConnectionId, HubBrowserEvents.TenantGroup(tenantId), Context.ConnectionAborted)");
+        foreach (var path in (string[])["src/Host/Realtime/EventsHub.cs", "src/Host/Realtime/HubBrowserEvents.cs", "src/BuildingBlocks/Realtime/IBrowserEvents.cs", "src/Host/Wiring/ServerEventsEndpoints.cs", "src/Host/Wiring/ServerEventsRegistration.cs", "tests/Integration.Tests/ServerEventsTests.cs"])
+        {
+            schema[path].ShouldBe(column[path], path);
+        }
+    }
+
+    [Fact]
     public void Every_profile_without_signalr_generates_no_server_events()
     {
         foreach (var profile in new[] { "saas-standard-react", "lean-crud", "saas-strict-react" })
