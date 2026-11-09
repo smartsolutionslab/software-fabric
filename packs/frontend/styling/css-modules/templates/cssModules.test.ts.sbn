@@ -1,0 +1,82 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { expect, test } from 'vitest';
+
+// Vitest hands a component a proxy for its CSS module that answers every class name, styled or not, so the component
+// tests cannot see a missing rule. This reads the stylesheets themselves.
+const source = dirname(fileURLToPath(import.meta.url));
+const moduleImport = /import (\w+) from '(\.{1,2}\/[^']+\.module\.css)';/g;
+
+/**
+ * What of a selector list the module scopes and exports: neither what is inside `:global(...)`, nested at any depth,
+ * nor what follows a bare `:global` up to the end of its selector. Only a comma outside parentheses ends a selector.
+ */
+function local(selector: string) {
+  let kept = '';
+  let depth = 0;
+  let inside = Infinity;
+  let after = Infinity;
+  for (let at = 0; at < selector.length; at++) {
+    const char = selector.charAt(at);
+    if (char === '(') {
+      depth++;
+    } else if (char === ')') {
+      depth--;
+      if (depth < inside) {
+        inside = Infinity;
+      }
+      if (depth < after) {
+        after = Infinity;
+      }
+    } else if (char === ',' && depth === after) {
+      after = Infinity;
+    } else if (selector.startsWith(':global', at) && !/[\w-]/.test(selector.charAt(at + 7))) {
+      if (selector.charAt(at + 7) === '(') {
+        inside = Math.min(inside, depth + 1);
+      } else {
+        after = Math.min(after, depth);
+      }
+      at += 6;
+      continue;
+    }
+    if (depth < Math.min(inside, after)) {
+      kept += char;
+    }
+  }
+  return kept;
+}
+
+/** The classes a stylesheet exports with at least one declaration, in any selector of a flat rule. */
+function styledClasses(css: string) {
+  const styled = new Set<string>();
+  for (const [, selector = '', body = ''] of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (/[\w-]+\s*:\s*[^;\s]/.test(body)) {
+      for (const [, name = ''] of local(selector).matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) {
+        styled.add(name);
+      }
+    }
+  }
+  return styled;
+}
+
+test('every class a component takes from its CSS module has a rule with declarations there', () => {
+  const unstyled: string[] = [];
+  const components = readdirSync(source, { recursive: true, encoding: 'utf8' }).filter((file) =>
+    /\.(vue|tsx?)$/.test(file),
+  );
+  for (const component of components) {
+    const path = join(source, component);
+    const code = readFileSync(path, 'utf8');
+    for (const [, name = '', stylesheet = ''] of code.matchAll(moduleImport)) {
+      const styled = styledClasses(readFileSync(join(dirname(path), stylesheet), 'utf8'));
+      for (const [, used = ''] of code.matchAll(new RegExp(`\\b${name}\\.([A-Za-z_]\\w*)`, 'g'))) {
+        if (!styled.has(used)) {
+          unstyled.push(`${relative(source, path)}: ${name}.${used}`);
+        }
+      }
+    }
+  }
+
+  expect([...new Set(unstyled)]).toEqual([]);
+});

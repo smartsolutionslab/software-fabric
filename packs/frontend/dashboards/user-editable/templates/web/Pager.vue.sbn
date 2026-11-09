@@ -1,7 +1,27 @@
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ if ui == "reka-ui"
+  button = "BaseButton"
+  button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
+  secondary = "outline"
+else
+  button = "Button"
+  button_import = "import { Button } from '@/components/ui/button';"
+  secondary = "secondary"
+end ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  ret 'class="' + tailwind + '"'
+end ~}}
 {%{<script setup lang="ts">
 import { computed, watch } from 'vue';
-import { Button } from '@/components/ui/button';
-
+}%}{{ button_import }}{%{
+}%}{{~ if css_modules ~}}
+import styles from './Pager.module.css';
+{{~ end ~}}
+{%{
 interface PagerProps {
   /** What is paged, for the buttons' names: "Next page of {label}". */
   label: string;
@@ -35,8 +55,8 @@ watch(
 </script>
 
 <template>
-  <div v-if="pages !== undefined && pages > 1" class="flex items-center gap-2 text-sm">
-    <Button
+  <div v-if="pages !== undefined && pages > 1" }%}{{ class_of "flex items-center gap-2 text-sm" "pager" }}{%{>
+    <}%}{{ button }}{%{
       type="button"
       variant="outline"
       size="sm"
@@ -45,9 +65,9 @@ watch(
       @click="emit('page', page - 1)"
     >
       Previous
-    </Button>
+    </}%}{{ button }}{%{>
     <span>Page {{ page }} of {{ pages }}</span>
-    <Button
+    <}%}{{ button }}{%{
       type="button"
       variant="outline"
       size="sm"
@@ -56,7 +76,7 @@ watch(
       @click="emit('page', page + 1)"
     >
       Next
-    </Button>
+    </}%}{{ button }}{%{>
   </div>
 </template>
 }%}

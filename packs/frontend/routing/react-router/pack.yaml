@@ -1,6 +1,7 @@
 option: frontend.routing.react-router
 files:
   - { template: templates/App.tsx.sbn, target: web/app/src/App.tsx }
+  - { template: templates/App.module.css.sbn, target: web/app/src/App.module.css, when: 'project["frontend.styling"] == "css-modules"' }
   - { template: templates/App.test.tsx.sbn, target: web/app/src/App.test.tsx }
   - { template: templates/router.tsx.sbn, target: web/app/src/providers/router.tsx }
   - { template: templates/modules.ts.sbn, target: web/app/src/modules/index.ts }
