@@ -5,11 +5,17 @@ import { defineConfig } from 'vitest/config';
 
 // Under Aspire the host's address arrives as services__host__http__0; /api is forwarded there without the prefix.
 const host = process.env.services__host__http__0;
+{{- if slots["web.custom-element-prefixes"] != "" }}
+
+// Tags Vue's compiler leaves to the browser as custom elements: any starting with a prefix a pack declares.
+const customElementPrefixes = [{{ slots["web.custom-element-prefixes"] }}];
+const isCustomElement = (tag: string) => customElementPrefixes.some((prefix) => tag.startsWith(prefix));
+{{- end }}
 
 export default defineConfig({
   plugins: [
     // Vue's first, then the chosen packs' in order.
-    vue(),
+    vue({{ if slots["web.custom-element-prefixes"] != "" }}{ template: { compilerOptions: { isCustomElement } } }{{ end }}),
 {{- if slots["web.vite-plugins"] != "" }}
 {{ slots["web.vite-plugins"] }},{{ end }}
   ],
