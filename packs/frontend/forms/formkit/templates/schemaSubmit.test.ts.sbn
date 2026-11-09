@@ -1,0 +1,112 @@
+{{~ if project["frontend.validation"] == "valibot" ~}}
+import { createNode, type FormKitNode } from '@formkit/core';
+import * as v from 'valibot';
+import { expect, test, vi } from 'vitest';
+import { schemaSubmit } from './schemaSubmit';
+
+const orderSchema = v.object({
+  customer: v.object({ name: v.pipe(v.string(), v.minLength(1, 'Enter a name')) }),
+  lines: v.array(v.object({ quantity: v.pipe(v.number(), v.integer(), v.minValue(1, 'Order at least one')) })),
+  note: v.pipe(v.string(), v.trim()),
+});
+
+const namedLikeObjectSchema = v.object({
+  toString: v.pipe(v.string(), v.minLength(1, 'Enter a text')),
+  constructor: v.pipe(v.string(), v.minLength(1, 'Enter a builder')),
+});
+{{ else ~}}
+import { createNode, type FormKitNode } from '@formkit/core';
+import { expect, test, vi } from 'vitest';
+import { z } from 'zod';
+import { schemaSubmit } from './schemaSubmit';
+
+const orderSchema = z.object({
+  customer: z.object({ name: z.string().min(1, 'Enter a name') }),
+  lines: z.array(z.object({ quantity: z.number().int().min(1, 'Order at least one') })),
+  note: z.string().trim(),
+});
+
+const namedLikeObjectSchema = z.object({
+  toString: z.string().min(1, 'Enter a text'),
+  constructor: z.string().min(1, 'Enter a builder'),
+});
+{{ end ~}}
+
+/** The nodes a FormKit order form has: a group for the customer, a list of lines, and a note. */
+function orderForm() {
+  return createNode({
+    type: 'group',
+    name: 'order',
+    children: [
+      createNode({ type: 'group', name: 'customer', children: [createNode({ name: 'name' })] }),
+      createNode({
+        type: 'list',
+        name: 'lines',
+        children: [
+          createNode({ type: 'group', children: [createNode({ name: 'quantity' })] }),
+          createNode({ type: 'group', children: [createNode({ name: 'quantity' })] }),
+        ],
+      }),
+      createNode({ name: 'note' }),
+    ],
+  });
+}
+
+/** The error messages a field shows. */
+function errorsOn(form: FormKitNode, address: string) {
+  return Object.values(form.at(address)?.store ?? {})
+    .filter((message) => message.type === 'error')
+    .map((message) => message.value);
+}
+
+test("a schema's messages land on the fields they belong to, nested and listed ones too", async () => {
+  const form = orderForm();
+  const handler = vi.fn();
+
+  await schemaSubmit(orderSchema, handler)(
+    { customer: { name: '' }, lines: [{ quantity: 1 }, { quantity: 0 }], note: '' },
+    form,
+  );
+
+  expect(handler).not.toHaveBeenCalled();
+  expect(errorsOn(form, 'customer.name')).toEqual(['Enter a name']);
+  expect(errorsOn(form, 'lines.0.quantity')).toEqual([]);
+  expect(errorsOn(form, 'lines.1.quantity')).toEqual(['Order at least one']);
+  expect(errorsOn(form, 'note')).toEqual([]);
+});
+
+test("a valid form hands the handler the schema's output", async () => {
+  const form = orderForm();
+  const handler = vi.fn();
+
+  await schemaSubmit(orderSchema, handler)(
+    { customer: { name: 'Ada' }, lines: [{ quantity: 2 }], note: '  fragile  ' },
+    form,
+  );
+
+  expect(handler).toHaveBeenCalledWith({ customer: { name: 'Ada' }, lines: [{ quantity: 2 }], note: 'fragile' }, form);
+});
+
+test("fields named like an object's own properties get their messages too", async () => {
+  const form = createNode({
+    type: 'group',
+    name: 'labels',
+    children: [createNode({ name: 'toString' }), createNode({ name: 'constructor' })],
+  });
+
+  await schemaSubmit(namedLikeObjectSchema, vi.fn())({ toString: '', constructor: '' }, form);
+
+  expect(errorsOn(form, 'toString')).toEqual(['Enter a text']);
+  expect(errorsOn(form, 'constructor')).toEqual(['Enter a builder']);
+});
+
+test('a second submit takes away the messages the schema no longer gives', async () => {
+  const form = orderForm();
+  const submit = schemaSubmit(orderSchema, vi.fn());
+
+  await submit({ customer: { name: '' }, lines: [{ quantity: 0 }], note: '' }, form);
+  await submit({ customer: { name: 'Ada' }, lines: [{ quantity: 0 }], note: '' }, form);
+
+  expect(errorsOn(form, 'customer.name')).toEqual([]);
+  expect(errorsOn(form, 'lines.0.quantity')).toEqual(['Order at least one']);
+});

@@ -1,0 +1,113 @@
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ if ui != "shadcn-vue" && ui != "reka-ui" ~}}
+throw new Error('The FormKit pack styles its inputs for shadcn-vue or reka-ui only so far; frontend.ui-library is {{ ui }}, frontend.styling is {{ project["frontend.styling"] }} (docs/adr/0006 of the generator).');
+{{~ end ~}}
+import type { FormKitNode } from '@formkit/core';
+import { defaultConfig } from '@formkit/vue';
+{{~ if css_modules ~}}
+import styles from './formkit.module.css';
+{{~ end ~}}
+
+{{~ if css_modules ~}}
+/**
+ * The class of each FormKit section, from src/forms/formkit.module.css; FormKit's own formkit-* classes and themes are
+ * not used.
+ */
+const sections: Record<string, string | undefined> = {
+  outer: styles.outer,
+  wrapper: styles.wrapper,
+  label: styles.label,
+  input: styles.input,
+  help: styles.help,
+  messages: styles.messages,
+  message: styles.message,
+};
+
+/** What an input of one type styles differently from the sections above. */
+const byType: Record<string, Record<string, string>> = {
+  textarea: { input: `${styles.input} ${styles.textarea}` },
+};
+{{~ else ~}}
+{{~ if ui == "reka-ui" ~}}
+/**
+ * What every text input, textarea and select shares: BaseButton's slate palette, since Reka UI has no theme of its own.
+ * FormKit marks the outer section of an input with errors data-errors, which the outer section's group passes on.
+ */
+const field =
+  'w-full rounded-md border border-slate-300 bg-white px-3 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-slate-500 focus-visible:border-slate-400 focus-visible:ring-[3px] focus-visible:ring-slate-400/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm group-data-[errors=true]:border-red-600 group-data-[errors=true]:ring-red-600/20';
+
+/** The classes of each FormKit section; FormKit's own formkit-* classes and themes are not used. */
+const sections: Record<string, string> = {
+  outer: 'group flex flex-col gap-2',
+  wrapper: 'flex flex-col gap-2',
+  label: 'flex items-center gap-2 text-sm leading-none font-medium select-none',
+  input: `${field} h-9 min-w-0 py-1`,
+  help: 'text-sm text-slate-500',
+  messages: 'flex flex-col gap-1',
+  message: 'text-sm text-red-600',
+};
+{{~ else ~}}
+/**
+ * What every text input, textarea and select shares, as shadcn-vue's Input and Textarea have it, in the theme's colours.
+ * FormKit marks the outer section of an input with errors data-errors, which the outer section's group passes on.
+ */
+const field =
+  'w-full rounded-md border border-input bg-transparent px-3 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 group-data-[errors=true]:border-destructive group-data-[errors=true]:ring-destructive/20 dark:group-data-[errors=true]:ring-destructive/40';
+
+/** The classes of each FormKit section, as shadcn-vue has them; FormKit's own formkit-* classes and themes are not used. */
+const sections: Record<string, string> = {
+  outer: 'group flex flex-col gap-2',
+  wrapper: 'flex flex-col gap-2',
+  label: 'flex items-center gap-2 text-sm leading-none font-medium select-none',
+  input: `${field} h-9 min-w-0 py-1`,
+  help: 'text-sm text-muted-foreground',
+  messages: 'flex flex-col gap-1',
+  message: 'text-sm text-destructive',
+};
+{{~ end ~}}
+
+/** What an input of one type styles differently from the sections above. */
+const byType: Record<string, Record<string, string>> = {
+  textarea: { input: `${field} flex field-sizing-content min-h-16 py-2` },
+};
+{{~ end ~}}
+
+/** FormKit's rootClasses: the classes a section of an input gets, before any `<section>-class` the input itself adds. */
+function classes(section: string, node: FormKitNode): Record<string, boolean> {
+  const list = byType[String(node.props.type)]?.[section] ?? sections[section] ?? '';
+  return Object.fromEntries(
+    list
+      .split(' ')
+      .filter((name) => name !== '')
+      .map((name) => [name, true]),
+  );
+}
+
+/**
+ * Shows each message as a paragraph with role="alert", so it is announced when it appears, as the project's other forms
+ * do; FormKit's default list of messages is a <ul> without a role.
+ */
+function alerts(node: FormKitNode) {
+  node.on('created', () => {
+    const definition = node.props.definition;
+    if (definition === undefined || typeof definition.schema !== 'function') {
+      return;
+    }
+
+    const schema = definition.schema;
+    node.props.definition = {
+      ...definition,
+      schemaMemoKey: definition.schemaMemoKey === undefined ? undefined : `${definition.schemaMemoKey}-alerts`,
+      schema: (extensions = {}) =>
+        schema({ ...extensions, messages: { $el: 'div' }, message: { $el: 'p', attrs: { role: 'alert' } } }),
+    };
+  });
+}
+
+/**
+ * FormKit's inputs and plugins, styled by the project; forms validate with their schema (src/forms/schemaSubmit.ts).
+ * Inputs commit each change at once (delay 0) rather than after FormKit's 20 ms debounce, so what a form shows and what
+ * depends on a field, such as another field's options, never lag behind what was typed or chosen.
+ */
+export default defaultConfig({ config: { rootClasses: classes, delay: 0 }, plugins: [alerts] });
