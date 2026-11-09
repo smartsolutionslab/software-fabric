@@ -135,7 +135,7 @@ public sealed class VectorIndexTests({{ database_fixture }}) : {{ test_lifetime 
         var cancellationToken = {{ test_cancellation_token }};
         var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder({{ database_connection_string }}) { Options = "-c enable_seqscan=off" };
         await using var indexed = VectorTables.DataSource(indexOnly.ConnectionString);
-        var library = new ModuleVectorIndex<SampleLibraryDbContext>(indexed, generator);
+        var library = new ModuleVectorIndex<SampleLibraryDbContext>(indexed, generator{{ tenant_argument }});
         await library.IndexAsync("novel", "a book of stories", cancellationToken);
         await library.IndexAsync("atlas", "a book of maps", cancellationToken);
         await library.IndexAsync("lunch", "team lunch on friday", cancellationToken);
