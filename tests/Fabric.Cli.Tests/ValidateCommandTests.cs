@@ -101,6 +101,16 @@ public class ValidateCommandTests
         run.Error.ShouldContain("error: frontend.api-client=orval requires backend.api-protocols has rest, but backend.api-protocols is empty.");
     }
 
+    /// <summary>Without a signed-in user there is no trustworthy tenant (#464).</summary>
+    [Fact]
+    public void Tenancy_without_authentication_exits_one_and_prints_the_sentence()
+    {
+        var run = CliRun.Of("validate", "--profile", "saas-standard-react", "--set", "backend.auth=none", "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: backend.tenancy=column requires backend.auth != none, but backend.auth is none.");
+    }
+
     [Fact]
     public void Several_overrides_are_applied()
     {
