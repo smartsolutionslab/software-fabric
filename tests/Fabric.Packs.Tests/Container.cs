@@ -30,7 +30,7 @@ internal sealed class Container : IDisposable
 
     public static Container Postgres(string password)
     {
-        var container = Start("postgres:18.3", 5432, $"POSTGRES_PASSWORD={password}");
+        var container = Start("postgres:18.3", 5432, [$"POSTGRES_PASSWORD={password}"]);
         container.WaitUntil("postgres", "pg_isready", "-U", "postgres");
         return container;
     }
@@ -38,7 +38,7 @@ internal sealed class Container : IDisposable
     /// <summary>SQL Server, the image the AppHost runs; ready once sqlcmd can sign in as sa. The licence is accepted for this test only.</summary>
     public static Container SqlServer(string password)
     {
-        var container = Start(SqlServerImage, 1433, "ACCEPT_EULA=Y", $"MSSQL_SA_PASSWORD={password}");
+        var container = Start(SqlServerImage, 1433, ["ACCEPT_EULA=Y", $"MSSQL_SA_PASSWORD={password}"]);
         container.WaitUntil("mssql", [.. SqlCmd(password, "master"), "-Q", "select 1"]);
         return container;
     }
@@ -47,7 +47,7 @@ internal sealed class Container : IDisposable
 
     public static Container RabbitMq()
     {
-        var container = Start("rabbitmq:4.3-management", 5672);
+        var container = Start("rabbitmq:4.3-management", 5672, []);
         // As the broker's own user: run as root, the check creates the Erlang cookie the broker then cannot read.
         container.WaitUntil("rabbitmq", "rabbitmq-diagnostics", "-q", "check_port_connectivity");
         return container;
@@ -56,7 +56,7 @@ internal sealed class Container : IDisposable
     /// <summary>A single KurrentDB node without TLS, as the AppHost runs it in development; ready once its HTTP port reports itself live.</summary>
     public static Container KurrentDb(string image)
     {
-        var container = Start(image, 2113, "KURRENTDB_INSECURE=true", "KURRENTDB_CLUSTER_SIZE=1");
+        var container = Start(image, 2113, ["KURRENTDB_INSECURE=true", "KURRENTDB_CLUSTER_SIZE=1"]);
         using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         for (var attempt = 0; attempt < 90; attempt++)
         {
@@ -202,10 +202,19 @@ internal sealed class Container : IDisposable
         }
     }
 
-    private static Container Start(string image, int containerPort, params string[] environment)
+    /// <summary>
+    /// Starts <paramref name="image"/> with <paramref name="containerPort"/> published on a local port Docker picks, or on
+    /// <paramref name="hostPort"/> when given.
+    /// </summary>
+    internal static Container Start(string image, int containerPort, string[] environment, int? hostPort = null, string? name = null)
     {
         DockerPorts.EnsureRunsAlone();
-        List<string> arguments = ["run", "--detach", "--publish", $"127.0.0.1::{containerPort}"];
+        List<string> arguments = ["run", "--detach", "--publish", $"127.0.0.1:{hostPort}:{containerPort}"];
+        if (name is not null)
+        {
+            arguments.AddRange(["--name", name]);
+        }
+
         foreach (var variable in environment)
         {
             arguments.AddRange(["--env", variable]);
