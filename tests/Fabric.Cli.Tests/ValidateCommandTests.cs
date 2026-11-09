@@ -53,15 +53,24 @@ public class ValidateCommandTests
         run.ExitCode.ShouldBe(0, run.Error);
     }
 
-    /// <summary>Their generated tests send requests through IDispatcher in a container without Wolverine's bus.</summary>
+    /// <summary>Their generated tests start Wolverine in process (#362).</summary>
     [Fact]
-    public void The_wolverine_mediator_with_agents_or_dashboards_exits_one_and_prints_both_sentences()
+    public void The_wolverine_mediator_with_agents_dashboards_grpc_and_an_mcp_server_is_valid()
     {
-        var run = CliRun.Of("validate", "--profile", "saas-ai-react", "--set", "backend.mediator=wolverine", "--catalog", Paths.RepositoryCatalog);
+        var run = CliRun.Of(
+            "validate",
+            "--profile",
+            "saas-ai-react",
+            "--set",
+            "backend.mediator=wolverine",
+            "--set",
+            "backend.api-protocols=rest,grpc",
+            "--set",
+            "backend.mcp=server",
+            "--catalog",
+            Paths.RepositoryCatalog);
 
-        run.ExitCode.ShouldBe(1);
-        run.Error.ShouldContain("error: backend.mediator=wolverine conflicts with backend.llm.agents == agent-framework.");
-        run.Error.ShouldContain("error: backend.mediator=wolverine conflicts with frontend.dashboards has user-editable.");
+        run.ExitCode.ShouldBe(0, run.Error);
     }
 
     [Fact]

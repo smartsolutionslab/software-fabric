@@ -1,4 +1,5 @@
 {{~ auth = project["backend.auth"] != "none" ~}}
+{{~ wolverine = project["backend.mediator"] == "wolverine" ~}}
 using {{ namespace }}.BuildingBlocks.Messaging;
 {{~ if auth ~}}
 using Grpc.Core;
@@ -13,12 +14,16 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+{{~ if wolverine ~}}
+using Wolverine;
+using Wolverine.Runtime;
+{{~ end ~}}
 
 namespace {{ namespace }}.GrpcServices.Tests;
 
 /// <summary>
 /// The real host in process, serving this assembly's sample service beside the modules' own. Nothing it would reach is
-/// started: no hosted service runs{{ if auth }}, and a test user signs in in place of the identity provider{{ end }}.
+/// started: no hosted service runs{{ if wolverine }} but Wolverine, in process{{ end }}{{ if auth }}, and a test user signs in in place of the identity provider{{ end }}.
 /// </summary>
 public sealed class GrpcHost : WebApplicationFactory<Program>
 {
@@ -48,6 +53,14 @@ public sealed class GrpcHost : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IHostedService>();
+{{~ if wolverine ~}}
+            // But Wolverine's runtime, which IDispatcher sends requests through: in process, with no broker and no message
+            // store, and with this assembly's handlers beside the modules'.
+            services.AddSingleton<IHostedService>(provider => (IHostedService)provider.GetRequiredService<IWolverineRuntime>())
+                .DisableAllExternalWolverineTransports()
+                .DisableAllWolverineMessagePersistence()
+                .ConfigureWolverine(options => options.Discovery.IncludeAssembly(typeof(ShoutHandler).Assembly));
+{{~ end ~}}
 {{~ if auth ~}}
             services.AddAuthentication(options =>
                 {

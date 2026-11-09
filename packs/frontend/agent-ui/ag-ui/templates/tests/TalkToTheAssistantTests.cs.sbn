@@ -1,4 +1,8 @@
+{{~ wolverine = project["backend.mediator"] == "wolverine" ~}}
 using {{ namespace }}.BuildingBlocks.Messaging;
+{{~ if wolverine ~}}
+using {{ namespace }}.BuildingBlocks.Modules;
+{{~ end ~}}
 using {{ namespace }}.Modules.Assistant.Api;
 using {{ namespace }}.Modules.Assistant.Application.Queries.CountWords;
 using {{ namespace }}.Modules.Assistant.Application.Queries.TalkToTheAssistant;
@@ -6,6 +10,11 @@ using {{ namespace }}.Tests.Fakes;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+{{~ if wolverine ~}}
+using Microsoft.Extensions.Hosting;
+using Wolverine;
+using Wolverine.Runtime;
+{{~ end ~}}
 
 namespace {{ namespace }}.Modules.Assistant.Tests.Queries;
 
@@ -57,6 +66,21 @@ public class TalkToTheAssistantTests
         services.AddDispatcher();
         services.AddSingleton(model);
         new AssistantModule().AddServices(services, configuration);
+{{~ if wolverine ~}}
+        services.AddWolverine(options =>
+        {
+            options.Durability.Mode = DurabilityMode.MediatorOnly;
+            options.Discovery.DisableConventionalDiscovery();
+            options.Discovery.IncludeAssembly(ModuleAssemblies.Of<AssistantModule>("Application"));
+            options.DiscoverRequestHandlers();
+        });
+        var provider = services.BuildServiceProvider();
+
+        // Wolverine's runtime is the hosted service a host would start.
+        ((IHostedService)provider.GetRequiredService<IWolverineRuntime>()).StartAsync(CancellationToken.None).GetAwaiter().GetResult();
+        return provider;
+{{~ else ~}}
         return services.BuildServiceProvider();
+{{~ end ~}}
     }
 }
