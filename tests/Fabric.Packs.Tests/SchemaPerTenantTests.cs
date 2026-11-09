@@ -79,9 +79,8 @@ public sealed class SchemaPerTenantTests
     }
 
     [Theory]
-    [InlineData("frontend.realtime=signalr", "src/Host/Realtime/EventsHub.cs", "#error The signalr pack groups browsers by tenant for backend.tenancy column only so far")]
     [InlineData("frontend.realtime=sse", "src/Host/Realtime/BrowserEventStreams.cs", "#error The sse pack sends to a tenant's streams for backend.tenancy column only so far")]
-    public void Signalr_and_sse_still_refuse_schema_per_tenant_until_their_own_branch(string realtime, string path, string refusal)
+    public void A_realtime_pack_still_refuses_schema_per_tenant_until_its_own_branch(string realtime, string path, string refusal)
     {
         Files(Profile, SchemaPerTenant, realtime)[path].ShouldStartWith(refusal);
     }
