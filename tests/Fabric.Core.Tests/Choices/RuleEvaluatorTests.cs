@@ -100,21 +100,34 @@ public class RuleEvaluatorTests
         "module defaults: module.event-store=kurrentdb requires backend.tenancy == none, but backend.tenancy is column.")]
     [InlineData("saas-standard-vue", new[] { "frontend.design-system=tokens-and-components" },
         "frontend.design-system=tokens-and-components requires frontend.framework == react, but frontend.framework is vue.")]
+    [InlineData("saas-standard-react", new[] { "frontend.design-system=tokens-and-components", "frontend.styling=css-modules", "frontend.ui-library=radix-headless" },
+        "frontend.design-system=tokens-and-components requires frontend.styling == tailwind, but frontend.styling is css-modules.")]
     [InlineData("saas-standard-vue", new[] { "frontend.architecture=micro-frontends", "frontend.design-system=tokens" },
         "frontend.mfe-technique=module-federation requires frontend.framework == react, but frontend.framework is vue.")]
     [InlineData("saas-standard-react", new[] { "frontend.styling=library-theme", "frontend.ui-library=radix-headless" },
         "frontend.styling=library-theme conflicts with frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless).")]
     [InlineData("saas-standard-react", new[] { "backend.data-access.reads=dapper" },
         "backend.data-access.reads=dapper requires backend.tenancy == none, but backend.tenancy is column.")]
+    [InlineData("lean-crud", new[] { "backend.database=sqlserver", "backend.bus.transport=rabbitmq", "backend.tenancy=schema-per-tenant" },
+        "backend.tenancy=schema-per-tenant requires backend.database == postgres, but backend.database is sqlserver.")]
+    [InlineData("lean-crud", new[] { "backend.tenancy=schema-per-tenant" },
+        "backend.tenancy=schema-per-tenant requires backend.bus.transport != none, but backend.bus.transport is none.")]
     [InlineData("lean-crud", new[] { "module.communication=contract-interface" },
         "module defaults: module.communication requires module.communication has integration-events, but module.communication is contract-interface.")]
-    [InlineData("saas-standard-react", new[] { "backend.mediator=wolverine", "backend.api-protocols=rest,grpc" },
-        "backend.mediator=wolverine conflicts with backend.api-protocols has grpc.")]
-    [InlineData("saas-standard-react", new[] { "backend.mediator=wolverine", "backend.mcp=server" },
-        "backend.mediator=wolverine conflicts with backend.mcp has server.")]
     public void Rejects_a_combination_the_packs_refuse_in_one_sentence(string profile, string[] settings, string violation)
     {
         Violations(profile, settings).ShouldBe([violation]);
+    }
+
+    /// <summary>Their generated tests start Wolverine in process (#362), so the Wolverine mediator is offered with them.</summary>
+    [Theory]
+    [InlineData("saas-ai-react", "backend.mediator=wolverine")]
+    [InlineData("saas-standard-react", "backend.mediator=wolverine", "frontend.dashboards=user-editable")]
+    [InlineData("saas-standard-react", "backend.mediator=wolverine", "backend.api-protocols=rest,grpc")]
+    [InlineData("saas-standard-react", "backend.mediator=wolverine", "backend.mcp=server")]
+    public void The_wolverine_mediator_is_allowed_with_agents_dashboards_grpc_and_an_mcp_server(string profile, params string[] settings)
+    {
+        Violations(profile, settings).ShouldBeEmpty();
     }
 
     [Theory]

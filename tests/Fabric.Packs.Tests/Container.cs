@@ -30,7 +30,7 @@ internal sealed class Container : IDisposable
 
     public static Container Postgres(string password)
     {
-        var container = Start("postgres:18.3", 5432, $"POSTGRES_PASSWORD={password}");
+        var container = Start("postgres:18.3", 5432, [$"POSTGRES_PASSWORD={password}"]);
         container.WaitUntil("postgres", "pg_isready", "-U", "postgres");
         return container;
     }
@@ -38,7 +38,7 @@ internal sealed class Container : IDisposable
     /// <summary>SQL Server, the image the AppHost runs; ready once sqlcmd can sign in as sa. The licence is accepted for this test only.</summary>
     public static Container SqlServer(string password)
     {
-        var container = Start(SqlServerImage, 1433, "ACCEPT_EULA=Y", $"MSSQL_SA_PASSWORD={password}");
+        var container = Start(SqlServerImage, 1433, ["ACCEPT_EULA=Y", $"MSSQL_SA_PASSWORD={password}"]);
         container.WaitUntil("mssql", [.. SqlCmd(password, "master"), "-Q", "select 1"]);
         return container;
     }
@@ -47,7 +47,7 @@ internal sealed class Container : IDisposable
 
     public static Container RabbitMq()
     {
-        var container = Start("rabbitmq:4.3-management", 5672);
+        var container = Start("rabbitmq:4.3-management", 5672, []);
         // As the broker's own user: run as root, the check creates the Erlang cookie the broker then cannot read.
         container.WaitUntil("rabbitmq", "rabbitmq-diagnostics", "-q", "check_port_connectivity");
         return container;
@@ -56,7 +56,7 @@ internal sealed class Container : IDisposable
     /// <summary>A single KurrentDB node without TLS, as the AppHost runs it in development; ready once its HTTP port reports itself live.</summary>
     public static Container KurrentDb(string image)
     {
-        var container = Start(image, 2113, "KURRENTDB_INSECURE=true", "KURRENTDB_CLUSTER_SIZE=1");
+        var container = Start(image, 2113, ["KURRENTDB_INSECURE=true", "KURRENTDB_CLUSTER_SIZE=1"]);
         using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         for (var attempt = 0; attempt < 90; attempt++)
         {
@@ -87,16 +87,18 @@ internal sealed class Container : IDisposable
     /// A single-node Kafka (the image Aspire runs). A client is told the broker's address by the broker itself, so it
     /// listens on the same port inside and outside the container and advertises that one.
     /// </summary>
-    public static Container Kafka()
+    internal static Container Kafka(int? hostPort = null, string? name = null)
     {
-        DockerPorts.EnsureRunsAlone();
-        var port = FreePort();
-        var id = Docker(
-            "run", "--detach", "--publish", $"127.0.0.1:{port}:{port}",
-            "--env", $"KAFKA_LISTENERS=PLAINTEXT://localhost:29092,CONTROLLER://localhost:29093,PLAINTEXT_HOST://0.0.0.0:{port}",
-            "--env", $"KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:29092,PLAINTEXT_HOST://localhost:{port}",
-            "confluentinc/confluent-local:8.2.0").Trim();
-        var container = new Container(id, port);
+        var port = hostPort ?? FreePort();
+        var container = Start(
+            "confluentinc/confluent-local:8.2.0",
+            port,
+            [
+                $"KAFKA_LISTENERS=PLAINTEXT://localhost:29092,CONTROLLER://localhost:29093,PLAINTEXT_HOST://0.0.0.0:{port}",
+                $"KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:29092,PLAINTEXT_HOST://localhost:{port}",
+            ],
+            port,
+            name);
         container.WaitUntil("appuser", "kafka-topics", "--bootstrap-server", "localhost:29092", "--list");
         return container;
     }
@@ -107,23 +109,25 @@ internal sealed class Container : IDisposable
     /// <see cref="ManagementPort"/> (HTTP); ready once the management port reports it healthy. Both licences are
     /// accepted for this test only.
     /// </summary>
-    public static Container ServiceBus()
+    internal static Container ServiceBus(int? amqpHostPort = null, string? name = null)
     {
         DockerPorts.EnsureRunsAlone();
         const string password = "Fabric-tests-1";
-        var network = Docker("network", "create", $"fabric-servicebus-{Guid.NewGuid():N}").Trim();
+        var networkName = name ?? $"fabric-servicebus-{Guid.NewGuid():N}";
+        var network = Docker("network", "create", networkName).Trim();
         List<string> started = [];
         Container container;
         try
         {
-            started.Add(Docker(
-                "run", "--detach", "--network", network, "--network-alias", "sqlserver",
+            started.Add(CreateAndStart(
+                "--name", $"{networkName}-sqlserver", "--network", network, "--network-alias", "sqlserver",
                 "--env", "ACCEPT_EULA=Y", "--env", $"MSSQL_SA_PASSWORD={password}",
-                "mcr.microsoft.com/mssql/server:2022-latest").Trim());
-            started.Add(Docker(
-                "run", "--detach", "--network", network, "--publish", "127.0.0.1::5672", "--publish", "127.0.0.1::5300",
+                "mcr.microsoft.com/mssql/server:2022-latest"));
+            started.Add(CreateAndStart(
+                "--name", $"{networkName}-emulator", "--network", network,
+                "--publish", $"127.0.0.1:{amqpHostPort}:5672", "--publish", "127.0.0.1::5300",
                 "--env", "ACCEPT_EULA=Y", "--env", "SQL_SERVER=sqlserver", "--env", $"MSSQL_SA_PASSWORD={password}",
-                "mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.0").Trim());
+                "mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.0"));
             container = new Container(started[1], PublishedPort(started[1], 5672), [started[0]], network, PublishedPort(started[1], 5300));
         }
         catch (Exception)
@@ -202,18 +206,57 @@ internal sealed class Container : IDisposable
         }
     }
 
-    private static Container Start(string image, int containerPort, params string[] environment)
+    /// <summary>
+    /// Starts <paramref name="image"/> with <paramref name="containerPort"/> published on a local port Docker picks, or on
+    /// <paramref name="hostPort"/> when given.
+    /// </summary>
+    internal static Container Start(string image, int containerPort, string[] environment, int? hostPort = null, string? name = null)
     {
         DockerPorts.EnsureRunsAlone();
-        List<string> arguments = ["run", "--detach", "--publish", $"127.0.0.1::{containerPort}"];
+        List<string> arguments = ["--publish", $"127.0.0.1:{hostPort}:{containerPort}"];
+        if (name is not null)
+        {
+            arguments.AddRange(["--name", name]);
+        }
+
         foreach (var variable in environment)
         {
             arguments.AddRange(["--env", variable]);
         }
 
         arguments.Add(image);
-        var id = Docker([.. arguments]).Trim();
-        return new Container(id, PublishedPort(id, containerPort));
+        var id = CreateAndStart([.. arguments]);
+        try
+        {
+            return new Container(id, PublishedPort(id, containerPort));
+        }
+        catch (InvalidOperationException)
+        {
+            // No Container owns it yet, so it is removed here, with its volumes, before the failure goes on.
+            Run(["rm", "--force", "--volumes", id]);
+            throw;
+        }
+    }
+
+    /// <summary>Creates a container from <c>docker create</c>'s <paramref name="arguments"/>, image last, starts it and returns its id.</summary>
+    /// <remarks>
+    /// Created and started apart: a start that fails, at networking for instance, leaves a created container and its
+    /// anonymous volumes, and only <c>docker create</c> says which container that is. It is removed with them before
+    /// the failure goes on.
+    /// </remarks>
+    private static string CreateAndStart(params string[] arguments)
+    {
+        var id = Docker(["create", .. arguments]).Trim();
+        try
+        {
+            Docker("start", id);
+            return id;
+        }
+        catch (InvalidOperationException)
+        {
+            Run(["rm", "--force", "--volumes", id]);
+            throw;
+        }
     }
 
     /// <summary>The local port Docker published a container's port on.</summary>

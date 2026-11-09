@@ -1,0 +1,86 @@
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Wolverine;
+using Wolverine.EntityFrameworkCore;
+using Wolverine.Postgresql;
+
+namespace {{ namespace }}.Tenancy.Tests;
+
+/// <summary>
+/// A consumer begins its tenant's <see cref="TenantScope"/> inside Handle, after Wolverine has created the DbContext it
+/// takes by constructor or as a parameter: the context works in that tenant's schema all the same, since it chooses its
+/// schema when first used. Wolverine runs as the host configures it, against the AppHost's database.
+/// </summary>
+{{~ database_fixture_attributes ~}}
+public sealed class TenantConsumerTests({{ database_fixture }})
+{
+    private const string TenantA = "tenant-a";
+
+    private const string TenantB = "tenant-b";
+
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `typeof(LedgerConstructorConsumer)` }}
+    {{ test_case_attribute `typeof(LedgerParameterConsumer)` }}
+    public async Task A_consumer_with_an_injected_context_that_begins_its_tenant_scope_in_Handle_writes_and_reads_its_tenants_schema(Type consumer)
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        using var host = await StartAsync(consumer, cancellationToken);
+        var arrived = new LedgerEntryArrived(TenantA, Guid.CreateVersion7(), "an entry a consumer recorded");
+
+        var seenByConsumer = await InvokeAsync(host, arrived, cancellationToken);
+
+        {{ `seenByConsumer` | should_contain `arrived.Id` }};
+        {{ `(await IdsAsync(host, TenantA, cancellationToken))` | should_contain `arrived.Id` }};
+        {{ `(await IdsAsync(host, TenantB, cancellationToken))` | should_not_contain `arrived.Id` }};
+    }
+
+    private static async Task<IReadOnlyList<Guid>> InvokeAsync(IHost host, LedgerEntryArrived arrived, CancellationToken cancellationToken)
+    {
+        await using var scope = host.Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IMessageBus>().InvokeAsync<IReadOnlyList<Guid>>(arrived, cancellationToken);
+    }
+
+    private static async Task<List<Guid>> IdsAsync(IHost host, string tenant, CancellationToken cancellationToken)
+    {
+        using var tenantScope = TenantScope.Begin(tenant);
+        await using var scope = host.Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<LedgerDbContext>().Set<LedgerEntry>()
+            .Select(entry => entry.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>The ledger's context and Wolverine as the host has them, with the one consumer under test.</summary>
+    private async Task<IHost> StartAsync(Type consumer, CancellationToken cancellationToken)
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:database"] = {{ database_connection_string }},
+            [$"{TenantSchemas.Tenants}:0"] = TenantA,
+            [$"{TenantSchemas.Tenants}:1"] = TenantB,
+        });
+        builder.Services.AddModuleDbContext(typeof(LedgerDbContext), builder.Configuration);
+        builder.Services.AddWolverine(options =>
+        {
+            options.ApplicationAssembly = typeof(TenantConsumerTests).Assembly;
+            options.UseRuntimeCompilation();
+            options.PersistMessagesWithPostgresql({{ database_connection_string }}, "tenancy_tests_wolverine");
+            options.UseEntityFrameworkCoreTransactions();
+            options.Discovery.DisableConventionalDiscovery();
+            options.Discovery.IncludeType(consumer);
+        });
+
+        var host = builder.Build();
+        await using (var scope = host.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<LedgerDbContext>().Database.MigrateAsync(cancellationToken);
+        }
+
+        await host.Services.MigrateTenantSchemasAsync([typeof(LedgerDbContext)], cancellationToken);
+        await host.StartAsync(cancellationToken);
+        return host;
+    }
+}

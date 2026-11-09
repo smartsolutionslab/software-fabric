@@ -1,0 +1,22 @@
+option: frontend.forms.formkit
+files:
+  # Owner decisions on #269: unstyled FormKit inputs, whose look the project owns in one config; a project-owned zod and
+  # valibot adapter, since @formkit/zod 2.5.0 peers zod 3 and FormKit publishes no valibot one.
+  - { template: templates/formkit.config.ts.sbn, target: web/app/src/forms/formkit.config.ts }
+  - { template: templates/formkit.module.css.sbn, target: web/app/src/forms/formkit.module.css, when: 'project["frontend.styling"] == "css-modules"' }
+  - { template: templates/schemaSubmit.ts.sbn, target: web/app/src/forms/schemaSubmit.ts }
+  - { template: templates/schemaSubmit.test.ts.sbn, target: web/app/src/forms/schemaSubmit.test.ts }
+  - { template: templates/formkit-provider.ts.sbn, target: web/app/src/providers/formkit.ts }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  - { slot: web.dev-dependencies, template: templates/dev-dependencies.sbn }
+  - { slot: web.imports, template: templates/import.sbn, order: 30 }
+  - { slot: web.providers, template: templates/provider.sbn, order: 30 }
+  - { slot: web.test-setup, template: templates/test-setup.sbn, order: 30 }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 30 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing another form library (vee-validate, TanStack Form), FormKit's published zod adapter (@formkit/zod) or a FormKit theme (@formkit/themes) fails lint.", file: templates/restricted.sbn }
+  - { kind: unit-test, describes: "schemaSubmit puts a zod or valibot schema's messages on the FormKit fields they belong to, nested and listed ones too, and hands a valid form's handler the schema's output (src/forms/schemaSubmit.test.ts).", file: templates/schemaSubmit.test.ts.sbn }

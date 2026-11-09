@@ -1,0 +1,49 @@
+option: backend.tenancy.schema-per-tenant
+# The tenant itself (ITenantContext, TenantScope, the token's claim, GET /me/tenant) is the same as the column pack's:
+# its files are copies, and a test fails when they differ. What differs is where a tenant's rows live.
+files:
+  - { template: templates/ITenantContext.cs.sbn, target: src/BuildingBlocks/Tenancy/ITenantContext.cs }
+  - { template: templates/TenantScope.cs.sbn, target: src/BuildingBlocks/Tenancy/TenantScope.cs }
+  - { template: templates/HttpTenantContext.cs.sbn, target: src/BuildingBlocks/Tenancy/HttpTenantContext.cs }
+  - { template: templates/TenancyRegistration.cs.sbn, target: src/BuildingBlocks/Tenancy/Wiring/TenancyRegistration.cs }
+  - { template: templates/CurrentTenant.cs.sbn, target: src/Host/CurrentTenant.cs }
+  - { template: templates/TenantSchemas.cs.sbn, target: src/BuildingBlocks/Tenancy/TenantSchemas.cs }
+  - { template: templates/TenantSchema.cs.sbn, target: src/BuildingBlocks/Tenancy/Wiring/TenantSchema.cs }
+  - { template: templates/TenantSchemaMigrations.cs.sbn, target: src/BuildingBlocks/Tenancy/Wiring/TenantSchemaMigrations.cs }
+  - { template: templates/TenantEnvironment.cs.sbn, target: src/AppHost/Wiring/TenantEnvironment.cs }
+  - { template: templates/NoTenantIds.cs.sbn, target: tests/Architecture.Tests/Rules/NoTenantIds.cs }
+  - { template: templates/tests/Tenancy.Tests.csproj.sbn, target: tests/Tenancy.Tests/Tenancy.Tests.csproj }
+  - { template: templates/tests/ApplicationDatabase.cs.sbn, target: tests/Tenancy.Tests/ApplicationDatabase.cs }
+  - { template: templates/tests/LedgerEntry.cs.sbn, target: tests/Tenancy.Tests/LedgerEntry.cs }
+  - { template: templates/tests/LedgerEntryConfiguration.cs.sbn, target: tests/Tenancy.Tests/LedgerEntryConfiguration.cs }
+  - { template: templates/tests/LedgerDbContext.cs.sbn, target: tests/Tenancy.Tests/LedgerDbContext.cs }
+  - { template: templates/tests/CreateLedger.cs.sbn, target: tests/Tenancy.Tests/CreateLedger.cs }
+  - { template: templates/tests/LedgerDbContextModelSnapshot.cs.sbn, target: tests/Tenancy.Tests/LedgerDbContextModelSnapshot.cs }
+  - { template: templates/tests/TenantSchemaTests.cs.sbn, target: tests/Tenancy.Tests/TenantSchemaTests.cs }
+  - { template: templates/tests/LedgerArchiveDbContext.cs.sbn, target: tests/Tenancy.Tests/LedgerArchiveDbContext.cs }
+  - { template: templates/tests/TenantSchemaNameTests.cs.sbn, target: tests/Tenancy.Tests/TenantSchemaNameTests.cs }
+  - { template: templates/tests/LedgerEntryArrived.cs.sbn, target: tests/Tenancy.Tests/LedgerEntryArrived.cs }
+  - { template: templates/tests/LedgerConstructorConsumer.cs.sbn, target: tests/Tenancy.Tests/LedgerConstructorConsumer.cs }
+  - { template: templates/tests/LedgerParameterConsumer.cs.sbn, target: tests/Tenancy.Tests/LedgerParameterConsumer.cs }
+  - { template: templates/tests/TenantConsumerTests.cs.sbn, target: tests/Tenancy.Tests/TenantConsumerTests.cs }
+slots:
+  - { slot: host.services, template: templates/host-services.sbn, order: 10 }
+  - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 20 }
+  - { slot: persistence.schema, template: templates/persistence-schema.sbn }
+  - { slot: persistence.model-conventions, template: templates/model-conventions.sbn }
+  - { slot: persistence.save-changes, template: templates/save-changes.sbn }
+  - { slot: migration-runner.preflight, template: templates/migration-runner-preflight.sbn }
+  - { slot: migration-runner.steps, template: templates/migration-runner-steps.sbn }
+  - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 16 }
+  - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 6 }
+  - { slot: solution.projects, template: templates/solution-project.sbn }
+  # With backend.test.integration testcontainers only (ADR-0002: dropped where no pack declares the slot).
+  - { slot: integration-tests.database, template: templates/integration-tests-database.sbn, order: 15, optional: true }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "Against the AppHost's database after the MigrationRunner: a listed tenant reads its own rows and none of another tenant's, each listed tenant has a schema of its own with its own migrations history for the sample context and for every module, and a tenant not listed, like no tenant, reads nothing and cannot save, nor can a context first used before its tenant was set.", file: templates/tests/TenantSchemaTests.cs.sbn }
+  - { kind: unit-test, describes: "Schema names are one module's and one tenant's alone: module and tenant pairs that would share a schema, or a tenant's schema that is another module's own, fail before either is migrated, and a name past the database's identifier limit fails instead of being cut short.", file: templates/tests/TenantSchemaNameTests.cs.sbn }
+  - { kind: unit-test, describes: "A Wolverine consumer whose DbContext is injected, by constructor or as a parameter of Handle, and which begins its TenantScope inside Handle, writes and reads its tenant's schema: the context chooses its schema when first used, not when Wolverine creates it.", file: templates/tests/TenantConsumerTests.cs.sbn }
+  - { kind: architecture-test, describes: "No type in a module has a TenantId: each tenant's rows are kept apart by its schema.", file: templates/NoTenantIds.cs.sbn }

@@ -1,0 +1,177 @@
+using System.Reflection;
+using {{ namespace }}.BuildingBlocks.Persistence;
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Tenancy.Tests;
+
+/// <summary>
+/// Schema-per-tenant tenancy against the AppHost's database: each listed tenant's rows live in a schema of its own, so
+/// no tenant reads another's, and a tenant not listed, like no tenant, reads nothing and cannot save. The tenant comes
+/// from a <see cref="TenantScope"/>, as in consumers and jobs; in a request it comes from the token.
+/// </summary>
+{{~ database_fixture_attributes ~}}
+public sealed class TenantSchemaTests({{ database_fixture }}) : {{ test_lifetime }}
+{
+    private const string TenantA = "tenant-a";
+
+    private const string TenantB = "tenant-b";
+
+    private const string Unlisted = "tenant-c";
+
+    private ServiceProvider? services;
+
+    private ServiceProvider Services => services ?? throw new InvalidOperationException("The services have not been built.");
+
+    {{ test_setup }}
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:database"] = {{ database_connection_string }},
+                [$"{TenantSchemas.Tenants}:0"] = TenantA,
+                [$"{TenantSchemas.Tenants}:1"] = TenantB,
+            })
+            .Build();
+        var collection = new ServiceCollection().AddSingleton<IConfiguration>(configuration);
+        foreach (var context in ModuleContexts().Append(typeof(LedgerDbContext)))
+        {
+            collection.AddModuleDbContext(context, configuration);
+        }
+
+        services = collection.BuildServiceProvider();
+
+        // As the MigrationRunner does: the module's own schema first, which checks the model against the snapshot.
+        await using (var scope = Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<LedgerDbContext>().Database.MigrateAsync({{ test_cancellation_token }});
+        }
+
+        await Services.MigrateTenantSchemasAsync([typeof(LedgerDbContext)], {{ test_cancellation_token }});
+    }
+
+    {{ test_teardown }}
+    {
+        if (services is not null)
+        {
+            await services.DisposeAsync();
+        }
+    }
+
+    {{ test_attribute }}
+    public async Task A_tenant_reads_its_own_rows_and_none_of_another_tenants()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var first = await AddAsync(TenantA, "tenant a's entry", cancellationToken);
+        var second = await AddAsync(TenantB, "tenant b's entry", cancellationToken);
+
+        var seenByA = await IdsAsync(TenantA, cancellationToken);
+        var seenByB = await IdsAsync(TenantB, cancellationToken);
+
+        {{ `seenByA` | should_contain `first` }};
+        {{ `seenByA` | should_not_contain `second` }};
+        {{ `seenByB` | should_contain `second` }};
+        {{ `seenByB` | should_not_contain `first` }};
+    }
+
+    {{ test_attribute }}
+    public async Task Each_listed_tenant_has_a_schema_of_its_own_with_its_own_migrations_history()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        foreach (var tenant in (string[])[TenantA, TenantB])
+        {
+            using var tenantScope = TenantScope.Begin(tenant);
+            await using var scope = Services.CreateAsyncScope();
+            var ledger = scope.ServiceProvider.GetRequiredService<LedgerDbContext>();
+
+            {{ `ledger.CurrentSchema` | should_be `$"{LedgerDbContext.Schema}_{tenant.Replace('-', '_')}"` }};
+            {{ `(await HistoryTablesAsync(ledger, cancellationToken))` | should_be `1L` }};
+            {{ `(await ledger.Database.GetAppliedMigrationsAsync(cancellationToken))` | should_be `[CreateLedger.Id]` }};
+        }
+    }
+
+    {{ test_attribute }}
+    public async Task A_tenant_not_listed_and_work_without_a_tenant_read_nothing_and_cannot_save()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        await AddAsync(TenantA, "tenant a's entry", cancellationToken);
+
+        foreach (var tenant in (string?[])[Unlisted, null])
+        {
+            {{ `(await IdsAsync(tenant, cancellationToken))` | should_be_empty }};
+            await {{ should_throw_async "InvalidOperationException" "() => AddAsync(tenant, \"an entry of no listed tenant\", cancellationToken)" }};
+        }
+    }
+
+    {{ test_attribute }}
+    public async Task A_context_first_used_before_its_tenant_is_set_stays_where_no_tenant_works()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        await AddAsync(TenantA, "tenant a's entry", cancellationToken);
+        await using var scope = Services.CreateAsyncScope();
+        var ledger = scope.ServiceProvider.GetRequiredService<LedgerDbContext>();
+        var seenWithoutTenant = await ledger.Set<LedgerEntry>().Select(entry => entry.Id).ToListAsync(cancellationToken);
+
+        using var tenantScope = TenantScope.Begin(TenantA);
+        ledger.Add(new LedgerEntry(Guid.CreateVersion7(), "an entry after the context's first use"));
+
+        {{ `seenWithoutTenant` | should_be_empty }};
+        {{ `ledger.CurrentSchema` | should_be `LedgerDbContext.Schema` }};
+        await {{ should_throw_async "InvalidOperationException" "() => ledger.SaveChangesAsync(cancellationToken)" }};
+    }
+
+    {{ test_attribute }}
+    public async Task The_migration_runner_gave_each_listed_tenant_a_schema_with_its_history_for_every_module()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        foreach (var tenant in (string[])[TenantA, TenantB])
+        {
+            using var tenantScope = TenantScope.Begin(tenant);
+            foreach (var context in ModuleContexts())
+            {
+                await using var scope = Services.CreateAsyncScope();
+                var module = (ModuleDbContext)scope.ServiceProvider.GetRequiredService(context);
+
+                {{ `module.CurrentSchema` | should_be `$"{module.ModuleSchema}_{tenant.Replace('-', '_')}"` }};
+                {{ `(await HistoryTablesAsync(module, cancellationToken))` | should_be `1L` `context.Name` }};
+            }
+        }
+    }
+
+    /// <summary>Every module's DbContext, from the Infrastructure assemblies the MigrationRunner migrates.</summary>
+    private static IEnumerable<Type> ModuleContexts() =>
+        Directory.EnumerateFiles(AppContext.BaseDirectory, "{{ namespace }}.Modules.*.Infrastructure.dll")
+            .Order(StringComparer.Ordinal)
+            .Select(Assembly.LoadFrom)
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(ModuleDbContext).IsAssignableFrom(type));
+
+    private static Task<long> HistoryTablesAsync(ModuleDbContext context, CancellationToken cancellationToken) =>
+        context.Database
+            .SqlQuery<long>($"select count(*) as \"Value\" from information_schema.tables where table_schema = {context.CurrentSchema} and table_name = '__EFMigrationsHistory'")
+            .SingleAsync(cancellationToken);
+
+    private static IDisposable? Within(string? tenant) => tenant is null ? null : TenantScope.Begin(tenant);
+
+    private async Task<Guid> AddAsync(string? tenant, string text, CancellationToken cancellationToken)
+    {
+        using var tenantScope = Within(tenant);
+        await using var scope = Services.CreateAsyncScope();
+        var ledger = scope.ServiceProvider.GetRequiredService<LedgerDbContext>();
+        var entry = new LedgerEntry(Guid.CreateVersion7(), text);
+        ledger.Add(entry);
+        await ledger.SaveChangesAsync(cancellationToken);
+        return entry.Id;
+    }
+
+    private async Task<List<Guid>> IdsAsync(string? tenant, CancellationToken cancellationToken)
+    {
+        using var tenantScope = Within(tenant);
+        await using var scope = Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<LedgerDbContext>().Set<LedgerEntry>()
+            .Select(entry => entry.Id)
+            .ToListAsync(cancellationToken);
+    }
+}

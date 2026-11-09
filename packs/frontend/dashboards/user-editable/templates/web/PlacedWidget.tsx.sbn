@@ -1,5 +1,23 @@
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  ret 'className="' + tailwind + '"'
+end ~}}
+{{~ func themed(shadcn, palette, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  if ui == "radix-headless"
+    ret 'className="' + palette + '"'
+  end
+  ret 'className="' + shadcn + '"'
+end ~}}
+{{~ if project["frontend.ui-library"] == "mui" ~}}
+{%{import { Box, Button, Paper, Stack, Typography } from '@mui/material';
 import { useGetDashboardsWidgetDeclarationsByIdQuery } from '@/api/generated';
-import { Button } from '@/components/ui/button';
 import type { Placement } from './layout';
 import { WidgetView } from './WidgetView';
 
@@ -20,14 +38,71 @@ export function PlacedWidget({ placement, rowHeight, refresh, onRemove }: Placed
   const title = declaration?.title ?? placement.source;
 
   return (
-    <section aria-label={title} className="flex h-full flex-col overflow-hidden rounded border bg-card p-2">
-      <header className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-medium">{title}</h2>
+    <Paper
+      component="section"
+      variant="outlined"
+      aria-label={title}
+      sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', p: 1 }}
+    >
+      <Stack
+        component="header"
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+      >
+        <Typography component="h2" variant="subtitle2">
+          {title}
+        </Typography>
+        <Button type="button" variant="text" size="small" aria-label={`Remove ${title}`} onClick={onRemove}>
+          Remove
+        </Button>
+      </Stack>
+      <Box sx={{ minHeight: 0, flex: 1, overflow: 'auto' }}>
+        <WidgetView
+          source={placement.source}
+          visual={placement.visual}
+          title={title}
+          height={Math.max(120, placement.height * rowHeight - 60)}
+          refresh={refresh}
+        />
+      </Box>
+    </Paper>
+  );
+}
+}%}{{~ else ~}}
+import { useGetDashboardsWidgetDeclarationsByIdQuery } from '@/api/generated';
+import { Button } from '@/components/ui/button';
+import type { Placement } from './layout';
+import { WidgetView } from './WidgetView';
+{{~ if css_modules ~}}
+import styles from './PlacedWidget.module.css';
+{{~ end ~}}
+
+interface PlacedWidgetProps {
+  placement: Placement;
+  rowHeight: number;
+  /** Goes up with every save of the dashboard, so the widget's data is read again. */
+  refresh: number;
+  onRemove: () => void;
+}
+
+/**
+ * A widget on the dashboard, titled by its own declaration rather than by the page of the widget picker on screen; its
+ * id stands in until the declaration arrives, or when the widget is no longer declared for the user.
+ */
+export function PlacedWidget({ placement, rowHeight, refresh, onRemove }: PlacedWidgetProps) {
+  const { data: declaration } = useGetDashboardsWidgetDeclarationsByIdQuery({ id: placement.source });
+  const title = declaration?.title ?? placement.source;
+
+  return (
+    <section aria-label={title} {{ themed "flex h-full flex-col overflow-hidden rounded border bg-card p-2" "flex h-full flex-col overflow-hidden rounded border bg-white p-2" "widget" }}>
+      <header {{ class_of "flex items-center justify-between gap-2" "header" }}>
+        <h2 {{ class_of "text-sm font-medium" "title" }}>{title}</h2>
         <Button type="button" variant="ghost" size="sm" aria-label={`Remove ${title}`} onClick={onRemove}>
           Remove
         </Button>
       </header>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div {{ class_of "min-h-0 flex-1 overflow-auto" "body" }}>
         <WidgetView
           source={placement.source}
           visual={placement.visual}
@@ -39,3 +114,4 @@ export function PlacedWidget({ placement, rowHeight, refresh, onRemove }: Placed
     </section>
   );
 }
+{{~ end ~}}

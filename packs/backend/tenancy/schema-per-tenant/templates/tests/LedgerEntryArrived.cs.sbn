@@ -1,0 +1,4 @@
+namespace {{ namespace }}.Tenancy.Tests;
+
+/// <summary>A message for one tenant's ledger, carrying its tenant as an integration event's metadata does.</summary>
+public sealed record LedgerEntryArrived(string TenantId, Guid Id, string Text);

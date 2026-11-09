@@ -1,0 +1,2 @@
+{{ if project["frontend.ui-library"] == "mui" }}/* The look is the MUI theme in src/theme.ts, and CssBaseline sets the page's baseline from it: no global rules here,
+   only the stylesheets a library needs imported. */{{ end }}

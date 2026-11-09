@@ -1,0 +1,16 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace {{ namespace }}.Tenancy.Tests;
+
+public sealed class LedgerEntryConfiguration : IEntityTypeConfiguration<LedgerEntry>
+{
+    public void Configure(EntityTypeBuilder<LedgerEntry> builder)
+    {
+        {{ not_null "builder" }}
+
+        builder.ToTable("ledger_entries");
+        builder.HasKey(entry => entry.Id);
+        builder.Property(entry => entry.Text).IsRequired();
+    }
+}

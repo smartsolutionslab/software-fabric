@@ -83,6 +83,7 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
       - id: choose
         # Assigned first: inside echo's arguments a failing reviewer.sh would not fail the step, and no review would run.
+        # Against the base branch as it is now: the event's base.sha can predate commits merged in from it.
         run: |
           reviewer="$(bash "$GATE/scripts/board/reviewer.sh" "$BASE" "$HEAD")"
           setting="REVIEW_MODEL_${reviewer^^}"
@@ -95,7 +96,7 @@ jobs:
           echo "model=$model" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE: origin/${{ github.base_ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
 
   review:
@@ -135,11 +136,12 @@ jobs:
         # base branch's files instead. The diff is untrusted, so the reviewer may run only commands that read the
         # checkout; in prompt mode anything else (writes, other commands, any URL, paths outside the checkout) is
         # refused, since there is no one to ask. Its shell gets no token (--secret-env-vars).
+        # The diff is against the base branch as it is now, like the reviewer's choice.
         env:
           COPILOT_GITHUB_TOKEN: ${{ github.token }}
           MODEL: ${{ needs.choose.outputs.model }}
           PR: ${{ github.event.pull_request.number }}
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE: origin/${{ github.base_ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           if [ "$EXEMPT" = true ]; then

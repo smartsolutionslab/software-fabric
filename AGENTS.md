@@ -50,10 +50,11 @@ This repo runs the protocol its packs generate (ADR-0004), copied into
 `.github/scripts/board/`; a test fails when the copy drifts from the packs.
 
 - **Take work** with `GITHUB_REPOSITORY=smartsolutionslab/software-fabric
-  bash .github/scripts/board/next.sh <lane> <executor>`. Lanes: `generator`
+  bash .github/scripts/board/next.sh <lane> <executor> [issue]`. Lanes: `generator`
   (src/, catalog, schema), `packs-backend`, `packs-frontend`, `ci` (workflows,
-  build/). Exit 3: nothing eligible. Exit 1: the claim failed; stop and report
-  it. Claude Code: `/next-issue`.
+  build/). With an issue, it claims that one only if it is eligible. Exit 3:
+  nothing eligible. Exit 1: the named issue is not eligible, or the claim
+  failed; stop and report it. Claude Code: `/next-issue`.
 - **Work only on the `agent/<issue>` branch you claimed**, push at
   least every two hours, and end every commit with
   `Agent-Executor: <family>-<runtime>/<detail>`.

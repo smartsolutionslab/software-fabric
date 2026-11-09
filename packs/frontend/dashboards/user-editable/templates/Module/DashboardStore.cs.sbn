@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace {{ namespace }}.Modules.Dashboards.Infrastructure;
 
-/// <summary>Every read filters by owner here{{ if project["backend.tenancy"] != "none" }}, and by tenant in the DbContext's query filter{{ end }}: a user reads only their own dashboards.</summary>
+/// <summary>Every read filters by owner here{{ if project["backend.tenancy"] == "column" }}, and by tenant in the DbContext's query filter{{ else if project["backend.tenancy"] != "none" }}, and by tenant in the tenant's own schema{{ end }}: a user reads only their own dashboards.</summary>
 public sealed class DashboardStore(DashboardsDbContext context) : IDashboardStore
 {
 {{~ if option ~}}

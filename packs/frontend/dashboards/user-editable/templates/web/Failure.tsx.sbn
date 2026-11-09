@@ -1,4 +1,12 @@
-import { Button } from '@/components/ui/button';
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret 'className={styles.' + module + '}'
+  end
+  ret 'className="' + tailwind + '"'
+end ~}}
+{{~ if project["frontend.ui-library"] == "mui" ~}}
+{%{import { Button, Stack } from '@mui/material';
 
 interface FailureProps {
   message: string;
@@ -9,7 +17,30 @@ interface FailureProps {
 /** A read that failed, said so, with a way to try it again. */
 export function Failure({ message, retry, onRetry }: FailureProps) {
   return (
-    <div role="alert" className="flex items-center gap-2 text-sm">
+    <Stack role="alert" direction="row" spacing={1} sx={{ alignItems: 'center', typography: 'body2' }}>
+      <span>{message}</span>
+      <Button type="button" variant="outlined" size="small" aria-label={retry} onClick={() => void onRetry()}>
+        Try again
+      </Button>
+    </Stack>
+  );
+}
+}%}{{~ else ~}}
+import { Button } from '@/components/ui/button';
+{{~ if css_modules ~}}
+import styles from './Failure.module.css';
+{{~ end ~}}
+
+interface FailureProps {
+  message: string;
+  retry: string;
+  onRetry: () => unknown;
+}
+
+/** A read that failed, said so, with a way to try it again. */
+export function Failure({ message, retry, onRetry }: FailureProps) {
+  return (
+    <div role="alert" {{ class_of "flex items-center gap-2 text-sm" "failure" }}>
       <span>{message}</span>
       <Button type="button" variant="outline" size="sm" aria-label={retry} onClick={() => void onRetry()}>
         Try again
@@ -17,3 +48,4 @@ export function Failure({ message, retry, onRetry }: FailureProps) {
     </div>
   );
 }
+{{~ end ~}}

@@ -9,7 +9,7 @@ namespace Fabric.Packs.Tests;
 /// with declarations there (Vitest hands out a module's class names whether or not the stylesheet has them, #358). The
 /// packs that write classes into their markup whatever the UI library branch for it: the data table, <c>SignedIn</c>,
 /// the routing App files, the micro-frontends shell's stylesheet, and the Vue dashboards and agent panel. Vue runs it with
-/// Reka UI; React's library with a pack of its own comes with #271, so radix-headless is stood in here.
+/// Reka UI, React with radix-headless (#271), whose dashboards and agent panel branch for it too.
 /// </summary>
 public sealed partial class CssModulesTests
 {
@@ -95,6 +95,60 @@ public sealed partial class CssModulesTests
             styled.ShouldContain("web/app/src/auth/SignedIn.tsx");
             styled.ShouldContain("web/app/src/components/ui/data-table.tsx");
         }
+    }
+
+    [Fact]
+    public void A_react_project_with_css_modules_generates_from_the_real_packs_alone()
+    {
+        foreach (var overrides in new[] { ReactCssModules, [.. ReactCssModules, .. AgentsAndDashboards], [.. ReactCssModules, .. AgentsAndDashboards, "frontend.forms=tanstack-form", "frontend.validation=valibot"] })
+        {
+            Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", React, overrides).Errors.ShouldBeEmpty(string.Join(' ', overrides));
+        }
+    }
+
+    [Fact]
+    public void Every_react_dashboard_and_agent_panel_component_takes_its_classes_from_a_module_with_a_rule_for_each()
+    {
+        foreach (var overrides in new string[][] { [.. ReactCssModules, .. AgentsAndDashboards], [.. ReactCssModules, .. AgentsAndDashboards, "frontend.forms=tanstack-form"] })
+        {
+            var styled = StyledComponents(Files(React, overrides));
+
+            foreach (var component in new[] { "DashboardEditor", "DashboardCanvas", "Failure", "Pager", "PlacedWidget", "DashboardAssistant", "PendingWidget" })
+            {
+                styled.ShouldContain($"web/app/src/dashboards/{component}.tsx");
+            }
+
+            styled.ShouldContain("web/app/src/agents/AgentPanel.tsx");
+            styled.ShouldContain("web/app/src/components/ui/button.tsx");
+        }
+    }
+
+    [Fact]
+    public void The_react_conversations_number_no_messages_and_their_answers_name_the_speaker_legibly()
+    {
+        var files = Files(React, [.. ReactCssModules, .. AgentsAndDashboards]);
+
+        foreach (var (stylesheet, list) in new[] { ("web/app/src/agents/AgentPanel.module.css", ".messages {"), ("web/app/src/dashboards/DashboardAssistant.module.css", ".conversation {") })
+        {
+            var css = files[stylesheet];
+            var rule = css[css.IndexOf(list, StringComparison.Ordinal)..];
+            rule[..(rule.IndexOf('}', StringComparison.Ordinal) + 1)].ShouldContain("list-style: none;", customMessage: $"{stylesheet}: without Tailwind's reset an <ol> numbers its messages");
+
+            var speaker = css[css.IndexOf(".answerSpeaker {", StringComparison.Ordinal)..];
+            speaker[..(speaker.IndexOf('}', StringComparison.Ordinal) + 1)].ShouldContain("color: #475569;");
+        }
+    }
+
+    [Fact]
+    public void The_react_css_modules_web_app_with_dashboards_and_the_agent_panel_builds_lints_formats_and_passes_its_tests()
+    {
+        using var project = new GeneratedProject(React, [.. ReactCssModules, .. AgentsAndDashboards]);
+
+        var plain = BuildLintFormatAndTest(project);
+
+        plain.ShouldContain("✓ src/cssModules.test.ts > every class a component takes from its CSS module has a rule with declarations there", customMessage: plain);
+        plain.ShouldContain("✓ src/dashboards/DashboardAssistant.test.tsx", customMessage: plain);
+        plain.ShouldContain("✓ src/agents/AgentPanel.test.tsx", customMessage: plain);
     }
 
     [Fact]

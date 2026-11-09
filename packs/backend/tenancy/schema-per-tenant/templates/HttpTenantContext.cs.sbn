@@ -1,0 +1,20 @@
+{{~ if project["backend.auth"] == "none" ~}}
+#error The column tenancy pack reads the tenant from the signed-in user's token, and backend.auth none signs nobody in; choose an identity provider or backend.tenancy none (docs/adr/0009 of the generator).
+{{~ else ~}}
+using Microsoft.AspNetCore.Http;
+
+namespace {{ namespace }}.BuildingBlocks.Tenancy;
+
+/// <summary>An explicit <see cref="TenantScope"/> first; otherwise {{ tenant_claim_description }}.</summary>
+public sealed class HttpTenantContext(IHttpContextAccessor accessor) : ITenantContext
+{
+    {{ tenant_claim_members }}
+
+    public string? TenantId => TenantScope.TenantId ?? FromToken();
+
+    private string? FromToken()
+    {
+        {{ tenant_claim "accessor.HttpContext?.User" }}
+    }
+}
+{{~ end ~}}

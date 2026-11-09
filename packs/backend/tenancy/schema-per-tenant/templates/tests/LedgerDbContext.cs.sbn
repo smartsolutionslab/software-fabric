@@ -1,0 +1,11 @@
+using {{ namespace }}.BuildingBlocks.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace {{ namespace }}.Tenancy.Tests;
+
+/// <summary>Stands in for a module's DbContext, with a migration of its own, as <c>dotnet ef</c> would write it.</summary>
+public sealed class LedgerDbContext(DbContextOptions<LedgerDbContext> options, IServiceProvider services)
+    : ModuleDbContext(options, services, Schema)
+{
+    public const string Schema = "tenancy_tests_ledger";
+}

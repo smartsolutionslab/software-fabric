@@ -1,0 +1,4 @@
+            {
+              group: ['antd', '@mantine/*', '@chakra-ui/*', '@fluentui/*', '@radix-ui/*', '@headlessui/react'],
+              message: 'Use MUI (@mui/material) and the theme in src/theme.ts (docs/adr).',
+            }
