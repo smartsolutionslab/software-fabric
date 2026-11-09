@@ -1,9 +1,35 @@
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ if ui == "reka-ui"
+  button = "BaseButton"
+  button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
+  secondary = "outline"
+else
+  button = "Button"
+  button_import = "import { Button } from '@/components/ui/button';"
+  secondary = "secondary"
+end ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  ret 'class="' + tailwind + '"'
+end ~}}
+{{~ func themed(shadcn, palette, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  if ui == "reka-ui"
+    ret 'class="' + palette + '"'
+  end
+  ret 'class="' + shadcn + '"'
+end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
 {{~ formkit = project["frontend.forms"] == "formkit" ~}}
-{{~ if project["frontend.ui-library"] != "shadcn-vue" || (project["frontend.forms"] != "vee-validate" && project["frontend.forms"] != "tanstack-form" && project["frontend.forms"] != "formkit") || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+{{~ if !((ui == "shadcn-vue" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form" || project["frontend.forms"] == "formkit")) || (ui == "reka-ui" && project["frontend.forms"] == "vee-validate")) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
@@ -37,15 +63,18 @@ import { computed, useId, watch } from 'vue';
 import { z } from 'zod';
 {{~ end ~}}
 {%{import { useAgent } from '@/agents/useAgent';
-import { Button } from '@/components/ui/button';
-}%}{{~ if formkit ~}}
+}%}{{ button_import }}
+{{~ if formkit ~}}
 import { schemaSubmit } from '@/forms/schemaSubmit';
 {{~ else if !tanstack ~}}
 import { toTypedSchema } from '@/forms/toTypedSchema';
 {{~ end ~}}
 {%{import type { Placement } from './layout';
 import { draftState, type PendingProposal, proposalsOf, toolOutcome, toolResults } from './proposal';
-
+}%}{{~ if css_modules ~}}
+import styles from './DashboardAssistant.module.css';
+{{~ end ~}}
+{%{
 /** What the conversation shows of one message, as text: the user's, the agent's, and what each of its tools did. */
 type Entry = { kind: 'user' | 'answer' | 'tool-call'; key: string; text: string };
 
@@ -151,23 +180,23 @@ const entries = computed(() =>
 </script>
 
 <template>
-  <section aria-label="Dashboard assistant" class="flex flex-col gap-2 rounded border p-2">
-    <h2 class="text-sm font-medium">Assistant</h2>
-    <ol aria-label="Conversation" class="flex flex-col gap-2 text-sm">
+  <section aria-label="Dashboard assistant" }%}{{ class_of "flex flex-col gap-2 rounded border p-2" "assistant" }}{%{>
+    <h2 }%}{{ class_of "text-sm font-medium" "heading" }}{%{>Assistant</h2>
+    <ol aria-label="Conversation" }%}{{ class_of "flex flex-col gap-2 text-sm" "conversation" }}{%{>
       <template v-for="entry in entries" :key="entry.key">
-        <li v-if="entry.kind === 'user'" class="self-end rounded-md bg-primary px-3 py-2 text-primary-foreground">
-          <p class="text-xs font-medium">You</p>
-          <p class="whitespace-pre-wrap">{{ entry.text }}</p>
+        <li v-if="entry.kind === 'user'" }%}{{ themed "self-end rounded-md bg-primary px-3 py-2 text-primary-foreground" "self-end rounded-md bg-slate-900 px-3 py-2 text-white" "user" }}{%{>
+          <p }%}{{ class_of "text-xs font-medium" "speaker" }}{%{>You</p>
+          <p }%}{{ class_of "whitespace-pre-wrap" "text" }}{%{>{{ entry.text }}</p>
         </li>
-        <li v-else-if="entry.kind === 'answer'" class="rounded-md bg-muted px-3 py-2">
-          <p class="text-xs font-medium text-muted-foreground">Assistant</p>
-          <p class="whitespace-pre-wrap">{{ entry.text }}</p>
+        <li v-else-if="entry.kind === 'answer'" }%}{{ themed "rounded-md bg-muted px-3 py-2" "rounded-md bg-slate-100 px-3 py-2" "answer" }}{%{>
+          <p }%}{{ themed "text-xs font-medium text-muted-foreground" "text-xs font-medium text-slate-600" "answerSpeaker" }}{%{>Assistant</p>
+          <p }%}{{ class_of "whitespace-pre-wrap" "text" }}{%{>{{ entry.text }}</p>
         </li>
-        <li v-else class="rounded-md border px-3 py-2">{{ entry.text }}</li>
+        <li v-else }%}{{ class_of "rounded-md border px-3 py-2" "toolCall" }}{%{>{{ entry.text }}</li>
       </template>
     </ol>
-    <p aria-live="polite" class="text-sm text-muted-foreground">{{ running ? 'Answering…' : '' }}</p>
-    <p v-if="failure" role="alert" class="text-sm text-destructive">The assistant could not answer: {{ failure }}</p>
+    <p aria-live="polite" }%}{{ themed "text-sm text-muted-foreground" "text-sm text-slate-500" "status" }}{%{>{{ running ? 'Answering…' : '' }}</p>
+    <p v-if="failure" role="alert" }%}{{ themed "text-sm text-destructive" "text-sm text-red-600" "error" }}{%{>The assistant could not answer: {{ failure }}</p>
 }%}{{~ if formkit ~}}
 {%{    <FormKit type="form" :actions="false" :value="{ question: '' }" form-class="flex flex-col gap-2" @submit="submit">
       <FormKit type="textarea" name="question" label="Ask the assistant" rows="2" />
@@ -176,8 +205,8 @@ const entries = computed(() =>
   </section>
 </template>
 }%}{{~ else ~}}
-{%{    <form novalidate class="flex flex-col gap-2" @submit="submit">
-      <label :for="field" class="text-sm font-medium">Ask the assistant</label>
+{%{    <form novalidate }%}{{ class_of "flex flex-col gap-2" "form" }}{%{ @submit="submit">
+      <label :for="field" }%}{{ class_of "text-sm font-medium" "heading" }}{%{>Ask the assistant</label>
 }%}{{~ if tanstack ~}}
       <form.Field v-slot="{ field: question }" name="question">
         <textarea
@@ -200,13 +229,13 @@ const entries = computed(() =>
         rows="2"
         :aria-invalid="errors.question ? true : undefined"
         :aria-describedby="errors.question ? `${field}-error` : undefined"
-        class="flex field-sizing-content min-h-12 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+        }%}{{ themed "flex field-sizing-content min-h-12 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40" "flex field-sizing-content min-h-12 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-slate-500 focus-visible:border-slate-400 focus-visible:ring-[3px] focus-visible:ring-slate-400/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-red-600 aria-invalid:ring-red-600/20 md:text-sm" "input" }}{%{
       />
 }%}{{~ end ~}}
-{%{      <p v-if="errors.question" :id="`${field}-error`" role="alert" class="text-sm text-destructive">
+{%{      <p v-if="errors.question" :id="`${field}-error`" role="alert" }%}{{ themed "text-sm text-destructive" "text-sm text-red-600" "error" }}{%{>
         {{ errors.question }}
       </p>
-      <Button type="submit" variant="secondary" :disabled="running" class="self-end">Ask</Button>
+      <}%}{{ button }}{%{ type="submit" variant="}%}{{ secondary }}{%{" :disabled="running" }%}{{ class_of "self-end" "ask" }}{%{>Ask</}%}{{ button }}{%{>
     </form>
   </section>
 </template>

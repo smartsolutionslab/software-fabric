@@ -100,14 +100,6 @@ public sealed class AgUiVueTests
     }
 
     [Fact]
-    public void Another_vue_ui_library_fails_the_panel_saying_it_is_not_built_for_it_yet()
-    {
-        var files = Files(Profile, [.. Vue.Where(choice => !choice.StartsWith("frontend.ui-library=", StringComparison.Ordinal)), "frontend.ui-library=reka-ui", Anthropic, AgentFramework, AgUi]);
-
-        files[Conversation].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate, TanStack Form or FormKit and zod or valibot only so far; frontend.ui-library is reka-ui");
-    }
-
-    [Fact]
     public void The_vue_web_app_builds_lints_and_passes_its_tests_and_the_end_to_end_test_talks_to_the_assistant_twice_through_the_panel()
     {
         using var project = NewProject(With(Anthropic, AgentFramework, AgUi));

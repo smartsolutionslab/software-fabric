@@ -1,2 +1,5 @@
+{{~ if project["frontend.styling"] == "css-modules" ~}}
+/* The shell reads no remote's styles: each remote styles its screens with CSS modules beside its components. */
+{{~ else ~}}
 /* Every remote's screens are styled by the shell's Tailwind, so it finds their class names too. */
-@source '../../modules';
+@source '../../modules';{{ end }}
