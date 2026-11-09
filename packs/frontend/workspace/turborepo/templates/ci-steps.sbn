@@ -1,0 +1,16 @@
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - name: The lockfile is committed
+        run: test -f web/pnpm-lock.yaml || { echo "::error::web/pnpm-lock.yaml is missing. Run pnpm install in web/ and commit it (README, First steps)."; exit 1; }
+      - run: pnpm install --frozen-lockfile
+        working-directory: web
+      - run: pnpm build
+        working-directory: web
+      - run: pnpm lint
+        working-directory: web
+      - run: pnpm test
+        working-directory: web

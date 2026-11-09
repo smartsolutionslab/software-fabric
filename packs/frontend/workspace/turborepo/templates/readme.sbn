@@ -1,0 +1,9 @@
+## Frontend
+
+```bash
+cd web && pnpm install && pnpm build
+```
+
+`pnpm build`, `pnpm lint` and `pnpm test` run the task in every workspace package through Turborepo, dependencies' builds first. A task whose inputs have not changed is read from the local cache (`web/.turbo/cache`) instead of running again.
+
+The AppHost starts the web app with everything else (`dotnet run --project src/AppHost`).
