@@ -145,8 +145,7 @@ public sealed partial class TestcontainersTests
     public void The_integration_tests_pass_on_testcontainers(string profile, string[] overrides)
     {
         using var project = NewProject(profile, overrides);
-        // A profile that brings modules is tested with them. A module added afterwards would, with authorization, bring
-        // its /permissions/manage endpoint, which makes the frontend's OpenAPI copy stale by design (RoleAuthorizationTests).
+        // A profile that brings modules is tested with them.
         if (!Directory.EnumerateDirectories(Path.Combine(project.ProjectDirectory, "src", "Modules")).Any())
         {
             project.AddModule("billing");
