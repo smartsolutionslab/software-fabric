@@ -132,6 +132,38 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
     }
 
     /// <summary>
+    /// Main moved after the pull request opened (a Codex agent's change landed) and the Claude agent merged it, while
+    /// the event still carries the old base SHA. Main's commits are not the branch's: Codex still reviews.
+    /// </summary>
+    [Fact]
+    public void The_reviewer_is_chosen_from_the_branch_s_commits_against_the_base_branch_tip_not_a_stale_base_sha()
+    {
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, mainMoved: MainMovedByCodex);
+
+        run.ExitCode.ShouldBe(0, run.Log);
+        var arguments = run.CopilotArguments.ShouldNotBeNull(run.Log);
+        arguments[arguments.IndexOf("--model") + 1].ShouldBe(WorkflowEnvironment()["REVIEW_MODEL_CODEX"]);
+    }
+
+    /// <summary>The same pull request: the diff the reviewer is asked to read is the branch's change, not main's too.</summary>
+    [Fact]
+    public void The_reviewed_diff_is_against_the_base_branch_tip_not_a_stale_base_sha()
+    {
+        var change = new Dictionary<string, (string, string)> { ["src/Invoice.cs"] = ("", "class Invoice;\n") };
+
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, change: change, mainMoved: ("Merged on main\n\nAgent-Executor: claude-cloud/other", "Merge main\n\nAgent-Executor: claude-cloud/lane-backend"));
+
+        run.ExitCode.ShouldBe(0, run.Log);
+        var prompt = Values(run.CopilotArguments.ShouldNotBeNull(run.Log), "-p").ShouldHaveSingleItem();
+        var range = DiffRange().Match(prompt);
+        range.Success.ShouldBeTrue(prompt);
+        BoardProject.Git(Path.Combine(state, "workspace-review"), "diff", "--name-only", range.Groups[1].Value).ShouldBe("src/Invoice.cs");
+    }
+
+    private static readonly (string MainCommit, string MergeMessage) MainMovedByCodex =
+        ("Merged on main\n\nAgent-Executor: codex-cloud/other", "Merge main\n\nAgent-Executor: claude-cloud/lane-backend");
+
+    /// <summary>
     /// The owner's decision on #55: a pull request by dependabot[bot] that changes dependency manifests and lockfiles
     /// only (a workflow only in its <c>uses:</c> lines) passes the review unreviewed, with a note saying so. The
     /// copilot stand-in answers a blocking finding, so a review that ran anyway would fail.
@@ -340,12 +372,14 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         int copilotExitCode = 0,
         bool tamper = false,
         string author = "developer",
-        IReadOnlyDictionary<string, (string Before, string After)>? change = null)
+        IReadOnlyDictionary<string, (string Before, string After)>? change = null,
+        (string MainCommit, string MergeMessage)? mainMoved = null)
     {
         WriteFakes(answer, copilotExitCode, tamper);
 
         Dictionary<string, string> expressions = new()
         {
+            ["github.base_ref"] = "main",
             ["github.event.pull_request.base.sha"] = "base",
             ["github.event.pull_request.head.sha"] = "HEAD",
             ["github.event.pull_request.number"] = "5",
@@ -355,7 +389,7 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         var log = "";
         foreach (var name in new[] { "choose", "review", "report" })
         {
-            var job = RunJob(name, Workspace(name, commitMessage, change ?? new Dictionary<string, (string, string)>()), expressions);
+            var job = RunJob(name, Workspace(name, commitMessage, change ?? new Dictionary<string, (string, string)>(), mainMoved), expressions);
             log += job.Log;
             if (job.ExitCode != 0)
             {
@@ -377,8 +411,17 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         return File.Exists(arguments) ? [.. File.ReadAllText(arguments).Split('\0')[..^1]] : null;
     }
 
-    /// <summary>A job's own checkout: the pull request's commits, and the gate's files from the base branch in .gate.</summary>
-    private string Workspace(string job, string commitMessage, IReadOnlyDictionary<string, (string Before, string After)> change)
+    /// <summary>
+    /// A job's own checkout: the pull request's commits, the base branch as origin/main (the checkout fetches every
+    /// branch), and the gate's files from the base branch in .gate. With <paramref name="mainMoved"/>, main gained a
+    /// commit (adding main.txt) after the pull request opened, which the pull request then merged; the event's base SHA
+    /// stays at <c>base</c>.
+    /// </summary>
+    private string Workspace(
+        string job,
+        string commitMessage,
+        IReadOnlyDictionary<string, (string Before, string After)> change,
+        (string MainCommit, string MergeMessage)? mainMoved = null)
     {
         var workspace = Path.Combine(state, $"workspace-{job}");
         Directory.CreateDirectory(workspace);
@@ -399,6 +442,18 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
 
         BoardProject.Git(workspace, "add", "--all");
         BoardProject.Git(workspace, "commit", "--quiet", "--allow-empty", "-m", commitMessage);
+        BoardProject.Git(workspace, "update-ref", "refs/remotes/origin/main", "base");
+        if (mainMoved is var (mainCommit, mergeMessage))
+        {
+            BoardProject.Git(workspace, "checkout", "--quiet", "-b", "moved", "base");
+            File.WriteAllText(Path.Combine(workspace, "main.txt"), "main\n");
+            BoardProject.Git(workspace, "add", "main.txt");
+            BoardProject.Git(workspace, "commit", "--quiet", "-m", mainCommit);
+            BoardProject.Git(workspace, "update-ref", "refs/remotes/origin/main", "moved");
+            BoardProject.Git(workspace, "checkout", "--quiet", "main");
+            BoardProject.Git(workspace, "merge", "--quiet", "--no-ff", "-m", mergeMessage, "moved");
+        }
+
         foreach (var entry in new[] { ".github", ".claude", "AGENTS.md" })
         {
             Copy(Path.Combine(board.Project.ProjectDirectory, entry), Path.Combine(workspace, ".gate", entry));
@@ -590,6 +645,9 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
 
     [GeneratedRegex(@"secrets\.([A-Za-z0-9_]+)")]
     private static partial Regex SecretReference();
+
+    [GeneratedRegex(@"\(git diff (\S+\.\.\.\S+)\)")]
+    private static partial Regex DiffRange();
 
     [GeneratedRegex(@"^@github/copilot@\d+\.\d+\.\d+$")]
     private static partial Regex ExactCopilotVersion();
