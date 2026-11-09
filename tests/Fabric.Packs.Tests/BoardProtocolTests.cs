@@ -288,6 +288,84 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         output.ShouldContain("No eligible issue in lane backend.");
     }
 
+    [Fact]
+    public void A_named_eligible_issue_is_claimed_even_with_a_lower_numbered_one_eligible()
+    {
+        Issues(Issue(7, "Pay an invoice", ReadyBackend), Issue(9, "Refund an invoice", ReadyBackend));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "9");
+
+        exitCode.ShouldBe(0, output);
+        output.Trim().ShouldBe("9 agent/9");
+        Head("agent/9").ShouldBe("chore(board): claim #9");
+        Executor("agent/9").ShouldBe("claude-cloud/lane-backend");
+        Field(9, "STATUS").ShouldBe("Claimed");
+        Labels(IssueState(9)).ShouldContain("agent:claimed");
+        HasBranch("agent/7").ShouldBeFalse();
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+    }
+
+    [Theory]
+    [InlineData("agent:ready,lane:backend", "", "closed", "Not claiming #9: it is closed.")]
+    [InlineData("lane:backend", "", "open", "Not claiming #9: it is not labelled agent:ready.")]
+    [InlineData("agent:ready,lane:frontend", "", "open", "Not claiming #9: it is not in lane backend.")]
+    [InlineData("agent:ready,lane:backend", "alice", "open", "Not claiming #9: it is assigned to alice.")]
+    [InlineData("agent:ready,lane:backend,agent:blocked", "", "open", "Not claiming #9: it is labelled agent:blocked.")]
+    [InlineData("agent:ready,lane:backend,needs:decision", "", "open", "Not claiming #9: it is escalated (needs:decision).")]
+    [InlineData("agent:ready,lane:backend,agent:claimed", "", "open", "Not claiming #9: it is already claimed (agent:claimed).")]
+    public void A_named_ineligible_issue_is_refused_with_its_reason_and_nothing_else_is_claimed(string labels, string assignee, string issueState, string reason)
+    {
+        Issues(Issue(7, "Pay an invoice", ReadyBackend), Issue(9, "Refund an invoice", labels.Split(','), assignee.Length == 0 ? null : [assignee], issueState));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "9");
+
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe(reason);
+        Origin("for-each-ref", "refs/heads/agent/").ShouldBeEmpty();
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+    }
+
+    [Fact]
+    public void A_named_issue_whose_branch_another_agent_holds_is_refused()
+    {
+        Issues(Issue(7, "Pay an invoice", ReadyBackend), Issue(9, "Refund an invoice", ReadyBackend));
+        Branch("agent/9", "chore(board): claim #9", Now.AddMinutes(-10));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "9");
+
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe("Not claiming #9: another agent holds agent/9, or it stopped being eligible meanwhile.");
+        Executor("agent/9").ShouldBe("codex-cloud/other");
+        HasBranch("agent/7").ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("9x")]
+    [InlineData("../pulls")]
+    public void A_named_issue_that_is_not_a_number_is_refused(string named)
+    {
+        Issues(Issue(7, "Pay an invoice", ReadyBackend));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", named);
+
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe($"Not claiming {named}: it is not an issue number.");
+        Origin("for-each-ref", "refs/heads/agent/").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_named_issue_that_cannot_be_read_is_refused_and_nothing_is_claimed()
+    {
+        Issues(Issue(9, "Refund an invoice", ReadyBackend));
+        File.WriteAllText(Path.Combine(state, "fail-issue-read"), "1");
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "9");
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain("Not claiming #9: it could not be read (above).");
+        Origin("for-each-ref", "refs/heads/agent/").ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("needs:decision")]
     [InlineData("needs:human")]

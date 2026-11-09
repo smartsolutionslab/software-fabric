@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Claims the next eligible issue of a lane (board protocol, docs/adr).
-# Usage: next.sh <lane> <executor>
+# Claims the next eligible issue of a lane (board protocol, docs/adr), or the one issue named.
+# Usage: next.sh <lane> <executor> [issue]
 # Prints "<issue> <branch>" and exits 0, or exits 3 when the lane has nothing eligible.
+# A named issue is claimed only if it is eligible in the lane; otherwise next.sh exits 1 with the reason, and never
+# falls back to another issue.
 # Eligible: open, labelled agent:ready and lane:<lane>, no assignee, not claimed, blocked or escalated (needs:*): an
 # escalation no owner had capacity for keeps agent:ready and has no assignee, but still waits for a developer.
 # The list is a snapshot, so each candidate is read again before its claim and once more after it: an issue assigned,
@@ -12,10 +14,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 lane="$1"
 executor="$2"
-
-candidates="$(board_issues "labels=$(board_uri "agent:ready,lane:$lane")" \
-  | jq -r --arg lane "$lane" "map(select(($board_eligible_jq) and ([.labels[].name] | index(\"agent:claimed\") | not)))
-           | sort_by(.number) | .[].number")"
+named="${3:-}"
 
 # Returns 0 when claimed, 2 when another agent holds or just took the issue, 1 when nothing was claimed for another
 # reason, 4 when the branch is held but recording the claim on the issue failed.
@@ -62,6 +61,47 @@ Claimed by \`$executor\` on branch \`$branch\`. The claim lapses after ${BOARD_L
   fi
   echo "$issue $branch"
 }
+
+# Why the named issue is not eligible in the lane, as one sentence, or nothing when it is.
+ineligible_jq='[.labels[].name] as $names
+  | if has("pull_request") then "it is a pull request"
+    elif .state != "open" then "it is closed"
+    elif (.assignees | length) > 0 then "it is assigned to \([.assignees[].login] | join(", "))"
+    elif ($names | index("agent:ready")) == null then "it is not labelled agent:ready"
+    elif ($names | index("lane:" + $lane)) == null then "it is not in lane \($lane)"
+    elif ($names | index("agent:blocked")) != null then "it is labelled agent:blocked"
+    elif any($names[]; startswith("needs:")) then "it is escalated (\([$names[] | select(startswith("needs:"))] | join(", ")))"
+    elif ($names | index("agent:claimed")) != null then "it is already claimed (agent:claimed)"
+    else empty end'
+
+if [ -n "$named" ]; then
+  if ! [[ "$named" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Not claiming $named: it is not an issue number." >&2
+    exit 1
+  fi
+  if ! state="$(board_issue "$named")" || [ -z "$state" ]; then
+    echo "Not claiming #$named: it could not be read (above)." >&2
+    exit 1
+  fi
+  reason="$(jq -r --arg lane "$lane" "$ineligible_jq" <<< "$state")"
+  if [ -n "$reason" ]; then
+    echo "Not claiming #$named: $reason." >&2
+    exit 1
+  fi
+  outcome=0
+  claim "$named" || outcome=$?
+  case "$outcome" in
+    0) exit 0 ;;
+    2) echo "Not claiming #$named: another agent holds agent/$named, or it stopped being eligible meanwhile." >&2 ;;
+    4) ;;
+    *) echo "Claiming #$named failed; nothing was claimed." >&2 ;;
+  esac
+  exit 1
+fi
+
+candidates="$(board_issues "labels=$(board_uri "agent:ready,lane:$lane")" \
+  | jq -r --arg lane "$lane" "map(select(($board_eligible_jq) and ([.labels[].name] | index(\"agent:claimed\") | not)))
+           | sort_by(.number) | .[].number")"
 
 while read -r issue; do
   [ -n "$issue" ] || continue
