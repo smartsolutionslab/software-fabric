@@ -7,7 +7,7 @@
 - In the app, use them in CSS modules as custom properties: `color: var(--ds-color-primary)`, `padding: var(--ds-spacing-4)`.
 {{~ end ~}}
 - The design system's components are Lit web components in `web/packages/ui/src/`, one per file (`Badge.ts` defines `<ds-badge>`), each with `<Name>.stories.ts` and `<Name>.test.ts`, exported from `src/index.ts`. Every tag starts with `ds-`.
-- A component's styles live in its shadow root (``static styles = css`...` ``) and use only the tokens' variables (`var(--ds-color-accent)`, `var(--ds-radius-sm)`); never a colour value, and no Tailwind classes, which do not reach inside it.
+- A component's styles live in its shadow root (``static styles = css`...` ``) and use only the tokens' variables (`var(--ds-color-accent)`, `var(--ds-radius-sm)`); a colour property takes a `--ds-color-*` token and nothing else (no literal, no named colour, no variable of its own), and no Tailwind classes, which do not reach inside it.
 - A reactive property is declared in `static properties` and with `declare` in the class, then set in the constructor; a class field would hide it.
 - Screens use the elements as tags (`<ds-badge tone="primary">New</ds-badge>`); the app's entry imports `@{{ name }}/ui` once, so never import a component file from a screen.
 {{~ if project["frontend.framework"] == "react" ~}}
