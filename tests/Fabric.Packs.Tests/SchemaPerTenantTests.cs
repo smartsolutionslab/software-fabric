@@ -87,10 +87,9 @@ public sealed class SchemaPerTenantTests
     }
 
     [Fact]
-    public void The_in_process_outbox_refuses_a_tenancy_without_a_tenant_column_instead_of_writing_where_no_table_is()
+    public void The_in_process_outbox_refuses_a_tenancy_it_has_no_table_for_instead_of_writing_where_none_is()
     {
-        // The catalog refuses schema-per-tenant with transport none before this file is rendered; database-per-tenant,
-        // which has no pack yet, is the tenancy that still reaches it.
+        // database-per-tenant, which has no pack yet, is the tenancy that still reaches the refusal.
         using var standIns = new StandIns();
         string[] overrides = ["backend.tenancy=database-per-tenant"];
         var packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, "lean-crud", overrides);
@@ -99,7 +98,114 @@ public sealed class SchemaPerTenantTests
 
         generated.Errors.ShouldBeEmpty();
         generated.Files.Single(file => file.Path == "src/BuildingBlocks/Messaging/Outbox.cs").Content
-            .ShouldStartWith("#error The in-process outbox of backend.bus.transport.none keeps one table per module schema, so it supports backend.tenancy none and column only so far (docs/adr/0006 of the generator): with backend.tenancy database-per-tenant a module's integration events would go to a tenant's schema");
+            .ShouldStartWith("#error The in-process outbox of backend.bus.transport.none keeps its table in each module's schema, or in each listed tenant's schema of it, so it supports backend.tenancy none, column and schema-per-tenant only so far (docs/adr/0006 of the generator): with backend.tenancy database-per-tenant a module's integration events would go to a tenant's database, which has no outbox table and which nothing delivers from.");
+    }
+
+    [Fact]
+    public async Task With_transport_none_an_event_published_under_a_tenant_is_delivered_from_that_tenants_outbox_in_that_tenant_alone()
+    {
+        using var project = new GeneratedProject("lean-crud", SchemaPerTenant);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
+            """);
+        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.BuildingBlocks.Tenancy;
+            using Shop.Contracts.Billing;
+            using Shop.Modules.Billing.Application;
+
+            namespace Shop.Modules.Billing.Api;
+
+            public sealed class PayInvoice : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints) =>
+                    endpoints.MapPost("/tenants/{tenant}/invoices/{id}/pay", async (string tenant, Guid id, IBillingUnitOfWork unitOfWork, CancellationToken cancellationToken) =>
+                    {
+                        using var scope = TenantScope.Begin(tenant);
+                        await unitOfWork.PublishAsync(new InvoicePaidV1(id));
+                        await unitOfWork.CommitAsync(cancellationToken);
+                        return Results.Accepted();
+                    }).AllowAnonymous();
+            }
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", """
+            using System.Collections.Concurrent;
+            using Shop.BuildingBlocks.Tenancy;
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoicePaidConsumer
+            {
+                /// <summary>Every delivery: the invoice, the tenant its metadata carries, and the tenant the consumer works in.</summary>
+                public static ConcurrentQueue<string> Deliveries { get; } = [];
+
+                public static void Handle(InvoicePaidV1 message, ITenantContext tenant) =>
+                    Deliveries.Enqueue($"{message.InvoiceId:D} {message.Metadata.TenantId} {tenant.TenantId}");
+            }
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Api/Deliveries.cs", """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.Modules.Shipping.Application;
+
+            namespace Shop.Modules.Shipping.Api;
+
+            public sealed class Deliveries : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints) =>
+                    endpoints.MapGet("/deliveries", () => InvoicePaidConsumer.Deliveries.ToArray()).AllowAnonymous();
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = RunMigrationRunner(project, postgres);
+        exitCode.ShouldBe(0, output);
+
+        // Each listed tenant's schema of a module has its outbox; the module's own schema, which holds no tenant's rows, has none.
+        postgres.Psql(DatabasePassword, "select string_agg(table_schema, ',' order by table_schema) from information_schema.tables where table_name = 'outbox_messages'")
+            .ShouldBe("billing_tenant_a,billing_tenant_b,shipping_tenant_a,shipping_tenant_b");
+
+        using var host = project.StartHost(new Dictionary<string, string>
+        {
+            ["ConnectionStrings__database"] = ConnectionString(postgres),
+            ["Authentication__Authority"] = "http://127.0.0.1:1/realms/shop",
+            ["Tenancy__Tenants__0"] = "tenant-a",
+            ["Tenancy__Tenants__1"] = "tenant-b",
+        });
+
+        var (invoiceA, invoiceB) = (Guid.NewGuid(), Guid.NewGuid());
+        (await host.PostAsync($"/billing/tenants/tenant-a/invoices/{invoiceA}/pay")).StatusCode.ShouldBe(System.Net.HttpStatusCode.Accepted);
+        (await host.PostAsync($"/billing/tenants/tenant-b/invoices/{invoiceB}/pay")).StatusCode.ShouldBe(System.Net.HttpStatusCode.Accepted);
+
+        // A tenant the list does not name has no outbox, as it has no rows: its event is refused, not left undelivered.
+        (await host.PostAsync($"/billing/tenants/tenant-z/invoices/{Guid.NewGuid()}/pay")).StatusCode.ShouldBe(System.Net.HttpStatusCode.InternalServerError);
+
+        var deliveries = "[]";
+        for (var attempt = 0; attempt < 60 && System.Text.Json.JsonSerializer.Deserialize<string[]>(deliveries)!.Length < 2; attempt++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            deliveries = await (await host.GetAsync("/shipping/deliveries")).Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        }
+
+        // Give a stray third delivery, or a second of either, the time to arrive before checking there is none.
+        await Task.Delay(2000, TestContext.Current.CancellationToken);
+        deliveries = await (await host.GetAsync("/shipping/deliveries")).Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        System.Text.Json.JsonSerializer.Deserialize<string[]>(deliveries).ShouldNotBeNull().Order(StringComparer.Ordinal).ShouldBe(
+            ((string[])[$"{invoiceA:D} tenant-a tenant-a", $"{invoiceB:D} tenant-b tenant-b"]).Order(StringComparer.Ordinal),
+            deliveries);
+
+        postgres.Psql(DatabasePassword, "select count(*) from billing_tenant_a.outbox_messages where delivered_at is not null").ShouldBe("1");
+        postgres.Psql(DatabasePassword, "select count(*) from billing_tenant_b.outbox_messages where delivered_at is not null").ShouldBe("1");
     }
 
     [Fact]
@@ -673,11 +779,14 @@ public sealed class SchemaPerTenantTests
         postgres.Psql(DatabasePassword, "select count(*) from information_schema.tables where table_schema = 'billing' and table_name = 'notes'").ShouldBe("0");
     }
 
+    private static string ConnectionString(Container postgres) =>
+        $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}";
+
     private static (int ExitCode, string Output) RunMigrationRunner(GeneratedProject project, Container postgres) =>
         project.DotNetCommand(
             new Dictionary<string, string>
             {
-                ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}",
+                ["ConnectionStrings__database"] = ConnectionString(postgres),
                 ["Tenancy__Tenants__0"] = "tenant-a",
                 ["Tenancy__Tenants__1"] = "tenant-b",
             },

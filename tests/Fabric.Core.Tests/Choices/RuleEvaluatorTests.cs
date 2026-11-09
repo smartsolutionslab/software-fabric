@@ -47,6 +47,13 @@ public class RuleEvaluatorTests
         Violations(profile, "module.ddd-depth=strict").ShouldBeEmpty();
     }
 
+    /// <summary>The in-process outbox delivers from each tenant's schema (#340), so schema-per-tenant needs no broker.</summary>
+    [Fact]
+    public void Schema_per_tenant_is_allowed_with_transport_none()
+    {
+        Violations("lean-crud", "backend.tenancy=schema-per-tenant").ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("saas-standard-vue", "frontend.state=redux-toolkit",
         "frontend.state=redux-toolkit requires frontend.framework == react, but frontend.framework is vue.")]
@@ -110,8 +117,6 @@ public class RuleEvaluatorTests
         "backend.data-access.reads=dapper requires backend.tenancy == none, but backend.tenancy is column.")]
     [InlineData("lean-crud", new[] { "backend.database=sqlserver", "backend.bus.transport=rabbitmq", "backend.tenancy=schema-per-tenant" },
         "backend.tenancy=schema-per-tenant requires backend.database == postgres, but backend.database is sqlserver.")]
-    [InlineData("lean-crud", new[] { "backend.tenancy=schema-per-tenant" },
-        "backend.tenancy=schema-per-tenant requires backend.bus.transport != none, but backend.bus.transport is none.")]
     [InlineData("lean-crud", new[] { "module.communication=contract-interface" },
         "module defaults: module.communication requires module.communication has integration-events, but module.communication is contract-interface.")]
     [InlineData("saas-standard-react", new[] { "backend.api-protocols=" },
