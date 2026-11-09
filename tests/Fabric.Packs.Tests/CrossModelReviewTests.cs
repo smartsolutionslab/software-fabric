@@ -191,6 +191,76 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         ((string)Statuses().ShouldHaveSingleItem(run.Log)!["state"]!).ShouldBe("pending");
     }
 
+    /// <summary>
+    /// The owner's decision on #474: a scheduled workflow re-runs the reviews that were postponed at a pull request's
+    /// current head, and nothing else: not a review with a verdict, not one postponed at a head since replaced, not a
+    /// run still going, not another check that happens to be pending.
+    /// </summary>
+    [Fact]
+    public void The_retry_workflow_re_runs_only_the_reviews_postponed_at_a_pull_request_s_current_head()
+    {
+        File.Exists(RetryWorkflowPath).ShouldBeTrue("The generated project has no workflow that retries postponed reviews.");
+        var postponed = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, limitedModels: ["*"]);
+        postponed.ExitCode.ShouldBe(0, postponed.Log);
+        var statuses = Statuses();
+        statuses.Add(Status("reviewed", "success", VerdictContext, "Reviewed by codex (gpt-6.1-sol): nothing blocking.", 43));
+        statuses.Add(Status("replaced", "pending", VerdictContext, "Postponed: Copilot's usage limit was reached.", 44));
+        statuses.Add(Status("running", "pending", VerdictContext, "Postponed: Copilot's usage limit was reached.", 45));
+        statuses.Add(Status("other", "pending", "ci/build", "Postponed: waiting for a runner.", 46));
+        File.WriteAllText(Path.Combine(state, "statuses.json"), statuses.ToJsonString());
+        File.WriteAllText(Path.Combine(state, "prs.json"), new JsonArray(
+            PullRequest(5, "HEAD"), PullRequest(6, "reviewed"), PullRequest(7, "replacing"), PullRequest(8, "running"), PullRequest(9, "other")).ToJsonString());
+        File.WriteAllText(Path.Combine(state, "runs.json"), new JsonArray(
+            Run(42, "completed"), Run(43, "completed"), Run(44, "completed"), Run(45, "in_progress"), Run(46, "completed")).ToJsonString());
+        File.Delete(Path.Combine(Fakes, "copilot-args"));
+
+        var retry = RunJob(RetryWorkflowPath, "retry", board.Project.ProjectDirectory, new() { ["github.token"] = "workflow-token" });
+
+        retry.ExitCode.ShouldBe(0, retry.Log);
+        File.ReadAllLines(Path.Combine(state, "reruns")).ShouldBe([RunId], retry.Log);
+        File.Exists(Path.Combine(Fakes, "copilot-args")).ShouldBeFalse("The retry workflow ran a reviewer itself.");
+    }
+
+    /// <summary>It re-runs reviews and reviews nothing itself: it can start a run, and read pull requests and statuses.</summary>
+    [Fact]
+    public void The_retry_workflow_runs_on_a_schedule_and_may_only_re_run_workflows()
+    {
+        File.Exists(RetryWorkflowPath).ShouldBeTrue("The generated project has no workflow that retries postponed reviews.");
+        var root = Root(RetryWorkflowPath);
+
+        ((YamlMappingNode)root["on"]).Children.Keys.Select(key => ((YamlScalarNode)key).Value).ShouldBe(["schedule", "workflow_dispatch"]);
+        Mapping(root, "permissions").ShouldBe(new Dictionary<string, string>
+        {
+            ["contents"] = "read",
+            ["pull-requests"] = "read",
+            ["statuses"] = "read",
+            ["actions"] = "write",
+        });
+        ((YamlMappingNode)root["jobs"]).Children.Values.Cast<YamlMappingNode>()
+            .ShouldAllBe(job => !job.Children.ContainsKey(new YamlScalarNode("permissions")));
+        File.ReadAllText(RetryWorkflowPath).ShouldNotContain("copilot", Case.Insensitive);
+    }
+
+    private string RetryWorkflowPath => Path.Combine(board.Project.ProjectDirectory, ".github", "workflows", "cross-model-review-retry.yml");
+
+    private static JsonObject Status(string sha, string state, string context, string description, int run) => new()
+    {
+        ["sha"] = sha,
+        ["state"] = state,
+        ["context"] = context,
+        ["description"] = description,
+        ["target_url"] = $"https://github.com/acme/shop/actions/runs/{run}",
+    };
+
+    private static JsonObject PullRequest(int number, string head) => new()
+    {
+        ["number"] = number,
+        ["state"] = "open",
+        ["head"] = new JsonObject { ["ref"] = $"agent/{number}", ["sha"] = head },
+    };
+
+    private static JsonObject Run(int id, string status) => new() { ["id"] = id, ["status"] = status };
+
     [Theory]
     [InlineData(NoFindings, "success")]
     [InlineData("""{"findings": [{"severity": "optional", "file": "src/Invoice.cs", "line": 3, "message": "Shorter name?"}]}""", "success")]

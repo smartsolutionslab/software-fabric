@@ -259,7 +259,7 @@ jobs:
           fi
           if [ "$POSTPONED" = true ]; then
             echo "::warning title=cross-model review::Postponed: Copilot's usage limit was reached. The verdict stays pending."
-            verdict pending "Postponed: Copilot's usage limit was reached; re-run this review once it resets."
+            verdict pending "Postponed: Copilot's usage limit was reached. The review is re-run hourly until it reaches a verdict."
             exit 0
           fi
           if bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/review/answer" "$REVIEWER ($MODEL)"; then

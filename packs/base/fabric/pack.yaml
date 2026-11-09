@@ -13,6 +13,7 @@ files:
   - { template: templates/board/report-review.sh.sbn, target: ".github/scripts/board/report-review.sh" }
   - { template: templates/board/dependency-update.sh.sbn, target: ".github/scripts/board/dependency-update.sh" }
   - { template: templates/board/review-status.sh.sbn, target: ".github/scripts/board/review-status.sh" }
+  - { template: templates/board/retry-reviews.sh.sbn, target: ".github/scripts/board/retry-reviews.sh" }
   - { template: templates/review-findings.schema.json.sbn, target: ".github/review-findings.schema.json" }
   - { template: templates/board.env.sbn, target: ".github/board.env" }
   - { template: templates/commit-scopes.sbn, target: ".github/commit-scopes" }
@@ -22,6 +23,7 @@ files:
   - { template: templates/workflows/agent-executor.yml.sbn, target: ".github/workflows/agent-executor.yml" }
   - { template: templates/workflows/commit-messages.yml.sbn, target: ".github/workflows/commit-messages.yml" }
   - { template: templates/workflows/cross-model-review.yml.sbn, target: ".github/workflows/cross-model-review.yml" }
+  - { template: templates/workflows/cross-model-review-retry.yml.sbn, target: ".github/workflows/cross-model-review-retry.yml" }
   - { template: templates/skills/next-issue.md.sbn, target: ".claude/skills/next-issue/SKILL.md" }
   - { template: templates/skills/verify.md.sbn, target: ".claude/skills/verify/SKILL.md" }
 slots:
