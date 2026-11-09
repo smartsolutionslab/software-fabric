@@ -171,15 +171,16 @@ dimensions:
   backend.tenancy:
     scope: project
     default: none
+    # A tenant comes from the signed-in user; without authentication there is no trustworthy tenant (#464).
     options:
       none:                { tier: supported }
-      column:              { tier: supported }
+      column:              { tier: supported, requires: ["backend.auth != none"] }
       schema-per-tenant:
         tier: experimental
         # Reason: the schema-per-tenant pack creates and migrates tenant schemas with PostgreSQL's SQL; SQL Server support is a later issue.
         # Reason: transport none's in-process outbox keeps one table per module schema, which a tenant's schema lacks; temporary.
-        requires: ["backend.database == postgres", "backend.bus.transport != none"]
-      database-per-tenant: { tier: experimental }
+        requires: ["backend.database == postgres", "backend.bus.transport != none", "backend.auth != none"]
+      database-per-tenant: { tier: experimental, requires: ["backend.auth != none"] }
 
   backend.llm:
     scope: project
