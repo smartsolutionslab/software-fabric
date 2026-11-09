@@ -87,15 +87,16 @@ internal sealed class Container : IDisposable
     /// A single-node Kafka (the image Aspire runs). A client is told the broker's address by the broker itself, so it
     /// listens on the same port inside and outside the container and advertises that one.
     /// </summary>
-    public static Container Kafka()
+    internal static Container Kafka(int? hostPort = null, string? name = null)
     {
         DockerPorts.EnsureRunsAlone();
-        var port = FreePort();
-        var id = Docker(
-            "run", "--detach", "--publish", $"127.0.0.1:{port}:{port}",
+        var port = hostPort ?? FreePort();
+        string[] naming = name is null ? [] : ["--name", name];
+        var id = Docker([
+            "run", "--detach", .. naming, "--publish", $"127.0.0.1:{port}:{port}",
             "--env", $"KAFKA_LISTENERS=PLAINTEXT://localhost:29092,CONTROLLER://localhost:29093,PLAINTEXT_HOST://0.0.0.0:{port}",
             "--env", $"KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:29092,PLAINTEXT_HOST://localhost:{port}",
-            "confluentinc/confluent-local:8.2.0").Trim();
+            "confluentinc/confluent-local:8.2.0"]).Trim();
         var container = new Container(id, port);
         container.WaitUntil("appuser", "kafka-topics", "--bootstrap-server", "localhost:29092", "--list");
         return container;
@@ -107,21 +108,23 @@ internal sealed class Container : IDisposable
     /// <see cref="ManagementPort"/> (HTTP); ready once the management port reports it healthy. Both licences are
     /// accepted for this test only.
     /// </summary>
-    public static Container ServiceBus()
+    internal static Container ServiceBus(int? amqpHostPort = null, string? name = null)
     {
         DockerPorts.EnsureRunsAlone();
         const string password = "Fabric-tests-1";
-        var network = Docker("network", "create", $"fabric-servicebus-{Guid.NewGuid():N}").Trim();
+        var networkName = name ?? $"fabric-servicebus-{Guid.NewGuid():N}";
+        var network = Docker("network", "create", networkName).Trim();
         List<string> started = [];
         Container container;
         try
         {
             started.Add(Docker(
-                "run", "--detach", "--network", network, "--network-alias", "sqlserver",
+                "run", "--detach", "--name", $"{networkName}-sqlserver", "--network", network, "--network-alias", "sqlserver",
                 "--env", "ACCEPT_EULA=Y", "--env", $"MSSQL_SA_PASSWORD={password}",
                 "mcr.microsoft.com/mssql/server:2022-latest").Trim());
             started.Add(Docker(
-                "run", "--detach", "--network", network, "--publish", "127.0.0.1::5672", "--publish", "127.0.0.1::5300",
+                "run", "--detach", "--name", $"{networkName}-emulator", "--network", network,
+                "--publish", $"127.0.0.1:{amqpHostPort}:5672", "--publish", "127.0.0.1::5300",
                 "--env", "ACCEPT_EULA=Y", "--env", "SQL_SERVER=sqlserver", "--env", $"MSSQL_SA_PASSWORD={password}",
                 "mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.0").Trim());
             container = new Container(started[1], PublishedPort(started[1], 5672), [started[0]], network, PublishedPort(started[1], 5300));
