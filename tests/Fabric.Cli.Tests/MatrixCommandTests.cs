@@ -8,6 +8,10 @@ public sealed class MatrixCommandTests : IDisposable
         "regenerate it with: dotnet run --project src/Fabric.Cli -- matrix --catalog catalog/catalog.yaml --packs packs " +
         "--extra build/matrix-extra.yaml --output build/matrix.json";
 
+    private const string NoValidChoiceSet =
+        "error: no valid choice set contains a pair of options with a pack, so the matrix would have no combination; " +
+        "look for a rule no choice set can meet, or an active dimension none of whose options has a pack.";
+
     private static readonly string CheckedInMatrix = Path.Combine(Paths.Repository, "build", "matrix.json");
 
     private static readonly string CheckedInExtra = Path.Combine(Paths.Repository, "build", "matrix-extra.yaml");
@@ -121,6 +125,81 @@ public sealed class MatrixCommandTests : IDisposable
             "error: the options with a pack are the values of one factor (backend.database=postgres, backend.database=sqlserver), so there is no pair to cover; " +
             "the matrix needs options with a pack in two dimensions, or two options of a multi-valued one." + Environment.NewLine);
         File.Exists(output).ShouldBeFalse();
+    }
+
+    /// <summary>
+    /// The reviewer's reproduction: a dimension without a pack added to the fixture catalog, always active, so no choice
+    /// set can be completed. The existing matrix must survive.
+    /// </summary>
+    [Fact]
+    public void A_globally_unsatisfiable_domain_fails_and_leaves_the_existing_matrix_untouched()
+    {
+        var catalog = Path.Combine(root, "catalog.yaml");
+        File.WriteAllText(
+            catalog,
+            File.ReadAllText(Paths.FixtureCatalog) + """
+
+                  x.required: { scope: project, default: on, options: { on: { tier: experimental } } }
+
+                """);
+        var output = Path.Combine(root, "matrix.json");
+        File.WriteAllText(output, "existing\n");
+
+        var run = CliRun.Of("matrix", "--catalog", catalog, "--packs", Paths.FixturePacks, "--output", output);
+
+        run.ExitCode.ShouldBe(1, run.Output);
+        run.Error.ShouldBe(NoValidChoiceSet + Environment.NewLine);
+        File.ReadAllText(output).ShouldBe("existing\n");
+    }
+
+    /// <summary>
+    /// The reviewer's reproduction: x.a=p requires x.b == q, and only x.a.p and x.b.p have a pack, so the one pair
+    /// to cover is infeasible. The existing matrix must survive.
+    /// </summary>
+    [Fact]
+    public void An_entirely_infeasible_domain_fails_and_leaves_the_existing_matrix_untouched()
+    {
+        var catalog = Path.Combine(root, "catalog.yaml");
+        File.WriteAllText(
+            catalog,
+            """
+            version: 1
+            dimensions:
+              x.a: { scope: project, default: p, options: { p: { tier: supported, requires: ["x.b == q"] } } }
+              x.b: { scope: project, default: p, options: { p: { tier: supported }, q: { tier: supported } } }
+
+            """);
+        var packs = Path.Combine(root, "packs");
+        foreach (var option in new[] { "x.a.p", "x.b.p" })
+        {
+            var pack = Path.Combine(packs, option);
+            Directory.CreateDirectory(Path.Combine(pack, "docs"));
+            File.WriteAllText(Path.Combine(pack, "docs", "adr.md"), "ADR\n");
+            File.WriteAllText(Path.Combine(pack, "docs", "agents.md"), "Rules\n");
+            File.WriteAllText(Path.Combine(pack, "gate.sbn"), "gate\n");
+            File.WriteAllText(
+                Path.Combine(pack, "pack.yaml"),
+                $$"""
+                option: {{option}}
+                files:
+                  - { template: gate.sbn, target: {{option}}.txt }
+                agents:
+                  agents-md: docs/agents.md
+                adr: docs/adr.md
+                gates:
+                  - { kind: unit-test, describes: "Fixture gate.", file: gate.sbn }
+
+                """);
+        }
+
+        var output = Path.Combine(root, "matrix.json");
+        File.WriteAllText(output, "existing\n");
+
+        var run = CliRun.Of("matrix", "--catalog", catalog, "--packs", packs, "--output", output);
+
+        run.ExitCode.ShouldBe(1, run.Output);
+        run.Error.ShouldBe(NoValidChoiceSet + Environment.NewLine);
+        File.ReadAllText(output).ShouldBe("existing\n");
     }
 
     /// <summary>A combination's choices are what <c>fabric new --choices</c> reads: dimension to option, or to a list for a multi-valued one.</summary>
