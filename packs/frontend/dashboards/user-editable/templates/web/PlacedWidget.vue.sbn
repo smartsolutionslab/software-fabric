@@ -1,10 +1,39 @@
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ if ui == "reka-ui"
+  button = "BaseButton"
+  button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
+  secondary = "outline"
+else
+  button = "Button"
+  button_import = "import { Button } from '@/components/ui/button';"
+  secondary = "secondary"
+end ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  ret 'class="' + tailwind + '"'
+end ~}}
+{{~ func themed(shadcn, palette, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  if ui == "reka-ui"
+    ret 'class="' + palette + '"'
+  end
+  ret 'class="' + shadcn + '"'
+end ~}}
 {%{<script setup lang="ts">
 import { computed } from 'vue';
 import { useGetDashboardsWidgetDeclarationsId } from '@/api/generated';
-import { Button } from '@/components/ui/button';
+}%}{{ button_import }}{%{
 import type { Placement } from './layout';
 import WidgetView from './WidgetView.vue';
-
+}%}{{~ if css_modules ~}}
+import styles from './PlacedWidget.module.css';
+{{~ end ~}}
+{%{
 interface PlacedWidgetProps {
   placement: Placement;
   height: number;
@@ -24,14 +53,14 @@ const title = computed(() => declaration.value?.title ?? placement.source);
 </script>
 
 <template>
-  <section :aria-label="title" class="flex h-full flex-col overflow-hidden rounded border bg-card p-2">
-    <header class="flex items-center justify-between gap-2">
-      <h2 class="text-sm font-medium">{{ title }}</h2>
-      <Button type="button" variant="ghost" size="sm" :aria-label="`Remove ${title}`" @click="emit('remove')">
+  <section :aria-label="title" }%}{{ themed "flex h-full flex-col overflow-hidden rounded border bg-card p-2" "flex h-full flex-col overflow-hidden rounded border bg-white p-2" "widget" }}{%{>
+    <header }%}{{ class_of "flex items-center justify-between gap-2" "header" }}{%{>
+      <h2 }%}{{ class_of "text-sm font-medium" "title" }}{%{>{{ title }}</h2>
+      <}%}{{ button }}{%{ type="button" variant="ghost" size="sm" :aria-label="`Remove ${title}`" @click="emit('remove')">
         Remove
-      </Button>
+      </}%}{{ button }}{%{>
     </header>
-    <div class="min-h-0 flex-1 overflow-auto">
+    <div }%}{{ class_of "min-h-0 flex-1 overflow-auto" "body" }}{%{>
       <WidgetView
         :source="placement.source"
         :visual="placement.visual"

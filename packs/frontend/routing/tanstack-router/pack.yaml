@@ -1,6 +1,7 @@
 option: frontend.routing.tanstack-router
 files:
   - { template: templates/App.tsx.sbn, target: web/app/src/App.tsx }
+  - { template: templates/App.module.css.sbn, target: web/app/src/App.module.css, when: 'project["frontend.styling"] == "css-modules"' }
   - { template: templates/App.test.tsx.sbn, target: web/app/src/App.test.tsx }
   - { template: templates/router.tsx.sbn, target: web/app/src/router.tsx }
   - { template: templates/rootRoute.ts.sbn, target: web/app/src/rootRoute.ts }

@@ -1,0 +1,41 @@
+.pending {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px dashed #0f172a;
+  border-radius: 0.25rem;
+  background-color: #fff;
+  padding: 0.5rem;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.title {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+}
+
+.body {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.note {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: #64748b;
+}

@@ -1,11 +1,20 @@
+{{~ func class_of(tailwind, module)
+  if project["frontend.styling"] == "css-modules"
+    ret ':class="styles.' + module + '"'
+  end
+  ret 'class="' + tailwind + '"'
+end ~}}
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router';
 import { moduleRoutes } from '@/modules';
+{{~ if project["frontend.styling"] == "css-modules" ~}}
+import styles from './App.module.css';
+{{~ end ~}}
 </script>
 
 <template>
   <div>
-    <nav aria-label="Modules" class="flex gap-4 p-2">
+    <nav aria-label="Modules" {{ class_of "flex gap-4 p-2" "navigation" }}>
       <RouterLink to="/">Home</RouterLink>
       <RouterLink v-for="route in moduleRoutes" :key="route.path" :to="`/${route.path}`">
         {{ "{{" }} route.title {{ "}}" }}
