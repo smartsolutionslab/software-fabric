@@ -2,7 +2,7 @@
 # Every commit a pull request adds is a Conventional Commit, <type>(<scope>)!: <subject> (board protocol, docs/adr).
 # The scopes are the project's: its modules in fabric.yaml and the fixed ones in .github/commit-scopes.
 # Merge commits are not checked. Needs git alone, so a project without a frontend needs no Node toolchain for it.
-# Usage: check-commits.sh <base sha> <head sha>
+# Usage: check-commits.sh <base revision> <head revision>
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
