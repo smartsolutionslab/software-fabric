@@ -1,3 +1,91 @@
+{{~ if project["frontend.ui-library"] == "mui" ~}}
+{%{import { Box, Button, Paper, Stack, Typography } from '@mui/material';
+import type { WidgetProposal } from './proposal';
+import { WidgetView } from './WidgetView';
+
+interface PendingWidgetProps {
+  proposal: WidgetProposal;
+  /** How many grid rows it spans, and how high one is. */
+  rows: number;
+  rowHeight: number;
+  /** Whether it takes the place of a widget on the draft rather than adding one. */
+  replacing: boolean;
+  /** Whether the draft has room for it: a replacement always has. */
+  canAccept: boolean;
+  /** Goes up with every save of the dashboard, so the widget's data is read again, as a placed widget's is. */
+  refresh: number;
+  onAccept: () => void;
+  onDiscard: () => void;
+}
+
+/**
+ * A widget the dashboards agent proposed, on the grid with its live data until the user decides. Accept puts it on the
+ * draft and Discard drops it; neither saves anything.
+ */
+export function PendingWidget({
+  proposal,
+  rows,
+  rowHeight,
+  replacing,
+  canAccept,
+  refresh,
+  onAccept,
+  onDiscard,
+}: PendingWidgetProps) {
+  const { source, title, visual } = proposal;
+
+  return (
+    <Paper
+      component="section"
+      variant="outlined"
+      aria-label={`Proposed: ${title}`}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+        p: 1,
+        borderStyle: 'dashed',
+        borderColor: 'primary.main',
+      }}
+    >
+      <Stack
+        component="header"
+        direction="row"
+        spacing={1}
+        useFlexGap
+        sx={{ flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}
+      >
+        <Typography component="h2" variant="subtitle2">
+          Proposed: {title}
+        </Typography>
+        <Stack direction="row" spacing={0.5}>
+          <Button type="button" variant="contained" size="small" disabled={!canAccept} onClick={onAccept}>
+            Accept
+          </Button>
+          <Button type="button" variant="text" size="small" onClick={onDiscard}>
+            Discard
+          </Button>
+        </Stack>
+      </Stack>
+      {replacing && (
+        <Typography variant="caption" color="text.secondary">
+          Replaces a widget on this dashboard.
+        </Typography>
+      )}
+      <Box sx={{ minHeight: 0, flex: 1, overflow: 'auto' }}>
+        <WidgetView
+          source={source}
+          visual={visual}
+          title={title}
+          height={Math.max(120, rows * rowHeight - 60)}
+          refresh={refresh}
+        />
+      </Box>
+    </Paper>
+  );
+}
+}%}{{~ else ~}}
 import { Button } from '@/components/ui/button';
 import type { WidgetProposal } from './proposal';
 import { WidgetView } from './WidgetView';
@@ -62,3 +150,4 @@ export function PendingWidget({
     </section>
   );
 }
+{{~ end ~}}
