@@ -153,6 +153,44 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         ((string)status["target_url"]!).ShouldBe($"https://github.com/acme/shop/actions/runs/{RunId}");
     }
 
+    /// <summary>
+    /// The owner's decision on #474: before postponing, the review tries once more with another model of the same
+    /// reviewing family, which stays independent of the author's.
+    /// </summary>
+    [Theory]
+    [InlineData("Agent-Executor: claude-cloud/lane-backend", "REVIEW_MODEL_CODEX", "gpt-")]
+    [InlineData("Agent-Executor: codex-cloud/lane-backend", "REVIEW_MODEL_CLAUDE", "claude-")]
+    public void A_model_that_hits_the_limit_is_replaced_once_by_the_fallback_of_the_same_family(string trailer, string setting, string family)
+    {
+        var environment = WorkflowEnvironment();
+        var model = environment[setting];
+        var fallbackSetting = setting.Replace("REVIEW_MODEL_", "REVIEW_FALLBACK_MODEL_", StringComparison.Ordinal);
+        var fallback = environment.GetValueOrDefault(fallbackSetting, "");
+        fallback.ShouldStartWith(family, Case.Sensitive, $"{fallbackSetting} names another model of the reviewing family.");
+        fallback.ShouldNotBe(model);
+
+        var run = Review($"Change\n\n{trailer}", NoFindings, limitedModels: [model]);
+
+        run.ExitCode.ShouldBe(0, run.Log);
+        CopilotModels().ShouldBe([model, fallback], ignoreOrder: false, run.Log);
+        ((string)Reviews().ShouldHaveSingleItem()!["body"]!).ShouldContain(fallback);
+        ((string)Statuses().ShouldHaveSingleItem(run.Log)!["state"]!).ShouldBe("success");
+    }
+
+    [Fact]
+    public void A_review_is_postponed_only_when_the_fallback_is_limited_too()
+    {
+        var environment = WorkflowEnvironment();
+        string[] models = [environment["REVIEW_MODEL_CODEX"], environment.GetValueOrDefault("REVIEW_FALLBACK_MODEL_CODEX", "")];
+
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, limitedModels: models);
+
+        run.ExitCode.ShouldBe(0, run.Log);
+        CopilotModels().ShouldBe(models, ignoreOrder: false, run.Log);
+        Reviews().ShouldBeEmpty();
+        ((string)Statuses().ShouldHaveSingleItem(run.Log)!["state"]!).ShouldBe("pending");
+    }
+
     [Theory]
     [InlineData(NoFindings, "success")]
     [InlineData("""{"findings": [{"severity": "optional", "file": "src/Invoice.cs", "line": 3, "message": "Shorter name?"}]}""", "success")]
