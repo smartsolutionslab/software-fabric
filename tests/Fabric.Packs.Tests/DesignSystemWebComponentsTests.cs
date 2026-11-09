@@ -84,7 +84,7 @@ public sealed class DesignSystemWebComponentsTests
     [Theory]
     [InlineData("saas-standard-react")]
     [InlineData("saas-standard-vue")]
-    [InlineData("saas-standard-react", "frontend.styling=css-modules", "frontend.ui-library=radix-headless")]
+    [InlineData("saas-standard-vue", "frontend.styling=css-modules", "frontend.ui-library=reka-ui")]
     public void The_tokens_package_and_the_apps_stylesheet_are_those_of_the_tokens_option(string profile, params string[] overrides)
     {
         var tokens = Files(profile, ["frontend.design-system=tokens", .. overrides]);
