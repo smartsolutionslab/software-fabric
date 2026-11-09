@@ -453,6 +453,218 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Labels(IssueState(7)).ShouldContain("agent:claimed");
     }
 
+    /// <summary>Runs next.sh for another agent from the origin's post-receive hook, once: right after a push lands.</summary>
+    private string ClaimRightAfterTheNextPush(string executor) =>
+        RightAfterTheNextPush($"bash '{Path.Combine(ProjectDirectory, ".github/scripts/board/next.sh")}' backend {executor}");
+
+    /// <summary>Runs a command from the origin's post-receive hook, once, and returns the file that receives its output.</summary>
+    private string RightAfterTheNextPush(string command)
+    {
+        var output = Path.Combine(state, "concurrent-claim");
+        var hook = Path.Combine(origin, "hooks", "post-receive");
+        File.WriteAllText(hook, $"""
+            #!/bin/sh
+            rm "$0"
+            unset GIT_DIR GIT_QUARANTINE_PATH
+            {command} > '{output}' 2>&1
+            echo "exit=$?" >> '{output}'
+
+            """);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        return output;
+    }
+
+    [Fact]
+    public void A_claim_right_after_a_release_lands_takes_the_released_issue_and_keeps_its_label_and_fields()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]), Issue(9, "Refund an invoice", ReadyBackend));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10), "claude-cloud/one");
+        var concurrent = ClaimRightAfterTheNextPush("claude-cloud/two");
+
+        var (exitCode, output) = Run("release.sh", "7", "Claimed by mistake.");
+
+        exitCode.ShouldBe(0, output);
+        var claim = File.ReadAllText(concurrent);
+        claim.ShouldStartWith("7 agent/7", Case.Sensitive, claim);
+        Executor("agent/7").ShouldBe("claude-cloud/two");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Claimed");
+        Field(7, "EXECUTOR").ShouldBe("claude-cloud/two");
+        HasBranch("agent/9").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_claim_that_listed_before_the_release_and_lands_right_after_it_keeps_its_label_and_fields()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10), "claude-cloud/one");
+        // next.sh's claim of #7 past its list, which it read before #7 was first claimed.
+        var lib = Path.Combine(ProjectDirectory, ".github/scripts/board/lib.sh");
+        var concurrent = RightAfterTheNextPush($"""
+            bash -c 'source {lib}
+              base="$(board_fetch agent/7)" && board_mark agent/7 "$base" "chore(board): claim #7
+
+            Agent-Executor: claude-cloud/two" && board_add_label 7 agent:claimed && board_status 7 Claimed && board_executor 7 claude-cloud/two'
+            """);
+
+        var (exitCode, output) = Run("release.sh", "7", "Claimed by mistake.");
+
+        exitCode.ShouldBe(0, output);
+        File.ReadAllText(concurrent).ShouldBe("exit=0\n", File.ReadAllText(concurrent));
+        Executor("agent/7").ShouldBe("claude-cloud/two");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Claimed");
+        Field(7, "EXECUTOR").ShouldBe("claude-cloud/two");
+    }
+
+    /// <summary>Runs a command once, right after the first gh call that returns while a condition holds.</summary>
+    private string RightAfterTheGhCallWhere(string condition, string command)
+    {
+        var output = Path.Combine(state, "concurrent-claim");
+        File.WriteAllText(Path.Combine(state, "after-call"), $"""
+            {condition} || exit 0
+            rm "$0"
+            {command} > '{output}' 2>&1
+            echo "exit=$?" >> '{output}'
+
+            """);
+        return output;
+    }
+
+    private string Claim7(string executor) =>
+        $"bash '{Path.Combine(ProjectDirectory, ".github/scripts/board/next.sh")}' backend {executor}";
+
+    [Fact]
+    public void A_release_retried_on_a_parked_branch_leaves_a_claim_landing_once_its_label_is_off_alone()
+    {
+        // A janitor run or an earlier release parked the branch and stopped before agent:claimed came off.
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-20), "claude-cloud/one");
+        Branch("agent/7", "chore(board): release #7", Now.AddMinutes(-10), "claude-cloud/one");
+        var concurrent = RightAfterTheGhCallWhere(
+            $"! jq -e '.[] | select(.number == 7) | any(.labels[]; .name == \"agent:claimed\")' '{Path.Combine(state, "issues.json")}' > /dev/null",
+            Claim7("claude-cloud/two"));
+
+        var (exitCode, output) = Run("release.sh", "7", "Claimed by mistake.");
+
+        exitCode.ShouldBe(0, output);
+        var claim = File.ReadAllText(concurrent);
+        claim.ShouldStartWith("7 agent/7", Case.Sensitive, claim);
+        Head("agent/7").ShouldBe("chore(board): claim #7");
+        Executor("agent/7").ShouldBe("claude-cloud/two");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Claimed");
+        Field(7, "EXECUTOR").ShouldBe("claude-cloud/two");
+    }
+
+    [Fact]
+    public void A_claim_landing_after_a_release_has_parked_the_branch_and_read_it_back_keeps_its_fields()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10), "claude-cloud/one");
+        var concurrent = RightAfterTheGhCallWhere(
+            $"git --git-dir '{origin}' log -1 --format=%s refs/heads/agent/7 | grep -q '^chore(board): release #7'",
+            Claim7("claude-cloud/two"));
+
+        var (exitCode, output) = Run("release.sh", "7", "Claimed by mistake.");
+
+        exitCode.ShouldBe(0, output);
+        var claim = File.ReadAllText(concurrent);
+        claim.ShouldStartWith("7 agent/7", Case.Sensitive, claim);
+        Executor("agent/7").ShouldBe("claude-cloud/two");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Claimed");
+        Field(7, "EXECUTOR").ShouldBe("claude-cloud/two");
+        Comments(7).ShouldContain("Released: Claimed by mistake.");
+    }
+
+    /// <summary>Another agent parks #7's branch at the head release.sh is about to read back, as a lapse or another release does.</summary>
+    private string Park7 =>
+        $"bash -c 'source {Path.Combine(ProjectDirectory, ".github/scripts/board/lib.sh")}; board_park 7 \"The claim lapsed.\" && board_unclaim 7 && board_status 7 Todo && board_executor 7 \"\"'";
+
+    [Fact]
+    public void A_release_whose_branch_is_parked_and_claimed_by_others_once_it_has_read_it_leaves_the_new_claim_its_label_and_fields()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10), "claude-cloud/one");
+        var concurrent = RightAfterTheGhCallWhere("true", $"{Park7} && {Claim7("claude-cloud/two")}");
+
+        var (exitCode, output) = Run("release.sh", "7", "Claimed by mistake.");
+
+        exitCode.ShouldBe(1, output);
+        var claim = File.ReadAllText(concurrent);
+        claim.ShouldStartWith("7 agent/7", Case.Sensitive, claim);
+        Head("agent/7").ShouldBe("chore(board): claim #7");
+        Executor("agent/7").ShouldBe("claude-cloud/two");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Claimed");
+        Field(7, "EXECUTOR").ShouldBe("claude-cloud/two");
+        output.ShouldContain("moved", Case.Sensitive, output);
+    }
+
+    [Fact]
+    public void A_release_whose_branch_another_agent_parks_once_it_has_read_it_leaves_the_issue_in_todo()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10), "claude-cloud/one");
+        var concurrent = RightAfterTheGhCallWhere("true", Park7);
+
+        var (exitCode, output) = Run("release.sh", "7", "Claimed by mistake.");
+
+        exitCode.ShouldBe(1, output);
+        File.ReadAllText(concurrent).ShouldBe("exit=0\n", File.ReadAllText(concurrent));
+        Head("agent/7").ShouldBe("chore(board): release #7");
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Todo");
+        Field(7, "EXECUTOR").ShouldBe("");
+        output.ShouldContain("moved", Case.Sensitive, output);
+    }
+
+    [Fact]
+    public void A_release_the_remote_refuses_leaves_the_issue_claimed()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-10));
+        Directory.CreateDirectory(Path.Combine(state, "board"));
+        File.WriteAllText(Path.Combine(state, "board", "7.STATUS"), "Claimed");
+        File.WriteAllText(Path.Combine(state, "board", "7.EXECUTOR"), "codex-cloud/other");
+        var hook = Path.Combine(origin, "hooks", "pre-receive");
+        File.WriteAllText(hook, "#!/bin/sh\necho 'Write access is not permitted through this proxy.' >&2\nexit 1\n");
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var (exitCode, output) = Run("release.sh", "7", "Claimed by mistake.");
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain("still claimed");
+        Head("agent/7").ShouldBe("chore(board): claim #7");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Claimed");
+        Field(7, "EXECUTOR").ShouldBe("codex-cloud/other");
+        Comments(7).ShouldNotContain("Released");
+    }
+
+    [Fact]
+    public void Two_agents_claiming_in_one_lane_at_once_take_distinct_issues()
+    {
+        Issues(Issue(7, "Pay an invoice", ReadyBackend), Issue(9, "Refund an invoice", ReadyBackend));
+        var concurrent = ClaimRightAfterTheNextPush("claude-cloud/two");
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/one");
+
+        exitCode.ShouldBe(0, output);
+        output.Trim().ShouldBe("7 agent/7");
+        File.ReadAllText(concurrent).ShouldStartWith("9 agent/9", Case.Sensitive, File.ReadAllText(concurrent));
+        Executor("agent/7").ShouldBe("claude-cloud/one");
+        Executor("agent/9").ShouldBe("claude-cloud/two");
+    }
+
     [Fact]
     public void The_janitor_parks_lapsed_claims_and_leaves_live_ones()
     {
