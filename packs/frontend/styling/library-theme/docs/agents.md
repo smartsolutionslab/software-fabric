@@ -2,7 +2,7 @@
 
 {{~ if project["frontend.ui-library"] == "mui" ~}}
 {{~ if project["frontend.design-system"] == "tokens" || project["frontend.design-system"] == "web-components" ~}}
-- Colours and shape live in one place, the design tokens, which the MUI theme in `src/theme.ts` is built from; change them in their token, never in the theme or per component.
+- Colours, shape and spacing live in one place, the design tokens, which the MUI theme in `src/theme.ts` is built from; change them in their token, never in the theme or per component.
 {{~ else ~}}
 - Colours, shape and type live in one place, the MUI theme in `src/theme.ts`; change them there, never per component.
 {{~ end ~}}

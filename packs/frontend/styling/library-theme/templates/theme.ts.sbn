@@ -4,10 +4,12 @@ throw new Error('The library-theme pack builds the theme for MUI only so far; fr
 import { createTheme } from '@mui/material/styles';
 import { tokens } from '@{{ name }}/tokens';
 
+const spacingTokens: Partial<Record<string, string>> = tokens.spacing;
+
 /**
- * The app's look in one place: every MUI component takes its colours and shape from this theme, and the theme takes
- * them from the design tokens (web/packages/tokens/src, docs/adr). Change a value in its token, never here or per
- * component; a screen names the theme's values (`color="text.secondary"`, `bgcolor: 'primary.main'` in `sx`).
+ * The app's look in one place: every MUI component takes its colours, shape and spacing from this theme, and the
+ * theme takes them from the design tokens (web/packages/tokens/src, docs/adr). Change a value in its token, never here
+ * or per component; a screen names the theme's values (`color="text.secondary"`, `bgcolor: 'primary.main'`, `p: 4`).
  */
 export const theme = createTheme({
   palette: {
@@ -18,6 +20,8 @@ export const theme = createTheme({
     divider: tokens.color.border,
   },
   shape: { borderRadius: tokens.radius.md },
+  // p: 4 takes the spacing.4 token, as Tailwind's p-4 does; a step the tokens do not define is a multiple of spacing.1.
+  spacing: (step: number) => spacingTokens[String(step)] ?? `calc(${step} * ${tokens.spacing[1]})`,
 });
 {{~ else ~}}
 import { createTheme } from '@mui/material/styles';
