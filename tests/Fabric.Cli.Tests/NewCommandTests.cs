@@ -108,6 +108,27 @@ public sealed class NewCommandTests : IDisposable
         Directory.Exists(Path.Combine(root, "broken")).ShouldBeFalse();
     }
 
+    /// <summary>Without a signed-in user there is no trustworthy tenant (#464).</summary>
+    [Fact]
+    public void Tenancy_without_authentication_writes_nothing()
+    {
+        var run = CliRun.Of(
+            "new",
+            Path.Combine(root, "broken"),
+            "--catalog",
+            Paths.RepositoryCatalog,
+            "--packs",
+            Paths.RepositoryPacks,
+            "--profile",
+            "saas-standard-react",
+            "--set",
+            "backend.auth=none");
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: backend.tenancy=column requires backend.auth != none, but backend.auth is none.");
+        Directory.Exists(Path.Combine(root, "broken")).ShouldBeFalse();
+    }
+
     [Fact]
     public void A_profile_whose_packs_do_not_exist_yet_reports_each_missing_pack()
     {

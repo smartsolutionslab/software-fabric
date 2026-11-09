@@ -74,6 +74,7 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         {
             ["contents"] = "read",
             ["pull-requests"] = "write",
+            ["statuses"] = "write",
         });
         Mapping(root, "permissions").Values.ShouldNotContain("write");
         Mapping((YamlMappingNode)jobs["choose"], "permissions").Values.ShouldNotContain("write");
@@ -129,6 +130,245 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         run.ExitCode.ShouldNotBe(0, run.Log);
         run.FailedJob.ShouldBe("review", run.Log);
         Reviews().ShouldBeEmpty();
+    }
+
+    /// <summary>
+    /// The owner's decision on #474: Copilot's usage limit is not a finding. The review is postponed instead of failed,
+    /// so no job is red and nothing is posted on the pull request, but the verdict status stays pending: a postponed
+    /// review is never a pass.
+    /// </summary>
+    [Fact]
+    public void A_reviewer_that_hits_copilot_s_usage_limit_is_postponed_not_failed_and_never_passes()
+    {
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, limitedModels: ["*"]);
+
+        run.ExitCode.ShouldBe(0, run.Log);
+        run.Log.ShouldContain("trust tier usage limit reached");
+        Reviews().ShouldBeEmpty();
+        var status = Statuses().ShouldHaveSingleItem(run.Log)!;
+        ((string)status["context"]!).ShouldBe(VerdictContext);
+        ((string)status["sha"]!).ShouldBe("HEAD");
+        ((string)status["state"]!).ShouldBe("pending");
+        ((string)status["description"]!).ShouldStartWith("Postponed");
+        ((string)status["target_url"]!).ShouldBe($"https://github.com/acme/shop/actions/runs/{RunId}");
+    }
+
+    /// <summary>
+    /// The owner's decision on #474 (no fallback model): Copilot's limit is account-wide, so a limited review is
+    /// postponed at once, without a second model call, and the workflow names no other model.
+    /// </summary>
+    [Theory]
+    [InlineData("Agent-Executor: claude-cloud/lane-backend", "REVIEW_MODEL_CODEX")]
+    [InlineData("Agent-Executor: codex-cloud/lane-backend", "REVIEW_MODEL_CLAUDE")]
+    public void A_limited_review_is_postponed_without_a_second_model_call(string trailer, string setting)
+    {
+        var model = WorkflowEnvironment()[setting];
+
+        var run = Review($"Change\n\n{trailer}", NoFindings, limitedModels: [model]);
+
+        run.ExitCode.ShouldBe(0, run.Log);
+        CopilotModels().ShouldBe([model], ignoreOrder: false, run.Log);
+        Reviews().ShouldBeEmpty();
+        ((string)Statuses().ShouldHaveSingleItem(run.Log)!["state"]!).ShouldBe("pending");
+        WorkflowEnvironment().Keys.ShouldNotContain(key => key.StartsWith("REVIEW_FALLBACK_MODEL_", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The owner's decision on #474: a scheduled workflow re-runs the reviews that were postponed at a pull request's
+    /// current head, and nothing else: not a review with a verdict, not one postponed at a head since replaced, not a
+    /// run still going, not another check that happens to be pending.
+    /// </summary>
+    [Fact]
+    public void The_retry_workflow_re_runs_only_the_reviews_postponed_at_a_pull_request_s_current_head()
+    {
+        File.Exists(RetryWorkflowPath).ShouldBeTrue("The generated project has no workflow that retries postponed reviews.");
+        var postponed = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, limitedModels: ["*"]);
+        postponed.ExitCode.ShouldBe(0, postponed.Log);
+        var statuses = Statuses();
+        statuses.Add(Status("reviewed", "success", VerdictContext, "Reviewed by codex (gpt-6.1-sol): nothing blocking.", 43));
+        statuses.Add(Status("replaced", "pending", VerdictContext, "Postponed: Copilot's usage limit was reached.", 44));
+        statuses.Add(Status("running", "pending", VerdictContext, "Postponed: Copilot's usage limit was reached.", 45));
+        statuses.Add(Status("other", "pending", "ci/build", "Postponed: waiting for a runner.", 46));
+        File.WriteAllText(Path.Combine(state, "statuses.json"), statuses.ToJsonString());
+        File.WriteAllText(Path.Combine(state, "prs.json"), new JsonArray(
+            PullRequest(5, "HEAD"), PullRequest(6, "reviewed"), PullRequest(7, "replacing"), PullRequest(8, "running"), PullRequest(9, "other")).ToJsonString());
+        File.WriteAllText(Path.Combine(state, "runs.json"), new JsonArray(
+            Run(42, "completed"), Run(43, "completed"), Run(44, "completed"), Run(45, "in_progress"), Run(46, "completed")).ToJsonString());
+        File.Delete(Path.Combine(Fakes, "copilot-args"));
+
+        var retry = RunJob(RetryWorkflowPath, "retry", board.Project.ProjectDirectory, new() { ["github.token"] = "workflow-token" });
+
+        retry.ExitCode.ShouldBe(0, retry.Log);
+        File.ReadAllLines(Path.Combine(state, "reruns")).ShouldBe([RunId], retry.Log);
+        File.Exists(Path.Combine(Fakes, "copilot-args")).ShouldBeFalse("The retry workflow ran a reviewer itself.");
+    }
+
+    /// <summary>It re-runs reviews and reviews nothing itself: it can start a run, and read pull requests and statuses.</summary>
+    [Fact]
+    public void The_retry_workflow_runs_on_a_schedule_and_may_only_re_run_workflows()
+    {
+        File.Exists(RetryWorkflowPath).ShouldBeTrue("The generated project has no workflow that retries postponed reviews.");
+        var root = Root(RetryWorkflowPath);
+
+        ((YamlMappingNode)root["on"]).Children.Keys.Select(key => ((YamlScalarNode)key).Value).ShouldBe(["schedule", "workflow_dispatch"]);
+        Mapping(root, "permissions").ShouldBe(new Dictionary<string, string>
+        {
+            ["contents"] = "read",
+            ["pull-requests"] = "read",
+            ["statuses"] = "read",
+            ["actions"] = "write",
+        });
+        ((YamlMappingNode)root["jobs"]).Children.Values.Cast<YamlMappingNode>()
+            .ShouldAllBe(job => !job.Children.ContainsKey(new YamlScalarNode("permissions")));
+        File.ReadAllText(RetryWorkflowPath).ShouldNotContain("copilot", Case.Insensitive);
+    }
+
+    /// <summary>
+    /// The owner's decision on #474: a push that leaves the pull request's own diff as it was, such as merging main,
+    /// keeps the verdict of the last real review instead of spending another. The copilot stand-in answers a blocking
+    /// finding this time, so a review that ran anyway would fail.
+    /// </summary>
+    [Fact]
+    public void A_head_whose_own_diff_is_unchanged_keeps_the_verdict_without_calling_copilot()
+    {
+        var reviewed = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, change: Invoice);
+        reviewed.ExitCode.ShouldBe(0, reviewed.Log);
+
+        var merged = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", Blocking, change: Invoice, mainMoved: MainMovedByClaude);
+
+        merged.ExitCode.ShouldBe(0, merged.Log);
+        merged.CopilotArguments.ShouldBeNull(merged.Log);
+        Reviews().Count.ShouldBe(1);
+        var status = Statuses().Last()!;
+        ((string)status["state"]!).ShouldBe("success");
+        ((string)status["description"]!).ShouldContain("unchanged");
+    }
+
+    [Fact]
+    public void A_blocking_verdict_is_kept_too_while_the_diff_is_unchanged()
+    {
+        var reviewed = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", Blocking, change: Invoice);
+        reviewed.FailedJob.ShouldBe("report", reviewed.Log);
+
+        var merged = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, change: Invoice, mainMoved: MainMovedByClaude);
+
+        merged.CopilotArguments.ShouldBeNull(merged.Log);
+        merged.FailedJob.ShouldBe("report", merged.Log);
+        ((string)Statuses().Last()!["state"]!).ShouldBe("failure");
+    }
+
+    [Fact]
+    public void A_changed_diff_is_reviewed_again()
+    {
+        var reviewed = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, change: Invoice);
+        reviewed.ExitCode.ShouldBe(0, reviewed.Log);
+
+        var changed = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", Blocking, change: PaidInvoice);
+
+        changed.CopilotArguments.ShouldNotBeNull(changed.Log);
+        changed.FailedJob.ShouldBe("report", changed.Log);
+        Reviews().Count.ShouldBe(2);
+    }
+
+    /// <summary>
+    /// Anyone can post a review: only the workflow's own are verdicts. A passing review of this very diff, copied by
+    /// someone else after the workflow's last verdict (on another diff), does not spare the diff a review.
+    /// </summary>
+    [Fact]
+    public void A_verdict_copied_into_someone_else_s_review_is_not_kept()
+    {
+        Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, change: Invoice).ExitCode.ShouldBe(0);
+        Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", Blocking, change: PaidInvoice).FailedJob.ShouldBe("report");
+        var reviews = Reviews();
+        var copy = JsonNode.Parse(reviews[0]!.ToJsonString())!.AsObject();
+        copy["user"] = new JsonObject { ["login"] = "mallory" };
+        reviews.Add(copy);
+        File.WriteAllText(Path.Combine(state, "reviews.json"), reviews.ToJsonString());
+
+        var back = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", Blocking, change: Invoice);
+
+        back.CopilotArguments.ShouldNotBeNull(back.Log);
+        back.FailedJob.ShouldBe("report", back.Log);
+    }
+
+    /// <summary>
+    /// The gate's scripts come from the base branch. One the base branch does not have yet is not run from the pull
+    /// request either: the pull request brings its own copies, which would keep a forged verdict and set the status.
+    /// Without them nothing is kept and no status is set, so the diff is reviewed and the gate stays closed.
+    /// </summary>
+    [Fact]
+    public void A_gate_script_the_base_branch_lacks_is_never_run_from_the_pull_request()
+    {
+        var forged = new Dictionary<string, (string, string)>(Invoice)
+        {
+            [".github/scripts/board/previous-verdict.sh"] = ("", "echo pass forged\n"),
+            [".github/scripts/board/review-status.sh"] = ("", "touch \"$FAKES/forged-status\"\n"),
+        };
+
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, change: forged, baseLacks: ["previous-verdict.sh", "review-status.sh"]);
+
+        run.CopilotArguments.ShouldNotBeNull(run.Log);
+        File.Exists(Path.Combine(Fakes, "forged-status")).ShouldBeFalse(run.Log);
+        Statuses().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_postponed_review_fails_while_the_base_branch_cannot_record_it()
+    {
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, limitedModels: ["*"], baseLacks: ["review-status.sh"]);
+
+        run.FailedJob.ShouldBe("report", run.Log);
+        Reviews().ShouldBeEmpty();
+    }
+
+    private static readonly Dictionary<string, (string, string)> Invoice = new() { ["src/Invoice.cs"] = ("", "class Invoice;\n") };
+
+    private static readonly Dictionary<string, (string, string)> PaidInvoice = new() { ["src/Invoice.cs"] = ("", "class Invoice { void Pay() {} }\n") };
+
+    private static readonly (string MainCommit, string MergeMessage) MainMovedByClaude =
+        ("Merged on main\n\nAgent-Executor: claude-cloud/other", "Merge main\n\nAgent-Executor: claude-cloud/lane-backend");
+
+    private string RetryWorkflowPath => Path.Combine(board.Project.ProjectDirectory, ".github", "workflows", "cross-model-review-retry.yml");
+
+    private static JsonObject Status(string sha, string state, string context, string description, int run) => new()
+    {
+        ["sha"] = sha,
+        ["state"] = state,
+        ["context"] = context,
+        ["description"] = description,
+        ["target_url"] = $"https://github.com/acme/shop/actions/runs/{run}",
+    };
+
+    private static JsonObject PullRequest(int number, string head) => new()
+    {
+        ["number"] = number,
+        ["state"] = "open",
+        ["head"] = new JsonObject { ["ref"] = $"agent/{number}", ["sha"] = head },
+    };
+
+    private static JsonObject Run(int id, string status) => new() { ["id"] = id, ["status"] = status };
+
+    [Theory]
+    [InlineData(NoFindings, "success")]
+    [InlineData("""{"findings": [{"severity": "optional", "file": "src/Invoice.cs", "line": 3, "message": "Shorter name?"}]}""", "success")]
+    [InlineData(Blocking, "failure")]
+    public void A_review_that_reaches_a_verdict_sets_the_verdict_status_to_it(string answer, string expectedState)
+    {
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", answer);
+
+        var status = Statuses().ShouldHaveSingleItem(run.Log)!;
+        ((string)status["context"]!).ShouldBe(VerdictContext);
+        ((string)status["sha"]!).ShouldBe("HEAD");
+        ((string)status["state"]!).ShouldBe(expectedState);
+    }
+
+    [Fact]
+    public void A_reviewer_that_crashes_without_reaching_a_limit_is_not_postponed()
+    {
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", "Error: something else broke", copilotExitCode: 1);
+
+        run.FailedJob.ShouldBe("review", run.Log);
+        Statuses().ShouldNotContain(status => (string)status!["state"]! == "pending" || (string)status!["state"]! == "success");
     }
 
     /// <summary>
@@ -334,10 +574,12 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         run.CopilotArguments.ShouldNotBeNull(run.Log);
     }
 
-    private YamlMappingNode Root()
+    private YamlMappingNode Root() => Root(WorkflowPath);
+
+    private static YamlMappingNode Root(string workflowPath)
     {
         var yaml = new YamlStream();
-        using var reader = new StreamReader(WorkflowPath);
+        using var reader = new StreamReader(workflowPath);
         yaml.Load(reader);
         return (YamlMappingNode)yaml.Documents[0].RootNode;
     }
@@ -354,6 +596,24 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         var path = Path.Combine(state, "reviews.json");
         return File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))!.AsArray() : [];
     }
+
+    /// <summary>The commit statuses posted, oldest first.</summary>
+    private JsonArray Statuses()
+    {
+        var path = Path.Combine(state, "statuses.json");
+        return File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))!.AsArray() : [];
+    }
+
+    /// <summary>The model of each copilot call in the last run, in order.</summary>
+    private List<string> CopilotModels()
+    {
+        var path = Path.Combine(Fakes, "copilot-models");
+        return File.Exists(path) ? [.. File.ReadAllLines(path)] : [];
+    }
+
+    private const string RunId = "42";
+
+    private const string VerdictContext = "cross-model-review/verdict";
 
     private sealed record ReviewRun(int ExitCode, string Log, List<string>? CopilotArguments, string? FailedJob = null);
 
@@ -373,13 +633,18 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         bool tamper = false,
         string author = "developer",
         IReadOnlyDictionary<string, (string Before, string After)>? change = null,
-        (string MainCommit, string MergeMessage)? mainMoved = null)
+        (string MainCommit, string MergeMessage)? mainMoved = null,
+        string[]? limitedModels = null,
+        string[]? baseLacks = null)
     {
-        WriteFakes(answer, copilotExitCode, tamper);
+        WriteFakes(answer, copilotExitCode, tamper, limitedModels ?? []);
 
         Dictionary<string, string> expressions = new()
         {
             ["github.base_ref"] = "main",
+            ["github.repository"] = "acme/shop",
+            ["github.run_id"] = RunId,
+            ["github.server_url"] = "https://github.com",
             ["github.event.pull_request.base.sha"] = "base",
             ["github.event.pull_request.head.sha"] = "HEAD",
             ["github.event.pull_request.number"] = "5",
@@ -389,7 +654,13 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         var log = "";
         foreach (var name in new[] { "choose", "review", "report" })
         {
-            var job = RunJob(name, Workspace(name, commitMessage, change ?? new Dictionary<string, (string, string)>(), mainMoved), expressions);
+            var workspace = Workspace(name, commitMessage, change ?? new Dictionary<string, (string, string)>(), mainMoved);
+            foreach (var script in baseLacks ?? [])
+            {
+                File.Delete(Path.Combine(workspace, ".gate", ".github", "scripts", "board", script));
+            }
+
+            var job = RunJob(WorkflowPath, name, workspace, expressions);
             log += job.Log;
             if (job.ExitCode != 0)
             {
@@ -424,6 +695,11 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         (string MainCommit, string MergeMessage)? mainMoved = null)
     {
         var workspace = Path.Combine(state, $"workspace-{job}");
+        if (Directory.Exists(workspace))
+        {
+            Directory.Delete(workspace, recursive: true);
+        }
+
         Directory.CreateDirectory(workspace);
         BoardProject.Git(workspace, "init", "--quiet", "--initial-branch=main");
         foreach (var (file, (before, _)) in change)
@@ -477,10 +753,18 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         }
     }
 
-    private void WriteFakes(string answer, int copilotExitCode, bool tamper)
+    /// <summary>
+    /// The stand-ins for one run. The copilot stand-in records its arguments and each model it was asked for, and for
+    /// a model in <paramref name="limitedModels"/> (<c>*</c>: every model) answers as Copilot did on 2026-11-09 when the
+    /// usage limit was reached: the message on stderr, exit code 1.
+    /// </summary>
+    private void WriteFakes(string answer, int copilotExitCode, bool tamper, string[] limitedModels)
     {
         Directory.CreateDirectory(Fakes);
+        File.Delete(Path.Combine(Fakes, "copilot-args"));
+        File.Delete(Path.Combine(Fakes, "copilot-models"));
         File.WriteAllText(Path.Combine(Fakes, "answer"), answer);
+        File.WriteAllText(Path.Combine(Fakes, "limited"), string.Concat(limitedModels.Select(model => model + "\n")));
         var tampering = tamper
             ? """
                 for script in .gate/.github/scripts/board/report-review.sh .github/scripts/board/report-review.sh; do
@@ -492,8 +776,18 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         Fake("copilot", $$"""
             #!/usr/bin/env bash
             printf '%s\0' "$@" > "$FAKES/copilot-args"
+            arguments=("$@")
+            model=""
+            for at in "${!arguments[@]}"; do
+              if [ "${arguments[$at]}" = --model ]; then model="${arguments[$((at + 1))]}"; fi
+            done
+            echo "$model" >> "$FAKES/copilot-models"
             printf 'COPILOT_GITHUB_TOKEN=%s\nGH_TOKEN=%s\nGITHUB_TOKEN=%s\n' "${COPILOT_GITHUB_TOKEN-unset}" "${GH_TOKEN-unset}" "${GITHUB_TOKEN-unset}" > "$FAKES/copilot-env"
             {{tampering}}
+            if grep -qxF -e "$model" -e '*' "$FAKES/limited"; then
+              echo "trust tier usage limit reached (Request ID: D809:565E2:2BBB814:2EF8725:6AF189ED)" >&2
+              exit 1
+            fi
             cat "$FAKES/answer"
             exit {{copilotExitCode}}
             """);
@@ -521,9 +815,9 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
     /// rest are checkouts, which the workspace stands in for. An expression the test does not know, a secret say, fails
     /// the test.
     /// </summary>
-    private JobRun RunJob(string name, string workspace, Dictionary<string, string> expressions)
+    private JobRun RunJob(string workflowPath, string name, string workspace, Dictionary<string, string> expressions)
     {
-        var job = (YamlMappingNode)((YamlMappingNode)Root()["jobs"])[name];
+        var job = (YamlMappingNode)((YamlMappingNode)Root(workflowPath)["jobs"])[name];
         var gh = Path.Combine(AppContext.BaseDirectory, "Board");
         if (!OperatingSystem.IsWindows())
         {
@@ -540,7 +834,7 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
             ["RUNNER_TEMP"] = runnerTemp,
             ["GITHUB_ENV"] = Path.Combine(runnerTemp, "env"),
         };
-        foreach (var (key, value) in WorkflowEnvironment().Concat(Mapping(job, "env")))
+        foreach (var (key, value) in Mapping(Root(workflowPath), "env").Concat(Mapping(job, "env")))
         {
             environment[key] = Evaluate(value, expressions, environment, []);
         }
