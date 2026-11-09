@@ -1,0 +1,11 @@
+import { Badge } from '@{{ name }}/ui';
+
+/** The {{ module.name }} module's screens; the shell shows them under /{{ module.name }}. */
+export default function {{ module.namespace }}Page() {
+  return (
+    <main>
+      <h1>{{ module.namespace }}</h1>
+      <Badge>Remote</Badge>
+    </main>
+  );
+}

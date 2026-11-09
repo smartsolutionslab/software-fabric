@@ -1,0 +1,143 @@
+import * as ui from '@{{ name }}/ui';
+import { initFederation, type NativeFederationResult } from '@softarc/native-federation-orchestrator';
+import { replaceInDOM, type ImportMapConfig } from '@softarc/native-federation-orchestrator/options';
+import * as react from 'react';
+import type { ComponentType } from 'react';
+import * as reactDom from 'react-dom';
+import { remotes, versions } from 'virtual:federation';
+
+/** What every module's remote exposes as ./Page: the module's screens, as one component. */
+interface RemoteModule {
+  default: ComponentType;
+}
+
+type ImportMap = Parameters<ImportMapConfig['setImportMapFn']>[0];
+
+/** The shell's own instance of each package it shares (federation.ts lists the same); a remote never loads its own. */
+const instances: Record<string, object> = { react, 'react-dom': reactDom, '@{{ name }}/ui': ui };
+
+const key = 'native-federation.shell';
+(globalThis as Record<symbol, unknown>)[Symbol.for(key)] = instances;
+
+/** An ES module that exports the shell's instance of a package, where the import map sends a remote's imports of it. */
+function moduleOf(packageName: string, instance: object) {
+  const names = Object.keys(instance).filter((name) => name !== 'default' && /^[A-Za-z_$][\w$]*$/.test(name));
+  const source = [
+    `const shared = globalThis[Symbol.for('${key}')][${JSON.stringify(packageName)}];`,
+    'export default shared.default ?? shared;',
+    `export const { ${names.join(', ')} } = shared;`,
+  ].join('\n');
+  return URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+}
+
+const fileOf = (packageName: string) => `${packageName.replaceAll('/', '_')}.js`;
+
+/**
+ * The shell's remoteEntry.json as native federation's host: its shared packages at the shell's versions, as singletons
+ * with strict versions. The orchestrator resolves every remote's singletons to them, and refuses a remote whose
+ * version differs instead of loading a second copy.
+ */
+const hostEntry = URL.createObjectURL(
+  new Blob(
+    [
+      JSON.stringify({
+        name: 'shell',
+        exposes: [],
+        shared: Object.keys(instances).map((packageName) => ({
+          packageName,
+          outFileName: fileOf(packageName),
+          version: versions[packageName],
+          requiredVersion: versions[packageName],
+          singleton: true,
+          strictVersion: true,
+        })),
+      }),
+    ],
+    { type: 'application/json' },
+  ),
+);
+
+/** The host's file of each shared package, as the import map names it, and the module that is the shell's instance. */
+const hosted = new Map(
+  Object.entries(instances).map(([packageName, instance]) => [
+    `${hostEntry}/${fileOf(packageName)}`,
+    moduleOf(packageName, instance),
+  ]),
+);
+
+const withShellInstances = (imports: Record<string, string>) =>
+  Object.fromEntries(Object.entries(imports).map(([specifier, url]) => [specifier, hosted.get(url) ?? url]));
+
+const setImportMap = replaceInDOM('importmap');
+
+const failures = new Map<string, number>();
+
+/**
+ * Imports a remote's module. The browser keeps a module that failed to import for good, so after a failure the next
+ * import of it asks for a new address (?retry=<n>), which loads it once its server is back, without a reload.
+ */
+function importModule(url: string): Promise<unknown> {
+  const failed = failures.get(url) ?? 0;
+  const address = failed === 0 ? url : `${url}?retry=${failed}`;
+  return import(/* @vite-ignore */ address).then(
+    (loaded: unknown) => {
+      failures.delete(url);
+      return loaded;
+    },
+    (error: unknown) => {
+      failures.set(url, failed + 1);
+      throw error;
+    },
+  );
+}
+
+let host: Promise<NativeFederationResult> | undefined;
+const initialised = new Map<string, ReturnType<NativeFederationResult['initRemoteEntry']>>();
+
+/** Native federation's orchestrator, started once with the shell as host; remotes are added when first opened. */
+function orchestrator() {
+  host ??= initFederation(
+    {},
+    {
+      hostRemoteEntry: { name: 'shell', url: hostEntry },
+      strict: { strictRemoteEntry: true, strictExternalCompatibility: true },
+      loadModuleFn: importModule,
+      setImportMapFn: (importMap: ImportMap, options) =>
+        setImportMap(
+          {
+            ...importMap,
+            imports: withShellInstances(importMap.imports),
+            ...(importMap.scopes && {
+              scopes: Object.fromEntries(
+                Object.entries(importMap.scopes).map(([scope, imports]) => [scope, withShellInstances(imports)]),
+              ),
+            }),
+          },
+          options,
+        ),
+    },
+  );
+  return host;
+}
+
+/**
+ * A module's page, from its remote: the remote's remoteEntry.json is read once, then its ./Page imported. A remote
+ * whose entry failed to load is read again the next time.
+ */
+export async function loadPage(module: string): Promise<ComponentType> {
+  const entry = remotes[module];
+  if (!entry) {
+    throw new Error(`No remote for the module ${module}: web/modules/${module} has no package.json.`);
+  }
+
+  const federation = await orchestrator();
+  let remote = initialised.get(module);
+  if (!remote) {
+    remote = federation.initRemoteEntry(entry, module);
+    initialised.set(module, remote);
+    remote.catch(() => initialised.delete(module));
+  }
+
+  const loaded = await (await remote).loadRemoteModule<RemoteModule>(module, './Page');
+  return loaded.default;
+}

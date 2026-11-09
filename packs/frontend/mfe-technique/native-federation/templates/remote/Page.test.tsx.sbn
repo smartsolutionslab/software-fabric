@@ -1,0 +1,9 @@
+import { render, screen } from '@testing-library/react';
+import { expect, test } from 'vitest';
+import {{ module.namespace }}Page from './{{ module.namespace }}Page';
+
+test('the page names its module', () => {
+  render(<{{ module.namespace }}Page />);
+
+  expect(screen.getByRole('heading', { name: '{{ module.namespace }}' })).toBeInTheDocument();
+});

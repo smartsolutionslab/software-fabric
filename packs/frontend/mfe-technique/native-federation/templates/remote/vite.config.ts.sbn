@@ -1,0 +1,26 @@
+{{~ if project["frontend.framework"] != "react" || project["frontend.design-system"] != "tokens-and-components" ~}}
+throw new Error('The native-federation pack builds React remotes on the tokens-and-components design system only so far; frontend.framework is {{ project["frontend.framework"] }}, frontend.design-system is {{ project["frontend.design-system"] }} (docs/adr/0006 of the generator).');
+{{~ end ~}}
+import react from '@vitejs/plugin-react';
+import type { Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
+import { remoteBoundary } from './boundary.js';
+import { serveFederation } from './serve.js';
+
+/** The plugins every build of the remote uses; native-federation-vite reads them from this file too. */
+const plugins = (): Plugin[] => [
+  ...react(),
+  // A remote bundles only its own files and packages: other remotes and the shell are loaded at run time (docs/adr).
+  remoteBoundary(),
+];
+
+// The {{ module.name }} module's remote: the shell loads ./Page from its remoteEntry.json at run time (docs/adr).
+// Under Aspire `pnpm dev` builds it in watch mode and serves dist; built, a deployment serves dist under
+// /modules/{{ module.name }}/.
+export default defineConfig({
+  plugins: [...plugins(), serveFederation(plugins)],
+  // `pnpm build` first bundles the page with Vite, writing nothing, so the boundary names a file of another remote or
+  // of the shell; native federation's dependency analysis would stop at it saying only that it is outside the remote.
+  build: { rolldownOptions: { input: './src/{{ module.namespace }}Page.tsx' }, write: false },
+  test: { environment: 'jsdom', include: ['src/**/*.test.{ts,tsx}'], setupFiles: ['./src/test-setup.ts'] },
+});
