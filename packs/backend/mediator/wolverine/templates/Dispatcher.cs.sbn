@@ -5,14 +5,16 @@ namespace {{ namespace }}.BuildingBlocks.Messaging;
 
 /// <summary>
 /// Sends every request through Wolverine's bus, which invokes its one handler inline and in Wolverine's pipeline. The bus
-/// is the host's (messaging is host-wide), so it is resolved on first use; a module's own registrations stay valid
-/// without a running host.
+/// is the host's (messaging is host-wide), so a module's own registrations stay valid without it; without it, sending a
+/// request fails.
 /// </summary>
 public sealed class Dispatcher(IServiceProvider services) : IDispatcher
 {
-    private IMessageBus? bus;
+    // Taken while the scope that created this dispatcher is alive: a handler's result, a stream of an agent's updates
+    // say, may send requests through it after Wolverine has disposed the scope the handler ran in.
+    private readonly IMessageBus? bus = services.GetService<IMessageBus>();
 
-    private IMessageBus Bus => bus ??= services.GetRequiredService<IMessageBus>();
+    private IMessageBus Bus => bus ?? services.GetRequiredService<IMessageBus>();
 
     public Task<TResult> SendAsync<TResult>(ICommand<TResult> command, CancellationToken cancellationToken)
     {

@@ -1,4 +1,5 @@
 {{~ option = project["backend.absence"] == "option" ~}}
+{{~ wolverine = project["backend.mediator"] == "wolverine" ~}}
 {{~ if option ~}}
 using System.Text.Json;
 {{~ end ~}}
@@ -7,6 +8,11 @@ using {{ namespace }}.BuildingBlocks.Messaging;
 using {{ namespace }}.Tests.Fakes;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+{{~ if wolverine ~}}
+using Microsoft.Extensions.Hosting;
+using Wolverine;
+using Wolverine.Runtime;
+{{~ end ~}}
 
 namespace {{ namespace }}.Agents.Tests;
 
@@ -378,6 +384,32 @@ public sealed class AgentTests
     };
 
 {{~ end ~}}
+{{~ if wolverine ~}}
+    /// <summary>
+    /// What the host provides, with the stand-in model and a dispatcher that keeps what it sends, one for the test: Wolverine
+    /// runs each handler in a scope of its own. Wolverine runs in process, finding this assembly's handlers as the host
+    /// finds the modules'.
+    /// </summary>
+    private static ServiceProvider Services(IChatClient model)
+    {
+        var services = new ServiceCollection()
+            .AddSingleton(model)
+            .AddSingleton<RecordingDispatcher>(provider => new RecordingDispatcher(new Dispatcher(provider)))
+            .AddSingleton<IDispatcher>(provider => provider.GetRequiredService<RecordingDispatcher>())
+            .AddWolverine(options =>
+            {
+                options.Durability.Mode = DurabilityMode.MediatorOnly;
+                options.Discovery.DisableConventionalDiscovery();
+                options.Discovery.IncludeAssembly(typeof(AskAboutWordsHandler).Assembly);
+                options.DiscoverRequestHandlers();
+            })
+            .BuildServiceProvider();
+
+        // Wolverine's runtime is the hosted service a host would start.
+        ((IHostedService)services.GetRequiredService<IWolverineRuntime>()).StartAsync(CancellationToken.None).GetAwaiter().GetResult();
+        return services;
+    }
+{{~ else ~}}
     /// <summary>What the host provides, with the stand-in model and a dispatcher that keeps what it sends.</summary>
     private static ServiceProvider Services(IChatClient model) =>
         new ServiceCollection()
@@ -393,4 +425,5 @@ public sealed class AgentTests
             .AddScoped<IQueryHandler<LongestWord, Result<Option<string>, ApiError>>, LongestWordHandler>()
 {{~ end ~}}
             .BuildServiceProvider();
+{{~ end ~}}
 }
