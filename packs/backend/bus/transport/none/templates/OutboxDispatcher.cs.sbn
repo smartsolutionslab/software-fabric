@@ -43,51 +43,22 @@ public sealed partial class OutboxDispatcher(
 {{~ if tenants ~}}
         // The module's own schema holds no tenant's rows and has no outbox; each listed tenant's schema has one.
         var tenants = TenantSchemas.Listed(configuration);
+{{~ end ~}}
         while (!stoppingToken.IsCancellationRequested)
         {
             var delivered = 0;
-            foreach (var tenant in tenants)
-            {
-                delivered += await DeliverPendingAsync(tenant, stoppingToken);
-            }
-
-            if (delivered == 0)
-            {
-                await signal.WaitAsync(PollInterval, stoppingToken);
-            }
-        }
-    }
-
-    /// <summary>Delivers one tenant's pending messages of every module, in the tenant's scope, so its consumers work in its schemas.</summary>
-    private async Task<int> DeliverPendingAsync(string tenant, CancellationToken stoppingToken)
-    {
-        using var tenantScope = TenantScope.Begin(tenant);
-        var delivered = 0;
-        foreach (var type in contexts.Types)
-        {
-            try
-            {
-                delivered += await DeliverPendingAsync(type, stoppingToken);
-            }
-#pragma warning disable CA1031 // The database may be away for a moment; the messages wait in their table until it is back.
-            // Only the host stopping ends the loop; any other cancellation (a timed-out call) is a failure like the rest.
-            catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
-#pragma warning restore CA1031
-            {
-                LogReadFailed(logger, exception, type.Name, tenant);
-            }
-        }
-
-        return delivered;
-    }
+{{~ if tenants ~}}
+            foreach (var (tenant, type) in tenants.SelectMany(tenant => contexts.Types.Select(type => (tenant, type))))
 {{~ else ~}}
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            var delivered = 0;
             foreach (var type in contexts.Types)
+{{~ end ~}}
             {
                 try
                 {
+{{~ if tenants ~}}
+                    // Its consumers run in the tenant too, so their contexts work in the tenant's schemas.
+                    using var tenantScope = TenantScope.Begin(tenant);
+{{~ end ~}}
                     delivered += await DeliverPendingAsync(type, stoppingToken);
                 }
 #pragma warning disable CA1031 // The database may be away for a moment; the messages wait in their table until it is back.
@@ -95,7 +66,7 @@ public sealed partial class OutboxDispatcher(
                 catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
 #pragma warning restore CA1031
                 {
-                    LogReadFailed(logger, exception, type.Name);
+                    LogReadFailed(logger, exception, type.Name{{ if tenants }}, tenant{{ end }});
                 }
             }
 
@@ -105,7 +76,6 @@ public sealed partial class OutboxDispatcher(
             }
         }
     }
-{{~ end ~}}
 
     private async Task<int> DeliverPendingAsync(Type contextType, CancellationToken cancellationToken)
     {
