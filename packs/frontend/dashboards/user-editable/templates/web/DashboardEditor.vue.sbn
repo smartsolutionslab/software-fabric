@@ -1,14 +1,34 @@
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ if ui == "reka-ui"
+  button = "BaseButton"
+  button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
+  secondary = "outline"
+else
+  button = "Button"
+  button_import = "import { Button } from '@/components/ui/button';"
+  secondary = "secondary"
+end ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  ret 'class="' + tailwind + '"'
+end ~}}
 {%{<script setup lang="ts">
 import { keepPreviousData } from '@tanstack/vue-query';
 import { computed, ref, watch } from 'vue';
 import { useGetDashboards, useGetDashboardsId } from '@/api/generated';
-import { Button } from '@/components/ui/button';
+}%}{{ button_import }}{%{
 import DashboardCanvas from './DashboardCanvas.vue';
 import Failure from './Failure.vue';
 import { fromSaved, type Placement } from './layout';
 import Pager from './Pager.vue';
 import { uuidV7 } from './uuidV7';
-
+}%}{{~ if css_modules ~}}
+import styles from './DashboardEditor.module.css';
+{{~ end ~}}
+{%{
 const pageSize = 100;
 
 interface Opened {
@@ -74,9 +94,9 @@ function start() {
 </script>
 
 <template>
-  <main class="flex flex-col gap-4 p-4">
-    <h1 class="text-xl font-semibold">Dashboards</h1>
-    <nav aria-label="Your dashboards" class="flex flex-wrap items-center gap-2">
+  <main }%}{{ class_of "flex flex-col gap-4 p-4" "editor" }}{%{>
+    <h1 }%}{{ class_of "text-xl font-semibold" "title" }}{%{>Dashboards</h1>
+    <nav aria-label="Your dashboards" }%}{{ class_of "flex flex-wrap items-center gap-2" "dashboards" }}{%{>
       <Failure
         v-if="listFailed"
         message="Your dashboards could not be loaded."
@@ -84,7 +104,7 @@ function start() {
         @retry="refetchList()"
       />
       <template v-else>
-        <Button
+        <}%}{{ button }}{%{
           v-for="dashboard in dashboards?.items ?? []"
           :key="dashboard.id"
           variant="outline"
@@ -92,9 +112,9 @@ function start() {
           @click="open(dashboard.id)"
         >
           {{ dashboard.name }}
-        </Button>
+        </}%}{{ button }}{%{>
       </template>
-      <Button @click="start()">New dashboard</Button>
+      <}%}{{ button }}{%{ @click="start()">New dashboard</}%}{{ button }}{%{>
       <Pager
         label="your dashboards"
         :page="page"

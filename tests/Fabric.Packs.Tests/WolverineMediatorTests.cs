@@ -220,4 +220,107 @@ public sealed class WolverineMediatorTests
         output.ShouldContain("Shop.Modules.Billing.Application.Commands.Stamp.LettersHandler has no public HandleAsync for its IQueryHandler of Shop.Modules.Billing.Application.Queries.Peek.Peek; Wolverine does not invoke an explicit interface implementation.");
         output.ShouldNotContain("Shop.Modules.Billing.Application.Commands.Stamp.LettersHandler has no public HandleAsync for its ICommandHandler");
     }
+
+    /// <summary>Wolverine discovers, and the module registers, only concrete classes, so a struct or an abstract class is no handler.</summary>
+    [Fact]
+    public void A_struct_or_an_abstract_class_implementing_a_handler_contract_is_no_handler_and_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Mediator);
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/CountLetters", Query.Replace(
+            "public sealed class CountLettersHandler", "public readonly record struct CountLettersHandler", StringComparison.Ordinal));
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/Shout", Command.Replace(
+            "public sealed class ShoutHandler", "public abstract class ShoutHandler", StringComparison.Ordinal));
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application.Queries.CountLetters.CountLetters has 0 handlers.");
+        output.ShouldContain("Shop.Modules.Billing.Application.Queries.CountLetters.CountLettersHandler implements a handler contract of Shop.Modules.Billing.Application.Queries.CountLetters.CountLetters but is not a concrete class; Wolverine invokes only concrete classes.");
+        output.ShouldContain("Shop.Modules.Billing.Application.Commands.Shout.Shout has 0 handlers.");
+        output.ShouldContain("Shop.Modules.Billing.Application.Commands.Shout.ShoutHandler implements a handler contract of Shop.Modules.Billing.Application.Commands.Shout.Shout but is not a concrete class; Wolverine invokes only concrete classes.");
+    }
+
+    /// <summary>An abstract base that implements the contract, with one concrete class deriving from it, is one handler.</summary>
+    [Fact]
+    public void An_abstract_base_handler_with_one_concrete_derived_class_counts_as_one_handler()
+    {
+        using var project = new GeneratedProject(Profile, Mediator);
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/CountLetters", Query.Replace(
+            "public sealed class CountLettersHandler", "public abstract class LetterCounter", StringComparison.Ordinal) + """
+
+            public sealed class CountLettersHandler : LetterCounter;
+            """);
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/Shout", Command);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+    }
+
+    /// <summary>Wolverine invokes the public HandleAsync for the request, so that method must be the contract's, with its full signature.</summary>
+    [Fact]
+    public void A_public_handle_async_that_does_not_implement_the_handler_contract_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Mediator);
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/CountLetters", Query);
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/Shout", """
+            using Shop.BuildingBlocks.Messaging;
+
+            namespace Shop.Modules.Billing.Application.Commands.Shout;
+
+            public sealed record Shout(string Text) : ICommand<Result<string, ApiError>>;
+
+            public sealed class ShoutHandler : ICommandHandler<Shout, Result<string, ApiError>>
+            {
+                private int shouts;
+
+                public Task<Result<int, ApiError>> HandleAsync(Shout command, CancellationToken cancellationToken)
+                {
+                    Ensure.That(command).IsNotNull();
+                    return Task.FromResult(Result<int, ApiError>.Success(++shouts));
+                }
+
+                Task<Result<string, ApiError>> ICommandHandler<Shout, Result<string, ApiError>>.HandleAsync(Shout command, CancellationToken cancellationToken)
+                {
+                    Ensure.That(command).IsNotNull();
+                    return Task.FromResult(Result<string, ApiError>.Success(command.Text.ToUpperInvariant()));
+                }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application.Commands.Shout.ShoutHandler has a public Task<Result<Int32, ApiError>> HandleAsync(Shout, CancellationToken) that does not implement its ICommandHandler of Shop.Modules.Billing.Application.Commands.Shout.Shout; Wolverine would invoke it, and the contract is Task<Result<String, ApiError>> HandleAsync(Shout, CancellationToken).");
+        output.ShouldNotContain("CountLettersHandler");
+    }
+
+    /// <summary>Wolverine also invokes a public static HandleAsync, so one taking the request beside the contract's method fails too.</summary>
+    [Fact]
+    public void A_public_static_handle_async_beside_the_contracts_method_fails_the_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Mediator);
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/CountLetters", Query);
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/Shout", Command.Replace(
+            "    public Task<Result<string, ApiError>> HandleAsync(", """
+                public static Task<Result<int, ApiError>> HandleAsync(Shout command)
+                {
+                    Ensure.That(command).IsNotNull();
+                    return Task.FromResult(Result<int, ApiError>.Success(command.Text.Length));
+                }
+
+                public Task<Result<string, ApiError>> HandleAsync(
+            """, StringComparison.Ordinal));
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application.Commands.Shout.ShoutHandler has a public Task<Result<Int32, ApiError>> HandleAsync(Shout) that does not implement its ICommandHandler of Shop.Modules.Billing.Application.Commands.Shout.Shout; Wolverine would invoke it, and the contract is Task<Result<String, ApiError>> HandleAsync(Shout, CancellationToken).");
+        output.ShouldNotContain("CountLettersHandler");
+    }
 }

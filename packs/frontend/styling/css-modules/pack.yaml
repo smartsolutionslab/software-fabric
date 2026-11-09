@@ -1,0 +1,10 @@
+option: frontend.styling.css-modules
+files:
+  - { template: templates/cssModules.test.ts.sbn, target: web/app/src/cssModules.test.ts }
+slots:
+  - { slot: web.styles, template: templates/styles.sbn, order: 90 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "Every class a component takes from its CSS module (styles.<name>) has a rule with at least one declaration in that module; Vitest's proxy for a module would hand the name out regardless (src/cssModules.test.ts).", file: templates/cssModules.test.ts.sbn }

@@ -154,6 +154,14 @@ public static class PairwiseMatrix
             }
         }
 
+        // Every pair infeasible leaves no row; an empty matrix would read as success and, written, drop every row.
+        if (errors.Count == 0 && combinations.Count == 0)
+        {
+            errors.Add(
+                "no valid choice set contains a pair of options with a pack, so the matrix would have no combination; " +
+                "look for a rule no choice set can meet, or an active dimension none of whose options has a pack.");
+        }
+
         return errors.Count > 0
             ? Failed(errors)
             : new MatrixResult(

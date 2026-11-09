@@ -1,6 +1,26 @@
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ if ui == "reka-ui"
+  button = "BaseButton"
+  button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
+  secondary = "outline"
+else
+  button = "Button"
+  button_import = "import { Button } from '@/components/ui/button';"
+  secondary = "secondary"
+end ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  ret 'class="' + tailwind + '"'
+end ~}}
 {%{<script setup lang="ts">
-import { Button } from '@/components/ui/button';
-
+}%}{{ button_import }}{%{
+}%}{{~ if css_modules ~}}
+import styles from './Failure.module.css';
+{{~ end ~}}
+{%{
 // Named in one word beside the page's other files; lint wants a component's name in two.
 defineOptions({ name: 'ReadFailure' });
 
@@ -10,9 +30,15 @@ const emit = defineEmits<{ retry: [] }>();
 </script>
 
 <template>
-  <div role="alert" class="flex items-center gap-2 text-sm">
+  <div role="alert" }%}{{ class_of "flex items-center gap-2 text-sm" "failure" }}{%{>
     <span>{{ message }}</span>
+}%}{{~ if ui == "reka-ui" ~}}
+    <BaseButton type="button" variant="outline" size="sm" :aria-label="retry" @click="emit('retry')"
+      >Try again</BaseButton
+    >
+{{~ else ~}}
     <Button type="button" variant="outline" size="sm" :aria-label="retry" @click="emit('retry')">Try again</Button>
-  </div>
+{{~ end ~}}
+{%{  </div>
 </template>
 }%}
