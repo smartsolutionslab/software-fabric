@@ -45,12 +45,20 @@ public static class SchemaReferences
         return false;
     }
 
-    /// <summary>Whether the literal at the index is an object's name: <c>'x'::regclass</c>, <c>CAST('x' AS regclass)</c>, <c>regclass 'x'</c>, <c>nextval('x')</c>.</summary>
+    /// <summary>
+    /// Whether the literal at the index is an object's name: <c>'x'::regclass</c>, <c>CAST('x' AS regclass)</c>,
+    /// <c>regclass 'x'</c>, <c>nextval('x')</c>, with the type qualified or not (<c>'x'::pg_catalog.regclass</c>).
+    /// </summary>
     private static bool NamesAnObject(List<(Kind Kind, string Text)> tokens, int index) =>
-        (At(tokens, index + 1, Kind.Other, "::") && IsObjectIdentifierType(tokens, index + 2))
-        || (At(tokens, index + 1, Kind.Identifier, "as") && IsObjectIdentifierType(tokens, index + 2))
+        (At(tokens, index + 1, Kind.Other, "::") && StartsAnObjectIdentifierType(tokens, index + 2))
+        || (At(tokens, index + 1, Kind.Identifier, "as") && StartsAnObjectIdentifierType(tokens, index + 2))
         || IsObjectIdentifierType(tokens, index - 1)
         || (At(tokens, index - 1, Kind.Other, "(") && index >= 2 && tokens[index - 2].Kind == Kind.Identifier && NameFunctions.Contains(tokens[index - 2].Text));
+
+    /// <summary>Whether an object identifier type's name starts at the index, qualified by its schema or not.</summary>
+    private static bool StartsAnObjectIdentifierType(List<(Kind Kind, string Text)> tokens, int index) =>
+        IsObjectIdentifierType(tokens, index)
+        || (At(tokens, index, Kind.Identifier) && At(tokens, index + 1, Kind.Period) && IsObjectIdentifierType(tokens, index + 2));
 
     private static bool IsObjectIdentifierType(List<(Kind Kind, string Text)> tokens, int index) =>
         index >= 0 && index < tokens.Count && tokens[index].Kind == Kind.Identifier && tokens[index].Text.StartsWith("reg", StringComparison.Ordinal);

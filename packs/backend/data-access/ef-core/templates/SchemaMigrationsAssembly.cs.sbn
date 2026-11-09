@@ -84,6 +84,10 @@ public sealed class SchemaMigrationsAssembly(ICurrentDbContext currentContext, I
         }
     }
 
+    /// <summary>A column's default value and a table's or column's comment are data, not SQL: no schema they read like is named.</summary>
+    private static bool IsLiteral(PropertyInfo property) =>
+        property.Name is nameof(ColumnOperation.DefaultValue) or nameof(ColumnOperation.Comment);
+
     private bool IsForThisContext(TypeInfo type) => type.GetCustomAttribute<DbContextAttribute>()?.ContextType == context.GetType();
 
     /// <summary>
@@ -124,7 +128,7 @@ public sealed class SchemaMigrationsAssembly(ICurrentDbContext currentContext, I
             {
                 property.SetValue(operation, context.CurrentSchema);
             }
-            else if (value is string text && operation is not SqlOperation && context.NamesModuleSchema(text))
+            else if (value is string text && operation is not SqlOperation && !IsLiteral(property) && context.NamesModuleSchema(text))
             {
                 unmovable.Add($"{operation.GetType().Name}.{property.Name} ({text})");
             }
