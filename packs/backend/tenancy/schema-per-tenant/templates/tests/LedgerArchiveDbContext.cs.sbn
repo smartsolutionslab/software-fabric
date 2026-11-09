@@ -1,0 +1,14 @@
+using {{ namespace }}.BuildingBlocks.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace {{ namespace }}.Tenancy.Tests;
+
+/// <summary>
+/// Stands in for a module named <c>tenancy-tests-ledger-a</c>, whose schema the ledger's tenants could reach: only its
+/// schema is used, to show the MigrationRunner refuses schemas that two module and tenant pairs share. It is never migrated.
+/// </summary>
+public sealed class LedgerArchiveDbContext(DbContextOptions<LedgerArchiveDbContext> options, IServiceProvider services)
+    : ModuleDbContext(options, services, Schema)
+{
+    public const string Schema = "tenancy_tests_ledger_a";
+}

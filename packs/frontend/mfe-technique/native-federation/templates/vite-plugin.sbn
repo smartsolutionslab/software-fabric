@@ -1,0 +1,2 @@
+    // The shell loads each module's remote at run time (federation.ts, docs/adr).
+    shellFederation()

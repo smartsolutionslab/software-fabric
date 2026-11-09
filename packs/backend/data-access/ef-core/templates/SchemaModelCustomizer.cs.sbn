@@ -1,0 +1,66 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+
+namespace {{ namespace }}.BuildingBlocks.Persistence;
+
+/// <summary>
+/// Refuses, once a module context's whole model is configured (its OnModelCreating overrides and the provider's
+/// configuration included), what it cannot take to another schema: seed data, entity splitting, sequences (HiLo's
+/// included), and SQL or an annotation naming the module's schema. Each would be shared between schemas, or fail in all
+/// but one. It fails the model wherever it is built: dotnet ef, the MigrationRunner before it migrates anything, the host.
+/// </summary>
+public sealed class SchemaModelCustomizer(ModelCustomizerDependencies dependencies) : RelationalModelCustomizer(dependencies)
+{
+    public override void Customize(ModelBuilder modelBuilder, DbContext context)
+    {
+        {{ not_null "modelBuilder" }}
+        {{ not_null "context" }}
+
+        base.Customize(modelBuilder, context);
+        if (context is not ModuleDbContext module)
+        {
+            return;
+        }
+
+        List<string> refused = [];
+        var model = modelBuilder.Model;
+        Annotations(module, model, "the model", refused);
+        foreach (var entity in model.GetEntityTypes())
+        {
+            var name = entity.DisplayName();
+            if (entity.GetSeedData().Any())
+            {
+                refused.Add($"seed data (HasData) on {name}");
+            }
+
+            refused.AddRange(entity.GetMappingFragments().Select(fragment => $"entity splitting (SplitToTable or SplitToView) of {name} into {fragment.StoreObject.DisplayName()}"));
+            refused.AddRange(entity.GetCheckConstraints().Where(check => module.NamesModuleSchema(check.Sql)).Select(check => $"check constraint {check.ModelName} of {name} naming the module's schema: {check.Sql}"));
+            Annotations(module, entity, name, refused);
+            foreach (var property in entity.GetDeclaredProperties())
+            {
+                Annotations(module, property, $"{name}.{property.Name}", refused);
+            }
+
+            foreach (var element in entity.GetDeclaredKeys().Concat<IReadOnlyAnnotatable>(entity.GetDeclaredForeignKeys()).Concat(entity.GetDeclaredIndexes()))
+            {
+                Annotations(module, element, name, refused);
+            }
+        }
+
+        refused.AddRange(model.GetSequences().Select(sequence => $"sequence {sequence.Schema}.{sequence.Name} (HasSequence or UseHiLo)"));
+        if (refused.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"{context.GetType().Name} works in a schema other than its module's, which cannot hold {string.Join("; ", refused.Distinct(StringComparer.Ordinal))}. Remove them; the ADR of backend.tenancy lists what a moved context refuses.");
+        }
+    }
+
+    /// <summary>An annotation, a provider's included, whose name or text names the module's schema: default or computed SQL, a column type, an index's filter, Npgsql's enums and extensions.</summary>
+    private static void Annotations(ModuleDbContext module, IReadOnlyAnnotatable annotatable, string owner, List<string> refused) =>
+        refused.AddRange(annotatable.GetAnnotations()
+            .Where(annotation => module.NamesModuleSchema(annotation.Name) || (annotation.Value is string text && module.NamesModuleSchema(text)))
+            .Select(annotation => annotation.Value is string text
+                ? $"{annotation.Name} of {owner} naming the module's schema: {text}"
+                : $"{annotation.Name} of {owner} naming the module's schema"));
+}

@@ -7,12 +7,17 @@ public static class RequestHandlerDiscovery
 {
     private static readonly Type[] HandlerDefinitions = [typeof(ICommandHandler<,>), typeof(IQueryHandler<,>)];
 
-    /// <summary>Makes every command and query handler in the modules' Application projects a Wolverine handler, so IDispatcher invokes it on the bus.</summary>
+    /// <summary>
+    /// Makes every command and query handler in the assemblies Wolverine searches a Wolverine handler, so IDispatcher
+    /// invokes it on the bus. A handler that takes IDispatcher, to run an agent or a widget's query, gets it from the
+    /// message's scope: Wolverine cannot build the dispatcher itself, since the dispatcher finds the bus through that scope.
+    /// </summary>
     public static WolverineOptions DiscoverRequestHandlers(this WolverineOptions options)
     {
         {{ not_null "options" }}
 
         options.Discovery.CustomizeHandlerDiscovery(query => query.Includes.WithCondition("command and query handlers", IsRequestHandler));
+        options.CodeGeneration.AlwaysUseServiceLocationFor<IDispatcher>();
         return options;
     }
 

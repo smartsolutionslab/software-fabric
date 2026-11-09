@@ -1,6 +1,8 @@
 {
   "name": "@{{ name }}/ui",
   "private": true,
+{{- if slots["web.ui-package-fields"] != "" }}
+{{ slots["web.ui-package-fields"] }},{{ end }}
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

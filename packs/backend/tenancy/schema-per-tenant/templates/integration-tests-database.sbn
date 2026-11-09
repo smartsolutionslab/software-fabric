@@ -1,0 +1,3 @@
+        // The AppHost's tenants (tenancy: schema per tenant), for the MigrationRunner and the host.
+        settings["Tenancy:Tenants:0"] = "tenant-a";
+        settings["Tenancy:Tenants:1"] = "tenant-b";
