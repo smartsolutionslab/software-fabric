@@ -74,6 +74,7 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         {
             ["contents"] = "read",
             ["pull-requests"] = "write",
+            ["statuses"] = "write",
         });
         Mapping(root, "permissions").Values.ShouldNotContain("write");
         Mapping((YamlMappingNode)jobs["choose"], "permissions").Values.ShouldNotContain("write");
@@ -129,6 +130,50 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         run.ExitCode.ShouldNotBe(0, run.Log);
         run.FailedJob.ShouldBe("review", run.Log);
         Reviews().ShouldBeEmpty();
+    }
+
+    /// <summary>
+    /// The owner's decision on #474: Copilot's usage limit is not a finding. The review is postponed instead of failed,
+    /// so no job is red and nothing is posted on the pull request, but the verdict status stays pending: a postponed
+    /// review is never a pass.
+    /// </summary>
+    [Fact]
+    public void A_reviewer_that_hits_copilot_s_usage_limit_is_postponed_not_failed_and_never_passes()
+    {
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", NoFindings, limitedModels: ["*"]);
+
+        run.ExitCode.ShouldBe(0, run.Log);
+        run.Log.ShouldContain("trust tier usage limit reached");
+        Reviews().ShouldBeEmpty();
+        var status = Statuses().ShouldHaveSingleItem(run.Log)!;
+        ((string)status["context"]!).ShouldBe(VerdictContext);
+        ((string)status["sha"]!).ShouldBe("HEAD");
+        ((string)status["state"]!).ShouldBe("pending");
+        ((string)status["description"]!).ShouldStartWith("Postponed");
+        ((string)status["target_url"]!).ShouldBe($"https://github.com/acme/shop/actions/runs/{RunId}");
+    }
+
+    [Theory]
+    [InlineData(NoFindings, "success")]
+    [InlineData("""{"findings": [{"severity": "optional", "file": "src/Invoice.cs", "line": 3, "message": "Shorter name?"}]}""", "success")]
+    [InlineData(Blocking, "failure")]
+    public void A_review_that_reaches_a_verdict_sets_the_verdict_status_to_it(string answer, string expectedState)
+    {
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", answer);
+
+        var status = Statuses().ShouldHaveSingleItem(run.Log)!;
+        ((string)status["context"]!).ShouldBe(VerdictContext);
+        ((string)status["sha"]!).ShouldBe("HEAD");
+        ((string)status["state"]!).ShouldBe(expectedState);
+    }
+
+    [Fact]
+    public void A_reviewer_that_crashes_without_reaching_a_limit_is_not_postponed()
+    {
+        var run = Review("Change\n\nAgent-Executor: claude-cloud/lane-backend", "Error: something else broke", copilotExitCode: 1);
+
+        run.FailedJob.ShouldBe("review", run.Log);
+        Statuses().ShouldNotContain(status => (string)status!["state"]! == "pending" || (string)status!["state"]! == "success");
     }
 
     /// <summary>
@@ -334,10 +379,12 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         run.CopilotArguments.ShouldNotBeNull(run.Log);
     }
 
-    private YamlMappingNode Root()
+    private YamlMappingNode Root() => Root(WorkflowPath);
+
+    private static YamlMappingNode Root(string workflowPath)
     {
         var yaml = new YamlStream();
-        using var reader = new StreamReader(WorkflowPath);
+        using var reader = new StreamReader(workflowPath);
         yaml.Load(reader);
         return (YamlMappingNode)yaml.Documents[0].RootNode;
     }
@@ -354,6 +401,24 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         var path = Path.Combine(state, "reviews.json");
         return File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))!.AsArray() : [];
     }
+
+    /// <summary>The commit statuses posted, oldest first.</summary>
+    private JsonArray Statuses()
+    {
+        var path = Path.Combine(state, "statuses.json");
+        return File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))!.AsArray() : [];
+    }
+
+    /// <summary>The model of each copilot call in the last run, in order.</summary>
+    private List<string> CopilotModels()
+    {
+        var path = Path.Combine(Fakes, "copilot-models");
+        return File.Exists(path) ? [.. File.ReadAllLines(path)] : [];
+    }
+
+    private const string RunId = "42";
+
+    private const string VerdictContext = "cross-model-review/verdict";
 
     private sealed record ReviewRun(int ExitCode, string Log, List<string>? CopilotArguments, string? FailedJob = null);
 
@@ -373,13 +438,17 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         bool tamper = false,
         string author = "developer",
         IReadOnlyDictionary<string, (string Before, string After)>? change = null,
-        (string MainCommit, string MergeMessage)? mainMoved = null)
+        (string MainCommit, string MergeMessage)? mainMoved = null,
+        string[]? limitedModels = null)
     {
-        WriteFakes(answer, copilotExitCode, tamper);
+        WriteFakes(answer, copilotExitCode, tamper, limitedModels ?? []);
 
         Dictionary<string, string> expressions = new()
         {
             ["github.base_ref"] = "main",
+            ["github.repository"] = "acme/shop",
+            ["github.run_id"] = RunId,
+            ["github.server_url"] = "https://github.com",
             ["github.event.pull_request.base.sha"] = "base",
             ["github.event.pull_request.head.sha"] = "HEAD",
             ["github.event.pull_request.number"] = "5",
@@ -389,7 +458,7 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         var log = "";
         foreach (var name in new[] { "choose", "review", "report" })
         {
-            var job = RunJob(name, Workspace(name, commitMessage, change ?? new Dictionary<string, (string, string)>(), mainMoved), expressions);
+            var job = RunJob(WorkflowPath, name, Workspace(name, commitMessage, change ?? new Dictionary<string, (string, string)>(), mainMoved), expressions);
             log += job.Log;
             if (job.ExitCode != 0)
             {
@@ -424,6 +493,11 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         (string MainCommit, string MergeMessage)? mainMoved = null)
     {
         var workspace = Path.Combine(state, $"workspace-{job}");
+        if (Directory.Exists(workspace))
+        {
+            Directory.Delete(workspace, recursive: true);
+        }
+
         Directory.CreateDirectory(workspace);
         BoardProject.Git(workspace, "init", "--quiet", "--initial-branch=main");
         foreach (var (file, (before, _)) in change)
@@ -477,10 +551,18 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         }
     }
 
-    private void WriteFakes(string answer, int copilotExitCode, bool tamper)
+    /// <summary>
+    /// The stand-ins for one run. The copilot stand-in records its arguments and each model it was asked for, and for
+    /// a model in <paramref name="limitedModels"/> (<c>*</c>: every model) answers as Copilot did on 2026-11-09 when the
+    /// usage limit was reached: the message on stderr, exit code 1.
+    /// </summary>
+    private void WriteFakes(string answer, int copilotExitCode, bool tamper, string[] limitedModels)
     {
         Directory.CreateDirectory(Fakes);
+        File.Delete(Path.Combine(Fakes, "copilot-args"));
+        File.Delete(Path.Combine(Fakes, "copilot-models"));
         File.WriteAllText(Path.Combine(Fakes, "answer"), answer);
+        File.WriteAllText(Path.Combine(Fakes, "limited"), string.Concat(limitedModels.Select(model => model + "\n")));
         var tampering = tamper
             ? """
                 for script in .gate/.github/scripts/board/report-review.sh .github/scripts/board/report-review.sh; do
@@ -492,8 +574,18 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         Fake("copilot", $$"""
             #!/usr/bin/env bash
             printf '%s\0' "$@" > "$FAKES/copilot-args"
+            arguments=("$@")
+            model=""
+            for at in "${!arguments[@]}"; do
+              if [ "${arguments[$at]}" = --model ]; then model="${arguments[$((at + 1))]}"; fi
+            done
+            echo "$model" >> "$FAKES/copilot-models"
             printf 'COPILOT_GITHUB_TOKEN=%s\nGH_TOKEN=%s\nGITHUB_TOKEN=%s\n' "${COPILOT_GITHUB_TOKEN-unset}" "${GH_TOKEN-unset}" "${GITHUB_TOKEN-unset}" > "$FAKES/copilot-env"
             {{tampering}}
+            if grep -qxF -e "$model" -e '*' "$FAKES/limited"; then
+              echo "trust tier usage limit reached (Request ID: D809:565E2:2BBB814:2EF8725:6AF189ED)" >&2
+              exit 1
+            fi
             cat "$FAKES/answer"
             exit {{copilotExitCode}}
             """);
@@ -521,9 +613,9 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
     /// rest are checkouts, which the workspace stands in for. An expression the test does not know, a secret say, fails
     /// the test.
     /// </summary>
-    private JobRun RunJob(string name, string workspace, Dictionary<string, string> expressions)
+    private JobRun RunJob(string workflowPath, string name, string workspace, Dictionary<string, string> expressions)
     {
-        var job = (YamlMappingNode)((YamlMappingNode)Root()["jobs"])[name];
+        var job = (YamlMappingNode)((YamlMappingNode)Root(workflowPath)["jobs"])[name];
         var gh = Path.Combine(AppContext.BaseDirectory, "Board");
         if (!OperatingSystem.IsWindows())
         {
@@ -540,7 +632,7 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
             ["RUNNER_TEMP"] = runnerTemp,
             ["GITHUB_ENV"] = Path.Combine(runnerTemp, "env"),
         };
-        foreach (var (key, value) in WorkflowEnvironment().Concat(Mapping(job, "env")))
+        foreach (var (key, value) in Mapping(Root(workflowPath), "env").Concat(Mapping(job, "env")))
         {
             environment[key] = Evaluate(value, expressions, environment, []);
         }

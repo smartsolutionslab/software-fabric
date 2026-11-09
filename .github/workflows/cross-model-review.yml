@@ -7,10 +7,15 @@ name: cross-model-review
 # that needs the organisation policy "Copilot CLI billed to the organization" and both models enabled. No secret, no
 # personal token and no model vendor's API key is used.
 #
-# Three jobs, each its own required check: choose picks the model, review runs the reviewer, report posts its findings
-# (a blocking one fails report; a reviewer that crashes fails review). The reviewer reads an untrusted diff, so its
-# job holds no token that can write to the pull request, and nothing it writes reaches the verdict but its answer,
-# which report takes as an artifact into a fresh checkout.
+# Three jobs: choose picks the model, review runs the reviewer, report posts its findings (a blocking one fails report;
+# a reviewer that crashes fails review). The reviewer reads an untrusted diff, so its job holds no token that can write
+# to the pull request, and nothing it writes reaches the verdict but its answer, which report takes as an artifact into
+# a fresh checkout.
+#
+# The verdict is the commit status cross-model-review/verdict on the pull request's head, which report sets: success
+# when nothing blocks, failure otherwise, and pending while the review is postponed. Copilot's usage or rate limit is
+# not a finding (#474): it postpones the review, so no job turns red and nothing is posted, but the verdict stays
+# pending, and a postponed review is never a pass. Branch protection requires that status, not the jobs.
 #
 # The gate's own files (its scripts, the findings schema, the reviewer briefs) come from the base branch, checked out
 # into .gate: a pull request must not choose its own reviewer or post its own verdict. The pull request's copies are
@@ -106,6 +111,8 @@ jobs:
     permissions:
       contents: read
       copilot-requests: write
+    outputs:
+      postponed: ${{ steps.review.outputs.postponed }}
     env:
       EXEMPT: ${{ needs.choose.outputs.exempt }}
     steps:
@@ -128,7 +135,8 @@ jobs:
             exit 0
           fi
           npm install -g "@github/copilot@$REVIEWER_CLI_VERSION"
-      - name: Review
+      - id: review
+        name: Review
         # Copilot signs in with the workflow's token, and with nothing else: no GH_TOKEN or GITHUB_TOKEN, even one the
         # runner sets.
         # The folder stays untrusted and the pull request's AGENTS.md is not read (--no-custom-instructions), so the
@@ -137,6 +145,7 @@ jobs:
         # checkout; in prompt mode anything else (writes, other commands, any URL, paths outside the checkout) is
         # refused, since there is no one to ask. Its shell gets no token (--secret-env-vars).
         # The diff is against the base branch as it is now, like the reviewer's choice.
+        # Copilot's usage or rate limit postpones the review; its message stays in this log. Any other failure fails it.
         env:
           COPILOT_GITHUB_TOKEN: ${{ github.token }}
           MODEL: ${{ needs.choose.outputs.model }}
@@ -156,12 +165,20 @@ jobs:
           Answer with every finding: its file, its line (null when it has none), whether it is blocking or optional,
           and what is wrong. Your answer is one JSON object matching this JSON schema, and nothing else, not even a
           code fence: $schema"
+          status=0
           env -u GH_TOKEN -u GITHUB_TOKEN copilot -p "$prompt" --model "$MODEL" --silent --no-custom-instructions \
             --no-ask-user --disable-mcp-server github-mcp-server --disallow-temp-dir \
             --secret-env-vars=COPILOT_GITHUB_TOKEN \
             --allow-tool='shell(git diff)' --allow-tool='shell(git show)' --allow-tool='shell(git log)' \
             --allow-tool='shell(ls)' --allow-tool='shell(grep)' \
-            > "$RUNNER_TEMP/answer"
+            > "$RUNNER_TEMP/answer" 2> "$RUNNER_TEMP/errors" || status=$?
+          cat "$RUNNER_TEMP/errors" >&2
+          if [ "$status" -ne 0 ] && grep -qiE 'usage limit|rate limit|too many requests' "$RUNNER_TEMP/errors" "$RUNNER_TEMP/answer"; then
+            echo "::warning title=cross-model review::$MODEL reached Copilot's usage limit: the review is postponed."
+            echo "postponed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          exit "$status"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: review-answer
@@ -176,9 +193,11 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      statuses: write
     env:
       EXEMPT: ${{ needs.choose.outputs.exempt }}
       NOTE: ${{ needs.choose.outputs.note }}
+      POSTPONED: ${{ needs.review.outputs.postponed }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -186,24 +205,45 @@ jobs:
           ref: ${{ github.event.pull_request.base.sha }}
           path: .gate
       - name: Use the gate's files from the base branch
+        # A script the base branch does not have yet comes from the pull request that brings it, as the whole gate did
+        # while the base branch had none.
         run: |
           if [ -f .gate/.github/scripts/board/report-review.sh ]; then gate=.gate; else gate=.; fi
+          for script in .github/scripts/board/*.sh; do
+            if [ -e "$script" ] && [ ! -e "$gate/$script" ]; then cp "$script" "$gate/$script"; fi
+          done
           echo "GATE=$gate/.github" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: review-answer
           path: ${{ runner.temp }}/review
-      - name: Post the findings; a blocking one fails this check
+      - name: Post the findings and the verdict; a blocking finding fails this check
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           REVIEWER: ${{ needs.choose.outputs.reviewer }}
           MODEL: ${{ needs.choose.outputs.model }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         # An exempt pull request posts nothing: Dependabot's token cannot write to it.
+        # A postponed review posts nothing either: it found nothing, because it did not run.
         run: |
           if [ "$EXEMPT" = true ]; then
             echo "::notice title=cross-model review::$NOTE"
             exit 0
           fi
-          bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/review/answer" "$REVIEWER ($MODEL)"
+          verdict() {
+            bash "$GATE/scripts/board/review-status.sh" "$HEAD" "$1" "$2" "$RUN"
+          }
+          if [ "$POSTPONED" = true ]; then
+            echo "::warning title=cross-model review::Postponed: Copilot's usage limit was reached. The verdict stays pending."
+            verdict pending "Postponed: Copilot's usage limit was reached; re-run this review once it resets."
+            exit 0
+          fi
+          if bash "$GATE/scripts/board/report-review.sh" "$PR" "$RUNNER_TEMP/review/answer" "$REVIEWER ($MODEL)"; then
+            verdict success "Reviewed by $REVIEWER ($MODEL): nothing blocking."
+          else
+            verdict failure "Reviewed by $REVIEWER ($MODEL): blocking findings, or no answer in the findings' shape."
+            exit 1
+          fi
 
