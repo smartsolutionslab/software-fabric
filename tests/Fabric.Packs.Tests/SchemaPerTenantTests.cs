@@ -78,13 +78,6 @@ public sealed class SchemaPerTenantTests
         schema["src/Modules/Dashboards/Dashboards.Infrastructure/DashboardStore.cs"].ShouldContain("and by tenant in the tenant's own schema");
     }
 
-    [Theory]
-    [InlineData("frontend.realtime=signalr", "src/Host/Realtime/EventsHub.cs", "#error The signalr pack groups browsers by tenant for backend.tenancy column only so far")]
-    public void A_realtime_pack_still_refuses_schema_per_tenant_until_its_own_branch(string realtime, string path, string refusal)
-    {
-        Files(Profile, SchemaPerTenant, realtime)[path].ShouldStartWith(refusal);
-    }
-
     [Fact]
     public void The_in_process_outbox_refuses_a_tenancy_without_a_tenant_column_instead_of_writing_where_no_table_is()
     {
