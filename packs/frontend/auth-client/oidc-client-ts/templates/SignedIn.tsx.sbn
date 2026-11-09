@@ -1,3 +1,48 @@
+{{~ if project["frontend.ui-library"] == "mui" ~}}
+{%{import { Button, Stack, Typography } from '@mui/material';
+import { type ReactNode, useEffect } from 'react';
+import { hasAuthParams, useAuth } from 'react-oidc-context';
+
+/** Renders its children for a signed-in user and sends everyone else to the identity provider. */
+export function SignedIn({ children }: { children: ReactNode }) {
+  const auth = useAuth();
+  const mustSignIn =
+    !auth.isAuthenticated && !auth.isLoading && !auth.activeNavigator && !auth.error && !hasAuthParams();
+
+  useEffect(() => {
+    if (mustSignIn) {
+      void auth.signinRedirect();
+    }
+  }, [mustSignIn, auth]);
+
+  if (auth.error) {
+    return (
+      <Typography role="alert" color="error" sx={{ p: 1 }}>
+        Sign-in failed: {auth.error.message}
+      </Typography>
+    );
+  }
+  if (!auth.isAuthenticated) {
+    return <Typography sx={{ p: 1 }}>Signing in…</Typography>;
+  }
+
+  return (
+    <>
+      <Stack
+        direction="row"
+        spacing={1.5}
+        sx={{ alignItems: 'center', justifyContent: 'flex-end', p: 1, typography: 'body2' }}
+      >
+        <span>Signed in as {auth.user?.profile.preferred_username}</span>
+        <Button type="button" size="small" onClick={() => void auth.signoutRedirect()}>
+          Sign out
+        </Button>
+      </Stack>
+      {children}
+    </>
+  );
+}
+}%}{{~ else ~}}
 import { type ReactNode, useEffect } from 'react';
 import { hasAuthParams, useAuth } from 'react-oidc-context';
 
@@ -32,3 +77,4 @@ export function SignedIn({ children }: { children: ReactNode }) {
     </>
   );
 }
+{{~ end ~}}

@@ -1,4 +1,7 @@
 import { type ColDef, type ColDefField, ClientSideRowModelModule, type Module, themeQuartz } from 'ag-grid-community';
+{{~ if project["frontend.ui-library"] == "mui" && project["frontend.styling"] == "library-theme" ~}}
+import { theme as appTheme } from '@/theme';
+{{~ end ~}}
 
 /** Core modules only; register sorting, filtering or paging modules here when a screen needs them. */
 export const modules: Module[] = [ClientSideRowModelModule];
@@ -12,6 +15,16 @@ export const theme = themeQuartz.withParams({
   borderColor: 'var(--border)',
   headerBackgroundColor: 'var(--muted)',
   accentColor: 'var(--primary)',
+});
+{{~ else if project["frontend.ui-library"] == "mui" && project["frontend.styling"] == "library-theme" ~}}
+/** Quartz drawn with the MUI theme of src/theme.ts, so the grid takes the app's colours and font from the same place. */
+export const theme = themeQuartz.withParams({
+  fontFamily: appTheme.typography.fontFamily,
+  backgroundColor: appTheme.palette.background.paper,
+  foregroundColor: appTheme.palette.text.primary,
+  borderColor: appTheme.palette.divider,
+  headerBackgroundColor: appTheme.palette.action.hover,
+  accentColor: appTheme.palette.primary.main,
 });
 {{~ else ~}}
 /** Quartz as AG Grid ships it: this UI library defines no theme variables for the grid to follow (docs/adr). */

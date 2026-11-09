@@ -1,0 +1,43 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { Button } from '@mui/material';
+import { ThemeProvider } from '@mui/material/styles';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, expect, test } from 'vitest';
+import { theme } from './theme';
+
+// Vitest runs without globals, so Testing Library cannot register its own cleanup.
+afterEach(cleanup);
+
+// Vitest runs in web/app; the components are under src.
+const source = join(process.cwd(), 'src');
+
+/** A colour written out: #hex, or a CSS colour function. */
+const colour = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/i;
+
+/** A value as the browser paints it: MUI sets some through its own custom properties (var(--variant-containedBg)). */
+function resolve(style: CSSStyleDeclaration, value: string): string {
+  const custom = /^var\((--[\w-]+)\)$/.exec(value)?.[1];
+  return custom === undefined ? value : resolve(style, style.getPropertyValue(custom).trim());
+}
+
+test("MUI's components take their colours from the theme", () => {
+  render(
+    <ThemeProvider theme={theme}>
+      <Button variant="contained">Save</Button>
+    </ThemeProvider>,
+  );
+
+  const style = getComputedStyle(screen.getByRole('button', { name: 'Save' }));
+  expect(resolve(style, style.backgroundColor)).toBe(theme.palette.primary.main);
+});
+
+test('no component writes a colour of its own', () => {
+  // Colours are the theme's, in src/theme.ts: a component names them through it (color="error", bgcolor: 'primary.main').
+  const components = readdirSync(source, { recursive: true, encoding: 'utf8' }).filter(
+    (path) => path.endsWith('.tsx') && !path.endsWith('.test.tsx'),
+  );
+  const coloured = components.filter((path) => colour.test(readFileSync(join(source, path), 'utf8')));
+
+  expect(coloured, 'components that write a colour instead of taking it from src/theme.ts').toEqual([]);
+});

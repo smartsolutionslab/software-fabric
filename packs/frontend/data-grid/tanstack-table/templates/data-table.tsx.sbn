@@ -1,3 +1,45 @@
+{{~ if project["frontend.ui-library"] == "mui" ~}}
+{%{import { Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import { type ColumnDef, type RowData, useTable } from '@tanstack/react-table';
+import { features, type Features } from './data-table-columns';
+
+interface DataTableProps<TRow extends RowData> {
+  columns: ColumnDef<Features, TRow, unknown>[];
+  data: TRow[];
+}
+
+/** A plain table over TanStack Table; keep columns and data stable (module scope or memoised). */
+export function DataTable<TRow extends RowData>({ columns, data }: DataTableProps<TRow>) {
+  const table = useTable({ features, columns, data });
+
+  return (
+    <Table size="small">
+      <TableHead>
+        {table.getHeaderGroups().map((group) => (
+          <TableRow key={group.id}>
+            {group.headers.map((header) => (
+              <TableCell key={header.id}>
+                {header.isPlaceholder ? null : <table.FlexRender header={header} />}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableHead>
+      <TableBody>
+        {table.getRowModel().rows.map((row) => (
+          <TableRow key={row.id}>
+            {row.getAllCells().map((cell) => (
+              <TableCell key={cell.id}>
+                <table.FlexRender cell={cell} />
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+}%}{{~ else ~}}
 import { type ColumnDef, type RowData, useTable } from '@tanstack/react-table';
 import { features, type Features } from './data-table-columns';
 
@@ -37,3 +79,4 @@ export function DataTable<TRow extends RowData>({ columns, data }: DataTableProp
     </table>
   );
 }
+{{~ end ~}}

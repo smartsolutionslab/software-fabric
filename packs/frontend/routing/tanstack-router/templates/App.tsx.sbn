@@ -1,3 +1,25 @@
+{{~ if project["frontend.ui-library"] == "mui" ~}}
+{%{import { Stack } from '@mui/material';
+import { Link, Outlet } from '@tanstack/react-router';
+import { moduleRoutes } from '@/modules';
+
+/** The root route's page: the navigation, then the matched route's page. */
+export function App() {
+  return (
+    <div>
+      <Stack component="nav" aria-label="Modules" direction="row" spacing={2} sx={{ p: 1 }}>
+        <Link to="/">Home</Link>
+        {moduleRoutes.map((route) => (
+          <Link key={route.id} to={route.fullPath}>
+            {route.options.staticData?.title}
+          </Link>
+        ))}
+      </Stack>
+      <Outlet />
+    </div>
+  );
+}
+}%}{{~ else ~}}
 import { Link, Outlet } from '@tanstack/react-router';
 import { moduleRoutes } from '@/modules';
 
@@ -17,3 +39,4 @@ export function App() {
     </div>
   );
 }
+{{~ end ~}}
