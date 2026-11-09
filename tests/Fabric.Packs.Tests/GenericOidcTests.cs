@@ -142,12 +142,11 @@ public sealed partial class GenericOidcTests
         project.AddModule("billing");
         project.Build();
 
-        // The new module's sample endpoint makes the frontend's OpenAPI copy stale; that test fails and rewrites it.
+        // The new module's sample endpoint is not in the OpenAPI document, so the frontend's copy stays current (#463).
         var (_, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
 
-        FailedCount().Match(output).Groups[1].Value.ShouldBe("1", customMessage: output);
-        FailedTest().Matches(output).Select(match => match.Groups[1].Value)
-            .ShouldBe(["Shop.Integration.Tests.OpenApiDocumentTests.The_frontends_copy_of_the_openapi_document_is_current"], customMessage: output);
+        FailedTest().Matches(output).Select(match => match.Groups[1].Value).ShouldBeEmpty(customMessage: output);
+        FailedCount().Match(output).Groups[1].Value.ShouldBe("0", customMessage: output);
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "tests", "Integration.Tests", "HostTests.cs"))
             .ShouldContain("A_token_from_the_identity_provider_identifies_the_user");
     }
@@ -165,9 +164,8 @@ public sealed partial class GenericOidcTests
 
         var (_, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
 
-        FailedCount().Match(output).Groups[1].Value.ShouldBe("1", customMessage: output);
-        FailedTest().Matches(output).Select(match => match.Groups[1].Value)
-            .ShouldBe(["Shop.Integration.Tests.OpenApiDocumentTests.The_frontends_copy_of_the_openapi_document_is_current"], customMessage: output);
+        FailedTest().Matches(output).Select(match => match.Groups[1].Value).ShouldBeEmpty(customMessage: output);
+        FailedCount().Match(output).Groups[1].Value.ShouldBe("0", customMessage: output);
     }
 
     private static Dictionary<string, string> Files(params string[] overrides)
