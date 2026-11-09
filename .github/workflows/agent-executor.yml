@@ -17,10 +17,11 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+      # Checks against the base branch as it is now: the event's base.sha can predate commits merged in from it.
       - name: Every commit on an agent branch names its executor
         run: bash .github/scripts/board/check-trailers.sh "$BRANCH" "$BASE" "$HEAD"
         env:
           BRANCH: ${{ github.head_ref }}
-          BASE: ${{ github.event.pull_request.base.sha }}
+          BASE: origin/${{ github.base_ref }}
           HEAD: ${{ github.event.pull_request.head.sha }}
 
