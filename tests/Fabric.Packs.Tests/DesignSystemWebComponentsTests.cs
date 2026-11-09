@@ -171,14 +171,18 @@ public sealed class DesignSystemWebComponentsTests
         output.ShouldContain("Broken.stories.ts");
     }
 
-    [Fact]
-    public void A_component_style_with_a_value_of_its_own_fails_the_ui_packages_tests()
+    [Theory]
+    [InlineData("var(--ds-color-primary)", "#3730a3")]
+    [InlineData("var(--ds-color-accent)", "red")]
+    [InlineData("var(--ds-color-accent)", "transparent")]
+    [InlineData("var(--ds-color-accent)", "var(--brand-red)")]
+    public void A_component_style_with_a_value_of_its_own_fails_the_ui_packages_tests(string token, string value)
     {
         using var project = new GeneratedProject("saas-standard-react", Choice);
         var badge = Path.Combine(project.ProjectDirectory, "web", "packages", "ui", "src", "Badge.ts");
         var source = File.ReadAllText(badge);
-        source.ShouldContain("var(--ds-color-primary)");
-        File.WriteAllText(badge, source.Replace("var(--ds-color-primary)", "#3730a3", StringComparison.Ordinal));
+        source.ShouldContain($"background-color: {token};");
+        File.WriteAllText(badge, source.Replace($"background-color: {token};", $"background-color: {value};", StringComparison.Ordinal));
         RunWeb(project, "install");
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "--filter", "@shop/ui", "test");
