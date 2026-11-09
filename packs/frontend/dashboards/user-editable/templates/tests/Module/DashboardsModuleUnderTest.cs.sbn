@@ -1,10 +1,19 @@
+{{~ wolverine = project["backend.mediator"] == "wolverine" ~}}
 using {{ namespace }}.BuildingBlocks.Dashboards;
 using {{ namespace }}.BuildingBlocks.Identity;
 using {{ namespace }}.BuildingBlocks.Messaging;
+{{~ if wolverine ~}}
+using {{ namespace }}.BuildingBlocks.Modules;
+{{~ end ~}}
 using {{ namespace }}.Modules.Dashboards.Api;
 using {{ namespace }}.Modules.Dashboards.Application;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+{{~ if wolverine ~}}
+using Microsoft.Extensions.Hosting;
+using Wolverine;
+using Wolverine.Runtime;
+{{~ end ~}}
 
 namespace {{ namespace }}.Modules.Dashboards.Tests;
 
@@ -40,7 +49,21 @@ internal sealed class DashboardsModuleUnderTest : IAsyncDisposable
             .AddSingleton<IDashboardStore>(Store)
             .AddSingleton<ICurrentUser>(new SignedInUser(subject))
             .AddSingleton<IWidgetAccess>(new HiddenWidgets(hiddenWidgets));
+{{~ if wolverine ~}}
+        collection.AddWolverine(options =>
+        {
+            options.Durability.Mode = DurabilityMode.MediatorOnly;
+            options.Discovery.DisableConventionalDiscovery();
+            options.Discovery.IncludeAssembly(ModuleAssemblies.Of<DashboardsModule>("Application"));
+            options.DiscoverRequestHandlers();
+        });
         services = collection.BuildServiceProvider();
+
+        // Wolverine's runtime is the hosted service a host would start.
+        ((IHostedService)services.GetRequiredService<IWolverineRuntime>()).StartAsync(CancellationToken.None).GetAwaiter().GetResult();
+{{~ else ~}}
+        services = collection.BuildServiceProvider();
+{{~ end ~}}
     }
 
     public InMemoryDashboardStore Store { get; }
