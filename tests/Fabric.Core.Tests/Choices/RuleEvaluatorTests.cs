@@ -125,6 +125,12 @@ public class RuleEvaluatorTests
         "frontend.api-client=orval requires backend.api-protocols has rest, but backend.api-protocols is empty.")]
     [InlineData("lean-crud", new[] { "frontend.api-client=openapi-fetch", "backend.api-protocols=" },
         "frontend.api-client=openapi-fetch requires backend.api-protocols has rest, but backend.api-protocols is empty.")]
+    [InlineData("saas-standard-react", new[] { "backend.auth=none" },
+        "backend.tenancy=column requires backend.auth != none, but backend.auth is none.")]
+    [InlineData("saas-standard-react", new[] { "backend.auth=none", "backend.tenancy=schema-per-tenant" },
+        "backend.tenancy=schema-per-tenant requires backend.auth != none, but backend.auth is none.")]
+    [InlineData("saas-standard-react", new[] { "backend.auth=none", "backend.tenancy=database-per-tenant" },
+        "backend.tenancy=database-per-tenant requires backend.auth != none, but backend.auth is none.")]
     public void Rejects_a_combination_the_packs_refuse_in_one_sentence(string profile, string[] settings, string violation)
     {
         Violations(profile, settings).ShouldBe([violation]);
