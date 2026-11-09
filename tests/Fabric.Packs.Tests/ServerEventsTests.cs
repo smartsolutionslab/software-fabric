@@ -49,14 +49,28 @@ public sealed class ServerEventsTests
         files["web/app/src/realtime/connection.ts"].ShouldNotContain("accessToken");
     }
 
+    /// <summary>A browser's tenant comes from its user's token, so the catalog refuses tenancy without authentication (#464).</summary>
     [Fact]
-    public void Signalr_with_tenancy_and_no_authentication_fails_the_build_naming_the_combination()
+    public void Signalr_with_tenancy_and_no_authentication_is_refused_by_the_catalog()
     {
-        var files = Files(Profile, SignalR, "backend.auth=none");
-        const string Refusal = "#error frontend.realtime signalr with backend.tenancy column needs an identity provider";
+        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", Profile, [SignalR, "backend.auth=none"]);
 
-        files["src/Host/Realtime/EventsHub.cs"].ShouldStartWith(Refusal);
-        files["tests/Integration.Tests/ServerEventsTests.cs"].ShouldStartWith(Refusal);
+        generated.Errors.ShouldBe(["backend.tenancy=column requires backend.auth != none, but backend.auth is none."]);
+    }
+
+    [Fact]
+    public void Under_schema_per_tenant_a_browser_joins_its_users_tenant_group_as_under_a_tenant_column()
+    {
+        // The tenant still comes from the signed-in user's token; only where its rows live differs, which the hub never reads.
+        var column = Files(Profile, SignalR);
+        var schema = Files(Profile, SignalR, "backend.tenancy=schema-per-tenant");
+
+        schema["src/Host/Realtime/EventsHub.cs"].ShouldNotContain("#error");
+        schema["src/Host/Realtime/EventsHub.cs"].ShouldContain("Groups.AddToGroupAsync(Context.ConnectionId, HubBrowserEvents.TenantGroup(tenantId), Context.ConnectionAborted)");
+        foreach (var path in (string[])["src/Host/Realtime/EventsHub.cs", "src/Host/Realtime/HubBrowserEvents.cs", "src/BuildingBlocks/Realtime/IBrowserEvents.cs", "src/Host/Wiring/ServerEventsEndpoints.cs", "src/Host/Wiring/ServerEventsRegistration.cs", "tests/Integration.Tests/ServerEventsTests.cs"])
+        {
+            schema[path].ShouldBe(column[path], path);
+        }
     }
 
     [Fact]

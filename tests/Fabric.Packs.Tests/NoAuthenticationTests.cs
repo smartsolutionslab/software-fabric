@@ -200,15 +200,13 @@ public sealed class NoAuthenticationTests
         e2eOutput.ShouldContain("1 passed");
     }
 
+    /// <summary>A tenant comes from the signed-in user, so the catalog refuses tenancy without authentication (#464).</summary>
     [Fact]
-    public void Column_tenancy_without_authentication_fails_the_build_saying_why()
+    public void Column_tenancy_without_authentication_is_refused_by_the_catalog()
     {
-        using var project = new GeneratedProject("saas-standard-react", NoAuthentication);
+        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", "saas-standard-react", [NoAuthentication]);
 
-        var (exitCode, output) = project.TryBuild();
-
-        exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("The column tenancy pack reads the tenant from the signed-in user's token");
+        generated.Errors.ShouldBe(["backend.tenancy=column requires backend.auth != none, but backend.auth is none."]);
     }
 
     [Fact]
