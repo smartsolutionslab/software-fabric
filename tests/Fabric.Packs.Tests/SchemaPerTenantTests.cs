@@ -86,11 +86,19 @@ public sealed class SchemaPerTenantTests
     }
 
     [Fact]
-    public void The_in_process_outbox_refuses_schema_per_tenant_instead_of_writing_where_no_table_is()
+    public void The_in_process_outbox_refuses_a_tenancy_without_a_tenant_column_instead_of_writing_where_no_table_is()
     {
-        var files = Files("lean-crud", SchemaPerTenant);
+        // The catalog refuses schema-per-tenant with transport none before this file is rendered; database-per-tenant,
+        // which has no pack yet, is the tenancy that still reaches it.
+        using var standIns = new StandIns();
+        string[] overrides = ["backend.tenancy=database-per-tenant"];
+        var packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, "lean-crud", overrides);
 
-        files["src/BuildingBlocks/Messaging/Outbox.cs"].ShouldStartWith("#error The in-process outbox of backend.bus.transport.none keeps one table per module schema, so it supports backend.tenancy none and column only so far");
+        var generated = Generator.New(Repository.Catalog, packs, "shop", "lean-crud", overrides);
+
+        generated.Errors.ShouldBeEmpty();
+        generated.Files.Single(file => file.Path == "src/BuildingBlocks/Messaging/Outbox.cs").Content
+            .ShouldStartWith("#error The in-process outbox of backend.bus.transport.none keeps one table per module schema, so it supports backend.tenancy none and column only so far (docs/adr/0006 of the generator): with backend.tenancy database-per-tenant a module's integration events would go to a tenant's schema");
     }
 
     [Fact]
