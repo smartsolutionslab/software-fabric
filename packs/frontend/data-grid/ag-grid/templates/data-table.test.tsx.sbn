@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { expect, test } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, expect, test } from 'vitest';
 import { DataTable } from './data-table';
 import { columnsOf } from './data-table-columns';
 
@@ -10,6 +10,10 @@ interface Person {
 const people = columnsOf<Person>();
 const columns = people.columns([people.accessor('name', { header: 'Name' })]);
 const data: Person[] = [{ name: 'first' }, { name: 'second' }];
+
+// Vitest runs without globals, so Testing Library cannot register its own cleanup. Unmounting destroys the grid, which
+// cancels its timers before jsdom is torn down.
+afterEach(cleanup);
 
 test('the table shows a header and one row per item', async () => {
   render(<DataTable columns={columns} data={data} />);
