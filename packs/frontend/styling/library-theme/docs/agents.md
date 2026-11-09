@@ -1,7 +1,11 @@
 ## Styling: the library's theme
 
 {{~ if project["frontend.ui-library"] == "mui" ~}}
+{{~ if project["frontend.design-system"] == "tokens" || project["frontend.design-system"] == "web-components" ~}}
+- Colours and shape live in one place, the design tokens, which the MUI theme in `src/theme.ts` is built from; change them in their token, never in the theme or per component.
+{{~ else ~}}
 - Colours, shape and type live in one place, the MUI theme in `src/theme.ts`; change them there, never per component.
+{{~ end ~}}
 - Style with MUI's props and `sx`, naming the theme's values (`color="error"`; `bgcolor: 'action.hover'` and `p: 1` in `sx`). No CSS files, no `className`, no inline `style`; `src/index.css` only imports the stylesheets a library needs.
 - A component that writes a colour of its own (`#hex`, `rgb()`) fails `src/theme.test.tsx`.
 {{~ else ~}}

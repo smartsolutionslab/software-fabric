@@ -1,5 +1,24 @@
 {{~ if project["frontend.ui-library"] != "mui" ~}}
 throw new Error('The library-theme pack builds the theme for MUI only so far; frontend.ui-library is {{ project["frontend.ui-library"] }} (docs/adr/0006 of the generator).');
+{{~ else if project["frontend.design-system"] == "tokens" || project["frontend.design-system"] == "web-components" ~}}
+import { createTheme } from '@mui/material/styles';
+import { tokens } from '@{{ name }}/tokens';
+
+/**
+ * The app's look in one place: every MUI component takes its colours and shape from this theme, and the theme takes
+ * them from the design tokens (web/packages/tokens/src, docs/adr). Change a value in its token, never here or per
+ * component; a screen names the theme's values (`color="text.secondary"`, `bgcolor: 'primary.main'` in `sx`).
+ */
+export const theme = createTheme({
+  palette: {
+    mode: 'light',
+    primary: { main: tokens.color.primary, contrastText: tokens.color['primary-foreground'] },
+    secondary: { main: tokens.color.accent, contrastText: tokens.color['accent-foreground'] },
+    background: { default: tokens.color.surface },
+    divider: tokens.color.border,
+  },
+  shape: { borderRadius: tokens.radius.md },
+});
 {{~ else ~}}
 import { createTheme } from '@mui/material/styles';
 
