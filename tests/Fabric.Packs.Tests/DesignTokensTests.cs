@@ -27,6 +27,11 @@ public sealed class DesignTokensTests
           expect(theme.spacing(4)).toBe('1.25rem');
         });
 
+        test('a negative step takes its token with the sign, and a string passes through', () => {
+          expect(theme.spacing(-4)).toBe('calc(-1 * 1.25rem)');
+          expect(theme.spacing(1, 'auto')).toBe('0.3rem auto');
+        });
+
         """;
 
     private const string ReactScreen = """
