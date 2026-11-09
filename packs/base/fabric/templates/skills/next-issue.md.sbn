@@ -5,11 +5,11 @@ description: Claim the next eligible issue of a lane from the board and deliver 
 
 # Deliver the next issue
 
-Arguments: the lane (one of the lanes in `docs/owners.yml`) and this run's executor, `<family>-<runtime>/<detail>`, e.g. `claude-cloud/lane-backend` or `claude-local/<host>`.
+Arguments: the lane (one of the lanes in `docs/owners.yml`), this run's executor, `<family>-<runtime>/<detail>`, e.g. `claude-cloud/lane-backend` or `claude-local/<host>`, and optionally the one issue to take.
 
-1. **Claim.** Run `bash .github/scripts/board/next.sh <lane> <executor>`.
+1. **Claim.** Run `bash .github/scripts/board/next.sh <lane> <executor> [issue]`. Without an issue it takes the lowest-numbered eligible one; with one it takes that issue or none.
    - Exit 3: nothing is eligible in the lane. Stop and say so.
-   - Exit 1: a claim failed for another reason, printed above (permissions, network, a refused push). Nothing was claimed. Stop and report that output verbatim; do not do the script's steps by hand.
+   - Exit 1: the named issue is not eligible (the reason is printed), or a claim failed for another reason, printed above (permissions, network, a refused push). Nothing was claimed. Stop and report that output verbatim; do not do the script's steps by hand.
    - Otherwise it prints `<issue> <branch>`. Fetch and check out that branch. If it already has commits, a previous agent left them: read them and resume, do not start over.
 2. **Work the phases** in AGENTS.md, each in its own subagent from `.claude/agents/`, handing each the artifact of the one before:
    architect → test-writer (returns the failing output verbatim) → the lane's engineer (may not edit those tests) → verify (the `/verify` skill: observes the change working end to end) → the lane's reviewer.
