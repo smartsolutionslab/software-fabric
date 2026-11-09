@@ -497,12 +497,8 @@ AppHost's model with it, declares it instead (*#260*).
 | `web.api-imports`, `web.api-headers` *(added in M1-07b; declared by every api-client pack)* | `web/app/src/api/baseApi.ts` | newline | oidc-client-ts (the bearer token) |
 | `web.openapi-paths`, `web.openapi-schemas` *(added for #184; role slots of `frontend.api-client`)* | `web/app/openapi.json` (`paths` after the host's own; `components.schemas`, sorted by name with the host's own) | `,` + newline / blank line | frontend.agent-ui.ag-ui (the assistant module's /permissions/manage, with authorization choices; #313), frontend.dashboards.user-editable (the dashboards module's endpoints) |
 | `web.vite-imports` *(added in M1-07)* | `web/app/vite.config.ts` | newline | tailwind, pwa yes |
-<<<<<<< HEAD
 | `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`), native-federation (`shellFederation()`, the `virtual:federation` module), pwa yes (`VitePWA({...})`, the service worker and manifest) |
-=======
-| `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`), pwa yes (`VitePWA({...})`, the service worker and manifest) |
 | `web.custom-element-prefixes` *(added for #388; declared by vue, not a role slot: React needs no telling)* | `web/app/vite.config.ts` (Vue's `isCustomElement`: a tag starting with one of these quoted prefixes is left to the browser; rendered only with a contribution) | `, ` | none yet; design-system web-components (#280) will contribute its tags' prefix |
->>>>>>> origin/main
 | `web.imports` | `web/app/src/main.tsx` | newline | redux, router, oidc |
 | `web.providers` | `web/app/src/main.tsx` | `,` + newline | redux, oidc, router — wrappers composed in order |
 | `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn, design-system tokens-and-components (the tokens' Tailwind theme, `@source` for the ui package), design-system tokens (the tokens' Tailwind theme, or their CSS custom properties with css-modules), micro-frontends (`@source` for the remotes) |
