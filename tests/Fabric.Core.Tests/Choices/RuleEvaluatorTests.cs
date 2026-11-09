@@ -114,6 +114,12 @@ public class RuleEvaluatorTests
         "backend.tenancy=schema-per-tenant requires backend.bus.transport != none, but backend.bus.transport is none.")]
     [InlineData("lean-crud", new[] { "module.communication=contract-interface" },
         "module defaults: module.communication requires module.communication has integration-events, but module.communication is contract-interface.")]
+    [InlineData("saas-standard-react", new[] { "backend.api-protocols=" },
+        "frontend.api-client=rtk-query-codegen requires backend.api-protocols has rest, but backend.api-protocols is empty.")]
+    [InlineData("saas-standard-vue", new[] { "backend.api-protocols=" },
+        "frontend.api-client=orval requires backend.api-protocols has rest, but backend.api-protocols is empty.")]
+    [InlineData("lean-crud", new[] { "frontend.api-client=openapi-fetch", "backend.api-protocols=" },
+        "frontend.api-client=openapi-fetch requires backend.api-protocols has rest, but backend.api-protocols is empty.")]
     public void Rejects_a_combination_the_packs_refuse_in_one_sentence(string profile, string[] settings, string violation)
     {
         Violations(profile, settings).ShouldBe([violation]);
