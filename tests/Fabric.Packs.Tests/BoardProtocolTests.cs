@@ -1451,6 +1451,57 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Directory.Delete(repository, recursive: true);
     }
 
+    /// <summary>
+    /// The workflow's own step, run as GitHub would: a commit that is not a Conventional Commit landed on main directly
+    /// after the pull request opened, the branch merged main, and the event still carries the old base SHA. Main's
+    /// commits are not the pull request's to check; the branch's own still are.
+    /// </summary>
+    [Theory]
+    [InlineData("feat(board): one", 0)]
+    [InlineData("One, not a conventional commit", 1)]
+    public void The_commit_message_workflow_checks_the_branch_against_the_base_branch_tip_not_a_stale_base_sha(string branchMessage, int expectedExitCode)
+    {
+        var repository = Repository();
+        var git = (string[] arguments) =>
+        {
+            var (code, output) = Shell.Run(repository, BoardProject.GitIdentity, "git", arguments);
+            code.ShouldBe(0, output);
+            return output.Trim();
+        };
+        git(["checkout", "--quiet", "-b", "agent/7"]);
+        git(["commit", "--quiet", "--allow-empty", "-m", branchMessage]);
+        git(["checkout", "--quiet", "main"]);
+        git(["commit", "--quiet", "--allow-empty", "-m", "Hotfix landed on main directly"]);
+        git(["update-ref", "refs/remotes/origin/main", "main"]);
+        git(["checkout", "--quiet", "agent/7"]);
+        git(["merge", "--quiet", "--no-ff", "-m", "Merge branch 'main' into agent/7", "main"]);
+        var payload = new Dictionary<string, string>
+        {
+            ["github.base_ref"] = "main",
+            ["github.event.pull_request.base.ref"] = "main",
+            ["github.event.pull_request.base.sha"] = git(["rev-parse", "base"]),
+            ["github.event.pull_request.head.sha"] = git(["rev-parse", "HEAD"]),
+        };
+        var (run, environment) = WorkflowStep("commit-messages.yml", "check-commits.sh", payload);
+
+        var (exitCode, log) = Shell.Run(
+            repository,
+            environment,
+            "bash",
+            "-e",
+            "-c",
+            run.Replace(".github/scripts/board/", Path.Combine(ProjectDirectory, ".github/scripts/board/"), StringComparison.Ordinal));
+
+        exitCode.ShouldBe(expectedExitCode, $"{run}\n{log}");
+        log.ShouldNotContain("Hotfix landed on main directly");
+        if (expectedExitCode == 1)
+        {
+            log.ShouldContain(branchMessage);
+        }
+
+        Directory.Delete(repository, recursive: true);
+    }
+
     [Fact]
     public void A_module_in_fabric_yaml_is_a_scope_without_a_list_kept_by_hand()
     {
