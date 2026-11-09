@@ -12,6 +12,10 @@ namespace {{ namespace }}.BuildingBlocks.Persistence;
 /// <summary>The base of every module's DbContext: the module's own schema and its entity configurations.</summary>
 public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider services, string schema) : DbContext(options)
 {
+{{~ if moves ~}}
+    private string? currentSchema;
+
+{{~ end ~}}
     /// <summary>The application's services, for conventions that depend on the current request.</summary>
     public IServiceProvider Services { get; } = services;
 {{~ if moves ~}}
@@ -19,8 +23,12 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
     /// <summary>The module's own schema: the one its migrations name, and the one the MigrationRunner checks its model in.</summary>
     public string ModuleSchema { get; } = schema;
 
-    /// <summary>The schema this instance works in: its tables, and its migrations history when it migrates.</summary>
-    public string CurrentSchema { get; } = {{ slots["persistence.schema"] }};
+    /// <summary>
+    /// The schema this instance works in: its tables, and its migrations history when it migrates. It is chosen when the
+    /// instance is first used (its first query or save), not when it is created, so work that sets its tenant after the
+    /// context was injected, as a consumer's Handle does, still works in that tenant's schema. Once chosen, it stays.
+    /// </summary>
+    public string CurrentSchema => currentSchema ??= Choose(ModuleSchema, Services);
 {{~ end ~}}
 {{ slots["persistence.context-members"] }}
 {{~ if slots["persistence.save-changes"] != "" ~}}
@@ -85,6 +93,8 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
 
     /// <summary>Whether SQL, or a name, qualifies an object with the module's schema: such SQL would reach the module's own objects.</summary>
     internal bool NamesModuleSchema(string sql) => SchemaReferences.Qualify(sql, ModuleSchema);
+
+    private static string Choose(string schema, IServiceProvider services) => {{ slots["persistence.schema"] }};
 {{~ end ~}}
 {{~ if slots["persistence.save-changes"] != "" ~}}
 

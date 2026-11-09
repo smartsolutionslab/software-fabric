@@ -22,6 +22,10 @@ files:
   - { template: templates/tests/TenantSchemaTests.cs.sbn, target: tests/Tenancy.Tests/TenantSchemaTests.cs }
   - { template: templates/tests/LedgerArchiveDbContext.cs.sbn, target: tests/Tenancy.Tests/LedgerArchiveDbContext.cs }
   - { template: templates/tests/TenantSchemaNameTests.cs.sbn, target: tests/Tenancy.Tests/TenantSchemaNameTests.cs }
+  - { template: templates/tests/LedgerEntryArrived.cs.sbn, target: tests/Tenancy.Tests/LedgerEntryArrived.cs }
+  - { template: templates/tests/LedgerConstructorConsumer.cs.sbn, target: tests/Tenancy.Tests/LedgerConstructorConsumer.cs }
+  - { template: templates/tests/LedgerParameterConsumer.cs.sbn, target: tests/Tenancy.Tests/LedgerParameterConsumer.cs }
+  - { template: templates/tests/TenantConsumerTests.cs.sbn, target: tests/Tenancy.Tests/TenantConsumerTests.cs }
 slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 10 }
   - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 20 }
@@ -39,6 +43,7 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: unit-test, describes: "Against the AppHost's database after the MigrationRunner: a listed tenant reads its own rows and none of another tenant's, each listed tenant has a schema of its own with its own migrations history for the sample context and for every module, and a tenant not listed, like no tenant, reads nothing and cannot save.", file: templates/tests/TenantSchemaTests.cs.sbn }
+  - { kind: unit-test, describes: "Against the AppHost's database after the MigrationRunner: a listed tenant reads its own rows and none of another tenant's, each listed tenant has a schema of its own with its own migrations history for the sample context and for every module, and a tenant not listed, like no tenant, reads nothing and cannot save, nor can a context first used before its tenant was set.", file: templates/tests/TenantSchemaTests.cs.sbn }
   - { kind: unit-test, describes: "Schema names are one module's and one tenant's alone: module and tenant pairs that would share a schema, or a tenant's schema that is another module's own, fail before either is migrated, and a name past the database's identifier limit fails instead of being cut short.", file: templates/tests/TenantSchemaNameTests.cs.sbn }
+  - { kind: unit-test, describes: "A Wolverine consumer whose DbContext is injected, by constructor or as a parameter of Handle, and which begins its TenantScope inside Handle, writes and reads its tenant's schema: the context chooses its schema when first used, not when Wolverine creates it.", file: templates/tests/TenantConsumerTests.cs.sbn }
   - { kind: architecture-test, describes: "No type in a module has a TenantId: each tenant's rows are kept apart by its schema.", file: templates/NoTenantIds.cs.sbn }

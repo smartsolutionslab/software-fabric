@@ -21,7 +21,8 @@ public sealed class SchemaPerTenantTests
     {
         var files = Files(Profile, SchemaPerTenant);
 
-        files["src/BuildingBlocks/Persistence/ModuleDbContext.cs"].ShouldContain("public string CurrentSchema { get; } = Shop.BuildingBlocks.Tenancy.TenantSchemas.Of(schema, services);");
+        files["src/BuildingBlocks/Persistence/ModuleDbContext.cs"].ShouldContain("public string CurrentSchema => currentSchema ??= Choose(ModuleSchema, Services);");
+        files["src/BuildingBlocks/Persistence/ModuleDbContext.cs"].ShouldContain("private static string Choose(string schema, IServiceProvider services) => Shop.BuildingBlocks.Tenancy.TenantSchemas.Of(schema, services);");
         files["src/BuildingBlocks/Persistence/ModuleDbContext.cs"].ShouldNotContain("TenantColumn");
         files["src/MigrationRunner/Program.cs"].ShouldContain("await host.Services.MigrateTenantSchemasAsync(contexts);");
         var appHost = files["src/AppHost/AppHost.cs"];
@@ -587,7 +588,7 @@ public sealed class SchemaPerTenantTests
 
         var (tenancyExitCode, tenancyOutput) = project.Test("tests/Tenancy.Tests/Tenancy.Tests.csproj");
         tenancyExitCode.ShouldBe(0, tenancyOutput);
-        tenancyOutput.ShouldContain("succeeded: 8");
+        tenancyOutput.ShouldContain("succeeded: 11");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
