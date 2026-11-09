@@ -176,13 +176,20 @@ public sealed class DesignSystemWebComponentsTests
     [InlineData("var(--ds-color-accent)", "red")]
     [InlineData("var(--ds-color-accent)", "transparent")]
     [InlineData("var(--ds-color-accent)", "var(--brand-red)")]
-    public void A_component_style_with_a_value_of_its_own_fails_the_ui_packages_tests(string token, string value)
+    [InlineData("var(--ds-color-accent)", "red", "background")]
+    [InlineData("var(--ds-color-accent)", "1px solid red", "border")]
+    [InlineData("var(--ds-color-accent)", "2px solid red", "outline")]
+    [InlineData("var(--ds-color-accent)", "0 0 4px red", "box-shadow")]
+    public void A_component_style_with_a_value_of_its_own_fails_the_ui_packages_tests(
+        string token,
+        string value,
+        string property = "background-color")
     {
         using var project = new GeneratedProject("saas-standard-react", Choice);
         var badge = Path.Combine(project.ProjectDirectory, "web", "packages", "ui", "src", "Badge.ts");
         var source = File.ReadAllText(badge);
         source.ShouldContain($"background-color: {token};");
-        File.WriteAllText(badge, source.Replace($"background-color: {token};", $"background-color: {value};", StringComparison.Ordinal));
+        File.WriteAllText(badge, source.Replace($"background-color: {token};", $"{property}: {value};", StringComparison.Ordinal));
         RunWeb(project, "install");
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "--filter", "@shop/ui", "test");
