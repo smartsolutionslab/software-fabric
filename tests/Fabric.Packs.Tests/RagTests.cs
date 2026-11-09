@@ -218,12 +218,13 @@ public sealed class RagTests
     }
 
     [Theory]
-    [InlineData("schema-per-tenant")]
-    [InlineData("database-per-tenant")]
-    public void Rag_with_another_tenancy_fails_the_build_instead_of_sharing_vectors_between_tenants(string tenancy)
+    // The catalog refuses schema-per-tenant with lean-crud's transport none before rag's guard is reached.
+    [InlineData("schema-per-tenant", new[] { "backend.bus.transport=rabbitmq" })]
+    [InlineData("database-per-tenant", new string[0])]
+    public void Rag_with_another_tenancy_fails_the_build_instead_of_sharing_vectors_between_tenants(string tenancy, string[] transport)
     {
         using var standIns = new StandIns();
-        string[] overrides = ["backend.llm=openai", Rag, $"backend.tenancy={tenancy}"];
+        string[] overrides = ["backend.llm=openai", Rag, $"backend.tenancy={tenancy}", .. transport];
         var packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, Profile, overrides);
 
         var generated = Generator.New(Repository.Catalog, packs, "shop", Profile, overrides);

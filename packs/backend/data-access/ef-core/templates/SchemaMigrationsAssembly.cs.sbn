@@ -1,0 +1,144 @@
+using System.Reflection;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
+
+namespace {{ namespace }}.BuildingBlocks.Persistence;
+
+/// <summary>
+/// A module context's migrations, moved to the schema it works in. <c>dotnet ef</c> writes the module's schema into
+/// every operation, so each schema an operation names that is the module's becomes
+/// <see cref="ModuleDbContext.CurrentSchema"/>. A name qualified with the module's schema anywhere else, quoted or not
+/// (a provider's annotation such as Npgsql's <c>Npgsql:Enum:billing.mood</c>, a column type, a default), a sequence and
+/// seed data cannot be moved, so such a migration fails in every schema, the module's own included, before any
+/// migration runs. Raw SQL (<c>migrationBuilder.Sql</c>) is passed on as written.
+/// </summary>
+public sealed class SchemaMigrationsAssembly(ICurrentDbContext currentContext, IMigrationsIdGenerator idGenerator) : IMigrationsAssembly
+{
+    private const BindingFlags Properties = BindingFlags.Public | BindingFlags.Instance;
+
+    private readonly ModuleDbContext context = (ModuleDbContext)currentContext.Context;
+
+    private IReadOnlyDictionary<string, TypeInfo>? migrations;
+
+    /// <summary>The context's own assembly, where <c>dotnet ef</c> writes a module's migrations.</summary>
+    public Assembly Assembly => context.GetType().Assembly;
+
+    public IReadOnlyDictionary<string, TypeInfo> Migrations => migrations ??= Assembly.DefinedTypes
+        .Where(type => type.IsSubclassOf(typeof(Migration)) && !type.IsAbstract && IsForThisContext(type))
+        .Select(type => (Id: type.GetCustomAttribute<MigrationAttribute>()?.Id, Type: type))
+        .Where(migration => migration.Id is not null)
+        .OrderBy(migration => migration.Id, StringComparer.Ordinal)
+        .ToDictionary(migration => migration.Id!, migration => migration.Type, StringComparer.Ordinal);
+
+    public ModelSnapshot? ModelSnapshot => Assembly.DefinedTypes
+        .Where(type => type.IsSubclassOf(typeof(ModelSnapshot)) && !type.IsAbstract && IsForThisContext(type))
+        .Select(type => (ModelSnapshot)Activator.CreateInstance(type)!)
+        .FirstOrDefault();
+
+    public string? FindMigrationId(string nameOrId)
+    {
+        {{ not_null "nameOrId" }}
+
+        return idGenerator.IsValidId(nameOrId)
+            ? Migrations.Keys.FirstOrDefault(id => string.Equals(id, nameOrId, StringComparison.OrdinalIgnoreCase))
+            : Migrations.Keys.FirstOrDefault(id => string.Equals(idGenerator.GetName(id), nameOrId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public Migration CreateMigration(TypeInfo migrationClass, string activeProvider)
+    {
+        {{ not_null "migrationClass" }}
+
+        var migration = (Migration)Activator.CreateInstance(migrationClass.AsType())!;
+        migration.ActiveProvider = activeProvider;
+        List<string> unmovable = [];
+        foreach (var operation in migration.UpOperations.Concat(DownOperationsOf(migration)))
+        {
+            Move(operation, unmovable);
+        }
+
+        if (unmovable.Count > 0)
+        {
+            var id = migrationClass.GetCustomAttribute<MigrationAttribute>()?.Id ?? migrationClass.Name;
+            throw new InvalidOperationException(
+                $"Migration {id} of {context.GetType().Name} holds what cannot be moved out of the module's schema '{context.ModuleSchema}', so no migration runs: {string.Join(", ", unmovable.Distinct(StringComparer.Ordinal))}.");
+        }
+
+        return migration;
+    }
+
+    /// <summary>
+    /// A migration's Down operations, or none when it has no Down: EF Core reports that when the migration is reverted,
+    /// not when it is applied, and moving it must not report it sooner.
+    /// </summary>
+    private static IReadOnlyList<MigrationOperation> DownOperationsOf(Migration migration)
+    {
+        try
+        {
+            return migration.DownOperations;
+        }
+        catch (NotSupportedException)
+        {
+            return [];
+        }
+    }
+
+    private bool IsForThisContext(TypeInfo type) => type.GetCustomAttribute<DbContextAttribute>()?.ContextType == context.GetType();
+
+    /// <summary>
+    /// Moves an operation, and the operations it holds (a new table's columns and keys), to the current schema, and
+    /// collects every other place that names the module's schema.
+    /// </summary>
+    private void Move(MigrationOperation operation, List<string> unmovable)
+    {
+        if (operation is SequenceOperation or RenameSequenceOperation or DropSequenceOperation or RestartSequenceOperation
+            or InsertDataOperation or UpdateDataOperation or DeleteDataOperation)
+        {
+            // A sequence would be shared between schemas through the SQL that names it; seed data would be inserted once per schema.
+            unmovable.Add(operation.GetType().Name);
+        }
+
+        foreach (var annotation in operation.GetAnnotations())
+        {
+            if (context.NamesModuleSchema(annotation.Name) || (annotation.Value is string text && context.NamesModuleSchema(text)))
+            {
+                unmovable.Add(annotation.Name);
+            }
+        }
+
+        switch (operation)
+        {
+            case EnsureSchemaOperation ensure when ensure.Name == context.ModuleSchema:
+                ensure.Name = context.CurrentSchema;
+                break;
+            case DropSchemaOperation drop when drop.Name == context.ModuleSchema:
+                drop.Name = context.CurrentSchema;
+                break;
+        }
+
+        foreach (var property in operation.GetType().GetProperties(Properties).Where(property => property.GetIndexParameters().Length == 0))
+        {
+            var value = property.GetValue(operation);
+            if (property.CanWrite && property.Name.EndsWith("Schema", StringComparison.Ordinal) && value is string schema && schema == context.ModuleSchema)
+            {
+                property.SetValue(operation, context.CurrentSchema);
+            }
+            else if (value is string text && operation is not SqlOperation && context.NamesModuleSchema(text))
+            {
+                unmovable.Add($"{operation.GetType().Name}.{property.Name} ({text})");
+            }
+            else if (value is MigrationOperation held)
+            {
+                Move(held, unmovable);
+            }
+            else if (value is IEnumerable<MigrationOperation> heldOperations)
+            {
+                foreach (var heldOperation in heldOperations)
+                {
+                    Move(heldOperation, unmovable);
+                }
+            }
+        }
+    }
+}
