@@ -552,7 +552,7 @@ dimensions:
         note: "tokens plus an own component package with Storybook"
         # Reason: the component package is React only (owner decision D5, #232).
         requires: ["frontend.framework == react"]
-      web-components:        { tier: experimental }
+      web-components:        { tier: experimental, note: "tokens plus Lit web components with Storybook, framework-neutral" }
 
   frontend.data-grid:
     scope: project

@@ -1,0 +1,22 @@
+import { expect, test } from 'vitest';
+import { Badge } from './Badge';
+
+test('a badge shows its label in the tone it is given', async () => {
+  const badge = document.createElement('ds-badge');
+  badge.tone = 'primary';
+  badge.textContent = 'New';
+  document.body.append(badge);
+  await badge.updateComplete;
+
+  expect(badge.getAttribute('tone')).toBe('primary');
+  expect(badge.shadowRoot?.querySelector('span')?.className).toBe('primary');
+  expect(badge.textContent).toBe('New');
+});
+
+test('a badge is styled only through the design tokens', () => {
+  const styles = Badge.styles.cssText;
+
+  expect(styles).toContain('var(--ds-color-primary)');
+  // A colour of its own would not follow the tokens: #fff, rgb(...), hsl(...), oklch(...).
+  expect(styles).not.toMatch(/#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|oklch|oklab|lab|lch|color)\(/i);
+});

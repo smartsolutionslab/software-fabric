@@ -1,6 +1,6 @@
 {
   "about": "Written by fabric matrix: a pairwise covering set over every option with a pack (ADR-0003). Each combination's choices are a full choice set without a profile, for fabric new --choices. Do not edit; regenerate it.",
-  "feasiblePairs": 8627,
+  "feasiblePairs": 8757,
   "combinations": [
     {
       "name": "pairwise-1",
@@ -252,7 +252,7 @@
         "frontend.validation": "zod",
         "frontend.styling": "css-modules",
         "frontend.ui-library": "reka-ui",
-        "frontend.design-system": "none",
+        "frontend.design-system": "web-components",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "echarts",
         "frontend.dashboards": [],
@@ -319,14 +319,15 @@
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn",
-        "frontend.design-system": "tokens",
+        "frontend.design-system": "web-components",
         "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "recharts",
+        "frontend.charts": "chartjs",
         "frontend.realtime": "signalr",
         "frontend.agent-ui": "none",
         "frontend.pwa": "yes",
         "frontend.test.extras": [
-          "screenshot-tests"
+          "screenshot-tests",
+          "accessibility"
         ],
         "backend.data-access.reads": "dapper"
       }
@@ -384,7 +385,7 @@
         "frontend.validation": "valibot",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn-vue",
-        "frontend.design-system": "tokens",
+        "frontend.design-system": "none",
         "frontend.data-grid": "ag-grid",
         "frontend.charts": "chartjs",
         "frontend.dashboards": [
@@ -394,10 +395,8 @@
         "frontend.realtime": "none",
         "frontend.agent-ui": "ag-ui",
         "frontend.auth-client": "oidc-client-ts",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [
-          "accessibility"
-        ],
+        "frontend.pwa": "yes",
+        "frontend.test.extras": [],
         "backend.data-access.reads": "ef-core"
       }
     },
@@ -453,9 +452,9 @@
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn",
-        "frontend.design-system": "tokens-and-components",
+        "frontend.design-system": "tokens",
         "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "chartjs",
+        "frontend.charts": "recharts",
         "frontend.dashboards": [
           "user-editable",
           "generative"
@@ -463,9 +462,8 @@
         "frontend.realtime": "none",
         "frontend.agent-ui": "ag-ui",
         "frontend.auth-client": "msal",
-        "frontend.pwa": "yes",
+        "frontend.pwa": "no",
         "frontend.test.extras": [
-          "storybook-tests",
           "screenshot-tests"
         ],
         "backend.data-access.reads": "dapper"
@@ -524,6 +522,7 @@
         "frontend.auth-client": "msal",
         "frontend.pwa": "no",
         "frontend.test.extras": [
+          "screenshot-tests",
           "accessibility"
         ],
         "backend.data-access.reads": "ef-core"
@@ -581,13 +580,12 @@
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn",
         "frontend.design-system": "tokens-and-components",
-        "frontend.data-grid": "ag-grid",
+        "frontend.data-grid": "tanstack-table",
         "frontend.charts": "recharts",
         "frontend.realtime": "sse",
         "frontend.pwa": "yes",
         "frontend.test.extras": [
-          "storybook-tests",
-          "screenshot-tests"
+          "storybook-tests"
         ],
         "backend.data-access.reads": "ef-core"
       }
@@ -598,32 +596,30 @@
         "backend.database": "postgres",
         "backend.data-access": "ef-core",
         "backend.topology": "modular-monolith",
-        "backend.bus.transport": "azure-service-bus",
+        "backend.bus.transport": "rabbitmq",
         "backend.bus.library": "wolverine",
         "backend.mediator": "wolverine",
         "backend.api-style": "minimal-apis",
         "backend.api-protocols": [],
         "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
+        "backend.result-style": "minimal",
+        "backend.guards": "bcl",
+        "backend.absence": "nullable",
         "backend.auth": "keycloak",
         "backend.authorization": [],
         "backend.tenancy": "none",
-        "backend.llm": "openai",
+        "backend.llm": "ollama",
         "backend.llm.agents": "none",
         "backend.llm.extras": [
           "rag",
           "evals"
         ],
-        "backend.llm.embeddings": "openai",
-        "backend.mcp": [
-          "client"
-        ],
+        "backend.llm.embeddings": "ollama",
+        "backend.mcp": [],
         "module.style": "event-sourced",
-        "module.event-store": "marten",
+        "module.event-store": "kurrentdb",
         "module.ddd-depth": "light",
-        "module.cqrs": "physical",
+        "module.cqrs": "logical",
         "module.communication": [
           "integration-events"
         ],
@@ -637,15 +633,15 @@
         "frontend.architecture": "spa",
         "frontend.workspace": "turborepo",
         "frontend.state": "pinia-tanstack-query",
-        "frontend.api-client": "openapi-fetch",
+        "frontend.api-client": "orval",
         "frontend.routing": "vue-router",
         "frontend.forms": "vee-validate",
         "frontend.validation": "valibot",
         "frontend.styling": "css-modules",
         "frontend.ui-library": "reka-ui",
-        "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "chartjs",
+        "frontend.design-system": "web-components",
+        "frontend.data-grid": "ag-grid",
+        "frontend.charts": "echarts",
         "frontend.dashboards": [],
         "frontend.realtime": "none",
         "frontend.auth-client": "oidc-client-ts",
@@ -664,33 +660,95 @@
         "backend.topology": "modular-monolith",
         "backend.bus.transport": "azure-service-bus",
         "backend.bus.library": "wolverine",
-        "backend.mediator": "hand-rolled",
+        "backend.mediator": "wolverine",
         "backend.api-style": "minimal-apis",
         "backend.api-protocols": [],
         "backend.errors": "result",
-        "backend.result-style": "minimal",
+        "backend.result-style": "typed-outcomes",
         "backend.guards": "ensure-that",
-        "backend.absence": "nullable",
-        "backend.auth": "generic-oidc",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
+        "backend.absence": "option",
+        "backend.auth": "none",
         "backend.tenancy": "none",
-        "backend.llm": "none",
-        "backend.mcp": [
-          "server"
+        "backend.llm": "openai",
+        "backend.llm.agents": "none",
+        "backend.llm.extras": [
+          "rag"
         ],
-        "module.style": "ddd",
-        "module.ddd-depth": "light",
-        "module.cqrs": "logical",
+        "backend.llm.embeddings": "openai",
+        "backend.mcp": [
+          "client"
+        ],
+        "module.style": "event-sourced",
+        "module.event-store": "marten",
+        "module.ddd-depth": "strict",
+        "module.cqrs": "physical",
         "module.communication": [
           "contract-interface",
           "integration-events"
         ],
-        "backend.test.framework": "nunit",
+        "backend.test.framework": "xunit",
         "backend.test.assertions": "awesome-assertions",
         "backend.test.mocks": "moq",
+        "backend.test.integration": "aspire-fixture",
+        "backend.test.extras": [],
+        "test.discipline": "test-after",
+        "frontend.framework": "vue",
+        "frontend.architecture": "spa",
+        "frontend.workspace": "turborepo",
+        "frontend.state": "pinia",
+        "frontend.api-client": "openapi-fetch",
+        "frontend.routing": "vue-router",
+        "frontend.forms": "vee-validate",
+        "frontend.validation": "zod",
+        "frontend.styling": "css-modules",
+        "frontend.ui-library": "reka-ui",
+        "frontend.design-system": "tokens",
+        "frontend.data-grid": "ag-grid",
+        "frontend.charts": "echarts",
+        "frontend.realtime": "sse",
+        "frontend.pwa": "no",
+        "frontend.test.extras": [
+          "screenshot-tests",
+          "accessibility"
+        ],
+        "backend.data-access.reads": "dapper"
+      }
+    },
+    {
+      "name": "pairwise-12",
+      "choices": {
+        "backend.database": "sqlserver",
+        "backend.data-access": "ef-core",
+        "backend.topology": "modular-monolith",
+        "backend.bus.transport": "azure-service-bus",
+        "backend.bus.library": "wolverine",
+        "backend.mediator": "hand-rolled",
+        "backend.api-style": "minimal-apis",
+        "backend.api-protocols": [],
+        "backend.errors": "result",
+        "backend.result-style": "typed-outcomes",
+        "backend.guards": "ensure-that",
+        "backend.absence": "nullable",
+        "backend.auth": "keycloak",
+        "backend.authorization": [
+          "roles"
+        ],
+        "backend.tenancy": "column",
+        "backend.llm": "anthropic",
+        "backend.llm.agents": "agent-framework",
+        "backend.llm.extras": [],
+        "backend.mcp": [
+          "server",
+          "client"
+        ],
+        "module.style": "crud",
+        "module.cqrs": "logical",
+        "module.communication": [
+          "integration-events"
+        ],
+        "backend.test.framework": "nunit",
+        "backend.test.assertions": "shouldly",
+        "backend.test.mocks": "nsubstitute",
         "backend.test.integration": "testcontainers",
         "backend.test.extras": [],
         "test.discipline": "test-after",
@@ -703,155 +761,25 @@
         "frontend.api-client": "rtk-query-codegen",
         "frontend.routing": "tanstack-router",
         "frontend.forms": "react-hook-form",
-        "frontend.validation": "valibot",
+        "frontend.validation": "zod",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn",
-        "frontend.design-system": "tokens",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
-        "frontend.realtime": "signalr",
-        "frontend.auth-client": "oidc-client-ts",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [],
-        "backend.data-access.reads": "dapper"
-      }
-    },
-    {
-      "name": "pairwise-12",
-      "choices": {
-        "backend.database": "postgres",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "rabbitmq",
-        "backend.bus.library": "wolverine",
-        "backend.mediator": "wolverine",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [],
-        "backend.errors": "result",
-        "backend.result-style": "minimal",
-        "backend.guards": "bcl",
-        "backend.absence": "nullable",
-        "backend.auth": "none",
-        "backend.tenancy": "none",
-        "backend.llm": "ollama",
-        "backend.llm.agents": "none",
-        "backend.llm.extras": [
-          "rag"
-        ],
-        "backend.llm.embeddings": "ollama",
-        "backend.mcp": [],
-        "module.style": "event-sourced",
-        "module.event-store": "kurrentdb",
-        "module.ddd-depth": "strict",
-        "module.cqrs": "logical",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "xunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "nsubstitute",
-        "backend.test.integration": "testcontainers",
-        "backend.test.extras": [],
-        "test.discipline": "test-after",
-        "frontend.framework": "vue",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "turborepo",
-        "frontend.state": "pinia",
-        "frontend.api-client": "orval",
-        "frontend.routing": "vue-router",
-        "frontend.forms": "vee-validate",
-        "frontend.validation": "zod",
-        "frontend.styling": "css-modules",
-        "frontend.ui-library": "reka-ui",
-        "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.realtime": "none",
-        "frontend.pwa": "yes",
-        "frontend.test.extras": [
-          "screenshot-tests",
-          "accessibility"
-        ],
-        "backend.data-access.reads": "dapper"
-      }
-    },
-    {
-      "name": "pairwise-13",
-      "choices": {
-        "backend.database": "postgres",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "kafka",
-        "backend.bus.library": "wolverine",
-        "backend.mediator": "hand-rolled",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest",
-          "grpc"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "bcl",
-        "backend.absence": "option",
-        "backend.auth": "entra-id",
-        "backend.authorization": [
-          "roles"
-        ],
-        "backend.tenancy": "column",
-        "backend.llm": "anthropic",
-        "backend.llm.agents": "none",
-        "backend.llm.extras": [
-          "rag"
-        ],
-        "backend.llm.embeddings": "ollama",
-        "backend.mcp": [
-          "server",
-          "client"
-        ],
-        "module.style": "ddd",
-        "module.ddd-depth": "light",
-        "module.cqrs": "none",
-        "module.communication": [
-          "integration-events"
-        ],
-        "backend.test.framework": "tunit",
-        "backend.test.assertions": "awesome-assertions",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "testcontainers",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "vue",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "nx",
-        "frontend.state": "tanstack-query",
-        "frontend.api-client": "orval",
-        "frontend.routing": "vue-router",
-        "frontend.forms": "vee-validate",
-        "frontend.validation": "valibot",
-        "frontend.styling": "css-modules",
-        "frontend.ui-library": "reka-ui",
-        "frontend.design-system": "tokens",
+        "frontend.design-system": "tokens-and-components",
         "frontend.data-grid": "ag-grid",
         "frontend.charts": "chartjs",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
-        "frontend.realtime": "sse",
-        "frontend.auth-client": "msal",
+        "frontend.dashboards": [],
+        "frontend.realtime": "signalr",
+        "frontend.agent-ui": "none",
+        "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
-          "screenshot-tests",
-          "accessibility"
+          "storybook-tests"
         ],
         "backend.data-access.reads": "ef-core"
       }
     },
     {
-      "name": "pairwise-14",
+      "name": "pairwise-13",
       "choices": {
         "backend.database": "postgres",
         "backend.data-access": "ef-core",
@@ -871,35 +799,35 @@
         "backend.authorization": [
           "roles"
         ],
-        "backend.tenancy": "none",
-        "backend.llm": "ollama",
+        "backend.tenancy": "column",
+        "backend.llm": "openai",
         "backend.llm.agents": "agent-framework",
         "backend.llm.extras": [
-          "rag"
+          "rag",
+          "evals"
         ],
         "backend.llm.embeddings": "ollama",
         "backend.mcp": [
           "server"
         ],
-        "module.style": "event-sourced",
-        "module.event-store": "marten",
-        "module.ddd-depth": "strict",
-        "module.cqrs": "physical",
+        "module.style": "ddd",
+        "module.ddd-depth": "light",
+        "module.cqrs": "none",
         "module.communication": [
           "contract-interface",
           "integration-events"
         ],
         "backend.test.framework": "nunit",
         "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "nsubstitute",
-        "backend.test.integration": "aspire-fixture",
+        "backend.test.mocks": "moq",
+        "backend.test.integration": "testcontainers",
         "backend.test.extras": [],
-        "test.discipline": "test-after",
+        "test.discipline": "red-first",
         "frontend.framework": "react",
         "frontend.architecture": "micro-frontends",
         "frontend.mfe-technique": "module-federation",
         "frontend.mfe-mixed-frameworks": "no",
-        "frontend.workspace": "pnpm-workspaces",
+        "frontend.workspace": "nx",
         "frontend.state": "zustand-tanstack-query",
         "frontend.api-client": "orval",
         "frontend.routing": "react-router",
@@ -907,54 +835,192 @@
         "frontend.validation": "valibot",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn",
-        "frontend.design-system": "tokens-and-components",
-        "frontend.data-grid": "ag-grid",
+        "frontend.design-system": "tokens",
+        "frontend.data-grid": "tanstack-table",
         "frontend.charts": "echarts",
-        "frontend.dashboards": [],
+        "frontend.dashboards": [
+          "user-editable",
+          "generative"
+        ],
         "frontend.realtime": "signalr",
-        "frontend.agent-ui": "none",
+        "frontend.agent-ui": "ag-ui",
         "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
-          "storybook-tests",
+          "screenshot-tests",
           "accessibility"
         ],
         "backend.data-access.reads": "ef-core"
       }
     },
     {
-      "name": "pairwise-15",
+      "name": "pairwise-14",
       "choices": {
-        "backend.database": "sqlserver",
+        "backend.database": "postgres",
         "backend.data-access": "ef-core",
         "backend.topology": "modular-monolith",
         "backend.bus.transport": "kafka",
         "backend.bus.library": "wolverine",
         "backend.mediator": "wolverine",
         "backend.api-style": "minimal-apis",
+        "backend.api-protocols": [
+          "rest"
+        ],
+        "backend.errors": "result",
+        "backend.result-style": "minimal",
+        "backend.guards": "ensure-that",
+        "backend.absence": "option",
+        "backend.auth": "entra-id",
+        "backend.authorization": [
+          "claims"
+        ],
+        "backend.tenancy": "none",
+        "backend.llm": "anthropic",
+        "backend.llm.agents": "none",
+        "backend.llm.extras": [
+          "rag",
+          "evals"
+        ],
+        "backend.llm.embeddings": "ollama",
+        "backend.mcp": [],
+        "module.style": "event-sourced",
+        "module.event-store": "marten",
+        "module.ddd-depth": "strict",
+        "module.cqrs": "physical",
+        "module.communication": [
+          "integration-events"
+        ],
+        "backend.test.framework": "tunit",
+        "backend.test.assertions": "awesome-assertions",
+        "backend.test.mocks": "nsubstitute",
+        "backend.test.integration": "testcontainers",
+        "backend.test.extras": [],
+        "test.discipline": "red-first",
+        "frontend.framework": "vue",
+        "frontend.architecture": "spa",
+        "frontend.workspace": "pnpm-workspaces",
+        "frontend.state": "tanstack-query",
+        "frontend.api-client": "orval",
+        "frontend.routing": "vue-router",
+        "frontend.forms": "vee-validate",
+        "frontend.validation": "valibot",
+        "frontend.styling": "css-modules",
+        "frontend.ui-library": "reka-ui",
+        "frontend.design-system": "none",
+        "frontend.data-grid": "tanstack-table",
+        "frontend.charts": "chartjs",
+        "frontend.dashboards": [],
+        "frontend.realtime": "sse",
+        "frontend.auth-client": "msal",
+        "frontend.pwa": "no",
+        "frontend.test.extras": [],
+        "backend.data-access.reads": "ef-core"
+      }
+    },
+    {
+      "name": "pairwise-15",
+      "choices": {
+        "backend.database": "postgres",
+        "backend.data-access": "ef-core",
+        "backend.topology": "modular-monolith",
+        "backend.bus.transport": "rabbitmq",
+        "backend.bus.library": "wolverine",
+        "backend.mediator": "hand-rolled",
+        "backend.api-style": "minimal-apis",
         "backend.api-protocols": [],
         "backend.errors": "result",
         "backend.result-style": "minimal",
         "backend.guards": "ensure-that",
         "backend.absence": "nullable",
-        "backend.auth": "keycloak",
+        "backend.auth": "generic-oidc",
         "backend.authorization": [
+          "roles",
           "claims"
         ],
-        "backend.tenancy": "column",
-        "backend.llm": "anthropic",
-        "backend.llm.agents": "none",
-        "backend.llm.extras": [],
-        "backend.mcp": [],
-        "module.style": "crud",
+        "backend.tenancy": "none",
+        "backend.llm": "none",
+        "backend.mcp": [
+          "server"
+        ],
+        "module.style": "ddd",
+        "module.ddd-depth": "strict",
         "module.cqrs": "logical",
         "module.communication": [
           "contract-interface",
           "integration-events"
         ],
         "backend.test.framework": "nunit",
-        "backend.test.assertions": "shouldly",
+        "backend.test.assertions": "awesome-assertions",
         "backend.test.mocks": "nsubstitute",
+        "backend.test.integration": "testcontainers",
+        "backend.test.extras": [],
+        "test.discipline": "test-after",
+        "frontend.framework": "react",
+        "frontend.architecture": "micro-frontends",
+        "frontend.mfe-technique": "module-federation",
+        "frontend.mfe-mixed-frameworks": "no",
+        "frontend.workspace": "turborepo",
+        "frontend.state": "tanstack-query",
+        "frontend.api-client": "orval",
+        "frontend.routing": "tanstack-router",
+        "frontend.forms": "react-hook-form",
+        "frontend.validation": "zod",
+        "frontend.styling": "tailwind",
+        "frontend.ui-library": "shadcn",
+        "frontend.design-system": "tokens-and-components",
+        "frontend.data-grid": "tanstack-table",
+        "frontend.charts": "recharts",
+        "frontend.dashboards": [
+          "user-editable"
+        ],
+        "frontend.realtime": "none",
+        "frontend.auth-client": "oidc-client-ts",
+        "frontend.pwa": "yes",
+        "frontend.test.extras": [
+          "storybook-tests",
+          "screenshot-tests"
+        ],
+        "backend.data-access.reads": "dapper"
+      }
+    },
+    {
+      "name": "pairwise-16",
+      "choices": {
+        "backend.database": "postgres",
+        "backend.data-access": "ef-core",
+        "backend.topology": "modular-monolith",
+        "backend.bus.transport": "kafka",
+        "backend.bus.library": "wolverine",
+        "backend.mediator": "wolverine",
+        "backend.api-style": "minimal-apis",
+        "backend.api-protocols": [
+          "rest"
+        ],
+        "backend.errors": "result",
+        "backend.result-style": "typed-outcomes",
+        "backend.guards": "ensure-that",
+        "backend.absence": "option",
+        "backend.auth": "entra-id",
+        "backend.authorization": [],
+        "backend.tenancy": "column",
+        "backend.llm": "ollama",
+        "backend.llm.agents": "none",
+        "backend.llm.extras": [
+          "rag"
+        ],
+        "backend.llm.embeddings": "openai",
+        "backend.mcp": [
+          "client"
+        ],
+        "module.style": "crud",
+        "module.cqrs": "logical",
+        "module.communication": [
+          "contract-interface",
+          "integration-events"
+        ],
+        "backend.test.framework": "xunit",
+        "backend.test.assertions": "shouldly",
+        "backend.test.mocks": "moq",
         "backend.test.integration": "testcontainers",
         "backend.test.extras": [],
         "test.discipline": "test-after",
@@ -968,77 +1034,14 @@
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn-vue",
-        "frontend.design-system": "tokens",
-        "frontend.data-grid": "ag-grid",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [],
-        "frontend.realtime": "signalr",
-        "frontend.auth-client": "oidc-client-ts",
-        "frontend.pwa": "yes",
-        "frontend.test.extras": [
-          "screenshot-tests"
-        ],
-        "backend.data-access.reads": "ef-core"
-      }
-    },
-    {
-      "name": "pairwise-16",
-      "choices": {
-        "backend.database": "sqlserver",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "azure-service-bus",
-        "backend.bus.library": "wolverine",
-        "backend.mediator": "wolverine",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "minimal",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "entra-id",
-        "backend.authorization": [],
-        "backend.tenancy": "column",
-        "backend.llm": "ollama",
-        "backend.llm.agents": "none",
-        "backend.llm.extras": [],
-        "backend.mcp": [
-          "client"
-        ],
-        "module.style": "crud",
-        "module.cqrs": "none",
-        "module.communication": [
-          "integration-events"
-        ],
-        "backend.test.framework": "tunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "aspire-fixture",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "react",
-        "frontend.architecture": "micro-frontends",
-        "frontend.mfe-technique": "module-federation",
-        "frontend.mfe-mixed-frameworks": "no",
-        "frontend.workspace": "turborepo",
-        "frontend.state": "redux-toolkit",
-        "frontend.api-client": "rtk-query-codegen",
-        "frontend.routing": "tanstack-router",
-        "frontend.forms": "react-hook-form",
-        "frontend.validation": "zod",
-        "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn",
-        "frontend.design-system": "tokens-and-components",
+        "frontend.design-system": "web-components",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "chartjs",
         "frontend.dashboards": [],
-        "frontend.realtime": "none",
+        "frontend.realtime": "signalr",
         "frontend.auth-client": "msal",
         "frontend.pwa": "no",
         "frontend.test.extras": [
-          "storybook-tests",
           "screenshot-tests",
           "accessibility"
         ],
@@ -1055,9 +1058,7 @@
         "backend.bus.library": "wolverine",
         "backend.mediator": "wolverine",
         "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest"
-        ],
+        "backend.api-protocols": [],
         "backend.errors": "result",
         "backend.result-style": "typed-outcomes",
         "backend.guards": "bcl",
@@ -1069,16 +1070,13 @@
         "backend.llm.extras": [
           "evals"
         ],
-        "backend.mcp": [
-          "client"
-        ],
-        "module.style": "ddd",
-        "module.ddd-depth": "light",
-        "module.cqrs": "none",
+        "backend.mcp": [],
+        "module.style": "crud",
+        "module.cqrs": "logical",
         "module.communication": [
           "integration-events"
         ],
-        "backend.test.framework": "xunit",
+        "backend.test.framework": "tunit",
         "backend.test.assertions": "awesome-assertions",
         "backend.test.mocks": "moq",
         "backend.test.integration": "testcontainers",
@@ -1087,20 +1085,21 @@
         "frontend.framework": "vue",
         "frontend.architecture": "spa",
         "frontend.workspace": "nx",
-        "frontend.state": "tanstack-query",
-        "frontend.api-client": "openapi-fetch",
+        "frontend.state": "pinia",
+        "frontend.api-client": "orval",
         "frontend.routing": "vue-router",
         "frontend.forms": "tanstack-form",
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn-vue",
-        "frontend.design-system": "none",
+        "frontend.design-system": "tokens",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "echarts",
         "frontend.realtime": "none",
         "frontend.pwa": "no",
         "frontend.test.extras": [
-          "screenshot-tests"
+          "screenshot-tests",
+          "accessibility"
         ],
         "backend.data-access.reads": "dapper"
       }
@@ -1111,8 +1110,7 @@
         "backend.database": "postgres",
         "backend.data-access": "ef-core",
         "backend.topology": "modular-monolith",
-        "backend.bus.transport": "kafka",
-        "backend.bus.library": "wolverine",
+        "backend.bus.transport": "none",
         "backend.mediator": "hand-rolled",
         "backend.api-style": "minimal-apis",
         "backend.api-protocols": [
@@ -1120,100 +1118,31 @@
           "grpc"
         ],
         "backend.errors": "result",
-        "backend.result-style": "minimal",
+        "backend.result-style": "typed-outcomes",
         "backend.guards": "bcl",
         "backend.absence": "option",
         "backend.auth": "keycloak",
         "backend.authorization": [
           "roles"
         ],
-        "backend.tenancy": "column",
-        "backend.llm": "openai",
-        "backend.llm.agents": "agent-framework",
+        "backend.tenancy": "none",
+        "backend.llm": "azure-openai",
+        "backend.llm.agents": "none",
         "backend.llm.extras": [
           "evals"
         ],
         "backend.mcp": [
-          "server"
-        ],
-        "module.style": "ddd",
-        "module.ddd-depth": "strict",
-        "module.cqrs": "logical",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "tunit",
-        "backend.test.assertions": "awesome-assertions",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "aspire-fixture",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "vue",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "nx",
-        "frontend.state": "pinia",
-        "frontend.api-client": "openapi-fetch",
-        "frontend.routing": "vue-router",
-        "frontend.forms": "tanstack-form",
-        "frontend.validation": "zod",
-        "frontend.styling": "css-modules",
-        "frontend.ui-library": "reka-ui",
-        "frontend.design-system": "tokens",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable",
-          "generative"
-        ],
-        "frontend.realtime": "signalr",
-        "frontend.agent-ui": "ag-ui",
-        "frontend.auth-client": "oidc-client-ts",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [
-          "screenshot-tests"
-        ],
-        "backend.data-access.reads": "ef-core"
-      }
-    },
-    {
-      "name": "pairwise-19",
-      "choices": {
-        "backend.database": "postgres",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "rabbitmq",
-        "backend.bus.library": "wolverine",
-        "backend.mediator": "wolverine",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "minimal",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "generic-oidc",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
-        "backend.tenancy": "column",
-        "backend.llm": "openai",
-        "backend.llm.agents": "none",
-        "backend.llm.extras": [
-          "rag"
-        ],
-        "backend.llm.embeddings": "azure-openai",
-        "backend.mcp": [
+          "server",
           "client"
         ],
-        "module.style": "crud",
-        "module.cqrs": "none",
+        "module.style": "event-sourced",
+        "module.event-store": "marten",
+        "module.ddd-depth": "light",
+        "module.cqrs": "physical",
         "module.communication": [
           "integration-events"
         ],
-        "backend.test.framework": "tunit",
+        "backend.test.framework": "nunit",
         "backend.test.assertions": "awesome-assertions",
         "backend.test.mocks": "moq",
         "backend.test.integration": "aspire-fixture",
@@ -1225,31 +1154,32 @@
         "frontend.state": "tanstack-query",
         "frontend.api-client": "openapi-fetch",
         "frontend.routing": "vue-router",
-        "frontend.forms": "vee-validate",
+        "frontend.forms": "tanstack-form",
         "frontend.validation": "zod",
         "frontend.styling": "css-modules",
         "frontend.ui-library": "reka-ui",
         "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [],
+        "frontend.data-grid": "ag-grid",
+        "frontend.charts": "chartjs",
+        "frontend.dashboards": [
+          "user-editable"
+        ],
         "frontend.realtime": "sse",
         "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
-          "screenshot-tests",
           "accessibility"
         ],
-        "backend.data-access.reads": "ef-core"
+        "backend.data-access.reads": "dapper"
       }
     },
     {
-      "name": "pairwise-20",
+      "name": "pairwise-19",
       "choices": {
         "backend.database": "sqlserver",
         "backend.data-access": "ef-core",
         "backend.topology": "modular-monolith",
-        "backend.bus.transport": "rabbitmq",
+        "backend.bus.transport": "kafka",
         "backend.bus.library": "wolverine",
         "backend.mediator": "wolverine",
         "backend.api-style": "minimal-apis",
@@ -1257,54 +1187,118 @@
           "rest"
         ],
         "backend.errors": "result",
-        "backend.result-style": "minimal",
+        "backend.result-style": "typed-outcomes",
         "backend.guards": "ensure-that",
         "backend.absence": "option",
-        "backend.auth": "keycloak",
-        "backend.authorization": [
-          "claims"
-        ],
-        "backend.tenancy": "column",
+        "backend.auth": "none",
+        "backend.tenancy": "none",
         "backend.llm": "none",
         "backend.mcp": [
           "client"
         ],
-        "module.style": "crud",
-        "module.cqrs": "none",
+        "module.style": "event-sourced",
+        "module.event-store": "kurrentdb",
+        "module.ddd-depth": "light",
+        "module.cqrs": "logical",
         "module.communication": [
+          "contract-interface",
           "integration-events"
         ],
         "backend.test.framework": "xunit",
         "backend.test.assertions": "awesome-assertions",
-        "backend.test.mocks": "nsubstitute",
+        "backend.test.mocks": "moq",
         "backend.test.integration": "aspire-fixture",
         "backend.test.extras": [],
         "test.discipline": "red-first",
         "frontend.framework": "react",
-        "frontend.architecture": "micro-frontends",
-        "frontend.mfe-technique": "module-federation",
-        "frontend.mfe-mixed-frameworks": "no",
+        "frontend.architecture": "spa",
         "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "zustand-tanstack-query",
-        "frontend.api-client": "orval",
-        "frontend.routing": "tanstack-router",
-        "frontend.forms": "react-hook-form",
+        "frontend.state": "redux-toolkit",
+        "frontend.api-client": "rtk-query-codegen",
+        "frontend.routing": "react-router",
+        "frontend.forms": "tanstack-form",
         "frontend.validation": "valibot",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn",
         "frontend.design-system": "tokens-and-components",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "recharts",
-        "frontend.dashboards": [],
-        "frontend.realtime": "sse",
-        "frontend.auth-client": "oidc-client-ts",
+        "frontend.data-grid": "ag-grid",
+        "frontend.charts": "chartjs",
+        "frontend.realtime": "signalr",
         "frontend.pwa": "yes",
         "frontend.test.extras": [
           "storybook-tests",
+          "accessibility"
+        ],
+        "backend.data-access.reads": "dapper"
+      }
+    },
+    {
+      "name": "pairwise-20",
+      "choices": {
+        "backend.database": "postgres",
+        "backend.data-access": "ef-core",
+        "backend.topology": "modular-monolith",
+        "backend.bus.transport": "kafka",
+        "backend.bus.library": "wolverine",
+        "backend.mediator": "wolverine",
+        "backend.api-style": "minimal-apis",
+        "backend.api-protocols": [
+          "rest"
+        ],
+        "backend.errors": "result",
+        "backend.result-style": "typed-outcomes",
+        "backend.guards": "bcl",
+        "backend.absence": "option",
+        "backend.auth": "entra-id",
+        "backend.authorization": [
+          "claims"
+        ],
+        "backend.tenancy": "none",
+        "backend.llm": "azure-openai",
+        "backend.llm.agents": "none",
+        "backend.llm.extras": [
+          "rag",
+          "evals"
+        ],
+        "backend.llm.embeddings": "ollama",
+        "backend.mcp": [
+          "client"
+        ],
+        "module.style": "ddd",
+        "module.ddd-depth": "strict",
+        "module.cqrs": "none",
+        "module.communication": [
+          "contract-interface",
+          "integration-events"
+        ],
+        "backend.test.framework": "xunit",
+        "backend.test.assertions": "shouldly",
+        "backend.test.mocks": "moq",
+        "backend.test.integration": "aspire-fixture",
+        "backend.test.extras": [],
+        "test.discipline": "red-first",
+        "frontend.framework": "react",
+        "frontend.architecture": "spa",
+        "frontend.workspace": "nx",
+        "frontend.state": "redux-toolkit",
+        "frontend.api-client": "rtk-query-codegen",
+        "frontend.routing": "tanstack-router",
+        "frontend.forms": "react-hook-form",
+        "frontend.validation": "zod",
+        "frontend.styling": "tailwind",
+        "frontend.ui-library": "shadcn",
+        "frontend.design-system": "tokens",
+        "frontend.data-grid": "tanstack-table",
+        "frontend.charts": "recharts",
+        "frontend.dashboards": [],
+        "frontend.realtime": "signalr",
+        "frontend.auth-client": "msal",
+        "frontend.pwa": "no",
+        "frontend.test.extras": [
           "screenshot-tests",
           "accessibility"
         ],
-        "backend.data-access.reads": "ef-core"
+        "backend.data-access.reads": "dapper"
       }
     },
     {
@@ -1321,19 +1315,20 @@
           "rest"
         ],
         "backend.errors": "result",
-        "backend.result-style": "minimal",
+        "backend.result-style": "typed-outcomes",
         "backend.guards": "ensure-that",
         "backend.absence": "option",
-        "backend.auth": "entra-id",
+        "backend.auth": "generic-oidc",
         "backend.authorization": [
           "claims"
         ],
         "backend.tenancy": "none",
-        "backend.llm": "azure-openai",
+        "backend.llm": "ollama",
         "backend.llm.agents": "none",
         "backend.llm.extras": [
-          "evals"
+          "rag"
         ],
+        "backend.llm.embeddings": "azure-openai",
         "backend.mcp": [
           "client"
         ],
@@ -1351,24 +1346,27 @@
         "backend.test.integration": "aspire-fixture",
         "backend.test.extras": [],
         "test.discipline": "red-first",
-        "frontend.framework": "vue",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "nx",
-        "frontend.state": "pinia-tanstack-query",
-        "frontend.api-client": "openapi-fetch",
-        "frontend.routing": "vue-router",
-        "frontend.forms": "vee-validate",
+        "frontend.framework": "react",
+        "frontend.architecture": "micro-frontends",
+        "frontend.mfe-technique": "module-federation",
+        "frontend.mfe-mixed-frameworks": "no",
+        "frontend.workspace": "turborepo",
+        "frontend.state": "redux-toolkit",
+        "frontend.api-client": "rtk-query-codegen",
+        "frontend.routing": "react-router",
+        "frontend.forms": "react-hook-form",
         "frontend.validation": "zod",
-        "frontend.styling": "css-modules",
-        "frontend.ui-library": "reka-ui",
-        "frontend.design-system": "tokens",
+        "frontend.styling": "tailwind",
+        "frontend.ui-library": "shadcn",
+        "frontend.design-system": "tokens-and-components",
         "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "chartjs",
+        "frontend.charts": "recharts",
         "frontend.dashboards": [],
-        "frontend.realtime": "sse",
-        "frontend.auth-client": "msal",
-        "frontend.pwa": "yes",
+        "frontend.realtime": "none",
+        "frontend.auth-client": "oidc-client-ts",
+        "frontend.pwa": "no",
         "frontend.test.extras": [
+          "storybook-tests",
           "screenshot-tests",
           "accessibility"
         ],
@@ -1381,50 +1379,63 @@
         "backend.database": "sqlserver",
         "backend.data-access": "ef-core",
         "backend.topology": "modular-monolith",
-        "backend.bus.transport": "kafka",
+        "backend.bus.transport": "rabbitmq",
         "backend.bus.library": "wolverine",
-        "backend.mediator": "wolverine",
+        "backend.mediator": "hand-rolled",
         "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [],
+        "backend.api-protocols": [
+          "rest",
+          "grpc"
+        ],
         "backend.errors": "result",
         "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
+        "backend.guards": "bcl",
         "backend.absence": "option",
-        "backend.auth": "none",
+        "backend.auth": "entra-id",
+        "backend.authorization": [
+          "roles",
+          "claims"
+        ],
         "backend.tenancy": "none",
-        "backend.llm": "none",
+        "backend.llm": "openai",
+        "backend.llm.agents": "agent-framework",
+        "backend.llm.extras": [
+          "evals"
+        ],
         "backend.mcp": [
           "client"
         ],
-        "module.style": "event-sourced",
-        "module.event-store": "kurrentdb",
-        "module.ddd-depth": "strict",
+        "module.style": "crud",
         "module.cqrs": "logical",
         "module.communication": [
           "integration-events"
         ],
-        "backend.test.framework": "nunit",
+        "backend.test.framework": "xunit",
         "backend.test.assertions": "shouldly",
         "backend.test.mocks": "moq",
         "backend.test.integration": "aspire-fixture",
         "backend.test.extras": [],
         "test.discipline": "red-first",
-        "frontend.framework": "react",
+        "frontend.framework": "vue",
         "frontend.architecture": "spa",
-        "frontend.workspace": "nx",
-        "frontend.state": "redux-toolkit",
-        "frontend.api-client": "rtk-query-codegen",
-        "frontend.routing": "react-router",
+        "frontend.workspace": "pnpm-workspaces",
+        "frontend.state": "pinia-tanstack-query",
+        "frontend.api-client": "openapi-fetch",
+        "frontend.routing": "vue-router",
         "frontend.forms": "tanstack-form",
-        "frontend.validation": "zod",
-        "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn",
-        "frontend.design-system": "tokens",
+        "frontend.validation": "valibot",
+        "frontend.styling": "css-modules",
+        "frontend.ui-library": "reka-ui",
+        "frontend.design-system": "none",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "chartjs",
+        "frontend.dashboards": [],
         "frontend.realtime": "none",
+        "frontend.agent-ui": "none",
+        "frontend.auth-client": "msal",
         "frontend.pwa": "no",
         "frontend.test.extras": [
+          "screenshot-tests",
           "accessibility"
         ],
         "backend.data-access.reads": "ef-core"
@@ -1442,79 +1453,13 @@
         "backend.api-protocols": [],
         "backend.errors": "result",
         "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
+        "backend.guards": "bcl",
         "backend.absence": "option",
-        "backend.auth": "entra-id",
+        "backend.auth": "keycloak",
         "backend.authorization": [
-          "roles"
+          "roles",
+          "claims"
         ],
-        "backend.tenancy": "none",
-        "backend.llm": "azure-openai",
-        "backend.llm.agents": "none",
-        "backend.llm.extras": [
-          "rag"
-        ],
-        "backend.llm.embeddings": "openai",
-        "backend.mcp": [
-          "server",
-          "client"
-        ],
-        "module.style": "crud",
-        "module.cqrs": "logical",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "nunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "testcontainers",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "vue",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "nx",
-        "frontend.state": "pinia",
-        "frontend.api-client": "orval",
-        "frontend.routing": "vue-router",
-        "frontend.forms": "tanstack-form",
-        "frontend.validation": "zod",
-        "frontend.styling": "css-modules",
-        "frontend.ui-library": "reka-ui",
-        "frontend.design-system": "tokens",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
-        "frontend.realtime": "signalr",
-        "frontend.auth-client": "oidc-client-ts",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [
-          "screenshot-tests",
-          "accessibility"
-        ],
-        "backend.data-access.reads": "dapper"
-      }
-    },
-    {
-      "name": "pairwise-24",
-      "choices": {
-        "backend.database": "postgres",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "azure-service-bus",
-        "backend.bus.library": "wolverine",
-        "backend.mediator": "wolverine",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "none",
         "backend.tenancy": "none",
         "backend.llm": "anthropic",
         "backend.llm.agents": "none",
@@ -1524,14 +1469,12 @@
         ],
         "backend.llm.embeddings": "azure-openai",
         "backend.mcp": [
+          "server",
           "client"
         ],
-        "module.style": "event-sourced",
-        "module.event-store": "marten",
-        "module.ddd-depth": "strict",
-        "module.cqrs": "physical",
+        "module.style": "crud",
+        "module.cqrs": "none",
         "module.communication": [
-          "contract-interface",
           "integration-events"
         ],
         "backend.test.framework": "xunit",
@@ -1540,23 +1483,90 @@
         "backend.test.integration": "aspire-fixture",
         "backend.test.extras": [],
         "test.discipline": "red-first",
-        "frontend.framework": "react",
+        "frontend.framework": "vue",
         "frontend.architecture": "spa",
-        "frontend.workspace": "turborepo",
-        "frontend.state": "redux-toolkit",
-        "frontend.api-client": "rtk-query-codegen",
-        "frontend.routing": "react-router",
-        "frontend.forms": "react-hook-form",
+        "frontend.workspace": "pnpm-workspaces",
+        "frontend.state": "pinia",
+        "frontend.api-client": "openapi-fetch",
+        "frontend.routing": "vue-router",
+        "frontend.forms": "vee-validate",
+        "frontend.validation": "zod",
+        "frontend.styling": "css-modules",
+        "frontend.ui-library": "reka-ui",
+        "frontend.design-system": "web-components",
+        "frontend.data-grid": "tanstack-table",
+        "frontend.charts": "echarts",
+        "frontend.dashboards": [
+          "user-editable"
+        ],
+        "frontend.realtime": "sse",
+        "frontend.auth-client": "oidc-client-ts",
+        "frontend.pwa": "yes",
+        "frontend.test.extras": [
+          "screenshot-tests",
+          "accessibility"
+        ],
+        "backend.data-access.reads": "ef-core"
+      }
+    },
+    {
+      "name": "pairwise-24",
+      "choices": {
+        "backend.database": "sqlserver",
+        "backend.data-access": "ef-core",
+        "backend.topology": "modular-monolith",
+        "backend.bus.transport": "azure-service-bus",
+        "backend.bus.library": "wolverine",
+        "backend.mediator": "hand-rolled",
+        "backend.api-style": "minimal-apis",
+        "backend.api-protocols": [],
+        "backend.errors": "result",
+        "backend.result-style": "typed-outcomes",
+        "backend.guards": "ensure-that",
+        "backend.absence": "option",
+        "backend.auth": "keycloak",
+        "backend.authorization": [
+          "roles",
+          "claims"
+        ],
+        "backend.tenancy": "none",
+        "backend.llm": "none",
+        "backend.mcp": [
+          "server",
+          "client"
+        ],
+        "module.style": "event-sourced",
+        "module.event-store": "kurrentdb",
+        "module.ddd-depth": "light",
+        "module.cqrs": "logical",
+        "module.communication": [
+          "integration-events"
+        ],
+        "backend.test.framework": "tunit",
+        "backend.test.assertions": "shouldly",
+        "backend.test.mocks": "moq",
+        "backend.test.integration": "aspire-fixture",
+        "backend.test.extras": [],
+        "test.discipline": "red-first",
+        "frontend.framework": "vue",
+        "frontend.architecture": "spa",
+        "frontend.workspace": "nx",
+        "frontend.state": "pinia-tanstack-query",
+        "frontend.api-client": "openapi-fetch",
+        "frontend.routing": "vue-router",
+        "frontend.forms": "vee-validate",
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn",
-        "frontend.design-system": "tokens-and-components",
+        "frontend.ui-library": "shadcn-vue",
+        "frontend.design-system": "tokens",
         "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "recharts",
-        "frontend.realtime": "none",
+        "frontend.charts": "echarts",
+        "frontend.dashboards": [],
+        "frontend.realtime": "sse",
+        "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
-          "storybook-tests",
+          "screenshot-tests",
           "accessibility"
         ],
         "backend.data-access.reads": "ef-core"
@@ -1564,6 +1574,139 @@
     },
     {
       "name": "pairwise-25",
+      "choices": {
+        "backend.database": "sqlserver",
+        "backend.data-access": "ef-core",
+        "backend.topology": "modular-monolith",
+        "backend.bus.transport": "azure-service-bus",
+        "backend.bus.library": "wolverine",
+        "backend.mediator": "hand-rolled",
+        "backend.api-style": "minimal-apis",
+        "backend.api-protocols": [],
+        "backend.errors": "result",
+        "backend.result-style": "typed-outcomes",
+        "backend.guards": "ensure-that",
+        "backend.absence": "option",
+        "backend.auth": "none",
+        "backend.tenancy": "none",
+        "backend.llm": "ollama",
+        "backend.llm.agents": "none",
+        "backend.llm.extras": [
+          "evals"
+        ],
+        "backend.mcp": [
+          "server",
+          "client"
+        ],
+        "module.style": "crud",
+        "module.cqrs": "none",
+        "module.communication": [
+          "integration-events"
+        ],
+        "backend.test.framework": "tunit",
+        "backend.test.assertions": "shouldly",
+        "backend.test.mocks": "moq",
+        "backend.test.integration": "aspire-fixture",
+        "backend.test.extras": [],
+        "test.discipline": "red-first",
+        "frontend.framework": "react",
+        "frontend.architecture": "spa",
+        "frontend.workspace": "pnpm-workspaces",
+        "frontend.state": "zustand-tanstack-query",
+        "frontend.api-client": "openapi-fetch",
+        "frontend.routing": "tanstack-router",
+        "frontend.forms": "react-hook-form",
+        "frontend.validation": "zod",
+        "frontend.styling": "tailwind",
+        "frontend.ui-library": "shadcn",
+        "frontend.design-system": "none",
+        "frontend.data-grid": "tanstack-table",
+        "frontend.charts": "recharts",
+        "frontend.realtime": "signalr",
+        "frontend.pwa": "yes",
+        "frontend.test.extras": [
+          "screenshot-tests",
+          "accessibility"
+        ],
+        "backend.data-access.reads": "ef-core"
+      }
+    },
+    {
+      "name": "pairwise-26",
+      "choices": {
+        "backend.database": "postgres",
+        "backend.data-access": "ef-core",
+        "backend.topology": "modular-monolith",
+        "backend.bus.transport": "kafka",
+        "backend.bus.library": "wolverine",
+        "backend.mediator": "hand-rolled",
+        "backend.api-style": "minimal-apis",
+        "backend.api-protocols": [
+          "rest",
+          "grpc"
+        ],
+        "backend.errors": "result",
+        "backend.result-style": "typed-outcomes",
+        "backend.guards": "ensure-that",
+        "backend.absence": "option",
+        "backend.auth": "generic-oidc",
+        "backend.authorization": [
+          "claims"
+        ],
+        "backend.tenancy": "none",
+        "backend.llm": "openai",
+        "backend.llm.agents": "none",
+        "backend.llm.extras": [
+          "rag",
+          "evals"
+        ],
+        "backend.llm.embeddings": "openai",
+        "backend.mcp": [
+          "server",
+          "client"
+        ],
+        "module.style": "event-sourced",
+        "module.event-store": "kurrentdb",
+        "module.ddd-depth": "light",
+        "module.cqrs": "logical",
+        "module.communication": [
+          "contract-interface",
+          "integration-events"
+        ],
+        "backend.test.framework": "nunit",
+        "backend.test.assertions": "shouldly",
+        "backend.test.mocks": "moq",
+        "backend.test.integration": "aspire-fixture",
+        "backend.test.extras": [],
+        "test.discipline": "red-first",
+        "frontend.framework": "vue",
+        "frontend.architecture": "spa",
+        "frontend.workspace": "turborepo",
+        "frontend.state": "pinia",
+        "frontend.api-client": "orval",
+        "frontend.routing": "vue-router",
+        "frontend.forms": "vee-validate",
+        "frontend.validation": "zod",
+        "frontend.styling": "css-modules",
+        "frontend.ui-library": "reka-ui",
+        "frontend.design-system": "web-components",
+        "frontend.data-grid": "tanstack-table",
+        "frontend.charts": "echarts",
+        "frontend.dashboards": [
+          "user-editable"
+        ],
+        "frontend.realtime": "none",
+        "frontend.auth-client": "oidc-client-ts",
+        "frontend.pwa": "no",
+        "frontend.test.extras": [
+          "screenshot-tests",
+          "accessibility"
+        ],
+        "backend.data-access.reads": "ef-core"
+      }
+    },
+    {
+      "name": "pairwise-27",
       "choices": {
         "backend.database": "sqlserver",
         "backend.data-access": "ef-core",
@@ -1581,7 +1724,74 @@
         "backend.absence": "option",
         "backend.auth": "entra-id",
         "backend.authorization": [
-          "roles"
+          "claims"
+        ],
+        "backend.tenancy": "none",
+        "backend.llm": "none",
+        "backend.mcp": [
+          "server",
+          "client"
+        ],
+        "module.style": "crud",
+        "module.cqrs": "none",
+        "module.communication": [
+          "contract-interface",
+          "integration-events"
+        ],
+        "backend.test.framework": "xunit",
+        "backend.test.assertions": "shouldly",
+        "backend.test.mocks": "moq",
+        "backend.test.integration": "aspire-fixture",
+        "backend.test.extras": [],
+        "test.discipline": "red-first",
+        "frontend.framework": "react",
+        "frontend.architecture": "micro-frontends",
+        "frontend.mfe-technique": "module-federation",
+        "frontend.mfe-mixed-frameworks": "no",
+        "frontend.workspace": "pnpm-workspaces",
+        "frontend.state": "tanstack-query",
+        "frontend.api-client": "orval",
+        "frontend.routing": "tanstack-router",
+        "frontend.forms": "react-hook-form",
+        "frontend.validation": "zod",
+        "frontend.styling": "tailwind",
+        "frontend.ui-library": "shadcn",
+        "frontend.design-system": "tokens-and-components",
+        "frontend.data-grid": "tanstack-table",
+        "frontend.charts": "echarts",
+        "frontend.dashboards": [],
+        "frontend.realtime": "none",
+        "frontend.auth-client": "msal",
+        "frontend.pwa": "no",
+        "frontend.test.extras": [
+          "storybook-tests",
+          "screenshot-tests",
+          "accessibility"
+        ],
+        "backend.data-access.reads": "ef-core"
+      }
+    },
+    {
+      "name": "pairwise-28",
+      "choices": {
+        "backend.database": "postgres",
+        "backend.data-access": "ef-core",
+        "backend.topology": "modular-monolith",
+        "backend.bus.transport": "rabbitmq",
+        "backend.bus.library": "wolverine",
+        "backend.mediator": "hand-rolled",
+        "backend.api-style": "minimal-apis",
+        "backend.api-protocols": [
+          "rest",
+          "grpc"
+        ],
+        "backend.errors": "result",
+        "backend.result-style": "typed-outcomes",
+        "backend.guards": "ensure-that",
+        "backend.absence": "option",
+        "backend.auth": "keycloak",
+        "backend.authorization": [
+          "claims"
         ],
         "backend.tenancy": "none",
         "backend.llm": "none",
@@ -1590,9 +1800,9 @@
           "client"
         ],
         "module.style": "event-sourced",
-        "module.event-store": "kurrentdb",
-        "module.ddd-depth": "strict",
-        "module.cqrs": "logical",
+        "module.event-store": "marten",
+        "module.ddd-depth": "light",
+        "module.cqrs": "physical",
         "module.communication": [
           "contract-interface",
           "integration-events"
@@ -1603,37 +1813,41 @@
         "backend.test.integration": "aspire-fixture",
         "backend.test.extras": [],
         "test.discipline": "red-first",
-        "frontend.framework": "vue",
-        "frontend.architecture": "spa",
+        "frontend.framework": "react",
+        "frontend.architecture": "micro-frontends",
+        "frontend.mfe-technique": "module-federation",
+        "frontend.mfe-mixed-frameworks": "no",
         "frontend.workspace": "turborepo",
-        "frontend.state": "tanstack-query",
-        "frontend.api-client": "openapi-fetch",
-        "frontend.routing": "vue-router",
-        "frontend.forms": "vee-validate",
+        "frontend.state": "zustand-tanstack-query",
+        "frontend.api-client": "orval",
+        "frontend.routing": "react-router",
+        "frontend.forms": "react-hook-form",
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn-vue",
-        "frontend.design-system": "none",
+        "frontend.ui-library": "shadcn",
+        "frontend.design-system": "web-components",
         "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [],
-        "frontend.realtime": "signalr",
-        "frontend.auth-client": "msal",
+        "frontend.charts": "recharts",
+        "frontend.dashboards": [
+          "user-editable"
+        ],
+        "frontend.realtime": "sse",
+        "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
           "screenshot-tests",
           "accessibility"
         ],
-        "backend.data-access.reads": "dapper"
+        "backend.data-access.reads": "ef-core"
       }
     },
     {
-      "name": "pairwise-26",
+      "name": "pairwise-29",
       "choices": {
         "backend.database": "postgres",
         "backend.data-access": "ef-core",
         "backend.topology": "modular-monolith",
-        "backend.bus.transport": "azure-service-bus",
+        "backend.bus.transport": "kafka",
         "backend.bus.library": "wolverine",
         "backend.mediator": "hand-rolled",
         "backend.api-style": "minimal-apis",
@@ -1663,13 +1877,13 @@
           "client"
         ],
         "module.style": "ddd",
-        "module.ddd-depth": "light",
+        "module.ddd-depth": "strict",
         "module.cqrs": "none",
         "module.communication": [
           "contract-interface",
           "integration-events"
         ],
-        "backend.test.framework": "nunit",
+        "backend.test.framework": "tunit",
         "backend.test.assertions": "shouldly",
         "backend.test.mocks": "moq",
         "backend.test.integration": "aspire-fixture",
@@ -1679,7 +1893,7 @@
         "frontend.architecture": "spa",
         "frontend.workspace": "turborepo",
         "frontend.state": "pinia-tanstack-query",
-        "frontend.api-client": "openapi-fetch",
+        "frontend.api-client": "orval",
         "frontend.routing": "vue-router",
         "frontend.forms": "vee-validate",
         "frontend.validation": "zod",
@@ -1704,13 +1918,12 @@
       }
     },
     {
-      "name": "pairwise-27",
+      "name": "pairwise-30",
       "choices": {
-        "backend.database": "postgres",
+        "backend.database": "sqlserver",
         "backend.data-access": "ef-core",
         "backend.topology": "modular-monolith",
-        "backend.bus.transport": "kafka",
-        "backend.bus.library": "wolverine",
+        "backend.bus.transport": "none",
         "backend.mediator": "hand-rolled",
         "backend.api-style": "minimal-apis",
         "backend.api-protocols": [
@@ -1721,65 +1934,56 @@
         "backend.result-style": "typed-outcomes",
         "backend.guards": "ensure-that",
         "backend.absence": "option",
-        "backend.auth": "keycloak",
-        "backend.authorization": [
-          "claims"
-        ],
+        "backend.auth": "none",
         "backend.tenancy": "none",
-        "backend.llm": "azure-openai",
+        "backend.llm": "anthropic",
         "backend.llm.agents": "none",
         "backend.llm.extras": [
-          "rag",
           "evals"
         ],
-        "backend.llm.embeddings": "ollama",
         "backend.mcp": [
           "server",
           "client"
         ],
-        "module.style": "crud",
+        "module.style": "ddd",
+        "module.ddd-depth": "strict",
         "module.cqrs": "none",
         "module.communication": [
           "contract-interface",
           "integration-events"
         ],
-        "backend.test.framework": "xunit",
+        "backend.test.framework": "nunit",
         "backend.test.assertions": "shouldly",
         "backend.test.mocks": "moq",
         "backend.test.integration": "aspire-fixture",
         "backend.test.extras": [],
         "test.discipline": "red-first",
-        "frontend.framework": "react",
-        "frontend.architecture": "micro-frontends",
-        "frontend.mfe-technique": "module-federation",
-        "frontend.mfe-mixed-frameworks": "no",
-        "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "redux-toolkit",
-        "frontend.api-client": "rtk-query-codegen",
-        "frontend.routing": "tanstack-router",
-        "frontend.forms": "react-hook-form",
+        "frontend.framework": "vue",
+        "frontend.architecture": "spa",
+        "frontend.workspace": "turborepo",
+        "frontend.state": "pinia-tanstack-query",
+        "frontend.api-client": "orval",
+        "frontend.routing": "vue-router",
+        "frontend.forms": "vee-validate",
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn",
-        "frontend.design-system": "tokens",
+        "frontend.ui-library": "shadcn-vue",
+        "frontend.design-system": "none",
         "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "recharts",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
-        "frontend.realtime": "signalr",
-        "frontend.auth-client": "oidc-client-ts",
+        "frontend.charts": "echarts",
+        "frontend.realtime": "none",
         "frontend.pwa": "no",
         "frontend.test.extras": [
-          "screenshot-tests"
+          "screenshot-tests",
+          "accessibility"
         ],
         "backend.data-access.reads": "ef-core"
       }
     },
     {
-      "name": "pairwise-28",
+      "name": "pairwise-31",
       "choices": {
-        "backend.database": "sqlserver",
+        "backend.database": "postgres",
         "backend.data-access": "ef-core",
         "backend.topology": "modular-monolith",
         "backend.bus.transport": "azure-service-bus",
@@ -1794,11 +1998,18 @@
         "backend.result-style": "typed-outcomes",
         "backend.guards": "ensure-that",
         "backend.absence": "option",
-        "backend.auth": "none",
+        "backend.auth": "generic-oidc",
+        "backend.authorization": [
+          "claims"
+        ],
         "backend.tenancy": "none",
-        "backend.llm": "openai",
-        "backend.llm.agents": "none",
-        "backend.llm.extras": [],
+        "backend.llm": "azure-openai",
+        "backend.llm.agents": "agent-framework",
+        "backend.llm.extras": [
+          "rag",
+          "evals"
+        ],
+        "backend.llm.embeddings": "openai",
         "backend.mcp": [
           "server",
           "client"
@@ -1806,71 +2017,6 @@
         "module.style": "ddd",
         "module.ddd-depth": "light",
         "module.cqrs": "none",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "xunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "aspire-fixture",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "react",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "nx",
-        "frontend.state": "zustand-tanstack-query",
-        "frontend.api-client": "openapi-fetch",
-        "frontend.routing": "tanstack-router",
-        "frontend.forms": "react-hook-form",
-        "frontend.validation": "zod",
-        "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn",
-        "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "recharts",
-        "frontend.realtime": "none",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [
-          "screenshot-tests",
-          "accessibility"
-        ],
-        "backend.data-access.reads": "ef-core"
-      }
-    },
-    {
-      "name": "pairwise-29",
-      "choices": {
-        "backend.database": "sqlserver",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "rabbitmq",
-        "backend.bus.library": "wolverine",
-        "backend.mediator": "hand-rolled",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest",
-          "grpc"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "entra-id",
-        "backend.authorization": [
-          "claims"
-        ],
-        "backend.tenancy": "none",
-        "backend.llm": "openai",
-        "backend.llm.agents": "agent-framework",
-        "backend.llm.extras": [
-          "evals"
-        ],
-        "backend.mcp": [
-          "client"
-        ],
-        "module.style": "crud",
-        "module.cqrs": "logical",
         "module.communication": [
           "contract-interface",
           "integration-events"
@@ -1891,13 +2037,15 @@
         "frontend.validation": "zod",
         "frontend.styling": "css-modules",
         "frontend.ui-library": "reka-ui",
-        "frontend.design-system": "none",
+        "frontend.design-system": "web-components",
         "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "chartjs",
-        "frontend.dashboards": [],
+        "frontend.charts": "echarts",
+        "frontend.dashboards": [
+          "user-editable"
+        ],
         "frontend.realtime": "none",
         "frontend.agent-ui": "none",
-        "frontend.auth-client": "msal",
+        "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
           "screenshot-tests",
@@ -1907,7 +2055,7 @@
       }
     },
     {
-      "name": "pairwise-30",
+      "name": "pairwise-32",
       "choices": {
         "backend.database": "postgres",
         "backend.data-access": "ef-core",
@@ -1931,85 +2079,12 @@
         ],
         "backend.tenancy": "none",
         "backend.llm": "anthropic",
-        "backend.llm.agents": "none",
+        "backend.llm.agents": "agent-framework",
         "backend.llm.extras": [
           "rag",
           "evals"
         ],
-        "backend.llm.embeddings": "openai",
-        "backend.mcp": [
-          "server",
-          "client"
-        ],
-        "module.style": "event-sourced",
-        "module.event-store": "kurrentdb",
-        "module.ddd-depth": "light",
-        "module.cqrs": "logical",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "xunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "aspire-fixture",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "vue",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "nx",
-        "frontend.state": "pinia",
-        "frontend.api-client": "orval",
-        "frontend.routing": "vue-router",
-        "frontend.forms": "vee-validate",
-        "frontend.validation": "zod",
-        "frontend.styling": "css-modules",
-        "frontend.ui-library": "reka-ui",
-        "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
-        "frontend.realtime": "sse",
-        "frontend.auth-client": "oidc-client-ts",
-        "frontend.pwa": "yes",
-        "frontend.test.extras": [
-          "screenshot-tests",
-          "accessibility"
-        ],
-        "backend.data-access.reads": "ef-core"
-      }
-    },
-    {
-      "name": "pairwise-31",
-      "choices": {
-        "backend.database": "sqlserver",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "kafka",
-        "backend.bus.library": "wolverine",
-        "backend.mediator": "hand-rolled",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest",
-          "grpc"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "keycloak",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
-        "backend.tenancy": "none",
-        "backend.llm": "azure-openai",
-        "backend.llm.agents": "none",
-        "backend.llm.extras": [
-          "evals"
-        ],
+        "backend.llm.embeddings": "ollama",
         "backend.mcp": [
           "server",
           "client"
@@ -2027,12 +2102,10 @@
         "backend.test.extras": [],
         "test.discipline": "red-first",
         "frontend.framework": "react",
-        "frontend.architecture": "micro-frontends",
-        "frontend.mfe-technique": "module-federation",
-        "frontend.mfe-mixed-frameworks": "no",
-        "frontend.workspace": "nx",
+        "frontend.architecture": "spa",
+        "frontend.workspace": "pnpm-workspaces",
         "frontend.state": "tanstack-query",
-        "frontend.api-client": "orval",
+        "frontend.api-client": "openapi-fetch",
         "frontend.routing": "react-router",
         "frontend.forms": "react-hook-form",
         "frontend.validation": "zod",
@@ -2041,77 +2114,16 @@
         "frontend.design-system": "tokens-and-components",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "echarts",
-        "frontend.dashboards": [],
+        "frontend.dashboards": [
+          "user-editable",
+          "generative"
+        ],
         "frontend.realtime": "none",
+        "frontend.agent-ui": "ag-ui",
         "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
           "storybook-tests",
-          "screenshot-tests",
-          "accessibility"
-        ],
-        "backend.data-access.reads": "ef-core"
-      }
-    },
-    {
-      "name": "pairwise-32",
-      "choices": {
-        "backend.database": "postgres",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "kafka",
-        "backend.bus.library": "wolverine",
-        "backend.mediator": "hand-rolled",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest",
-          "grpc"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "none",
-        "backend.tenancy": "none",
-        "backend.llm": "ollama",
-        "backend.llm.agents": "none",
-        "backend.llm.extras": [
-          "rag",
-          "evals"
-        ],
-        "backend.llm.embeddings": "openai",
-        "backend.mcp": [
-          "server",
-          "client"
-        ],
-        "module.style": "crud",
-        "module.cqrs": "none",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "xunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "aspire-fixture",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "vue",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "pinia-tanstack-query",
-        "frontend.api-client": "orval",
-        "frontend.routing": "vue-router",
-        "frontend.forms": "vee-validate",
-        "frontend.validation": "zod",
-        "frontend.styling": "css-modules",
-        "frontend.ui-library": "reka-ui",
-        "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.realtime": "none",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [
           "screenshot-tests",
           "accessibility"
         ],
@@ -2135,10 +2147,14 @@
         "backend.result-style": "typed-outcomes",
         "backend.guards": "ensure-that",
         "backend.absence": "option",
-        "backend.auth": "none",
+        "backend.auth": "keycloak",
+        "backend.authorization": [
+          "roles",
+          "claims"
+        ],
         "backend.tenancy": "none",
-        "backend.llm": "anthropic",
-        "backend.llm.agents": "none",
+        "backend.llm": "openai",
+        "backend.llm.agents": "agent-framework",
         "backend.llm.extras": [
           "rag",
           "evals"
@@ -2161,9 +2177,7 @@
         "backend.test.extras": [],
         "test.discipline": "red-first",
         "frontend.framework": "react",
-        "frontend.architecture": "micro-frontends",
-        "frontend.mfe-technique": "module-federation",
-        "frontend.mfe-mixed-frameworks": "no",
+        "frontend.architecture": "spa",
         "frontend.workspace": "pnpm-workspaces",
         "frontend.state": "zustand-tanstack-query",
         "frontend.api-client": "orval",
@@ -2172,10 +2186,16 @@
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn",
-        "frontend.design-system": "tokens",
+        "frontend.design-system": "web-components",
         "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
+        "frontend.charts": "chartjs",
+        "frontend.dashboards": [
+          "user-editable",
+          "generative"
+        ],
         "frontend.realtime": "none",
+        "frontend.agent-ui": "ag-ui",
+        "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
           "screenshot-tests",
@@ -2201,13 +2221,9 @@
         "backend.result-style": "typed-outcomes",
         "backend.guards": "ensure-that",
         "backend.absence": "option",
-        "backend.auth": "entra-id",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
+        "backend.auth": "none",
         "backend.tenancy": "none",
-        "backend.llm": "openai",
+        "backend.llm": "azure-openai",
         "backend.llm.agents": "agent-framework",
         "backend.llm.extras": [
           "rag",
@@ -2233,23 +2249,18 @@
         "frontend.framework": "react",
         "frontend.architecture": "spa",
         "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "tanstack-query",
+        "frontend.state": "zustand-tanstack-query",
         "frontend.api-client": "orval",
-        "frontend.routing": "tanstack-router",
+        "frontend.routing": "react-router",
         "frontend.forms": "react-hook-form",
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn",
-        "frontend.design-system": "tokens-and-components",
+        "frontend.design-system": "tokens",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "recharts",
-        "frontend.dashboards": [
-          "user-editable",
-          "generative"
-        ],
         "frontend.realtime": "none",
-        "frontend.agent-ui": "ag-ui",
-        "frontend.auth-client": "msal",
+        "frontend.agent-ui": "none",
         "frontend.pwa": "no",
         "frontend.test.extras": [
           "screenshot-tests",
@@ -2264,8 +2275,7 @@
         "backend.database": "postgres",
         "backend.data-access": "ef-core",
         "backend.topology": "modular-monolith",
-        "backend.bus.transport": "azure-service-bus",
-        "backend.bus.library": "wolverine",
+        "backend.bus.transport": "none",
         "backend.mediator": "hand-rolled",
         "backend.api-style": "minimal-apis",
         "backend.api-protocols": [
@@ -2276,14 +2286,14 @@
         "backend.result-style": "typed-outcomes",
         "backend.guards": "ensure-that",
         "backend.absence": "option",
-        "backend.auth": "keycloak",
+        "backend.auth": "generic-oidc",
         "backend.authorization": [
           "roles",
           "claims"
         ],
         "backend.tenancy": "none",
         "backend.llm": "azure-openai",
-        "backend.llm.agents": "agent-framework",
+        "backend.llm.agents": "none",
         "backend.llm.extras": [
           "rag",
           "evals"
@@ -2293,8 +2303,10 @@
           "server",
           "client"
         ],
-        "module.style": "crud",
-        "module.cqrs": "none",
+        "module.style": "event-sourced",
+        "module.event-store": "marten",
+        "module.ddd-depth": "light",
+        "module.cqrs": "physical",
         "module.communication": [
           "contract-interface",
           "integration-events"
@@ -2308,21 +2320,20 @@
         "frontend.framework": "vue",
         "frontend.architecture": "spa",
         "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "pinia",
+        "frontend.state": "pinia-tanstack-query",
         "frontend.api-client": "orval",
         "frontend.routing": "vue-router",
         "frontend.forms": "tanstack-form",
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn-vue",
-        "frontend.design-system": "none",
+        "frontend.design-system": "tokens",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "echarts",
         "frontend.dashboards": [
           "user-editable"
         ],
-        "frontend.realtime": "sse",
-        "frontend.agent-ui": "none",
+        "frontend.realtime": "none",
         "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
@@ -2349,9 +2360,19 @@
         "backend.result-style": "typed-outcomes",
         "backend.guards": "ensure-that",
         "backend.absence": "option",
-        "backend.auth": "none",
+        "backend.auth": "entra-id",
+        "backend.authorization": [
+          "roles",
+          "claims"
+        ],
         "backend.tenancy": "none",
-        "backend.llm": "none",
+        "backend.llm": "ollama",
+        "backend.llm.agents": "agent-framework",
+        "backend.llm.extras": [
+          "rag",
+          "evals"
+        ],
+        "backend.llm.embeddings": "openai",
         "backend.mcp": [
           "server",
           "client"
@@ -2373,17 +2394,23 @@
         "frontend.framework": "vue",
         "frontend.architecture": "spa",
         "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "pinia",
+        "frontend.state": "tanstack-query",
         "frontend.api-client": "orval",
         "frontend.routing": "vue-router",
         "frontend.forms": "tanstack-form",
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn-vue",
-        "frontend.design-system": "none",
+        "frontend.design-system": "tokens",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "echarts",
+        "frontend.dashboards": [
+          "user-editable",
+          "generative"
+        ],
         "frontend.realtime": "none",
+        "frontend.agent-ui": "ag-ui",
+        "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
           "screenshot-tests",
@@ -2395,7 +2422,7 @@
     {
       "name": "pairwise-37",
       "choices": {
-        "backend.database": "postgres",
+        "backend.database": "sqlserver",
         "backend.data-access": "ef-core",
         "backend.topology": "modular-monolith",
         "backend.bus.transport": "none",
@@ -2416,20 +2443,16 @@
         ],
         "backend.tenancy": "none",
         "backend.llm": "openai",
-        "backend.llm.agents": "none",
+        "backend.llm.agents": "agent-framework",
         "backend.llm.extras": [
-          "rag",
           "evals"
         ],
-        "backend.llm.embeddings": "azure-openai",
         "backend.mcp": [
           "server",
           "client"
         ],
-        "module.style": "event-sourced",
-        "module.event-store": "kurrentdb",
-        "module.ddd-depth": "light",
-        "module.cqrs": "logical",
+        "module.style": "crud",
+        "module.cqrs": "none",
         "module.communication": [
           "contract-interface",
           "integration-events"
@@ -2440,23 +2463,22 @@
         "backend.test.integration": "aspire-fixture",
         "backend.test.extras": [],
         "test.discipline": "red-first",
-        "frontend.framework": "vue",
+        "frontend.framework": "react",
         "frontend.architecture": "spa",
         "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "pinia-tanstack-query",
+        "frontend.state": "redux-toolkit",
         "frontend.api-client": "orval",
-        "frontend.routing": "vue-router",
-        "frontend.forms": "tanstack-form",
+        "frontend.routing": "react-router",
+        "frontend.forms": "react-hook-form",
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
-        "frontend.ui-library": "reka-ui",
-        "frontend.design-system": "none",
+        "frontend.ui-library": "shadcn",
+        "frontend.design-system": "web-components",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
+        "frontend.dashboards": [],
         "frontend.realtime": "none",
+        "frontend.agent-ui": "ag-ui",
         "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
@@ -2483,11 +2505,7 @@
         "backend.result-style": "typed-outcomes",
         "backend.guards": "ensure-that",
         "backend.absence": "option",
-        "backend.auth": "generic-oidc",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
+        "backend.auth": "none",
         "backend.tenancy": "none",
         "backend.llm": "openai",
         "backend.llm.agents": "none",
@@ -2495,13 +2513,15 @@
           "rag",
           "evals"
         ],
-        "backend.llm.embeddings": "ollama",
+        "backend.llm.embeddings": "azure-openai",
         "backend.mcp": [
           "server",
           "client"
         ],
-        "module.style": "crud",
-        "module.cqrs": "none",
+        "module.style": "event-sourced",
+        "module.event-store": "kurrentdb",
+        "module.ddd-depth": "light",
+        "module.cqrs": "logical",
         "module.communication": [
           "contract-interface",
           "integration-events"
@@ -2512,24 +2532,20 @@
         "backend.test.integration": "aspire-fixture",
         "backend.test.extras": [],
         "test.discipline": "red-first",
-        "frontend.framework": "vue",
+        "frontend.framework": "react",
         "frontend.architecture": "spa",
         "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "pinia-tanstack-query",
-        "frontend.api-client": "openapi-fetch",
-        "frontend.routing": "vue-router",
-        "frontend.forms": "tanstack-form",
+        "frontend.state": "tanstack-query",
+        "frontend.api-client": "orval",
+        "frontend.routing": "react-router",
+        "frontend.forms": "react-hook-form",
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn-vue",
+        "frontend.ui-library": "shadcn",
         "frontend.design-system": "none",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
         "frontend.realtime": "none",
-        "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
           "screenshot-tests",
@@ -2557,19 +2573,21 @@
         "backend.absence": "option",
         "backend.auth": "none",
         "backend.tenancy": "none",
-        "backend.llm": "anthropic",
+        "backend.llm": "openai",
         "backend.llm.agents": "agent-framework",
         "backend.llm.extras": [
           "rag",
           "evals"
         ],
-        "backend.llm.embeddings": "openai",
+        "backend.llm.embeddings": "ollama",
         "backend.mcp": [
           "server",
           "client"
         ],
-        "module.style": "crud",
-        "module.cqrs": "none",
+        "module.style": "event-sourced",
+        "module.event-store": "kurrentdb",
+        "module.ddd-depth": "light",
+        "module.cqrs": "logical",
         "module.communication": [
           "contract-interface",
           "integration-events"
@@ -2590,7 +2608,7 @@
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
         "frontend.ui-library": "shadcn",
-        "frontend.design-system": "none",
+        "frontend.design-system": "web-components",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "echarts",
         "frontend.realtime": "none",
@@ -2605,75 +2623,6 @@
     },
     {
       "name": "pairwise-40",
-      "choices": {
-        "backend.database": "sqlserver",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "none",
-        "backend.mediator": "hand-rolled",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest",
-          "grpc"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "keycloak",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
-        "backend.tenancy": "none",
-        "backend.llm": "ollama",
-        "backend.llm.agents": "agent-framework",
-        "backend.llm.extras": [
-          "evals"
-        ],
-        "backend.mcp": [
-          "server",
-          "client"
-        ],
-        "module.style": "crud",
-        "module.cqrs": "none",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "xunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "aspire-fixture",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "react",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "redux-toolkit",
-        "frontend.api-client": "orval",
-        "frontend.routing": "react-router",
-        "frontend.forms": "react-hook-form",
-        "frontend.validation": "zod",
-        "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn",
-        "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [],
-        "frontend.realtime": "none",
-        "frontend.agent-ui": "ag-ui",
-        "frontend.auth-client": "oidc-client-ts",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [
-          "screenshot-tests",
-          "accessibility"
-        ],
-        "backend.data-access.reads": "ef-core"
-      }
-    },
-    {
-      "name": "pairwise-41",
       "choices": {
         "backend.database": "postgres",
         "backend.data-access": "ef-core",
@@ -2717,14 +2666,80 @@
         "frontend.framework": "vue",
         "frontend.architecture": "spa",
         "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "tanstack-query",
+        "frontend.state": "pinia",
         "frontend.api-client": "orval",
         "frontend.routing": "vue-router",
         "frontend.forms": "tanstack-form",
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn-vue",
+        "frontend.ui-library": "reka-ui",
         "frontend.design-system": "none",
+        "frontend.data-grid": "tanstack-table",
+        "frontend.charts": "echarts",
+        "frontend.realtime": "none",
+        "frontend.pwa": "no",
+        "frontend.test.extras": [
+          "screenshot-tests",
+          "accessibility"
+        ],
+        "backend.data-access.reads": "ef-core"
+      }
+    },
+    {
+      "name": "pairwise-41",
+      "choices": {
+        "backend.database": "postgres",
+        "backend.data-access": "ef-core",
+        "backend.topology": "modular-monolith",
+        "backend.bus.transport": "none",
+        "backend.mediator": "hand-rolled",
+        "backend.api-style": "minimal-apis",
+        "backend.api-protocols": [
+          "rest",
+          "grpc"
+        ],
+        "backend.errors": "result",
+        "backend.result-style": "typed-outcomes",
+        "backend.guards": "ensure-that",
+        "backend.absence": "option",
+        "backend.auth": "none",
+        "backend.tenancy": "none",
+        "backend.llm": "openai",
+        "backend.llm.agents": "none",
+        "backend.llm.extras": [
+          "rag",
+          "evals"
+        ],
+        "backend.llm.embeddings": "openai",
+        "backend.mcp": [
+          "server",
+          "client"
+        ],
+        "module.style": "event-sourced",
+        "module.event-store": "marten",
+        "module.ddd-depth": "light",
+        "module.cqrs": "logical",
+        "module.communication": [
+          "contract-interface",
+          "integration-events"
+        ],
+        "backend.test.framework": "xunit",
+        "backend.test.assertions": "shouldly",
+        "backend.test.mocks": "moq",
+        "backend.test.integration": "aspire-fixture",
+        "backend.test.extras": [],
+        "test.discipline": "red-first",
+        "frontend.framework": "react",
+        "frontend.architecture": "spa",
+        "frontend.workspace": "pnpm-workspaces",
+        "frontend.state": "redux-toolkit",
+        "frontend.api-client": "rtk-query-codegen",
+        "frontend.routing": "react-router",
+        "frontend.forms": "react-hook-form",
+        "frontend.validation": "zod",
+        "frontend.styling": "tailwind",
+        "frontend.ui-library": "shadcn",
+        "frontend.design-system": "tokens-and-components",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "echarts",
         "frontend.realtime": "none",
@@ -2755,13 +2770,13 @@
         "backend.absence": "option",
         "backend.auth": "none",
         "backend.tenancy": "none",
-        "backend.llm": "anthropic",
+        "backend.llm": "openai",
         "backend.llm.agents": "agent-framework",
         "backend.llm.extras": [
           "rag",
           "evals"
         ],
-        "backend.llm.embeddings": "azure-openai",
+        "backend.llm.embeddings": "openai",
         "backend.mcp": [
           "server",
           "client"
@@ -2778,21 +2793,21 @@
         "backend.test.integration": "aspire-fixture",
         "backend.test.extras": [],
         "test.discipline": "red-first",
-        "frontend.framework": "react",
+        "frontend.framework": "vue",
         "frontend.architecture": "spa",
         "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "zustand-tanstack-query",
+        "frontend.state": "tanstack-query",
         "frontend.api-client": "orval",
-        "frontend.routing": "react-router",
-        "frontend.forms": "react-hook-form",
+        "frontend.routing": "vue-router",
+        "frontend.forms": "tanstack-form",
         "frontend.validation": "zod",
         "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn",
+        "frontend.ui-library": "shadcn-vue",
         "frontend.design-system": "none",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "echarts",
         "frontend.realtime": "none",
-        "frontend.agent-ui": "ag-ui",
+        "frontend.agent-ui": "none",
         "frontend.pwa": "no",
         "frontend.test.extras": [
           "screenshot-tests",
@@ -2818,79 +2833,7 @@
         "backend.result-style": "typed-outcomes",
         "backend.guards": "ensure-that",
         "backend.absence": "option",
-        "backend.auth": "keycloak",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
-        "backend.tenancy": "none",
-        "backend.llm": "none",
-        "backend.mcp": [
-          "server",
-          "client"
-        ],
-        "module.style": "event-sourced",
-        "module.event-store": "marten",
-        "module.ddd-depth": "light",
-        "module.cqrs": "physical",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "xunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "aspire-fixture",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "react",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "redux-toolkit",
-        "frontend.api-client": "rtk-query-codegen",
-        "frontend.routing": "react-router",
-        "frontend.forms": "react-hook-form",
-        "frontend.validation": "zod",
-        "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn",
-        "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
-        "frontend.realtime": "none",
-        "frontend.auth-client": "oidc-client-ts",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [
-          "screenshot-tests",
-          "accessibility"
-        ],
-        "backend.data-access.reads": "ef-core"
-      }
-    },
-    {
-      "name": "pairwise-44",
-      "choices": {
-        "backend.database": "postgres",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "none",
-        "backend.mediator": "hand-rolled",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest",
-          "grpc"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "keycloak",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
+        "backend.auth": "none",
         "backend.tenancy": "none",
         "backend.llm": "anthropic",
         "backend.llm.agents": "agent-framework",
@@ -2903,10 +2846,8 @@
           "server",
           "client"
         ],
-        "module.style": "event-sourced",
-        "module.event-store": "marten",
-        "module.ddd-depth": "light",
-        "module.cqrs": "physical",
+        "module.style": "crud",
+        "module.cqrs": "none",
         "module.communication": [
           "contract-interface",
           "integration-events"
@@ -2930,362 +2871,8 @@
         "frontend.design-system": "none",
         "frontend.data-grid": "tanstack-table",
         "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable",
-          "generative"
-        ],
         "frontend.realtime": "none",
         "frontend.agent-ui": "ag-ui",
-        "frontend.auth-client": "oidc-client-ts",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [
-          "screenshot-tests",
-          "accessibility"
-        ],
-        "backend.data-access.reads": "ef-core"
-      }
-    },
-    {
-      "name": "pairwise-45",
-      "choices": {
-        "backend.database": "postgres",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "none",
-        "backend.mediator": "hand-rolled",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest",
-          "grpc"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "keycloak",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
-        "backend.tenancy": "none",
-        "backend.llm": "none",
-        "backend.mcp": [
-          "server",
-          "client"
-        ],
-        "module.style": "crud",
-        "module.cqrs": "none",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "xunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "aspire-fixture",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "vue",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "pinia-tanstack-query",
-        "frontend.api-client": "orval",
-        "frontend.routing": "vue-router",
-        "frontend.forms": "tanstack-form",
-        "frontend.validation": "zod",
-        "frontend.styling": "tailwind",
-        "frontend.ui-library": "reka-ui",
-        "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
-        "frontend.realtime": "none",
-        "frontend.auth-client": "oidc-client-ts",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [
-          "screenshot-tests",
-          "accessibility"
-        ],
-        "backend.data-access.reads": "ef-core"
-      }
-    },
-    {
-      "name": "pairwise-46",
-      "choices": {
-        "backend.database": "postgres",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "none",
-        "backend.mediator": "hand-rolled",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest",
-          "grpc"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "entra-id",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
-        "backend.tenancy": "none",
-        "backend.llm": "anthropic",
-        "backend.llm.agents": "none",
-        "backend.llm.extras": [
-          "rag",
-          "evals"
-        ],
-        "backend.llm.embeddings": "openai",
-        "backend.mcp": [
-          "server",
-          "client"
-        ],
-        "module.style": "crud",
-        "module.cqrs": "none",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "xunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "aspire-fixture",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "react",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "redux-toolkit",
-        "frontend.api-client": "rtk-query-codegen",
-        "frontend.routing": "react-router",
-        "frontend.forms": "react-hook-form",
-        "frontend.validation": "zod",
-        "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn",
-        "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
-        "frontend.realtime": "none",
-        "frontend.auth-client": "msal",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [
-          "screenshot-tests",
-          "accessibility"
-        ],
-        "backend.data-access.reads": "ef-core"
-      }
-    },
-    {
-      "name": "pairwise-47",
-      "choices": {
-        "backend.database": "postgres",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "none",
-        "backend.mediator": "hand-rolled",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest",
-          "grpc"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "keycloak",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
-        "backend.tenancy": "none",
-        "backend.llm": "none",
-        "backend.mcp": [
-          "server",
-          "client"
-        ],
-        "module.style": "event-sourced",
-        "module.event-store": "marten",
-        "module.ddd-depth": "light",
-        "module.cqrs": "logical",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "xunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "aspire-fixture",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "react",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "redux-toolkit",
-        "frontend.api-client": "rtk-query-codegen",
-        "frontend.routing": "react-router",
-        "frontend.forms": "react-hook-form",
-        "frontend.validation": "zod",
-        "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn",
-        "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
-        "frontend.realtime": "none",
-        "frontend.auth-client": "oidc-client-ts",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [
-          "screenshot-tests",
-          "accessibility"
-        ],
-        "backend.data-access.reads": "ef-core"
-      }
-    },
-    {
-      "name": "pairwise-48",
-      "choices": {
-        "backend.database": "postgres",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "none",
-        "backend.mediator": "hand-rolled",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest",
-          "grpc"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "keycloak",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
-        "backend.tenancy": "none",
-        "backend.llm": "none",
-        "backend.mcp": [
-          "server",
-          "client"
-        ],
-        "module.style": "event-sourced",
-        "module.event-store": "kurrentdb",
-        "module.ddd-depth": "light",
-        "module.cqrs": "logical",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "xunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "aspire-fixture",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "react",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "redux-toolkit",
-        "frontend.api-client": "rtk-query-codegen",
-        "frontend.routing": "react-router",
-        "frontend.forms": "react-hook-form",
-        "frontend.validation": "zod",
-        "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn",
-        "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
-        "frontend.realtime": "none",
-        "frontend.auth-client": "oidc-client-ts",
-        "frontend.pwa": "no",
-        "frontend.test.extras": [
-          "screenshot-tests",
-          "accessibility"
-        ],
-        "backend.data-access.reads": "ef-core"
-      }
-    },
-    {
-      "name": "pairwise-49",
-      "choices": {
-        "backend.database": "postgres",
-        "backend.data-access": "ef-core",
-        "backend.topology": "modular-monolith",
-        "backend.bus.transport": "none",
-        "backend.mediator": "hand-rolled",
-        "backend.api-style": "minimal-apis",
-        "backend.api-protocols": [
-          "rest",
-          "grpc"
-        ],
-        "backend.errors": "result",
-        "backend.result-style": "typed-outcomes",
-        "backend.guards": "ensure-that",
-        "backend.absence": "option",
-        "backend.auth": "keycloak",
-        "backend.authorization": [
-          "roles",
-          "claims"
-        ],
-        "backend.tenancy": "none",
-        "backend.llm": "anthropic",
-        "backend.llm.agents": "agent-framework",
-        "backend.llm.extras": [
-          "rag",
-          "evals"
-        ],
-        "backend.llm.embeddings": "openai",
-        "backend.mcp": [
-          "server",
-          "client"
-        ],
-        "module.style": "event-sourced",
-        "module.event-store": "kurrentdb",
-        "module.ddd-depth": "light",
-        "module.cqrs": "logical",
-        "module.communication": [
-          "contract-interface",
-          "integration-events"
-        ],
-        "backend.test.framework": "xunit",
-        "backend.test.assertions": "shouldly",
-        "backend.test.mocks": "moq",
-        "backend.test.integration": "aspire-fixture",
-        "backend.test.extras": [],
-        "test.discipline": "red-first",
-        "frontend.framework": "react",
-        "frontend.architecture": "spa",
-        "frontend.workspace": "pnpm-workspaces",
-        "frontend.state": "redux-toolkit",
-        "frontend.api-client": "rtk-query-codegen",
-        "frontend.routing": "react-router",
-        "frontend.forms": "react-hook-form",
-        "frontend.validation": "zod",
-        "frontend.styling": "tailwind",
-        "frontend.ui-library": "shadcn",
-        "frontend.design-system": "none",
-        "frontend.data-grid": "tanstack-table",
-        "frontend.charts": "echarts",
-        "frontend.dashboards": [
-          "user-editable"
-        ],
-        "frontend.realtime": "none",
-        "frontend.agent-ui": "none",
-        "frontend.auth-client": "oidc-client-ts",
         "frontend.pwa": "no",
         "frontend.test.extras": [
           "screenshot-tests",
@@ -3986,6 +3573,10 @@
     ],
     [
       "module.communication without integration-events",
+      "frontend.design-system=web-components"
+    ],
+    [
+      "module.communication without integration-events",
       "frontend.data-grid=tanstack-table"
     ],
     [
@@ -4538,6 +4129,10 @@
     ],
     [
       "frontend.design-system=tokens",
+      "frontend.test.extras has storybook-tests"
+    ],
+    [
+      "frontend.design-system=web-components",
       "frontend.test.extras has storybook-tests"
     ],
     [
