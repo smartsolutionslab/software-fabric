@@ -1,0 +1,6 @@
+import { afterEach } from 'vitest';
+
+// Every test starts from an empty document.
+afterEach(() => {
+  document.body.replaceChildren();
+});

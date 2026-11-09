@@ -1,0 +1,6 @@
+import { defineConfig } from 'vitest/config';
+
+// Storybook builds with this configuration too.
+export default defineConfig({
+  test: { environment: 'jsdom', include: ['src/**/*.test.ts'], setupFiles: ['./src/test-setup.ts'] },
+});

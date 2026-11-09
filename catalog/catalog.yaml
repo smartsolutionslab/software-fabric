@@ -551,7 +551,7 @@ dimensions:
         # Reason: the component package is React only (owner decision D5, #232), and its components are styled with
         # Tailwind only, which the pack refuses loudly otherwise (D4: such combinations are catalog rules, #271).
         requires: ["frontend.framework == react", "frontend.styling == tailwind"]
-      web-components:        { tier: experimental }
+      web-components:        { tier: experimental, note: "tokens plus Lit web components with Storybook, framework-neutral" }
 
   frontend.data-grid:
     scope: project

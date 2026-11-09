@@ -1,0 +1,7 @@
+## Design system
+
+Tokens are in `web/packages/tokens/src` (W3C design tokens, compiled by Style Dictionary); the design system's components are web components (Lit) in `web/packages/ui`, each with a story, used in any screen as a tag (`<ds-badge tone="primary">New</ds-badge>`). Browse them in Storybook:
+
+```bash
+cd web && pnpm --filter @{{ name }}/ui storybook
+```
