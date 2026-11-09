@@ -1,6 +1,15 @@
+{{~ func class_of(tailwind, module)
+  if project["frontend.styling"] == "css-modules"
+    ret ':class="styles.' + module + '"'
+  end
+  ret 'class="' + tailwind + '"'
+end ~}}
 <script setup lang="ts">
 import { watchEffect } from 'vue';
 import { useAuth } from '@/auth/useAuth';
+{{~ if project["frontend.styling"] == "css-modules" ~}}
+import styles from './SignedIn.module.css';
+{{~ end ~}}
 
 /** Renders its default slot for a signed-in user and sends everyone else to the identity provider. */
 const { user, isAuthenticated, isLoading, error, activeNavigator, signinRedirect, signoutRedirect } = useAuth();
@@ -17,7 +26,7 @@ watchEffect(() => {
   <p v-else-if="activeNavigator === 'signoutRedirect'">Signing out…</p>
   <p v-else-if="!isAuthenticated">Signing in…</p>
   <template v-else>
-    <div class="flex items-center justify-end gap-3 p-2 text-sm">
+    <div {{ class_of "flex items-center justify-end gap-3 p-2 text-sm" "signedIn" }}>
       <span>Signed in as {{ "{{" }} user?.profile.preferred_username {{ "}}" }}</span>
       <button type="button" @click="signoutRedirect()">Sign out</button>
     </div>

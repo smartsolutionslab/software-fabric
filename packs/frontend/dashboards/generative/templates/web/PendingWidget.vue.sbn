@@ -1,8 +1,37 @@
+{{~ ui = project["frontend.ui-library"] ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ if ui == "reka-ui"
+  button = "BaseButton"
+  button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
+  secondary = "outline"
+else
+  button = "Button"
+  button_import = "import { Button } from '@/components/ui/button';"
+  secondary = "secondary"
+end ~}}
+{{~ func class_of(tailwind, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  ret 'class="' + tailwind + '"'
+end ~}}
+{{~ func themed(shadcn, palette, module)
+  if css_modules
+    ret ':class="styles.' + module + '"'
+  end
+  if ui == "reka-ui"
+    ret 'class="' + palette + '"'
+  end
+  ret 'class="' + shadcn + '"'
+end ~}}
 {%{<script setup lang="ts">
-import { Button } from '@/components/ui/button';
+}%}{{ button_import }}{%{
 import type { WidgetProposal } from './proposal';
 import WidgetView from './WidgetView.vue';
-
+}%}{{~ if css_modules ~}}
+import styles from './PendingWidget.module.css';
+{{~ end ~}}
+{%{
 interface PendingWidgetProps {
   proposal: WidgetProposal;
   height: number;
@@ -23,19 +52,23 @@ const emit = defineEmits<{ accept: []; discard: [] }>();
 </script>
 
 <template>
+}%}{{~ if css_modules ~}}
+  <section :aria-label="`Proposed: ${proposal.title}`" :class="styles.pending">
+{{~ else ~}}
   <section
     :aria-label="`Proposed: ${proposal.title}`"
-    class="flex h-full flex-col overflow-hidden rounded border border-dashed border-primary bg-card p-2"
+    {{ themed "flex h-full flex-col overflow-hidden rounded border border-dashed border-primary bg-card p-2" "flex h-full flex-col overflow-hidden rounded border border-dashed border-slate-900 bg-white p-2" "pending" }}
   >
-    <header class="flex flex-wrap items-center justify-between gap-2">
-      <h2 class="text-sm font-medium">Proposed: {{ proposal.title }}</h2>
-      <div class="flex gap-1">
-        <Button type="button" size="sm" :disabled="!canAccept" @click="emit('accept')">Accept</Button>
-        <Button type="button" variant="ghost" size="sm" @click="emit('discard')">Discard</Button>
+{{~ end ~}}
+{%{    <header }%}{{ class_of "flex flex-wrap items-center justify-between gap-2" "header" }}{%{>
+      <h2 }%}{{ class_of "text-sm font-medium" "title" }}{%{>Proposed: {{ proposal.title }}</h2>
+      <div }%}{{ class_of "flex gap-1" "actions" }}{%{>
+        <}%}{{ button }}{%{ type="button" size="sm" :disabled="!canAccept" @click="emit('accept')">Accept</}%}{{ button }}{%{>
+        <}%}{{ button }}{%{ type="button" variant="ghost" size="sm" @click="emit('discard')">Discard</}%}{{ button }}{%{>
       </div>
     </header>
-    <p v-if="replacing" class="text-xs text-muted-foreground">Replaces a widget on this dashboard.</p>
-    <div class="min-h-0 flex-1 overflow-auto">
+    <p v-if="replacing" }%}{{ themed "text-xs text-muted-foreground" "text-xs text-slate-500" "note" }}{%{>Replaces a widget on this dashboard.</p>
+    <div }%}{{ class_of "min-h-0 flex-1 overflow-auto" "body" }}{%{>
       <WidgetView
         :source="proposal.source"
         :visual="proposal.visual"
