@@ -165,37 +165,32 @@ public sealed class RoleAuthorizationTests
 
     /// <summary>
     /// Every module a project is generated with gets the sample endpoint GET /&lt;module&gt;/permissions/manage once it has
-    /// authorization choices, so the frontend's copy of the OpenAPI document lists it, in the order the host maps modules
-    /// (by name), or the generated OpenApiDocumentTests fails on a project nobody has touched (#313).
+    /// authorization choices, but the endpoint stays out of the OpenAPI document: a module added after generation then
+    /// adds nothing to it, so the frontend's copy, which add-module never rewrites (ADR-0005), stays current (#463).
     /// </summary>
     [Theory]
     [InlineData("saas-ai-react", new[] { Roles })]
     [InlineData("saas-ai-react", new[] { "backend.authorization=claims" })]
     [InlineData("saas-ai-react", new[] { "backend.authorization=roles,claims" })]
     [InlineData("saas-standard-vue", new[] { Roles, "backend.llm=openai", "backend.llm.agents=agent-framework", "frontend.agent-ui=ag-ui", "frontend.dashboards=user-editable" })]
-    public void The_frontends_openapi_copy_lists_every_generated_modules_permission_endpoint_in_the_hosts_order(string profile, string[] overrides)
+    public void Every_generated_module_has_a_permission_endpoint_the_frontends_openapi_copy_does_not_list(string profile, string[] overrides)
     {
         var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, overrides);
         generated.Errors.ShouldBeEmpty();
         var files = generated.Files.ToDictionary(file => file.Path, file => file.Content);
-        List<string> expected = [.. files.Keys
-            .Select(path => System.Text.RegularExpressions.Regex.Match(path, "^src/Modules/(?<module>[^/]+)/[^/]+\\.Api/Endpoints/CanManage\\.cs$"))
-            .Where(match => match.Success)
-            .Select(match => match.Groups["module"].Value)
-            .Order(StringComparer.Ordinal)
-            .Select(module => $"/{module.ToLowerInvariant()}/permissions/manage")];
-        expected.Count.ShouldBeGreaterThan(1);
+        var endpoints = files
+            .Where(file => System.Text.RegularExpressions.Regex.IsMatch(file.Key, "^src/Modules/[^/]+/[^/]+\\.Api/Endpoints/CanManage\\.cs$"))
+            .ToList();
+        endpoints.Count.ShouldBeGreaterThan(1);
 
         var paths = System.Text.Json.Nodes.JsonNode.Parse(files["web/app/openapi.json"])!["paths"]!.AsObject()
             .Select(path => path.Key)
             .ToList();
 
-        paths.Where(path => path.EndsWith("/permissions/manage", StringComparison.Ordinal)).ShouldBe(expected);
-        foreach (var (module, next) in expected.Zip(expected.Skip(1)))
+        paths.Where(path => path.EndsWith("/permissions/manage", StringComparison.Ordinal)).ShouldBeEmpty();
+        foreach (var (path, content) in endpoints)
         {
-            var prefix = module[..module.IndexOf("/permissions/", StringComparison.Ordinal)];
-            paths.FindLastIndex(path => path.StartsWith(prefix + "/", StringComparison.Ordinal) || path == prefix)
-                .ShouldBeLessThan(paths.IndexOf(next), $"{prefix}'s paths come before {next}, as the host maps modules by name.");
+            content.ShouldContain(".ExcludeFromDescription()", customMessage: path);
         }
     }
 
@@ -208,11 +203,13 @@ public sealed class RoleAuthorizationTests
             .ShouldContain("HttpStatusCode.Forbidden");
         project.Build();
 
-        // The new module's sample endpoint makes the frontend's OpenAPI copy stale; that test fails and rewrites it.
-        var (_, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+        // The new module's sample endpoint is not in the OpenAPI document, so the frontend's copy stays current (#463).
+        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
 
-        output.ShouldContain("failed: 1", customMessage: output);
-        output.ShouldContain("failed Shop.Integration.Tests.OpenApiDocumentTests.The_frontends_copy_of_the_openapi_document_is_current", customMessage: output);
+        // Before the exit code: the copy failing is a failed test too, and this names the cause.
+        output.ShouldNotContain("The_frontends_copy_of_the_openapi_document", customMessage: output);
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0", customMessage: output);
     }
 
     /// <summary>A project of the profile with roles; fails while the roles pack is a stand-in.</summary>

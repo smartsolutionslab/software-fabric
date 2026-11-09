@@ -10,12 +10,14 @@ using Microsoft.AspNetCore.Routing;
 namespace {{ namespace }}.Modules.{{ module.namespace }}.Api.Endpoints;
 
 /// <summary>
-/// 200 when the caller holds the policy {{ module.name }}.manage, 403 when not: the frontend can ask before it offers to
-/// manage {{ module.name }}. It is also the sample of an endpoint naming one of its module's policies.
+/// 200 when the caller holds the policy {{ module.name }}.manage, 403 when not: the sample of an endpoint naming one of
+/// its module's policies, which the integration tests prove the policy on. It stays out of the OpenAPI document, so a
+/// module added after generation leaves the frontend's copy of it current.
 /// </summary>
 public sealed class CanManage : IEndpoint
 {
     public void Map(IEndpointRouteBuilder endpoints) =>
         endpoints.MapGet("/permissions/manage", () => TypedResults.Ok())
-            .RequireAuthorization({{ module.namespace }}PolicyNames.Manage);
+            .RequireAuthorization({{ module.namespace }}PolicyNames.Manage)
+            .ExcludeFromDescription();
 }
