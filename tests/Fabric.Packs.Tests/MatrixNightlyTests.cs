@@ -215,6 +215,9 @@ public sealed class MatrixNightlyTests : IDisposable
         ((YamlScalarNode)report["needs"]).Value.ShouldBe("combination");
         ((YamlScalarNode)report["if"]).Value.ShouldBe("${{ !cancelled() }}");
         ((YamlScalarNode)((YamlMappingNode)report["permissions"])["issues"]).Value.ShouldBe("write");
+        var concurrency = (YamlMappingNode)report["concurrency"];
+        ((YamlScalarNode)concurrency["group"]).Value.ShouldBe("matrix-report", "issue reporting is serialised across refs, so two runs cannot both open an issue for one combination.");
+        ((YamlScalarNode)concurrency["cancel-in-progress"]).Value.ShouldBe("false");
         var runs = Runs(report);
         runs.ShouldContain(run => run.StartsWith("build/matrix-report.sh ", StringComparison.Ordinal) && run.Contains(">> \"$GITHUB_STEP_SUMMARY\"", StringComparison.Ordinal));
         runs.ShouldContain(run => run.StartsWith("build/matrix-issues.sh ", StringComparison.Ordinal));

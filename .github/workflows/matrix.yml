@@ -9,8 +9,8 @@ on:
     - cron: "23 2 * * *"
   workflow_dispatch:
 
-# Never two runs at once: a dispatch while the nightly runs waits for it, so the two cannot both open an issue for the
-# same failing combination. Neither trigger is a pull request, so a run is never cancelled for a newer one.
+# One run per ref; neither trigger is a pull request, so a run is never cancelled for a newer one. Runs on different
+# refs may overlap; the report job serialises them where it matters.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -71,6 +71,11 @@ jobs:
     needs: combination
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    # One report at a time across every ref (a dispatch on a branch beside the nightly on main): each reads the open
+    # issues before it opens any, so two at once could both open an issue for the same combination.
+    concurrency:
+      group: matrix-report
+      cancel-in-progress: false
     permissions:
       contents: read
       issues: write
