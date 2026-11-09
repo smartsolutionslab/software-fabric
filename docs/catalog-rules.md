@@ -27,7 +27,7 @@ catalog agree.
 
 | Field | Meaning |
 |---|---|
-| `tier` | `supported` (its pairs pass in the matrix) or `experimental` (generated with a warning). An option without a pack under `packs/` is `experimental`. The PR that adds its pack puts it into the matrix but leaves it `experimental`; it is promoted to `supported` once every matrix combination containing it is green in the same nightly run (ADR-0003, amended 2026-11-06). `SupportTierTests` fails the build when a `supported` option has no pack. |
+| `tier` | `supported` (its pairs pass in the matrix) or `experimental` (generated with a warning). An option without a pack under `packs/` is `experimental`. The PR that adds its pack puts it into the matrix but leaves it `experimental`; it is promoted to `supported` once every matrix combination containing it is green in the same nightly run (ADR-0003, amended 2026-11-06). `SupportTierTests` fails the build when a `supported` option has no pack, or is in neither a profile nor a combination of `build/matrix.json`. |
 | `requires` | List of conditions, **all** of which must hold when this option is chosen. |
 | `conflicts` | List of conditions, **none** of which may hold when this option is chosen. |
 | `note` | Human text. Not interpreted. |

@@ -1,0 +1,46 @@
+import { css, html, LitElement } from 'lit';
+
+export type BadgeTone = 'accent' | 'primary';
+
+/** A short label for a state or a count, in one of the design system's tones: <ds-badge tone="primary">New</ds-badge>. */
+export class Badge extends LitElement {
+  static override properties = { tone: { reflect: true } };
+
+  // Shadow DOM keeps the page's styles out; the tokens' --ds-* variables are inherited into it, and are all it reads.
+  static override styles = css`
+    span {
+      display: inline-flex;
+      align-items: center;
+      padding: var(--ds-spacing-1) var(--ds-spacing-2);
+      border-radius: var(--ds-radius-sm);
+    }
+    .accent {
+      background-color: var(--ds-color-accent);
+      color: var(--ds-color-accent-foreground);
+    }
+    .primary {
+      background-color: var(--ds-color-primary);
+      color: var(--ds-color-primary-foreground);
+    }
+  `;
+
+  // Declared, not initialised as a field: a class field would hide the reactive property Lit defines.
+  declare tone: BadgeTone;
+
+  constructor() {
+    super();
+    this.tone = 'accent';
+  }
+
+  override render() {
+    return html`<span class=${this.tone} part="badge"><slot></slot></span>`;
+  }
+}
+
+customElements.define('ds-badge', Badge);
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'ds-badge': Badge;
+  }
+}

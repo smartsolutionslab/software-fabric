@@ -1,0 +1,20 @@
+import type { Meta, StoryObj } from '@storybook/web-components-vite';
+import { html } from 'lit';
+import type { BadgeTone } from './Badge';
+import './Badge';
+
+type BadgeArgs = { tone: BadgeTone; label: string };
+
+const meta = {
+  title: 'Badge',
+  args: { tone: 'accent', label: 'New' },
+  render: ({ tone, label }) => html`<ds-badge tone=${tone}>${label}</ds-badge>`,
+} satisfies Meta<BadgeArgs>;
+
+export default meta;
+
+type Story = StoryObj<BadgeArgs>;
+
+export const Accent: Story = {};
+
+export const Primary: Story = { args: { tone: 'primary' } };
