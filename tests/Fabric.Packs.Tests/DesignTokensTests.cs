@@ -11,6 +11,18 @@ namespace Fabric.Packs.Tests;
 public sealed class DesignTokensTests
 {
     private const string Choice = "frontend.design-system=tokens";
+    private const string LibraryTheme = "frontend.styling=library-theme";
+
+    /// <summary>The theme takes the primary colour from its token, changed to #0b6e4f.</summary>
+    private const string ThemeTokensTest = """
+        import { expect, test } from 'vitest';
+        import { theme } from './theme';
+
+        test('the theme takes its primary colour from the tokens', () => {
+          expect(theme.palette.primary.main).toBe('#0b6e4f');
+        });
+
+        """;
 
     private const string ReactScreen = """
         export function Tokens() {
@@ -125,12 +137,44 @@ public sealed class DesignTokensTests
     [Theory]
     [InlineData("saas-standard-react", "frontend.ui-library=mui")]
     [InlineData("saas-standard-vue", "frontend.ui-library=vuetify")]
-    public void Tokens_for_a_styling_the_pack_does_not_compile_to_fail_loudly(string profile, string library)
+    public void With_the_library_theme_the_tokens_also_compile_to_a_typescript_module_for_the_theme(string profile, string library)
     {
-        using var project = new GeneratedProject(profile, Choice, "frontend.styling=library-theme", library);
+        // Vuetify has no pack yet, so the project is generated with stand-ins for it.
+        using var project = new GeneratedProject(profile, Choice, LibraryTheme, library);
+        string Read(string path) => File.ReadAllText(Path.Combine(project.ProjectDirectory, path));
 
-        File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "packages", "tokens", "build.mjs"))
-            .ShouldStartWith("throw new Error('The tokens pack compiles tokens for Tailwind and CSS Modules only so far; frontend.styling is library-theme (docs/adr/0006 of the generator).');");
+        var build = Read("web/packages/tokens/build.mjs");
+        build.ShouldNotContain("throw new Error");
+        build.ShouldContain("{ destination: 'tokens.ts', format: 'typescript/tokens' },");
+        Read("web/packages/tokens/package.json").ShouldContain("\".\": \"./dist/tokens.ts\"");
+        Read("web/app/src/index.css").ShouldNotContain("@shop/tokens", customMessage: "the theme reads the tokens, not the stylesheet");
+        Read("AGENTS.md").ShouldContain("through the library's theme in `src/theme.ts`");
+    }
+
+    [Fact]
+    public void With_mui_the_theme_is_built_from_the_tokens_instead_of_colours_of_its_own()
+    {
+        var theme = Files("saas-standard-react", Choice, LibraryTheme, "frontend.ui-library=mui")["web/app/src/theme.ts"];
+
+        theme.ShouldContain("import { tokens } from '@shop/tokens';");
+        theme.ShouldContain("primary: { main: tokens.color.primary, contrastText: tokens.color['primary-foreground'] },");
+        theme.ShouldContain("secondary: { main: tokens.color.accent, contrastText: tokens.color['accent-foreground'] },");
+        theme.ShouldNotContain("#", customMessage: "a colour of the theme's own");
+    }
+
+    [Fact]
+    public void The_mui_web_app_on_the_tokens_builds_lints_is_formatted_and_its_theme_takes_a_changed_token()
+    {
+        using var project = new GeneratedProject("saas-standard-react", Choice, LibraryTheme, "frontend.ui-library=mui");
+        var colours = Path.Combine(project.ProjectDirectory, "web", "packages", "tokens", "src", "color.tokens.json");
+        File.WriteAllText(colours, File.ReadAllText(colours).Replace("\"#3730a3\"", "\"#0b6e4f\"", StringComparison.Ordinal));
+        project.Write("web/app/src/theme-tokens.test.ts", ThemeTokensTest);
+
+        RunWeb(project, "install", "build", "lint", "test");
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "format:check");
+        exitCode.ShouldBe(0, $"pnpm format:check:\n{output}");
+        File.Exists(Path.Combine(project.ProjectDirectory, "web", "packages", "tokens", "dist", "tokens.ts")).ShouldBeTrue();
     }
 
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
