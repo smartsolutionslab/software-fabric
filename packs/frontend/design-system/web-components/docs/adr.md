@@ -22,5 +22,5 @@ React renders a tag with a hyphen as a custom element and passes a property the 
 
 - The same components serve a React and a Vue app; nothing in them depends on either.
 - The app reads the tokens' CSS, so the tokens are built first: the app's `dev`, `build` and `test` and the ui package's `storybook` build them, and a fresh clone needs no prior `pnpm build`.
-- A token that references one that does not exist fails the build; a component whose shadow styles carry a colour value of their own (a literal, a named colour such as `red` or `transparent`, or a variable that is not a colour token) fails the ui package's tests.
+- A token that references one that does not exist fails the build; a component whose shadow styles carry a colour value of their own (a literal, a named colour such as `red` or `transparent`, or a variable that is not a colour token), in a colour property or inside a `background`, `border`, `outline` or shadow shorthand, fails the ui package's tests.
 - A component cannot be restyled from outside except through the tokens or the `part`s it exposes (`::part(badge)`); that is the point of the design system, not a limitation to work around.

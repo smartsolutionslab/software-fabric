@@ -15,16 +15,29 @@ test('a badge shows its label in the tone it is given', async () => {
 
 test('a badge is styled only through the design tokens', () => {
   const styles = Badge.styles.cssText;
-  const colourDeclarations = [...styles.matchAll(/([a-z-]+)\s*:\s*([^;{}]+);/g)]
-    .map(([, property = '', value = '']) => `${property}: ${value.trim()}`)
-    .filter((declaration) => /^(color|fill|stroke|[a-z-]+-color):/.test(declaration));
+  const declarations = [...styles.matchAll(/([a-z-]+)\s*:\s*([^;{}]+);/g)].map(([, property = '', value = '']) => ({
+    property,
+    value: value.trim(),
+  }));
+  // A colour property takes a colour token and nothing else: not red, transparent or a variable of its own.
+  const colourProperty = /^(color|fill|stroke|[a-z-]+-color)$/;
+  // A shorthand may carry a colour among its other parts; every part must then be a token, a length or a keyword.
+  const colourBearing = /^(background|border(-[a-z]+)*|outline(-[a-z]+)*|[a-z-]*shadow)$/;
+  const keywords = ['none', 'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset'];
+  const isNonColourPart = (part: string) =>
+    /^(var\(--ds-[a-z0-9-]+\)|-?[\d.]+[a-z%]*)$/.test(part) || keywords.includes(part);
 
   expect(styles).toContain('var(--ds-color-primary)');
   // A colour of its own would not follow the tokens: #fff, rgb(...), hsl(...), oklch(...) anywhere in the styles.
   expect(styles).not.toMatch(/#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|oklch|oklab|lab|lch|color)\(/i);
-  // A colour property takes a colour token and nothing else: not red, transparent or a variable of its own.
-  expect(colourDeclarations).not.toHaveLength(0);
-  for (const declaration of colourDeclarations) {
-    expect(declaration).toMatch(/: var\(--ds-color-[a-z0-9-]+\)$/);
+  expect(declarations.filter(({ property }) => colourProperty.test(property))).not.toHaveLength(0);
+  for (const { property, value } of declarations) {
+    if (colourProperty.test(property)) {
+      expect(`${property}: ${value}`).toMatch(/: var\(--ds-color-[a-z0-9-]+\)$/);
+    } else if (colourBearing.test(property)) {
+      for (const part of value.split(/[\s,]+/)) {
+        expect(isNonColourPart(part), `${property}: ${value}`).toBe(true);
+      }
+    }
   }
 });
