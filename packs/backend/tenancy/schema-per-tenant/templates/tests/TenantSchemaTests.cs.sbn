@@ -106,6 +106,23 @@ public sealed class TenantSchemaTests({{ database_fixture }}) : {{ test_lifetime
     }
 
     {{ test_attribute }}
+    public async Task A_context_first_used_before_its_tenant_is_set_stays_where_no_tenant_works()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        await AddAsync(TenantA, "tenant a's entry", cancellationToken);
+        await using var scope = Services.CreateAsyncScope();
+        var ledger = scope.ServiceProvider.GetRequiredService<LedgerDbContext>();
+        var seenWithoutTenant = await ledger.Set<LedgerEntry>().Select(entry => entry.Id).ToListAsync(cancellationToken);
+
+        using var tenantScope = TenantScope.Begin(TenantA);
+        ledger.Add(new LedgerEntry(Guid.CreateVersion7(), "an entry after the context's first use"));
+
+        {{ `seenWithoutTenant` | should_be_empty }};
+        {{ `ledger.CurrentSchema` | should_be `LedgerDbContext.Schema` }};
+        await {{ should_throw_async "InvalidOperationException" "() => ledger.SaveChangesAsync(cancellationToken)" }};
+    }
+
+    {{ test_attribute }}
     public async Task The_migration_runner_gave_each_listed_tenant_a_schema_with_its_history_for_every_module()
     {
         var cancellationToken = {{ test_cancellation_token }};

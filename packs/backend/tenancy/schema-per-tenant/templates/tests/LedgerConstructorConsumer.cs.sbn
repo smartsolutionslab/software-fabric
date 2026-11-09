@@ -1,0 +1,19 @@
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using Microsoft.EntityFrameworkCore;
+
+namespace {{ namespace }}.Tenancy.Tests;
+
+/// <summary>A consumer whose DbContext comes through its constructor: Wolverine creates it before Handle runs.</summary>
+public sealed class LedgerConstructorConsumer(LedgerDbContext ledger)
+{
+    /// <summary>Records the entry in its tenant's ledger, then answers what that ledger holds.</summary>
+    public async Task<IReadOnlyList<Guid>> Handle(LedgerEntryArrived message, CancellationToken cancellationToken)
+    {
+        {{ not_null "message" }}
+
+        using var tenant = TenantScope.Begin(message.TenantId);
+        ledger.Add(new LedgerEntry(message.Id, message.Text));
+        await ledger.SaveChangesAsync(cancellationToken);
+        return await ledger.Set<LedgerEntry>().Select(entry => entry.Id).ToListAsync(cancellationToken);
+    }
+}
