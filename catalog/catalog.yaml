@@ -543,8 +543,9 @@ dimensions:
       tokens-and-components:
         tier: experimental
         note: "tokens plus an own component package with Storybook"
-        # Reason: the component package is React only (owner decision D5, #232).
-        requires: ["frontend.framework == react"]
+        # Reason: the component package is React only (owner decision D5, #232), and its components are styled with
+        # Tailwind only, which the pack refuses loudly otherwise (D4: such combinations are catalog rules, #271).
+        requires: ["frontend.framework == react", "frontend.styling == tailwind"]
       web-components:        { tier: experimental }
 
   frontend.data-grid:
