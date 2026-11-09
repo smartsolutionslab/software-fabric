@@ -4,6 +4,8 @@
 - Use the index from the module's Infrastructure and give Application an interface of its own if a use case needs it; never reference Npgsql or Pgvector from Domain or Application.
 {{~ if project["backend.tenancy"] == "column" ~}}
 - Every record belongs to the current tenant. `ModuleVectorIndex` reads it from `ITenantContext`, as the module's DbContext does, never from its caller: a key is a key within one tenant, a search returns only that tenant's records, and without a tenant a search finds nothing, a removal removes nothing and indexing fails. In consumers and background work, open `using var tenant = TenantScope.Begin(message.Metadata.TenantId);` before indexing or searching. Never read or write the `embeddings` table around the index to reach another tenant's records.
+{{~ else if project["backend.tenancy"] == "schema-per-tenant" ~}}
+- Every record belongs to the current tenant and lies in the `embeddings` table of that tenant's schema, `<module>_<tenant>`. `ModuleVectorIndex` picks the schema as the module's DbContext does, never from its caller, at each call: a search returns only that tenant's records, and without a tenant listed in `Tenancy:Tenants` a search finds nothing, a removal removes nothing and indexing fails. In consumers and background work, open `using var tenant = TenantScope.Begin(message.Metadata.TenantId);` before indexing or searching. Never read or write another tenant's `embeddings` table around the index.
 {{~ end ~}}
 {{~ if project["backend.tenancy"] != "column" ~}}
 - A search returns as many records as asked whenever the module has that many: where the HNSW index answers short, `SearchAsync` ranks every record exactly. Never page, repeat or widen a search around the index to make up a short answer.

@@ -1,4 +1,8 @@
+{{~ schemas = project["backend.tenancy"] == "schema-per-tenant" ~}}
 using {{ namespace }}.BuildingBlocks.Rag;
+{{~ if schemas ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 
@@ -12,7 +16,7 @@ public static class VectorIndexRegistration
     /// Registers <see cref="ModuleVectorIndex{TContext}"/> for every module, over a data source of the connection
     /// string <c>database</c> that knows the <c>vector</c> type. The connection string is read when an index is first
     /// needed; registering connects to nothing.
-{{~ if project["backend.tenancy"] == "column" ~}}
+{{~ if project["backend.tenancy"] == "column" || schemas ~}}
     /// An index is scoped, as the tenant source it reads is.
 {{~ end ~}}
     /// </summary>
@@ -22,7 +26,7 @@ public static class VectorIndexRegistration
 
         return services
             .AddKeyedSingleton(VectorTables.DataSourceKey, (_, _) => VectorTables.DataSource(ConnectionString(configuration)))
-{{~ if project["backend.tenancy"] == "column" ~}}
+{{~ if project["backend.tenancy"] == "column" || schemas ~}}
             .AddScoped(typeof(ModuleVectorIndex<>));
 {{~ else ~}}
             .AddSingleton(typeof(ModuleVectorIndex<>));
@@ -30,17 +34,33 @@ public static class VectorIndexRegistration
     }
 
     /// <summary>
+{{~ if schemas ~}}
+    /// Creates the vector extension and each module's <c>embeddings</c> table in every schema of its DbContext for a
+    /// tenant listed in Tenancy:Tenants. A step of the MigrationRunner, after the modules' migrations, so hosts never
+    /// create tables.
+{{~ else ~}}
     /// Creates the vector extension and each module's <c>embeddings</c> table, in the schema of its DbContext. A step
     /// of the MigrationRunner, after the modules' migrations, so hosts never create tables.
+{{~ end ~}}
     /// </summary>
     public static Task CreateVectorTablesAsync(this IServiceProvider services, IEnumerable<Type> contexts, CancellationToken cancellationToken = default)
     {
         {{ not_null "contexts" }}
+{{~ if schemas ~}}
+
+        var configuration = services.GetRequiredService<IConfiguration>();
+        var tenants = TenantSchemas.Listed(configuration);
+        return VectorTables.CreateAsync(
+            ConnectionString(configuration),
+            contexts.Select(VectorTables.SchemaOf).SelectMany(schema => tenants.Select(tenant => TenantSchemas.For(schema, tenant))),
+            cancellationToken);
+{{~ else ~}}
 
         return VectorTables.CreateAsync(
             ConnectionString(services.GetRequiredService<IConfiguration>()),
             contexts.Select(VectorTables.SchemaOf),
             cancellationToken);
+{{~ end ~}}
     }
 
     private static string ConnectionString(IConfiguration configuration) =>

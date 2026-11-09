@@ -1,10 +1,15 @@
-{{~ column = project["backend.tenancy"] == "column" ~}}
-{{~ if project["backend.tenancy"] != "none" && !column ~}}
-#error The rag pack keeps its vectors apart by a tenant column, so it supports backend.tenancy none and column only so far (docs/adr/0006 of the generator): with backend.tenancy {{ project["backend.tenancy"] }} a search would return every tenant's records.
+{{~ column = project["backend.tenancy"] == "column"
+schemas = project["backend.tenancy"] == "schema-per-tenant"
+table = "{Table}"
+if schemas
+  table = "{table}"
+end ~}}
+{{~ if project["backend.tenancy"] != "none" && !column && !schemas ~}}
+#error The rag pack keeps its vectors apart by a tenant column or a schema per tenant, so it supports backend.tenancy none, column and schema-per-tenant only so far (docs/adr/0006 of the generator): with backend.tenancy {{ project["backend.tenancy"] }} a search would return every tenant's records.
 {{~ end ~}}
 using System.Globalization;
 using {{ namespace }}.BuildingBlocks.Persistence;
-{{~ if column ~}}
+{{~ if column || schemas ~}}
 using {{ namespace }}.BuildingBlocks.Tenancy;
 {{~ end ~}}
 using Microsoft.Extensions.AI;
@@ -23,13 +28,18 @@ namespace {{ namespace }}.BuildingBlocks.Rag;
 /// Every record belongs to the current tenant, from <see cref="ITenantContext"/> as the module's DbContext reads it: a
 /// key is a key within that tenant, a search finds only its records, and without a tenant nothing is found, removed or
 /// indexed.
+{{~ else if schemas ~}}
+/// Every record belongs to the current tenant and lies in the <c>embeddings</c> table of that tenant's schema of the
+/// module, chosen as the module's DbContext chooses its schema (<see cref="TenantSchemas.Of"/>): a search finds only
+/// that tenant's records, and without a tenant listed in Tenancy:Tenants nothing is found, removed or indexed.
 {{~ end ~}}
 /// </summary>
 /// <typeparam name="TContext">The module's DbContext, whose <c>Schema</c> holds the table.</typeparam>
 public sealed class ModuleVectorIndex<TContext>(
     [FromKeyedServices(VectorTables.DataSourceKey)] NpgsqlDataSource dataSource,
     IEmbeddingGenerator<string, Embedding<float>> generator{{ if column }},
-    ITenantContext tenants{{ end }})
+    ITenantContext tenants{{ else if schemas }},
+    IServiceProvider services{{ end }})
     where TContext : ModuleDbContext
 {
     /// <summary>pgvector's bounds for hnsw.ef_search; its default is the lower one.</summary>
@@ -37,7 +47,11 @@ public sealed class ModuleVectorIndex<TContext>(
 
     private const int MaximumBreadth = 1000;
 
+{{~ if schemas ~}}
+    private static readonly string ModuleSchema = VectorTables.SchemaOf(typeof(TContext));
+{{~ else ~}}
     private static readonly string Table = VectorTables.Table(VectorTables.SchemaOf(typeof(TContext)));
+{{~ end ~}}
 
     /// <summary>Embeds the text and stores it under the key, replacing what the key held before.</summary>
     public async Task IndexAsync(string key, string text, CancellationToken cancellationToken)
@@ -52,6 +66,13 @@ public sealed class ModuleVectorIndex<TContext>(
             $"INSERT INTO {Table} (tenant_id, key, content, embedding) VALUES ($1, $2, $3, $4) " +
             "ON CONFLICT (tenant_id, key) DO UPDATE SET content = excluded.content, embedding = excluded.embedding");
         command.Parameters.Add(new NpgsqlParameter { Value = tenant });
+{{~ else if schemas ~}}
+
+        var table = TenantTable() ?? throw new InvalidOperationException($"Cannot index '{key}' without a tenant listed in {TenantSchemas.Tenants}.");
+        var embedding = await EmbedAsync(text, cancellationToken);
+        await using var command = dataSource.CreateCommand(
+            $"INSERT INTO {table} (key, content, embedding) VALUES ($1, $2, $3) " +
+            "ON CONFLICT (key) DO UPDATE SET content = excluded.content, embedding = excluded.embedding");
 {{~ else ~}}
 
         var embedding = await EmbedAsync(text, cancellationToken);
@@ -78,6 +99,13 @@ public sealed class ModuleVectorIndex<TContext>(
 
         await using var command = dataSource.CreateCommand($"DELETE FROM {Table} WHERE tenant_id = $1 AND key = $2");
         command.Parameters.Add(new NpgsqlParameter { Value = tenant });
+{{~ else if schemas ~}}
+        if (TenantTable() is not { } table)
+        {
+            return;
+        }
+
+        await using var command = dataSource.CreateCommand($"DELETE FROM {table} WHERE key = $1");
 {{~ else ~}}
         await using var command = dataSource.CreateCommand($"DELETE FROM {Table} WHERE key = $1");
 {{~ end ~}}
@@ -95,6 +123,12 @@ public sealed class ModuleVectorIndex<TContext>(
 {{~ if column ~}}
 
         if (tenants.TenantId is not { } tenant)
+        {
+            return [];
+        }
+{{~ else if schemas ~}}
+
+        if (TenantTable() is not { } table)
         {
             return [];
         }
@@ -116,7 +150,7 @@ public sealed class ModuleVectorIndex<TContext>(
 {{~ if column ~}}
         await using (var search = new NpgsqlCommand($"SELECT key, content, embedding <=> $1 FROM {Table} WHERE tenant_id = $3 ORDER BY embedding <=> $1 LIMIT $2", connection, transaction))
 {{~ else ~}}
-        await using (var search = new NpgsqlCommand($"SELECT key, content, embedding <=> $1 FROM {Table} ORDER BY embedding <=> $1 LIMIT $2", connection, transaction))
+        await using (var search = new NpgsqlCommand($"SELECT key, content, embedding <=> $1 FROM {{ table }} ORDER BY embedding <=> $1 LIMIT $2", connection, transaction))
 {{~ end ~}}
         {
             search.Parameters.Add(new NpgsqlParameter { Value = embedding });
@@ -148,7 +182,7 @@ public sealed class ModuleVectorIndex<TContext>(
                 $"WITH tenant AS MATERIALIZED (SELECT key, content, embedding FROM {Table} WHERE tenant_id = $3) " +
                 "SELECT key, content, embedding <=> $1 FROM tenant ORDER BY embedding <=> $1, key LIMIT $2",
 {{~ else ~}}
-                $"WITH records AS MATERIALIZED (SELECT key, content, embedding FROM {Table}) " +
+                $"WITH records AS MATERIALIZED (SELECT key, content, embedding FROM {{ table }}) " +
                 "SELECT key, content, embedding <=> $1 FROM records ORDER BY embedding <=> $1, key LIMIT $2",
 {{~ end ~}}
                 connection,
@@ -171,4 +205,17 @@ public sealed class ModuleVectorIndex<TContext>(
 
     private async Task<Vector> EmbedAsync(string text, CancellationToken cancellationToken) =>
         new(await generator.GenerateVectorAsync(text, cancellationToken: cancellationToken));
+{{~ if schemas ~}}
+
+    /// <summary>
+    /// The vector table of the current tenant's schema, read at each call, as a <see cref="TenantScope"/> may begin after
+    /// the index was created; none without a listed tenant, whose work stays in the module's own schema, which holds no
+    /// vectors.
+    /// </summary>
+    private string? TenantTable()
+    {
+        var schema = TenantSchemas.Of(ModuleSchema, services);
+        return schema == ModuleSchema ? null : VectorTables.Table(schema);
+    }
+{{~ end ~}}
 }

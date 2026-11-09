@@ -20,6 +20,8 @@ namespace {{ namespace }}.BuildingBlocks.Rag;
 {{~ if project["backend.tenancy"] == "column" ~}}
 /// Each record belongs to a tenant: <c>tenant_id</c> leads the primary key, so a key is unique within a tenant and
 /// the key's index also finds one tenant's records.
+{{~ else if project["backend.tenancy"] == "schema-per-tenant" ~}}
+/// Each tenant has its own: the table lies in each listed tenant's schema of the module, not in the module's own schema.
 {{~ end ~}}
 /// The MigrationRunner creates them after the modules' migrations; the host never creates or alters them.
 /// </summary>
