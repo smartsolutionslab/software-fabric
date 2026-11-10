@@ -1,3 +1,10 @@
+{{~ tokens = project["frontend.design-system"] == "tokens" ~}}
+{{~ func colour(token, value)
+  if tokens
+    ret "var(--ds-color-" + token + ")"
+  end
+  ret value
+end ~}}
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -7,7 +14,7 @@
 
 .header,
 .cell {
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid {{ colour "border" "#e2e8f0" }};
   padding: 0.5rem;
 }
 

@@ -1,3 +1,10 @@
+{{~ tokens = project["frontend.design-system"] == "tokens" ~}}
+{{~ func colour(token, value)
+  if tokens
+    ret "var(--ds-color-" + token + ")"
+  end
+  ret value
+end ~}}
 .conversation {
   display: flex;
   max-width: 48rem;
@@ -17,14 +24,14 @@
 .user {
   align-self: flex-end;
   border-radius: 0.375rem;
-  background-color: #0f172a;
+  background-color: {{ colour "primary" "#0f172a" }};
   padding: 0.5rem 0.75rem;
-  color: #fff;
+  color: {{ colour "primary-foreground" "#fff" }};
 }
 
 .answer {
   border-radius: 0.375rem;
-  background-color: #f1f5f9;
+  background-color: {{ colour "surface" "#f1f5f9" }};
   padding: 0.5rem 0.75rem;
 }
 
@@ -36,7 +43,7 @@
 }
 
 .answerSpeaker {
-  color: #475569;
+  color: {{ colour "muted-foreground" "#475569" }};
 }
 
 .text {
@@ -44,7 +51,7 @@
 }
 
 .toolCall {
-  border: 1px solid #e2e8f0;
+  border: 1px solid {{ colour "border" "#e2e8f0" }};
   border-radius: 0.375rem;
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
@@ -62,11 +69,11 @@
 }
 
 .status {
-  color: #64748b;
+  color: {{ colour "muted-foreground" "#64748b" }};
 }
 
 .error {
-  color: #dc2626;
+  color: {{ colour "destructive" "#dc2626" }};
 }
 
 .form {
@@ -86,7 +93,7 @@
   field-sizing: content;
   min-height: 4rem;
   width: 100%;
-  border: 1px solid #cbd5e1;
+  border: 1px solid {{ colour "border" "#cbd5e1" }};
   border-radius: 0.375rem;
   background-color: transparent;
   padding: 0.5rem 0.75rem;
@@ -95,7 +102,7 @@
 }
 
 .input:focus-visible {
-  outline: 2px solid #64748b;
+  outline: 2px solid {{ colour "primary" "#64748b" }};
   outline-offset: 2px;
 }
 
@@ -105,7 +112,7 @@
 }
 
 .input[aria-invalid='true'] {
-  border-color: #dc2626;
+  border-color: {{ colour "destructive" "#dc2626" }};
 }
 
 .send {

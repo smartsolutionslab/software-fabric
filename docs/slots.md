@@ -508,6 +508,34 @@ AppHost's model with it, declares it instead (*#260*).
 | `web.remote-restricted-imports` *(added for #156; declared by module-federation and native-federation)* | `web/modules/<module>/eslint.config.js` | `,` + newline | mfe-mixed-frameworks no (bans every UI framework but the shell's) |
 | `web.ui-package-fields` *(added for #285; declared by tokens-and-components and web-components)* | `web/packages/ui/package.json`, after `"private"` | `,` + newline | native-federation (`"version": "0.0.0"`: native federation shares a package only when its package.json names a version) |
 
+#### The design-token contract *(#373)*
+
+With `frontend.design-system=tokens`, `web/packages/tokens` is the one place
+the project's colours live, so another pack's screens read the tokens'
+semantic names instead of colours of their own. This is a contract, not a
+slot: each pack branches on the choice itself (ADR-0006),
+`{{ if project["frontend.design-system"] == "tokens" }}`, and a project
+without the tokens keeps its output byte for byte. The tokens pack keeps
+every name below; renaming or removing one breaks the packs that read it.
+
+| Name | CSS Modules | Tailwind | Reads it |
+|---|---|---|---|
+| `primary` | `var(--ds-color-primary)` | `bg-primary`, `border-primary`, `ring-primary` | the user's bubble, the default button (hover: `primary` at 90%), a pending widget's dashed border, focus outlines and rings |
+| `primary-foreground` | `var(--ds-color-primary-foreground)` | `text-primary-foreground` | text on `primary` |
+| `accent`, `accent-foreground` | `var(--ds-color-accent)` | `bg-accent`, `text-accent-foreground` | an outline or ghost button under the pointer |
+| `surface` | `var(--ds-color-surface)` | `bg-surface` | a widget, an answer bubble, an outline button, a FormKit input |
+| `border` | `var(--ds-color-border)` | `border-border` | the borders of inputs, tool calls, the assistant, widgets and table rows |
+| `muted-foreground` | `var(--ds-color-muted-foreground)` | `text-muted-foreground` | status lines, speaker labels, notes, help text, placeholders |
+| `destructive` | `var(--ds-color-destructive)` | `text-destructive`, `border-destructive`, `ring-destructive` | alerts and invalid inputs |
+
+The tokens also define radius `sm`, `md`, `lg` and spacing `1`, `2`, `3`,
+`4`, `6`, `8` (`var(--ds-radius-md)`, `var(--ds-spacing-4)`; with Tailwind
+`rounded-md`, `p-4`). The packs read the colours today: the agent panel
+(ag-ui), both dashboards packs, tanstack-table's data table, FormKit's inputs
+and the radix-headless and Reka UI buttons. `DesignTokensScreensTests` fails
+when one of their screens in a tokens project writes a hex colour or a
+Tailwind palette class.
+
 ### CI
 
 | Slot | File | Filled by |

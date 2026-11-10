@@ -1,3 +1,10 @@
+{{~ tokens = project["frontend.design-system"] == "tokens" ~}}
+{{~ func colour(token, value)
+  if tokens
+    ret "var(--ds-color-" + token + ")"
+  end
+  ret value
+end ~}}
 .canvas {
   display: flex;
   flex-direction: column;
@@ -20,7 +27,7 @@
 }
 
 .input {
-  border: 1px solid #cbd5e1;
+  border: 1px solid {{ colour "border" "#cbd5e1" }};
   border-radius: 0.25rem;
   padding: 0.25rem 0.5rem;
   font: inherit;

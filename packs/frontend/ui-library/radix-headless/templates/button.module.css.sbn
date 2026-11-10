@@ -1,3 +1,10 @@
+{{~ tokens = project["frontend.design-system"] == "tokens" ~}}
+{{~ func colour(token, value)
+  if tokens
+    ret "var(--ds-color-" + token + ")"
+  end
+  ret value
+end ~}}
 .button {
   box-sizing: border-box;
   display: inline-flex;
@@ -20,7 +27,7 @@
 }
 
 .button:focus-visible {
-  outline: 2px solid #64748b;
+  outline: 2px solid {{ colour "primary" "#64748b" }};
   outline-offset: 2px;
 }
 
@@ -30,21 +37,24 @@
 }
 
 .variantDefault {
-  background-color: #0f172a;
-  color: #fff;
+  background-color: {{ colour "primary" "#0f172a" }};
+  color: {{ colour "primary-foreground" "#fff" }};
 }
 
 .variantDefault:hover {
-  background-color: #334155;
+  background-color: {{ if tokens }}color-mix(in srgb, var(--ds-color-primary) 90%, transparent){{ else }}#334155{{ end }};
 }
 
 .variantOutline {
-  border-color: #cbd5e1;
-  background-color: #fff;
+  border-color: {{ colour "border" "#cbd5e1" }};
+  background-color: {{ colour "surface" "#fff" }};
 }
 
 .variantOutline:hover {
-  background-color: #f1f5f9;
+  background-color: {{ colour "accent" "#f1f5f9" }};
+{{~ if tokens ~}}
+  color: var(--ds-color-accent-foreground);
+{{~ end ~}}
 }
 
 .variantGhost {
@@ -52,7 +62,10 @@
 }
 
 .variantGhost:hover {
-  background-color: #f1f5f9;
+  background-color: {{ colour "accent" "#f1f5f9" }};
+{{~ if tokens ~}}
+  color: var(--ds-color-accent-foreground);
+{{~ end ~}}
 }
 
 .sizeDefault {

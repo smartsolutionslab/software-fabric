@@ -6,12 +6,19 @@
   end
   ret 'className="' + tailwind + '"'
 end ~}}
+{{~ # The palette's colours under the tokens' semantic names (docs/slots.md of the generator), with the tokens.
+func palette_of(palette)
+  if project["frontend.design-system"] != "tokens"
+    ret palette
+  end
+  ret palette | string.replace "bg-slate-900" "bg-primary" | string.replace "text-white" "text-primary-foreground" | string.replace "bg-slate-100" "bg-surface" | string.replace "bg-white" "bg-surface" | string.replace "border-slate-300" "border-border" | string.replace "border-slate-400" "border-primary" | string.replace "border-slate-900" "border-primary" | string.replace "ring-slate-400" "ring-primary" | string.replace "text-slate-500" "text-muted-foreground" | string.replace "text-slate-600" "text-muted-foreground" | string.replace "border-red-600" "border-destructive" | string.replace "ring-red-600" "ring-destructive" | string.replace "text-red-600" "text-destructive"
+end ~}}
 {{~ func themed(shadcn, palette, module)
   if css_modules
     ret 'className={styles.' + module + '}'
   end
   if ui == "radix-headless"
-    ret 'className="' + palette + '"'
+    ret 'className="' + palette_of(palette) + '"'
   end
   ret 'className="' + shadcn + '"'
 end ~}}
