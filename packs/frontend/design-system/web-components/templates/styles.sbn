@@ -1,1 +1,12 @@
-{{ if project["frontend.styling"] == "tailwind" }}@import '@{{ name }}/tokens/theme.css';{{ else if project["frontend.styling"] == "css-modules" || project["frontend.styling"] == "library-theme" }}@import '@{{ name }}/tokens/tokens.css';{{ end }}
+{{ if project["frontend.styling"] == "tailwind" }}@import '@{{ name }}/tokens/theme.css';
+
+/* A border without a colour of its own (border, border-b) takes the tokens' border colour, not currentColor. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--ds-color-border);
+  }
+}{{ else if project["frontend.styling"] == "css-modules" || project["frontend.styling"] == "library-theme" }}@import '@{{ name }}/tokens/tokens.css';{{ end }}
