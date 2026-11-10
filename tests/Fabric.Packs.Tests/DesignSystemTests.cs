@@ -21,6 +21,8 @@ public sealed class DesignSystemTests
           return (
             <section className="bg-primary text-primary-foreground rounded-md">
               <Badge>New</Badge>
+              <p className="text-muted-foreground">Updated today</p>
+              <p className="text-destructive">Out of stock</p>
             </section>
           );
         }
@@ -60,14 +62,33 @@ public sealed class DesignSystemTests
 
         var tokens = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "packages", "tokens", "dist", "tokens.css"));
         tokens.ShouldContain("--ds-color-primary:");
+        tokens.ShouldContain("--ds-color-muted-foreground: var(--ds-color-ink-500);");
+        tokens.ShouldContain("--ds-color-destructive: var(--ds-color-danger-600);");
+        var theme = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "packages", "tokens", "dist", "theme.css"));
+        theme.ShouldContain("--color-muted-foreground: var(--ds-color-muted-foreground);");
+        theme.ShouldContain("--color-destructive: var(--ds-color-destructive);");
         var assets = Path.Combine(project.ProjectDirectory, "web", "app", "dist", "assets");
         var css = string.Concat(Directory.GetFiles(assets, "*.css").Select(File.ReadAllText));
         css.ShouldContain("--ds-color-primary:");
         css.ShouldContain(".bg-primary{background-color:var(--ds-color-primary)}");
         css.ShouldContain(".text-primary-foreground{color:var(--ds-color-primary-foreground)}");
+        css.ShouldContain(".text-muted-foreground{color:var(--ds-color-muted-foreground)}");
+        css.ShouldContain(".text-destructive{color:var(--ds-color-destructive)}");
 
         // Badge's own utilities, which only the ui package's source names.
         css.ShouldContain(".bg-accent{background-color:var(--ds-color-accent)}");
+    }
+
+    [Fact]
+    public void The_colour_tokens_are_the_tokens_options_destructive_and_muted_foreground_included()
+    {
+        var colours = Files(Choice)["web/packages/tokens/src/color.tokens.json"];
+
+        colours.ShouldContain("\"destructive\": { \"$value\": \"{color.danger.600}\" }");
+        colours.ShouldContain("\"muted-foreground\": { \"$value\": \"{color.ink.500}\" }");
+        colours.ShouldContain("\"600\": { \"$value\": \"#dc2626\" }");
+        colours.ShouldContain("\"500\": { \"$value\": \"#64748b\" }");
+        colours.ShouldBe(Files("frontend.design-system=tokens")["web/packages/tokens/src/color.tokens.json"]);
     }
 
     [Fact]
@@ -160,6 +181,13 @@ public sealed class DesignSystemTests
         var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", Profile, [Choice, "frontend.styling=css-modules", "frontend.ui-library=radix-headless"]);
 
         generated.Errors.ShouldContain(error => error.Contains("frontend.design-system=tokens-and-components requires frontend.styling == tailwind", StringComparison.Ordinal));
+    }
+
+    private static Dictionary<string, string> Files(string choice)
+    {
+        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", Profile, [choice]);
+        generated.Errors.ShouldBeEmpty();
+        return generated.Files.ToDictionary(file => file.Path, file => file.Content);
     }
 
     private static void RunWeb(GeneratedProject project, params string[] steps)
