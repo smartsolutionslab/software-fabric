@@ -23,7 +23,7 @@ public class CatalogReferenceTests
             scope: module
             default: ddd
             options:
-              ddd:  { tier: supported }
+              ddd:  { tier: supported, note: "AggregateRoot<TId> roots" }
               crud: { tier: experimental, note: "plain tables | no aggregates" }
           backend.database:
             scope: project
@@ -151,7 +151,7 @@ public class CatalogReferenceTests
         | Option | Tier | Requires | Conflicts | Profiles | Note |
         |---|---|---|---|---|---|
         | `crud` | experimental | — | — | `everything`, `small` | plain tables \| no aggregates |
-        | `ddd` | supported | — | — | — | — |
+        | `ddd` | supported | — | — | — | AggregateRoot&lt;TId> roots |
 
         """;
 
