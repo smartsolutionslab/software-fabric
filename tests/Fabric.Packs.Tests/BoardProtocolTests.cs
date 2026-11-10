@@ -852,6 +852,30 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Head("agent/7").ShouldBe("chore(board): release #7");
     }
 
+    // A claim whose Status write lands after an escalation parked the branch leaves an escalated issue shown as Claimed.
+    [Theory]
+    [InlineData("needs:decision", false)]
+    [InlineData("agent:blocked", false)]
+    [InlineData("needs:decision", true)]
+    public void The_janitor_shows_a_parked_escalated_issue_still_shown_as_claimed_as_blocked(string escalation, bool labelled)
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, escalation, .. labelled ? ["agent:claimed"] : Array.Empty<string>()]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddHours(-3));
+        Branch("agent/7", "chore(board): release #7", Now.AddHours(-2));
+        Directory.CreateDirectory(Path.Combine(state, "board"));
+        File.WriteAllText(Path.Combine(state, "board", "7.STATUS"), "Claimed");
+        File.WriteAllText(Path.Combine(state, "board", "7.EXECUTOR"), "codex-cloud/other");
+
+        var (exitCode, output) = Run("janitor.sh");
+
+        exitCode.ShouldBe(0, output);
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+        Labels(IssueState(7)).ShouldContain(escalation);
+        Field(7, "STATUS").ShouldBe("Blocked");
+        Field(7, "EXECUTOR").ShouldBe("codex-cloud/other");
+        Head("agent/7").ShouldBe("chore(board): release #7");
+    }
+
     [Fact]
     public void The_janitor_leaves_a_live_claim_shown_as_claimed_alone()
     {
