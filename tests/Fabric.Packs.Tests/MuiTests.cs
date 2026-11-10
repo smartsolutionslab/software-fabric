@@ -141,6 +141,13 @@ public sealed partial class MuiTests
               return <Box sx={sx}>NestedDestructured</Box>;
             }
             """,
+        ["Conditional"] = """
+            import { Box } from '@mui/material';
+
+            export function Conditional({ active }: { active: boolean }) {
+              return <Box sx={{ color: active ? '#fff' : 'primary.main', label: 'Issue ' + '#393' }}>Conditional</Box>;
+            }
+            """,
         ["Palette"] = """
             import { Box } from '@mui/material';
 
@@ -166,6 +173,8 @@ public sealed partial class MuiTests
         const entry = { label: 'Issue #393', sx: { color: 'primary.main' } };
         const anchor = { href: '#add' };
         const asserted = { label: 'Issue #393' as const, title: 'Issue #394' satisfies string };
+        const suffix = location.hash;
+        const joined = { label: 'Issue #393' + suffix, title: suffix || '#fee', text: suffix ? '#add' : '#bad' };
         const { sx: themed } = { label: 'Issue #393', sx: { color: 'primary.main' } };
 
         function Content() {
@@ -184,6 +193,14 @@ public sealed partial class MuiTests
 
         export function Anchor() {
           return <Link {...anchor}>Add</Link>;
+        }
+
+        export function Joined({ active }: { active: boolean }) {
+          return (
+            <a href={active ? '#add' : '#fee'} title={'Issue #' + '393'} aria-label={suffix ?? '#bad'}>
+              {joined.label} {joined.title} {joined.text}
+            </a>
+          );
         }
 
         export function Asserted() {
