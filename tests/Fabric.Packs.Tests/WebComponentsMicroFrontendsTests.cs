@@ -74,6 +74,12 @@ public sealed class WebComponentsMicroFrontendsTests
     {
         using var project = Project(framework, "web-components");
         var web = Path.Combine(project.ProjectDirectory, "web");
+
+        // A stylesheet the remote imports: the shell loads only remote.js, so the remote's styles must come with it.
+        project.Write("web/modules/billing/src/notice.css", ".notice {\n  letter-spacing: 3px;\n}\n");
+        var element = Path.Combine(web, "modules", "billing", "src", "element.ts");
+        File.WriteAllText(element, "import './notice.css';\n" + File.ReadAllText(element));
+
         foreach (var step in new[] { "install", "build" })
         {
             var (exitCode, output) = Shell.Run(web, "pnpm", step);
@@ -81,9 +87,10 @@ public sealed class WebComponentsMicroFrontendsTests
         }
 
         var dist = Path.Combine(web, "modules", "billing", "dist");
-        Directory.GetFiles(dist, "*.js", SearchOption.AllDirectories).Select(Path.GetFileName).ShouldBe(["remote.js"]);
+        Directory.GetFiles(dist, "*", SearchOption.AllDirectories).Select(Path.GetFileName).ShouldBe(["remote.js"]);
         var script = File.ReadAllText(Path.Combine(dist, "remote.js"));
         script.ShouldContain("remote-billing");
+        script.ShouldContain(".notice{letter-spacing:3px}");
 
         // The design system's elements are the shell's: the remote renders <ds-badge> without bundling a second definition.
         script.ShouldContain("ds-badge");
