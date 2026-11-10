@@ -1,0 +1,3 @@
+func quote_identifier(name)
+  ret "\"" + name + "\""
+end

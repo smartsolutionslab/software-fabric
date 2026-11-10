@@ -1,11 +1,17 @@
 option: backend.database.sqlserver
 files:
   - { template: templates/connection.sbn, target: config/database.txt }
+  - { template: templates/archive.sbn, target: "src/{{ module.name }}/Archive.txt", per-module: true, when: 'module.name == "archive"' }
 slots:
   - { slot: readme.database, template: templates/line.sbn }
   - { slot: readme.sections, template: templates/section.sbn, order: 10 }
+  - { slot: templates.functions, template: templates/functions.sbn }
+declares-slots:
+  - { slot: database.readers, description: "The protocols that read the database.", separator: ", " }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
+modules:
+  archive: { module.style: ddd }
 gates:
   - { kind: unit-test, describes: "Fixture gate.", file: templates/gate.sbn }

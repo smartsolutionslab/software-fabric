@@ -28,7 +28,7 @@ public class GeneratorTests
             "docs/adr/0004-module-style-ddd.md",
             "fabric.yaml",
         ]);
-        Content(result, "config/database.txt").ShouldBe("provider=postgres\n");
+        Content(result, "config/database.txt").ShouldBe("provider=postgres\nread by: rest\n");
         Content(result, "fabric.yaml").ShouldContain("name: shop\nprofile: minimal\n");
     }
 
@@ -41,6 +41,7 @@ public class GeneratorTests
             Database: sqlserver
             Protocols: rest, grpc
             Modules start as: crud
+            Orders table: [orders]
 
             ## sqlserver
 
@@ -49,6 +50,8 @@ public class GeneratorTests
             ## rest
 
             ## modules: crud
+
+            ## modules: ddd
 
 
             """);

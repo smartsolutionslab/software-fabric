@@ -3,11 +3,13 @@ files:
   - { template: templates/readme.md.sbn, target: README.md }
   - { template: templates/agents.md.sbn, target: AGENTS.md }
   - { template: templates/backend-engineer.md.sbn, target: .claude/agents/backend-engineer.md }
+  - { template: templates/protocols.md.sbn, target: docs/protocols.md, when: '(project["backend.api-protocols"] | array.size) > 1' }
 declares-slots:
   - { slot: readme.sections, description: "One section per option.", cardinality: zero-or-more }
   - { slot: readme.database, description: "The database line.", cardinality: exactly-one }
   - { slot: agents.sections, description: "Every pack's agents-md; filled by the generator." }
   - { slot: agents.brief.backend-engineer, description: "Every pack's backend-engineer brief; filled by the generator." }
+  - { slot: templates.functions, description: "Function definitions every template can call (quote_identifier); never rendered as text.", cardinality: zero-or-more }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

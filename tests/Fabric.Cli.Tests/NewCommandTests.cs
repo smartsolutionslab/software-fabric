@@ -22,7 +22,7 @@ public sealed class NewCommandTests : IDisposable
         var run = New("shop", "--profile", "everything");
 
         run.ExitCode.ShouldBe(0);
-        run.Output.ShouldBe($"created {Path.Combine(root, "shop")} with 10 files.{Environment.NewLine}");
+        run.Output.ShouldBe($"created {Path.Combine(root, "shop")} with 15 files.{Environment.NewLine}");
         Tree("shop").Keys.ShouldContain("docs/adr/0005-module-style-crud.md");
         Tree("shop")["fabric.yaml"].ShouldContain("name: shop\n");
         Tree("shop")["fabric.yaml"].ShouldContain("backend.api-protocols: [rest, grpc]\n");

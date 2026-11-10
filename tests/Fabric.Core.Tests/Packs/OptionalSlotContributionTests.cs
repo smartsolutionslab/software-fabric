@@ -44,7 +44,7 @@ public sealed class OptionalSlotContributionTests : IDisposable
               - { slot: {{slot}}, template: templates/extra.sbn, order: 30, optional: {{(optional ? "true" : "false")}} }
 
             """;
-        File.WriteAllText(manifest, File.ReadAllText(manifest).Replace("slots:\n", entry, StringComparison.Ordinal));
+        File.WriteAllText(manifest, File.ReadAllText(manifest).Replace("\nslots:\n", "\n" + entry, StringComparison.Ordinal));
 
         var loaded = PackLoader.Load(packsRoot, Fixtures.MinimalCatalog);
         loaded.Errors.ShouldBeEmpty();

@@ -184,7 +184,7 @@ public sealed class PackModuleTests : IDisposable
         var generated = New("everything");
 
         generated.Errors.ShouldBeEmpty();
-        FabricYaml(generated).ShouldEndWith("modules:\n  reports:\n    module.style: crud\n");
+        FabricYaml(generated).ShouldEndWith("modules:\n  archive:\n    module.style: ddd\n  reports:\n    module.style: crud\n");
     }
 
     [Fact]

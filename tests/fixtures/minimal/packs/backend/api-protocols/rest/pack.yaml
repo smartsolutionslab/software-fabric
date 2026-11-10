@@ -2,6 +2,8 @@ option: backend.api-protocols.rest
 files: []
 slots:
   - { slot: readme.sections, template: templates/section.sbn, order: 20 }
+  - { slot: database.readers, template: templates/reader.sbn }
+  - { slot: grpc.services, template: templates/grpc-service.sbn, optional: true }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

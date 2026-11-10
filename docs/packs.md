@@ -7,10 +7,11 @@ or names a test or script that does not exist.
 
 `tests/fixtures/minimal` is a small working catalog and pack set: the
 generator's own tests run on it (`GeneratorTests`, `AddModuleTests`), and
-`ConditionalFileTests` runs on a copy of it with one file entry added. The
-rules it has no example of (role slots, brought modules, optional
-contributions, template functions) are shown working by the tests named
-under each, on packs those tests write themselves.
+`ConditionalFileTests`, `OptionalSlotContributionTests` and
+`PackModuleTests` run on copies of it with an entry added. It has a minimal
+example of each rule below, as checked in, and the section says where:
+conditional files, brought modules, optional contributions, role slots and
+template functions. `MinimalFixtureTests` keeps each example working.
 
 ## Where a pack lives
 
@@ -163,6 +164,11 @@ files:
   the model, nothing else
   (`RendererTests.A_file_condition_cannot_call_the_contributed_functions`).
 
+The fixture shows it: `base/core` writes `docs/protocols.md` only for a
+project that serves more than one protocol,
+`when: '(project["backend.api-protocols"] | array.size) > 1'`
+(`MinimalFixtureTests.A_conditional_file_is_written_only_for_the_choices_its_condition_holds_for`).
+
 ## Branching on another choice
 
 A template may read another dimension
@@ -241,6 +247,13 @@ modules:
   selection. The loader rejects it
   (`PackModuleTests.A_module_scoped_pack_cannot_bring_a_module`).
 
+The fixture shows it: `backend/database/sqlserver` brings `archive` pinned
+to `module.style: ddd`, which wins over the `everything` profile's `crud`
+default
+(`MinimalFixtureTests.A_pack_brings_its_module_with_its_pinned_choices_over_the_module_defaults`),
+and writes `src/archive/Archive.txt` for that module only
+(`MinimalFixtureTests.The_pack_that_brings_a_module_writes_that_module_s_own_files_for_it_only`).
+
 ## What a template sees
 
 Templates are [Scriban](https://github.com/scriban/scriban).
@@ -313,6 +326,12 @@ so a misspelled slot name is still caught everywhere it is not marked
 optional. Mark a contribution optional only when some valid combination of
 choices has no pack declaring its slot.
 
+The fixture shows it: `backend/api-protocols/rest` contributes
+`rest-gateway` to `grpc.services` with `optional: true`; with grpc chosen
+it renders in `config/grpc.txt`, and with rest alone, where no pack declares
+the slot, it is dropped
+(`MinimalFixtureTests.An_optional_contribution_renders_where_its_slot_is_declared_and_is_dropped_where_it_is_not`).
+
 A generated web app must pass its own `pnpm format:check` (Prettier), so a
 contribution to a file under `web/` is written as Prettier prints it at
 the depth where it lands; the template adds the trailing comma after the
@@ -347,6 +366,12 @@ Today `frontend.framework`, `frontend.api-client`, `frontend.workspace` and
 `module.event-store` have role slots; `catalog/catalog.yaml` is the list,
 and `docs/catalog.md` does not show them.
 
+The fixture shows it: its catalog gives `backend.database` the role slot
+`database.readers`, both database packs declare it joined by `", "`, and
+the protocol packs fill it in `config/database.txt` whichever database is
+chosen
+(`MinimalFixtureTests.A_role_slot_is_declared_by_every_option_of_its_dimension_and_filled_whichever_is_chosen`).
+
 ## Template functions
 
 A pattern that runs through every pack is a function, not a branch. Packs
@@ -361,6 +386,12 @@ An error in a template still names the template's own line and column
 Write `{{ not_null "services" }}`, never a guard of your own: the chosen
 guards pack decides whether that renders `Ensure.That(services).IsNotNull();`
 or `ArgumentNullException.ThrowIfNull(services);`.
+
+The fixture shows it: both database packs define `quote_identifier` in
+`templates.functions`, which `base/core` declares, and the README template
+calls `{{ quote_identifier "orders" }}`, rendering `"orders"` on postgres
+and `[orders]` on sqlserver
+(`MinimalFixtureTests.A_template_calls_the_function_the_chosen_pack_defines`).
 
 ### Vocabularies
 

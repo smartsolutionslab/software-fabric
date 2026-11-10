@@ -3,5 +3,6 @@
 Database: {{ slots["readme.database"] }}
 Protocols: {{ project["backend.api-protocols"] | array.join ", " }}
 Modules start as: {{ module_defaults["module.style"] }}
+Orders table: {{ quote_identifier "orders" }}
 
 {{ slots["readme.sections"] }}

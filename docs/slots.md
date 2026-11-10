@@ -517,6 +517,9 @@ slot: each pack branches on the choice itself (ADR-0006),
 `{{ if project["frontend.design-system"] == "tokens" }}`, and a project
 without the tokens keeps its output byte for byte. The tokens pack keeps
 every name below; renaming or removing one breaks the packs that read it.
+The tokens packages of `web-components` and `tokens-and-components` define
+the same names, `muted-foreground` and `destructive` included (#548), but the
+screens read them only under `tokens` today.
 
 | Name | CSS Modules | Tailwind | Reads it |
 |---|---|---|---|
