@@ -50,6 +50,180 @@ public sealed partial class VuetifyTests
         </template>
         """;
 
+    /// <summary>Components that colour themselves each in another way: every one must fail the theme check (#530, #545).</summary>
+    private static readonly Dictionary<string, string> OwnColours = new()
+    {
+        ["Alarm"] = OwnColour,
+        ["Prop"] = """
+            <template>
+              <v-sheet color="#fafafa">Prop</v-sheet>
+            </template>
+            """,
+        ["StaticClass"] = """
+            <template>
+              <span class="border-[#ccc]">StaticClass</span>
+            </template>
+            """,
+        ["Bound"] = """
+            <template>
+              <span :style="{ color: 'rgb(211, 47, 47)' }">Bound</span>
+            </template>
+            """,
+        ["BoundLonghand"] = """
+            <template>
+              <span v-bind:style="`color: #333`">BoundLonghand</span>
+            </template>
+            """,
+        ["BoundClass"] = """
+            <template>
+              <span :class="{ 'text-[#fff]': true }">BoundClass</span>
+            </template>
+            """,
+        ["Hoisted"] = """
+            <script setup lang="ts">
+            const alarm = { color: 'hsl(0, 65%, 51%)' };
+            </script>
+
+            <template>
+              <p :style="alarm">Hoisted</p>
+            </template>
+            """,
+        ["OptionsApi"] = """
+            <script lang="ts">
+            export default { data: () => ({ alarm: { color: '#fff' } }) };
+            </script>
+
+            <template>
+              <p :style="alarm">OptionsApi</p>
+            </template>
+            """,
+        ["Spread"] = """
+            <template>
+              <p v-bind="{ style: { color: '#fff' } }">Spread</p>
+            </template>
+            """,
+        ["SpreadNamed"] = """
+            <script setup lang="ts">
+            const alarm = { style: { color: '#fff' } };
+            </script>
+
+            <template>
+              <p v-bind="alarm">SpreadNamed</p>
+            </template>
+            """,
+        ["Destructured"] = """
+            <script setup lang="ts">
+            const { color } = { color: '#fff' };
+            </script>
+
+            <template>
+              <v-sheet :color="color">Destructured</v-sheet>
+            </template>
+            """,
+        ["NestedDestructured"] = """
+            <script setup lang="ts">
+            const {
+              appearance: { color },
+            } = { appearance: { color: '#fff' } };
+            </script>
+
+            <template>
+              <v-sheet :color="color">NestedDestructured</v-sheet>
+            </template>
+            """,
+        ["Conditional"] = """
+            <script setup lang="ts">
+            defineProps<{ active: boolean }>();
+            </script>
+
+            <template>
+              <v-sheet :color="active ? '#fff' : 'primary'" :title="'Issue ' + '#393'">Conditional</v-sheet>
+            </template>
+            """,
+        ["Palette"] = """
+            <script setup lang="ts">
+            const palette = { danger: '#f00' };
+            </script>
+
+            <template>
+              <v-sheet :color="palette.danger">Palette</v-sheet>
+            </template>
+            """,
+        ["StyleBlock"] = """
+            <template>
+              <p class="alarm">StyleBlock</p>
+            </template>
+
+            <style scoped>
+            .alarm {
+              color: #333;
+            }
+            </style>
+            """,
+    };
+
+    /// <summary>
+    /// The keys whose values are content, never a style, in an object or as an attribute (owner decision on #530): a value
+    /// under one of them may look like a colour.
+    /// </summary>
+    private static readonly string[] ContentKeys = ["label", "title", "href", "to", "alt", "description", "text", "placeholder"];
+
+    /// <summary>Components that style themselves only through the theme, beside content that looks like a colour (#530).</summary>
+    private const string ThemedEntries = """
+        <script setup lang="ts">
+        const entry = { label: 'Issue #393', color: 'primary' };
+        const anchor = { href: '#add' };
+        const asserted = { label: 'Issue #393' as const, title: 'Issue #394' satisfies string };
+        const suffix = location.hash;
+        const joined = { label: 'Issue #393' + suffix, title: suffix || '#fee', text: suffix ? '#add' : '#bad' };
+        const { color: themed } = { label: 'Issue #393', color: 'primary' };
+
+        defineProps<{ active: boolean }>();
+        </script>
+
+        <template>
+          <v-sheet :color="entry.color">{{ entry.label }}</v-sheet>
+          <v-sheet :color="themed">Destructured</v-sheet>
+          <a v-bind="anchor">Add</a>
+          <a v-bind="{ href: '#add' }">Add</a>
+          <a v-bind:href="'#add'">Add</a>
+          <a :href="active ? '#add' : '#fee'" :title="'Issue #' + '393'" :aria-label="suffix ?? '#bad'">
+            {{ joined.label }} {{ joined.title }} {{ joined.text }}
+          </a>
+          <v-sheet :title="'#add' as string" :aria-label="'#bad' satisfies string">
+            {{ asserted.label }} {{ asserted.title }}
+          </v-sheet>
+        </template>
+        """;
+
+    /// <summary>A component without a colour of its own, whose text, comments and links look like one (#398).</summary>
+    private const string Unstyled = """
+        <script setup lang="ts">
+        // Fixed in #393; see #add.
+        defineProps<{ issue: number }>();
+        </script>
+
+        <template>
+          <!-- Fixed in #393; see #add. -->
+          <p>
+            Issue #393 <a href="#add">Add</a> <a href="https://example.com/#fee">Fee</a>
+            <span :aria-label="`Issue #${issue}`">#{{ issue }}</span> <abbr aria-description="#bad">Bad</abbr>
+          </p>
+        </template>
+        """;
+
+    /// <summary>A component whose object under the content key and whose attribute of that name, written and bound, hold a colour-like value.</summary>
+    private static string ContentUnder(string key) => $$$"""
+        <script setup lang="ts">
+        const entry = { {{{key}}}: '#fee', color: 'primary' };
+        </script>
+
+        <template>
+          <v-sheet :color="entry.color" {{{key}}}="#add">{{ entry.{{{key}}} }}</v-sheet>
+          <v-sheet :{{{key}}}="'#bad'">Bound</v-sheet>
+        </template>
+        """;
+
     private const string OtherLibraries = """
         import { Button } from 'primevue/button';
         import { ElButton } from 'element-plus';
@@ -269,12 +443,35 @@ public sealed partial class VuetifyTests
     {
         using var project = new GeneratedProject(Vue, Vuetify);
         RunWeb(project, "install");
-        project.Write("web/app/src/pages/AlarmBanner.vue", OwnColour);
+        foreach (var (name, content) in OwnColours)
+        {
+            project.Write($"web/app/src/pages/{name}.vue", content);
+        }
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "test", "src/theme.test.ts");
 
         exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("pages/AlarmBanner.vue");
+        foreach (var name in OwnColours.Keys)
+        {
+            output.ShouldContain($"pages/{name}.vue", customMessage: output);
+        }
+    }
+
+    [Fact]
+    public void A_component_whose_text_comments_links_or_content_keys_look_like_a_colour_passes_the_theme_check()
+    {
+        using var project = new GeneratedProject(Vue, Vuetify);
+        RunWeb(project, "install");
+        project.Write("web/app/src/pages/Changelog.vue", Unstyled);
+        project.Write("web/app/src/pages/Entries.vue", ThemedEntries);
+        foreach (var key in ContentKeys)
+        {
+            project.Write($"web/app/src/pages/content/{key}.vue", ContentUnder(key));
+        }
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "test", "src/theme.test.ts");
+
+        exitCode.ShouldBe(0, output);
     }
 
     [Fact]
