@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { Button } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import { cleanup, render, screen } from '@testing-library/react';
+import ts from 'typescript';
 import { afterEach, expect, test } from 'vitest';
 import { theme } from './theme';
 
@@ -14,6 +15,51 @@ const source = join(process.cwd(), 'src');
 
 /** A colour written out: #hex, or a CSS colour function. */
 const colour = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/i;
+
+/** The keys and JSX attributes whose values are content, never a style: they may look like a colour (href="#add"). */
+const contentKeys = new Set(['label', 'title', 'href', 'to', 'alt', 'description', 'text', 'placeholder']);
+const content = (name: string): boolean => contentKeys.has(name) || name.startsWith('aria-');
+
+/** The name of the JSX attribute or object property a value is given to, when it is written out. */
+function nameOf(node: ts.Node): string | undefined {
+  if (ts.isJsxAttribute(node)) {
+    return ts.isIdentifier(node.name) ? node.name.text : undefined;
+  }
+  if (ts.isPropertyAssignment(node)) {
+    return ts.isIdentifier(node.name) || ts.isStringLiteral(node.name) ? node.name.text : undefined;
+  }
+  return undefined;
+}
+
+/** Whether a literal is the value of a content key or attribute, through braces, parentheses and template parts. */
+function isContent(literal: ts.Node): boolean {
+  let node = literal;
+  while (
+    ts.isJsxExpression(node.parent) ||
+    ts.isParenthesizedExpression(node.parent) ||
+    ts.isTemplateSpan(node.parent) ||
+    ts.isTemplateExpression(node.parent)
+  ) {
+    node = node.parent;
+  }
+  const owner = node.parent;
+  if (ts.isPropertyAssignment(owner) && owner.initializer !== node) {
+    return false;
+  }
+  const name = nameOf(owner);
+  return name !== undefined && content(name);
+}
+
+/**
+ * Whether a component writes a colour: any literal in its code that looks like one, wherever it is, unless it is content
+ * (the value of a content key or attribute). Text and comments are not code, so Issue #393 in either never counts.
+ */
+function writesColour(node: ts.Node): boolean {
+  if ((ts.isStringLiteralLike(node) || ts.isTemplateLiteralToken(node)) && colour.test(node.text) && !isContent(node)) {
+    return true;
+  }
+  return ts.forEachChild(node, writesColour) === true;
+}
 
 /** A value as the browser paints it: MUI sets some through its own custom properties (var(--variant-containedBg)). */
 function resolve(style: CSSStyleDeclaration, value: string): string {
@@ -37,7 +83,16 @@ test('no component writes a colour of its own', () => {
   const components = readdirSync(source, { recursive: true, encoding: 'utf8' }).filter(
     (path) => path.endsWith('.tsx') && !path.endsWith('.test.tsx'),
   );
-  const coloured = components.filter((path) => colour.test(readFileSync(join(source, path), 'utf8')));
+  const coloured = components.filter((path) => {
+    const file = ts.createSourceFile(
+      path,
+      readFileSync(join(source, path), 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
+    return writesColour(file);
+  });
 
   expect(coloured, 'components that write a colour instead of taking it from src/theme.ts').toEqual([]);
 });
