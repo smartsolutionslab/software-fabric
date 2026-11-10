@@ -215,12 +215,12 @@ public sealed partial class FormKitTests
     [Fact]
     public void With_another_vue_ui_library_the_formkit_screens_fail_saying_what_they_are_built_from()
     {
-        var files = FilesStandingIn([FormKit, "frontend.ui-library=vuetify", .. VueAgentAndDashboards]);
+        var files = FilesStandingIn([FormKit, "frontend.ui-library=quasar", .. VueAgentAndDashboards]);
 
-        files["web/app/src/agents/AgentConversation.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is formkit");
-        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is formkit");
-        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is formkit");
-        files["web/app/src/forms/formkit.config.ts"].ShouldStartWith("throw new Error('The FormKit pack styles its inputs for shadcn-vue or reka-ui only so far; frontend.ui-library is vuetify");
+        files["web/app/src/agents/AgentConversation.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate, TanStack Form or FormKit, reka-ui with vee-validate or FormKit, or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is quasar, frontend.forms is formkit");
+        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate, TanStack Form or FormKit, reka-ui with vee-validate or FormKit, or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is quasar, frontend.forms is formkit");
+        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit, reka-ui with vee-validate or FormKit, or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is quasar, frontend.forms is formkit");
+        files["web/app/src/forms/formkit.config.ts"].ShouldStartWith("throw new Error('The FormKit pack styles its inputs for shadcn-vue, reka-ui or vuetify only so far; frontend.ui-library is quasar");
     }
 
     [Fact]
@@ -402,7 +402,7 @@ public sealed partial class FormKitTests
         return generated.Files.ToDictionary(file => file.Path, file => file.Content);
     }
 
-    /// <summary>The project with the overrides; options without a pack (vuetify) are stood in.</summary>
+    /// <summary>The project with the overrides; options without a pack (quasar) are stood in.</summary>
     private static Dictionary<string, string> FilesStandingIn(string[] overrides)
     {
         using var standIns = new StandIns();

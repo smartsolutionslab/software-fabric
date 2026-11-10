@@ -98,11 +98,11 @@ public sealed partial class RekaUiDashboardsTests
     [Fact]
     public void Another_vue_ui_library_still_fails_the_screens_saying_they_are_not_built_for_it()
     {
-        var files = Files(["frontend.ui-library=vuetify", .. AgentsAndDashboards]);
+        var files = Files(["frontend.ui-library=quasar", .. AgentsAndDashboards]);
 
-        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify");
-        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify");
-        files["web/app/src/agents/AgentConversation.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify");
+        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate, TanStack Form or FormKit, reka-ui with vee-validate or FormKit, or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is quasar");
+        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit, reka-ui with vee-validate or FormKit, or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is quasar");
+        files["web/app/src/agents/AgentConversation.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate, TanStack Form or FormKit, reka-ui with vee-validate or FormKit, or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is quasar");
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public sealed partial class RekaUiDashboardsTests
         formatExitCode.ShouldBe(0, format);
     }
 
-    /// <summary>The project with the overrides; options without a pack (here only vuetify) are stood in.</summary>
+    /// <summary>The project with the overrides; options without a pack (here only quasar) are stood in.</summary>
     private static Dictionary<string, string> Files(string[] overrides)
     {
         using var standIns = new StandIns();
