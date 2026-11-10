@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
 
@@ -19,10 +21,11 @@ public static class CatalogReader
         ArgumentNullException.ThrowIfNull(reader);
         ArgumentNullException.ThrowIfNull(sourceName);
 
+        var text = reader.ReadToEnd();
         var stream = new YamlStream();
         try
         {
-            stream.Load(reader);
+            stream.Load(new StringReader(text));
         }
         catch (YamlException exception)
         {
@@ -44,8 +47,12 @@ public static class CatalogReader
             ? ReadProfiles(source, profilesNode)
             : new OrderedDictionary<string, Profile>();
 
-        return new CatalogModel(version, dimensions, profiles);
+        return new CatalogModel(version, dimensions, profiles, Hash(text));
     }
+
+    /// <summary>Line endings are left out, so a checkout with CRLF ships the same catalog as one with LF.</summary>
+    private static string Hash(string text) =>
+        "sha256:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text.Replace("\r\n", "\n", StringComparison.Ordinal))));
 
     private static OrderedDictionary<string, Dimension> ReadDimensions(YamlSource source, YamlNode node)
     {
