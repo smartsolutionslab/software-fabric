@@ -27,7 +27,7 @@ A module can index its own records as vectors and retrieve the ones nearest to a
 {{~ if project["backend.tenancy"] == "column" ~}}
 - Work outside a request indexes and searches only inside a `TenantScope`; without one it finds nothing and cannot index.
 - One HNSW index serves every tenant. A search that the index answers short, because a tenant has fewer records than asked or other tenants' records crowd its own out, costs an exact ranking of that tenant's records. A project whose tenants grow large and very unequal may want partial indexes or partitions per tenant; that is a decision of its own.
-- This pack keeps vectors apart by a tenant column only: with `schema-per-tenant` or `database-per-tenant` tenancy the build fails rather than sharing vectors between tenants.
+- This pack keeps vectors apart by a tenant column or a schema per tenant: with `database-per-tenant` tenancy the build fails rather than sharing vectors between tenants.
 {{~ else if project["backend.tenancy"] == "schema-per-tenant" ~}}
 - Work outside a request indexes and searches only inside a `TenantScope`; without one it finds nothing and cannot index.
 - A search that the index answers short, because the tenant has fewer records than asked or the index cannot reach some of them, costs an exact ranking of every record in the tenant's table, read in full. A search the index answers in full costs nothing extra.

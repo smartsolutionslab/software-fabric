@@ -194,6 +194,16 @@ public sealed class RagTests
     }
 
     [Fact]
+    public void Rag_with_a_tenant_column_documents_only_a_database_per_tenant_as_unsupported()
+    {
+        var files = Files(Profile, "backend.llm=openai", Rag, "backend.tenancy=column");
+
+        var adr = files.Single(file => file.Key.EndsWith("-backend-llm-extras-rag.md", StringComparison.Ordinal)).Value;
+        adr.ShouldNotContain("`schema-per-tenant` or `database-per-tenant`", Case.Sensitive, "the pack supports a schema per tenant");
+        adr.ShouldContain("This pack keeps vectors apart by a tenant column or a schema per tenant: with `database-per-tenant` tenancy the build fails rather than sharing vectors between tenants.");
+    }
+
+    [Fact]
     public void Rag_without_tenancy_keeps_one_record_per_key_and_no_tenant()
     {
         var files = RagFiles("openai", "openai");
