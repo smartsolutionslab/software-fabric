@@ -340,10 +340,9 @@ not, naming the slot
 `PackLoaderTests.A_role_slot_declared_with_another_separator_is_rejected`).
 A pack may describe the slot more concretely in its own declaration.
 
-Four dimensions have role slots today: `frontend.framework` (16),
-`frontend.api-client` (4), `frontend.workspace` (`web.workspace-packages`)
-and `module.event-store` (`event-store.json-converters`); the catalog,
-`catalog/catalog.yaml`, is the list.
+Today `frontend.framework`, `frontend.api-client`, `frontend.workspace` and
+`module.event-store` have role slots; `catalog/catalog.yaml` is the list,
+and `docs/catalog.md` does not show them.
 
 ## Template functions
 
