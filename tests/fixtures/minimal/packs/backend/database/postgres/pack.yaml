@@ -4,6 +4,9 @@ files:
 slots:
   - { slot: readme.database, template: templates/line.sbn }
   - { slot: readme.sections, template: templates/section.sbn, order: 10 }
+  - { slot: templates.functions, template: templates/functions.sbn }
+declares-slots:
+  - { slot: database.readers, description: "The protocols that read the database.", separator: ", " }
 agents:
   agents-md: docs/agents.md
   briefs: { backend-engineer: docs/engineer.md }

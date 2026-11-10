@@ -1,0 +1,2 @@
+deadline={{ settings["backend.api-protocols.grpc.deadline-seconds"] }}s
+services: {{ slots["grpc.services"] }}
