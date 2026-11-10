@@ -1,13 +1,14 @@
 import type { DetailedHTMLProps, HTMLAttributes } from 'react';
 import type { Badge, BadgeTone } from '@{{ name }}/ui';
 
-// The design system's elements as JSX tags: one entry per element, with the properties it takes.
-type Element<T extends HTMLElement, Properties> = DetailedHTMLProps<HTMLAttributes<T>, T> & Partial<Properties>;
+// The design system's elements as JSX tags: one entry per element, with the properties it takes. Not named Element:
+// inside namespace JSX that name is JSX.Element, which takes no type arguments, and skipLibCheck hides the error.
+type Tag<T extends HTMLElement, Properties> = DetailedHTMLProps<HTMLAttributes<T>, T> & Partial<Properties>;
 
 declare module 'react' {
   namespace JSX {
     interface IntrinsicElements {
-      'ds-badge': Element<Badge, { tone: BadgeTone }>;
+      'ds-badge': Tag<Badge, { tone: BadgeTone }>;
     }
   }
 }
