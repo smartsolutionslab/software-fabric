@@ -111,6 +111,26 @@ public class ValidateCommandTests
         run.Error.ShouldContain("error: backend.tenancy=column requires backend.auth != none, but backend.auth is none.");
     }
 
+    /// <summary>The agent panel is built for a single-page app only (#518).</summary>
+    [Fact]
+    public void An_agent_panel_in_micro_frontends_exits_one_and_prints_the_sentence()
+    {
+        var run = CliRun.Of("validate", "--profile", "saas-ai-react", "--set", "frontend.architecture=micro-frontends", "--set", "frontend.design-system=tokens", "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: frontend.agent-ui=ag-ui requires frontend.architecture == spa, but frontend.architecture is micro-frontends.");
+    }
+
+    /// <summary>Orval generates TanStack Query hooks, or Pinia's plain functions; Redux Toolkit's server data is RTK Query (#518).</summary>
+    [Fact]
+    public void Orval_with_redux_toolkit_exits_one_and_prints_the_sentence()
+    {
+        var run = CliRun.Of("validate", "--profile", "saas-standard-react", "--set", "frontend.api-client=orval", "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: frontend.api-client=orval requires frontend.state in (zustand-tanstack-query, tanstack-query, pinia-tanstack-query, pinia), but frontend.state is redux-toolkit.");
+    }
+
     [Fact]
     public void Several_overrides_are_applied()
     {
