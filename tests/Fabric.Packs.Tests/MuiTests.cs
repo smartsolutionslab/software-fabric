@@ -29,6 +29,117 @@ public sealed partial class MuiTests
         }
         """;
 
+    /// <summary>Components that colour themselves each in another way: every one must fail the theme check.</summary>
+    private static readonly Dictionary<string, string> OwnColours = new()
+    {
+        ["Alarm"] = OwnColour,
+        ["Inline"] = """
+            export function Inline() {
+              return <span style={{ color: 'rgb(211, 47, 47)' }}>Inline</span>;
+            }
+            """,
+        ["Prop"] = """
+            import { Box } from '@mui/material';
+
+            export function Prop() {
+              return <Box bgcolor="#fafafa">Prop</Box>;
+            }
+            """,
+        ["Hoisted"] = """
+            import { Typography } from '@mui/material';
+
+            const alarm = { color: 'hsl(0, 65%, 51%)' };
+
+            export function Hoisted() {
+              return <Typography sx={alarm}>Hoisted</Typography>;
+            }
+            """,
+        ["Styled"] = """
+            import { styled } from '@mui/material/styles';
+
+            export const Styled = styled('div')({ borderColor: '#ccc' });
+            """,
+        ["StyledTemplate"] = """
+            import styled from '@emotion/styled';
+
+            export const StyledTemplate = styled.div`
+              color: #333;
+            `;
+            """,
+    };
+
+    /// <summary>A component without a colour of its own, whose text, comment and links look like one (#398).</summary>
+    private const string Unstyled = """
+        import { Link, Typography } from '@mui/material';
+
+        // Fixed in #393; see #add.
+        export function Changelog({ issue }: { issue: number }) {
+          return (
+            <Typography>
+              Issue #393 <Link href="#add">Add</Link> <a href="https://example.com/#fee">Fee</a>{' '}
+              <span aria-label={`Issue #${issue}`}>#{issue}</span>
+            </Typography>
+          );
+        }
+        """;
+
+    private const string ResolveColour = """
+        /** A value as the browser paints it: MUI sets some through its own custom properties. */
+        function resolve(style: CSSStyleDeclaration, value: string): string {
+          const custom = /^var\((--[\w-]+)\)$/.exec(value)?.[1];
+          return custom === undefined ? value : resolve(style, style.getPropertyValue(custom).trim());
+        }
+        """;
+
+    /// <summary>The app's navigation with React Router, under the theme whose primary colour the test changed.</summary>
+    private const string ReactRouterLinks = $$"""
+        import { ThemeProvider } from '@mui/material/styles';
+        import { render, screen } from '@testing-library/react';
+        import { MemoryRouter } from 'react-router';
+        import { expect, test } from 'vitest';
+        import { App } from './App';
+        import { theme } from './theme';
+
+        {{ResolveColour}}
+
+        test("the navigation links take the theme's primary colour", () => {
+          render(
+            <ThemeProvider theme={theme}>
+              <MemoryRouter>
+                <App />
+              </MemoryRouter>
+            </ThemeProvider>,
+          );
+
+          const style = getComputedStyle(screen.getByRole('link', { name: 'Home' }));
+          expect(resolve(style, style.color)).toBe('#0b6e4f');
+        });
+        """;
+
+    /// <summary>The app's navigation with TanStack Router, under the theme whose primary colour the test changed.</summary>
+    private const string TanStackLinks = $$"""
+        import { ThemeProvider } from '@mui/material/styles';
+        import { render, screen } from '@testing-library/react';
+        import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
+        import { expect, test } from 'vitest';
+        import { App } from './App';
+        import { createAppRouter } from './router';
+        import { theme } from './theme';
+
+        {{ResolveColour}}
+
+        test("the navigation links take the theme's primary colour", async () => {
+          render(
+            <ThemeProvider theme={theme}>
+              <RouterProvider router={createAppRouter(createMemoryHistory(), <App />)} />
+            </ThemeProvider>,
+          );
+
+          const style = getComputedStyle(await screen.findByRole('link', { name: 'Home' }));
+          expect(resolve(style, style.color)).toBe('#0b6e4f');
+        });
+        """;
+
     private const string OtherLibraries = """
         import { Button as AntButton } from 'antd';
         import { Button as MantineButton } from '@mantine/core';
@@ -212,12 +323,48 @@ public sealed partial class MuiTests
     {
         using var project = new GeneratedProject(React, Mui);
         RunWeb(project, "install");
-        project.Write("web/app/src/pages/Alarm.tsx", OwnColour);
+        foreach (var (name, content) in OwnColours)
+        {
+            project.Write($"web/app/src/pages/{name}.tsx", content);
+        }
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "test", "src/theme.test.tsx");
 
         exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("pages/Alarm.tsx");
+        foreach (var name in OwnColours.Keys)
+        {
+            output.ShouldContain($"pages/{name}.tsx", customMessage: output);
+        }
+    }
+
+    [Fact]
+    public void A_component_whose_text_comments_or_links_look_like_a_colour_passes_the_theme_check()
+    {
+        using var project = new GeneratedProject(React, Mui);
+        RunWeb(project, "install");
+        project.Write("web/app/src/pages/Changelog.tsx", Unstyled);
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "test", "src/theme.test.tsx");
+
+        exitCode.ShouldBe(0, output);
+    }
+
+    [Theory]
+    [InlineData("frontend.routing=react-router")]
+    [InlineData("frontend.routing=tanstack-router")]
+    public void With_mui_the_navigation_links_take_the_theme_s_primary_colour(string routing)
+    {
+        using var project = new GeneratedProject(React, [.. Mui, routing]);
+        RunWeb(project, "install");
+        var themePath = Path.Combine(project.ProjectDirectory, "web", "app", "src", "theme.ts");
+        var theme = File.ReadAllText(themePath);
+        theme.ShouldContain("primary: { main: '#2563eb' }");
+        File.WriteAllText(themePath, theme.Replace("primary: { main: '#2563eb' }", "primary: { main: '#0b6e4f' }", StringComparison.Ordinal));
+        project.Write("web/app/src/links.test.tsx", routing.EndsWith("tanstack-router", StringComparison.Ordinal) ? TanStackLinks : ReactRouterLinks);
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "test", "src/links.test.tsx");
+
+        exitCode.ShouldBe(0, output);
     }
 
     private static void FormatIsClean(GeneratedProject project)
