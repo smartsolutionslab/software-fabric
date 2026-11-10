@@ -184,24 +184,23 @@ public sealed class DesignSystemWebComponentsTests
     }
 
     [Theory]
-    [InlineData("var(--ds-color-primary)", "#3730a3")]
-    [InlineData("var(--ds-color-accent)", "red")]
-    [InlineData("var(--ds-color-accent)", "transparent")]
-    [InlineData("var(--ds-color-accent)", "var(--brand-red)")]
-    [InlineData("var(--ds-color-accent)", "red", "background")]
-    [InlineData("var(--ds-color-accent)", "1px solid red", "border")]
-    [InlineData("var(--ds-color-accent)", "2px solid red", "outline")]
-    [InlineData("var(--ds-color-accent)", "0 0 4px red", "box-shadow")]
-    public void A_component_style_with_a_value_of_its_own_fails_the_ui_packages_tests(
-        string token,
-        string value,
-        string property = "background-color")
+    [InlineData("background-color: var(--ds-color-primary);", "background-color: #3730a3;")]
+    [InlineData("background-color: var(--ds-color-accent);", "background-color: red;")]
+    [InlineData("background-color: var(--ds-color-accent);", "background-color: transparent;")]
+    [InlineData("background-color: var(--ds-color-accent);", "background-color: var(--brand-red);")]
+    [InlineData("background-color: var(--ds-color-accent);", "background: red;")]
+    [InlineData("background-color: var(--ds-color-accent);", "border: 1px solid red;")]
+    [InlineData("background-color: var(--ds-color-accent);", "outline: 2px solid red;")]
+    [InlineData("background-color: var(--ds-color-accent);", "box-shadow: 0 0 4px red;")]
+    // The last declaration of a rule needs no semicolon.
+    [InlineData("color: var(--ds-color-accent-foreground);", "color: red")]
+    public void A_component_style_with_a_value_of_its_own_fails_the_ui_packages_tests(string declaration, string mutation)
     {
         using var project = new GeneratedProject("saas-standard-react", Choice);
         var badge = Path.Combine(project.ProjectDirectory, "web", "packages", "ui", "src", "Badge.ts");
         var source = File.ReadAllText(badge);
-        source.ShouldContain($"background-color: {token};");
-        File.WriteAllText(badge, source.Replace($"background-color: {token};", $"{property}: {value};", StringComparison.Ordinal));
+        source.Split(declaration).Length.ShouldBe(2, $"Badge.ts declares {declaration} once");
+        File.WriteAllText(badge, source.Replace(declaration, mutation, StringComparison.Ordinal));
         RunWeb(project, "install");
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "--filter", "@shop/ui", "test");
