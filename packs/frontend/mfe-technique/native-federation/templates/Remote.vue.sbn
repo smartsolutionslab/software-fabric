@@ -1,0 +1,72 @@
+<script lang="ts">
+import type { Component } from 'vue';
+import { loadPage } from './federation';
+
+const pages = new Map<string, Promise<Component>>();
+
+/**
+ * Loads a module's page from its remote once; every later mount gets the same component. A load that failed is
+ * forgotten, so the next mount tries again once the remote is back (federation.ts).
+ */
+function pageOf(module: string): Promise<Component> {
+  const known = pages.get(module);
+  if (known) {
+    return known;
+  }
+
+  const page = loadPage(module);
+  pages.set(module, page);
+  page.catch(() => pages.delete(module));
+  return page;
+}
+</script>
+
+<script setup lang="ts">
+import { computed, onErrorCaptured, ref, shallowRef, watch } from 'vue';
+
+/** A module's page, loaded at run time from the module's own remote, web/modules/<module> (docs/adr). */
+defineOptions({ name: 'RemotePage' });
+
+const props = defineProps<{ module: string }>();
+
+type Loaded = { module: string; page: Component } | { module: string; failed: true };
+
+const loaded = shallowRef<Loaded>();
+const failedToRender = ref(false);
+
+watch(
+  () => props.module,
+  (module, _, onCleanup) => {
+    let mounted = true;
+    onCleanup(() => {
+      mounted = false;
+    });
+    failedToRender.value = false;
+    pageOf(module).then(
+      (page) => mounted && (loaded.value = { module, page }),
+      () => mounted && (loaded.value = { module, failed: true }),
+    );
+  },
+  { immediate: true },
+);
+
+/** Keeps the shell running when a remote's page fails to render: only that module's page says so. */
+onErrorCaptured(() => {
+  failedToRender.value = true;
+  return false;
+});
+
+const page = computed(() => {
+  const current = loaded.value;
+  return current?.module === props.module && 'page' in current ? current.page : undefined;
+});
+const failed = computed(
+  () => failedToRender.value || (loaded.value?.module === props.module && 'failed' in loaded.value),
+);
+</script>
+
+<template>
+  <p v-if="failed" role="alert">{{ "{{" }} module {{ "}}" }} could not be loaded.</p>
+  <component :is="page" v-else-if="page" />
+  <p v-else>Loading {{ "{{" }} module {{ "}}" }}…</p>
+</template>

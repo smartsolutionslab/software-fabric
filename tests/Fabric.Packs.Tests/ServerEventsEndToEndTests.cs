@@ -46,4 +46,21 @@ public sealed class ServerEventsEndToEndTests
         brokenExitCode.ShouldNotBe(0, broken);
         broken.ShouldContain("failed Shop.Integration.Tests.ServerEventsTests.A_test_event_reaches_the_browsers_of_the_senders_tenant_only");
     }
+
+    [Fact]
+    public void Under_schema_per_tenant_a_server_event_reaches_the_browsers_of_its_tenant_only()
+    {
+        using var project = new GeneratedProject("saas-standard-react", "frontend.realtime=signalr", "backend.tenancy=schema-per-tenant");
+        project.AddModule("billing");
+        project.Build();
+
+        var (exitCode, output) = project.DotNetCommand(
+            new Dictionary<string, string>(),
+            "test", "--project", "tests/Integration.Tests/Integration.Tests.csproj", "-c", "Release", "--no-build", "--no-ansi",
+            "--", "--filter-method", "Shop.Integration.Tests.ServerEventsTests.A_test_event_reaches_the_browsers_of_the_senders_tenant_only");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("succeeded: 1", customMessage: output);
+        output.ShouldContain("failed: 0", customMessage: output);
+    }
 }

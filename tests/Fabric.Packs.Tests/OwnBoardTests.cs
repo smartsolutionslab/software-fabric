@@ -12,6 +12,7 @@ public sealed class OwnBoardTests
         ".github/workflows/board-return.yml",
         ".github/workflows/commit-messages.yml",
         ".github/workflows/cross-model-review.yml",
+        ".github/workflows/cross-model-review-retry.yml",
         ".claude/skills/next-issue/SKILL.md",
         ".claude/skills/verify/SKILL.md",
     ];

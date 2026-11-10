@@ -52,8 +52,6 @@ slots:
   - { slot: e2e.apphost-arguments, template: templates/e2e-apphost-arguments.sbn, order: 90 }
   - { slot: web.dependencies, template: templates/web-dependency.sbn }
   - { slot: web.restricted-imports, template: templates/web-restricted.sbn, order: 50 }
-  # The assistant module's sample policy endpoint, with authorization choices; before the dashboards module's, as the host maps modules by name.
-  - { slot: web.openapi-paths, template: templates/openapi-paths.sbn }
   # With backend.test.integration testcontainers only (ADR-0002: dropped where no pack declares the slot).
   - { slot: integration-tests.resources, template: templates/testcontainers-resources.sbn, order: 40, optional: true }
 agents:

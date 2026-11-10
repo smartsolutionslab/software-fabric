@@ -178,6 +178,23 @@ public sealed class GenerativeDashboardsTests
         output.ShouldContain("succeeded: 56");
     }
 
+    /// <summary>
+    /// With an authorization choice the proposal checks a widget's access, which asks ASP.NET Core's authorization
+    /// service; under Wolverine's mediator the module tests' own host refused to build the handlers for it (#465).
+    /// </summary>
+    [Fact]
+    public void With_the_wolverine_mediator_and_roles_the_dashboards_tests_pass()
+    {
+        using var project = NewProject(Profile, Anthropic, AgentFramework, AgUi, Generative, "backend.mediator=wolverine", "backend.authorization=roles");
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Modules/Dashboards.Tests/Dashboards.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+        output.ShouldContain("succeeded: 56");
+    }
+
     [Fact]
     public void A_command_given_to_an_agent_of_the_dashboards_module_fails_the_architecture_tests_naming_it()
     {

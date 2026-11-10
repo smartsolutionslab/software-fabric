@@ -126,11 +126,10 @@ public sealed partial class MsalTests
     /// <summary>The gate: the web app's own tests run MSAL against the configuration it ships, and the sign-in screens.</summary>
     [Theory]
     [InlineData("saas-standard-react", "src/auth/SignedIn.test.tsx", "src/auth/RequirePermission.test.tsx")]
-    [InlineData("saas-standard-vue", "src/auth/SignedIn.test.ts", null)]
-    public void The_web_app_installs_builds_lints_is_formatted_and_its_sign_in_tests_pass(string profile, string signedInTest, string? permissionTest)
+    [InlineData("saas-standard-vue", "src/auth/SignedIn.test.ts", "src/auth/RequirePermission.test.ts")]
+    public void The_web_app_installs_builds_lints_is_formatted_and_its_sign_in_tests_pass(string profile, string signedInTest, string permissionTest)
     {
-        // Vue shows and hides by role or claim with no auth client yet (docs/adr/0006 of the generator).
-        using var project = permissionTest is null ? new GeneratedProject(profile, EntraId, Msal) : new GeneratedProject(profile, EntraId, Msal, RolesAndClaims);
+        using var project = new GeneratedProject(profile, EntraId, Msal, RolesAndClaims);
         var web = Path.Combine(project.ProjectDirectory, "web");
         var app = Path.Combine(web, "app");
 
@@ -148,10 +147,7 @@ public sealed partial class MsalTests
         plain.ShouldContain("✓ src/auth/msalConfig.test.ts > coming back from the stand-in, msal-browser signs the user in and the access token is kept", customMessage: testOutput);
         plain.ShouldContain($"✓ {signedInTest} > an anonymous visitor is sent to the identity provider", customMessage: testOutput);
         plain.ShouldContain($"✓ {signedInTest} > a session whose access token expires sends the user back to the identity provider", customMessage: testOutput);
-        if (permissionTest is not null)
-        {
-            plain.ShouldContain($"✓ {permissionTest} > an element that requires the manager role and the finance department is shown to the developer", customMessage: testOutput);
-        }
+        plain.ShouldContain($"✓ {permissionTest} > an element that requires the manager role and the finance department is shown to the developer", customMessage: testOutput);
 
         var (formatExitCode, formatOutput) = Shell.Run(app, "pnpm", "format:check");
         formatExitCode.ShouldBe(0, $"pnpm format:check:\n{formatOutput}");

@@ -349,17 +349,13 @@ public sealed class AgUiTests
         without["web/app/src/agents/AgentPanel.test.tsx"].ShouldNotContain("axe");
     }
 
+    /// <summary>The panel is built for a single-page app only, so the catalog refuses it elsewhere (#518).</summary>
     [Fact]
-    public void Where_the_panel_is_not_built_yet_the_web_apps_tests_fail_saying_so()
+    public void The_panel_outside_a_single_page_app_is_refused_by_the_catalog()
     {
-        var files = Files("industrial-event-driven-mfe", Anthropic, AgentFramework, AgUi);
+        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", "industrial-event-driven-mfe", [Anthropic, AgentFramework, AgUi]);
 
-        files.Keys.ShouldNotContain(Panel);
-        files.Keys.ShouldNotContain(Client);
-        files.Keys.ShouldNotContain(PanelEndToEndTest);
-        files["web/app/src/agents/AgentPanel.test.ts"].ShouldStartWith("throw new Error('The ag-ui pack builds the agent panel for a React or Vue single-page app only so far");
-        files["web/app/src/agents/AgentPanel.test.ts"].ShouldContain("frontend.architecture is micro-frontends");
-
+        generated.Errors.ShouldBe(["frontend.agent-ui=ag-ui requires frontend.architecture == spa, but frontend.architecture is micro-frontends."]);
         Files(Profile, Anthropic, AgentFramework, AgUi).Keys.ShouldNotContain("web/app/src/agents/AgentPanel.test.ts");
     }
 

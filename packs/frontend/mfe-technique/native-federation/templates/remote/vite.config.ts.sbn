@@ -1,15 +1,27 @@
-{{~ if project["frontend.framework"] != "react" || project["frontend.design-system"] != "tokens-and-components" ~}}
-throw new Error('The native-federation pack builds React remotes on the tokens-and-components design system only so far; frontend.framework is {{ project["frontend.framework"] }}, frontend.design-system is {{ project["frontend.design-system"] }} (docs/adr/0006 of the generator).');
-{{~ end ~}}
+{{~ vue = project["frontend.framework"] == "vue" ~}}
+{{~ if vue ~}}
+import vue from '@vitejs/plugin-vue';
+{{~ else ~}}
 import react from '@vitejs/plugin-react';
+{{~ end ~}}
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 import { remoteBoundary } from './boundary.js';
 import { serveFederation } from './serve.js';
+{{~ if vue && slots["web.custom-element-prefixes"] != "" ~}}
+
+// As in the shell: tags Vue's compiler leaves to the browser as custom elements, any starting with a declared prefix.
+const customElementPrefixes = [{{ slots["web.custom-element-prefixes"] }}];
+const isCustomElement = (tag: string) => customElementPrefixes.some((prefix) => tag.startsWith(prefix));
+{{~ end ~}}
 
 /** The plugins every build of the remote uses; native-federation-vite reads them from this file too. */
 const plugins = (): Plugin[] => [
+{{~ if vue ~}}
+  vue({{ if slots["web.custom-element-prefixes"] != "" }}{ template: { compilerOptions: { isCustomElement } } }{{ end }}),
+{{~ else ~}}
   ...react(),
+{{~ end ~}}
   // A remote bundles only its own files and packages: other remotes and the shell are loaded at run time (docs/adr).
   remoteBoundary(),
 ];
@@ -21,6 +33,6 @@ export default defineConfig({
   plugins: [...plugins(), serveFederation(plugins)],
   // `pnpm build` first bundles the page with Vite, writing nothing, so the boundary names a file of another remote or
   // of the shell; native federation's dependency analysis would stop at it saying only that it is outside the remote.
-  build: { rolldownOptions: { input: './src/{{ module.namespace }}Page.tsx' }, write: false },
-  test: { environment: 'jsdom', include: ['src/**/*.test.{ts,tsx}'], setupFiles: ['./src/test-setup.ts'] },
+  build: { rolldownOptions: { input: './src/{{ module.namespace }}Page.{{ if vue }}vue{{ else }}tsx{{ end }}' }, write: false },
+  test: { environment: 'jsdom', include: ['src/**/*.test.{{ if vue }}ts{{ else }}{ts,tsx}{{ end }}'], setupFiles: ['./src/test-setup.ts'] },
 });

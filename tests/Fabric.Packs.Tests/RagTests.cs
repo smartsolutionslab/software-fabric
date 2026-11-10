@@ -18,6 +18,9 @@ public sealed class RagTests
     private const string Image = ".WithImage(\"pgvector/pgvector\", \"0.8.7-pg18\")";
     private const string Store = "src/BuildingBlocks/Rag";
 
+    /// <summary>Schema-per-tenant tenancy over a broker, signed in through the default identity provider.</summary>
+    private static readonly string[] SchemaPerTenant = ["backend.tenancy=schema-per-tenant", "backend.bus.transport=rabbitmq"];
+
     /// <summary>The notes module keeps a search over the billing module's vectors: in a field, in a method body, and through a generic helper of its own.</summary>
     private const string NotesSearchingBillingsVectors = """
         using Microsoft.Extensions.DependencyInjection;
@@ -217,21 +220,40 @@ public sealed class RagTests
         files.Keys.ShouldContain("tests/Rag.Tests/SampleLibraryDbContext.cs");
     }
 
-    [Theory]
-    // The catalog refuses schema-per-tenant with lean-crud's transport none before rag's guard is reached.
-    [InlineData("schema-per-tenant", new[] { "backend.bus.transport=rabbitmq" })]
-    [InlineData("database-per-tenant", new string[0])]
-    public void Rag_with_another_tenancy_fails_the_build_instead_of_sharing_vectors_between_tenants(string tenancy, string[] transport)
+    [Fact]
+    public void Rag_with_a_schema_per_tenant_keeps_each_tenants_vectors_in_its_tenants_schema_and_no_tenant_column()
+    {
+        var files = Files(Profile, ["backend.llm=openai", Rag, .. SchemaPerTenant]);
+
+        var store = files[$"{Store}/ModuleVectorIndex.cs"];
+        store.ShouldNotContain("#error");
+        store.ShouldNotContain("tenant_id");
+        store.ShouldContain("TenantSchemas.Of(ModuleSchema, services)");
+        store.ShouldContain("ON CONFLICT (key)");
+        store.ShouldNotContain("string tenant", Case.Sensitive, "a caller never passes the tenant");
+        var tables = files[$"{Store}/VectorTables.cs"];
+        tables.ShouldContain("(key text primary key, content text not null, embedding vector({Dimensions}) not null)");
+        tables.ShouldNotContain("tenant_id");
+        var registration = files[$"{Store}/Wiring/VectorIndexRegistration.cs"];
+        registration.ShouldContain(".AddScoped(typeof(ModuleVectorIndex<>))");
+        registration.ShouldContain("TenantSchemas.For(schema, tenant)");
+        files["AGENTS.md"].ShouldContain("TenantScope.Begin");
+        files.Keys.ShouldContain("tests/Rag.Tests/TenantSchemaVectorIndexTests.cs");
+        files.Keys.ShouldNotContain("tests/Rag.Tests/TenantVectorIndexTests.cs");
+    }
+
+    [Fact]
+    public void Rag_with_a_database_per_tenant_fails_the_build_instead_of_sharing_vectors_between_tenants()
     {
         using var standIns = new StandIns();
-        string[] overrides = ["backend.llm=openai", Rag, $"backend.tenancy={tenancy}", .. transport];
+        string[] overrides = ["backend.llm=openai", Rag, "backend.tenancy=database-per-tenant"];
         var packs = standIns.Complete(Repository.Catalog, Repository.Packs.Packs, Profile, overrides);
 
         var generated = Generator.New(Repository.Catalog, packs, "shop", Profile, overrides);
 
         generated.Errors.ShouldBeEmpty();
         var store = generated.Files.Single(file => file.Path == $"{Store}/ModuleVectorIndex.cs").Content;
-        store.ShouldStartWith($"#error The rag pack keeps its vectors apart by a tenant column, so it supports backend.tenancy none and column only so far (docs/adr/0006 of the generator): with backend.tenancy {tenancy} a search would return every tenant's records.");
+        store.ShouldStartWith("#error The rag pack keeps its vectors apart by a tenant column or a schema per tenant, so it supports backend.tenancy none, column and schema-per-tenant only so far (docs/adr/0006 of the generator): with backend.tenancy database-per-tenant a search would return every tenant's records.");
     }
 
     [Fact]
@@ -288,6 +310,28 @@ public sealed class RagTests
     public void The_generated_rag_tests_under_a_tenant_column_return_each_tenant_only_its_own_records()
     {
         using var project = NewProject("openai", "openai", "backend.tenancy=column");
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Infrastructure", BillingSearchingItsOwnVectors);
+        project.Build();
+
+        var (ragExitCode, ragOutput) = project.Test("tests/Rag.Tests/Rag.Tests.csproj");
+        ragExitCode.ShouldBe(0, ragOutput);
+        ragOutput.ShouldContain("failed: 0");
+        ragOutput.ShouldContain("succeeded: 9");
+
+        var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        architectureExitCode.ShouldBe(0, architectureOutput);
+        architectureOutput.ShouldContain("failed: 0");
+
+        var (moduleExitCode, moduleOutput) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj");
+        moduleExitCode.ShouldBe(0, moduleOutput);
+        moduleOutput.ShouldContain("failed: 0");
+    }
+
+    [Fact]
+    public void The_generated_rag_tests_under_a_schema_per_tenant_return_each_tenant_only_the_records_in_its_own_schema()
+    {
+        using var project = NewProject("openai", "openai", SchemaPerTenant);
         project.AddModule("billing");
         project.WriteTypes("src/Modules/Billing/Billing.Infrastructure", BillingSearchingItsOwnVectors);
         project.Build();

@@ -1,15 +1,26 @@
-{{~ if project["backend.tenancy"] != "none" && project["backend.tenancy"] != "column" ~}}
-#error The in-process outbox of backend.bus.transport.none keeps one table per module schema, so it supports backend.tenancy none and column only so far (docs/adr/0006 of the generator): with backend.tenancy {{ project["backend.tenancy"] }} a module's integration events would go to a tenant's schema, which has no outbox table and which nothing delivers from.
+{{~ if project["backend.tenancy"] != "none" && project["backend.tenancy"] != "column" && project["backend.tenancy"] != "schema-per-tenant" ~}}
+#error The in-process outbox of backend.bus.transport.none keeps its table in each module's schema, or in each listed tenant's schema of it, so it supports backend.tenancy none, column and schema-per-tenant only so far (docs/adr/0006 of the generator): with backend.tenancy {{ project["backend.tenancy"] }} a module's integration events would go to a tenant's database, which has no outbox table and which nothing delivers from.
 {{~ end ~}}
+{{~ tenants = project["backend.tenancy"] == "schema-per-tenant" ~}}
 using System.Text.Json;
+{{~ if tenants ~}}
+using {{ namespace }}.BuildingBlocks.Persistence;
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
 using {{ namespace }}.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace {{ namespace }}.BuildingBlocks.Messaging;
 
 /// <summary>
+{{~ if tenants ~}}
+/// The outbox table in each listed tenant's schema of a module: integration events saved in the same transaction as the
+/// tenant's changes, delivered in-process afterwards. The MigrationRunner creates it; it stays out of the module's EF Core
+/// model.
+{{~ else ~}}
 /// The outbox table in a module's schema: integration events saved in the same transaction as the module's changes,
 /// delivered in-process afterwards. The MigrationRunner creates it; it stays out of the module's EF Core model.
+{{~ end ~}}
 /// </summary>
 public static class Outbox
 {
@@ -65,6 +76,14 @@ public static class Outbox
     {
         {{ not_null "context" }}
         {{ not_null "integrationEvents" }}
+{{~ if tenants ~}}
+
+        // The module's own schema, where work without a listed tenant goes, holds no tenant's rows and has no outbox.
+        if (context is ModuleDbContext module && module.CurrentSchema == module.ModuleSchema)
+        {
+            throw new InvalidOperationException($"Cannot publish integration events through {context.GetType().Name} without a tenant listed in {TenantSchemas.Tenants}.");
+        }
+{{~ end ~}}
 
 {{~ if project["backend.database"] == "postgres" ~}}
         var insert = Sql(SchemaOf(context), """insert into "$schema$".outbox_messages (id, type, payload) values ({0}, {1}, {2})""");

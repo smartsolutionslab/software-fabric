@@ -23,6 +23,9 @@ dotnet run --project src/Fabric.Cli -- matrix --catalog catalog/catalog.yaml --p
   --extra build/matrix-extra.yaml --output build/matrix.json
 ```
 
+The tier change that promotes the option later is a catalog change, so it
+regenerates `docs/catalog.md` the same way (`docs/catalog-rules.md`).
+
 Packs under `packs/base/` are the **base**: always part of every project,
 no catalog entry. The base declares the slots the other packs fill.
 

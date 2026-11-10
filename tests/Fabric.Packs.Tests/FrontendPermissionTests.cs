@@ -9,6 +9,9 @@ namespace Fabric.Packs.Tests;
 /// <c>useHasRole(role)</c>, <c>useHasClaim(type, value?)</c> and <c>&lt;RequirePermission&gt;</c>, read from the ID token
 /// (<c>useAuth().user.profile</c>), and the Keycloak realm puts realm roles and <c>department</c> into the ID token.
 /// Owner decisions: https://github.com/smartsolutionslab/software-fabric/issues/75#issuecomment-6629903567.
+/// #517: Vue has the same in both auth clients, oidc-client-ts and msal: <c>useHasRole</c> and <c>useHasClaim</c>
+/// composables over <c>useAuth()</c> and a <c>RequirePermission.vue</c> component (owner decision on #517: the Vue
+/// branch, no catalog rule).
 /// </summary>
 public sealed class FrontendPermissionTests
 {
@@ -21,6 +24,12 @@ public sealed class FrontendPermissionTests
     private const string UseHasClaim = "web/app/src/auth/useHasClaim.ts";
     private const string RequirePermission = "web/app/src/auth/RequirePermission.tsx";
     private const string RequirePermissionTest = "web/app/src/auth/RequirePermission.test.tsx";
+
+    private const string VueProfile = "saas-standard-vue";
+    private const string OidcClientTs = "oidc-client-ts";
+    private const string Msal = "msal";
+    private const string VueRequirePermission = "web/app/src/auth/RequirePermission.vue";
+    private const string VueRequirePermissionTest = "web/app/src/auth/RequirePermission.test.ts";
 
     [Fact]
     public void Without_roles_or_claims_the_app_has_no_permission_hooks_and_the_realm_no_id_token_mappers()
@@ -116,6 +125,79 @@ public sealed class FrontendPermissionTests
         var (formatExitCode, formatOutput) = Shell.Run(app, "pnpm", "format:check");
         formatExitCode.ShouldBe(0, $"pnpm format:check:\n{formatOutput}");
     }
+
+    [Theory]
+    [InlineData(OidcClientTs, Roles, true, false)]
+    [InlineData(OidcClientTs, Claims, false, true)]
+    [InlineData(OidcClientTs, RolesAndClaims, true, true)]
+    [InlineData(Msal, Roles, true, false)]
+    [InlineData(Msal, Claims, false, true)]
+    [InlineData(Msal, RolesAndClaims, true, true)]
+    public void With_vue_the_app_has_the_composable_of_each_chosen_authorization_and_RequirePermission_with_either(string authClient, string authorization, bool hasRole, bool hasClaim)
+    {
+        var files = Files(VueProfile, VueOverrides(authClient, authorization));
+
+        files.ContainsKey(UseHasRole).ShouldBe(hasRole);
+        files.ContainsKey(UseHasClaim).ShouldBe(hasClaim);
+        files.Keys.ShouldContain(VueRequirePermission);
+        files.Keys.ShouldContain(VueRequirePermissionTest);
+        files.Keys.ShouldNotContain(RequirePermission);
+        files.Keys.ShouldNotContain(RequirePermissionTest);
+        files[VueRequirePermissionTest].ShouldNotContain("throw new Error(");
+    }
+
+    [Theory]
+    [InlineData(OidcClientTs, Roles, "useHasRole")]
+    [InlineData(OidcClientTs, Claims, "useHasClaim")]
+    [InlineData(Msal, Roles, "useHasRole")]
+    [InlineData(Msal, Claims, "useHasClaim")]
+    public void With_vue_the_agent_rules_and_the_adr_describe_the_composables_and_the_component(string authClient, string authorization, string composable)
+    {
+        var files = Files(VueProfile, VueOverrides(authClient, authorization));
+        var agents = files["AGENTS.md"];
+        var adr = files.Single(file => file.Key.EndsWith($"-frontend-auth-client-{authClient}.md", StringComparison.Ordinal)).Value;
+
+        agents.ShouldContain("Hiding an element is a convenience, never protection: the backend policy decides.");
+        agents.ShouldContain(composable);
+        agents.ShouldContain("<RequirePermission");
+        agents.ShouldContain("#fallback");
+        agents.ShouldContain("src/auth/RequirePermission.test.ts");
+        agents.ShouldNotContain("react-oidc-context");
+        agents.ShouldNotContain("@azure/msal-react");
+        adr.ShouldContain("RequirePermission.vue");
+        adr.ShouldContain("src/auth/RequirePermission.test.ts");
+        adr.ShouldNotContain("React's only so far");
+    }
+
+    [Theory]
+    [InlineData(OidcClientTs, Roles, "an element that requires the manager role is shown to the developer")]
+    [InlineData(OidcClientTs, Claims, "an element that requires the finance department is shown to the analyst")]
+    [InlineData(OidcClientTs, RolesAndClaims, "an element that requires the manager role and the finance department is shown to the developer")]
+    [InlineData(Msal, Roles, "an element that requires the manager role is shown to the developer")]
+    [InlineData(Msal, Claims, "an element that requires the finance department is shown to the analyst")]
+    public void With_vue_the_web_app_installs_builds_lints_is_formatted_and_its_permission_tests_pass(string authClient, string authorization, string permissionTest)
+    {
+        using var project = new GeneratedProject(VueProfile, VueOverrides(authClient, authorization));
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var app = Path.Combine(web, "app");
+
+        foreach (var step in new[] { "install", "build", "lint" })
+        {
+            var (exitCode, output) = Shell.Run(web, "pnpm", step);
+            exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
+        }
+
+        var (testExitCode, testOutput) = Shell.Run(app, "pnpm", "test", "--reporter=verbose");
+        testExitCode.ShouldBe(0, $"pnpm test:\n{testOutput}");
+        var plainTestOutput = Regex.Replace(testOutput, @"\x1B\[[0-9;]*m", string.Empty);
+        plainTestOutput.ShouldContain($"✓ src/auth/RequirePermission.test.ts > {permissionTest}", customMessage: testOutput);
+
+        var (formatExitCode, formatOutput) = Shell.Run(app, "pnpm", "format:check");
+        formatExitCode.ShouldBe(0, $"pnpm format:check:\n{formatOutput}");
+    }
+
+    private static string[] VueOverrides(string authClient, string authorization) =>
+        authClient == Msal ? ["backend.auth=entra-id", "frontend.auth-client=msal", authorization] : [authorization];
 
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
     {

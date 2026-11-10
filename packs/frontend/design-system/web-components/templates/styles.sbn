@@ -1,0 +1,1 @@
+{{ if project["frontend.styling"] == "tailwind" }}@import '@{{ name }}/tokens/theme.css';{{ else if project["frontend.styling"] == "css-modules" || project["frontend.styling"] == "library-theme" }}@import '@{{ name }}/tokens/tokens.css';{{ end }}

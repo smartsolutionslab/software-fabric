@@ -1,0 +1,16 @@
+{{~ if project["frontend.design-system"] == "web-components" ~}}
+<script setup lang="ts">
+// Defines the design system's elements; the remote gets the shell's instance of the package, so they are defined once.
+import '@{{ name }}/ui';
+</script>
+
+{{~ end ~}}
+<!-- The {{ module.name }} module's screens; the shell shows them under /{{ module.name }}. -->
+<template>
+  <main>
+    <h1>{{ module.namespace }}</h1>
+{{~ if project["frontend.design-system"] == "web-components" ~}}
+    <ds-badge>Remote</ds-badge>
+{{~ end ~}}
+  </main>
+</template>

@@ -438,12 +438,31 @@ public sealed class DashboardsTests
         project.Write("tests/Integration.Tests/ManagedWidgetTests.cs", ManagedWidgetTests);
         project.Build();
 
-        // The billing module, added after generation, brings a sample endpoint the frontend's OpenAPI copy does not know
-        // yet; that one test fails and rewrites the copy, as it does for any module added with roles.
-        var (_, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+        // The billing module, added after generation, brings a sample endpoint the OpenAPI document leaves out, so the
+        // frontend's copy stays current (#463).
+        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
 
-        output.ShouldContain("failed: 1", customMessage: output);
-        output.ShouldContain("failed Shop.Integration.Tests.OpenApiDocumentTests.The_frontends_copy_of_the_openapi_document_is_current", customMessage: output);
+        output.ShouldNotContain("The_frontends_copy_of_the_openapi_document", customMessage: output);
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0", customMessage: output);
+        output.ShouldNotContain("skipped: 1", customMessage: output);
+    }
+
+    /// <summary>
+    /// With an authorization choice a widget's access asks ASP.NET Core's authorization service, whose implementation is
+    /// not public; Wolverine's mediator builds each handler's dependencies in generated code and refused it, so every
+    /// dashboard request answered 500 (#465).
+    /// </summary>
+    [Fact]
+    public void With_the_wolverine_mediator_and_roles_the_integration_tests_save_and_reload_a_dashboard()
+    {
+        using var project = new GeneratedProject("lean-crud", Dashboards, Roles, "backend.bus.transport=rabbitmq", "backend.mediator=wolverine");
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0", customMessage: output);
         output.ShouldNotContain("skipped: 1", customMessage: output);
     }
 

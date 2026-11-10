@@ -198,11 +198,12 @@ public sealed class ClaimAuthorizationTests
             .ShouldContain(generatedTest);
         project.Build();
 
-        // The new module's sample endpoint makes the frontend's OpenAPI copy stale; that test fails and rewrites it.
-        var (_, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+        // The new module's sample endpoint is not in the OpenAPI document, so the frontend's copy stays current (#463).
+        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
 
-        output.ShouldContain("failed: 1", customMessage: output);
-        output.ShouldContain("failed Shop.Integration.Tests.OpenApiDocumentTests.The_frontends_copy_of_the_openapi_document_is_current", customMessage: output);
+        output.ShouldNotContain("The_frontends_copy_of_the_openapi_document", customMessage: output);
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0", customMessage: output);
     }
 
     /// <summary>A project of the profile with the authorization choice; fails while one of its packs is a stand-in.</summary>

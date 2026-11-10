@@ -3,7 +3,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace {{ namespace }}.Rag.Tests;
 
+{{~ if project["backend.tenancy"] == "column" ~}}
 /// <summary>Stands in for a module's DbContext: only its schema is used, to keep the crowded-index test apart. It is never created.</summary>
+{{~ else ~}}
+/// <summary>Stands in for a module's DbContext: only its schema is used, to keep the test of tenants not listed apart. It is never created.</summary>
+{{~ end ~}}
 public sealed class SampleTenantShelfDbContext(DbContextOptions<SampleTenantShelfDbContext> options, IServiceProvider services)
     : ModuleDbContext(options, services, Schema)
 {

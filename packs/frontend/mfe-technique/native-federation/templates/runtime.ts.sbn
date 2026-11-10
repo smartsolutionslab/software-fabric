@@ -1,10 +1,18 @@
+{{~ if project["frontend.design-system"] != "tokens" ~}}
 import * as ui from '@{{ name }}/ui';
+{{~ end ~}}
 import { initFederation, type NativeFederationResult } from '@softarc/native-federation-orchestrator';
 import { replaceInDOM, type ImportMapConfig } from '@softarc/native-federation-orchestrator/options';
+{{~ if project["frontend.framework"] == "vue" ~}}
+import { remotes, versions } from 'virtual:federation';
+import * as vue from 'vue';
+import type { Component as ComponentType } from 'vue';
+{{~ else ~}}
 import * as react from 'react';
 import type { ComponentType } from 'react';
 import * as reactDom from 'react-dom';
 import { remotes, versions } from 'virtual:federation';
+{{~ end ~}}
 
 /** What every module's remote exposes as ./Page: the module's screens, as one component. */
 interface RemoteModule {
@@ -14,7 +22,7 @@ interface RemoteModule {
 type ImportMap = Parameters<ImportMapConfig['setImportMapFn']>[0];
 
 /** The shell's own instance of each package it shares (federation.ts lists the same); a remote never loads its own. */
-const instances: Record<string, object> = { react, 'react-dom': reactDom, '@{{ name }}/ui': ui };
+const instances: Record<string, object> = { {{ if project["frontend.framework"] == "vue" }}vue{{ else }}react, 'react-dom': reactDom{{ end }}{{ if project["frontend.design-system"] != "tokens" }}, '@{{ name }}/ui': ui{{ end }} };
 
 const key = 'native-federation.shell';
 (globalThis as Record<symbol, unknown>)[Symbol.for(key)] = instances;

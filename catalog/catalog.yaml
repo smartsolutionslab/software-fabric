@@ -171,15 +171,15 @@ dimensions:
   backend.tenancy:
     scope: project
     default: none
+    # A tenant comes from the signed-in user; without authentication there is no trustworthy tenant (#464).
     options:
       none:                { tier: supported }
-      column:              { tier: supported }
+      column:              { tier: supported, requires: ["backend.auth != none"] }
       schema-per-tenant:
         tier: experimental
         # Reason: the schema-per-tenant pack creates and migrates tenant schemas with PostgreSQL's SQL; SQL Server support is a later issue.
-        # Reason: transport none's in-process outbox keeps one table per module schema, which a tenant's schema lacks; temporary.
-        requires: ["backend.database == postgres", "backend.bus.transport != none"]
-      database-per-tenant: { tier: experimental }
+        requires: ["backend.database == postgres", "backend.auth != none"]
+      database-per-tenant: { tier: experimental, requires: ["backend.auth != none"] }
 
   backend.llm:
     scope: project
@@ -441,15 +441,19 @@ dimensions:
       web.openapi-paths: { description: "Entries of the checked-in OpenAPI document's paths, after the host's own, as the running host serves them (indented four spaces), for endpoints a pack generates.", separator: ",\n" }
       web.openapi-schemas: { description: "Entries of the checked-in OpenAPI document's components.schemas, one per contribution and indented six spaces, as the running host serves them; the document sorts them by name with the host's own.", separator: "\n\n" }
     note: "Always generated from the backend's OpenAPI document; CI fails when it is stale."
+    # Each client is built from the document only the rest protocol serves (#415).
     options:
       rtk-query-codegen:
         tier: supported
-        requires: ["frontend.state == redux-toolkit"]
-      orval:         { tier: supported }
+        requires: ["frontend.state == redux-toolkit", "backend.api-protocols has rest"]
+      # Orval generates TanStack Query hooks, or plain functions for Pinia's stores; never Redux Toolkit's RTK Query (#518).
+      orval:
+        tier: supported
+        requires: ["backend.api-protocols has rest", "frontend.state in (zustand-tanstack-query, tanstack-query, pinia-tanstack-query, pinia)"]
       # A plain typed client: TanStack Query's caches wrap its calls; Redux Toolkit's server data is RTK Query (#264).
       openapi-fetch:
         tier: experimental
-        requires: ["frontend.state != redux-toolkit"]
+        requires: ["frontend.state != redux-toolkit", "backend.api-protocols has rest"]
 
   frontend.routing:
     scope: project
@@ -550,7 +554,7 @@ dimensions:
         # Reason: the component package is React only (owner decision D5, #232), and its components are styled with
         # Tailwind only, which the pack refuses loudly otherwise (D4: such combinations are catalog rules, #271).
         requires: ["frontend.framework == react", "frontend.styling == tailwind"]
-      web-components:        { tier: experimental }
+      web-components:        { tier: experimental, note: "tokens plus Lit web components with Storybook, framework-neutral" }
 
   frontend.data-grid:
     scope: project
@@ -600,7 +604,11 @@ dimensions:
     note: "How users talk to the backend's agents. AG-UI over the host's POST /agents/{name}, which runs an agent's query through the dispatcher. ADR-0013."
     options:
       none:  { tier: experimental, note: "no agent panel; agents are reached through the project's own endpoints" }
-      ag-ui: { tier: experimental, note: "an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host" }
+      # The agent panel is built for a single-page app; where it lives in a micro-frontend shell is a later design question (#518).
+      ag-ui:
+        tier: experimental
+        note: "an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host"
+        requires: ["frontend.architecture == spa"]
 
   frontend.auth-client:
     scope: project

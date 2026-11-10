@@ -1,0 +1,27 @@
+# Design system: web components
+
+**Status:** Accepted (generated)
+
+## Decision
+
+The visual language is the project's own, in two workspace packages, and serves any framework that renders HTML:
+
+- `web/packages/tokens`: colours, radii and spacing as design tokens in W3C DTCG JSON (`$value`, `$type`), compiled by Style Dictionary 5. The build writes every token as a CSS variable on `:root` (`dist/tokens.css`: `--ds-color-primary`, `--ds-radius-md`, `--ds-spacing-4`){{ if project["frontend.styling"] == "tailwind" }} and the same tokens as a Tailwind theme (`dist/theme.css`), which `src/index.css` imports, so `bg-primary`, `rounded-md` and `p-4` take the tokens' values{{ else if project["frontend.styling"] == "library-theme" }}, which `src/index.css` imports for the components, and the same tokens as a typed TypeScript module (`dist/tokens.ts`), which the UI library's theme in `src/theme.ts` is built from{{ else }}, which `src/index.css` imports, so every CSS module reads them with `var(...)`{{ end }}. A token is changed once, in its JSON file.
+- `web/packages/ui` (`@{{ name }}/ui`): the design system's own components as web components, written with Lit 3, each with a Storybook story (the web-components renderer) and a test. Its build type-checks them and builds Storybook, so a broken story fails CI. The app imports the package once, in `src/main.{{ if project["frontend.framework"] == "vue" }}ts{{ else }}tsx{{ end }}`, which defines the elements; screens use them as tags (`<ds-badge tone="primary">`).
+
+The components render into shadow DOM: the page's styles, Tailwind's utilities included, do not reach inside them. They are styled only through the tokens' `--ds-*` variables, which custom properties inherit into the shadow root, so a token changed in its JSON file changes the components and the app alike.
+{{~ if project["frontend.framework"] == "vue" ~}}
+
+Vue's compiler is told to leave every `ds-` tag to the browser (`isCustomElement` in `vite.config.ts`), so it does not look for a Vue component of that name.
+{{~ else ~}}
+
+React renders a tag with a hyphen as a custom element and passes a property the element defines (`tone`) as that property. `src/design-system.d.ts` declares each element's tag for JSX, so a screen's use of it is type-checked.
+{{~ end ~}}
+
+## Consequences
+
+- The same components serve a React and a Vue app; nothing in them depends on either.
+- The app reads the tokens' CSS, so the tokens are built first: the app's `dev`, `build` and `test` and the ui package's `storybook` and `test` build them, and a fresh clone needs no prior `pnpm build`.
+- A token that references one that does not exist fails the build. A component that paints a colour of its own fails the ui package's tests. They render each variant with an element as its label and read every colour the browser computed, in any property (shadows, gradients and filters included), on the element, its label, every element in its shadow root and their generated `::before` and `::after`. They also give an element inside the badge each of the component's declaration blocks in turn, as the browser parsed them, so a rule for a state the test does not render (`:hover`, `:focus-visible`), inside `@media` or in a keyframe counts too, and a custom property of the component's own counts when a colour property can take it. Each colour must be what a `--ds-color-*` token resolves to, as the tokens are built and again after every token is changed; a variant's background and text must be its own tone's tokens. Every colour property the component leaves alone starts from a colour no stylesheet uses instead of the browser's default, another in each pass, so a colour of its own cannot pass for a default it equals (`fill: black`), nor for the one the check starts from. The check reads what the browser computes, not the stylesheet's text, so it does not depend on how a colour was written: a literal, a named colour such as `red` or `transparent`, a variable that is not a token, or a shorthand all fail it alike.
+- Those tests run in Chromium (Vitest's browser mode with Playwright), because only a browser resolves the tokens' variables inside shadow DOM; jsdom returns a declaration's text, not its colour. The ui package's `test` installs Playwright's Chromium first, which does nothing once it is there.
+- A component cannot be restyled from outside except through the tokens or the `part`s it exposes (`::part(badge)`); that is the point of the design system, not a limitation to work around.

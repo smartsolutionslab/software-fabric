@@ -3,7 +3,10 @@
 {{~ if auth ~}}
 using System.Net;
 {{~ end ~}}
+using System.Reflection;
+using System.Runtime.Loader;
 using System.Text.Json;
+using {{ namespace }}.Host.Mcp;
 {{~ if policies ~}}
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol;
@@ -92,6 +95,25 @@ public sealed class McpServerTests : IDisposable
 
         {{ `(result.IsError ?? false)` | should_be_true }};
         {{ `Text(result)` | should_start_with `"The arguments are not a Shout:"` }};
+    }
+
+    {{ test_attribute }}
+    public void A_tools_serializer_options_are_finished_before_any_tool_is_built()
+    {
+        // Tools built at once, as hosts are when tests run in parallel, must not each finish options the other is
+        // finishing. A fresh copy of the host's assembly holds options that no tool has touched yet.
+        var fresh = new AssemblyLoadContext(nameof(A_tools_serializer_options_are_finished_before_any_tool_is_built), isCollectible: true);
+        try
+        {
+            var tool = fresh.LoadFromAssemblyPath(typeof(RequestTool).Assembly.Location).GetType(typeof(RequestTool).FullName!, throwOnError: true)!;
+            var options = (JsonSerializerOptions)tool.GetField("Json", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+
+            {{ `options.IsReadOnly` | should_be_true }};
+        }
+        finally
+        {
+            fresh.Unload();
+        }
     }
 {{~ if project["backend.absence"] == "option" ~}}
 

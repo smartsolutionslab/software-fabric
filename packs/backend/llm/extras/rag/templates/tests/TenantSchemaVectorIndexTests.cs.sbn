@@ -1,0 +1,163 @@
+using {{ namespace }}.BuildingBlocks.Rag;
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using {{ namespace }}.Tests.Fakes;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Rag.Tests;
+
+/// <summary>
+/// A module's index under a schema per tenant: the tenant comes from the persistence layer's tenant source, here a
+/// <see cref="TenantScope"/> as in consumers and jobs, never from the caller, and each listed tenant's records live in
+/// the vector table of its own schema, so no tenant finds another's. A tenant not listed, like no tenant, finds nothing
+/// and cannot index. No test calls a real model.
+/// </summary>
+{{~ database_fixture_attributes ~}}
+public sealed class TenantSchemaVectorIndexTests({{ database_fixture }}) : {{ test_lifetime }}
+{
+    private const string TenantA = "tenant-a";
+
+    private const string TenantB = "tenant-b";
+
+    private const string Unlisted = "tenant-c";
+
+    private readonly FakeEmbeddingGenerator generator = new(VectorTables.Dimensions);
+
+    private ServiceProvider? services;
+
+    private Npgsql.NpgsqlDataSource? dataSource;
+
+    private ServiceProvider Services => services ?? throw new InvalidOperationException("The services have not been built.");
+
+    private Npgsql.NpgsqlDataSource DataSource => dataSource ?? throw new InvalidOperationException("The data source has not been created.");
+
+    {{ test_setup }}
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"{TenantSchemas.Tenants}:0"] = TenantA,
+                [$"{TenantSchemas.Tenants}:1"] = TenantB,
+            })
+            .Build();
+        services = new ServiceCollection().AddSingleton<IConfiguration>(configuration).AddTenancy().BuildServiceProvider();
+        List<string> schemas = [];
+        foreach (var module in (string[])[SampleTenantNotesDbContext.Schema, SampleTenantDraftsDbContext.Schema, SampleTenantShelfDbContext.Schema])
+        {
+            schemas.AddRange([TenantSchemas.For(module, TenantA), TenantSchemas.For(module, TenantB)]);
+        }
+
+        await VectorTables.CreateAsync({{ database_connection_string }}, schemas, {{ test_cancellation_token }});
+        dataSource = VectorTables.DataSource({{ database_connection_string }});
+    }
+
+    {{ test_attribute }}
+    public async Task Each_tenants_search_returns_only_the_records_it_indexed_which_lie_in_its_own_schema()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var notes = new ModuleVectorIndex<SampleTenantNotesDbContext>(DataSource, generator, Services);
+        using (TenantScope.Begin(TenantA))
+        {
+            await notes.IndexAsync("invoice-a", "unpaid invoice for office chairs", cancellationToken);
+            await notes.IndexAsync("note-a", "team lunch on friday", cancellationToken);
+        }
+
+        using (TenantScope.Begin(TenantB))
+        {
+            await notes.IndexAsync("invoice-b", "unpaid invoice for office chairs and desks", cancellationToken);
+        }
+
+        using (TenantScope.Begin(TenantA))
+        {
+            {{ `(await notes.SearchAsync("unpaid invoice for chairs", 10, cancellationToken)).Select(passage => passage.Key)` | should_be `["invoice-a", "note-a"]` }};
+        }
+
+        using (TenantScope.Begin(TenantB))
+        {
+            {{ `(await notes.SearchAsync("unpaid invoice for chairs", 10, cancellationToken)).Select(passage => passage.Key)` | should_be `["invoice-b"]` }};
+        }
+
+        {{ `(await KeysAsync(TenantSchemas.For(SampleTenantNotesDbContext.Schema, TenantA), cancellationToken))` | should_be `["invoice-a", "note-a"]` }};
+        {{ `(await KeysAsync(TenantSchemas.For(SampleTenantNotesDbContext.Schema, TenantB), cancellationToken))` | should_be `["invoice-b"]` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_key_both_tenants_index_keeps_a_record_for_each_and_removing_one_leaves_the_other()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var drafts = new ModuleVectorIndex<SampleTenantDraftsDbContext>(DataSource, generator, Services);
+        using (TenantScope.Begin(TenantA))
+        {
+            await drafts.IndexAsync("draft-1", "tenant a drafts about chairs", cancellationToken);
+        }
+
+        using (TenantScope.Begin(TenantB))
+        {
+            await drafts.IndexAsync("draft-1", "tenant b drafts about desks", cancellationToken);
+        }
+
+        using (TenantScope.Begin(TenantA))
+        {
+            {{ `(await drafts.SearchAsync("drafts", 5, cancellationToken)).Select(passage => (passage.Key, passage.Text))` | should_be `[("draft-1", "tenant a drafts about chairs")]` }};
+            await drafts.RemoveAsync("draft-1", cancellationToken);
+            {{ `(await drafts.SearchAsync("drafts", 5, cancellationToken))` | should_be_empty }};
+        }
+
+        using (TenantScope.Begin(TenantB))
+        {
+            {{ `(await drafts.SearchAsync("drafts", 5, cancellationToken)).Select(passage => (passage.Key, passage.Text))` | should_be `[("draft-1", "tenant b drafts about desks")]` }};
+        }
+    }
+
+    {{ test_attribute }}
+    public async Task A_tenant_not_listed_and_work_without_a_tenant_find_nothing_remove_nothing_and_cannot_index()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var shelf = new ModuleVectorIndex<SampleTenantShelfDbContext>(DataSource, generator, Services);
+        using (TenantScope.Begin(TenantA))
+        {
+            await shelf.IndexAsync("note-listed", "a record of a listed tenant", cancellationToken);
+        }
+
+        foreach (var tenant in (string?[])[Unlisted, null])
+        {
+            using var tenantScope = tenant is null ? null : TenantScope.Begin(tenant);
+
+            {{ `(await shelf.SearchAsync("a record of a listed tenant", 5, cancellationToken))` | should_be_empty }};
+            await shelf.RemoveAsync("note-listed", cancellationToken);
+            await {{ should_throw_async `InvalidOperationException` `() => shelf.IndexAsync("note-unlisted", "a record of no listed tenant", cancellationToken)` }};
+        }
+
+        using (TenantScope.Begin(TenantA))
+        {
+            {{ `(await shelf.SearchAsync("a record of a listed tenant", 5, cancellationToken)).Select(passage => passage.Key)` | should_contain `"note-listed"` }};
+        }
+    }
+
+    {{ test_teardown }}
+    {
+        generator.Dispose();
+        if (dataSource is not null)
+        {
+            await dataSource.DisposeAsync();
+        }
+
+        if (services is not null)
+        {
+            await services.DisposeAsync();
+        }
+    }
+
+    private async Task<List<string>> KeysAsync(string schema, CancellationToken cancellationToken)
+    {
+        List<string> keys = [];
+        await using var command = DataSource.CreateCommand($"SELECT key FROM {VectorTables.Table(schema)} ORDER BY key");
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            keys.Add(reader.GetString(0));
+        }
+
+        return keys;
+    }
+}

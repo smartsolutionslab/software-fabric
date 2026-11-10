@@ -13,7 +13,8 @@ public static class ValueObjectConventions
     /// in the Domain project of the module whose Infrastructure assembly holds the context
     /// (<c>Shop.Modules.Billing.Infrastructure</c> maps <c>Shop.Modules.Billing.Domain</c>). A generic value object is
     /// registered as each closed type the Domain's properties and fields use (<c>TypedId&lt;Customer&gt;</c>), never as
-    /// its open definition, which EF Core cannot convert.
+    /// its open definition, which EF Core cannot convert. A context in an assembly that does not reference such a Domain,
+    /// as a test project's own context does, has no module value objects to map.
     /// </summary>
     public static ModelConfigurationBuilder MapValueObjects(this ModelConfigurationBuilder configurationBuilder, Assembly contextAssembly)
     {
@@ -21,7 +22,14 @@ public static class ValueObjectConventions
         {{ not_null "contextAssembly" }}
 
         var infrastructure = contextAssembly.GetName().Name!;
-        var domain = Assembly.Load(string.Concat(infrastructure.AsSpan(0, infrastructure.LastIndexOf('.')), ".Domain"));
+        var domainName = string.Concat(infrastructure.AsSpan(0, infrastructure.LastIndexOf('.')), ".Domain");
+        var reference = contextAssembly.GetReferencedAssemblies().FirstOrDefault(name => name.Name == domainName);
+        if (reference is null)
+        {
+            return configurationBuilder;
+        }
+
+        var domain = Assembly.Load(reference);
         foreach (var type in ValueObjectsOf(domain))
         {
             var backing = type.GetInterfaces()

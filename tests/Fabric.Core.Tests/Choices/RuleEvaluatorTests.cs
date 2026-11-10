@@ -47,6 +47,13 @@ public class RuleEvaluatorTests
         Violations(profile, "module.ddd-depth=strict").ShouldBeEmpty();
     }
 
+    /// <summary>The in-process outbox delivers from each tenant's schema (#340), so schema-per-tenant needs no broker.</summary>
+    [Fact]
+    public void Schema_per_tenant_is_allowed_with_transport_none()
+    {
+        Violations("lean-crud", "backend.tenancy=schema-per-tenant").ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("saas-standard-vue", "frontend.state=redux-toolkit",
         "frontend.state=redux-toolkit requires frontend.framework == react, but frontend.framework is vue.")]
@@ -102,6 +109,8 @@ public class RuleEvaluatorTests
         "frontend.design-system=tokens-and-components requires frontend.framework == react, but frontend.framework is vue.")]
     [InlineData("saas-standard-react", new[] { "frontend.design-system=tokens-and-components", "frontend.styling=css-modules", "frontend.ui-library=radix-headless" },
         "frontend.design-system=tokens-and-components requires frontend.styling == tailwind, but frontend.styling is css-modules.")]
+    [InlineData("saas-standard-react", new[] { "frontend.design-system=tokens-and-components", "frontend.styling=library-theme", "frontend.ui-library=mui" },
+        "frontend.design-system=tokens-and-components requires frontend.styling == tailwind, but frontend.styling is library-theme.")]
     [InlineData("saas-standard-vue", new[] { "frontend.architecture=micro-frontends", "frontend.design-system=tokens" },
         "frontend.mfe-technique=module-federation requires frontend.framework == react, but frontend.framework is vue.")]
     [InlineData("saas-standard-react", new[] { "frontend.styling=library-theme", "frontend.ui-library=radix-headless" },
@@ -110,10 +119,26 @@ public class RuleEvaluatorTests
         "backend.data-access.reads=dapper requires backend.tenancy == none, but backend.tenancy is column.")]
     [InlineData("lean-crud", new[] { "backend.database=sqlserver", "backend.bus.transport=rabbitmq", "backend.tenancy=schema-per-tenant" },
         "backend.tenancy=schema-per-tenant requires backend.database == postgres, but backend.database is sqlserver.")]
-    [InlineData("lean-crud", new[] { "backend.tenancy=schema-per-tenant" },
-        "backend.tenancy=schema-per-tenant requires backend.bus.transport != none, but backend.bus.transport is none.")]
     [InlineData("lean-crud", new[] { "module.communication=contract-interface" },
         "module defaults: module.communication requires module.communication has integration-events, but module.communication is contract-interface.")]
+    [InlineData("saas-standard-react", new[] { "backend.api-protocols=" },
+        "frontend.api-client=rtk-query-codegen requires backend.api-protocols has rest, but backend.api-protocols is empty.")]
+    [InlineData("saas-standard-vue", new[] { "backend.api-protocols=" },
+        "frontend.api-client=orval requires backend.api-protocols has rest, but backend.api-protocols is empty.")]
+    [InlineData("lean-crud", new[] { "frontend.api-client=openapi-fetch", "backend.api-protocols=" },
+        "frontend.api-client=openapi-fetch requires backend.api-protocols has rest, but backend.api-protocols is empty.")]
+    [InlineData("saas-standard-react", new[] { "backend.auth=none" },
+        "backend.tenancy=column requires backend.auth != none, but backend.auth is none.")]
+    [InlineData("saas-standard-react", new[] { "backend.auth=none", "backend.tenancy=schema-per-tenant" },
+        "backend.tenancy=schema-per-tenant requires backend.auth != none, but backend.auth is none.")]
+    [InlineData("saas-standard-react", new[] { "backend.auth=none", "backend.tenancy=database-per-tenant" },
+        "backend.tenancy=database-per-tenant requires backend.auth != none, but backend.auth is none.")]
+    [InlineData("saas-ai-react", new[] { "frontend.architecture=micro-frontends", "frontend.design-system=tokens" },
+        "frontend.agent-ui=ag-ui requires frontend.architecture == spa, but frontend.architecture is micro-frontends.")]
+    [InlineData("saas-ai-react", new[] { "frontend.architecture=multi-app" },
+        "frontend.agent-ui=ag-ui requires frontend.architecture == spa, but frontend.architecture is multi-app.")]
+    [InlineData("saas-standard-react", new[] { "frontend.api-client=orval" },
+        "frontend.api-client=orval requires frontend.state in (zustand-tanstack-query, tanstack-query, pinia-tanstack-query, pinia), but frontend.state is redux-toolkit.")]
     public void Rejects_a_combination_the_packs_refuse_in_one_sentence(string profile, string[] settings, string violation)
     {
         Violations(profile, settings).ShouldBe([violation]);

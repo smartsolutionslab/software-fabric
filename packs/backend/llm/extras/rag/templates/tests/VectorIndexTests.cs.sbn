@@ -1,9 +1,25 @@
-{{~ tenant_argument = ""
+{{~ schemas = project["backend.tenancy"] == "schema-per-tenant"
+tenant_argument = ""
 if project["backend.tenancy"] == "column"
   tenant_argument = ", tenant"
+else if schemas
+  tenant_argument = ", Services"
+end
+func in_tenant(schema)
+  if schemas
+    ret "InTenant(" + schema + ")"
+  end
+  ret schema
 end ~}}
 using {{ namespace }}.BuildingBlocks.Rag;
+{{~ if schemas ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
 using {{ namespace }}.Tests.Fakes;
+{{~ if schemas ~}}
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+{{~ end ~}}
 
 namespace {{ namespace }}.Rag.Tests;
 
@@ -14,6 +30,10 @@ namespace {{ namespace }}.Rag.Tests;
 {{~ database_fixture_attributes ~}}
 public sealed class VectorIndexTests({{ database_fixture }}) : {{ test_lifetime }}
 {
+{{~ if schemas ~}}
+    private const string Tenant = "tenant-a";
+
+{{~ end ~}}
     private readonly FakeEmbeddingGenerator generator = new(VectorTables.Dimensions);
 {{~ if project["backend.tenancy"] == "column" ~}}
 
@@ -21,13 +41,31 @@ public sealed class VectorIndexTests({{ database_fixture }}) : {{ test_lifetime 
 {{~ end ~}}
 
     private Npgsql.NpgsqlDataSource? dataSource;
+{{~ if schemas ~}}
+
+    private ServiceProvider? services;
+{{~ end ~}}
 
     private Npgsql.NpgsqlDataSource DataSource => dataSource ?? throw new InvalidOperationException("The data source has not been created.");
+{{~ if schemas ~}}
+
+    /// <summary>The tenant source fixed to one listed tenant, for the tests that are not about tenants.</summary>
+    private ServiceProvider Services => services ?? throw new InvalidOperationException("The services have not been built.");
+{{~ end ~}}
 
     {{ test_setup }}
     {
 {{~ if project["backend.tenancy"] == "column" ~}}
         await VectorTables.CreateAsync({{ database_connection_string }}, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema], {{ test_cancellation_token }});
+{{~ else if schemas ~}}
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [$"{TenantSchemas.Tenants}:0"] = Tenant })
+            .Build();
+        services = new ServiceCollection()
+            .AddSingleton<IConfiguration>(configuration)
+            .AddSingleton<ITenantContext>(new OneTenant(Tenant))
+            .BuildServiceProvider();
+        await VectorTables.CreateAsync({{ database_connection_string }}, [InTenant(SampleNotesDbContext.Schema), InTenant(SampleDraftsDbContext.Schema), InTenant(SampleShelfDbContext.Schema), InTenant(SampleLibraryDbContext.Schema)], {{ test_cancellation_token }});
 {{~ else ~}}
         await VectorTables.CreateAsync({{ database_connection_string }}, [SampleNotesDbContext.Schema, SampleDraftsDbContext.Schema, SampleShelfDbContext.Schema, SampleLibraryDbContext.Schema], {{ test_cancellation_token }});
 {{~ end ~}}
@@ -97,14 +135,14 @@ public sealed class VectorIndexTests({{ database_fixture }}) : {{ test_lifetime 
         var cancellationToken = {{ test_cancellation_token }};
         var indexOnly = new Npgsql.NpgsqlConnectionStringBuilder({{ database_connection_string }}) { Options = "-c enable_seqscan=off" };
         await using var indexed = VectorTables.DataSource(indexOnly.ConnectionString);
-        var library = new ModuleVectorIndex<SampleLibraryDbContext>(indexed, generator);
+        var library = new ModuleVectorIndex<SampleLibraryDbContext>(indexed, generator{{ tenant_argument }});
         await library.IndexAsync("novel", "a book of stories", cancellationToken);
         await library.IndexAsync("atlas", "a book of maps", cancellationToken);
         await library.IndexAsync("lunch", "team lunch on friday", cancellationToken);
 
         // Two records the HNSW index cannot reach, so it answers short. Records at equal distances from one another leave
         // some unreachable at random; a vector of no length is the certain case, as pgvector's cosine index leaves it out.
-        await using (var unreachable = indexed.CreateCommand($"INSERT INTO {VectorTables.Table(SampleLibraryDbContext.Schema)} (key, content, embedding) SELECT 'blank-' || number, 'blank', $1 FROM generate_series(1, 2) number"))
+        await using (var unreachable = indexed.CreateCommand($"INSERT INTO {VectorTables.Table({{ in_tenant "SampleLibraryDbContext.Schema" }})} (key, content, embedding) SELECT 'blank-' || number, 'blank', $1 FROM generate_series(1, 2) number"))
         {
             unreachable.Parameters.Add(new Npgsql.NpgsqlParameter { Value = new Pgvector.Vector(new float[VectorTables.Dimensions]) });
             await unreachable.ExecuteNonQueryAsync(cancellationToken);
@@ -123,5 +161,16 @@ public sealed class VectorIndexTests({{ database_fixture }}) : {{ test_lifetime 
         {
             await dataSource.DisposeAsync();
         }
+{{~ if schemas ~}}
+
+        if (services is not null)
+        {
+            await services.DisposeAsync();
+        }
+{{~ end ~}}
     }
+{{~ if schemas ~}}
+
+    private static string InTenant(string schema) => TenantSchemas.For(schema, Tenant);
+{{~ end ~}}
 }

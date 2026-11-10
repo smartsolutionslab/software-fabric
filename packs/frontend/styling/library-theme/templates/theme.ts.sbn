@@ -1,5 +1,41 @@
 {{~ if project["frontend.ui-library"] != "mui" ~}}
 throw new Error('The library-theme pack builds the theme for MUI only so far; frontend.ui-library is {{ project["frontend.ui-library"] }} (docs/adr/0006 of the generator).');
+{{~ else if project["frontend.design-system"] == "tokens" || project["frontend.design-system"] == "web-components" ~}}
+import { createTheme } from '@mui/material/styles';
+import { tokens } from '@{{ name }}/tokens';
+
+const spacingTokens: Partial<Record<string, string>> = tokens.spacing;
+
+/**
+ * A spacing step as MUI asks for it: `p: 4` takes the spacing.4 token, as Tailwind's p-4 does, and a step the tokens do
+ * not define is a multiple of spacing.1. A negative step is its token negated; a string (`'auto'`) passes through.
+ */
+function space(step: number | string): string {
+  if (typeof step === 'string') {
+    return step;
+  }
+  if (step < 0) {
+    return `calc(-1 * ${space(-step)})`;
+  }
+  return spacingTokens[String(step)] ?? `calc(${step} * ${tokens.spacing[1]})`;
+}
+
+/**
+ * The app's look in one place: every MUI component takes its colours, shape and spacing from this theme, and the
+ * theme takes them from the design tokens (web/packages/tokens/src, docs/adr). Change a value in its token, never here
+ * or per component; a screen names the theme's values (`color="text.secondary"`, `bgcolor: 'primary.main'`, `p: 4`).
+ */
+export const theme = createTheme({
+  palette: {
+    mode: 'light',
+    primary: { main: tokens.color.primary, contrastText: tokens.color['primary-foreground'] },
+    secondary: { main: tokens.color.accent, contrastText: tokens.color['accent-foreground'] },
+    background: { default: tokens.color.surface },
+    divider: tokens.color.border,
+  },
+  shape: { borderRadius: tokens.radius.md },
+  spacing: space,
+});
 {{~ else ~}}
 import { createTheme } from '@mui/material/styles';
 

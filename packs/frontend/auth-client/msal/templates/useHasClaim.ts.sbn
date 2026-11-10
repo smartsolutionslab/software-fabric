@@ -1,3 +1,34 @@
+{{~ if project["frontend.framework"] == "vue" ~}}
+import { computed, type ComputedRef, type MaybeRefOrGetter, toValue } from 'vue';
+import { useAuth } from './useAuth';
+
+/**
+ * Whether the signed-in user's ID token has the claim, with the value when one is given (a list-valued claim needs to
+ * contain it). Hiding an element is a convenience, never protection: the backend policy decides.
+ */
+export function useHasClaim(
+  type: MaybeRefOrGetter<string>,
+  value?: MaybeRefOrGetter<string | undefined>,
+): ComputedRef<boolean> {
+  // The signed-in account, the one the app's access token is for; other accounts may be cached.
+  const { account } = useAuth();
+  return computed(() => {
+    const claims: Record<string, unknown> = account.value?.idTokenClaims ?? {};
+    const claim = claims[toValue(type)];
+    if (claim === undefined || claim === null) {
+      return false;
+    }
+    const expected = toValue(value);
+    if (expected === undefined) {
+      return true;
+    }
+
+    // Compared as text, as the backend's RequireClaim does: email_verified true meets 'true'.
+    const values: unknown[] = Array.isArray(claim) ? claim : [claim];
+    return values.some((each) => String(each) === expected);
+  });
+}
+{{~ else ~}}
 import { useMsal } from '@azure/msal-react';
 
 /**
@@ -19,3 +50,4 @@ export function useHasClaim(type: string, value?: string): boolean {
   const values: unknown[] = Array.isArray(claim) ? claim : [claim];
   return values.some((each) => String(each) === value);
 }
+{{~ end ~}}

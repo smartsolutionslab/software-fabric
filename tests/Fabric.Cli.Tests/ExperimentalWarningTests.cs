@@ -6,7 +6,7 @@ namespace Fabric.Cli.Tests;
 /// ADR-0003: an experimental option is generated with a warning. The warning goes to standard error, names each chosen
 /// experimental option once, and changes neither the exit code nor what is written.
 /// </summary>
-public sealed class ExperimentalWarningTests : IDisposable
+public sealed partial class ExperimentalWarningTests : IDisposable
 {
     private readonly string root = Directory.CreateTempSubdirectory("fabric-experimental-").FullName;
 
@@ -83,7 +83,9 @@ public sealed class ExperimentalWarningTests : IDisposable
         Lines(warned.Error).ShouldBe([Warning("backend.database=sqlserver"), Warning("backend.api-protocols=grpc")]);
         warned.Output.Replace(Path.Combine(root, "warned"), "", StringComparison.Ordinal)
             .ShouldBe(plain.Output.Replace(Path.Combine(root, "plain"), "", StringComparison.Ordinal));
-        Tree(Path.Combine(root, "warned", "shop")).ShouldBe(Tree(Path.Combine(root, "plain", "shop")));
+
+        // The two catalogs differ in their tiers, so fabric.yaml records a different catalog hash; nothing else differs.
+        WithoutCatalogHash(Tree(Path.Combine(root, "warned", "shop"))).ShouldBe(WithoutCatalogHash(Tree(Path.Combine(root, "plain", "shop"))));
     }
 
     [Fact]
@@ -127,4 +129,13 @@ public sealed class ExperimentalWarningTests : IDisposable
     private static Dictionary<string, string> Tree(string directory) =>
         Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
             .ToDictionary(path => Path.GetRelativePath(directory, path).Replace('\\', '/'), File.ReadAllText);
+
+    private static Dictionary<string, string> WithoutCatalogHash(Dictionary<string, string> tree)
+    {
+        tree["fabric.yaml"] = CatalogHashLine().Replace(tree["fabric.yaml"], string.Empty);
+        return tree;
+    }
+
+    [GeneratedRegex(@"^catalog: sha256:[0-9a-f]{64}\n", RegexOptions.Multiline)]
+    private static partial Regex CatalogHashLine();
 }

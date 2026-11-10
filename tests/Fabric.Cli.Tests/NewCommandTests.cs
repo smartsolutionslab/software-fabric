@@ -87,6 +87,92 @@ public sealed class NewCommandTests : IDisposable
         Directory.Exists(Path.Combine(root, "broken")).ShouldBeFalse();
     }
 
+    /// <summary>Every API client is generated from the OpenAPI document, which only the rest protocol serves (#415).</summary>
+    [Fact]
+    public void An_api_client_without_the_rest_protocol_writes_nothing()
+    {
+        var run = CliRun.Of(
+            "new",
+            Path.Combine(root, "broken"),
+            "--catalog",
+            Paths.RepositoryCatalog,
+            "--packs",
+            Paths.RepositoryPacks,
+            "--profile",
+            "lean-crud",
+            "--set",
+            "backend.api-protocols=");
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: frontend.api-client=orval requires backend.api-protocols has rest, but backend.api-protocols is empty.");
+        Directory.Exists(Path.Combine(root, "broken")).ShouldBeFalse();
+    }
+
+    /// <summary>Without a signed-in user there is no trustworthy tenant (#464).</summary>
+    [Fact]
+    public void Tenancy_without_authentication_writes_nothing()
+    {
+        var run = CliRun.Of(
+            "new",
+            Path.Combine(root, "broken"),
+            "--catalog",
+            Paths.RepositoryCatalog,
+            "--packs",
+            Paths.RepositoryPacks,
+            "--profile",
+            "saas-standard-react",
+            "--set",
+            "backend.auth=none");
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: backend.tenancy=column requires backend.auth != none, but backend.auth is none.");
+        Directory.Exists(Path.Combine(root, "broken")).ShouldBeFalse();
+    }
+
+    /// <summary>The agent panel is built for a single-page app only (#518).</summary>
+    [Fact]
+    public void An_agent_panel_in_micro_frontends_writes_nothing()
+    {
+        var run = CliRun.Of(
+            "new",
+            Path.Combine(root, "broken"),
+            "--catalog",
+            Paths.RepositoryCatalog,
+            "--packs",
+            Paths.RepositoryPacks,
+            "--profile",
+            "saas-ai-react",
+            "--set",
+            "frontend.architecture=micro-frontends",
+            "--set",
+            "frontend.design-system=tokens");
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: frontend.agent-ui=ag-ui requires frontend.architecture == spa, but frontend.architecture is micro-frontends.");
+        Directory.Exists(Path.Combine(root, "broken")).ShouldBeFalse();
+    }
+
+    /// <summary>Orval generates TanStack Query hooks, or Pinia's plain functions; Redux Toolkit's server data is RTK Query (#518).</summary>
+    [Fact]
+    public void Orval_with_redux_toolkit_writes_nothing()
+    {
+        var run = CliRun.Of(
+            "new",
+            Path.Combine(root, "broken"),
+            "--catalog",
+            Paths.RepositoryCatalog,
+            "--packs",
+            Paths.RepositoryPacks,
+            "--profile",
+            "saas-standard-react",
+            "--set",
+            "frontend.api-client=orval");
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: frontend.api-client=orval requires frontend.state in (zustand-tanstack-query, tanstack-query, pinia-tanstack-query, pinia), but frontend.state is redux-toolkit.");
+        Directory.Exists(Path.Combine(root, "broken")).ShouldBeFalse();
+    }
+
     [Fact]
     public void A_profile_whose_packs_do_not_exist_yet_reports_each_missing_pack()
     {

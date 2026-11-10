@@ -4,6 +4,14 @@
 defines what the rule fields mean, so the generator and a human reading the
 catalog agree.
 
+[`catalog.md`](catalog.md) lists every dimension and option as they stand,
+generated from the catalog. A change to the catalog regenerates it in the
+same pull request; a test fails while it is stale:
+
+```bash
+dotnet run --project src/Fabric.Cli -- reference --catalog catalog/catalog.yaml --output docs/catalog.md
+```
+
 ## Scope
 
 | `scope` | Meaning |
