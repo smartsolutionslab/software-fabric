@@ -217,9 +217,9 @@ public sealed partial class FormKitTests
     {
         var files = FilesStandingIn([FormKit, "frontend.ui-library=vuetify", .. VueAgentAndDashboards]);
 
-        files["web/app/src/agents/AgentConversation.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is formkit");
-        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is formkit");
-        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue with vee-validate, TanStack Form or FormKit, or reka-ui with vee-validate or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is formkit");
+        files["web/app/src/agents/AgentConversation.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue or reka-ui with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is formkit");
+        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue or reka-ui with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is formkit");
+        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue or reka-ui with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is formkit");
         files["web/app/src/forms/formkit.config.ts"].ShouldStartWith("throw new Error('The FormKit pack styles its inputs for shadcn-vue or reka-ui only so far; frontend.ui-library is vuetify");
     }
 

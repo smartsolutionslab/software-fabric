@@ -24,7 +24,19 @@ const setImportMap = vi.hoisted(() => vi.fn());
 
 vi.mock('virtual:federation', () => ({
   remotes: { billing: 'http://remote/remoteEntry.json' },
-  versions: { {{ if project["frontend.framework"] == "vue" }}vue: '3.5.44'{{ else }}react: '19.3.1', 'react-dom': '19.3.1'{{ end }}{{ if project["frontend.design-system"] != "tokens" }}, '@{{ name }}/ui': '0.0.0'{{ end }} },
+{{~ if project["frontend.framework"] == "vue" ~}}
+  versions: { vue: '3.5.44'{{ if project["frontend.design-system"] != "tokens" }}, '@{{ name }}/ui': '0.0.0'{{ end }} },
+{{~ else ~}}
+  versions: {
+    react: '19.3.1',
+    'react/jsx-runtime': '19.3.1',
+    'react/jsx-dev-runtime': '19.3.1',
+    'react-dom': '19.3.1',
+{{~ if project["frontend.design-system"] != "tokens" ~}}
+    '@{{ name }}/ui': '0.0.0',
+{{~ end ~}}
+  },
+{{~ end ~}}
 }));
 vi.mock('@softarc/native-federation-orchestrator/options', () => ({ replaceInDOM: () => setImportMap }));
 
@@ -89,6 +101,8 @@ test('the shell is the host: its packages at its versions, as singletons the orc
 {{~ else ~}}
   expect(entry.shared).toEqual([
     singleton('react', 'react.js', '19.3.1'),
+    singleton('react/jsx-runtime', 'react_jsx-runtime.js', '19.3.1'),
+    singleton('react/jsx-dev-runtime', 'react_jsx-dev-runtime.js', '19.3.1'),
     singleton('react-dom', 'react-dom.js', '19.3.1'),
 {{~ if project["frontend.design-system"] != "tokens" ~}}
     singleton('@{{ name }}/ui', '@{{ name }}_ui.js', '0.0.0'),
