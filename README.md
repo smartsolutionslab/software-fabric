@@ -50,7 +50,7 @@ dotnet build Fabric.slnx -c Release
 ```
 
 ```bash
-fabric() { dotnet src/Fabric.Cli/bin/Release/net10.0/fabric.dll "$@"; }
+fabric() { dotnet src/Fabric.Cli/bin/Release/net11.0/fabric.dll "$@"; }
 fabric profiles
 fabric validate --profile saas-standard-vue --set backend.database=sqlserver
 fabric new ../shop --profile everything --catalog tests/fixtures/minimal/catalog.yaml --packs tests/fixtures/minimal/packs
@@ -84,5 +84,5 @@ instead of a profile, without the end-to-end tests: its choices go to
 
 ## Stack of the generator itself
 
-C# / .NET 10 CLI, distributed as a `dotnet tool`. Templates rendered with
+C# / .NET 11 CLI, distributed as a `dotnet tool`. Templates rendered with
 Scriban. Tests in xUnit.
