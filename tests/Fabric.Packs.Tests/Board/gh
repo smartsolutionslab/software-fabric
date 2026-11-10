@@ -146,7 +146,14 @@ case "${positional[0]} ${positional[1]:-}" in
   "project field-list")
     echo '{"fields":[{"id":"STATUS","name":"Status","options":[{"id":"Todo","name":"Todo"},{"id":"Claimed","name":"Claimed"},{"id":"In Progress","name":"In Progress"},{"id":"In Review","name":"In Review"},{"id":"Blocked","name":"Blocked"},{"id":"Done","name":"Done"}]},{"id":"EXECUTOR","name":"Executor"}]}'
     ;;
-  "project item-list") jq --arg repo "$GITHUB_REPOSITORY" '{items: map({id: "ITEM-\(.number)", content: {url: "https://github.com/\($repo)/issues/\(.number)"}})}' "$issues" ;;
+  # Like gh: a single-select field's value is its option's name, keyed by the field's name in lower case, and absent when unset.
+  "project item-list")
+    statuses="$(for file in "$state"/board/*.STATUS; do
+      if [ -e "$file" ]; then jq -n --arg number "$(basename "$file" .STATUS)" --arg status "$(cat "$file")" '{($number): $status}'; fi
+    done | jq -s 'add // {}')"
+    jq --arg repo "$GITHUB_REPOSITORY" --argjson statuses "$statuses" '{items: map({id: "ITEM-\(.number)", content: {url: "https://github.com/\($repo)/issues/\(.number)"}}
+      + ($statuses[.number | tostring] | if . == null then {} else {status: .} end))}' "$issues"
+    ;;
   "project item-edit")
     item="${flag[id]#ITEM-}"; field="${flag[field-id]}"
     value="${flag[single-select-option-id]:-${flag[text]:-}}"

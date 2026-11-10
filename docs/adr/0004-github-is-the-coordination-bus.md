@@ -44,7 +44,10 @@ returns an issue to Todo when its branch's last commit is older than the
 lease period (default 2 h) and it has no open PR. Released, escalated and
 lapsed claims **park** the branch: a release commit goes on top, the work
 stays, and the next agent resumes it with a new claim commit. Branches are
-never renamed, deleted or force-pushed.
+never renamed, deleted or force-pushed. Labels and board fields have no
+compare-and-swap, so a stale write can mark an ended claim taken again: the
+branch is the only enforced lock, and until the janitor's next run resets a
+parked issue's `agent:claimed` and `Status=Claimed` it only looks claimed.
 
 **Escalation to a developer.** Three routes, each with a label and a
 concrete question or the verbatim failure in a comment:
