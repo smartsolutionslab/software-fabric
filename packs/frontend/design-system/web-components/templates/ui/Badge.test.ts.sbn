@@ -1,5 +1,6 @@
 import '@{{ name }}/tokens/tokens.css';
 import { expect, test } from 'vitest';
+import { userEvent } from 'vitest/browser';
 import './Badge';
 import type { BadgeTone } from './Badge';
 
@@ -26,15 +27,29 @@ const colourTokens = () =>
     .flatMap((rule) => [...rule.style])
     .filter((property) => property.startsWith('--ds-color-'));
 
-// What a colour token resolves to, computed by the browser the way it computes the badge's colours.
-const resolve = (token: string) => {
+// What a colour computes to, in the form the browser computes the badge's colours to.
+const computed = (colour: string) => {
   const probe = document.createElement('i');
-  probe.style.color = `var(${token})`;
+  probe.style.color = colour;
   document.body.append(probe);
-  const colour = getComputedStyle(probe).color;
+  const value = getComputedStyle(probe).color;
   probe.remove();
-  return colour;
+  return value;
 };
+
+// What a colour token resolves to.
+const resolve = (token: string) => computed(`var(${token})`);
+
+// The gate's own colours, each another and none of them one in `taken`: a token may resolve to any colour, so the
+// colours the gate starts from or changes the tokens to must not be one a compliant palette already uses.
+function* coloursOutside(taken: string[]): Generator<string, never> {
+  for (let n = 0; ; n += 1) {
+    const colour = computed(`rgb(${(n % 250) + 1}, ${Math.floor(n / 250) + 2}, 3)`);
+    if (!taken.includes(colour)) {
+      yield colour;
+    }
+  }
+}
 
 // Every colour property the component does not set starts from the colour `unset` instead of the browser's default, so
 // a colour of its own cannot pass for a default it happens to equal (fill: black). Each pass uses another one, so a
@@ -64,8 +79,9 @@ const blocksOf = (rules: CSSRuleList): CSSStyleDeclaration[] =>
     ...('cssRules' in rule && rule.cssRules instanceof CSSRuleList ? blocksOf(rule.cssRules) : []),
   ]);
 
-// Each colour the badge paints, where, for one tone: on its host, its label and its shadow elements as rendered, and on
-// an element inside it given each of the component's declaration blocks, so a state the test does not render counts.
+// Each colour the badge paints, where, for one tone: on its host, its label and its shadow elements as rendered and again
+// while the pointer is over it, and on an element inside it given each of the component's declaration blocks, so a state
+// the test does not render counts.
 const paintedColours = async (tone: BadgeTone, unset: string) => {
   const badge = document.createElement('ds-badge');
   badge.tone = tone;
@@ -83,19 +99,25 @@ const paintedColours = async (tone: BadgeTone, unset: string) => {
   const own = [...root.adoptedStyleSheets, ...root.styleSheets];
   root.adoptedStyleSheets = [unsetSheet(unset), ...root.adoptedStyleSheets];
 
-  const rendered = [badge, label, ...root.querySelectorAll('*')].flatMap((element) =>
-    [null, '::before', '::after'].flatMap((pseudo) => {
-      const style = getComputedStyle(element, pseudo);
-      // A ::before or ::after without content is not generated, and paints nothing.
-      if (pseudo && style.content === 'none') {
-        return [];
-      }
-      return coloursOf(style).map(({ property, colour }) => ({
-        where: `${element.localName}${pseudo ?? ''} ${property}`,
-        colour,
-      }));
-    }),
-  );
+  const render = (state: string) =>
+    [badge, label, ...root.querySelectorAll('*')].flatMap((element) =>
+      [null, '::before', '::after'].flatMap((pseudo) => {
+        const style = getComputedStyle(element, pseudo);
+        // A ::before or ::after without content is not generated, and paints nothing.
+        if (pseudo && style.content === 'none') {
+          return [];
+        }
+        return coloursOf(style).map(({ property, colour }) => ({
+          where: `${state} ${element.localName}${pseudo ?? ''} ${property}`,
+          colour,
+        }));
+      }),
+    );
+  const rendered = render('shown');
+  // A state's rules can combine into a colour no single one of them declares (a shadow in a variable set on hover).
+  await userEvent.hover(badge);
+  const hovered = render('hovered');
+  await userEvent.unhover(badge);
   const declared = own
     .flatMap((sheet) => blocksOf(sheet.cssRules))
     .flatMap((block) => {
@@ -119,14 +141,12 @@ const paintedColours = async (tone: BadgeTone, unset: string) => {
       return [...colours, ...custom];
     });
   const shown = getComputedStyle(span);
-  return { painted: [...rendered, ...declared], background: shown.backgroundColor, text: shown.color };
+  return { painted: [...rendered, ...hovered, ...declared], background: shown.backgroundColor, text: shown.color };
 };
 
 // Returns the colours the pass allowed.
 const expectOnlyTokens = async (unset: string) => {
-  const tokens = colourTokens();
-  expect(tokens).toContain('--ds-color-primary');
-  const allowed = [...tokens.map(resolve), unset];
+  const allowed = [...colourTokens().map(resolve), unset];
   for (const tone of Object.keys(tones) as BadgeTone[]) {
     const { painted, background, text } = await paintedColours(tone, unset);
     expect(background, `${tone} background`).toBe(resolve(tones[tone].background));
@@ -155,11 +175,14 @@ test('a badge shows its label in the tone it is given', async () => {
 // a colour of its own would not follow (a literal, a named colour, transparent, a variable that is not a token).
 test('a badge is styled only through the design tokens', async () => {
   const root = document.documentElement;
-  const built = await expectOnlyTokens('rgb(1, 2, 3)');
+  const tokens = colourTokens();
+  expect(tokens).toContain('--ds-color-primary');
+  const fresh = coloursOutside(tokens.map(resolve));
+  const built = await expectOnlyTokens(fresh.next().value);
 
-  colourTokens().forEach((token, index) => root.style.setProperty(token, `rgb(${index + 10}, 20, 30)`));
+  tokens.forEach((token) => root.style.setProperty(token, fresh.next().value));
   try {
-    const changed = await expectOnlyTokens('rgb(4, 5, 6)');
+    const changed = await expectOnlyTokens(fresh.next().value);
     // No colour is allowed in both passes, so none the component writes itself can pass both.
     expect(changed.filter((colour) => built.includes(colour))).toEqual([]);
   } finally {
