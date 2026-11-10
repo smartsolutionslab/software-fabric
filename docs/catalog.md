@@ -473,7 +473,7 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `react-router` | supported | `frontend.framework == react` | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-strict-react` | — |
-| `tanstack-router` | supported | `frontend.framework == react` | — | — | — |
+| `tanstack-router` | experimental | `frontend.framework == react` | — | — | — |
 | `vue-router` | experimental | `frontend.framework == vue` | — | `saas-standard-vue` | — |
 
 ### `frontend.state`
@@ -497,7 +497,7 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `css-modules` | supported | — | — | — | — |
-| `library-theme` | supported | — | `frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless)` | — | the UI library's own theming system |
+| `library-theme` | experimental | — | `frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless)` | — | the UI library's own theming system |
 | `tailwind` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
 
 ### `frontend.test.extras`

@@ -465,7 +465,7 @@ dimensions:
         tier: supported
         requires: ["frontend.framework == react"]
       tanstack-router:
-        tier: supported  # nightly run 42800894655
+        tier: experimental
         requires: ["frontend.framework == react"]
       vue-router:
         tier: experimental
@@ -500,7 +500,7 @@ dimensions:
       tailwind:      { tier: supported }
       css-modules:   { tier: supported }  # nightly run 42800894655
       library-theme:
-        tier: supported  # nightly run 42800894655
+        tier: experimental
         note: "the UI library's own theming system"
         # Reason: these libraries are headless or styled with Tailwind only, so they have no theming system of their own.
         conflicts: ["frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless)"]
