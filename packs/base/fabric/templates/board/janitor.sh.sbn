@@ -41,8 +41,8 @@ board_git ls-remote --heads origin | awk 'index($2, "refs/heads/agent/") == 1 { 
     # Parked, but still labelled agent:claimed: a release, escalation or lapse stopped half-way. Neither next.sh nor
     # this loop would ever take the issue again, so finish it. Parked, but shown as Claimed: the same, or a stale write
     # marked an ended claim again; labels and fields have no compare-and-swap, so only the branch is a lock and the
-    # rest is repaired here. An escalation keeps its Blocked status and its executor for the developer; anything else
-    # is back in Todo. A claim pushed meanwhile has moved the branch: its label goes back on, and the fields are its own.
+    # rest is repaired here. An escalation keeps its executor for the developer and shows Blocked; anything else is
+    # back in Todo. A claim pushed meanwhile has moved the branch: its label goes back on, and the fields are its own.
     issue_state="$(board_issue "$issue")" || continue
     labelled=false
     if jq -e 'any(.labels[]; .name == "agent:claimed")' <<< "$issue_state" > /dev/null; then
@@ -52,11 +52,8 @@ board_git ls-remote --heads origin | awk 'index($2, "refs/heads/agent/") == 1 { 
     if jq -e 'any(.labels[]; .name == "agent:blocked" or (.name | startswith("needs:")))' <<< "$issue_state" > /dev/null; then
       escalated=true
     fi
-    status=""
-    if [ "$escalated" = false ]; then
-      read_items || continue
-      status="$(status_of "$issue")" || continue
-    fi
+    read_items || continue
+    status="$(status_of "$issue")" || continue
     if [ "$labelled" = true ] || [ "$status" = Claimed ]; then
       if [ "$labelled" = true ]; then
         board_unclaim "$issue" || continue
@@ -71,6 +68,8 @@ board_git ls-remote --heads origin | awk 'index($2, "refs/heads/agent/") == 1 { 
       if [ "$escalated" = false ]; then
         board_status "$issue" Todo
         board_executor "$issue" ""
+      elif [ "$status" = Claimed ]; then
+        board_status "$issue" Blocked
       fi
       echo "Finished giving back #$issue."
     fi
