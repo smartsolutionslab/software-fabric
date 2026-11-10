@@ -1,3 +1,18 @@
+{{~ if project["frontend.framework"] == "vue" ~}}
+import { computed, type ComputedRef, type MaybeRefOrGetter, toValue } from 'vue';
+import { useAuth } from './useAuth';
+
+/**
+ * Whether the signed-in user holds the {{ role_kind }}, as the ID token says (`{{ id_token_roles_claim }}`). Hiding an element is a
+ * convenience, never protection: the backend policy decides.
+ */
+export function useHasRole(role: MaybeRefOrGetter<string>): ComputedRef<boolean> {
+  const { user } = useAuth();
+  return computed(() => {
+    {{ id_token_has_role "user.value?.profile" "toValue(role)" }}
+  });
+}
+{{~ else ~}}
 import { useAuth } from 'react-oidc-context';
 
 /**
@@ -7,3 +22,4 @@ import { useAuth } from 'react-oidc-context';
 export function useHasRole(role: string): boolean {
   {{ id_token_has_role "useAuth().user?.profile" "role" }}
 }
+{{~ end ~}}

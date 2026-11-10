@@ -692,6 +692,20 @@ public sealed class SchemaPerTenantTests
         architectureExitCode.ShouldBe(0, architectureOutput);
     }
 
+    [Fact]
+    public void Beside_strict_value_object_conventions_the_generated_tenancy_tests_pass_with_their_contexts_outside_any_module()
+    {
+        // #511: strict maps the value objects of the Domain beside a context's Infrastructure; the tenancy tests' own
+        // contexts live in tests/Tenancy.Tests, which has no Domain.
+        using var project = new GeneratedProject("saas-strict-react", SchemaPerTenant);
+        project.AddModule("billing");
+        project.Build();
+
+        var (tenancyExitCode, tenancyOutput) = project.Test("tests/Tenancy.Tests/Tenancy.Tests.csproj");
+        tenancyExitCode.ShouldBe(0, tenancyOutput);
+        tenancyOutput.ShouldContain("succeeded: 11");
+    }
+
     /// <summary>The billing notes' configuration with one more statement on the builder.</summary>
     private static void WriteNoteConfiguration(GeneratedProject project, string statement) =>
         project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/NoteConfiguration.cs", $$"""
