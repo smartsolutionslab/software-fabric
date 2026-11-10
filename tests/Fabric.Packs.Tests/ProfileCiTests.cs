@@ -316,7 +316,9 @@ public sealed class ProfileCiTests
         var copy = Directory.CreateTempSubdirectory("complete-profiles-test-");
         try
         {
-            var cli = Path.Combine("src", "Fabric.Cli", "bin", "Release", "net10.0");
+            // The CLI is built for the target framework this test assembly is: both come from Directory.Build.props.
+            var targetFramework = Path.GetFileName(Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory));
+            var cli = Path.Combine("src", "Fabric.Cli", "bin", "Release", targetFramework);
             Copy(Path.Combine(Repository.Root, "build", "complete-profiles.sh"), Path.Combine(copy.FullName, "build", "complete-profiles.sh"));
             Copy(Path.Combine(Repository.Root, cli), Path.Combine(copy.FullName, cli));
             var removed = Path.Combine(copy.FullName, cli, "packs", pack);
