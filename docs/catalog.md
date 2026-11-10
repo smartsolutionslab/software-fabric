@@ -59,8 +59,8 @@ resolved choices contain it: set by the profile or one it extends, or taken as a
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `entra-id` | experimental | — | — | — | — |
-| `generic-oidc` | experimental | — | — | — | — |
+| `entra-id` | supported | — | — | — | — |
+| `generic-oidc` | supported | — | — | — | — |
 | `keycloak` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
 | `none` | experimental | — | — | — | no authentication: every endpoint is anonymous and there is no sign-in |
 
@@ -93,7 +93,7 @@ resolved choices contain it: set by the profile or one it extends, or taken as a
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `azure-service-bus` | experimental | — | — | — | — |
+| `azure-service-bus` | supported | — | — | — | — |
 | `kafka` | supported | — | — | `industrial-event-driven-mfe` | — |
 | `none` | supported | — | — | `lean-crud` | in-process integration events through an outbox table |
 | `rabbitmq` | supported | — | — | `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
@@ -116,7 +116,7 @@ resolved choices contain it: set by the profile or one it extends, or taken as a
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `dapper` | experimental | `backend.tenancy == none` | — | — | query handlers read with Dapper over IReadConnection, in SQL for the project's one database |
+| `dapper` | supported | `backend.tenancy == none` | — | — | query handlers read with Dapper over IReadConnection, in SQL for the project's one database |
 | `ef-core` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | query handlers read through EF Core, as the rest of the module does |
 
 ### `backend.database`
@@ -127,7 +127,7 @@ resolved choices contain it: set by the profile or one it extends, or taken as a
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `postgres` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
-| `sqlserver` | experimental | — | — | — | — |
+| `sqlserver` | supported | — | — | — | — |
 
 ### `backend.errors`
 
@@ -157,10 +157,10 @@ resolved choices contain it: set by the profile or one it extends, or taken as a
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `anthropic` | experimental | — | — | — | — |
-| `azure-openai` | experimental | — | — | — | — |
+| `anthropic` | supported | — | — | — | — |
+| `azure-openai` | supported | — | — | — | — |
 | `none` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | the project calls no language model |
-| `ollama` | experimental | — | — | — | a local model server |
+| `ollama` | supported | — | — | — | a local model server |
 | `openai` | experimental | — | — | `saas-ai-react` | — |
 
 ### `backend.llm.agents`
@@ -173,7 +173,7 @@ resolved choices contain it: set by the profile or one it extends, or taken as a
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `agent-framework` | experimental | — | — | `saas-ai-react` | Microsoft Agent Framework (Microsoft.Agents.AI) |
-| `none` | experimental | — | — | — | use cases call the model directly; no agent framework |
+| `none` | supported | — | — | — | use cases call the model directly; no agent framework |
 
 ### `backend.llm.embeddings`
 
@@ -185,8 +185,8 @@ resolved choices contain it: set by the profile or one it extends, or taken as a
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `azure-openai` | experimental | — | — | — | — |
-| `ollama` | experimental | — | — | — | a local model server |
-| `openai` | experimental | — | — | `saas-ai-react` | — |
+| `ollama` | supported | — | — | — | a local model server |
+| `openai` | supported | — | — | `saas-ai-react` | — |
 
 ### `backend.llm.extras`
 
@@ -223,7 +223,7 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `hand-rolled` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
-| `wolverine` | experimental | `backend.bus.library == wolverine` | — | — | — |
+| `wolverine` | supported | `backend.bus.library == wolverine` | — | — | — |
 
 ### `backend.result-style`
 
@@ -255,7 +255,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `awesome-assertions` | experimental | — | — | — | — |
+| `awesome-assertions` | supported | — | — | — | — |
 | `shouldly` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
 
 ### `backend.test.extras`
@@ -274,8 +274,8 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `nunit` | experimental | — | — | — | — |
-| `tunit` | experimental | — | — | — | — |
+| `nunit` | supported | — | — | — | — |
+| `tunit` | supported | — | — | — | — |
 | `xunit` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
 
 ### `backend.test.integration`
@@ -286,7 +286,7 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `aspire-fixture` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
-| `testcontainers` | experimental | — | — | — | — |
+| `testcontainers` | supported | — | — | — | — |
 
 ### `backend.test.mocks`
 
@@ -317,7 +317,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `ag-ui` | experimental | `frontend.architecture == spa` | — | `saas-ai-react` | an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host |
+| `ag-ui` | supported | `frontend.architecture == spa` | — | `saas-ai-react` | an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host |
 | `none` | experimental | — | — | — | no agent panel; agents are reached through the project's own endpoints |
 
 ### `frontend.api-client`
@@ -328,7 +328,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `openapi-fetch` | experimental | `frontend.state != redux-toolkit`, `backend.api-protocols has rest` | — | — | — |
+| `openapi-fetch` | supported | `frontend.state != redux-toolkit`, `backend.api-protocols has rest` | — | — | — |
 | `orval` | supported | `backend.api-protocols has rest`, `frontend.state in (zustand-tanstack-query, tanstack-query, pinia-tanstack-query, pinia)` | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-standard-vue` | — |
 | `rtk-query-codegen` | supported | `frontend.state == redux-toolkit`, `backend.api-protocols has rest` | — | `saas-ai-react`, `saas-standard-react`, `saas-strict-react` | — |
 
@@ -339,7 +339,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `micro-frontends` | experimental | `frontend.design-system != none` | — | `industrial-event-driven-mfe` | — |
+| `micro-frontends` | supported | `frontend.design-system != none` | — | `industrial-event-driven-mfe` | — |
 | `multi-app` | experimental | — | — | — | several apps and shared libraries in one workspace |
 | `spa` | supported | — | — | `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
 
@@ -351,7 +351,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `msal` | experimental | `backend.auth == entra-id` | — | — | — |
+| `msal` | supported | `backend.auth == entra-id` | — | — | — |
 | `oidc-client-ts` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
 
 ### `frontend.charts`
@@ -361,9 +361,9 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `chartjs` | experimental | — | — | — | — |
+| `chartjs` | supported | — | — | — | — |
 | `echarts` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
-| `recharts` | experimental | `frontend.framework == react` | — | — | — |
+| `recharts` | supported | `frontend.framework == react` | — | — | — |
 
 ### `frontend.dashboards`
 
@@ -374,7 +374,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `generative` | experimental | `frontend.dashboards has user-editable`, `frontend.agent-ui == ag-ui` | — | `saas-ai-react` | an agent in the agent panel proposes widgets from the same declared widgets; the user accepts and saves them (#185) |
+| `generative` | supported | `frontend.dashboards has user-editable`, `frontend.agent-ui == ag-ui` | — | `saas-ai-react` | an agent in the agent panel proposes widgets from the same declared widgets; the user accepts and saves them (#185) |
 | `user-editable` | experimental | `backend.errors == result`, `backend.data-access == ef-core`, `backend.database == postgres` | — | `saas-ai-react` | users arrange, resize and save widgets on dashboards of their own |
 
 ### `frontend.data-grid`
@@ -384,7 +384,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `ag-grid` | experimental | — | — | — | community vs enterprise licence is the project's call |
+| `ag-grid` | supported | — | — | — | community vs enterprise licence is the project's call |
 | `tanstack-table` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
 
 ### `frontend.design-system`
@@ -395,8 +395,8 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `none` | supported | — | — | `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | the UI library as shipped |
-| `tokens` | experimental | — | — | — | Style Dictionary tokens, framework-neutral |
-| `tokens-and-components` | experimental | `frontend.framework == react`, `frontend.styling == tailwind` | — | `industrial-event-driven-mfe` | tokens plus an own component package with Storybook |
+| `tokens` | supported | — | — | — | Style Dictionary tokens, framework-neutral |
+| `tokens-and-components` | supported | `frontend.framework == react`, `frontend.styling == tailwind` | — | `industrial-event-driven-mfe` | tokens plus an own component package with Storybook |
 | `web-components` | experimental | — | — | — | tokens plus Lit web components with Storybook, framework-neutral |
 
 ### `frontend.forms`
@@ -406,10 +406,10 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `formkit` | experimental | `frontend.framework == vue` | — | — | — |
+| `formkit` | supported | `frontend.framework == vue` | — | — | — |
 | `react-hook-form` | supported | `frontend.framework == react` | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-strict-react` | — |
 | `tanstack-form` | experimental | — | — | — | — |
-| `vee-validate` | experimental | `frontend.framework == vue` | — | `saas-standard-vue` | — |
+| `vee-validate` | supported | `frontend.framework == vue` | — | `saas-standard-vue` | — |
 
 ### `frontend.framework`
 
@@ -429,7 +429,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `no` | experimental | — | — | `industrial-event-driven-mfe` | — |
+| `no` | supported | — | — | `industrial-event-driven-mfe` | — |
 | `yes` | experimental | `frontend.design-system in (tokens, web-components)` | — | — | — |
 
 ### `frontend.mfe-technique`
@@ -440,8 +440,8 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `module-federation` | experimental | `frontend.framework == react` | — | `industrial-event-driven-mfe` | — |
-| `native-federation` | experimental | — | — | — | — |
+| `module-federation` | supported | `frontend.framework == react` | — | `industrial-event-driven-mfe` | — |
+| `native-federation` | supported | — | — | — | — |
 | `web-components` | experimental | — | — | — | — |
 
 ### `frontend.pwa`
@@ -452,7 +452,7 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `no` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
-| `yes` | experimental | — | — | — | — |
+| `yes` | supported | — | — | — | — |
 
 ### `frontend.realtime`
 
@@ -473,7 +473,7 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `react-router` | supported | `frontend.framework == react` | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-strict-react` | — |
-| `tanstack-router` | experimental | `frontend.framework == react` | — | — | — |
+| `tanstack-router` | supported | `frontend.framework == react` | — | — | — |
 | `vue-router` | experimental | `frontend.framework == vue` | — | `saas-standard-vue` | — |
 
 ### `frontend.state`
@@ -483,11 +483,11 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `pinia` | experimental | `frontend.framework == vue` | — | — | — |
+| `pinia` | supported | `frontend.framework == vue` | — | — | — |
 | `pinia-tanstack-query` | experimental | `frontend.framework == vue` | — | `saas-standard-vue` | — |
 | `redux-toolkit` | supported | `frontend.framework == react` | — | `saas-ai-react`, `saas-standard-react`, `saas-strict-react` | — |
 | `tanstack-query` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud` | — |
-| `zustand-tanstack-query` | experimental | `frontend.framework == react` | — | — | — |
+| `zustand-tanstack-query` | supported | `frontend.framework == react` | — | — | — |
 
 ### `frontend.styling`
 
@@ -496,8 +496,8 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `css-modules` | experimental | — | — | — | — |
-| `library-theme` | experimental | — | `frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless)` | — | the UI library's own theming system |
+| `css-modules` | supported | — | — | — | — |
+| `library-theme` | supported | — | `frontend.ui-library in (shadcn, shadcn-vue, reka-ui, radix-headless)` | — | the UI library's own theming system |
 | `tailwind` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
 
 ### `frontend.test.extras`
@@ -510,7 +510,7 @@ Settings:
 |---|---|---|---|---|---|
 | `accessibility` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | axe in component and e2e tests |
 | `screenshot-tests` | experimental | — | — | — | — |
-| `storybook-tests` | experimental | `frontend.design-system == tokens-and-components` | — | — | — |
+| `storybook-tests` | supported | `frontend.design-system == tokens-and-components` | — | — | — |
 
 ### `frontend.ui-library`
 
@@ -523,12 +523,12 @@ Settings:
 | `element-plus` | experimental | `frontend.framework == vue` | — | — | — |
 | `fluent-ui` | experimental | `frontend.framework == react` | — | — | — |
 | `mantine` | experimental | `frontend.framework == react` | — | — | — |
-| `mui` | experimental | `frontend.framework == react` | `frontend.styling == tailwind` | — | — |
+| `mui` | supported | `frontend.framework == react` | `frontend.styling == tailwind` | — | — |
 | `quasar` | experimental | `frontend.framework == vue` | — | — | — |
-| `radix-headless` | experimental | `frontend.framework == react` | — | — | — |
+| `radix-headless` | supported | `frontend.framework == react` | — | — | — |
 | `reka-ui` | experimental | `frontend.framework == vue` | — | — | — |
 | `shadcn` | supported | `frontend.framework == react`, `frontend.styling == tailwind` | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-strict-react` | — |
-| `shadcn-vue` | experimental | `frontend.framework == vue`, `frontend.styling == tailwind` | — | `saas-standard-vue` | — |
+| `shadcn-vue` | supported | `frontend.framework == vue`, `frontend.styling == tailwind` | — | `saas-standard-vue` | — |
 | `vuetify` | experimental | `frontend.framework == vue` | — | — | — |
 
 ### `frontend.validation`
@@ -538,7 +538,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `valibot` | experimental | — | — | — | — |
+| `valibot` | supported | — | — | — | — |
 | `zod` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
 
 ### `frontend.workspace`
@@ -548,9 +548,9 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `nx` | experimental | — | — | — | — |
+| `nx` | supported | — | — | — | — |
 | `pnpm-workspaces` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
-| `turborepo` | experimental | — | — | — | — |
+| `turborepo` | supported | — | — | — | — |
 
 ### `module.communication`
 
@@ -593,7 +593,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `kurrentdb` | experimental | `backend.tenancy == none` | — | — | — |
+| `kurrentdb` | supported | `backend.tenancy == none` | — | — | — |
 | `marten` | supported | `backend.database == postgres`, `backend.tenancy == none` | — | `industrial-event-driven-mfe` | — |
 
 ### `module.style`
@@ -615,4 +615,4 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `red-first` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | new-behaviour tests observed failing; output quoted in the PR |
-| `test-after` | experimental | — | — | — | coverage gate only |
+| `test-after` | supported | — | — | — | coverage gate only |
