@@ -66,7 +66,52 @@ public sealed partial class MuiTests
               color: #333;
             `;
             """,
+        ["Shadowed"] = """
+            import { Box } from '@mui/material';
+
+            export function Shadowed() {
+              const sx = { color: '#fff' };
+              return <Box sx={sx}>Shadowed</Box>;
+            }
+
+            export function Themed() {
+              const sx = { color: 'primary.main' };
+              return <Box sx={sx}>Themed</Box>;
+            }
+            """,
+        ["Spread"] = """
+            import { Box } from '@mui/material';
+
+            export function Spread() {
+              return <Box {...{ sx: { color: '#fff' } }}>Spread</Box>;
+            }
+            """,
+        ["SpreadNamed"] = """
+            import { Box } from '@mui/material';
+
+            const alarm = { sx: { color: '#fff' } };
+
+            export function SpreadNamed() {
+              return <Box {...alarm}>SpreadNamed</Box>;
+            }
+            """,
     };
+
+    /// <summary>Components that style themselves only through the theme, beside content that looks like a colour (#398 review).</summary>
+    private const string ThemedEntries = """
+        import { Box, Link } from '@mui/material';
+
+        const entry = { label: 'Issue #393', sx: { color: 'primary.main' } };
+        const anchor = { href: '#add' };
+
+        export function Entry() {
+          return <Box sx={entry.sx}>{entry.label}</Box>;
+        }
+
+        export function Anchor() {
+          return <Link {...anchor}>Add</Link>;
+        }
+        """;
 
     /// <summary>A component without a colour of its own, whose text, comment and links look like one (#398).</summary>
     private const string Unstyled = """
@@ -345,6 +390,7 @@ public sealed partial class MuiTests
         using var project = new GeneratedProject(React, Mui);
         RunWeb(project, "install");
         project.Write("web/app/src/pages/Changelog.tsx", Unstyled);
+        project.Write("web/app/src/pages/Entries.tsx", ThemedEntries);
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "test", "src/theme.test.tsx");
 
