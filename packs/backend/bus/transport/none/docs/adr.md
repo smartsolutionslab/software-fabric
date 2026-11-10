@@ -11,6 +11,9 @@ There is no broker and no messaging library. Modules still talk through integrat
 - A consumer that throws leaves its message undelivered, and the message backs off before it is tried again, counted from the moment it failed: 1 second after the first failure, doubling with every further one (1, 2, 4, … 256 seconds), never more than 5 minutes. The wait is kept in the row (`next_attempt_at`), so it holds however busy the dispatcher is, and other messages are delivered meanwhile. After ten attempts, about eight and a half minutes after the first, the message is left for a developer with its last error in `last_error`.
 - The dispatcher reads up to 20 messages at a time in one transaction, and that transaction, with the messages' row locks, stays open while the batch's consumers run. A slow consumer therefore keeps a database connection and its batch's rows locked until it returns; other host instances skip those rows rather than wait for them.
 - The outbox table is not part of the module's EF Core model, so no EF Core migration mentions it. The MigrationRunner creates it in every module's schema, as a step after the modules' migrations; the host never creates tables, so hosts starting together do not race over it.
+{{~ if project["backend.tenancy"] == "schema-per-tenant" ~}}
+- With a schema per tenant, a tenant's events are saved with its rows: the outbox table is in each listed tenant's schema of a module, `<module>_<tenant>`, and the MigrationRunner creates it there for every tenant in `Tenancy:Tenants`; the module's own schema, which holds no tenant's rows, has none, and committing events without a listed tenant fails as saving does. The dispatcher reads every listed tenant's outbox in turn and hands each message to its consumers inside that tenant's `TenantScope`, so a consumer works in the tenant the event belongs to. A tenant added to the list is delivered once the host restarts with it.
+{{~ end ~}}
 
 ## Consequences
 
