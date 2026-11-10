@@ -1,8 +1,16 @@
 {{~ fw = project["frontend.framework"] ~}}
 import { expect, test } from '@playwright/test';
 
-/** A remote's build of a package it shares, as native federation names it in dist: {{ fw }}.<hash>-dev.js. */
-const sharedPackage = /\/({{ if fw == "vue" }}vue{{ else }}react|react-dom{{ end }}|_{{ name }}_ui)\.[^/]+\.js$/;
+{{~ if fw == "vue" ~}}
+/**
+ * A remote's build of a package it shares, as native federation names it in dist: vue.<hash>-dev.js. The shell's own
+ * vue, vue.runtime.esm-bundler-<hash>.js from Vite, has more dots in its name.
+ */
+const sharedPackage = /\/(vue|_{{ name }}_ui)\.[^/.]+\.js$/;
+{{~ else ~}}
+/** A remote's build of a package it shares, as native federation names it in dist: react.<hash>-dev.js. */
+const sharedPackage = /\/(react|react-dom|_{{ name }}_ui)\.[^/]+\.js$/;
+{{~ end ~}}
 
 test("{{ module.name }}'s page comes from its own remote, with the shell's {{ fw }} and design system", async ({ page }) => {
   const entries: string[] = [];
