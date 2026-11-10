@@ -164,6 +164,7 @@ jobs pass while a review is postponed, so a protection that requires them instea
   pending. A verdict is kept only from the workflow's own reviews (`github-actions[bot]`), since anyone can post a
   review, and only for the same reviewing family, so the family rule holds for every head.
 - *As built (#480):* only pull requests by `dependabot[bot]` are fetched and checked, since the script exempts no
-  other author; it is read with `git show origin/<base>:.github/scripts/board/dependency-update.sh` from a full
-  checkout, and the pull request's head from `refs/pull/<number>/head`. A head that moved while the retry ran is left
+  other author; it is read from the commit `refs/remotes/origin/<base>` resolves to, by its full name so that a tag
+  named `origin/<base>` cannot stand in for the branch, in a full checkout, and the pull request's head from
+  `refs/pull/<number>/head`. A head that moved while the retry ran is left
   to the next run.

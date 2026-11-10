@@ -260,6 +260,33 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
         File.Exists(Path.Combine(Fakes, "copilot-args")).ShouldBeFalse("The retry workflow ran a reviewer itself.");
     }
 
+    /// <summary>
+    /// The base branch is <c>refs/remotes/origin/&lt;base&gt;</c> and nothing else: a tag named <c>origin/main</c>, which
+    /// git would prefer to the remote branch of that name, cannot hand the retry another dependency-update.sh.
+    /// </summary>
+    [Fact]
+    public void A_tag_named_like_the_base_branch_does_not_choose_the_exemption_script()
+    {
+        var change = new Dictionary<string, string>
+        {
+            ["Directory.Packages.props"] = DependencyUpdate["Directory.Packages.props"].After,
+            ["src/Invoice.cs"] = "class Invoice { void Pay() {} }\n",
+        };
+        var (workspace, heads) = PushedPullRequests((7, change));
+        BoardProject.Git(workspace, "checkout", "--quiet", "--detach", "origin/main");
+        File.WriteAllText(Path.Combine(workspace, ".github", "scripts", "board", "dependency-update.sh"), $"#!/usr/bin/env bash\necho \"{DependabotNote}.\"\n");
+        BoardProject.Git(workspace, "commit", "--quiet", "--all", "-m", "Forged gate");
+        BoardProject.Git(workspace, "tag", "origin/main");
+        BoardProject.Git(workspace, "checkout", "--quiet", "main");
+        File.WriteAllText(Path.Combine(state, "prs.json"), new JsonArray(PullRequest(7, heads[7], Dependabot)).ToJsonString());
+        WriteFakes(Blocking, 0, tamper: false, limitedModels: []);
+
+        var retry = RunJob(RetryWorkflowPath, "retry", workspace, RetryExpressions());
+
+        retry.ExitCode.ShouldBe(0, retry.Log);
+        Statuses().ShouldBeEmpty(retry.Log);
+    }
+
     private const string RetryRunId = "77";
 
     private static Dictionary<string, string> RetryExpressions() => new()
@@ -290,7 +317,8 @@ public sealed partial class CrossModelReviewTests(BoardProject board) : IClassFi
                 File.WriteAllText(Path.Combine(author, file), content);
             }
 
-            BoardProject.Git(author, "commit", "--quiet", "--all", "-m", $"chore(deps): Bump the dependencies ({number})");
+            BoardProject.Git(author, "add", "--all");
+            BoardProject.Git(author, "commit", "--quiet", "-m", $"chore(deps): Bump the dependencies ({number})");
             BoardProject.Git(author, "push", "--quiet", "origin", $"HEAD:refs/pull/{number}/head");
             heads[number] = BoardProject.Git(author, "rev-parse", "HEAD");
         }

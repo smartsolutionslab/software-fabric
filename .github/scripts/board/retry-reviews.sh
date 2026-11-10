@@ -16,20 +16,22 @@ run_url="$1"
 # Prints the note and returns 0 when the base branch's dependency-update.sh exempts the pull request at its head;
 # returns 2 when it does not, and 1 when the pull request or its base branch could not be fetched.
 exemption() {
-  local pr="$1" head="$2" base="$3" author="$4" gate note
+  local pr="$1" head="$2" base="$3" author="$4" tip gate note
   board_git fetch --quiet --no-tags origin "+refs/heads/$base:refs/remotes/origin/$base" \
     "+refs/pull/$pr/head:refs/remotes/pull/$pr" || return 1
+  # By its full name and as a commit: a tag named origin/<base> would otherwise be preferred to the branch.
+  tip="$(board_git rev-parse --verify --quiet "refs/remotes/origin/$base^{commit}")" || return 1
   if ! board_git cat-file -e "$head^{commit}" 2> /dev/null; then
     echo "#$pr: its head $head moved while this ran; the next run checks the new one." >&2
     return 2
   fi
   gate="$(mktemp)" || return 1
-  if ! board_git show "origin/$base:.github/scripts/board/dependency-update.sh" > "$gate" 2> /dev/null; then
+  if ! board_git show "$tip:.github/scripts/board/dependency-update.sh" > "$gate" 2> /dev/null; then
     echo "#$pr: the base branch $base has no dependency-update.sh, so nothing is exempt." >&2
     rm -f "$gate"
     return 2
   fi
-  if note="$(cd "$board_root" && bash "$gate" "$author" "origin/$base" "$head")"; then
+  if note="$(cd "$board_root" && bash "$gate" "$author" "$tip" "$head")"; then
     rm -f "$gate"
     echo "$note"
     return 0
