@@ -391,7 +391,7 @@ dimensions:
         tier: supported  # nightly run 42800894655
         # Reason: the pack builds React remotes only (owner decision D5, #232).
         requires: ["frontend.framework == react"]
-      native-federation: { tier: supported }  # nightly run 42800894655
+      native-federation: { tier: experimental }
       web-components:    { tier: experimental }
 
   frontend.mfe-mixed-frameworks:

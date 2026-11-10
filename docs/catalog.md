@@ -441,7 +441,7 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `module-federation` | supported | `frontend.framework == react` | — | `industrial-event-driven-mfe` | — |
-| `native-federation` | supported | — | — | — | — |
+| `native-federation` | experimental | — | — | — | — |
 | `web-components` | experimental | — | — | — | — |
 
 ### `frontend.pwa`
