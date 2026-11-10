@@ -175,9 +175,12 @@ this pack.
   on a choice (ADR-0001).
 - Every branch renders something valid for each option of the dimension it
   reads, or fails loudly; it never silently renders nothing. Failing loudly
-  is an `#error` (or, in a web file, `throw new Error(...)`) that names the
-  choice the pack does not handle yet and ADR-0006, so the generated
-  project's build stops on it. Where the catalog can say so, a rule refuses
+  names the choice the pack does not handle yet and ADR-0006: an `#error`
+  in a C# file, which stops the generated project's build, or in a web file
+  a `throw new Error(...)` in a script the build runs (orval's
+  `orval.config.ts`, the tokens' `build.mjs`). A throw in a module the app
+  only bundles fails when the module runs, not at build time, so it is not
+  loud enough on its own. Where the catalog can say so, a rule refuses
   the combination before anything is generated instead (M3-05,
   `docs/catalog-rules.md`).
 - The vocabularies below are the exception: no pack may refuse another test
