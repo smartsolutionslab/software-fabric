@@ -147,9 +147,10 @@ public sealed class DesignTokensTests
     [Theory]
     [InlineData("saas-standard-react", "frontend.ui-library=mui")]
     [InlineData("saas-standard-vue", "frontend.ui-library=vuetify")]
+    [InlineData("saas-standard-vue", "frontend.ui-library=quasar")]
     public void With_the_library_theme_the_tokens_also_compile_to_a_typescript_module_for_the_theme(string profile, string library)
     {
-        // Vuetify has no pack yet, so the project is generated with stand-ins for it.
+        // Quasar has no pack, so that project is generated with a stand-in for it.
         using var project = new GeneratedProject(profile, Choice, LibraryTheme, library);
         string Read(string path) => File.ReadAllText(Path.Combine(project.ProjectDirectory, path));
 

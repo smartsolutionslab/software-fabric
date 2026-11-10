@@ -1,2 +1,3 @@
 {{ if project["frontend.ui-library"] == "mui" }}/* The look is the MUI theme in src/theme.ts, and CssBaseline sets the page's baseline from it: no global rules here,
-   only the stylesheets a library needs imported. */{{ end }}
+   only the stylesheets a library needs imported. */{{ else if project["frontend.ui-library"] == "vuetify" }}/* The look is the Vuetify theme in src/theme.ts, and vuetify/styles (imported in src/main.ts) sets the page's baseline:
+   no global rules here, only the stylesheets a library needs imported. */{{ end }}

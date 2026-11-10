@@ -26,6 +26,16 @@ export const theme = themeQuartz.withParams({
   headerBackgroundColor: appTheme.palette.action.hover,
   accentColor: appTheme.palette.primary.main,
 });
+{{~ else if project["frontend.ui-library"] == "vuetify" ~}}
+/** Quartz drawn with the CSS variables of Vuetify's theme, so the grid takes the app's colours from the same place. */
+export const theme = themeQuartz.withParams({
+  fontFamily: 'inherit',
+  backgroundColor: 'rgb(var(--v-theme-surface))',
+  foregroundColor: 'rgb(var(--v-theme-on-surface))',
+  borderColor: 'rgba(var(--v-border-color), var(--v-border-opacity))',
+  headerBackgroundColor: 'rgba(var(--v-theme-on-surface), var(--v-hover-opacity))',
+  accentColor: 'rgb(var(--v-theme-primary))',
+});
 {{~ else ~}}
 /** Quartz as AG Grid ships it: this UI library defines no theme variables for the grid to follow (docs/adr). */
 export const theme = themeQuartz;

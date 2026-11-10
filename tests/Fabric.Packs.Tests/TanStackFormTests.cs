@@ -335,15 +335,15 @@ public sealed partial class TanStackFormTests
     [Fact]
     public void With_another_vue_ui_library_the_tanstack_form_screens_fail_saying_what_they_are_built_from()
     {
-        string[] overrides = [TanStackForm, "frontend.ui-library=vuetify", .. VueAgentAndDashboards];
+        string[] overrides = [TanStackForm, "frontend.ui-library=quasar", .. VueAgentAndDashboards];
         using var standIns = new StandIns();
         var generated = Generator.New(Repository.Catalog, standIns.Complete(Repository.Catalog, Repository.Packs.Packs, Vue, overrides), "shop", Vue, overrides);
         generated.Errors.ShouldBeEmpty();
         var files = generated.Files.ToDictionary(file => file.Path, file => file.Content);
 
-        files["web/app/src/agents/AgentConversation.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue or reka-ui with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is tanstack-form");
-        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue or reka-ui with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is tanstack-form");
-        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue or reka-ui with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is vuetify, frontend.forms is tanstack-form");
+        files["web/app/src/agents/AgentConversation.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The ag-ui pack builds the Vue agent panel from shadcn-vue, reka-ui or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is quasar, frontend.forms is tanstack-form");
+        files["web/app/src/dashboards/DashboardCanvas.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue, reka-ui or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is quasar, frontend.forms is tanstack-form");
+        files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldStartWith("<script lang=\"ts\">\nthrow new Error('The generative dashboards pack builds the Vue assistant from shadcn-vue, reka-ui or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is quasar, frontend.forms is tanstack-form");
     }
 
     [Fact]

@@ -218,9 +218,10 @@ public sealed class DesignSystemWebComponentsTests
     [Theory]
     [InlineData("saas-standard-react", "frontend.ui-library=mui")]
     [InlineData("saas-standard-vue", "frontend.ui-library=vuetify")]
+    [InlineData("saas-standard-vue", "frontend.ui-library=quasar")]
     public void With_the_library_theme_the_tokens_package_is_the_tokens_options_and_the_app_imports_its_variables(string profile, string library)
     {
-        // Vuetify has no pack yet, so the projects are generated with stand-ins for it.
+        // Quasar has no pack, so those projects are generated with a stand-in for it.
         using var tokens = new GeneratedProject(profile, "frontend.design-system=tokens", LibraryTheme, library);
         using var webComponents = new GeneratedProject(profile, Choice, LibraryTheme, library);
 

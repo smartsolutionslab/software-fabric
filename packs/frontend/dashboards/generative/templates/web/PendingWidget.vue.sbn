@@ -1,21 +1,41 @@
 {{~ ui = project["frontend.ui-library"] ~}}
-{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ vuetify = ui == "vuetify" ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" && !vuetify ~}}
 {{~ if ui == "reka-ui"
   button = "BaseButton"
   button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
   secondary = "outline"
+else if vuetify
+  button = "VBtn"
+  button_import = "import { VBtn } from 'vuetify/components';"
+  secondary = "tonal"
 else
   button = "Button"
   button_import = "import { Button } from '@/components/ui/button';"
   secondary = "secondary"
 end ~}}
-{{~ func class_of(tailwind, module)
+{{~ if vuetify
+  primary = ' color="primary"'
+  ghost = 'variant="text"'
+  small = 'size="small"'
+else
+  primary = ""
+  ghost = 'variant="ghost"'
+  small = 'size="sm"'
+end ~}}
+{{~ func class_of(tailwind, module, material)
+  if vuetify
+    ret 'class="' + material + '"'
+  end
   if css_modules
     ret ':class="styles.' + module + '"'
   end
   ret 'class="' + tailwind + '"'
 end ~}}
-{{~ func themed(shadcn, palette, module)
+{{~ func themed(shadcn, palette, module, material)
+  if vuetify
+    ret 'class="' + material + '"'
+  end
   if css_modules
     ret ':class="styles.' + module + '"'
   end
@@ -57,18 +77,18 @@ const emit = defineEmits<{ accept: []; discard: [] }>();
 {{~ else ~}}
   <section
     :aria-label="`Proposed: ${proposal.title}`"
-    {{ themed "flex h-full flex-col overflow-hidden rounded border border-dashed border-primary bg-card p-2" "flex h-full flex-col overflow-hidden rounded border border-dashed border-slate-900 bg-white p-2" "pending" }}
+    {{ themed "flex h-full flex-col overflow-hidden rounded border border-dashed border-primary bg-card p-2" "flex h-full flex-col overflow-hidden rounded border border-dashed border-slate-900 bg-white p-2" "pending" "d-flex h-100 flex-column overflow-hidden rounded border border-dashed border-primary bg-surface pa-2" }}
   >
 {{~ end ~}}
-{%{    <header }%}{{ class_of "flex flex-wrap items-center justify-between gap-2" "header" }}{%{>
-      <h2 }%}{{ class_of "text-sm font-medium" "title" }}{%{>Proposed: {{ proposal.title }}</h2>
-      <div }%}{{ class_of "flex gap-1" "actions" }}{%{>
-        <}%}{{ button }}{%{ type="button" size="sm" :disabled="!canAccept" @click="emit('accept')">Accept</}%}{{ button }}{%{>
-        <}%}{{ button }}{%{ type="button" variant="ghost" size="sm" @click="emit('discard')">Discard</}%}{{ button }}{%{>
+{%{    <header }%}{{ class_of "flex flex-wrap items-center justify-between gap-2" "header" "d-flex flex-wrap align-center justify-space-between ga-2" }}{%{>
+      <h2 }%}{{ class_of "text-sm font-medium" "title" "text-title-small" }}{%{>Proposed: {{ proposal.title }}</h2>
+      <div }%}{{ class_of "flex gap-1" "actions" "d-flex ga-1" }}{%{>
+        <}%}{{ button }}{{ primary }}{%{ type="button" }%}{{ small }}{%{ :disabled="!canAccept" @click="emit('accept')">Accept</}%}{{ button }}{%{>
+        <}%}{{ button }}{%{ type="button" }%}{{ ghost }} {{ small }}{%{ @click="emit('discard')">Discard</}%}{{ button }}{%{>
       </div>
     </header>
-    <p v-if="replacing" }%}{{ themed "text-xs text-muted-foreground" "text-xs text-slate-500" "note" }}{%{>Replaces a widget on this dashboard.</p>
-    <div }%}{{ class_of "min-h-0 flex-1 overflow-auto" "body" }}{%{>
+    <p v-if="replacing" }%}{{ themed "text-xs text-muted-foreground" "text-xs text-slate-500" "note" "text-body-small text-medium-emphasis" }}{%{>Replaces a widget on this dashboard.</p>
+    <div }%}{{ class_of "min-h-0 flex-1 overflow-auto" "body" "flex-1-1 overflow-auto" }}{%{>
       <WidgetView
         :source="proposal.source"
         :visual="proposal.visual"

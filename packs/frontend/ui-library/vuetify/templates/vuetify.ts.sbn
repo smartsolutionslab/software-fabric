@@ -1,0 +1,11 @@
+import { createVuetify } from 'vuetify';
+{{~ if project["frontend.styling"] == "library-theme" ~}}
+import { theme } from './theme';
+
+/** The app's Vuetify: its components take their colours from the theme in src/theme.ts (docs/adr). */
+export const vuetify = createVuetify({ theme });
+{{~ else ~}}
+
+/** The app's Vuetify, with Vuetify's default theme (docs/adr). */
+export const vuetify = createVuetify();
+{{~ end ~}}

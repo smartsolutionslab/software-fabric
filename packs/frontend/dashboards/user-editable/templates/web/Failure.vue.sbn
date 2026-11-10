@@ -1,15 +1,23 @@
 {{~ ui = project["frontend.ui-library"] ~}}
-{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ vuetify = ui == "vuetify" ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" && !vuetify ~}}
 {{~ if ui == "reka-ui"
   button = "BaseButton"
   button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
   secondary = "outline"
+else if vuetify
+  button = "VBtn"
+  button_import = "import { VBtn } from 'vuetify/components';"
+  secondary = "tonal"
 else
   button = "Button"
   button_import = "import { Button } from '@/components/ui/button';"
   secondary = "secondary"
 end ~}}
-{{~ func class_of(tailwind, module)
+{{~ func class_of(tailwind, module, material)
+  if vuetify
+    ret 'class="' + material + '"'
+  end
   if css_modules
     ret ':class="styles.' + module + '"'
   end
@@ -30,12 +38,14 @@ const emit = defineEmits<{ retry: [] }>();
 </script>
 
 <template>
-  <div role="alert" }%}{{ class_of "flex items-center gap-2 text-sm" "failure" }}{%{>
+  <div role="alert" }%}{{ class_of "flex items-center gap-2 text-sm" "failure" "d-flex align-center ga-2 text-body-medium" }}{%{>
     <span>{{ message }}</span>
 }%}{{~ if ui == "reka-ui" ~}}
     <BaseButton type="button" variant="outline" size="sm" :aria-label="retry" @click="emit('retry')"
       >Try again</BaseButton
     >
+{{~ else if vuetify ~}}
+    <VBtn type="button" variant="outlined" size="small" :aria-label="retry" @click="emit('retry')">Try again</VBtn>
 {{~ else ~}}
     <Button type="button" variant="outline" size="sm" :aria-label="retry" @click="emit('retry')">Try again</Button>
 {{~ end ~}}

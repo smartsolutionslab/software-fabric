@@ -1,0 +1,2 @@
+    // Vitest runs Vuetify's components through Vite, which imports the stylesheet each one imports; Node itself cannot.
+    { name: 'vuetify-in-tests', config: () => ({ test: { server: { deps: { inline: ['vuetify'] } } } }) }
