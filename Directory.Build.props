@@ -8,6 +8,11 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <Deterministic>true</Deterministic>
+    <!-- The generator's SemVer, recorded in every fabric.yaml. No git SHA in the informational version: the same
+         version must write the same bytes from any checkout (AGENTS.md: same input, same output). -->
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionSuffix>dev</VersionSuffix>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <!-- One type per file, named after the type: SA1402 and SA1649, configured in stylecop.json and .editorconfig. -->

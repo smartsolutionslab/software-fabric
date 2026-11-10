@@ -9,8 +9,10 @@ namespace Fabric.Core.Generation;
 
 /// <summary>
 /// <c>fabric.yaml</c>: the record of what a generated project chose. Written once by <c>fabric new</c>, extended by
-/// <c>fabric add-module</c>, and read by agents and tools. Multi-valued dimensions are always lists. <c>settings</c>,
-/// the numbers chosen options declare (ADR-0014), appears only when there are any.
+/// <c>fabric add-module</c>, and read by agents and tools. <c>generator</c> and <c>catalog</c> record the generator's
+/// version and the hash of the catalog that wrote it last; files from before they were recorded have neither.
+/// Multi-valued dimensions are always lists. <c>settings</c>, the numbers chosen options declare (ADR-0014), appears
+/// only when there are any.
 /// </summary>
 public static partial class FabricFile
 {
@@ -27,6 +29,8 @@ public static partial class FabricFile
         var text = new StringBuilder()
             .Append("# Written by fabric. These choices are fixed for this project (ADR-0001 of the generator).\n")
             .Append("fabric: ").Append(Version).Append('\n')
+            .Append("generator: ").Append(GeneratorVersion.Current).Append('\n')
+            .Append("catalog: ").Append(catalog.Hash).Append('\n')
             .Append("name: ").Append(Scalar(name)).Append('\n');
         if (profile is not null)
         {
@@ -83,7 +87,7 @@ public static partial class FabricFile
 
         var source = new YamlSource(sourceName, message => new FabricFileException(message));
         var root = source.Mapping(stream.Documents[0].RootNode, FileName);
-        var fields = source.Fields(root, FileName, "fabric", "name", "profile", "project", "settings", "module-defaults", "modules");
+        var fields = source.Fields(root, FileName, "fabric", "generator", "catalog", "name", "profile", "project", "settings", "module-defaults", "modules");
 
         var versionNode = fields.Required("fabric");
         var version = source.Integer(versionNode, "fabric", FileName);
