@@ -9,6 +9,8 @@ public sealed class MicroFrontendsEndToEndTests
     [InlineData("react", "native-federation", "tokens-and-components")]
     [InlineData("vue", "native-federation", "tokens")]
     [InlineData("vue", "native-federation", "web-components")]
+    [InlineData("react", "web-components", "tokens-and-components")]
+    [InlineData("vue", "web-components", "web-components")]
     public void A_modules_page_comes_from_its_own_remote_under_aspire(string framework, string technique, string designSystem)
     {
         using var project = new GeneratedProject(

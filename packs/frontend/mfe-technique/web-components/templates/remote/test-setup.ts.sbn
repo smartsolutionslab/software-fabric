@@ -1,0 +1,10 @@
+import '@testing-library/jest-dom/vitest';
+{{~ if project["frontend.design-system"] == "web-components" ~}}
+// The shell defines the design system's elements for the page; a remote's tests define them as the shell's tests do.
+import '@{{ name }}/ui';
+{{~ end ~}}
+import { cleanup } from '@testing-library/{{ project["frontend.framework"] }}';
+import { afterEach } from 'vitest';
+
+// Without Vitest's globals Testing Library cannot clean up by itself; every test starts from an empty document.
+afterEach(cleanup);

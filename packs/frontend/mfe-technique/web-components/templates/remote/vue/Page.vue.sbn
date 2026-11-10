@@ -1,0 +1,12 @@
+<!-- The {{ module.name }} module's screens; the shell shows them under /{{ module.name }}. -->
+{{~ if project["frontend.design-system"] == "web-components" ~}}
+<!-- <ds-badge> is the design system's element, which the shell defines once for the page. -->
+{{~ end ~}}
+<template>
+  <main>
+    <h1>{{ module.namespace }}</h1>
+{{~ if project["frontend.design-system"] == "web-components" ~}}
+    <ds-badge>Remote</ds-badge>
+{{~ end ~}}
+  </main>
+</template>

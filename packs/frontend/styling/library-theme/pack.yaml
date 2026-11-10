@@ -2,8 +2,8 @@ option: frontend.styling.library-theme
 files:
   - { template: templates/theme.ts.sbn, target: web/app/src/theme.ts }
   - { template: templates/theme.test.tsx.sbn, target: web/app/src/theme.test.tsx, when: 'project["frontend.ui-library"] == "mui"' }
-  # For a library whose theme is not built yet: a test that fails the web tests saying so (ADR-0006).
-  - { template: templates/theme-not-built.test.ts.sbn, target: web/app/src/theme.test.ts, when: 'project["frontend.ui-library"] != "mui"' }
+  # Vuetify's gate; for a library whose theme is not built yet, a test that fails the web tests saying so (ADR-0006).
+  - { template: templates/theme.test.ts.sbn, target: web/app/src/theme.test.ts, when: 'project["frontend.ui-library"] != "mui"' }
 slots:
   # The provider is the outermost, so every provider and page inside it, the sign-in included, takes the theme.
   - { slot: web.imports, template: templates/imports.sbn, order: -4 }
@@ -14,4 +14,5 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: unit-test, describes: "MUI's components take their colours from src/theme.ts, and a component (*.tsx) that writes a colour of its own (#hex, rgb(), hsl(), oklch()) fails the web tests naming the file (src/theme.test.tsx).", file: templates/theme.test.tsx.sbn }
+  - { kind: unit-test, describes: "MUI's components take their colours from src/theme.ts, and a component (*.tsx) that writes a colour of its own (#hex, rgb(), hsl(), oklch()) in a literal of its code, other than the value of a content key or attribute (label, title, href, to, alt, description, text, placeholder, aria-*), fails the web tests naming the file (src/theme.test.tsx).", file: templates/theme.test.tsx.sbn }
+  - { kind: unit-test, describes: "Vuetify takes its colours from src/theme.ts, and a component (*.vue) that writes a colour of its own (#hex, rgb(), hsl(), oklch()) in its style blocks, or in a literal of its script or its template's attributes and expressions, other than the value of a content key or attribute (label, title, href, to, alt, description, text, placeholder, aria-*), fails the web tests naming the file (src/theme.test.ts).", file: templates/theme.test.ts.sbn }

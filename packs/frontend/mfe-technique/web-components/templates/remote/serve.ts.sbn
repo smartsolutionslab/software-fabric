@@ -1,0 +1,28 @@
+import { build, type Plugin, type PreviewServer, type Rolldown } from 'vite';
+
+/**
+ * Makes `pnpm dev` (vite preview, which Aspire starts) build the remote in watch mode before it serves dist, and again
+ * on every change: the shell always loads the remote's built remote.js, as it does once deployed (docs/adr). The
+ * watcher closes with the server that started it.
+ */
+export function serveBuild(watch = build): Plugin {
+  return {
+    name: 'serve-build',
+    async configurePreviewServer({ config, httpServer }: Pick<PreviewServer, 'config' | 'httpServer'>) {
+      const watcher = (await watch({
+        configFile: config.configFile,
+        root: config.root,
+        build: { watch: {}, minify: false },
+      })) as Rolldown.RolldownWatcher;
+      // Served once the first build is written, so the shell never asks for a remote.js that is not there yet.
+      await new Promise<void>((resolve) =>
+        watcher.on('event', ({ code }) => {
+          if (code === 'END' || code === 'ERROR') {
+            resolve();
+          }
+        }),
+      );
+      httpServer.on('close', () => void watcher.close());
+    },
+  };
+}

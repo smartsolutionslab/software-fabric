@@ -1,0 +1,2 @@
+    // The shell loads each module's remote, which defines its page as a custom element, at run time (docs/adr).
+    shellRemotes()

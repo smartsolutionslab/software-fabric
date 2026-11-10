@@ -1,0 +1,13 @@
+            {
+              group: [
+                'primevue',
+                'quasar',
+                'element-plus',
+                'ant-design-vue',
+                'naive-ui',
+                '@headlessui/vue',
+                'radix-vue',
+                'reka-ui',
+              ],
+              message: 'Use Vuetify (vuetify/components){{ if project["frontend.styling"] == "library-theme" }} and the theme in src/theme.ts{{ end }} (docs/adr).',
+            }

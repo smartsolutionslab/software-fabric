@@ -4,6 +4,7 @@
     "ink": {
       "50": { "$value": "#f8fafc" },
       "200": { "$value": "#e2e8f0" },
+      "500": { "$value": "#64748b" },
       "900": { "$value": "#0f172a" }
     },
     "brand": {
@@ -13,11 +14,16 @@
     "signal": {
       "500": { "$value": "#d97706" }
     },
+    "danger": {
+      "600": { "$value": "#dc2626" }
+    },
     "primary": { "$value": "{color.brand.700}" },
     "primary-foreground": { "$value": "{color.ink.50}" },
     "accent": { "$value": "{color.signal.500}" },
     "accent-foreground": { "$value": "{color.ink.900}" },
     "surface": { "$value": "{color.ink.50}" },
-    "border": { "$value": "{color.ink.200}" }
+    "border": { "$value": "{color.ink.200}" },
+    "muted-foreground": { "$value": "{color.ink.500}" },
+    "destructive": { "$value": "{color.danger.600}" }
   }
 }

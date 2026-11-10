@@ -29,7 +29,7 @@ import BaseButton from './BaseButton.vue';
 test('a button is a button with the default look', () => {
   render(BaseButton, { slots: { default: 'Save' } });
 
-  expect(screen.getByRole('button', { name: 'Save' })).toHaveClass('bg-slate-900');
+  expect(screen.getByRole('button', { name: 'Save' })).{{ if project["frontend.design-system"] == "tokens" }}toHaveClass('bg-primary'){{ else }}toHaveClass('bg-slate-900'){{ end }};
 });
 
 test("with as-child the child takes the button's look and stays what it is", () => {
@@ -38,7 +38,7 @@ test("with as-child the child takes the button's look and stays what it is", () 
     slots: { default: () => h('a', { href: '/billing' }, 'Billing') },
   });
 
-  expect(screen.getByRole('link', { name: 'Billing' })).toHaveClass('border-slate-300');
+  expect(screen.getByRole('link', { name: 'Billing' })).{{ if project["frontend.design-system"] == "tokens" }}toHaveClass('border-border'){{ else }}toHaveClass('border-slate-300'){{ end }};
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });
 {{~ end ~}}

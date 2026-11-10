@@ -200,6 +200,8 @@ public sealed class DesignSystemWebComponentsTests
     [InlineData("display: inline-flex;", "display: inline-flex; box-shadow: 0 0 4px rgb(1, 2, 3);")]
     // A state's colour counts as well, though no test hovers the badge.
     [InlineData(".primary {", ".accent:hover { color: red; } .primary {")]
+    // So does one that only a hovered badge paints, though no rule of its own names a colour property.
+    [InlineData(".primary {", ":host(:hover) { --ring: 0 0 4px red; } span { box-shadow: var(--ring); } .primary {")]
     public void A_component_style_with_a_value_of_its_own_fails_the_ui_packages_tests(string declaration, string mutation)
     {
         using var project = new GeneratedProject("saas-standard-react", Choice);
@@ -215,12 +217,34 @@ public sealed class DesignSystemWebComponentsTests
         output.ShouldContain("a badge is styled only through the design tokens");
     }
 
+    // A token may resolve to any colour, the gate's own included: the colours it starts unset properties from and those
+    // it changes the tokens to are none of the tokens' as built.
+    [Theory]
+    [InlineData("#0a141e")]
+    [InlineData("#040506")]
+    [InlineData("#010203")]
+    public void A_badge_styled_only_through_tokens_passes_the_ui_packages_tests_whatever_colour_a_token_is(string colour)
+    {
+        using var project = new GeneratedProject("saas-standard-react", Choice);
+        var tokens = Path.Combine(project.ProjectDirectory, "web", "packages", "tokens", "src", "color.tokens.json");
+        var source = File.ReadAllText(tokens);
+        const string ink = "\"50\": { \"$value\": \"#f8fafc\" }";
+        source.Split(ink).Length.ShouldBe(2, $"color.tokens.json declares {ink} once");
+        File.WriteAllText(tokens, source.Replace(ink, $"\"50\": {{ \"$value\": \"{colour}\" }}", StringComparison.Ordinal));
+        RunWeb(project, "install");
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "--filter", "@shop/ui", "test");
+
+        exitCode.ShouldBe(0, output);
+    }
+
     [Theory]
     [InlineData("saas-standard-react", "frontend.ui-library=mui")]
     [InlineData("saas-standard-vue", "frontend.ui-library=vuetify")]
+    [InlineData("saas-standard-vue", "frontend.ui-library=quasar")]
     public void With_the_library_theme_the_tokens_package_is_the_tokens_options_and_the_app_imports_its_variables(string profile, string library)
     {
-        // Vuetify has no pack yet, so the projects are generated with stand-ins for it.
+        // Quasar has no pack, so those projects are generated with a stand-in for it.
         using var tokens = new GeneratedProject(profile, "frontend.design-system=tokens", LibraryTheme, library);
         using var webComponents = new GeneratedProject(profile, Choice, LibraryTheme, library);
 

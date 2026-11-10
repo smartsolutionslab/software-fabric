@@ -1,3 +1,10 @@
+{{~ tokens = project["frontend.design-system"] == "tokens" ~}}
+{{~ func colour(token, value)
+  if tokens
+    ret "var(--ds-color-" + token + ")"
+  end
+  ret value
+end ~}}
 .outer,
 .wrapper {
   display: flex;
@@ -19,16 +26,16 @@
   width: 100%;
   min-width: 0;
   height: 2.25rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid {{ colour "border" "#cbd5e1" }};
   border-radius: 0.375rem;
-  background-color: #fff;
+  background-color: {{ colour "surface" "#fff" }};
   padding: 0.25rem 0.75rem;
   font: inherit;
   font-size: 0.875rem;
 }
 
 .input:focus-visible {
-  outline: 2px solid #64748b;
+  outline: 2px solid {{ colour "primary" "#64748b" }};
   outline-offset: 2px;
 }
 
@@ -38,7 +45,7 @@
 }
 
 .outer[data-errors='true'] .input {
-  border-color: #dc2626;
+  border-color: {{ colour "destructive" "#dc2626" }};
 }
 
 .textarea {
@@ -52,7 +59,7 @@
 .help {
   font-size: 0.875rem;
   line-height: 1.25rem;
-  color: #64748b;
+  color: {{ colour "muted-foreground" "#64748b" }};
 }
 
 .messages {
@@ -65,5 +72,5 @@
   margin: 0;
   font-size: 0.875rem;
   line-height: 1.25rem;
-  color: #dc2626;
+  color: {{ colour "destructive" "#dc2626" }};
 }

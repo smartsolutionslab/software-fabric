@@ -1,0 +1,29 @@
+import type { Plugin, Rolldown } from 'vite';
+
+/**
+ * Makes remote.js add the remote's stylesheets to the page: the shell loads only that one file, so a stylesheet beside
+ * it would never be applied (docs/adr). Each stays where Vite wrote it and is linked relative to remote.js, so its
+ * url()s resolve against the remote's dist, wherever a deployment serves it, not against the shell.
+ */
+export function linkStyles(): Plugin {
+  return {
+    name: 'link-styles',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_, bundle) {
+      const sheets = Object.values(bundle)
+        .filter((file): file is Rolldown.OutputAsset => file.type === 'asset' && file.fileName.endsWith('.css'))
+        .map((sheet) => sheet.fileName);
+      const script = bundle['remote.js'];
+      if (sheets.length === 0 || script?.type !== 'chunk') {
+        return;
+      }
+
+      const links = sheets.map(
+        (sheet) =>
+          `document.head.append(Object.assign(document.createElement('link'), { rel: 'stylesheet', href: new URL(${JSON.stringify(sheet)}, import.meta.url).href }));`,
+      );
+      script.code = `${links.join('\n')}\n${script.code}`;
+    },
+  };
+}

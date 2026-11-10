@@ -29,6 +29,219 @@ public sealed partial class MuiTests
         }
         """;
 
+    /// <summary>Components that colour themselves each in another way: every one must fail the theme check (#398, #526, #530).</summary>
+    private static readonly Dictionary<string, string> OwnColours = new()
+    {
+        ["Alarm"] = OwnColour,
+        ["Inline"] = """
+            export function Inline() {
+              return <span style={{ color: 'rgb(211, 47, 47)' }}>Inline</span>;
+            }
+            """,
+        ["Prop"] = """
+            import { Box } from '@mui/material';
+
+            export function Prop() {
+              return <Box bgcolor="#fafafa">Prop</Box>;
+            }
+            """,
+        ["SystemProp"] = """
+            import { Box } from '@mui/material';
+
+            export function SystemProp() {
+              return <Box border="1px solid #ccc">SystemProp</Box>;
+            }
+            """,
+        ["Hoisted"] = """
+            import { Typography } from '@mui/material';
+
+            const alarm = { color: 'hsl(0, 65%, 51%)' };
+
+            export function Hoisted() {
+              return <Typography sx={alarm}>Hoisted</Typography>;
+            }
+            """,
+        ["Styled"] = """
+            import { styled } from '@mui/material/styles';
+
+            export const Styled = styled('div')({ borderColor: '#ccc' });
+            """,
+        ["StyledTemplate"] = """
+            import styled from '@emotion/styled';
+
+            export const StyledTemplate = styled.div`
+              color: #333;
+            `;
+            """,
+        ["StyledObject"] = """
+            import styled from '@emotion/styled';
+
+            export const StyledObject = styled.div({ color: '#fff' });
+            """,
+        ["Aliased"] = """
+            import { styled as themed } from '@mui/material/styles';
+
+            export const Aliased = themed('div')({ color: '#fff' });
+            """,
+        ["Shadowed"] = """
+            import { Box } from '@mui/material';
+
+            export function Shadowed() {
+              const sx = { color: '#fff' };
+              return <Box sx={sx}>Shadowed</Box>;
+            }
+
+            export function Themed() {
+              const sx = { color: 'primary.main' };
+              return <Box sx={sx}>Themed</Box>;
+            }
+            """,
+        ["Spread"] = """
+            import { Box } from '@mui/material';
+
+            export function Spread() {
+              return <Box {...{ sx: { color: '#fff' } }}>Spread</Box>;
+            }
+            """,
+        ["SpreadNamed"] = """
+            import { Box } from '@mui/material';
+
+            const alarm = { sx: { color: '#fff' } };
+
+            export function SpreadNamed() {
+              return <Box {...alarm}>SpreadNamed</Box>;
+            }
+            """,
+        ["SpreadTyped"] = """
+            import { Box, type BoxProps } from '@mui/material';
+
+            const props: BoxProps = { sx: { color: '#fff' } };
+
+            export function SpreadTyped() {
+              return <Box {...props}>SpreadTyped</Box>;
+            }
+            """,
+        ["Destructured"] = """
+            import { Box } from '@mui/material';
+
+            const { sx } = { sx: { color: '#fff' } };
+
+            export function Destructured() {
+              return <Box sx={sx}>Destructured</Box>;
+            }
+            """,
+        ["NestedDestructured"] = """
+            import { Box } from '@mui/material';
+
+            const {
+              appearance: { sx },
+            } = { appearance: { sx: { color: '#fff' } } };
+
+            export function NestedDestructured() {
+              return <Box sx={sx}>NestedDestructured</Box>;
+            }
+            """,
+        ["Conditional"] = """
+            import { Box } from '@mui/material';
+
+            export function Conditional({ active }: { active: boolean }) {
+              return <Box sx={{ color: active ? '#fff' : 'primary.main', label: 'Issue ' + '#393' }}>Conditional</Box>;
+            }
+            """,
+        ["Palette"] = """
+            import { Box } from '@mui/material';
+
+            const palette = { danger: '#f00' };
+
+            export function Palette() {
+              return <Box sx={{ color: palette.danger }}>Palette</Box>;
+            }
+            """,
+    };
+
+    /// <summary>
+    /// The keys whose values are content, never a style, in an object or as a JSX attribute (owner decision on #530):
+    /// a value under one of them may look like a colour.
+    /// </summary>
+    private static readonly string[] ContentKeys = ["label", "title", "href", "to", "alt", "description", "text", "placeholder"];
+
+    /// <summary>Components that style themselves only through the theme, beside content that looks like a colour (#526's reviews).</summary>
+    private const string ThemedEntries = """
+        import { Box, Link } from '@mui/material';
+        import { styled } from '@mui/material/styles';
+
+        const entry = { label: 'Issue #393', sx: { color: 'primary.main' } };
+        const anchor = { href: '#add' };
+        const asserted = { label: 'Issue #393' as const, title: 'Issue #394' satisfies string };
+        const suffix = location.hash;
+        const joined = { label: 'Issue #393' + suffix, title: suffix || '#fee', text: suffix ? '#add' : '#bad' };
+        const { sx: themed } = { label: 'Issue #393', sx: { color: 'primary.main' } };
+
+        function Content() {
+          return <a href="#add">Add</a>;
+        }
+
+        export const ThemedContent = styled(Content)({ color: 'primary.main' });
+
+        export function Destructured() {
+          return <Box sx={themed}>Destructured</Box>;
+        }
+
+        export function Entry() {
+          return <Box sx={entry.sx}>{entry.label}</Box>;
+        }
+
+        export function Anchor() {
+          return <Link {...anchor}>Add</Link>;
+        }
+
+        export function Joined({ active }: { active: boolean }) {
+          return (
+            <a href={active ? '#add' : '#fee'} title={'Issue #' + '393'} aria-label={suffix ?? '#bad'}>
+              {joined.label} {joined.title} {joined.text}
+            </a>
+          );
+        }
+
+        export function Asserted() {
+          return (
+            <Box title={'#add' as string} aria-label={'#bad' satisfies string}>
+              {asserted.label} {asserted.title}
+            </Box>
+          );
+        }
+        """;
+
+    /// <summary>A component without a colour of its own, whose text, comment and links look like one (#398).</summary>
+    private const string Unstyled = """
+        import { Link, Typography } from '@mui/material';
+
+        // Fixed in #393; see #add.
+        export function Changelog({ issue }: { issue: number }) {
+          return (
+            <Typography>
+              Issue #393 <Link href="#add">Add</Link> <a href="https://example.com/#fee">Fee</a>{' '}
+              <span aria-label={`Issue #${issue}`}>#{issue}</span> <abbr aria-description="#bad">Bad</abbr>
+            </Typography>
+          );
+        }
+        """;
+
+    /// <summary>A component whose object under the content key and whose JSX attribute of that name hold a colour-like value.</summary>
+    private static string ContentUnder(string key) => $$"""
+        import { Box } from '@mui/material';
+
+        const entry = { {{key}}: '#fee', sx: { color: 'primary.main' } };
+
+        export function Content() {
+          return (
+            <Box sx={entry.sx} {{key}}="#add">
+              {entry.{{key}}}
+            </Box>
+          );
+        }
+        """;
+
     private const string ResolveColour = """
         /** A value as the browser paints it: MUI sets some through its own custom properties. */
         function resolve(style: CSSStyleDeclaration, value: string): string {
@@ -208,10 +421,10 @@ public sealed partial class MuiTests
     [Fact]
     public void The_library_theme_for_a_library_it_does_not_build_yet_fails_the_web_tests_saying_so()
     {
-        using var project = new GeneratedProject("saas-standard-vue", Mui[1], "frontend.ui-library=vuetify");
+        using var project = new GeneratedProject("saas-standard-vue", Mui[1], "frontend.ui-library=quasar");
 
         var theme = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", "src", "theme.ts"));
-        theme.ShouldStartWith("throw new Error('The library-theme pack builds the theme for MUI only so far; frontend.ui-library is vuetify (docs/adr/0006 of the generator).');");
+        theme.ShouldStartWith("throw new Error('The library-theme pack builds the theme for MUI and Vuetify only so far; frontend.ui-library is quasar (docs/adr/0006 of the generator).');");
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", "src", "theme.test.ts")).ShouldContain("import './theme';");
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", "src", "main.ts")).ShouldNotContain("ThemeProvider");
     }
@@ -271,12 +484,35 @@ public sealed partial class MuiTests
     {
         using var project = new GeneratedProject(React, Mui);
         RunWeb(project, "install");
-        project.Write("web/app/src/pages/Alarm.tsx", OwnColour);
+        foreach (var (name, content) in OwnColours)
+        {
+            project.Write($"web/app/src/pages/{name}.tsx", content);
+        }
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "test", "src/theme.test.tsx");
 
         exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("pages/Alarm.tsx");
+        foreach (var name in OwnColours.Keys)
+        {
+            output.ShouldContain($"pages/{name}.tsx", customMessage: output);
+        }
+    }
+
+    [Fact]
+    public void A_component_whose_text_comments_links_or_content_keys_look_like_a_colour_passes_the_theme_check()
+    {
+        using var project = new GeneratedProject(React, Mui);
+        RunWeb(project, "install");
+        project.Write("web/app/src/pages/Changelog.tsx", Unstyled);
+        project.Write("web/app/src/pages/Entries.tsx", ThemedEntries);
+        foreach (var key in ContentKeys)
+        {
+            project.Write($"web/app/src/pages/content/{key}.tsx", ContentUnder(key));
+        }
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "test", "src/theme.test.tsx");
+
+        exitCode.ShouldBe(0, output);
     }
 
     [Theory]

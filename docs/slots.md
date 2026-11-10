@@ -499,14 +499,42 @@ AppHost's model with it, declares it instead (*#260*).
 | `web.api-imports`, `web.api-headers` *(added in M1-07b; declared by every api-client pack)* | `web/app/src/api/baseApi.ts` | newline | oidc-client-ts (the bearer token) |
 | `web.openapi-paths`, `web.openapi-schemas` *(added for #184; role slots of `frontend.api-client`)* | `web/app/openapi.json` (`paths` after the host's own; `components.schemas`, sorted by name with the host's own) | `,` + newline / blank line | frontend.dashboards.user-editable (the dashboards module's endpoints; a module's /permissions/manage is not in the document, #463) |
 | `web.vite-imports` *(added in M1-07)* | `web/app/vite.config.ts` | newline | tailwind, pwa yes |
-| `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`), native-federation (`shellFederation()`, the `virtual:federation` module), pwa yes (`VitePWA({...})`, the service worker and manifest) |
-| `web.custom-element-prefixes` *(added for #388; declared by vue, not a role slot: React needs no telling)* | `web/app/vite.config.ts` (Vue's `isCustomElement`: a tag starting with one of these quoted prefixes is left to the browser; rendered only with a contribution), and with native-federation every remote's `web/modules/<module>/vite.config.ts` | `, ` | design-system web-components (`'ds-'`) |
+| `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`), native-federation (`shellFederation()`, the `virtual:federation` module), mfe-technique web-components (`shellRemotes()`, the `virtual:remotes` module), pwa yes (`VitePWA({...})`, the service worker and manifest) |
+| `web.custom-element-prefixes` *(added for #388; declared by vue, not a role slot: React needs no telling)* | `web/app/vite.config.ts` (Vue's `isCustomElement`: a tag starting with one of these quoted prefixes is left to the browser; rendered only with a contribution), and with native-federation or mfe-technique web-components every remote's `web/modules/<module>/vite.config.ts` | `, ` | design-system web-components (`'ds-'`) |
 | `web.imports` | `web/app/src/main.tsx` | newline | redux, router, oidc, design-system web-components (defines its elements) |
 | `web.providers` | `web/app/src/main.tsx` | `,` + newline | redux, oidc, router — wrappers composed in order |
 | `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn, design-system tokens-and-components (the tokens' Tailwind theme, `@source` for the ui package), design-system tokens and web-components (the tokens' Tailwind theme, or their CSS custom properties with css-modules), micro-frontends (`@source` for the remotes) |
 | `web.restricted-imports` *(added in M1-07)* | `web/app/eslint.config.js` | `,` + newline | router, shadcn, react-hook-form, zod — each bans its alternatives; micro-frontends (the shell imports no remote); agent-ui none (no AG-UI or CopilotKit client), agent-ui ag-ui (no CopilotKit) |
-| `web.remote-restricted-imports` *(added for #156; declared by module-federation and native-federation)* | `web/modules/<module>/eslint.config.js` | `,` + newline | mfe-mixed-frameworks no (bans every UI framework but the shell's) |
+| `web.remote-restricted-imports` *(added for #156; declared by module-federation, native-federation and mfe-technique web-components)* | `web/modules/<module>/eslint.config.js` | `,` + newline | mfe-mixed-frameworks no (bans every UI framework but the shell's) |
 | `web.ui-package-fields` *(added for #285; declared by tokens-and-components and web-components)* | `web/packages/ui/package.json`, after `"private"` | `,` + newline | native-federation (`"version": "0.0.0"`: native federation shares a package only when its package.json names a version) |
+
+#### The design-token contract *(#373)*
+
+With `frontend.design-system=tokens`, `web/packages/tokens` is the one place
+the project's colours live, so another pack's screens read the tokens'
+semantic names instead of colours of their own. This is a contract, not a
+slot: each pack branches on the choice itself (ADR-0006),
+`{{ if project["frontend.design-system"] == "tokens" }}`, and a project
+without the tokens keeps its output byte for byte. The tokens pack keeps
+every name below; renaming or removing one breaks the packs that read it.
+
+| Name | CSS Modules | Tailwind | Reads it |
+|---|---|---|---|
+| `primary` | `var(--ds-color-primary)` | `bg-primary`, `border-primary`, `ring-primary` | the user's bubble, the default button (hover: `primary` at 90%), a pending widget's dashed border, focus outlines and rings |
+| `primary-foreground` | `var(--ds-color-primary-foreground)` | `text-primary-foreground` | text on `primary` |
+| `accent`, `accent-foreground` | `var(--ds-color-accent)` | `bg-accent`, `text-accent-foreground` | an outline or ghost button under the pointer |
+| `surface` | `var(--ds-color-surface)` | `bg-surface` | a widget, an answer bubble, an outline button, a FormKit input |
+| `border` | `var(--ds-color-border)` | `border-border` | the borders of inputs, tool calls, the assistant, widgets and table rows |
+| `muted-foreground` | `var(--ds-color-muted-foreground)` | `text-muted-foreground` | status lines, speaker labels, notes, help text, placeholders |
+| `destructive` | `var(--ds-color-destructive)` | `text-destructive`, `border-destructive`, `ring-destructive` | alerts and invalid inputs |
+
+The tokens also define radius `sm`, `md`, `lg` and spacing `1`, `2`, `3`,
+`4`, `6`, `8` (`var(--ds-radius-md)`, `var(--ds-spacing-4)`; with Tailwind
+`rounded-md`, `p-4`). The packs read the colours today: the agent panel
+(ag-ui), both dashboards packs, tanstack-table's data table, FormKit's inputs
+and the radix-headless and Reka UI buttons. `DesignTokensScreensTests` fails
+when one of their screens in a tokens project writes a hex colour or a
+Tailwind palette class.
 
 ### CI
 

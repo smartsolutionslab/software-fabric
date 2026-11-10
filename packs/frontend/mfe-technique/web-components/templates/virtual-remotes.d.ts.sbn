@@ -1,0 +1,5 @@
+/** Written by shellRemotes() in web/app/remotes.ts. */
+declare module 'virtual:remotes' {
+  /** Each module's script module, which defines the module's page as a custom element, by the module's name. */
+  export const remotes: Record<string, string>;
+}
