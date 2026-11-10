@@ -8,9 +8,9 @@
 {{~ else if vue ~}}
 {{~ shared = "`vue` and `@" + name + "/ui`" ~}}
 {{~ else if project["frontend.design-system"] == "tokens" ~}}
-{{~ shared = "`react` and `react-dom`" ~}}
+{{~ shared = "`react`, its JSX runtimes and `react-dom`" ~}}
 {{~ else ~}}
-{{~ shared = "`react`, `react-dom` and `@" + name + "/ui`" ~}}
+{{~ shared = "`react`, its JSX runtimes, `react-dom` and `@" + name + "/ui`" ~}}
 {{~ end ~}}
 # Micro-frontend technique: native federation
 
@@ -60,6 +60,12 @@ exactly.
   source file imports, and a page's compiled template imports `vue` where its source does not, so `vue` would be
   bundled into the page as a second copy. `vue` is shared with `includeSecondaries: false`: its compiler and server
   renderer are no page's imports.
+{{~ else ~}}
+- **Every shared package is kept** (`features: { ignoreUnusedDeps: false }`): native federation drops a shared package no
+  source file imports, and a page's compiled JSX imports `react/jsx-runtime` (`react/jsx-dev-runtime` under Aspire,
+  where `NODE_ENV` is `development`) where its source imports nothing from React, so React's JSX runtime would be
+  bundled into the page. The packages are shared with `includeSecondaries: false`, and the two JSX runtimes on their
+  own: `react-dom/server` and React's compiler runtime are no page's imports.
 {{~ end ~}}
 - `src/remotes/Remote.{{ if vue }}vue{{ else }}tsx{{ end }}` loads a module's `./Page` once, shows it, and shows that the module is unavailable when its
   remote cannot be loaded. The next time that page is opened it reads the remote's `remoteEntry.json` again, and imports
