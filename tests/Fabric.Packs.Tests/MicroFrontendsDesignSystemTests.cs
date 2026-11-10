@@ -14,6 +14,7 @@ public sealed class MicroFrontendsDesignSystemTests
     [InlineData("module-federation", "web-components", "react")]
     [InlineData("native-federation", "tokens", "react")]
     [InlineData("native-federation", "web-components", "react")]
+    [InlineData("native-federation", "tokens-and-components", "react")]
     [InlineData("native-federation", "tokens", "vue")]
     [InlineData("native-federation", "web-components", "vue")]
     public void The_shell_and_a_remote_install_build_lint_pass_their_tests_and_format_check(string technique, string designSystem, string framework)
@@ -39,6 +40,14 @@ public sealed class MicroFrontendsDesignSystemTests
             // The remote shares the shell's vue, which its compiled template imports, instead of bundling a copy into the page.
             File.ReadAllText(Path.Combine(web, "modules", "billing", "dist", remoteEntry))
                 .ShouldContain("\"packageName\": \"vue\"", customMessage: "billing's remoteEntry.json shares vue");
+        }
+        else if (technique == "native-federation")
+        {
+            // The remote shares the shell's react and the JSX runtime its compiled page imports, instead of bundling a
+            // second React into the page (#515).
+            var entry = File.ReadAllText(Path.Combine(web, "modules", "billing", "dist", remoteEntry));
+            entry.ShouldContain("\"packageName\": \"react\"", customMessage: $"billing's remoteEntry.json shares react:\n{entry}");
+            entry.ShouldContain("\"packageName\": \"react/jsx-runtime\"", customMessage: $"billing's remoteEntry.json shares react/jsx-runtime:\n{entry}");
         }
     }
 
