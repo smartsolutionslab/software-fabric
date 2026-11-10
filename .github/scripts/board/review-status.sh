@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Sets the cross-model review's verdict on a commit: the commit status cross-model-review/verdict (board protocol,
+# docs/adr). The status, not the review's jobs, is the verdict: a review that Copilot's usage limit postponed leaves it
+# pending, which is never a pass, while no job of its run failed.
+# Usage: review-status.sh <commit> <pending|success|failure> <description> <the review run's URL>
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+gh api -X POST "repos/$repo/statuses/$1" -f state="$2" -f context=cross-model-review/verdict -f description="$3" \
+  -f target_url="$4" > /dev/null
+

@@ -58,6 +58,25 @@ case "${positional[0]} ${positional[1]:-}" in
         echo '{"message":"Write access to this GitHub API path is not permitted through this proxy."}' >&2
         exit 1
         ;;
+      # The combined status: the newest status of each context, as GitHub answers it.
+      "GET commits/"*"/status")
+        sha="${path#commits/}"; sha="${sha%/status}"
+        jq --arg sha "$sha" '{statuses: (map(select(.sha == $sha)) | reverse | unique_by(.context))}' "$state/statuses.json" 2>/dev/null || echo '{"statuses":[]}'
+        ;;
+      "POST statuses/"*)
+        file="$state/statuses.json"
+        [ -e "$file" ] || echo '[]' > "$file"
+        jq --arg sha "${path#statuses/}" --arg state "${flag[f:state]}" --arg context "${flag[f:context]}" \
+          --arg description "${flag[f:description]:-}" --arg url "${flag[f:target_url]:-}" \
+          '. + [{sha: $sha, state: $state, context: $context, description: $description, target_url: $url}]' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+        echo '{}'
+        ;;
+      "GET actions/runs/"*) jq --argjson id "${path#actions/runs/}" '.[] | select(.id == $id)' "$state/runs.json" ;;
+      "POST actions/runs/"*"/rerun") run="${path#actions/runs/}"; echo "${run%/rerun}" >> "$state/reruns"; echo '{}' ;;
+      # The reviews posted here, by the workflow's bot unless a test wrote another author.
+      "GET pulls/"*"/reviews"*)
+        jq 'map(.user //= {login: "github-actions[bot]"})' "$state/reviews.json" 2>/dev/null || echo '[]'
+        ;;
       "GET commits/"*) jq -n --arg date "$(cat "$state/commits/${path#commits/}" 2>/dev/null || echo 2000-01-01T00:00:00Z)" '{commit: {committer: {date: $date}}}' ;;
       "GET issues/"*"/comments") n="${path#issues/}"; cat "$state/comments/${n%/comments}.json" 2>/dev/null || echo '[]' ;;
       "GET issues?"*)
@@ -113,7 +132,7 @@ case "${positional[0]} ${positional[1]:-}" in
       "GET pulls?"*)
         if [ -e "$state/fail-pulls" ]; then echo '{"message":"Service Unavailable"}' >&2; exit 1; fi
         head="$(tr '&' '\n' <<< "${path#pulls?}" | sed -n 's/^head=//p' | sed 's/%3A/:/g; s/%2F/\//g; s/^[^:]*://')"
-        jq --arg head "$head" 'map(select(.head.ref == $head))' "$state/prs.json" 2>/dev/null || echo '[]'
+        jq --arg head "$head" 'map(select($head == "" or .head.ref == $head))' "$state/prs.json" 2>/dev/null || echo '[]'
         ;;
       *) echo "fake gh: no answer for api $method $path" >&2; exit 64 ;;
     esac

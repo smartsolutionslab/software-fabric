@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Posts a reviewer's findings on the pull request and fails when one of them blocks (board protocol, docs/adr).
-# Usage: report-review.sh <pull request> <findings file> <reviewer>
+# Usage: report-review.sh <pull request> <findings file> <reviewer> [<diff fingerprint> <reviewing family> <head>]
 # The findings file is the reviewer's final answer. Its findings are the last top-level JSON object in it shaped by
 # .github/review-findings.schema.json: the reviewer's CLI cannot hold a model to the schema, and models write prose,
 # or a code fence, around their answer. An answer without such an object fails the review.
@@ -9,6 +9,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 pr="$1"
 findings_file="$2"
 reviewer="$3"
+fingerprint="${4:-}"
+family="${5:-}"
+head="${6:-}"
 
 # Every top-level object in the answer: from each "{" that a key or "}" follows, the shortest span to a "}" that parses
 # as a JSON object, unless it starts inside an object already found. Then the schema, checked here too: a severity the
@@ -45,6 +48,19 @@ if [ $((blocking + optional)) -eq 0 ]; then
 No findings."
 fi
 
+# With a fingerprint, the review records its verdict on that diff, hidden in its body: a later head whose diff is the
+# same keeps the verdict instead of being reviewed again (previous-verdict.sh).
+record=""
+if [ -n "$fingerprint" ]; then
+  verdict=pass
+  if [ "$blocking" -gt 0 ]; then
+    verdict=fail
+  fi
+  record="
+
+<!-- cross-model-review diff=$fingerprint reviewer=$family head=$head verdict=$verdict -->"
+fi
+
 # Findings with a line go on that line; the rest, or all of them when GitHub refuses a line, go in the body.
 listed() {
   jq -r "$1"' | "- **\(.severity)** `\(.file)\(if .line then ":\(.line)" else "" end)`: \(.message)"' <<< "$findings"
@@ -61,9 +77,9 @@ body() {
   local list
   list="$(listed "$1")" || return 1
   if [ -n "$list" ]; then
-    printf '%s\n\n%s' "$summary" "$list"
+    printf '%s\n\n%s%s' "$summary" "$list" "$record"
   else
-    printf '%s' "$summary"
+    printf '%s%s' "$summary" "$record"
   fi
 }
 
