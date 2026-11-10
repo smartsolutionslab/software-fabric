@@ -1,7 +1,0 @@
-import { expect, test } from 'vitest';
-// Throws until the generator builds the theme for frontend.ui-library {{ project["frontend.ui-library"] }}, failing this file with its message.
-import './theme';
-
-test('the library theme is built for this UI library', () => {
-  expect(true).toBe(true);
-});

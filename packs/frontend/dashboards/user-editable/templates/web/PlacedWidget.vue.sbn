@@ -1,21 +1,39 @@
 {{~ ui = project["frontend.ui-library"] ~}}
-{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ vuetify = ui == "vuetify" ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" && !vuetify ~}}
 {{~ if ui == "reka-ui"
   button = "BaseButton"
   button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
   secondary = "outline"
+else if vuetify
+  button = "VBtn"
+  button_import = "import { VBtn } from 'vuetify/components';"
+  secondary = "tonal"
 else
   button = "Button"
   button_import = "import { Button } from '@/components/ui/button';"
   secondary = "secondary"
 end ~}}
-{{~ func class_of(tailwind, module)
+{{~ if vuetify
+  ghost = 'variant="text"'
+  small = 'size="small"'
+else
+  ghost = 'variant="ghost"'
+  small = 'size="sm"'
+end ~}}
+{{~ func class_of(tailwind, module, material)
+  if vuetify
+    ret 'class="' + material + '"'
+  end
   if css_modules
     ret ':class="styles.' + module + '"'
   end
   ret 'class="' + tailwind + '"'
 end ~}}
-{{~ func themed(shadcn, palette, module)
+{{~ func themed(shadcn, palette, module, material)
+  if vuetify
+    ret 'class="' + material + '"'
+  end
   if css_modules
     ret ':class="styles.' + module + '"'
   end
@@ -53,14 +71,14 @@ const title = computed(() => declaration.value?.title ?? placement.source);
 </script>
 
 <template>
-  <section :aria-label="title" }%}{{ themed "flex h-full flex-col overflow-hidden rounded border bg-card p-2" "flex h-full flex-col overflow-hidden rounded border bg-white p-2" "widget" }}{%{>
-    <header }%}{{ class_of "flex items-center justify-between gap-2" "header" }}{%{>
-      <h2 }%}{{ class_of "text-sm font-medium" "title" }}{%{>{{ title }}</h2>
-      <}%}{{ button }}{%{ type="button" variant="ghost" size="sm" :aria-label="`Remove ${title}`" @click="emit('remove')">
+  <section :aria-label="title" }%}{{ themed "flex h-full flex-col overflow-hidden rounded border bg-card p-2" "flex h-full flex-col overflow-hidden rounded border bg-white p-2" "widget" "d-flex h-100 flex-column overflow-hidden rounded border bg-surface pa-2" }}{%{>
+    <header }%}{{ class_of "flex items-center justify-between gap-2" "header" "d-flex align-center justify-space-between ga-2" }}{%{>
+      <h2 }%}{{ class_of "text-sm font-medium" "title" "text-title-small" }}{%{>{{ title }}</h2>
+      <}%}{{ button }}{%{ type="button" }%}{{ ghost }} {{ small }}{%{ :aria-label="`Remove ${title}`" @click="emit('remove')">
         Remove
       </}%}{{ button }}{%{>
     </header>
-    <div }%}{{ class_of "min-h-0 flex-1 overflow-auto" "body" }}{%{>
+    <div }%}{{ class_of "min-h-0 flex-1 overflow-auto" "body" "flex-1-1 overflow-auto" }}{%{>
       <WidgetView
         :source="placement.source"
         :visual="placement.visual"

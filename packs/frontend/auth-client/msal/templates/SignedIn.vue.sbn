@@ -1,4 +1,8 @@
-{{~ func class_of(tailwind, module)
+{{~ vuetify = project["frontend.ui-library"] == "vuetify" ~}}
+{{~ func class_of(tailwind, module, material)
+  if vuetify
+    ret 'class="' + material + '"'
+  end
   if project["frontend.styling"] == "css-modules"
     ret ':class="styles.' + module + '"'
   end
@@ -6,8 +10,11 @@
 end ~}}
 <script setup lang="ts">
 import { watchEffect } from 'vue';
+{{~ if vuetify ~}}
+import { VBtn } from 'vuetify/components';
+{{~ end ~}}
 import { useAuth } from '@/auth/useAuth';
-{{~ if project["frontend.styling"] == "css-modules" ~}}
+{{~ if project["frontend.styling"] == "css-modules" && !vuetify ~}}
 import styles from './SignedIn.module.css';
 {{~ end ~}}
 
@@ -26,9 +33,13 @@ watchEffect(() => {
   <p v-else-if="activeNavigator === 'logoutRedirect'">Signing out…</p>
   <p v-else-if="!isAuthenticated">Signing in…</p>
   <template v-else>
-    <div {{ class_of "flex items-center justify-end gap-3 p-2 text-sm" "signedIn" }}>
+    <div {{ class_of "flex items-center justify-end gap-3 p-2 text-sm" "signedIn" "d-flex align-center justify-end ga-3 pa-2 text-body-medium" }}>
       <span>Signed in as {{ "{{" }} account?.username {{ "}}" }}</span>
+{{~ if vuetify ~}}
+      <VBtn type="button" variant="text" size="small" @click="logoutRedirect()">Sign out</VBtn>
+{{~ else ~}}
       <button type="button" @click="logoutRedirect()">Sign out</button>
+{{~ end ~}}
     </div>
     <slot />
   </template>

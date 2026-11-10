@@ -1,0 +1,48 @@
+{{~ if project["frontend.ui-library"] == "vuetify" ~}}
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { render, screen } from '@testing-library/vue';
+import { expect, test } from 'vitest';
+import { h } from 'vue';
+import { VBtn } from 'vuetify/components';
+import { theme } from './theme';
+import { vuetify } from './vuetify';
+
+// Vitest runs in web/app; the components are under src.
+const source = join(process.cwd(), 'src');
+
+/** A colour written out: #hex, or a CSS colour function. */
+const colour = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/i;
+
+/** A colour as Vuetify writes it into its theme's CSS variables: '37,99,235' for #2563eb. */
+function channels(hex: string): string {
+  const value = Number.parseInt(hex.slice(1), 16);
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255].join(',');
+}
+
+test("Vuetify's components take their colours from the theme", () => {
+  render({ render: () => h(VBtn, { color: 'primary' }, () => 'Save') });
+
+  expect(screen.getByRole('button', { name: 'Save' })).toHaveClass('bg-primary');
+  const primary = theme.themes.light.colors.primary;
+  expect(vuetify.theme.current.value.colors.primary).toBe(primary);
+  const stylesheet = [...document.head.querySelectorAll('style')].map((style) => style.textContent).join('\n');
+  expect(stylesheet).toContain(`--v-theme-primary: ${channels(primary)};`);
+});
+
+test('no component writes a colour of its own', () => {
+  // Colours are the theme's, in src/theme.ts: a component names them through it (color="error", class="bg-primary").
+  const components = readdirSync(source, { recursive: true, encoding: 'utf8' }).filter((path) => path.endsWith('.vue'));
+  const coloured = components.filter((path) => colour.test(readFileSync(join(source, path), 'utf8')));
+
+  expect(coloured, 'components that write a colour instead of taking it from src/theme.ts').toEqual([]);
+});
+{{~ else ~}}
+import { expect, test } from 'vitest';
+// Throws until the generator builds the theme for frontend.ui-library {{ project["frontend.ui-library"] }}, failing this file with its message.
+import './theme';
+
+test('the library theme is built for this UI library', () => {
+  expect(true).toBe(true);
+});
+{{~ end ~}}

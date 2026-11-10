@@ -12,7 +12,7 @@ files:
   - { template: templates/useAuth.ts.sbn, target: web/app/src/auth/useAuth.ts, when: 'project["frontend.framework"] == "vue"' }
   - { template: templates/SignedIn.vue.sbn, target: web/app/src/auth/SignedIn.vue, when: 'project["frontend.framework"] == "vue"' }
   # CSS Modules (ADR-0006): SignedIn's bar takes its class from a module beside it, in either framework.
-  - { template: templates/SignedIn.module.css.sbn, target: web/app/src/auth/SignedIn.module.css, when: 'project["frontend.styling"] == "css-modules" && project["frontend.ui-library"] != "mui"' }
+  - { template: templates/SignedIn.module.css.sbn, target: web/app/src/auth/SignedIn.module.css, when: 'project["frontend.styling"] == "css-modules" && project["frontend.ui-library"] != "mui" && project["frontend.ui-library"] != "vuetify"' }
   - { template: templates/SignedIn.test.ts.sbn, target: web/app/src/auth/SignedIn.test.ts, when: 'project["frontend.framework"] == "vue"' }
   - { template: templates/auth-provider.ts.sbn, target: web/app/src/providers/auth.ts, when: 'project["frontend.framework"] == "vue"' }
   # Vue (#517): RequirePermission.vue over the composables in useHasRole.ts and useHasClaim.ts, which read useAuth(); no catalog rule (owner decision on #517).

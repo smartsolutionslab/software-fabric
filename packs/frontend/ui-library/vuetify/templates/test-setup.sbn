@@ -1,0 +1,5 @@
+import { config as mountConfig } from '@vue/test-utils';
+import { vuetify } from '@/vuetify';
+
+// Every component renders under the app's Vuetify instance, as it does in src/main.ts.
+mountConfig.global.plugins.push(vuetify);

@@ -1,15 +1,30 @@
 {{~ ui = project["frontend.ui-library"] ~}}
-{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ vuetify = ui == "vuetify" ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" && !vuetify ~}}
 {{~ if ui == "reka-ui"
   button = "BaseButton"
   button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
   secondary = "outline"
+else if vuetify
+  button = "VBtn"
+  button_import = "import { VBtn } from 'vuetify/components';"
+  secondary = "tonal"
 else
   button = "Button"
   button_import = "import { Button } from '@/components/ui/button';"
   secondary = "secondary"
 end ~}}
-{{~ func class_of(tailwind, module)
+{{~ if vuetify
+  primary = ' color="primary"'
+  outline = 'variant="outlined"'
+else
+  primary = ""
+  outline = 'variant="outline"'
+end ~}}
+{{~ func class_of(tailwind, module, material)
+  if vuetify
+    ret 'class="' + material + '"'
+  end
   if css_modules
     ret ':class="styles.' + module + '"'
   end
@@ -94,9 +109,9 @@ function start() {
 </script>
 
 <template>
-  <main }%}{{ class_of "flex flex-col gap-4 p-4" "editor" }}{%{>
-    <h1 }%}{{ class_of "text-xl font-semibold" "title" }}{%{>Dashboards</h1>
-    <nav aria-label="Your dashboards" }%}{{ class_of "flex flex-wrap items-center gap-2" "dashboards" }}{%{>
+  <main }%}{{ class_of "flex flex-col gap-4 p-4" "editor" "d-flex flex-column ga-4 pa-4" }}{%{>
+    <h1 }%}{{ class_of "text-xl font-semibold" "title" "text-headline-small" }}{%{>Dashboards</h1>
+    <nav aria-label="Your dashboards" }%}{{ class_of "flex flex-wrap items-center gap-2" "dashboards" "d-flex flex-wrap align-center ga-2" }}{%{>
       <Failure
         v-if="listFailed"
         message="Your dashboards could not be loaded."
@@ -107,14 +122,14 @@ function start() {
         <}%}{{ button }}{%{
           v-for="dashboard in dashboards?.items ?? []"
           :key="dashboard.id"
-          variant="outline"
+          }%}{{ outline }}{%{
           :aria-pressed="String(opened?.id === dashboard.id)"
           @click="open(dashboard.id)"
         >
           {{ dashboard.name }}
         </}%}{{ button }}{%{>
       </template>
-      <}%}{{ button }}{%{ @click="start()">New dashboard</}%}{{ button }}{%{>
+      <}%}{{ button }}{{ primary }}{%{ @click="start()">New dashboard</}%}{{ button }}{%{>
       <Pager
         label="your dashboards"
         :page="page"
