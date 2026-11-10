@@ -23,7 +23,9 @@ public sealed class GeneratorSdkTests
         var globalJson = JsonNode.Parse(File.ReadAllText(Path.Combine(Repository.Root, "global.json")))!;
 
         ((string?)globalJson["sdk"]?["version"]).ShouldBe("11.0.100");
-        typeof(GeneratorSdkTests).Assembly.GetCustomAttribute<TargetFrameworkAttribute>()?.FrameworkName.ShouldBe(".NETCoreApp,Version=v11.0");
+        var targetFramework = typeof(GeneratorSdkTests).Assembly.GetCustomAttribute<TargetFrameworkAttribute>();
+        targetFramework.ShouldNotBeNull();
+        targetFramework.FrameworkName.ShouldBe(".NETCoreApp,Version=v11.0");
         Environment.Version.Major.ShouldBe(11);
     }
 
