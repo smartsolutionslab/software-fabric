@@ -94,12 +94,17 @@ function expressionWritesColour(expression: string, attribute: string | undefine
 }
 
 type TemplateNode = NonNullable<NonNullable<SFCDescriptor['template']>['ast']>['children'][number];
-type Attribute = Extract<TemplateNode, { type: 1 }>['props'][number];
+type Attribute = Extract<TemplateNode, { type: typeof elementNode }>['props'][number];
 
 /** The kinds of template node the check reads: NodeTypes in @vue/compiler-core, which vue/compiler-sfc does not export. */
 const elementNode = 1;
 const interpolationNode = 5;
 const attributeNode = 6;
+
+/** An expression of the template as Vue reads it, its HTML entities decoded (:color="&quot;#fff&quot;" is '#fff'). */
+function decoded(expression: Extract<TemplateNode, { type: typeof interpolationNode }>['content']): string {
+  return 'content' in expression ? expression.content : expression.loc.source;
+}
 
 /**
  * Whether an attribute writes a colour. A written value is content under a content attribute (href="#add"), a style
@@ -112,11 +117,11 @@ function attributeWritesColour(attribute: Attribute): boolean {
   }
   const { name, arg, exp } = attribute;
   const isStatic = arg !== undefined && 'isStatic' in arg && arg.isStatic;
-  if (arg !== undefined && !isStatic && expressionWritesColour(arg.loc.source, undefined)) {
+  if (arg !== undefined && !isStatic && expressionWritesColour(decoded(arg), undefined)) {
     return true;
   }
-  const bound = name === 'bind' && arg !== undefined && isStatic ? arg.loc.source : undefined;
-  return exp !== undefined && expressionWritesColour(exp.loc.source, bound);
+  const bound = name === 'bind' && arg !== undefined && isStatic ? decoded(arg) : undefined;
+  return exp !== undefined && expressionWritesColour(decoded(exp), bound);
 }
 
 /** Whether a template writes a colour: in an attribute or an interpolation (a mustache). Text and comments never count. */
@@ -125,7 +130,7 @@ function templateWritesColour(nodes: TemplateNode[]): boolean {
     if (node.type === elementNode) {
       return node.props.some(attributeWritesColour) || templateWritesColour(node.children);
     }
-    return node.type === interpolationNode && expressionWritesColour(node.content.loc.source, undefined);
+    return node.type === interpolationNode && expressionWritesColour(decoded(node.content), undefined);
   });
 }
 
