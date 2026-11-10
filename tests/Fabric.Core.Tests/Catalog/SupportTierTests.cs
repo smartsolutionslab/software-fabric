@@ -82,8 +82,6 @@ public class SupportTierTests
     [InlineData("frontend.data-grid", "ag-grid")]
     [InlineData("frontend.charts", "recharts")]
     [InlineData("frontend.charts", "chartjs")]
-    [InlineData("frontend.dashboards", "generative")]
-    [InlineData("frontend.agent-ui", "ag-ui")]
     [InlineData("frontend.auth-client", "msal")]
     [InlineData("frontend.pwa", "yes")]
     [InlineData("frontend.test.extras", "storybook-tests")]
@@ -108,6 +106,8 @@ public class SupportTierTests
     [InlineData("frontend.realtime", "sse")]
     [InlineData("frontend.routing", "tanstack-router")]
     [InlineData("frontend.styling", "library-theme")]
+    [InlineData("frontend.dashboards", "generative")]
+    [InlineData("frontend.agent-ui", "ag-ui")]
     public void An_option_whose_pack_changed_after_nightly_run_42800894655_stays_experimental(string dimension, string option)
     {
         var catalog = CatalogReader.ReadFile(RepositoryRoot.File("catalog", "catalog.yaml"));
