@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { Button } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
@@ -34,28 +34,24 @@ function called(node: ts.Expression): string {
 }
 
 /**
- * Whether a component writes a colour in a styling value: a styling prop, or a styling call, with what they name in the
- * same file (sx={alarm} reads const alarm). Text, comments, links and other props are content, not styling, even when
- * they look like a colour (Issue #393, href="#add").
+ * Whether a component writes a colour in a styling value: a styling prop (given directly or in a spread), or a styling
+ * call, with what they name in the same file, resolved by the compiler in its scope (sx={alarm} reads that alarm, and
+ * sx={entry.sx} only entry's sx). Text, comments, links and other props are content, not styling, even when they look
+ * like a colour (Issue #393, href="#add").
  */
-function writesColour(path: string): boolean {
-  const file = ts.createSourceFile(
-    path,
-    readFileSync(join(source, path), 'utf8'),
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
-  );
-  const declarations = new Map<string, ts.Node>();
-  const declare = (node: ts.Node): void => {
-    if ((ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name && ts.isIdentifier(node.name)) {
-      declarations.set(node.name.text, node);
-    }
-    ts.forEachChild(node, declare);
-  };
-  declare(file);
-
+function writesColour(file: ts.SourceFile, checker: ts.TypeChecker): boolean {
   const read = new Set<ts.Node>();
+  /** What a name refers to, when it is declared in this file: the value it was given. */
+  const declared = (symbol: ts.Symbol | undefined): ts.Node[] =>
+    (symbol?.declarations ?? [])
+      .filter((declaration) => declaration.getSourceFile() === file)
+      .map((declaration): ts.Node | undefined =>
+        ts.isVariableDeclaration(declaration) || ts.isPropertyAssignment(declaration)
+          ? declaration.initializer
+          : declaration,
+      )
+      .filter((value): value is ts.Node => value !== undefined);
+  const anyColoured = (nodes: ts.Node[]): boolean => nodes.some((node) => coloured(node));
   const coloured = (node: ts.Node): boolean => {
     if (read.has(node)) {
       return false;
@@ -65,22 +61,37 @@ function writesColour(path: string): boolean {
       return colour.test(node.text);
     }
     if (ts.isIdentifier(node)) {
-      const named =
-        (ts.isPropertyAccessExpression(node.parent) || ts.isPropertyAssignment(node.parent)) &&
-        node.parent.name === node;
-      const declaration = named ? undefined : declarations.get(node.text);
-      return declaration !== undefined && coloured(declaration);
+      return anyColoured(declared(checker.getSymbolAtLocation(node)));
     }
-    return ts.forEachChild(node, coloured) ?? false;
+    if (ts.isShorthandPropertyAssignment(node)) {
+      return anyColoured(declared(checker.getShorthandAssignmentValueSymbol(node)));
+    }
+    if (ts.isPropertyAssignment(node)) {
+      return coloured(node.initializer) || (ts.isComputedPropertyName(node.name) && coloured(node.name));
+    }
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      const member = ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression;
+      const symbol = checker.getSymbolAtLocation(member);
+      // A member the compiler cannot find is read whole; one declared elsewhere (theme.palette) is not this file's.
+      return symbol === undefined ? ts.forEachChild(node, coloured) === true : anyColoured(declared(symbol));
+    }
+    if (ts.isJsxSpreadAttribute(node)) {
+      const props = checker.getTypeAtLocation(node.expression).getProperties();
+      return anyColoured(props.filter((prop) => stylingProp.test(prop.name)).flatMap(declared));
+    }
+    return ts.forEachChild(node, coloured) === true;
   };
   const styling = (node: ts.Node): boolean => {
     if (ts.isJsxAttribute(node) && stylingProp.test(node.name.getText(file))) {
       return node.initializer !== undefined && coloured(node.initializer);
     }
+    if (ts.isJsxSpreadAttribute(node)) {
+      return coloured(node);
+    }
     if ((ts.isCallExpression(node) || ts.isTaggedTemplateExpression(node)) && stylingCalls.has(called(node))) {
       return coloured(node);
     }
-    return ts.forEachChild(node, styling) ?? false;
+    return ts.forEachChild(node, styling) === true;
   };
   return styling(file);
 }
@@ -107,7 +118,16 @@ test('no component writes a colour of its own', () => {
   const components = readdirSync(source, { recursive: true, encoding: 'utf8' }).filter(
     (path) => path.endsWith('.tsx') && !path.endsWith('.test.tsx'),
   );
-  const coloured = components.filter(writesColour);
+  // One program for every component, without the libraries: names and members are resolved within the source alone.
+  const program = ts.createProgram(
+    components.map((path) => join(source, path)),
+    { noLib: true, noResolve: true, jsx: ts.JsxEmit.Preserve },
+  );
+  const checker = program.getTypeChecker();
+  const coloured = components.filter((path) => {
+    const file = program.getSourceFile(join(source, path));
+    return file !== undefined && writesColour(file, checker);
+  });
 
   expect(coloured, 'components that write a colour instead of taking it from src/theme.ts').toEqual([]);
 });
