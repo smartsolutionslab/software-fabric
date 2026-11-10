@@ -21,11 +21,18 @@ const entry = (module: string) =>
   `${process.env[`REMOTE_${module.toUpperCase().replaceAll('-', '_')}_URL`] ?? `/modules/${module}`}/remoteEntry.json`;
 
 /** What the shell shares with every remote as one instance; each remote's federation.config.js shares the same. */
-const shared = [{{ if project["frontend.framework"] == "vue" }}'vue'{{ else }}'react', 'react-dom'{{ end }}{{ if project["frontend.design-system"] != "tokens" }}, '@{{ name }}/ui'{{ end }}];
+const shared = [{{ if project["frontend.framework"] == "vue" }}'vue'{{ else }}'react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom'{{ end }}{{ if project["frontend.design-system"] != "tokens" }}, '@{{ name }}/ui'{{ end }}];
+
+/** The package a shared entry point belongs to: react for react/jsx-runtime, @scope/name for a scoped package. */
+const packageOf = (name: string) =>
+  name
+    .split('/')
+    .slice(0, name.startsWith('@') ? 2 : 1)
+    .join('/');
 
 /** A shared package's version as installed for the shell; native federation compares it with each remote's. */
 const versionOf = (name: string): string => {
-  const manifest = new URL(`node_modules/${name}/package.json`, import.meta.url);
+  const manifest = new URL(`node_modules/${packageOf(name)}/package.json`, import.meta.url);
   return (JSON.parse(readFileSync(manifest, 'utf8')) as { version: string }).version;
 };
 
