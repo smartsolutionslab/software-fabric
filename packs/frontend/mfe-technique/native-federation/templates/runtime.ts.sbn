@@ -11,6 +11,8 @@ import type { Component as ComponentType } from 'vue';
 import * as react from 'react';
 import type { ComponentType } from 'react';
 import * as reactDom from 'react-dom';
+import * as jsxDevRuntime from 'react/jsx-dev-runtime';
+import * as jsxRuntime from 'react/jsx-runtime';
 import { remotes, versions } from 'virtual:federation';
 {{~ end ~}}
 
@@ -22,7 +24,19 @@ interface RemoteModule {
 type ImportMap = Parameters<ImportMapConfig['setImportMapFn']>[0];
 
 /** The shell's own instance of each package it shares (federation.ts lists the same); a remote never loads its own. */
-const instances: Record<string, object> = { {{ if project["frontend.framework"] == "vue" }}vue{{ else }}react, 'react-dom': reactDom{{ end }}{{ if project["frontend.design-system"] != "tokens" }}, '@{{ name }}/ui': ui{{ end }} };
+{{~ if project["frontend.framework"] == "vue" ~}}
+const instances: Record<string, object> = { vue{{ if project["frontend.design-system"] != "tokens" }}, '@{{ name }}/ui': ui{{ end }} };
+{{~ else ~}}
+const instances: Record<string, object> = {
+  react,
+  'react/jsx-runtime': jsxRuntime,
+  'react/jsx-dev-runtime': jsxDevRuntime,
+  'react-dom': reactDom,
+{{~ if project["frontend.design-system"] != "tokens" ~}}
+  '@{{ name }}/ui': ui,
+{{~ end ~}}
+};
+{{~ end ~}}
 
 const key = 'native-federation.shell';
 (globalThis as Record<symbol, unknown>)[Symbol.for(key)] = instances;

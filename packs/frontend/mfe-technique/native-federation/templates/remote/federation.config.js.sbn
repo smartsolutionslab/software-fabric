@@ -11,8 +11,15 @@ export default withNativeFederation({
 {{~ if project["frontend.framework"] == "vue" ~}}
     vue: { singleton: true, strictVersion: true, requiredVersion: 'auto', includeSecondaries: false },
 {{~ else ~}}
-    react: { singleton: true, strictVersion: true, requiredVersion: 'auto' },
-    'react-dom': { singleton: true, strictVersion: true, requiredVersion: 'auto' },
+    react: { singleton: true, strictVersion: true, requiredVersion: 'auto', includeSecondaries: false },
+    'react/jsx-runtime': { singleton: true, strictVersion: true, requiredVersion: 'auto', includeSecondaries: false },
+    'react/jsx-dev-runtime': {
+      singleton: true,
+      strictVersion: true,
+      requiredVersion: 'auto',
+      includeSecondaries: false,
+    },
+    'react-dom': { singleton: true, strictVersion: true, requiredVersion: 'auto', includeSecondaries: false },
 {{~ end ~}}
 {{~ if project["frontend.design-system"] != "tokens" ~}}
     '@{{ name }}/ui': { singleton: true, strictVersion: true, requiredVersion: 'auto' },
@@ -22,6 +29,13 @@ export default withNativeFederation({
   // A page's compiled template imports vue, which native federation's scan of the sources does not see: it would drop
   // vue as unused and bundle a copy of it into the page. So nothing listed above is dropped, and vue is shared without
   // its secondary entry points (compiler, server renderer), which no page imports.
+  features: { ignoreUnusedDeps: false },
+{{~ else ~}}
+  // A page's compiled JSX imports react/jsx-runtime (react/jsx-dev-runtime under Aspire, where NODE_ENV is
+  // development), which native federation's scan of the sources does not see: it would drop react as unused and bundle
+  // React's JSX runtime into the page. So nothing listed above is dropped, and the packages are shared without their
+  // other entry points (react-dom/server, the compiler runtime), which no page imports; the JSX runtimes are listed on
+  // their own.
   features: { ignoreUnusedDeps: false },
 {{~ end ~}}
 });

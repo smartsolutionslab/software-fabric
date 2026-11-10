@@ -309,10 +309,14 @@ public sealed class MicroFrontendsTests
         project.AddModule("billing");
 
         var remote = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "modules", "billing", "federation.config.js"));
-        foreach (var package in new[] { "react", "'react-dom'", "'@shop/ui'" })
+        // React's packages without their other entry points, and its JSX runtime on its own, as a page's compiled JSX imports it (#515).
+        foreach (var package in new[] { "react", "'react/jsx-runtime'", "'react-dom'" })
         {
-            remote.ShouldContain($"{package}: {{ singleton: true, strictVersion: true, requiredVersion: 'auto' }}");
+            remote.ShouldContain($"{package}: {{ singleton: true, strictVersion: true, requiredVersion: 'auto', includeSecondaries: false }}");
         }
+
+        remote.ShouldContain("'@shop/ui': { singleton: true, strictVersion: true, requiredVersion: 'auto' }");
+        remote.ShouldContain("features: { ignoreUnusedDeps: false }");
 
         var shell = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", "package.json"));
         shell.ShouldContain("\"@softarc/native-federation-orchestrator\": \"4.9.0\"");
