@@ -14,4 +14,4 @@ In place of the auth client's sign-in test, the web app's end-to-end tests start
 
 - Anyone who can reach the host can call every endpoint. Whatever stands in front of it (a gateway, a private network) is the only protection, and it is outside this project.
 - Authentication is not added by hand, module by module. A project that needs it chooses an identity provider for `backend.auth` (and, with it, `backend.authorization`), which brings token validation, the sign-in flow and its own rules in one change.
-- Options that need a signed-in user cannot be combined with it: column tenancy, which reads the tenant from the user's token, fails the build saying so.
+- Options that need a signed-in user cannot be combined with it: the catalog refuses every `backend.tenancy` other than `none`, because a tenant is read from the user's token.
