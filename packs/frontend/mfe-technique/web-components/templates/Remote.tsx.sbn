@@ -1,0 +1,34 @@
+import { createElement, useEffect, useState } from 'react';
+import { loadElement } from './elements';
+
+type Loaded = { module: string; tag: string } | { module: string; failed: true };
+
+/**
+ * A module's page: the custom element its own remote, web/modules/<module>, defines, loaded at run time (docs/adr).
+ * The remote renders into the element with its own copy of its framework, so a page that fails to render leaves the
+ * shell running.
+ */
+export function Remote({ module }: { module: string }) {
+  const [loaded, setLoaded] = useState<Loaded>();
+
+  useEffect(() => {
+    let mounted = true;
+    loadElement(module).then(
+      (tag) => mounted && setLoaded({ module, tag }),
+      () => mounted && setLoaded({ module, failed: true }),
+    );
+    return () => {
+      mounted = false;
+    };
+  }, [module]);
+
+  if (loaded?.module !== module) {
+    return <p>Loading {module}…</p>;
+  }
+
+  if ('failed' in loaded) {
+    return <p role="alert">{module} could not be loaded.</p>;
+  }
+
+  return createElement(loaded.tag);
+}

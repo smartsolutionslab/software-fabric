@@ -1,0 +1,60 @@
+// @vitest-environment node
+import { EventEmitter } from 'node:events';
+import type { build } from 'vite';
+import { expect, test, vi } from 'vitest';
+import { serveBuild } from '../serve';
+
+/** A watching build as Vite's build() answers it: events, and a close. */
+function watching() {
+  const events = new EventEmitter();
+  return {
+    on: (event: 'event', listener: (event: { code: string }) => void) => events.on(event, listener),
+    close: vi.fn(() => Promise.resolve()),
+    listening: () => events.listenerCount('event') > 0,
+    emit: (code: string) => events.emit('event', { code }),
+  };
+}
+
+/** Starts the plugin's preview hook as Vite would, with a server whose HTTP server can close. */
+function start(watcher: ReturnType<typeof watching>) {
+  const watch = vi.fn(async () => watcher);
+  const plugin = serveBuild(watch as unknown as typeof build);
+  const hook = plugin.configurePreviewServer;
+  const handler = (typeof hook === 'function' ? hook : hook?.handler) as (server: unknown) => Promise<void>;
+  const httpServer = new EventEmitter();
+  const started = handler({ config: { configFile: '/remote/vite.config.ts', root: '/remote' }, httpServer });
+  return { watch, httpServer, started };
+}
+
+test('vite preview serves once the first build of its watcher is written', async () => {
+  const watcher = watching();
+  const { watch, started } = start(watcher);
+  let served = false;
+  void started.then(() => {
+    served = true;
+  });
+  await vi.waitFor(() => expect(watcher.listening()).toBe(true));
+  expect(served).toBe(false);
+
+  watcher.emit('END');
+
+  await started;
+  expect(watch).toHaveBeenCalledWith({
+    configFile: '/remote/vite.config.ts',
+    root: '/remote',
+    build: { watch: {}, minify: false },
+  });
+});
+
+test('the watcher closes when the preview server closes', async () => {
+  const watcher = watching();
+  const { httpServer, started } = start(watcher);
+  await vi.waitFor(() => expect(watcher.listening()).toBe(true));
+  watcher.emit('END');
+  await started;
+  expect(watcher.close).not.toHaveBeenCalled();
+
+  httpServer.emit('close');
+
+  expect(watcher.close).toHaveBeenCalledOnce();
+});

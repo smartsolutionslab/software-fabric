@@ -17,6 +17,10 @@ public sealed class MicroFrontendsDesignSystemTests
     [InlineData("native-federation", "tokens-and-components", "react")]
     [InlineData("native-federation", "tokens", "vue")]
     [InlineData("native-federation", "web-components", "vue")]
+    [InlineData("web-components", "tokens", "react")]
+    [InlineData("web-components", "web-components", "react")]
+    [InlineData("web-components", "tokens", "vue")]
+    [InlineData("web-components", "web-components", "vue")]
     public void The_shell_and_a_remote_install_build_lint_pass_their_tests_and_format_check(string technique, string designSystem, string framework)
     {
         using var project = Project(technique, designSystem, framework);
@@ -32,10 +36,15 @@ public sealed class MicroFrontendsDesignSystemTests
         var (formatExitCode, formatOutput) = Shell.Run(Path.Combine(web, "app"), "pnpm", "format:check");
         formatExitCode.ShouldBe(0, $"pnpm format:check:\n{formatOutput}");
 
-        var remoteEntry = technique == "native-federation" ? "remoteEntry.json" : "remoteEntry.js";
+        var remoteEntry = technique switch
+        {
+            "native-federation" => "remoteEntry.json",
+            "web-components" => "remote.js",
+            _ => "remoteEntry.js",
+        };
         File.Exists(Path.Combine(web, "modules", "billing", "dist", remoteEntry)).ShouldBeTrue($"billing's remote builds its {remoteEntry}");
 
-        if (framework == "vue")
+        if (technique == "native-federation" && framework == "vue")
         {
             // The remote shares the shell's vue, which its compiled template imports, instead of bundling a copy into the page.
             File.ReadAllText(Path.Combine(web, "modules", "billing", "dist", remoteEntry))
@@ -54,6 +63,7 @@ public sealed class MicroFrontendsDesignSystemTests
     [Theory]
     [InlineData("module-federation")]
     [InlineData("native-federation")]
+    [InlineData("web-components")]
     public void With_tokens_no_file_names_a_ui_package_since_none_is_generated(string technique)
     {
         using var project = Project(technique, "tokens");

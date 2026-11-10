@@ -1,0 +1,42 @@
+import { remotes } from 'virtual:remotes';
+import { importScript } from './script';
+
+/** The custom element a module's remote defines for its page (web/modules/<module>/src/element.ts). */
+export const tagOf = (module: string) => `remote-${module}`;
+
+const loaded = new Map<string, Promise<string>>();
+const failures = new Map<string, number>();
+
+/**
+ * Loads a module's remote, a script module that defines the module's page as a custom element, once, and answers the
+ * element's tag. The browser keeps a module that failed to import for good, so after a failure the next load asks for
+ * a new address (?retry=<n>), which loads it once its server is back, without a reload of the shell.
+ */
+export function loadElement(module: string): Promise<string> {
+  const known = loaded.get(module);
+  if (known) {
+    return known;
+  }
+
+  const script = remotes[module];
+  if (!script) {
+    return Promise.reject(new Error(`No remote for the module ${module}: web/modules/${module} has no package.json.`));
+  }
+
+  const failed = failures.get(module) ?? 0;
+  const tag = tagOf(module);
+  const load = importScript(failed === 0 ? script : `${script}?retry=${failed}`).then(() => {
+    if (!customElements.get(tag)) {
+      throw new Error(`${script} defines no <${tag}>.`);
+    }
+
+    failures.delete(module);
+    return tag;
+  });
+  loaded.set(module, load);
+  load.catch(() => {
+    loaded.delete(module);
+    failures.set(module, failed + 1);
+  });
+  return load;
+}

@@ -1,0 +1,41 @@
+<script setup lang="ts">
+import { computed, shallowRef, watch } from 'vue';
+import { loadElement } from './elements';
+
+/**
+ * A module's page: the custom element its own remote, web/modules/<module>, defines, loaded at run time (docs/adr).
+ * The remote renders into the element with its own copy of its framework, so a page that fails to render leaves the
+ * shell running.
+ */
+defineOptions({ name: 'RemotePage' });
+
+const props = defineProps<{ module: string }>();
+
+type Loaded = { module: string; tag: string } | { module: string; failed: true };
+
+const loaded = shallowRef<Loaded>();
+
+watch(
+  () => props.module,
+  (module, _, onCleanup) => {
+    let mounted = true;
+    onCleanup(() => {
+      mounted = false;
+    });
+    loadElement(module).then(
+      (tag) => mounted && (loaded.value = { module, tag }),
+      () => mounted && (loaded.value = { module, failed: true }),
+    );
+  },
+  { immediate: true },
+);
+
+const current = computed(() => (loaded.value?.module === props.module ? loaded.value : undefined));
+const tag = computed(() => (current.value && 'tag' in current.value ? current.value.tag : undefined));
+</script>
+
+<template>
+  <p v-if="current && 'failed' in current" role="alert">{{ "{{" }} module {{ "}}" }} could not be loaded.</p>
+  <component :is="tag" v-else-if="tag" />
+  <p v-else>Loading {{ "{{" }} module {{ "}}" }}…</p>
+</template>
