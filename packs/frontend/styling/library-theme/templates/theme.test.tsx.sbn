@@ -31,12 +31,18 @@ function nameOf(node: ts.Node): string | undefined {
   return undefined;
 }
 
-/** Whether a literal is the value of a content key or attribute, through braces, parentheses and template parts. */
+/**
+ * Whether a literal is the value of a content key or attribute, through braces, parentheses, template parts and type
+ * assertions ('#add' as const, satisfies string).
+ */
 function isContent(literal: ts.Node): boolean {
   let node = literal;
   while (
     ts.isJsxExpression(node.parent) ||
     ts.isParenthesizedExpression(node.parent) ||
+    ts.isAsExpression(node.parent) ||
+    ts.isSatisfiesExpression(node.parent) ||
+    ts.isNonNullExpression(node.parent) ||
     ts.isTemplateSpan(node.parent) ||
     ts.isTemplateExpression(node.parent)
   ) {
