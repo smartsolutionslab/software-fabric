@@ -6,6 +6,8 @@
     <AssemblyName>fabric</AssemblyName>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>fabric</ToolCommandName>
+    <!-- GitHub Packages links the package to the repository its metadata names (release.yml, build/tool-check.sh). -->
+    <RepositoryUrl>https://github.com/smartsolutionslab/software-fabric</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,10 +18,11 @@
     <ProjectReference Include="../Fabric.Core/Fabric.Core.csproj" />
   </ItemGroup>
 
-  <!-- The tool ships the catalog and the packs it generates from, next to its own binaries. -->
+  <!-- The tool ships the catalog and the packs it generates from, next to its own binaries: in a tool package they come
+       with the published output, under tools/, so they are not also packed as content files. -->
   <ItemGroup>
-    <Content Include="../../catalog/catalog.yaml" Link="catalog/catalog.yaml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="../../packs/**" LinkBase="packs" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../catalog/catalog.yaml" Link="catalog/catalog.yaml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
+    <Content Include="../../packs/**" LinkBase="packs" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Pack="false" />
   </ItemGroup>
 
 </Project>
