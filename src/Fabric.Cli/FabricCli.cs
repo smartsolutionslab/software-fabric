@@ -4,6 +4,7 @@ using Fabric.Core.Choices;
 using Fabric.Core.Generation;
 using Fabric.Core.Matrix;
 using Fabric.Core.Packs;
+using Fabric.Core.Reference;
 
 namespace Fabric.Cli;
 
@@ -25,6 +26,7 @@ public static class FabricCli
             AddModuleCommand(output, error),
             ProfilesCommand(output, error),
             MatrixCommand(output, error),
+            ReferenceCommand(output, error),
         };
 
         return root.Parse(args).Invoke(new InvocationConfiguration { Output = output, Error = error });
@@ -274,6 +276,39 @@ public static class FabricCli
             output.WriteLine(
                 $"wrote {target}: {Count(matrix.Combinations.Count, "combination")} cover {matrix.FeasiblePairs} feasible pairs; " +
                 $"{Count(infeasible, "pair")} {(infeasible == 1 ? "is" : "are")} infeasible.");
+            return 0;
+        }));
+
+        return command;
+    }
+
+    private static Command ReferenceCommand(TextWriter output, TextWriter error)
+    {
+        var catalog = CatalogOption();
+        var file = new Option<string?>("--output") { Description = "Where to write the reference (docs/catalog.md). Without it, the reference is printed." };
+        var command = new Command(
+            "reference",
+            "Write the catalog reference: every dimension and option with its tier, rules, note and the profiles that use it.")
+        {
+            file,
+            catalog,
+        };
+
+        command.SetAction(result => Guarded(error, () =>
+        {
+            var catalogModel = CatalogReader.ReadFile(result.GetValue(catalog)!);
+            var markdown = CatalogReference.Write(catalogModel);
+            if (result.GetValue(file) is not { } target)
+            {
+                output.Write(markdown);
+                return 0;
+            }
+
+            File.WriteAllText(target, markdown);
+            var options = catalogModel.Dimensions.Values.Sum(dimension => dimension.Options.Count);
+            output.WriteLine(
+                $"wrote {target}: {Count(catalogModel.Dimensions.Count, "dimension")}, {Count(options, "option")}, " +
+                $"{Count(catalogModel.Profiles.Count, "profile")}.");
             return 0;
         }));
 

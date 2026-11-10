@@ -43,6 +43,9 @@ on, through the board protocol in ADR-0004.
 - Branch from `main`; one issue per branch; PRs target `main`.
 - Conventional Commits; a scope is one of `.github/commit-scopes`. CI checks every commit a PR adds.
 - Tests first for new behaviour; quote the failing output in the PR.
+- A change to `catalog/catalog.yaml` regenerates `docs/catalog.md` (`fabric reference`), and a change to the catalog or
+  `packs/` regenerates `build/matrix.json` (`fabric matrix`), in the same PR; a test fails while either is stale. The
+  commands are in `docs/catalog-rules.md` and `docs/packs.md`.
 
 ## Board protocol (from M2)
 
