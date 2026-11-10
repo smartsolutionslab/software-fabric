@@ -5,9 +5,12 @@
   ret 'className="' + tailwind + '"'
 end ~}}
 {{~ if project["frontend.ui-library"] == "mui" ~}}
-{%{import { Stack } from '@mui/material';
-import { Link, Outlet } from '@tanstack/react-router';
+{%{import { Link as MuiLink, Stack } from '@mui/material';
+import { createLink, Outlet } from '@tanstack/react-router';
 import { moduleRoutes } from '@/modules';
+
+/** A router link drawn as MUI's Link, so it takes its colours from the theme. */
+const Link = createLink(MuiLink);
 
 /** The root route's page: the navigation, then the matched route's page. */
 export function App() {

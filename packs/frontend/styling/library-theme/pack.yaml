@@ -14,4 +14,4 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: unit-test, describes: "MUI's components take their colours from src/theme.ts, and a component (*.tsx) that writes a colour of its own (#hex, rgb(), hsl(), oklch()) fails the web tests naming the file (src/theme.test.tsx).", file: templates/theme.test.tsx.sbn }
+  - { kind: unit-test, describes: "MUI's components take their colours from src/theme.ts, and a component (*.tsx) that writes a colour of its own (#hex, rgb(), hsl(), oklch()) in a styling value (sx, style, a colour prop, styled/css/keyframes calls) fails the web tests naming the file (src/theme.test.tsx).", file: templates/theme.test.tsx.sbn }

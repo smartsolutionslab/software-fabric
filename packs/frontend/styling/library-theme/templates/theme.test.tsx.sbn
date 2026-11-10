@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { Button } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import { cleanup, render, screen } from '@testing-library/react';
+import ts from 'typescript';
 import { afterEach, expect, test } from 'vitest';
 import { theme } from './theme';
 
@@ -14,6 +15,75 @@ const source = join(process.cwd(), 'src');
 
 /** A colour written out: #hex, or a CSS colour function. */
 const colour = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/i;
+
+/** The props a component styles itself with: sx, style, css, and the colour props (color, bgcolor, borderColor, fill). */
+const stylingProp = /^(?:sx|style|styles|css|fill|stroke|\w*colou?r)$/i;
+
+/** The calls that style a component: styled(...), styled.div`...`, css`...`, keyframes`...`. */
+const stylingCalls = new Set(['styled', 'css', 'keyframes']);
+
+/** The function a call or tagged template starts from: styled for styled('div')({...}) and styled.div`...`. */
+function called(node: ts.Expression): string {
+  if (ts.isCallExpression(node) || ts.isPropertyAccessExpression(node)) {
+    return called(node.expression);
+  }
+  if (ts.isTaggedTemplateExpression(node)) {
+    return called(node.tag);
+  }
+  return ts.isIdentifier(node) ? node.text : '';
+}
+
+/**
+ * Whether a component writes a colour in a styling value: a styling prop, or a styling call, with what they name in the
+ * same file (sx={alarm} reads const alarm). Text, comments, links and other props are content, not styling, even when
+ * they look like a colour (Issue #393, href="#add").
+ */
+function writesColour(path: string): boolean {
+  const file = ts.createSourceFile(
+    path,
+    readFileSync(join(source, path), 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const declarations = new Map<string, ts.Node>();
+  const declare = (node: ts.Node): void => {
+    if ((ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name && ts.isIdentifier(node.name)) {
+      declarations.set(node.name.text, node);
+    }
+    ts.forEachChild(node, declare);
+  };
+  declare(file);
+
+  const read = new Set<ts.Node>();
+  const coloured = (node: ts.Node): boolean => {
+    if (read.has(node)) {
+      return false;
+    }
+    read.add(node);
+    if (ts.isStringLiteralLike(node) || ts.isTemplateLiteralToken(node)) {
+      return colour.test(node.text);
+    }
+    if (ts.isIdentifier(node)) {
+      const named =
+        (ts.isPropertyAccessExpression(node.parent) || ts.isPropertyAssignment(node.parent)) &&
+        node.parent.name === node;
+      const declaration = named ? undefined : declarations.get(node.text);
+      return declaration !== undefined && coloured(declaration);
+    }
+    return ts.forEachChild(node, coloured) ?? false;
+  };
+  const styling = (node: ts.Node): boolean => {
+    if (ts.isJsxAttribute(node) && stylingProp.test(node.name.getText(file))) {
+      return node.initializer !== undefined && coloured(node.initializer);
+    }
+    if ((ts.isCallExpression(node) || ts.isTaggedTemplateExpression(node)) && stylingCalls.has(called(node))) {
+      return coloured(node);
+    }
+    return ts.forEachChild(node, styling) ?? false;
+  };
+  return styling(file);
+}
 
 /** A value as the browser paints it: MUI sets some through its own custom properties (var(--variant-containedBg)). */
 function resolve(style: CSSStyleDeclaration, value: string): string {
@@ -37,7 +107,7 @@ test('no component writes a colour of its own', () => {
   const components = readdirSync(source, { recursive: true, encoding: 'utf8' }).filter(
     (path) => path.endsWith('.tsx') && !path.endsWith('.test.tsx'),
   );
-  const coloured = components.filter((path) => colour.test(readFileSync(join(source, path), 'utf8')));
+  const coloured = components.filter(writesColour);
 
   expect(coloured, 'components that write a colour instead of taking it from src/theme.ts').toEqual([]);
 });
