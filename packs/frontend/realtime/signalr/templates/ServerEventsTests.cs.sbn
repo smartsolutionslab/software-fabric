@@ -1,6 +1,3 @@
-{{~ if project["backend.tenancy"] != "none" && project["backend.auth"] == "none" ~}}
-#error frontend.realtime signalr with backend.tenancy {{ project["backend.tenancy"] }} needs an identity provider: a browser's tenant comes from its user's token, and backend.auth none signs nobody in (docs/adr/0009 of the generator).
-{{~ end ~}}
 {{~ tenanted = project["backend.tenancy"] != "none"
    signed_in = project["backend.auth"] != "none"
    usings = ["System.Collections.Concurrent", "System.Net.Http.Json", "Microsoft.AspNetCore.SignalR.Client"]
