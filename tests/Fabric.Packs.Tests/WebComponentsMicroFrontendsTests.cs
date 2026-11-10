@@ -75,8 +75,10 @@ public sealed class WebComponentsMicroFrontendsTests
         using var project = Project(framework, "web-components");
         var web = Path.Combine(project.ProjectDirectory, "web");
 
-        // A stylesheet the remote imports: the shell loads only remote.js, so the remote's styles must come with it.
-        project.Write("web/modules/billing/src/notice.css", ".notice {\n  letter-spacing: 3px;\n}\n");
+        // A stylesheet the remote imports, with an image too large to inline: the shell loads only remote.js, so the
+        // remote's styles must come with it, and the image must still resolve against the remote, not the shell.
+        project.Write("web/modules/billing/src/notice.css", ".notice {\n  letter-spacing: 3px;\n  background: url('./pattern.png');\n}\n");
+        File.WriteAllBytes(Path.Combine(web, "modules", "billing", "src", "pattern.png"), new byte[8192]);
         var element = Path.Combine(web, "modules", "billing", "src", "element.ts");
         File.WriteAllText(element, "import './notice.css';\n" + File.ReadAllText(element));
 
@@ -87,10 +89,20 @@ public sealed class WebComponentsMicroFrontendsTests
         }
 
         var dist = Path.Combine(web, "modules", "billing", "dist");
-        Directory.GetFiles(dist, "*", SearchOption.AllDirectories).Select(Path.GetFileName).ShouldBe(["remote.js"]);
+        Directory.GetFiles(dist, "*.js", SearchOption.AllDirectories).Select(Path.GetFileName).ShouldBe(["remote.js"]);
         var script = File.ReadAllText(Path.Combine(dist, "remote.js"));
         script.ShouldContain("remote-billing");
-        script.ShouldContain(".notice{letter-spacing:3px}");
+
+        // remote.js adds the remote's stylesheet to the page from where Vite wrote it, so its url()s resolve as built.
+        var sheet = Directory.GetFiles(dist, "*.css", SearchOption.AllDirectories).ShouldHaveSingleItem();
+        var sheetPath = Path.GetRelativePath(dist, sheet).Replace('\\', '/');
+        script.ShouldContain($"new URL(\"{sheetPath}\", import.meta.url)");
+        var styles = File.ReadAllText(sheet);
+        styles.ShouldContain("letter-spacing:3px");
+        var image = System.Text.RegularExpressions.Regex.Match(styles, @"url\(([^)]*pattern[^)]*\.png)\)");
+        image.Success.ShouldBeTrue(styles);
+        File.Exists(Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sheet)!, image.Groups[1].Value.Trim('"', '\''))))
+            .ShouldBeTrue($"{image.Groups[1].Value}, relative to {sheetPath}");
 
         // The design system's elements are the shell's: the remote renders <ds-badge> without bundling a second definition.
         script.ShouldContain("ds-badge");
