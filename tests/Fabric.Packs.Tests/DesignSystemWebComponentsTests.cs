@@ -270,6 +270,50 @@ public sealed class DesignSystemWebComponentsTests
         css.ShouldContain("--ds-color-primary:");
     }
 
+    [Fact]
+    public void A_tag_given_a_property_value_its_element_does_not_take_fails_the_build()
+    {
+        using var project = new GeneratedProject("saas-standard-react", Choice);
+        project.Write("web/app/src/pages/Tokens.tsx", """
+            export function Tokens() {
+              return <ds-badge tone="shouting">New</ds-badge>;
+            }
+            """ + "\n");
+        RunWeb(project, "install");
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "build");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Tokens.tsx");
+        output.ShouldContain("\"shouting\"");
+    }
+
+    // Declaring the tags must leave React's own element types whole: MUI types `component="form"` through them.
+    [Fact]
+    public void With_mui_a_screen_rendering_a_component_as_another_element_builds()
+    {
+        using var project = new GeneratedProject("saas-standard-react", Choice, LibraryTheme, "frontend.ui-library=mui");
+        project.Write("web/app/src/pages/Tokens.tsx", """
+            import Stack from '@mui/material/Stack';
+            import Typography from '@mui/material/Typography';
+
+            export function Tokens() {
+              return (
+                <Stack component="form" onSubmit={(event) => event.preventDefault()} noValidate>
+                  <Typography component="label" htmlFor="tone">
+                    Tone
+                  </Typography>
+                  <ds-badge id="tone" tone="primary">
+                    New
+                  </ds-badge>
+                </Stack>
+              );
+            }
+            """ + "\n");
+
+        RunWeb(project, "install", "build");
+    }
+
     private static Dictionary<string, string> TokensPackage(GeneratedProject project)
     {
         var package = Path.Combine(project.ProjectDirectory, "web", "packages", "tokens");
