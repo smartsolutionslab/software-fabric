@@ -30,10 +30,12 @@ script module and mounts its tag.
 {{~ end ~}}
   The element has no shadow root{{ if vue }} (`shadowRoot: false`){{ end }}, so the shell's stylesheet styles the page as it styles the shell's
   own screens.
-- **`pnpm build`** type-checks the remote and builds one file, `dist/remote.js`, with Vite: the page, its packages and
-  its own copy of {{ framework }}, with the remote's own stylesheet, from a CSS file or module it imports, inside it
-  (`styles.ts`): the shell loads only that file. Nothing is shared with the shell, so a remote's version of {{ framework }} is its own
+- **`pnpm build`** type-checks the remote and builds one script, `dist/remote.js`, with Vite: the page, its packages and
+  its own copy of {{ framework }}. Nothing is shared with the shell, so a remote's version of {{ framework }} is its own
   to choose and to upgrade, and the shell never has to match it.
+- **The remote's own stylesheet**, from a CSS file or module it imports, stays where Vite writes it in `dist`, and
+  `remote.js` links it relative to itself (`styles.ts`): the shell loads only that one script, and a stylesheet linked
+  from the remote's address keeps its `url()`s pointing at the remote's assets, not at the shell's.
 - **Under Aspire** a remote stays a Vite app: `pnpm dev` is `vite preview`, whose `serve.ts` plugin first builds the
   remote in watch mode and then serves `dist`. A change is rebuilt in the background and shows after a reload of the
   shell, without hot module replacement; the shell always loads a built `remote.js`, as it does once deployed.

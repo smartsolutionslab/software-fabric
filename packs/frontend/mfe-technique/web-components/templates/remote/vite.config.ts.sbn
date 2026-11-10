@@ -7,7 +7,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 import { remoteBoundary } from './boundary.js';
 import { serveBuild } from './serve.js';
-import { inlineStyles } from './styles.js';
+import { linkStyles } from './styles.js';
 {{~ if vue && slots["web.custom-element-prefixes"] != "" ~}}
 
 // As in the shell: tags Vue's compiler leaves to the browser as custom elements, any starting with a declared prefix.
@@ -30,7 +30,7 @@ export default defineConfig({
 {{~ end ~}}
     // A remote bundles only its own files and packages: other remotes and the shell are loaded at run time (docs/adr).
     remoteBoundary(),
-    inlineStyles(),
+    linkStyles(),
     serveBuild(),
   ],
   build: {
