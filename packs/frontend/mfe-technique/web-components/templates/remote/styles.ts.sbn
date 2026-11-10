@@ -1,0 +1,28 @@
+import type { Plugin, Rolldown } from 'vite';
+
+/**
+ * Puts the remote's stylesheet into remote.js, which adds it to the page when the shell imports it: the shell loads
+ * only that one file, so a stylesheet written beside it would never be applied (docs/adr).
+ */
+export function inlineStyles(): Plugin {
+  return {
+    name: 'inline-styles',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_, bundle) {
+      const sheets = Object.values(bundle).filter(
+        (file): file is Rolldown.OutputAsset => file.type === 'asset' && file.fileName.endsWith('.css'),
+      );
+      const script = bundle['remote.js'];
+      if (sheets.length === 0 || script?.type !== 'chunk') {
+        return;
+      }
+
+      const css = sheets.map((sheet) => String(sheet.source)).join('\n');
+      script.code = `document.head.append(Object.assign(document.createElement('style'), { textContent: ${JSON.stringify(css)} }));\n${script.code}`;
+      for (const sheet of sheets) {
+        Reflect.deleteProperty(bundle, sheet.fileName);
+      }
+    },
+  };
+}
