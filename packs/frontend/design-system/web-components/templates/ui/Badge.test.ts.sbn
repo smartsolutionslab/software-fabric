@@ -1,5 +1,90 @@
+import '@{{ name }}/tokens/tokens.css';
 import { expect, test } from 'vitest';
-import { Badge } from './Badge';
+import './Badge';
+import type { BadgeTone } from './Badge';
+
+// The tokens each tone shows: its background and its text.
+const tones: Record<BadgeTone, { background: string; text: string }> = {
+  accent: { background: '--ds-color-accent', text: '--ds-color-accent-foreground' },
+  primary: { background: '--ds-color-primary', text: '--ds-color-primary-foreground' },
+};
+
+// Every property the browser paints a colour from; a shadow or a gradient may carry several.
+const colourProperties = [
+  'color',
+  'background-color',
+  'background-image',
+  'border-top-color',
+  'border-right-color',
+  'border-bottom-color',
+  'border-left-color',
+  'outline-color',
+  'text-decoration-color',
+  'box-shadow',
+  'text-shadow',
+];
+
+// The browser computes every colour to a function (rgb(...), oklch(...)), whatever the stylesheet wrote.
+const coloursIn = (value: string) => value.match(/[a-z-]+\([^()]*\)/g) ?? [];
+
+const colourTokens = () =>
+  [...document.styleSheets]
+    .flatMap((sheet) => [...sheet.cssRules])
+    .filter((rule): rule is CSSStyleRule => rule instanceof CSSStyleRule && rule.selectorText === ':root')
+    .flatMap((rule) => [...rule.style])
+    .filter((property) => property.startsWith('--ds-color-'));
+
+// What a colour token resolves to, computed by the browser the way it computes the badge's colours.
+const resolve = (token: string) => {
+  const probe = document.createElement('i');
+  probe.style.color = `var(${token})`;
+  document.body.append(probe);
+  const colour = getComputedStyle(probe).color;
+  probe.remove();
+  return colour;
+};
+
+// Each colour the badge's host and shadow elements paint, with the colour an unstyled element in its place has.
+const paintedColours = async (tone: BadgeTone) => {
+  const badge = document.createElement('ds-badge');
+  badge.tone = tone;
+  badge.textContent = 'New';
+  const unstyled = document.createElement('span');
+  document.body.append(badge, unstyled);
+  await badge.updateComplete;
+  const elements = [badge, ...(badge.shadowRoot?.querySelectorAll('*') ?? [])];
+  const painted = elements.flatMap((element) =>
+    [null, '::before', '::after'].flatMap((pseudo) => {
+      const style = getComputedStyle(element, pseudo);
+      const plain = getComputedStyle(unstyled, pseudo);
+      return colourProperties.map((property) => ({
+        where: `${element.localName}${pseudo ?? ''} ${property}`,
+        colours: coloursIn(style.getPropertyValue(property)),
+        unstyled: coloursIn(plain.getPropertyValue(property)),
+      }));
+    }),
+  );
+  const span = badge.shadowRoot?.querySelector('span');
+  const shown = span ? getComputedStyle(span) : undefined;
+  return { painted, background: shown?.backgroundColor, text: shown?.color };
+};
+
+const expectOnlyTokens = async () => {
+  const tokens = colourTokens();
+  expect(tokens).toContain('--ds-color-primary');
+  const values = tokens.map(resolve);
+  for (const tone of Object.keys(tones) as BadgeTone[]) {
+    const { painted, background, text } = await paintedColours(tone);
+    expect(background, `${tone} background`).toBe(resolve(tones[tone].background));
+    expect(text, `${tone} text`).toBe(resolve(tones[tone].text));
+    for (const { where, colours, unstyled } of painted) {
+      for (const colour of colours) {
+        expect([...values, ...unstyled], `${tone}: ${where}: ${colour}`).toContain(colour);
+      }
+    }
+    document.body.replaceChildren();
+  }
+};
 
 test('a badge shows its label in the tone it is given', async () => {
   const badge = document.createElement('ds-badge');
@@ -13,31 +98,19 @@ test('a badge shows its label in the tone it is given', async () => {
   expect(badge.textContent).toBe('New');
 });
 
-test('a badge is styled only through the design tokens', () => {
-  const styles = Badge.styles.cssText;
-  const declarations = [...styles.matchAll(/([a-z-]+)\s*:\s*([^;{}]+);/g)].map(([, property = '', value = '']) => ({
-    property,
-    value: value.trim(),
-  }));
-  // A colour property takes a colour token and nothing else: not red, transparent or a variable of its own.
-  const colourProperty = /^(color|fill|stroke|[a-z-]+-color)$/;
-  // A shorthand may carry a colour among its other parts; every part must then be a token, a length or a keyword.
-  const colourBearing = /^(background|border(-[a-z]+)*|outline(-[a-z]+)*|[a-z-]*shadow)$/;
-  const keywords = ['none', 'solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset'];
-  const isNonColourPart = (part: string) =>
-    /^(var\(--ds-[a-z0-9-]+\)|-?[\d.]+[a-z%]*)$/.test(part) || keywords.includes(part);
+// Each colour the badge paints is a --ds-color-* token's, as the tokens are built and again when every token changes:
+// a colour of its own would not follow (a literal, a named colour, transparent, a variable that is not a token).
+test('a badge is styled only through the design tokens', async () => {
+  const root = document.documentElement;
+  await expectOnlyTokens();
 
-  expect(styles).toContain('var(--ds-color-primary)');
-  // A colour of its own would not follow the tokens: #fff, rgb(...), hsl(...), oklch(...) anywhere in the styles.
-  expect(styles).not.toMatch(/#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|oklch|oklab|lab|lch|color)\(/i);
-  expect(declarations.filter(({ property }) => colourProperty.test(property))).not.toHaveLength(0);
-  for (const { property, value } of declarations) {
-    if (colourProperty.test(property)) {
-      expect(`${property}: ${value}`).toMatch(/: var\(--ds-color-[a-z0-9-]+\)$/);
-    } else if (colourBearing.test(property)) {
-      for (const part of value.split(/[\s,]+/)) {
-        expect(isNonColourPart(part), `${property}: ${value}`).toBe(true);
-      }
-    }
+  // The page around the badge gets a colour of its own too, so one the badge sets cannot pass for the page's.
+  document.body.style.color = 'rgb(1, 2, 3)';
+  colourTokens().forEach((token, index) => root.style.setProperty(token, `rgb(${index + 10}, 20, 30)`));
+  try {
+    await expectOnlyTokens();
+  } finally {
+    root.removeAttribute('style');
+    document.body.removeAttribute('style');
   }
 });

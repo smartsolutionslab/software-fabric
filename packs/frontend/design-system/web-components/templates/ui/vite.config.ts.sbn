@@ -1,6 +1,18 @@
+import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
-// Storybook builds with this configuration too.
+// Storybook builds with this configuration too. The tests run in Chromium: only a browser computes the colours the
+// tokens' variables resolve to inside shadow DOM.
 export default defineConfig({
-  test: { environment: 'jsdom', include: ['src/**/*.test.ts'], setupFiles: ['./src/test-setup.ts'] },
+  test: {
+    include: ['src/**/*.test.ts'],
+    setupFiles: ['./src/test-setup.ts'],
+    browser: {
+      enabled: true,
+      provider: playwright(),
+      headless: true,
+      instances: [{ browser: 'chromium' }],
+      screenshotFailures: false,
+    },
+  },
 });
