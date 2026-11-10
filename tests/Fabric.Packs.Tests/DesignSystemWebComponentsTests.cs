@@ -194,6 +194,10 @@ public sealed class DesignSystemWebComponentsTests
     [InlineData("background-color: var(--ds-color-accent);", "box-shadow: 0 0 4px red;")]
     // The last declaration of a rule needs no semicolon.
     [InlineData("color: var(--ds-color-accent-foreground);", "color: red")]
+    // A colour equal to the browser's default is still a colour of its own.
+    [InlineData("display: inline-flex;", "display: inline-flex; fill: black;")]
+    // A state's colour counts as well, though no test hovers the badge.
+    [InlineData(".primary {", ".accent:hover { color: red; } .primary {")]
     public void A_component_style_with_a_value_of_its_own_fails_the_ui_packages_tests(string declaration, string mutation)
     {
         using var project = new GeneratedProject("saas-standard-react", Choice);
