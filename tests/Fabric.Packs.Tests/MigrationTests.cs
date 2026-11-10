@@ -16,7 +16,7 @@ public sealed class MigrationTests
         using var postgres = Container.Postgres(DatabasePassword);
         var (runExitCode, runOutput) = project.DotNetCommand(
             new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
         runExitCode.ShouldBe(0, runOutput);
 
         postgres.Psql(DatabasePassword, "select count(*) from information_schema.tables where table_schema = 'billing' and table_name = 'notes'").ShouldBe("1");
@@ -48,7 +48,7 @@ public sealed class MigrationTests
         using var postgres = Container.Postgres(DatabasePassword);
         var (exitCode, output) = project.DotNetCommand(
             new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("probe step ran after the migrations; database configured: True");
@@ -74,7 +74,7 @@ public sealed class MigrationTests
         using var postgres = Container.Postgres(DatabasePassword);
         var (exitCode, output) = project.DotNetCommand(
             new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
 
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("probe preflight refused 1 contexts");
@@ -110,7 +110,7 @@ public sealed class MigrationTests
         using var postgres = Container.Postgres(DatabasePassword);
         var (exitCode, output) = project.DotNetCommand(
             new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
 
         exitCode.ShouldBe(0, output);
         postgres.Psql(DatabasePassword, "select \"Text\" from billing_one.notes").ShouldBe("billing_one");
@@ -159,7 +159,7 @@ public sealed class MigrationTests
         using var postgres = Container.Postgres(DatabasePassword);
         var (exitCode, output) = project.DotNetCommand(
             new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
 
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("20990101000000_Mood");
