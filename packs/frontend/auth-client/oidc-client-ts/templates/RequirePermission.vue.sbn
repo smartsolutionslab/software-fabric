@@ -1,0 +1,59 @@
+{{~ roles = project["backend.authorization"] | array.contains "roles" ~}}
+{{~ claims = project["backend.authorization"] | array.contains "claims" ~}}
+<script setup lang="ts">
+{{~ if roles && claims ~}}
+import { computed } from 'vue';
+{{~ end ~}}
+{{~ if claims ~}}
+import { useHasClaim } from './useHasClaim';
+{{~ end ~}}
+{{~ if roles ~}}
+import { useHasRole } from './useHasRole';
+{{~ end ~}}
+
+{{~ if roles && claims ~}}
+// A role, a claim, or both; both together means the user needs both.
+type RequirePermissionProps =
+  { role: string; claim?: string; value?: string } | { role?: string; claim: string; value?: string };
+{{~ else if roles ~}}
+interface RequirePermissionProps {
+  /** The {{ role_kind }} the user must hold. */
+  role: string;
+}
+{{~ else ~}}
+interface RequirePermissionProps {
+  /** The claim the user's ID token must have. */
+  claim: string;
+  /** The value the claim must have; without one, any value will do. */
+  value?: string;
+}
+{{~ end ~}}
+
+/**
+ * Renders its default slot only for a user whose ID token meets the requirement, else its fallback slot (nothing by
+ * default). Hiding an element is a convenience, never protection: the backend policy decides.
+ */
+{{~ if roles && claims ~}}
+const { role, claim, value } = defineProps<RequirePermissionProps>();
+const hasRole = useHasRole(() => role ?? '');
+const hasClaim = useHasClaim(
+  () => claim ?? '',
+  () => value,
+);
+const allowed = computed(() => (role === undefined || hasRole.value) && (claim === undefined || hasClaim.value));
+{{~ else if roles ~}}
+const { role } = defineProps<RequirePermissionProps>();
+const allowed = useHasRole(() => role);
+{{~ else ~}}
+const { claim, value } = defineProps<RequirePermissionProps>();
+const allowed = useHasClaim(
+  () => claim,
+  () => value,
+);
+{{~ end ~}}
+</script>
+
+<template>
+  <slot v-if="allowed" />
+  <slot v-else name="fallback" />
+</template>

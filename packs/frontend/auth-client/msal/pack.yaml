@@ -6,8 +6,8 @@ files:
   - { template: templates/accessToken.ts.sbn, target: web/app/src/auth/accessToken.ts }
   - { template: templates/SignedIn.tsx.sbn, target: web/app/src/auth/SignedIn.tsx, when: 'project["frontend.framework"] == "react"' }
   - { template: templates/SignedIn.test.tsx.sbn, target: web/app/src/auth/SignedIn.test.tsx, when: 'project["frontend.framework"] == "react"' }
-  - { template: templates/useHasRole.ts.sbn, target: web/app/src/auth/useHasRole.ts, when: 'project["frontend.framework"] == "react" && object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles")' }
-  - { template: templates/useHasClaim.ts.sbn, target: web/app/src/auth/useHasClaim.ts, when: 'project["frontend.framework"] == "react" && object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "claims")' }
+  - { template: templates/useHasRole.ts.sbn, target: web/app/src/auth/useHasRole.ts, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles")' }
+  - { template: templates/useHasClaim.ts.sbn, target: web/app/src/auth/useHasClaim.ts, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "claims")' }
   - { template: templates/RequirePermission.tsx.sbn, target: web/app/src/auth/RequirePermission.tsx, when: 'project["frontend.framework"] == "react" && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/RequirePermission.test.tsx.sbn, target: web/app/src/auth/RequirePermission.test.tsx, when: 'project["frontend.framework"] == "react" && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/Started.tsx.sbn, target: web/app/src/auth/Started.tsx, when: 'project["frontend.framework"] == "react"' }
@@ -20,7 +20,9 @@ files:
   - { template: templates/SignedIn.module.css.sbn, target: web/app/src/auth/SignedIn.module.css, when: 'project["frontend.styling"] == "css-modules" && project["frontend.ui-library"] != "mui"' }
   - { template: templates/SignedIn.test.ts.sbn, target: web/app/src/auth/SignedIn.test.ts, when: 'project["frontend.framework"] == "vue"' }
   - { template: templates/auth-provider.ts.sbn, target: web/app/src/providers/auth.ts, when: 'project["frontend.framework"] == "vue"' }
-  - { template: templates/RequirePermission.vue-pending.test.ts.sbn, target: web/app/src/auth/RequirePermission.test.ts, when: 'project["frontend.framework"] == "vue" && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  # Vue (#517): RequirePermission.vue over the composables in useHasRole.ts and useHasClaim.ts, which read useAuth(); no catalog rule (owner decision on #517).
+  - { template: templates/RequirePermission.vue.sbn, target: web/app/src/auth/RequirePermission.vue, when: 'project["frontend.framework"] == "vue" && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/RequirePermission.test.ts.sbn, target: web/app/src/auth/RequirePermission.test.ts, when: 'project["frontend.framework"] == "vue" && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
 slots:
   - { slot: templates.functions, template: templates/functions.sbn }
   - { slot: web.dependencies, template: templates/dependencies.sbn }
@@ -38,3 +40,4 @@ gates:
   - { kind: unit-test, describes: "With React, an MSAL client whose initialize() rejects is shown as a failed sign-in, not left signing in (src/providers/auth.test.tsx).", file: templates/auth-provider.test.tsx.sbn }
   - { kind: unit-test, describes: "With Vue, SignedIn does the same over the useAuth() composable (src/auth/SignedIn.test.ts).", file: templates/SignedIn.test.ts.sbn }
   - { kind: unit-test, describes: "With React and backend.authorization roles or claims, RequirePermission and the useHasRole / useHasClaim hooks show an element to a user whose ID token holds the role or claim and hide it from one whose does not (src/auth/RequirePermission.test.tsx).", file: templates/RequirePermission.test.tsx.sbn }
+  - { kind: unit-test, describes: "With Vue and backend.authorization roles or claims, RequirePermission.vue and the useHasRole / useHasClaim composables show an element to a user whose ID token holds the role or claim and hide it from one whose does not (src/auth/RequirePermission.test.ts).", file: templates/RequirePermission.test.ts.sbn }
