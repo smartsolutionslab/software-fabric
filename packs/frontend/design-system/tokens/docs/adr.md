@@ -8,6 +8,9 @@ The visual language's values are the project's own design tokens, in the workspa
 {{~ if project["frontend.styling"] == "tailwind" ~}}
 
 The build writes every token as a CSS variable (`dist/tokens.css`, `--ds-color-primary`) and the same tokens as a Tailwind theme (`dist/theme.css`), which `src/index.css` imports, so `bg-primary`, `rounded-md` and `p-4` take the tokens' values.
+{{~ else if project["frontend.styling"] == "library-theme" ~}}
+
+The build also writes the tokens as a typed TypeScript module (`dist/tokens.ts`: `tokens.color.primary`, `tokens.radius.md`), the package's main export. The UI library's theme in `src/theme.ts` is built from it instead of from values of its own, so a token changed in its JSON file changes the theme and every component that takes it.
 {{~ else ~}}
 
 The build writes every token as a CSS custom property on `:root` (`dist/tokens.css`: `--ds-color-primary`, `--ds-radius-md`, `--ds-spacing-4`), which `src/index.css` imports, so every CSS module reads them with `var(...)`.
@@ -21,7 +24,7 @@ There is no component package: the tokens serve the app's components, whatever f
 
 ## Consequences
 
-- The app reads the tokens' CSS, so the tokens are built first: the app's `dev`, `build` and `test` build them, and a fresh clone needs no prior `pnpm build`.
+- The app reads the tokens' {{ if project["frontend.styling"] == "library-theme" }}TypeScript module{{ else }}CSS{{ end }}, so the tokens are built first: the app's `dev`, `build` and `test` build them, and a fresh clone needs no prior `pnpm build`.
 - A token that references one that does not exist fails the build.
 {{~ if project["frontend.styling"] == "tailwind" ~}}
 - Tailwind's own scales stay available; a utility for a step the tokens do not define (`p-5`, `bg-red-500`) takes Tailwind's value, not a token's. Add the token when the step is part of the design.

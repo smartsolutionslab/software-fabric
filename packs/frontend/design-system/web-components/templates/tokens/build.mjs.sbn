@@ -1,12 +1,12 @@
-{{~ if project["frontend.styling"] != "tailwind" && project["frontend.styling"] != "css-modules" ~}}
-throw new Error('The tokens pack compiles tokens for Tailwind and CSS Modules only so far; frontend.styling is {{ project["frontend.styling"] }} (docs/adr/0006 of the generator).');
-{{~ end ~}}
 // Compiles the design tokens (src/*.tokens.json, W3C DTCG: $value, $type): the one place the project's colours, radii
 // and spacing are set.
 // dist/tokens.css: every token as a CSS variable on :root (--ds-color-primary, --ds-spacing-4).
 {{~ if project["frontend.styling"] == "tailwind" ~}}
 // dist/theme.css: the same tokens under Tailwind's names (--color-primary, --radius-md, --spacing-4), read by @theme,
 // so bg-primary, rounded-md and p-4 use them.
+{{~ else if project["frontend.styling"] == "library-theme" ~}}
+// dist/tokens.ts: the same tokens as a typed object (tokens.color.primary, tokens.radius.md), which the UI library's
+// theme in the app's src/theme.ts is built from.
 {{~ end ~}}
 // A reference to a token that does not exist ({color.missing}) fails the build.
 import StyleDictionary from 'style-dictionary';
@@ -26,6 +26,24 @@ StyleDictionary.registerFormat({
       '',
     ].join('\n'),
 });
+{{~ else if project["frontend.styling"] == "library-theme" ~}}
+
+StyleDictionary.registerFormat({
+  name: 'typescript/tokens',
+  format: ({ dictionary }) => {
+    const tokens = {};
+    for (const token of dictionary.allTokens) {
+      const path = [...token.path];
+      const name = path.pop();
+      let group = tokens;
+      for (const key of path) {
+        group = group[key] ??= {};
+      }
+      group[name] = token.$value;
+    }
+    return `export const tokens = ${JSON.stringify(tokens, null, 2)} as const;\n`;
+  },
+});
 {{~ end ~}}
 
 const dictionary = new StyleDictionary({
@@ -40,6 +58,8 @@ const dictionary = new StyleDictionary({
         { destination: 'tokens.css', format: 'css/variables', options: { outputReferences: true } },
 {{~ if project["frontend.styling"] == "tailwind" ~}}
         { destination: 'theme.css', format: 'tailwind/theme' },
+{{~ else if project["frontend.styling"] == "library-theme" ~}}
+        { destination: 'tokens.ts', format: 'typescript/tokens' },
 {{~ end ~}}
       ],
     },
