@@ -177,7 +177,7 @@ public sealed class McpServerTests
         var (mcpExitCode, mcpOutput) = project.Test("tests/Mcp.Server.Tests/Mcp.Server.Tests.csproj");
         mcpExitCode.ShouldBe(0, mcpOutput);
         mcpOutput.ShouldContain("failed: 0");
-        mcpOutput.ShouldContain("succeeded: 13");
+        mcpOutput.ShouldContain("succeeded: 14");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
@@ -195,7 +195,7 @@ public sealed class McpServerTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 10");
+        output.ShouldContain("succeeded: 11");
     }
 
     [Fact]
@@ -208,7 +208,7 @@ public sealed class McpServerTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 11");
+        output.ShouldContain("succeeded: 12");
     }
 
     [Fact]
