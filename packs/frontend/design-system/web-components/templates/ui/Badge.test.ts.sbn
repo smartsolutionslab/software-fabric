@@ -9,23 +9,9 @@ const tones: Record<BadgeTone, { background: string; text: string }> = {
   primary: { background: '--ds-color-primary', text: '--ds-color-primary-foreground' },
 };
 
-// Every property the browser paints a colour from; a shadow or a gradient may carry several.
-const colourProperties = [
-  'color',
-  'background-color',
-  'background-image',
-  'border-top-color',
-  'border-right-color',
-  'border-bottom-color',
-  'border-left-color',
-  'outline-color',
-  'text-decoration-color',
-  'box-shadow',
-  'text-shadow',
-];
-
-// The browser computes every colour to a function (rgb(...), oklch(...)), whatever the stylesheet wrote.
-const coloursIn = (value: string) => value.match(/[a-z-]+\([^()]*\)/g) ?? [];
+// The browser computes every colour to a colour function (rgb(...), oklch(...)), whatever the stylesheet wrote; a
+// shadow, a gradient or a filter may carry several.
+const coloursIn = (value: string) => value.match(/\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\([^()]*\)/g) ?? [];
 
 const colourTokens = () =>
   [...document.styleSheets]
@@ -44,24 +30,30 @@ const resolve = (token: string) => {
   return colour;
 };
 
-// Each colour the badge's host and shadow elements paint, with the colour an unstyled element in its place has.
+// Each colour the badge's host, its label and its shadow elements paint, with the colour an unstyled element in its place has.
 const paintedColours = async (tone: BadgeTone) => {
   const badge = document.createElement('ds-badge');
   badge.tone = tone;
-  badge.textContent = 'New';
+  // The label is an element, so styles for slotted content apply to it.
+  const label = document.createElement('span');
+  label.textContent = 'New';
+  badge.append(label);
   const unstyled = document.createElement('span');
   document.body.append(badge, unstyled);
   await badge.updateComplete;
-  const elements = [badge, ...(badge.shadowRoot?.querySelectorAll('*') ?? [])];
+  const elements = [badge, label, ...(badge.shadowRoot?.querySelectorAll('*') ?? [])];
   const painted = elements.flatMap((element) =>
     [null, '::before', '::after'].flatMap((pseudo) => {
       const style = getComputedStyle(element, pseudo);
       const plain = getComputedStyle(unstyled, pseudo);
-      return colourProperties.map((property) => ({
-        where: `${element.localName}${pseudo ?? ''} ${property}`,
-        colours: coloursIn(style.getPropertyValue(property)),
-        unstyled: coloursIn(plain.getPropertyValue(property)),
-      }));
+      // Every property the browser computes, so a colour cannot hide in one a list would leave out.
+      return [...style]
+        .filter((property) => !property.startsWith('--'))
+        .map((property) => ({
+          where: `${element.localName}${pseudo ?? ''} ${property}`,
+          colours: coloursIn(style.getPropertyValue(property)),
+          unstyled: coloursIn(plain.getPropertyValue(property)),
+        }));
     }),
   );
   const span = badge.shadowRoot?.querySelector('span');
