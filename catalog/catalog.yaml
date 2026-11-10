@@ -54,6 +54,8 @@ profiles:
     frontend.agent-ui: ag-ui
     frontend.dashboards: [user-editable, generative]
 
+# A `# nightly run <id>` comment names the nightly matrix run in which every combination containing the option
+# passed, which promoted it to supported (ADR-0003, amended 2026-11-06).
 dimensions:
 
   # ─────────────────────────── Backend · project ───────────────────────────
@@ -63,7 +65,7 @@ dimensions:
     default: postgres
     options:
       postgres:  { tier: supported }
-      sqlserver: { tier: experimental }
+      sqlserver: { tier: supported }  # nightly run 42800894655
 
   backend.data-access:
     scope: project
@@ -86,7 +88,7 @@ dimensions:
     options:
       none:              { tier: supported, note: "in-process integration events through an outbox table" }
       rabbitmq:          { tier: supported }
-      azure-service-bus: { tier: experimental }
+      azure-service-bus: { tier: supported }  # nightly run 42800894655
       kafka:             { tier: supported }
 
   backend.bus.library:
@@ -102,7 +104,7 @@ dimensions:
     options:
       hand-rolled: { tier: supported }
       wolverine:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["backend.bus.library == wolverine"]
 
   backend.api-style:
@@ -154,8 +156,8 @@ dimensions:
     default: keycloak
     options:
       keycloak:     { tier: supported }
-      entra-id:     { tier: experimental }
-      generic-oidc: { tier: experimental }
+      entra-id:     { tier: supported }  # nightly run 42800894655
+      generic-oidc: { tier: supported }  # nightly run 42800894655
       none:         { tier: experimental, note: "no authentication: every endpoint is anonymous and there is no sign-in" }
 
   backend.authorization:
@@ -187,10 +189,10 @@ dimensions:
     note: "One provider per project, behind Microsoft.Extensions.AI's IChatClient. ADR-0010."
     options:
       none:         { tier: supported, note: "the project calls no language model" }
-      anthropic:    { tier: experimental }
+      anthropic:    { tier: supported }  # nightly run 42800894655
       openai:       { tier: experimental }
-      azure-openai: { tier: experimental }
-      ollama:       { tier: experimental, note: "a local model server" }
+      azure-openai: { tier: supported }  # nightly run 42800894655
+      ollama:       { tier: supported, note: "a local model server" }  # nightly run 42800894655
 
   backend.llm.agents:
     scope: project
@@ -198,7 +200,7 @@ dimensions:
     default: none
     note: "Agents on the provider's IChatClient: defined in a module's Application project, run by a command or query, calling use cases through the dispatcher. ADR-0011."
     options:
-      none:            { tier: experimental, note: "use cases call the model directly; no agent framework" }
+      none:            { tier: supported, note: "use cases call the model directly; no agent framework" }  # nightly run 42800894655
       agent-framework: { tier: experimental, note: "Microsoft Agent Framework (Microsoft.Agents.AI)" }
 
   backend.llm.extras:
@@ -224,9 +226,9 @@ dimensions:
     default-from: backend.llm
     note: "The provider of the embedding generator, behind Microsoft.Extensions.AI's IEmbeddingGenerator. Defaults to backend.llm when that provider has embeddings; anthropic has none, so it is chosen explicitly there. ADR-0012."
     options:
-      openai:       { tier: experimental }
+      openai:       { tier: supported }  # nightly run 42800894655
       azure-openai: { tier: experimental }
-      ollama:       { tier: experimental, note: "a local model server" }
+      ollama:       { tier: supported, note: "a local model server" }  # nightly run 42800894655
 
   backend.mcp:
     scope: project
@@ -262,7 +264,7 @@ dimensions:
         # Reason: the Marten pack keeps no tenant apart in its event streams, so any tenancy would leak one tenant's events to another.
         requires: ["backend.database == postgres", "backend.tenancy == none"]
       kurrentdb:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         # Reason: the KurrentDB pack keeps no tenant apart in its streams, so any tenancy would leak one tenant's events to another.
         requires: ["backend.tenancy == none"]
 
@@ -305,15 +307,15 @@ dimensions:
     default: xunit
     options:
       xunit: { tier: supported }
-      nunit: { tier: experimental }
-      tunit: { tier: experimental }
+      nunit: { tier: supported }  # nightly run 42800894655
+      tunit: { tier: supported }  # nightly run 42800894655
 
   backend.test.assertions:
     scope: project
     default: shouldly
     options:
       shouldly:           { tier: supported }
-      awesome-assertions: { tier: experimental }
+      awesome-assertions: { tier: supported }  # nightly run 42800894655
 
   backend.test.mocks:
     scope: project
@@ -327,7 +329,7 @@ dimensions:
     default: aspire-fixture
     options:
       aspire-fixture: { tier: supported }
-      testcontainers: { tier: experimental }
+      testcontainers: { tier: supported }  # nightly run 42800894655
 
   backend.test.extras:
     scope: project
@@ -341,7 +343,7 @@ dimensions:
     default: red-first
     options:
       red-first:  { tier: supported, note: "new-behaviour tests observed failing; output quoted in the PR" }
-      test-after: { tier: experimental, note: "coverage gate only" }
+      test-after: { tier: supported, note: "coverage gate only" }  # nightly run 42800894655
 
   # ─────────────────────────── Frontend ──────────────────────────────────────
 
@@ -377,7 +379,7 @@ dimensions:
       spa:       { tier: supported }
       multi-app: { tier: experimental, note: "several apps and shared libraries in one workspace" }
       micro-frontends:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["frontend.design-system != none"]
 
   frontend.mfe-technique:
@@ -386,7 +388,7 @@ dimensions:
     default: module-federation
     options:
       module-federation:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         # Reason: the pack builds React remotes only (owner decision D5, #232).
         requires: ["frontend.framework == react"]
       native-federation: { tier: experimental }
@@ -397,7 +399,7 @@ dimensions:
     active-when: "frontend.architecture == micro-frontends"
     default: "no"
     options:
-      "no":  { tier: experimental }
+      "no":  { tier: supported }  # nightly run 42800894655
       "yes":
         tier: experimental
         requires: ["frontend.design-system in (tokens, web-components)"]
@@ -410,8 +412,8 @@ dimensions:
       web.workspace-packages: { description: "Lines of pnpm-workspace.yaml's packages list ('  - app')." }
     options:
       pnpm-workspaces: { tier: supported }
-      nx:              { tier: experimental }
-      turborepo:       { tier: experimental }
+      nx:              { tier: supported }  # nightly run 42800894655
+      turborepo:       { tier: supported }  # nightly run 42800894655
 
   frontend.state:
     scope: project
@@ -421,14 +423,14 @@ dimensions:
         tier: supported
         requires: ["frontend.framework == react"]
       zustand-tanstack-query:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["frontend.framework == react"]
       tanstack-query: { tier: supported }
       pinia-tanstack-query:
         tier: experimental
         requires: ["frontend.framework == vue"]
       pinia:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["frontend.framework == vue"]
 
   frontend.api-client:
@@ -452,7 +454,7 @@ dimensions:
         requires: ["backend.api-protocols has rest", "frontend.state in (zustand-tanstack-query, tanstack-query, pinia-tanstack-query, pinia)"]
       # A plain typed client: TanStack Query's caches wrap its calls; Redux Toolkit's server data is RTK Query (#264).
       openapi-fetch:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["frontend.state != redux-toolkit", "backend.api-protocols has rest"]
 
   frontend.routing:
@@ -478,10 +480,10 @@ dimensions:
         requires: ["frontend.framework == react"]
       tanstack-form: { tier: experimental }
       vee-validate:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["frontend.framework == vue"]
       formkit:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["frontend.framework == vue"]
 
   frontend.validation:
@@ -489,14 +491,14 @@ dimensions:
     default: zod
     options:
       zod:     { tier: supported }
-      valibot: { tier: experimental }
+      valibot: { tier: supported }  # nightly run 42800894655
 
   frontend.styling:
     scope: project
     default: tailwind
     options:
       tailwind:      { tier: supported }
-      css-modules:   { tier: experimental }
+      css-modules:   { tier: supported }  # nightly run 42800894655
       library-theme:
         tier: experimental
         note: "the UI library's own theming system"
@@ -511,10 +513,10 @@ dimensions:
         tier: supported
         requires: ["frontend.framework == react", "frontend.styling == tailwind"]
       radix-headless:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["frontend.framework == react"]
       mui:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["frontend.framework == react"]
         conflicts: ["frontend.styling == tailwind"]
       mantine:
@@ -539,7 +541,7 @@ dimensions:
         tier: experimental
         requires: ["frontend.framework == vue"]
       shadcn-vue:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["frontend.framework == vue", "frontend.styling == tailwind"]
 
   frontend.design-system:
@@ -547,9 +549,9 @@ dimensions:
     default: none
     options:
       none:   { tier: supported, note: "the UI library as shipped" }
-      tokens: { tier: experimental, note: "Style Dictionary tokens, framework-neutral" }
+      tokens: { tier: supported, note: "Style Dictionary tokens, framework-neutral" }  # nightly run 42800894655
       tokens-and-components:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         note: "tokens plus an own component package with Storybook"
         # Reason: the component package is React only (owner decision D5, #232), and its components are styled with
         # Tailwind only, which the pack refuses loudly otherwise (D4: such combinations are catalog rules, #271).
@@ -561,7 +563,7 @@ dimensions:
     default: tanstack-table
     options:
       tanstack-table: { tier: supported }
-      ag-grid:        { tier: experimental, note: "community vs enterprise licence is the project's call" }
+      ag-grid:        { tier: supported, note: "community vs enterprise licence is the project's call" }  # nightly run 42800894655
 
   frontend.charts:
     scope: project
@@ -569,9 +571,9 @@ dimensions:
     options:
       echarts: { tier: supported }
       recharts:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["frontend.framework == react"]
-      chartjs: { tier: experimental }
+      chartjs: { tier: supported }  # nightly run 42800894655
 
   frontend.dashboards:
     scope: project
@@ -617,7 +619,7 @@ dimensions:
     options:
       oidc-client-ts: { tier: supported }
       msal:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["backend.auth == entra-id"]
 
   frontend.pwa:
@@ -625,7 +627,7 @@ dimensions:
     default: "no"
     options:
       "no":  { tier: supported }
-      "yes": { tier: experimental }
+      "yes": { tier: supported }  # nightly run 42800894655
 
   frontend.test.extras:
     scope: project
@@ -634,7 +636,7 @@ dimensions:
     note: "Vitest, Testing Library and Playwright are always present."
     options:
       storybook-tests:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         requires: ["frontend.design-system == tokens-and-components"]
       screenshot-tests: { tier: experimental }
       accessibility:    { tier: supported, note: "axe in component and e2e tests" }
@@ -650,7 +652,7 @@ dimensions:
     options:
       ef-core: { tier: supported, note: "query handlers read through EF Core, as the rest of the module does" }
       dapper:
-        tier: experimental
+        tier: supported  # nightly run 42800894655
         note: "query handlers read with Dapper over IReadConnection, in SQL for the project's one database"
         # Reason: Dapper's SQL bypasses the tenant column's EF Core query filter, so any tenancy would read every tenant's rows.
         requires: ["backend.tenancy == none"]
