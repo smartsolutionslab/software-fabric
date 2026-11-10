@@ -16,9 +16,11 @@ public class FabricFileTests
     private static readonly string GeneratorVersion =
         typeof(FabricFile).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
 
+    /// <summary>The fixture catalog's text with LF line endings, whatever the checkout's.</summary>
+    private static readonly string CatalogText = File.ReadAllText(Path.Combine(Fixtures.MinimalRoot, "catalog.yaml")).ReplaceLineEndings("\n");
+
     /// <summary>SHA-256 of the fixture catalog's text, worked out here independently of the generator.</summary>
-    private static readonly string CatalogHash =
-        "sha256:" + Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(Path.Combine(Fixtures.MinimalRoot, "catalog.yaml"))));
+    private static readonly string CatalogHash = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(CatalogText)));
 
     private static Dictionary<string, IReadOnlyList<string>> Values(params (string Dimension, string[] Options)[] values) =>
         values.ToDictionary(value => value.Dimension, value => (IReadOnlyList<string>)value.Options);
@@ -64,7 +66,7 @@ public class FabricFileTests
     [Fact]
     public void The_catalog_hash_does_not_depend_on_the_catalogs_line_endings()
     {
-        var text = File.ReadAllText(Path.Combine(Fixtures.MinimalRoot, "catalog.yaml"));
+        var text = CatalogText;
         var withLf = CatalogReader.Read(new StringReader(text), "catalog.yaml");
         var withCrLf = CatalogReader.Read(new StringReader(text.Replace("\n", "\r\n", StringComparison.Ordinal)), "catalog.yaml");
 
@@ -77,7 +79,7 @@ public class FabricFileTests
     [Fact]
     public void The_catalog_hash_changes_with_any_change_to_the_catalogs_text()
     {
-        var text = File.ReadAllText(Path.Combine(Fixtures.MinimalRoot, "catalog.yaml"));
+        var text = CatalogText;
         var changed = CatalogReader.Read(new StringReader(text + "# a comment is a change too\n"), "catalog.yaml");
         var expected = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text + "# a comment is a change too\n")));
 
