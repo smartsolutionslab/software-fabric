@@ -13,6 +13,9 @@ dimensions:
   backend.database:
     scope: project
     default: postgres
+    # Role slots (ADR-0008): both database packs declare it, so the protocol packs fill it whichever database is chosen.
+    role-slots:
+      database.readers: { description: "The protocols that read the database.", separator: ", " }
     options:
       postgres:  { tier: supported }
       sqlserver: { tier: supported }

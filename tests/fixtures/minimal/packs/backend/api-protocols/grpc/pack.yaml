@@ -1,7 +1,11 @@
 option: backend.api-protocols.grpc
-files: []
+files:
+  - { template: templates/grpc.sbn, target: config/grpc.txt }
 slots:
   - { slot: readme.sections, template: templates/section.sbn, order: 20 }
+  - { slot: database.readers, template: templates/reader.sbn }
+declares-slots:
+  - { slot: grpc.services, description: "The services grpc serves besides its own.", cardinality: zero-or-more }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

@@ -1,1 +1,2 @@
 provider={{ project["backend.database"] }}
+read by: {{ slots["database.readers"] }}
