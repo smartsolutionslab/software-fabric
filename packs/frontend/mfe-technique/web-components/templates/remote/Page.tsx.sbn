@@ -1,0 +1,20 @@
+{{~ if project["frontend.design-system"] == "tokens-and-components" ~}}
+import { Badge } from '@{{ name }}/ui';
+
+{{~ end ~}}
+{{~ if project["frontend.design-system"] == "web-components" ~}}
+// <ds-badge> is the design system's element, defined once for the page by the shell; design-system.d.ts types it.
+{{~ end ~}}
+/** The {{ module.name }} module's screens; the shell shows them under /{{ module.name }}. */
+export default function {{ module.namespace }}Page() {
+  return (
+    <main>
+      <h1>{{ module.namespace }}</h1>
+{{~ if project["frontend.design-system"] == "tokens-and-components" ~}}
+      <Badge>Remote</Badge>
+{{~ else if project["frontend.design-system"] == "web-components" ~}}
+      <ds-badge>Remote</ds-badge>
+{{~ end ~}}
+    </main>
+  );
+}

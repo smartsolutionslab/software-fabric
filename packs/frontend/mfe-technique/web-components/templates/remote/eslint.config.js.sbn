@@ -1,0 +1,163 @@
+{{~ if project["frontend.framework"] == "vue" ~}}
+import js from '@eslint/js';
+import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescript';
+import pluginVue from 'eslint-plugin-vue';
+import globals from 'globals';
+
+export default defineConfigWithVueTs(
+  { ignores: ['dist'] },
+  js.configs.recommended,
+  pluginVue.configs['flat/essential'],
+  vueTsConfigs.strict,
+  {
+    files: ['**/*.{ts,vue}'],
+    languageOptions: { globals: globals.browser },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            // A remote reaches other modules through the API and events, never through their code (docs/adr).
+            {
+              group: ['@{{ name }}/module-*'],
+              message:
+                "A remote never imports another module's remote; modules talk through the API and events (docs/adr).",
+            },
+{{- if project["frontend.design-system"] == "web-components" }}
+            // One definition of each element per page, the shell's: a second customElements.define of a tag throws.
+            {
+              group: ['@{{ name }}/ui'],
+              allowTypeImports: true,
+              message:
+                "The shell defines the design system's elements once for the page; a remote renders their tags and imports only their types (docs/adr).",
+            },{{ end }}
+{{- if slots["web.restricted-imports"] != "" }}
+            // The libraries the project chose, as in the shell: each bans its alternatives.
+{{ slots["web.restricted-imports"] }},{{ end }}
+{{- if slots["web.remote-restricted-imports"] != "" }}
+{{ slots["web.remote-restricted-imports"] }},{{ end }}
+          ],
+        },
+      ],
+    },
+  },
+{{~ if project["frontend.design-system"] == "web-components" ~}}
+  {
+    // The tests define the design system's elements, as the shell's tests do; the remote's build never imports them.
+    files: ['src/test-setup.ts'],
+    rules: { 'no-restricted-imports': 'off' },
+  },
+{{~ end ~}}
+  {
+    // The shell's rule for tests, from Vue's ADR: a test waits for a condition, not a count. A fixed number of yields
+    // passes on a fast machine and fails on a loaded CI runner.
+    files: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "ForStatement[test] AwaitExpression > NewExpression[callee.name='Promise'], " +
+            "ForOfStatement AwaitExpression > NewExpression[callee.name='Promise'], " +
+            "ForInStatement AwaitExpression > NewExpression[callee.name='Promise']",
+          message:
+            'A fixed count of timer yields is not a bound on work that advances in another phase of the event loop. ' +
+            'Wait for the condition: findBy* or waitFor. To drive fake timers, use vi.advanceTimersByTimeAsync.',
+        },
+        {
+          selector:
+            ':matches(' +
+            "ExpressionStatement[expression.type='AwaitExpression'][expression.argument.callee.name='Promise'], " +
+            "ExpressionStatement[expression.type='AwaitExpression'][expression.argument.callee.name=/^(settle|sleep|delay|wait|pause|tick|nextTick|flushPromises|setTimeout)$/], " +
+            "ExpressionStatement[expression.type='AwaitExpression'][expression.argument.callee.name='act'][expression.argument.arguments.0.body.body.length=0]" +
+            ") + ExpressionStatement:has(CallExpression[callee.name='expect'])",
+          message:
+            'A settle may not immediately precede an assertion: it assumes the work finished in time. ' +
+            'Wait for the condition: findBy* or waitFor.',
+        },
+      ],
+    },
+  },
+);
+{{~ else ~}}
+import js from '@eslint/js';
+import reactHooks from 'eslint-plugin-react-hooks';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+
+export default tseslint.config(
+  { ignores: ['dist'] },
+  {
+    extends: [js.configs.recommended, ...tseslint.configs.strict],
+    files: ['**/*.{ts,tsx}'],
+    languageOptions: { globals: globals.browser },
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            // A remote reaches other modules through the API and events, never through their code (docs/adr).
+            {
+              group: ['@{{ name }}/module-*'],
+              message:
+                "A remote never imports another module's remote; modules talk through the API and events (docs/adr).",
+            },
+{{- if project["frontend.design-system"] == "web-components" }}
+            // One definition of each element per page, the shell's: a second customElements.define of a tag throws.
+            {
+              group: ['@{{ name }}/ui'],
+              allowTypeImports: true,
+              message:
+                "The shell defines the design system's elements once for the page; a remote renders their tags and imports only their types (docs/adr).",
+            },{{ end }}
+{{- if slots["web.restricted-imports"] != "" }}
+            // The libraries the project chose, as in the shell: each bans its alternatives.
+{{ slots["web.restricted-imports"] }},{{ end }}
+{{- if slots["web.remote-restricted-imports"] != "" }}
+{{ slots["web.remote-restricted-imports"] }},{{ end }}
+          ],
+        },
+      ],
+    },
+  },
+{{~ if project["frontend.design-system"] == "web-components" ~}}
+  {
+    // The tests define the design system's elements, as the shell's tests do; the remote's build never imports them.
+    files: ['src/test-setup.ts'],
+    rules: { 'no-restricted-imports': 'off' },
+  },
+{{~ end ~}}
+  {
+    // The shell's rule for tests, from React's ADR: a test waits for a condition, not a count. A fixed number of yields
+    // passes on a fast machine and fails on a loaded CI runner.
+    files: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "ForStatement[test] AwaitExpression > NewExpression[callee.name='Promise'], " +
+            "ForOfStatement AwaitExpression > NewExpression[callee.name='Promise'], " +
+            "ForInStatement AwaitExpression > NewExpression[callee.name='Promise']",
+          message:
+            'A fixed count of timer yields is not a bound on work that advances in another phase of the event loop. ' +
+            'Wait for the condition: findBy* or waitFor. To drive fake timers, use vi.advanceTimersByTimeAsync.',
+        },
+        {
+          selector:
+            ':matches(' +
+            "ExpressionStatement[expression.type='AwaitExpression'][expression.argument.callee.name='Promise'], " +
+            "ExpressionStatement[expression.type='AwaitExpression'][expression.argument.callee.name=/^(settle|sleep|delay|wait|pause|tick|nextTick|flushPromises|setTimeout)$/], " +
+            "ExpressionStatement[expression.type='AwaitExpression'][expression.argument.callee.name='act'][expression.argument.arguments.0.body.body.length=0]" +
+            ") + ExpressionStatement:has(CallExpression[callee.name='expect'])",
+          message:
+            'A settle may not immediately precede an assertion: it assumes the work finished in time. ' +
+            'Wait for the condition: findBy* or waitFor.',
+        },
+      ],
+    },
+  },
+);
+{{~ end ~}}

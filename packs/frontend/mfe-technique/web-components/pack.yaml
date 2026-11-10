@@ -1,0 +1,48 @@
+option: frontend.mfe-technique.web-components
+files:
+  - { template: templates/remotes.ts.sbn, target: web/app/remotes.ts }
+  - { template: templates/virtual-remotes.d.ts.sbn, target: web/app/src/remotes/virtual-remotes.d.ts }
+  - { template: templates/script.ts.sbn, target: web/app/src/remotes/script.ts }
+  - { template: templates/elements.ts.sbn, target: web/app/src/remotes/elements.ts }
+  - { template: templates/elements.test.ts.sbn, target: web/app/src/remotes/elements.test.ts }
+  - { template: templates/Remote.tsx.sbn, target: web/app/src/remotes/Remote.tsx, when: 'project["frontend.framework"] == "react"' }
+  - { template: templates/Remote.test.tsx.sbn, target: web/app/src/remotes/Remote.test.tsx, when: 'project["frontend.framework"] == "react"' }
+  - { template: templates/Remote.vue.sbn, target: web/app/src/remotes/Remote.vue, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/Remote.test.ts.sbn, target: web/app/src/remotes/Remote.test.ts, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/remote.spec.ts.sbn, target: "web/app/e2e/remotes/{{ module.name }}.spec.ts", per-module: true }
+  - { template: templates/remote/package.json.sbn, target: "web/modules/{{ module.name }}/package.json", per-module: true }
+  - { template: templates/remote/vite.config.ts.sbn, target: "web/modules/{{ module.name }}/vite.config.ts", per-module: true }
+  - { template: templates/remote/serve.ts.sbn, target: "web/modules/{{ module.name }}/serve.ts", per-module: true }
+  - { template: templates/remote/serve.test.ts.sbn, target: "web/modules/{{ module.name }}/src/serve.test.ts", per-module: true }
+  - { template: templates/remote/tsconfig.json.sbn, target: "web/modules/{{ module.name }}/tsconfig.json", per-module: true }
+  - { template: templates/remote/eslint.config.js.sbn, target: "web/modules/{{ module.name }}/eslint.config.js", per-module: true }
+  - { template: templates/remote/prettierrc.json.sbn, target: "web/modules/{{ module.name }}/.prettierrc.json", per-module: true }
+  - { template: templates/remote/gitignore.sbn, target: "web/modules/{{ module.name }}/.gitignore", per-module: true }
+  - { template: templates/remote/test-setup.ts.sbn, target: "web/modules/{{ module.name }}/src/test-setup.ts", per-module: true }
+  - { template: templates/remote/element.ts.sbn, target: "web/modules/{{ module.name }}/src/element.ts", per-module: true }
+  - { template: templates/remote/element.test.ts.sbn, target: "web/modules/{{ module.name }}/src/element.test.tsx", per-module: true, when: 'project["frontend.framework"] == "react"' }
+  - { template: templates/remote/element.test.ts.sbn, target: "web/modules/{{ module.name }}/src/element.test.ts", per-module: true, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/remote/Page.tsx.sbn, target: "web/modules/{{ module.name }}/src/{{ module.namespace }}Page.tsx", per-module: true, when: 'project["frontend.framework"] == "react"' }
+  - { template: templates/remote/Page.test.tsx.sbn, target: "web/modules/{{ module.name }}/src/{{ module.namespace }}Page.test.tsx", per-module: true, when: 'project["frontend.framework"] == "react"' }
+  - { template: templates/remote/vue/Page.vue.sbn, target: "web/modules/{{ module.name }}/src/{{ module.namespace }}Page.vue", per-module: true, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/remote/vue/Page.test.ts.sbn, target: "web/modules/{{ module.name }}/src/{{ module.namespace }}Page.test.ts", per-module: true, when: 'project["frontend.framework"] == "vue"' }
+  - { template: templates/remote/boundary.ts.sbn, target: "web/modules/{{ module.name }}/boundary.ts", per-module: true }
+  - { template: templates/remote/boundary.test.ts.sbn, target: "web/modules/{{ module.name }}/src/boundary.test.ts", per-module: true }
+declares-slots:
+  - { slot: web.remote-restricted-imports, description: "Entries of every remote's no-restricted-imports patterns ({ group: [...], message: '...' }), indented twelve spaces as Prettier prints them.", separator: ",\n" }
+slots:
+  - { slot: web.vite-imports, template: templates/vite-imports.sbn, order: 40 }
+  - { slot: web.vite-plugins, template: templates/vite-plugin.sbn, order: 40 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "The shell imports each module's remote, a script module, once, under a new address after a failure, and refuses one that defines no <remote-<module>> (src/remotes/elements.test.ts).", file: templates/elements.test.ts.sbn }
+  - { kind: unit-test, describes: "Remote shows the element a module's remote defines and says the module is unavailable when its remote cannot be loaded (src/remotes/Remote.test.tsx).", file: templates/Remote.test.tsx.sbn }
+  - { kind: unit-test, describes: "With Vue, Remote.vue shows the element a module's remote defines and says the module is unavailable when its remote cannot be loaded (src/remotes/Remote.test.ts).", file: templates/Remote.test.ts.sbn }
+  - { kind: unit-test, describes: "A remote defines its page as <remote-<module>> with its framework's own wrapper, and the element shows the page when mounted and mounted again (web/modules/<module>/src/element.test.ts).", file: templates/remote/element.test.ts.sbn }
+  - { kind: unit-test, describes: "A remote's `pnpm dev` (vite preview) serves once its watching build has written, and closes the watcher with the server (web/modules/<module>/src/serve.test.ts).", file: templates/remote/serve.test.ts.sbn }
+  - { kind: ci-step, describes: "Every remote's build type-checks it and builds dist/remote.js, one script module with its own framework, and its lint runs ESLint, with the library bans the shell has, and Prettier; the frontend job runs both for every package.", file: templates/remote/package.json.sbn }
+  - { kind: ci-step, describes: "A file of another remote or of the shell loaded into a remote, by any import path, fails the remote's build and tests.", file: templates/remote/boundary.ts.sbn }
+  - { kind: lint-rule, describes: "With the web-components design system, a remote importing @<project>/ui other than for its types fails its lint: the shell defines the elements once for the page.", file: templates/remote/eslint.config.js.sbn }
+  - { kind: end-to-end-test, describes: "A signed-in browser opens each module and sees its page, the element its own remote defines, loaded from the remote's own server, again after the remote was down, and again when opened twice (e2e/remotes/<module>.spec.ts, run against the running AppHost).", file: templates/remote.spec.ts.sbn }

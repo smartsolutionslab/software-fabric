@@ -1,0 +1,16 @@
+{{~ if project["frontend.framework"] == "vue" ~}}
+import { defineCustomElement } from 'vue';
+import {{ module.namespace }}Page from './{{ module.namespace }}Page.vue';
+
+// The {{ module.name }} module's page as the custom element the shell mounts, with Vue's own wrapper (docs/adr). Without a
+// shadow root, so the shell's stylesheet styles the page as it styles the shell's own screens.
+customElements.define('remote-{{ module.name }}', defineCustomElement({{ module.namespace }}Page, { shadowRoot: false }));
+{{~ else ~}}
+import r2wc from '@r2wc/react-to-web-component';
+import {{ module.namespace }}Page from './{{ module.namespace }}Page';
+
+// The {{ module.name }} module's page as the custom element the shell mounts, rendered by this remote's own React
+// through r2wc (docs/adr). Without a shadow root, so the shell's stylesheet styles the page as it styles the shell's own
+// screens.
+customElements.define('remote-{{ module.name }}', r2wc({{ module.namespace }}Page));
+{{~ end ~}}

@@ -1,0 +1,2 @@
+/** Imports a remote's script module from its own address: the browser loads it, the shell's build never bundles it. */
+export const importScript = (url: string): Promise<unknown> => import(/* @vite-ignore */ url);

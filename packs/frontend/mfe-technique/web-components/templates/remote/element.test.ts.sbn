@@ -1,0 +1,25 @@
+{{~ if project["frontend.framework"] == "vue" ~}}
+import { screen } from '@testing-library/vue';
+{{~ else ~}}
+import { screen } from '@testing-library/react';
+{{~ end ~}}
+import { expect, test } from 'vitest';
+import './element';
+
+test('the remote defines its page as the element remote-{{ module.name }}', () => {
+  expect(customElements.get('remote-{{ module.name }}')).toBeDefined();
+});
+
+test('the element shows the page once the shell mounts it, and again after it is moved', async () => {
+  const element = document.createElement('remote-{{ module.name }}');
+  document.body.append(element);
+
+  expect(await screen.findByRole('heading', { name: '{{ module.namespace }}' })).toBeInTheDocument();
+
+  // Leaving a module's page and opening it again removes the element and adds it anew.
+  element.remove();
+  document.body.append(element);
+
+  expect(await screen.findByRole('heading', { name: '{{ module.namespace }}' })).toBeInTheDocument();
+  element.remove();
+});

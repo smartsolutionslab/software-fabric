@@ -1,0 +1,54 @@
+import { beforeEach, expect, test, vi } from 'vitest';
+import { loadElement } from './elements';
+import { importScript } from './script';
+
+vi.mock('virtual:remotes', () => ({
+  remotes: {
+    billing: 'http://billing/remote.js',
+    shipping: 'http://shipping/remote.js',
+    stock: 'http://stock/remote.js',
+    returns: 'http://returns/remote.js',
+  },
+}));
+vi.mock('./script', () => ({ importScript: vi.fn() }));
+
+/** What a remote's script does when it is imported: it defines the module's page as a custom element. */
+const defines = (tag: string) => async () => {
+  customElements.define(tag, class extends HTMLElement {});
+};
+
+beforeEach(() => {
+  vi.mocked(importScript).mockReset();
+});
+
+test("a module's page is the element its remote's script defines, and the script is imported once", async () => {
+  vi.mocked(importScript).mockImplementation(defines('remote-billing'));
+
+  expect(await loadElement('billing')).toBe('remote-billing');
+  expect(await loadElement('billing')).toBe('remote-billing');
+
+  expect(importScript).toHaveBeenCalledExactlyOnceWith('http://billing/remote.js');
+});
+
+test('a remote whose script failed to import is imported under a new address the next time', async () => {
+  vi.mocked(importScript)
+    .mockRejectedValueOnce(new TypeError('Failed to fetch dynamically imported module'))
+    .mockImplementationOnce(defines('remote-stock'));
+
+  await expect(loadElement('stock')).rejects.toThrow('Failed to fetch');
+  expect(await loadElement('stock')).toBe('remote-stock');
+
+  expect(vi.mocked(importScript).mock.calls).toEqual([['http://stock/remote.js'], ['http://stock/remote.js?retry=1']]);
+});
+
+test('a script that defines no element for its module is refused, so the shell says it is unavailable', async () => {
+  vi.mocked(importScript).mockResolvedValue({});
+
+  await expect(loadElement('returns')).rejects.toThrow('http://returns/remote.js defines no <remote-returns>.');
+});
+
+test('a module without a remote is refused without importing anything', async () => {
+  await expect(loadElement('unknown')).rejects.toThrow('No remote for the module unknown');
+
+  expect(importScript).not.toHaveBeenCalled();
+});

@@ -1,0 +1,19 @@
+import { render, screen } from '@testing-library/react';
+import { expect, test } from 'vitest';
+import {{ module.namespace }}Page from './{{ module.namespace }}Page';
+
+test('the page names its module', () => {
+  render(<{{ module.namespace }}Page />);
+
+  expect(screen.getByRole('heading', { name: '{{ module.namespace }}' })).toBeInTheDocument();
+});
+{{~ if project["frontend.design-system"] == "web-components" ~}}
+
+test("the page shows the design system's badge as a web component", () => {
+  const { container } = render(<{{ module.namespace }}Page />);
+
+  const badge = container.querySelector('ds-badge');
+  expect(badge?.shadowRoot).not.toBeNull();
+  expect(badge).toHaveTextContent('Remote');
+});
+{{~ end ~}}

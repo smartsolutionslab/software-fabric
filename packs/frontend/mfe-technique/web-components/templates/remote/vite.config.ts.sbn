@@ -1,0 +1,40 @@
+{{~ vue = project["frontend.framework"] == "vue" ~}}
+{{~ if vue ~}}
+import vue from '@vitejs/plugin-vue';
+{{~ else ~}}
+import react from '@vitejs/plugin-react';
+{{~ end ~}}
+import { defineConfig } from 'vitest/config';
+import { remoteBoundary } from './boundary.js';
+import { serveBuild } from './serve.js';
+{{~ if vue && slots["web.custom-element-prefixes"] != "" ~}}
+
+// As in the shell: tags Vue's compiler leaves to the browser as custom elements, any starting with a declared prefix.
+const customElementPrefixes = [{{ slots["web.custom-element-prefixes"] }}];
+const isCustomElement = (tag: string) => customElementPrefixes.some((prefix) => tag.startsWith(prefix));
+{{~ end ~}}
+
+// The {{ module.name }} module's remote: one script module, dist/remote.js, which defines the module's page as the
+// custom element <remote-{{ module.name }}>; the shell imports it at run time and mounts the tag (docs/adr). Under
+// Aspire `pnpm dev` builds it in watch mode and serves dist; built, a deployment serves dist under
+// /modules/{{ module.name }}/.
+export default defineConfig({
+  // Its files name each other relative to remote.js, wherever a deployment serves them.
+  base: './',
+  plugins: [
+{{~ if vue ~}}
+    vue({{ if slots["web.custom-element-prefixes"] != "" }}{ template: { compilerOptions: { isCustomElement } } }{{ end }}),
+{{~ else ~}}
+    react(),
+{{~ end ~}}
+    // A remote bundles only its own files and packages: other remotes and the shell are loaded at run time (docs/adr).
+    remoteBoundary(),
+    serveBuild(),
+  ],
+  build: {
+    // One file the shell imports by its name, its own framework included: nothing is shared with the shell, and a
+    // retry under a new address loads all of it again.
+    rolldownOptions: { input: './src/element.ts', output: { entryFileNames: 'remote.js', codeSplitting: false } },
+  },
+  test: { environment: 'jsdom', include: ['src/**/*.test.{{ if vue }}ts{{ else }}{ts,tsx}{{ end }}'], setupFiles: ['./src/test-setup.ts'] },
+});

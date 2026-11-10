@@ -1,0 +1,24 @@
+import type { Plugin } from 'vite';
+import { expect, test } from 'vitest';
+import { remoteBoundary } from '../boundary';
+
+/** Calls the plugin's load hook as Vite would, with an error that throws. */
+const load = (plugin: Plugin, id: string) => () => {
+  const hook = plugin.load;
+  const handler = typeof hook === 'function' ? hook : hook?.handler;
+  const context = {
+    error: (message: string) => {
+      throw new Error(message);
+    },
+  };
+  return handler?.call(context as never, id);
+};
+
+test("another remote's or the shell's file is refused whatever the platform's path separator", () => {
+  const plugin = remoteBoundary('C:\\shop\\web\\modules\\{{ module.name }}\\', 'C:\\shop\\web\\');
+
+  expect(load(plugin, 'C:/shop/web/modules/other/src/OtherPage.{{ if project["frontend.framework"] == "vue" }}vue{{ else }}tsx{{ end }}')).toThrow('A remote bundles only its own files');
+  expect(load(plugin, 'C:/shop/web/app/src/App.{{ if project["frontend.framework"] == "vue" }}vue{{ else }}tsx{{ end }}')).toThrow('A remote bundles only its own files');
+  expect(load(plugin, 'C:/shop/web/modules/{{ module.name }}/src/{{ module.namespace }}Page.{{ if project["frontend.framework"] == "vue" }}vue{{ else }}tsx{{ end }}')()).toBeNull();
+  expect(load(plugin, 'C:/shop/web/packages/ui/src/Badge.{{ if project["frontend.framework"] == "vue" }}ts{{ else }}tsx{{ end }}')()).toBeNull();
+});

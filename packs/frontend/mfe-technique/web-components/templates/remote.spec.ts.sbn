@@ -1,0 +1,72 @@
+{{~ ds = project["frontend.design-system"] ~}}
+import { expect, test, type Page } from '@playwright/test';
+
+/** Signs in, when the project has sign-in, and opens the {{ module.name }} module's page from the shell's navigation. */
+async function open{{ module.namespace }}(page: Page) {
+  await page.goto('/');
+{{~ if project["backend.auth"] != "none" ~}}
+  {{ browser_sign_in "page" "'developer'" }}
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+{{~ end ~}}
+
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+}
+
+test("{{ module.name }}'s page is the element its own remote defines", async ({ page }) => {
+  const scripts: string[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.endsWith('/remote.js')) {
+      scripts.push(url.origin);
+    }
+  });
+
+  await open{{ module.namespace }}(page);
+
+  const element = page.locator('remote-{{ module.name }}');
+  await expect(element.getByRole('heading', { name: '{{ module.namespace }}' })).toBeVisible();
+  // Loaded from the remote's own server, not bundled into the shell.
+  const shell = new URL(page.url()).origin;
+  expect(scripts.some((origin) => origin !== shell)).toBe(true);
+{{~ if ds == "web-components" ~}}
+  // The design system's element inside the remote's page is the one the shell defined: upgraded, with its shadow root.
+  const badge = element.locator('ds-badge');
+  await expect(badge).toHaveText('Remote');
+  expect(await badge.evaluate((node) => node.shadowRoot !== null)).toBe(true);
+{{~ else if ds == "tokens-and-components" ~}}
+  await expect(element.getByText('Remote')).toBeVisible();
+{{~ end ~}}
+});
+
+test("{{ module.name }}'s page loads again once its remote is back, without a reload", async ({ page, baseURL }) => {
+  // The remote's server is down: the browser's request for its remote.js fails, as when it is stopped.
+  const shell = new URL(baseURL ?? 'http://localhost:5173').origin;
+  let down = true;
+  await page.route(
+    (url) => url.pathname.endsWith('/remote.js') && url.origin !== shell,
+    (route) => (down ? route.abort('connectionrefused') : route.continue()),
+  );
+
+  await open{{ module.namespace }}(page);
+  await expect(page.getByRole('alert')).toHaveText('{{ module.name }} could not be loaded.');
+
+  // Back up: leaving the page and opening it again loads the remote, in the same document.
+  down = false;
+  await page.getByRole('link', { name: 'Home' }).click();
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+
+  await expect(page.getByRole('heading', { name: '{{ module.namespace }}' })).toBeVisible();
+});
+
+test("{{ module.name }}'s page shows again when it is opened a second time", async ({ page }) => {
+  await open{{ module.namespace }}(page);
+  await expect(page.getByRole('heading', { name: '{{ module.namespace }}' })).toBeVisible();
+
+  // Leaving the page removes the element; opening it again adds a new one, which renders the page anew.
+  await page.getByRole('link', { name: 'Home' }).click();
+  await expect(page.locator('remote-{{ module.name }}')).toHaveCount(0);
+  await page.getByRole('link', { name: '{{ module.namespace }}' }).click();
+
+  const element = page.locator('remote-{{ module.name }}');
+  await expect(element.getByRole('heading', { name: '{{ module.namespace }}' })).toBeVisible();
+});
