@@ -1,0 +1,38 @@
+name: cross-model-review-retry
+
+# Re-runs the cross-model reviews that the reviewer's usage limit postponed, once an hour (board protocol, docs/adr): a
+# pull request whose verdict at its current head is still pending as postponed gets that review run again, which then
+# reaches a verdict or is postponed once more. It reviews nothing itself: it can re-run workflows, read pull requests
+# and set commit statuses, and the review it starts holds the review's own permissions.
+#
+# It also sets the verdict of a dependency update exempt from review, which that update's own run cannot set:
+# Dependabot's runs get a read-only token (#480). A pull request by Dependabot that the base branch's
+# dependency-update.sh exempts at its current head gets cross-model-review/verdict success with the exemption note. The
+# script comes from the base branch, never from the pull request, whose head is only fetched and diffed.
+on:
+  schedule:
+    - cron: "47 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+  actions: write
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - run: bash .github/scripts/board/retry-reviews.sh "$RUN"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+

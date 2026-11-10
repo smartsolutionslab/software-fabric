@@ -3,6 +3,8 @@
 - Colours, radii and spacing are tokens in `web/packages/tokens/src/*.tokens.json` (W3C DTCG: `$value`, `$type`; reference another token as `{color.brand.700}`). Change a value there, never in a component.
 {{~ if project["frontend.styling"] == "tailwind" ~}}
 - In the app, use them through Tailwind's utilities (`bg-primary`, `rounded-md`, `p-4`) or as CSS variables (`var(--ds-color-primary)`).
+{{~ else if project["frontend.styling"] == "library-theme" ~}}
+- In the app, use them through the library's theme in `src/theme.ts`, which is built from the compiled tokens (`import { tokens } from '@{{ name }}/tokens'`, `tokens.color.primary`); a screen names the theme's values, never a token's.
 {{~ else ~}}
 - In the app, use them in CSS modules as custom properties: `color: var(--ds-color-primary)`, `padding: var(--ds-spacing-4)`.
 {{~ end ~}}
