@@ -28,16 +28,19 @@ public sealed class RequestTool : McpServerTool
 {
     /// <summary>
     /// Web defaults, but a missing argument or a null where the record allows none is refused, not defaulted{{ if option }};
-    /// an absent <see cref="Option{T}"/> is <c>null</c>, at the top of an answer or nested in it{{ end }}.
+    /// an absent <see cref="Option{T}"/> is <c>null</c>, at the top of an answer or nested in it{{ end }}. Finished here,
+    /// before any tool is built: <see cref="AIJsonUtilities.CreateJsonSchema"/> finishes options it is given, and two tools
+    /// built at once, as hosts are in parallel tests, would each finish them while the other does.
     /// </summary>
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    private static readonly JsonSerializerOptions Json = Finished(new(JsonSerializerDefaults.Web)
     {
         RespectRequiredConstructorParameters = true,
         RespectNullableAnnotations = true,
+        TypeInfoResolver = AIJsonUtilities.DefaultOptions.TypeInfoResolver,
 {{~ if option ~}}
         Converters = { new OptionJsonConverterFactory() },
 {{~ end ~}}
-    };
+    });
 
     private readonly McpToolDefinition definition;
 
@@ -116,6 +119,12 @@ public sealed class RequestTool : McpServerTool
 
     private static CallToolResult Succeeded(object value) =>
         new() { Content = [new TextContentBlock { Text = JsonSerializer.Serialize(value, value.GetType(), Json) }] };
+
+    private static JsonSerializerOptions Finished(JsonSerializerOptions options)
+    {
+        options.MakeReadOnly();
+        return options;
+    }
 
     private static CallToolResult Failed(string message) =>
         new() { IsError = true, Content = [new TextContentBlock { Text = message }] };
