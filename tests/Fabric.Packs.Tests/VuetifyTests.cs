@@ -74,6 +74,16 @@ public sealed partial class VuetifyTests
               <span v-bind:style="`color: #333`">BoundLonghand</span>
             </template>
             """,
+        ["BoundEncoded"] = """
+            <template>
+              <v-sheet :color="&quot;#fff&quot;">BoundEncoded</v-sheet>
+            </template>
+            """,
+        ["MustacheEncoded"] = """
+            <template>
+              <p :style="{ color: colour }">{{ (colour = &quot;#fff&quot;) }}</p>
+            </template>
+            """,
         ["BoundClass"] = """
             <template>
               <span :class="{ 'text-[#fff]': true }">BoundClass</span>
