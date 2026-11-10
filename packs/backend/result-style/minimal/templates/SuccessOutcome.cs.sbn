@@ -1,0 +1,10 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>A <see cref="Result{TValue,TError}"/>'s success case, matched in a <c>switch</c> on a result: <c>SuccessOutcome&lt;InvoiceDto&gt; success =&gt; ...</c>.</summary>
+public readonly struct SuccessOutcome<TValue>
+    where TValue : notnull
+{
+    internal SuccessOutcome(TValue value) => Value = value;
+
+    public TValue Value { get; }
+}

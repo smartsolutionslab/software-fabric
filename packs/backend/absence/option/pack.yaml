@@ -1,6 +1,8 @@
 option: backend.absence.option
 files:
   - { template: templates/Option.cs.sbn, target: src/Kernel/Option.cs }
+  - { template: templates/Some.cs.sbn, target: src/Kernel/Some.cs }
+  - { template: templates/None.cs.sbn, target: src/Kernel/None.cs }
   - { template: templates/NoNullableReturns.cs.sbn, target: tests/Architecture.Tests/Rules/NoNullableReturns.cs }
   - { template: templates/Absence.Tests.csproj.sbn, target: tests/Kernel/Absence.Tests/Absence.Tests.csproj }
   - { template: templates/OptionTests.cs.sbn, target: tests/Kernel/Absence.Tests/OptionTests.cs }

@@ -21,7 +21,7 @@ This is a backstop, not a way to report errors: a failure a caller should expect
 
 ## Consequences
 
-- A caller cannot ignore a failure without saying so; the compiler shows every place a failure is handled.
+- A caller cannot ignore a failure without saying so; the compiler shows every place a failure is handled. A result is a C# 15 union of its success and failure cases, so a `switch` on one that leaves out a case does not compile; a module whose errors form a closed set declares them as a union and gets the same check where it maps them.
 - No exception filter decides status codes; the error that knows the failure carries its status.{{ if project["backend.guards"] == "ensure-that" }} The one exception handler knows a single rule: `GuardException` is `400`, everything else `500`.{{ end }}
 {{~ if project["backend.guards"] == "ensure-that" ~}}
 - A guard that rejects input from an endpoint answers `400`, not `500`; a client cannot tell which field failed beyond the guard's message (field-level validation is a separate choice).

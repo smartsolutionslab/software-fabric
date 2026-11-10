@@ -4,6 +4,7 @@
 - `ApiError` (code, message, `HttpStatusCode`) is what callers see, and it belongs to the module's Application project: each error has a stable `Code` (`billing.invoice-not-found`) and the right status.
 - A rule the domain enforces fails with a `DomainError` (code and message, no HTTP) from the Domain project; the Application maps it with `ApiError.From(error, status)`, choosing the status there. `Result.MapError(...)` does it in one call.
 - An operation that succeeds with nothing to return yields `Unit.Value`.
+- A result is a union of `SuccessOutcome<TValue>` and `FailureOutcome<TError>`; a `switch` on it that misses a case does not compile. A closed set of a module's errors is a union too, `public union InvoiceError(InvoiceAlreadyPaid, InvoiceOverdue);`, mapped with a `switch` without a discard arm, so a new error fails the build until it is handled.
 - Endpoints end with `.ToHttpResult()`; do not build problem details by hand.
 {{~ if project["backend.guards"] == "ensure-that" ~}}
 - A guard or value-object factory that rejects a caller's input uses `Ensure.That`, whose failures throw `GuardException`; the host answers it with `400` problem details, code `invalid-argument`. That is a backstop for preconditions, not a way to report errors: a failure a caller should expect is a `Result`.

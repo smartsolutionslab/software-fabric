@@ -1,0 +1,10 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>An <see cref="Option{T}"/>'s case that holds a value, matched in a <c>switch</c> on an option: <c>Some&lt;Invoice&gt; some =&gt; ...</c>.</summary>
+public readonly struct Some<T>
+    where T : notnull
+{
+    internal Some(T value) => Value = value;
+
+    public T Value { get; }
+}

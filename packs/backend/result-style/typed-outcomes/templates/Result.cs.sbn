@@ -1,7 +1,14 @@
+using System.Runtime.CompilerServices;
+
 namespace {{ namespace }}.Kernel;
 
-/// <summary>Either a value or an expected failure. Business failures carry a typed error; bugs and broken infrastructure throw.</summary>
-public readonly struct Result<TValue, TError>
+/// <summary>
+/// Either a value or an expected failure: a union of <see cref="SuccessOutcome{TValue}"/> and
+/// <see cref="FailureOutcome{TError}"/>, so a <c>switch</c> on a result that misses either case does not compile.
+/// Business failures carry a typed error; bugs and broken infrastructure throw.
+/// </summary>
+[Union]
+public readonly struct Result<TValue, TError> : Result<TValue, TError>.IUnionMembers
     where TValue : notnull
     where TError : notnull
 {
@@ -16,6 +23,28 @@ public readonly struct Result<TValue, TError>
         this.isSuccess = isSuccess;
     }
 
+    /// <summary>
+    /// What makes the result a union, kept apart so that <see cref="Value"/> stays the success's value: the compiler
+    /// turns a case into a result with <c>Create</c>, which lets a handler write <c>Success(dto)</c> and the return type
+    /// supply the error type, and matches a case with <c>TryGetValue</c>, without boxing it.
+    /// </summary>
+    public interface IUnionMembers
+    {
+        object? Value { get; }
+
+        bool HasValue { get; }
+
+#pragma warning disable CA1000 // The union's conversions are static factories on the generic type by definition.
+        static Result<TValue, TError> Create(SuccessOutcome<TValue> outcome) => Success(outcome.Value);
+
+        static Result<TValue, TError> Create(FailureOutcome<TError> outcome) => Failure(outcome.Error);
+#pragma warning restore CA1000
+
+        bool TryGetValue(out SuccessOutcome<TValue> outcome);
+
+        bool TryGetValue(out FailureOutcome<TError> outcome);
+    }
+
     public bool IsSuccess => isSuccess;
 
     public bool IsFailure => !isSuccess;
@@ -26,18 +55,15 @@ public readonly struct Result<TValue, TError>
     public TError Error =>
         isSuccess ? throw new InvalidOperationException("Result is a success; no error.") : error;
 
+    object? IUnionMembers.Value => isSuccess ? new SuccessOutcome<TValue>(value) : new FailureOutcome<TError>(error);
+
+    bool IUnionMembers.HasValue => true;
+
 #pragma warning disable CA1000 // Static factories on the generic type: Result<InvoiceDto, ApiError>.Success(dto) where no return type infers it.
     public static Result<TValue, TError> Success(TValue value) => new(value, default!, isSuccess: true);
 
     public static Result<TValue, TError> Failure(TError error) => new(default!, error, isSuccess: false);
 #pragma warning restore CA1000
-
-#pragma warning disable CA2225 // The named alternatives are Success and Failure above.
-    /// <summary>Lets a handler write <c>Success(dto)</c>; the return type supplies the error type.</summary>
-    public static implicit operator Result<TValue, TError>(SuccessOutcome<TValue> outcome) => Success(outcome.Value);
-
-    public static implicit operator Result<TValue, TError>(FailureOutcome<TError> outcome) => Failure(outcome.Error);
-#pragma warning restore CA2225
 
     public TOut Match<TOut>(Func<TValue, TOut> onSuccess, Func<TError, TOut> onFailure)
     {
@@ -54,5 +80,17 @@ public readonly struct Result<TValue, TError>
         {{ not_null "map" }}
 
         return isSuccess ? Result<TValue, TOut>.Success(value) : Result<TValue, TOut>.Failure(map(error));
+    }
+
+    bool IUnionMembers.TryGetValue(out SuccessOutcome<TValue> outcome)
+    {
+        outcome = isSuccess ? new SuccessOutcome<TValue>(value) : default;
+        return isSuccess;
+    }
+
+    bool IUnionMembers.TryGetValue(out FailureOutcome<TError> outcome)
+    {
+        outcome = isSuccess ? default : new FailureOutcome<TError>(error);
+        return !isSuccess;
     }
 }
