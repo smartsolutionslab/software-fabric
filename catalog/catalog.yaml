@@ -447,7 +447,10 @@ dimensions:
       rtk-query-codegen:
         tier: supported
         requires: ["frontend.state == redux-toolkit", "backend.api-protocols has rest"]
-      orval:         { tier: supported, requires: ["backend.api-protocols has rest"] }
+      # Orval generates TanStack Query hooks, or plain functions for Pinia's stores; never Redux Toolkit's RTK Query (#518).
+      orval:
+        tier: supported
+        requires: ["backend.api-protocols has rest", "frontend.state in (zustand-tanstack-query, tanstack-query, pinia-tanstack-query, pinia)"]
       # A plain typed client: TanStack Query's caches wrap its calls; Redux Toolkit's server data is RTK Query (#264).
       openapi-fetch:
         tier: experimental
@@ -602,7 +605,11 @@ dimensions:
     note: "How users talk to the backend's agents. AG-UI over the host's POST /agents/{name}, which runs an agent's query through the dispatcher. ADR-0013."
     options:
       none:  { tier: experimental, note: "no agent panel; agents are reached through the project's own endpoints" }
-      ag-ui: { tier: experimental, note: "an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host" }
+      # The agent panel is built for a single-page app; where it lives in a micro-frontend shell is a later design question (#518).
+      ag-ui:
+        tier: experimental
+        note: "an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host"
+        requires: ["frontend.architecture == spa"]
 
   frontend.auth-client:
     scope: project

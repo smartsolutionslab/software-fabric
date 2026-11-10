@@ -128,6 +128,12 @@ public class RuleEvaluatorTests
         "backend.tenancy=schema-per-tenant requires backend.auth != none, but backend.auth is none.")]
     [InlineData("saas-standard-react", new[] { "backend.auth=none", "backend.tenancy=database-per-tenant" },
         "backend.tenancy=database-per-tenant requires backend.auth != none, but backend.auth is none.")]
+    [InlineData("saas-ai-react", new[] { "frontend.architecture=micro-frontends", "frontend.design-system=tokens" },
+        "frontend.agent-ui=ag-ui requires frontend.architecture == spa, but frontend.architecture is micro-frontends.")]
+    [InlineData("saas-ai-react", new[] { "frontend.architecture=multi-app" },
+        "frontend.agent-ui=ag-ui requires frontend.architecture == spa, but frontend.architecture is multi-app.")]
+    [InlineData("saas-standard-react", new[] { "frontend.api-client=orval" },
+        "frontend.api-client=orval requires frontend.state in (zustand-tanstack-query, tanstack-query, pinia-tanstack-query, pinia), but frontend.state is redux-toolkit.")]
     public void Rejects_a_combination_the_packs_refuse_in_one_sentence(string profile, string[] settings, string violation)
     {
         Violations(profile, settings).ShouldBe([violation]);
