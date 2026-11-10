@@ -7,7 +7,7 @@
 - Colours, shape and type live in one place, the MUI theme in `src/theme.ts`; change them there, never per component.
 {{~ end ~}}
 - Style with MUI's props and `sx`, naming the theme's values (`color="error"`; `bgcolor: 'action.hover'` and `p: 1` in `sx`). No CSS files, no `className`, no inline `style`; `src/index.css` only imports the stylesheets a library needs.
-- A component that writes a colour of its own (`#hex`, `rgb()`) fails `src/theme.test.tsx`.
+- A component that writes a colour of its own (`#hex`, `rgb()`) anywhere in its code fails `src/theme.test.tsx`; text, comments and the values of content keys and attributes (`label`, `title`, `href`, `to`, `alt`, `description`, `text`, `placeholder`, `aria-*`) may look like one (`Issue #393`, `href="#add"`). Never style with a content value.
 {{~ if project["frontend.routing"] == "react-router" ~}}
 - A link to a route is MUI's `Link` drawn as the router's: `<Link component={NavLink} to="/path">`, so it takes the theme's colours.
 {{~ else if project["frontend.routing"] == "tanstack-router" ~}}
