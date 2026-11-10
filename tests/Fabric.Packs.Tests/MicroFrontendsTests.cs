@@ -11,6 +11,7 @@ public sealed class MicroFrontendsTests
     [Theory]
     [InlineData("module-federation")]
     [InlineData("native-federation")]
+    [InlineData("web-components")]
     public void A_micro_frontends_project_generates_from_the_real_packs_alone_and_add_module_creates_the_modules_remote(string technique)
     {
         var remoteEntry = RemoteEntryOf(technique);
@@ -22,8 +23,9 @@ public sealed class MicroFrontendsTests
             File.Exists(Path.Combine(project.ProjectDirectory, "web", "modules", "billing", file)).ShouldBeTrue($"web/modules/billing/{file}");
         }
 
-        File.Exists(Path.Combine(project.ProjectDirectory, "web", "app", "federation.ts")).ShouldBeTrue("the shell's federation configuration");
-        File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", "federation.ts")).ShouldContain($"/{remoteEntry}");
+        var shellConfiguration = ShellConfigurationOf(technique);
+        File.Exists(Path.Combine(project.ProjectDirectory, "web", "app", shellConfiguration)).ShouldBeTrue("the shell's configuration of its remotes");
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", shellConfiguration)).ShouldContain($"/{remoteEntry}");
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "pnpm-workspace.yaml")).ShouldContain("  - modules/*");
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "AppHost", "AppHost.cs")).ShouldContain(".WithRemotes(remotes)");
 
@@ -35,6 +37,7 @@ public sealed class MicroFrontendsTests
     [Theory]
     [InlineData("module-federation")]
     [InlineData("native-federation")]
+    [InlineData("web-components")]
     public void The_shell_and_a_remote_per_module_install_build_lint_and_pass_their_tests_and_format_check(string technique)
     {
         var remoteEntry = RemoteEntryOf(technique);
@@ -84,6 +87,7 @@ public sealed class MicroFrontendsTests
     [Theory]
     [InlineData("module-federation")]
     [InlineData("native-federation")]
+    [InlineData("web-components")]
     public void The_shell_importing_a_remote_a_remote_importing_another_framework_or_a_banned_library_a_counted_test_and_an_unformatted_remote_fail_lint(string technique)
     {
         using var project = new GeneratedProject(Profile, Technique(technique));
@@ -159,6 +163,7 @@ public sealed class MicroFrontendsTests
     [Theory]
     [InlineData("module-federation")]
     [InlineData("native-federation")]
+    [InlineData("web-components")]
     public void The_shell_bundling_a_remotes_file_or_a_remote_bundling_another_remotes_file_fails_the_build_whatever_the_import_path(string technique)
     {
         using var project = new GeneratedProject(Profile, Technique(technique));
@@ -272,6 +277,7 @@ public sealed class MicroFrontendsTests
     [Theory]
     [InlineData("native-federation", true)]
     [InlineData("module-federation", false)]
+    [InlineData("web-components", false)]
     public void The_ui_package_names_a_version_only_for_native_federation(string technique, bool versioned)
     {
         using var project = new GeneratedProject(Profile, Technique(technique));
@@ -337,7 +343,15 @@ public sealed class MicroFrontendsTests
     private static string Technique(string technique) => $"frontend.mfe-technique={technique}";
 
     /// <summary>The file each remote's build writes for the shell to load.</summary>
-    private static string RemoteEntryOf(string technique) => technique == "native-federation" ? "remoteEntry.json" : "remoteEntry.js";
+    private static string RemoteEntryOf(string technique) => technique switch
+    {
+        "native-federation" => "remoteEntry.json",
+        "web-components" => "remote.js",
+        _ => "remoteEntry.js",
+    };
+
+    /// <summary>The shell's file that finds every remote; web components are no federation.</summary>
+    private static string ShellConfigurationOf(string technique) => technique == "web-components" ? "remotes.ts" : "federation.ts";
 
     private static void RunWeb(GeneratedProject project, params string[] steps)
     {
