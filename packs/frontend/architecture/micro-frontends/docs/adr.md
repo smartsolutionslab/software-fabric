@@ -13,7 +13,7 @@ The frontend is a **shell** and one **remote** per backend module.
 
 - **The shell** is `web/app`: sign-in, navigation, the providers every screen shares, and the route of each module.
   It holds no module's screens; a module's route mounts that module's remote with `<Remote module="<module>" />`
-  (`src/remotes/Remote.tsx`, from the chosen federation technique).
+  (`src/remotes/Remote.{{ if project["frontend.framework"] == "vue" }}vue{{ else }}tsx{{ end }}`, from the chosen federation technique).
 - **A remote** is `web/modules/<module>`, its own workspace package (`@{{ name }}/module-<module>`) with its own build,
   lint and tests. `fabric add-module` creates it with the module; nothing lists the remotes. pnpm finds them through
   `modules/*` in `pnpm-workspace.yaml`, the AppHost through the directories of `web/modules`, the shell through the same
@@ -38,6 +38,6 @@ The frontend is a **shell** and one **remote** per backend module.
 
 - A module's screens build, test and fail on their own; the shell only fails when it cannot load them, and then shows
   that the module is unavailable instead of failing as a whole.
-- What every screen needs (sign-in, the design system, React) comes from the shell and is shared; a library whose
+- What every screen needs (sign-in, the design system, {{ if project["frontend.framework"] == "vue" }}Vue{{ else }}React{{ end }}) comes from the shell and is shared; a library whose
   context a remote uses (a router, a query client) must be shared as a singleton by both, or the remote sees none.
 - Every remote is one more dev server and one more package to install and update.

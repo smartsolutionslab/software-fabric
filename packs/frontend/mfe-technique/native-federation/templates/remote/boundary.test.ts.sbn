@@ -17,8 +17,8 @@ const load = (plugin: Plugin, id: string) => () => {
 test("another remote's or the shell's file is refused whatever the platform's path separator", () => {
   const plugin = remoteBoundary('C:\\shop\\web\\modules\\{{ module.name }}\\', 'C:\\shop\\web\\');
 
-  expect(load(plugin, 'C:/shop/web/modules/other/src/OtherPage.tsx')).toThrow('A remote bundles only its own files');
-  expect(load(plugin, 'C:/shop/web/app/src/App.tsx')).toThrow('A remote bundles only its own files');
-  expect(load(plugin, 'C:/shop/web/modules/{{ module.name }}/src/{{ module.namespace }}Page.tsx')()).toBeNull();
-  expect(load(plugin, 'C:/shop/web/packages/ui/src/Badge.tsx')()).toBeNull();
+  expect(load(plugin, 'C:/shop/web/modules/other/src/OtherPage.{{ if project["frontend.framework"] == "vue" }}vue{{ else }}tsx{{ end }}')).toThrow('A remote bundles only its own files');
+  expect(load(plugin, 'C:/shop/web/app/src/App.{{ if project["frontend.framework"] == "vue" }}vue{{ else }}tsx{{ end }}')).toThrow('A remote bundles only its own files');
+  expect(load(plugin, 'C:/shop/web/modules/{{ module.name }}/src/{{ module.namespace }}Page.{{ if project["frontend.framework"] == "vue" }}vue{{ else }}tsx{{ end }}')()).toBeNull();
+  expect(load(plugin, 'C:/shop/web/packages/ui/src/Badge.{{ if project["frontend.framework"] == "vue" }}ts{{ else }}tsx{{ end }}')()).toBeNull();
 });

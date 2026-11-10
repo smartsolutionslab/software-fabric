@@ -1,9 +1,10 @@
+{{~ fw = project["frontend.framework"] ~}}
 import { expect, test } from '@playwright/test';
 
-/** A remote's build of a package it shares, as native federation names it in dist: react.<hash>-dev.js. */
-const sharedPackage = /\/(react|react-dom|_{{ name }}_ui)\.[^/]+\.js$/;
+/** A remote's build of a package it shares, as native federation names it in dist: {{ fw }}.<hash>-dev.js. */
+const sharedPackage = /\/({{ if fw == "vue" }}vue{{ else }}react|react-dom{{ end }}|_{{ name }}_ui)\.[^/]+\.js$/;
 
-test("{{ module.name }}'s page comes from its own remote, with the shell's react and design system", async ({ page }) => {
+test("{{ module.name }}'s page comes from its own remote, with the shell's {{ fw }} and design system", async ({ page }) => {
   const entries: string[] = [];
   const shared: string[] = [];
   page.on('request', (request) => {

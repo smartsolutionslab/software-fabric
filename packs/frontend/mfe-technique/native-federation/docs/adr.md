@@ -1,10 +1,24 @@
+{{~ vue = project["frontend.framework"] == "vue" ~}}
+{{~ framework = "React" ~}}
+{{~ if vue ~}}
+{{~ framework = "Vue" ~}}
+{{~ end ~}}
+{{~ if vue && project["frontend.design-system"] == "tokens" ~}}
+{{~ shared = "`vue`" ~}}
+{{~ else if vue ~}}
+{{~ shared = "`vue` and `@" + name + "/ui`" ~}}
+{{~ else if project["frontend.design-system"] == "tokens" ~}}
+{{~ shared = "`react` and `react-dom`" ~}}
+{{~ else ~}}
+{{~ shared = "`react`, `react-dom` and `@" + name + "/ui`" ~}}
+{{~ end ~}}
 # Micro-frontend technique: native federation
 
 **Status:** Accepted (generated)
 
 ## Context
 
-The shell has to load each module's remote at run time, share React and the design system with it as one instance,
+The shell has to load each module's remote at run time, share {{ framework }} and the design system with it as one instance,
 and work in development without a step a developer runs by hand. Native federation does this with plain ES modules
 and an import map, without a bundler's runtime: a remote's build writes `remoteEntry.json`, which names the modules it
 exposes and the packages it shares.
@@ -21,7 +35,7 @@ exactly.
   in an Angular shell. It peers on core `~4.8.1`, so core is pinned there. Upgrade the three together, and run the
   micro-frontend end-to-end tests on every upgrade.
 - **A remote** (`web/modules/<module>/federation.config.js`) is named after its module and exposes one entry, `./Page`:
-  the module's screens as one component, the default export of `src/<Module>Page.tsx`. `pnpm build` type-checks it,
+  the module's screens as one component, the default export of `src/<Module>Page.{{ if vue }}vue{{ else }}tsx{{ end }}`. `pnpm build` type-checks it,
   bundles the page once with Vite without writing it, so the remote's boundary names a file of another remote or of
   the shell (native federation's dependency analysis would stop at it saying only that it is outside the remote), and
   runs `native-federation-vite build`, which reuses the plugins of the remote's `vite.config.ts` and writes
@@ -30,18 +44,24 @@ exactly.
   remote with native federation in watch mode, unminified, and then serves `dist`. Native federation has no dev server;
   a change is rebuilt in the background and shows after a reload of the shell, without hot module replacement.
 - **The shell is the host.** `src/remotes/federation.ts` starts the orchestrator once, with the shell's own
-  `remoteEntry.json`: `react`{{ if project["frontend.design-system"] == "tokens" }} and{{ else }},{{ end }} `react-dom`{{ if project["frontend.design-system"] == "tokens" }}{{ else }} and `@{{ name }}/ui`{{ end }} at the shell's installed versions (`web/app/federation.ts`
+  `remoteEntry.json`: {{ shared }} at the shell's installed versions (`web/app/federation.ts`
   reads them). The import map sends each of them to a module that exports the shell's own instance, so a remote renders
-  with the shell's React and its hooks work. The shell itself is built and served by Vite as before; nothing about it
+  with the shell's {{ framework }} and {{ if vue }}its reactivity works across the shell and the remote{{ else }}its hooks work{{ end }}. The shell itself is built and served by Vite as before; nothing about it
   is federated except what it shares.
-- **Shared as singletons with strict versions** by both sides: `react`{{ if project["frontend.design-system"] == "tokens" }} and{{ else }},{{ end }} `react-dom`{{ if project["frontend.design-system"] == "tokens" }}{{ else }} and `@{{ name }}/ui`{{ end }}, each with
+- **Shared as singletons with strict versions** by both sides: {{ shared }}, each with
   `singleton: true, strictVersion: true, requiredVersion: 'auto'`, so a remote's required version is the exact pin in
   its package.json. The orchestrator runs with `strictExternalCompatibility`: a remote built against another version
-  fails to load and the shell says so, instead of loading a second React whose hooks would fail at run time.
+  fails to load and the shell says so, instead of loading a second {{ framework }} whose {{ if vue }}components and reactivity{{ else }}hooks{{ end }} would fail at run time.
 {{- if project["frontend.design-system"] != "tokens" }} The ui
   package is a workspace package; native federation shares a package only when its package.json names a version, so
   this pack gives it `"version": "0.0.0"`, and its required version is `workspace:*`.{{ end }}
-- `src/remotes/Remote.tsx` loads a module's `./Page` once, shows it, and shows that the module is unavailable when its
+{{~ if vue ~}}
+- **Every shared package is kept** (`features: { ignoreUnusedDeps: false }`): native federation drops a shared package no
+  source file imports, and a page's compiled template imports `vue` where its source does not, so `vue` would be
+  bundled into the page as a second copy. `vue` is shared with `includeSecondaries: false`: its compiler and server
+  renderer are no page's imports.
+{{~ end ~}}
+- `src/remotes/Remote.{{ if vue }}vue{{ else }}tsx{{ end }}` loads a module's `./Page` once, shows it, and shows that the module is unavailable when its
   remote cannot be loaded. The next time that page is opened it reads the remote's `remoteEntry.json` again, and imports
   a module that failed under a new address (`?retry=<n>`): the browser keeps a failed module import for good, so only a
   new address loads it once its server is back, without reloading the shell.
@@ -52,12 +72,13 @@ exactly.
   while the shell is open, with new content-hashed file names, is therefore picked up after a reload of the shell; until
   then a retry asks for the file names the shell first read.
 {{~ if project["frontend.design-system"] == "tokens" ~}}
-- **No ui package is shared**: the tokens design system has no components, so a remote shares only React with the
+- **No ui package is shared**: the tokens design system has no components, so a remote shares only {{ framework }} with the
   shell, and styles its screens with the tokens' CSS variables, which the shell's stylesheet defines.
 {{~ else if project["frontend.design-system"] == "web-components" ~}}
 - **The design system's elements are defined once**, by the shell's instance of `@{{ name }}/ui`: a remote's page imports
-  the package for its elements and renders them as tags (`<ds-badge>`), which its `src/design-system.d.ts` declares
-  for React's JSX as the shell's does.
+  the package for its elements and renders them as tags (`<ds-badge>`), which {{ if vue }}Vue's compiler leaves to the
+  browser as custom elements through the remote's `isCustomElement` in `vite.config.ts`, as in the shell's{{ else }}its `src/design-system.d.ts` declares
+  for React's JSX as the shell's does{{ end }}.
 {{~ end ~}}
 - No type declarations are exchanged: a remote is loaded by name, and its page takes no props.
 - Each remote's `lint` runs ESLint, with the shell's library bans and test rules, and Prettier, and its tests run with

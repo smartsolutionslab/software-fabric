@@ -1,6 +1,12 @@
+{{~ fw = project["frontend.framework"] ~}}
 import type { initFederation } from '@softarc/native-federation-orchestrator';
+{{~ if project["frontend.framework"] == "vue" ~}}
+import { expect, test, vi } from 'vitest';
+import * as vue from 'vue';
+{{~ else ~}}
 import * as react from 'react';
 import { expect, test, vi } from 'vitest';
+{{~ end ~}}
 import { loadPage } from './federation';
 
 // jsdom has no object URLs: each one names the blob it was made from, so a test can read it.
@@ -18,7 +24,7 @@ const setImportMap = vi.hoisted(() => vi.fn());
 
 vi.mock('virtual:federation', () => ({
   remotes: { billing: 'http://remote/remoteEntry.json' },
-  versions: { react: '19.3.1', 'react-dom': '19.3.1'{{ if project["frontend.design-system"] != "tokens" }}, '@{{ name }}/ui': '0.0.0'{{ end }} },
+  versions: { {{ if project["frontend.framework"] == "vue" }}vue: '3.5.44'{{ else }}react: '19.3.1', 'react-dom': '19.3.1'{{ end }}{{ if project["frontend.design-system"] != "tokens" }}, '@{{ name }}/ui': '0.0.0'{{ end }} },
 }));
 vi.mock('@softarc/native-federation-orchestrator/options', () => ({ replaceInDOM: () => setImportMap }));
 
@@ -74,6 +80,13 @@ test('the shell is the host: its packages at its versions, as singletons the orc
     singleton: true,
     strictVersion: true,
   });
+{{~ if fw == "vue" ~}}
+  expect(entry.shared).toHaveLength({{ if project["frontend.design-system"] != "tokens" }}2{{ else }}1{{ end }});
+  expect(entry.shared).toContainEqual(singleton('vue', 'vue.js', '3.5.44'));
+{{~ if project["frontend.design-system"] != "tokens" ~}}
+  expect(entry.shared).toContainEqual(singleton('@{{ name }}/ui', '@{{ name }}_ui.js', '0.0.0'));
+{{~ end ~}}
+{{~ else ~}}
   expect(entry.shared).toEqual([
     singleton('react', 'react.js', '19.3.1'),
     singleton('react-dom', 'react-dom.js', '19.3.1'),
@@ -81,22 +94,23 @@ test('the shell is the host: its packages at its versions, as singletons the orc
     singleton('@{{ name }}/ui', '@{{ name }}_ui.js', '0.0.0'),
 {{~ end ~}}
   ]);
+{{~ end ~}}
 });
 
 test("a remote's import of a shared package gets the shell's own instance", async () => {
   await loadPage('billing');
 
   options().setImportMapFn?.({
-    imports: { react: `${hostEntry()}/react.js`, 'billing/./Page': 'http://remote/Page.js' },
-    scopes: { 'http://remote/': { react: `${hostEntry()}/react.js` } },
+    imports: { {{ fw }}: `${hostEntry()}/{{ fw }}.js`, 'billing/./Page': 'http://remote/Page.js' },
+    scopes: { 'http://remote/': { {{ fw }}: `${hostEntry()}/{{ fw }}.js` } },
   });
 
   const [importMap] = setImportMap.mock.calls[0] ?? [];
   expect(importMap.imports['billing/./Page']).toBe('http://remote/Page.js');
-  const module = await textOf(importMap.imports.react);
-  expect(importMap.scopes['http://remote/'].react).toBe(importMap.imports.react);
-  expect(module).toContain(`globalThis[Symbol.for('native-federation.shell')]["react"]`);
-  expect(module).toMatch(/export const \{ [^}]*\buseState\b[^}]*\} = shared;/);
+  const module = await textOf(importMap.imports.{{ fw }});
+  expect(importMap.scopes['http://remote/'].{{ fw }}).toBe(importMap.imports.{{ fw }});
+  expect(module).toContain(`globalThis[Symbol.for('native-federation.shell')]["{{ fw }}"]`);
+  expect(module).toMatch(/export const \{ [^}]*\b{{ if fw == "vue" }}ref{{ else }}useState{{ end }}\b[^}]*\} = shared;/);
   const instances = globalThis as Record<symbol, Record<string, unknown> | undefined>;
-  expect(instances[Symbol.for('native-federation.shell')]?.react).toBe(react);
+  expect(instances[Symbol.for('native-federation.shell')]?.{{ fw }}).toBe({{ fw }});
 });
