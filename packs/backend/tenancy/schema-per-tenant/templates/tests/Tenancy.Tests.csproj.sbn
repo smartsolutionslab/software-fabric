@@ -1,17 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+{{~ if project["backend.bus.transport"] != "none" ~}}
   <!-- Schema-per-tenant tenancy against the AppHost's database alone, after the MigrationRunner: no host, and Wolverine
        in process for the consumers. -->
+{{~ else ~}}
+  <!-- Schema-per-tenant tenancy against the AppHost's database alone, after the MigrationRunner: no host. -->
+{{~ end ~}}
   <PropertyGroup>
     <RootNamespace>{{ namespace }}.Tenancy.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
     {{ database_fixture_package_references }}
+{{~ if project["backend.bus.transport"] != "none" ~}}
     <PackageReference Include="WolverineFx.Postgresql" />
 {{~ # Mediator wolverine already references it from every test project (tests.packages). ~}}
 {{~ if project["backend.mediator"] != "wolverine" ~}}
     <PackageReference Include="WolverineFx.RuntimeCompilation" />
+{{~ end ~}}
 {{~ end ~}}
   </ItemGroup>
 

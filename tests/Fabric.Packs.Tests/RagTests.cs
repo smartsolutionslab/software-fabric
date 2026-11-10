@@ -18,7 +18,7 @@ public sealed class RagTests
     private const string Image = ".WithImage(\"pgvector/pgvector\", \"0.8.7-pg18\")";
     private const string Store = "src/BuildingBlocks/Rag";
 
-    /// <summary>Schema-per-tenant tenancy, which the catalog refuses with lean-crud's transport none, signed in through the default identity provider.</summary>
+    /// <summary>Schema-per-tenant tenancy over a broker, signed in through the default identity provider.</summary>
     private static readonly string[] SchemaPerTenant = ["backend.tenancy=schema-per-tenant", "backend.bus.transport=rabbitmq"];
 
     /// <summary>The notes module keeps a search over the billing module's vectors: in a field, in a method body, and through a generic helper of its own.</summary>
