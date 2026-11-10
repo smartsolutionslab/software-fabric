@@ -42,4 +42,4 @@ adr: docs/adr.md
 gates:
   - { kind: ci-step, describes: "The token build fails on a token that references one that does not exist (Style Dictionary throws on broken references); pnpm build, dev and test run it first.", file: templates/tokens/build.mjs.sbn }
   - { kind: ci-step, describes: "The ui package's build type-checks its components and stories and builds Storybook; a story that does not compile fails the frontend job.", file: templates/ui/package.json.sbn }
-  - { kind: ci-step, describes: "The ui package's tests fail when a component's shadow styles carry a colour value of their own instead of a token's --ds-* variable.", file: templates/ui/Badge.test.ts.sbn }
+  - { kind: ci-step, describes: "The ui package's tests, in Chromium, fail when a colour a component paints, in any computed property of its element, label or shadow elements, or in any of its rules (states included), is not what a --ds-color-* token resolves to, as built and again after every token is changed.", file: templates/ui/Badge.test.ts.sbn }
