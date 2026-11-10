@@ -37,6 +37,7 @@ containers.
 |---|---|
 | [`catalog/catalog.yaml`](catalog/catalog.yaml) | Every option, its scope and its rules |
 | [`docs/catalog-rules.md`](docs/catalog-rules.md) | The rule grammar the catalog uses |
+| [`docs/catalog.md`](docs/catalog.md) | Every dimension and option, generated from the catalog by `fabric reference` |
 | [`docs/packs.md`](docs/packs.md) | How to write a pack: layout, targets, template model, slots |
 | [`schema/pack.schema.json`](schema/pack.schema.json) | What an option pack must declare |
 | [`docs/adr/`](docs/adr/) | Decisions 0001–0008 |
@@ -55,6 +56,7 @@ fabric validate --profile saas-standard-vue --set backend.database=sqlserver
 fabric new ../shop --profile everything --catalog tests/fixtures/minimal/catalog.yaml --packs tests/fixtures/minimal/packs
 fabric add-module billing --project ../shop --catalog tests/fixtures/minimal/catalog.yaml --packs tests/fixtures/minimal/packs
 fabric matrix --catalog catalog/catalog.yaml --packs packs --extra build/matrix-extra.yaml --output build/matrix.json
+fabric reference --catalog catalog/catalog.yaml --output docs/catalog.md
 ```
 
 `fabric matrix` writes the pairwise matrix (ADR-0003): full choice sets
@@ -62,6 +64,10 @@ without a profile, each one's `choices` ready for `fabric new --choices`,
 that together contain every pair of options with a pack that some valid
 choice set contains, and the pairs none does. `build/matrix.json` is checked in, and a test fails when it is
 stale; `build/matrix-extra.yaml` adds combinations a defect needs.
+
+`fabric reference` writes `docs/catalog.md`: every dimension and option with
+its tier, rules, note and the profiles that use it. It is checked in too, and
+a test fails when it is stale.
 
 `build/profiles.sh` is what CI runs after the tests: every fixture profile
 generated twice and compared, a module added, every real profile validated.
