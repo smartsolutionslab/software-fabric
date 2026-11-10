@@ -71,12 +71,10 @@ public class SupportTierTests
     [InlineData("frontend.state", "zustand-tanstack-query")]
     [InlineData("frontend.state", "pinia")]
     [InlineData("frontend.api-client", "openapi-fetch")]
-    [InlineData("frontend.routing", "tanstack-router")]
     [InlineData("frontend.forms", "vee-validate")]
     [InlineData("frontend.forms", "formkit")]
     [InlineData("frontend.validation", "valibot")]
     [InlineData("frontend.styling", "css-modules")]
-    [InlineData("frontend.styling", "library-theme")]
     [InlineData("frontend.ui-library", "radix-headless")]
     [InlineData("frontend.ui-library", "mui")]
     [InlineData("frontend.ui-library", "shadcn-vue")]
@@ -108,6 +106,8 @@ public class SupportTierTests
     [InlineData("frontend.design-system", "web-components")]
     [InlineData("frontend.realtime", "signalr")]
     [InlineData("frontend.realtime", "sse")]
+    [InlineData("frontend.routing", "tanstack-router")]
+    [InlineData("frontend.styling", "library-theme")]
     public void An_option_whose_pack_changed_after_nightly_run_42800894655_stays_experimental(string dimension, string option)
     {
         var catalog = CatalogReader.ReadFile(RepositoryRoot.File("catalog", "catalog.yaml"));
