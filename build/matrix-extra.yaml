@@ -8,4 +8,13 @@
 #     choices:
 #       backend.database: postgres
 #       backend.api-protocols: [rest]
-combinations: []
+combinations:
+  - reason: >-
+      #465: with Wolverine's mediator and an authorization choice, every dashboards request answered 500, in the host and
+      in the generative module tests' host; pairwise coverage does not keep the three together. Tenancy none, because
+      schema-per-tenant rows stopped at the backend build then (#430, #462) and never reached the dashboards tests.
+    choices:
+      frontend.dashboards: [user-editable, generative]
+      backend.mediator: wolverine
+      backend.authorization: [roles]
+      backend.tenancy: none

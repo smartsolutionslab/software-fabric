@@ -113,6 +113,7 @@ slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 30 }
   - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 50 }
   - { slot: tests.module-host-services, template: templates/module-host-services.sbn }
+  - { slot: messaging.wolverine-options, template: templates/wolverine-options.sbn, optional: true }
   - { slot: web.dependencies, template: templates/web-dependency.sbn }
   - { slot: web.styles, template: templates/web-styles.sbn }
   - { slot: web.openapi-paths, template: templates/openapi-paths.sbn }
