@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "{{ if slots["web.prepare"] != "" }}{{ slots["web.prepare"] }} && {{ end }}vite",
-    "build": "{{ if slots["web.prepare"] != "" }}{{ slots["web.prepare"] }} && {{ end }}vue-tsc -b && vite build",
+    "build": "{{ if slots["web.prepare"] != "" }}{{ slots["web.prepare"] }} && {{ end }}vue-tsc -b && node check-declarations.mjs && vite build",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

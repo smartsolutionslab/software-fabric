@@ -17,6 +17,7 @@ Playwright runs end-to-end tests in `web/app/e2e` against the running applicatio
 ## Consequences
 
 - Type errors fail the build (`vue-tsc -b` runs before `vite build`, `.vue` files included), lint errors fail CI.
+- `skipLibCheck` skips every declaration file, so after `vue-tsc -b` the build runs `check-declarations.mjs`: it type-checks the `.d.ts` files the workspace owns (the app's and each remote's or package's, under its own `tsconfig.json`) with `skipLibCheck` off and reports only their errors. Those under `node_modules` stay skipped; their errors are not ours to fix.
 - eslint-plugin-vue's `recommended` and `strongly-recommended` sets are left out: beyond `essential` they are mostly layout rules (attributes per line, indentation) that Prettier owns and would contradict.
 - Components are named in more than one word (`vue/multi-word-component-names`): a module's page is `BillingPage.vue`; the start page keeps its file name `Home.vue` and is named `HomePage` with `defineOptions`.
 - Formatting is Prettier's alone (`.prettierrc.json`: single quotes, trailing commas, 2 spaces, 120 columns); CI runs `pnpm format:check` and fails on any file Prettier would change. The ESLint rules are correctness rules only; files a tool writes are listed in `.prettierignore`.

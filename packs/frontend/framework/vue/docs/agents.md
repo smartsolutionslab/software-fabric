@@ -7,6 +7,7 @@
 - Call the backend through `/api/...`; the dev server forwards it to the host. Never hard-code the host's port.
 - End-to-end tests go in `e2e/` (Playwright); run them with the AppHost up: `pnpm e2e`.
 - No `any`, no non-null assertions (`!`); lint fails on both.
+- A `.d.ts` file you write is type-checked by `pnpm build` (`check-declarations.mjs`), although `skipLibCheck` is on; fix its errors, never exclude it.
 - A library is installed in `src/main.ts` through its pack's provider, never with `app.use` added by hand there.
 - Run `pnpm format` in `web/app` before committing; CI runs `pnpm format:check` and fails on any file Prettier would change. Do not add formatting rules to ESLint.
 - A file a tool writes (not people) goes in `.prettierignore`, never a hand-formatted copy.

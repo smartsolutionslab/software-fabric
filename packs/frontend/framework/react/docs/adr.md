@@ -15,6 +15,7 @@ Playwright runs end-to-end tests in `web/app/e2e` against the running applicatio
 ## Consequences
 
 - Type errors fail the build (`tsc -b` runs before `vite build`), lint errors fail CI.
+- `skipLibCheck` skips every declaration file, so after `tsc -b` the build runs `check-declarations.mjs`: it type-checks the `.d.ts` files the workspace owns (the app's and each remote's or package's, under its own `tsconfig.json`) with `skipLibCheck` off and reports only their errors. Those under `node_modules` stay skipped; their errors are not ours to fix.
 - Formatting is Prettier's alone (`.prettierrc.json`: single quotes, trailing commas, 2 spaces, 120 columns); CI runs `pnpm format:check` and fails on any file Prettier would change. The ESLint rules are correctness rules only, so the two never disagree; files a tool writes (the generated client, `openapi.json`) are listed in `.prettierignore`.
 - In `*.test.ts(x)`, ESLint (`no-restricted-syntax`) fails on two shapes: a `for`, `for...of` or `for...in` loop that awaits a `new Promise(...)`, whatever its bound; and, immediately before a statement calling `expect`, an awaited `new Promise(...)`, an awaited call to a helper named `settle`, `sleep`, `delay`, `wait`, `pause`, `tick`, `nextTick`, `flushPromises` or `setTimeout`, or an empty `await act(async () => {})`.
 - That rule is necessary, not sufficient. It cannot see:

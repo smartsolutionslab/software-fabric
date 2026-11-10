@@ -1,0 +1,33 @@
+// skipLibCheck skips every declaration file, the workspace's own as well as those under node_modules. This checks the
+// workspace's own: each package's .d.ts files, in a program built from its tsconfig.json with skipLibCheck off, and
+// reports only their errors, so node_modules' declaration files stay skipped.
+import path from 'node:path';
+import ts from 'typescript';
+
+const workspace = path.resolve('..');
+const configs = ts.sys.readDirectory(workspace, ['.json'], ['**/node_modules', '**/dist'], ['**/tsconfig.json']);
+
+const diagnostics = configs.flatMap((config) => {
+  const { config: json } = ts.readConfigFile(config, ts.sys.readFile);
+  const { fileNames, options } = ts.parseJsonConfigFileContent(json, ts.sys, path.dirname(config));
+  const declarations = fileNames.filter((file) => file.endsWith('.d.ts'));
+  if (declarations.length === 0) {
+    return [];
+  }
+
+  const program = ts.createProgram(fileNames, { ...options, skipLibCheck: false });
+  return declarations.flatMap((file) => {
+    const source = program.getSourceFile(file);
+    return [...program.getSyntacticDiagnostics(source), ...program.getSemanticDiagnostics(source)];
+  });
+});
+
+if (diagnostics.length > 0) {
+  const host = {
+    getCanonicalFileName: (file) => file,
+    getCurrentDirectory: ts.sys.getCurrentDirectory,
+    getNewLine: () => ts.sys.newLine,
+  };
+  process.stderr.write(ts.formatDiagnostics(diagnostics, host));
+  process.exitCode = 1;
+}
