@@ -88,7 +88,7 @@ public sealed partial class VuetifyTests
         main.ShouldContain("// Outermost first: each one wraps all that follow it.\n  withVuetify,\n", customMessage: "the sign-in and every page are inside Vuetify's VApp");
         files["web/app/src/providers/vuetify.ts"].ShouldContain("h(VApp, null, { default: () => h(root) })");
 
-        files["web/app/src/test-setup.ts"].ShouldContain("config.global.plugins.push(vuetify);");
+        files["web/app/src/test-setup.ts"].ShouldContain("mountConfig.global.plugins.push(vuetify);");
         var vite = files["web/app/vite.config.ts"];
         vite.ShouldContain("deps: { inline: ['vuetify'] }");
         vite.ShouldNotContain("tailwind");
