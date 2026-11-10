@@ -112,7 +112,8 @@ public sealed partial class MuiTests
           );
 
           const style = getComputedStyle(screen.getByRole('link', { name: 'Home' }));
-          expect(resolve(style, style.color)).toBe('#0b6e4f');
+          // #0b6e4f, as the browser serialises it.
+          expect(resolve(style, style.color)).toBe('rgb(11, 110, 79)');
         });
         """;
 
@@ -136,7 +137,8 @@ public sealed partial class MuiTests
           );
 
           const style = getComputedStyle(await screen.findByRole('link', { name: 'Home' }));
-          expect(resolve(style, style.color)).toBe('#0b6e4f');
+          // #0b6e4f, as the browser serialises it.
+          expect(resolve(style, style.color)).toBe('rgb(11, 110, 79)');
         });
         """;
 
