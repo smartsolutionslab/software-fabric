@@ -1,0 +1,51 @@
+import { render, screen } from '@testing-library/vue';
+import { expect, test, vi } from 'vitest';
+import { h } from 'vue';
+import { loadPage } from './federation';
+import Remote from './Remote.vue';
+
+vi.mock('./federation', () => ({ loadPage: vi.fn() }));
+
+/** A page as a remote exposes it: a component, here one that renders a heading. */
+const pageNamed = (name: string) => () => h('h1', name);
+
+test("a module's page is the page its remote exposes", async () => {
+  vi.mocked(loadPage).mockResolvedValue(pageNamed('Billing'));
+
+  render(Remote, { props: { module: 'billing' } });
+
+  expect(await screen.findByRole('heading', { name: 'Billing' })).toBeInTheDocument();
+  expect(loadPage).toHaveBeenCalledWith('billing');
+});
+
+test('a remote that cannot be loaded leaves the shell running and says so', async () => {
+  vi.mocked(loadPage).mockRejectedValue(new Error('remoteEntry.json did not load'));
+
+  render(Remote, { props: { module: 'shipping' } });
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('shipping could not be loaded.');
+});
+
+test('a remote that failed to load is loaded again the next time its page is shown', async () => {
+  vi.mocked(loadPage)
+    .mockRejectedValueOnce(new Error('remoteEntry.json did not load'))
+    .mockResolvedValueOnce(pageNamed('Stock'));
+
+  const { unmount } = render(Remote, { props: { module: 'stock' } });
+  expect(await screen.findByText('stock could not be loaded.')).toBeInTheDocument();
+  unmount();
+
+  render(Remote, { props: { module: 'stock' } });
+
+  expect(await screen.findByRole('heading', { name: 'Stock' })).toBeInTheDocument();
+});
+
+test('a page that fails to render leaves the shell running and says so', async () => {
+  vi.mocked(loadPage).mockResolvedValue(() => {
+    throw new Error('the page failed to render');
+  });
+
+  render(Remote, { props: { module: 'returns' } });
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('returns could not be loaded.');
+});

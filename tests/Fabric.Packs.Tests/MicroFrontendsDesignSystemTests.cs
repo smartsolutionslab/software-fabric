@@ -4,18 +4,21 @@ namespace Fabric.Packs.Tests;
 /// frontend.architecture=micro-frontends on the design systems besides tokens-and-components (#400): the shell and each
 /// remote use what the chosen design system provides. With tokens there is no ui package, so nothing names one; with
 /// web-components a remote's page shows the design system's custom element, and native federation shares its ui package
-/// as it does tokens-and-components'.
+/// as it does tokens-and-components'. Vue, which allows tokens and web-components, has native federation's Vue shell
+/// runtime and Vue remotes.
 /// </summary>
 public sealed class MicroFrontendsDesignSystemTests
 {
     [Theory]
-    [InlineData("module-federation", "tokens")]
-    [InlineData("module-federation", "web-components")]
-    [InlineData("native-federation", "tokens")]
-    [InlineData("native-federation", "web-components")]
-    public void The_shell_and_a_remote_install_build_lint_and_pass_their_tests(string technique, string designSystem)
+    [InlineData("module-federation", "tokens", "react")]
+    [InlineData("module-federation", "web-components", "react")]
+    [InlineData("native-federation", "tokens", "react")]
+    [InlineData("native-federation", "web-components", "react")]
+    [InlineData("native-federation", "tokens", "vue")]
+    [InlineData("native-federation", "web-components", "vue")]
+    public void The_shell_and_a_remote_install_build_lint_pass_their_tests_and_format_check(string technique, string designSystem, string framework)
     {
-        using var project = Project(technique, designSystem);
+        using var project = Project(technique, designSystem, framework);
 
         var web = Path.Combine(project.ProjectDirectory, "web");
         foreach (var step in new[] { "install", "build", "lint", "test" })
@@ -24,8 +27,19 @@ public sealed class MicroFrontendsDesignSystemTests
             exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
         }
 
+        // The generated CI's check of the shell's formatting, which runs only in web/app.
+        var (formatExitCode, formatOutput) = Shell.Run(Path.Combine(web, "app"), "pnpm", "format:check");
+        formatExitCode.ShouldBe(0, $"pnpm format:check:\n{formatOutput}");
+
         var remoteEntry = technique == "native-federation" ? "remoteEntry.json" : "remoteEntry.js";
         File.Exists(Path.Combine(web, "modules", "billing", "dist", remoteEntry)).ShouldBeTrue($"billing's remote builds its {remoteEntry}");
+
+        if (framework == "vue")
+        {
+            // The remote shares the shell's vue, which its compiled template imports, instead of bundling a copy into the page.
+            File.ReadAllText(Path.Combine(web, "modules", "billing", "dist", remoteEntry))
+                .ShouldContain("\"packageName\": \"vue\"", customMessage: "billing's remoteEntry.json shares vue");
+        }
     }
 
     [Theory]
@@ -62,6 +76,24 @@ public sealed class MicroFrontendsDesignSystemTests
         File.ReadAllText(Path.Combine(remote, "src", "BillingPage.test.tsx")).ShouldContain(".shadowRoot");
     }
 
+    [Fact]
+    public void With_web_components_a_vue_remotes_page_shows_the_design_systems_element_which_its_compiler_leaves_to_the_browser()
+    {
+        using var project = Project("native-federation", "web-components", "vue");
+        var remote = Path.Combine(project.ProjectDirectory, "web", "modules", "billing");
+
+        var page = File.ReadAllText(Path.Combine(remote, "src", "BillingPage.vue"));
+        page.ShouldContain("import '@shop/ui';");
+        page.ShouldContain("<ds-badge>Remote</ds-badge>");
+
+        // Vue's compiler resolves an unknown tag as a component unless told: the remote is told as the shell is.
+        File.ReadAllText(Path.Combine(remote, "vite.config.ts")).ShouldContain("const customElementPrefixes = ['ds-'];");
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", "vite.config.ts")).ShouldContain("const customElementPrefixes = ['ds-'];");
+        File.Exists(Path.Combine(remote, "src", "design-system.d.ts")).ShouldBeFalse("React's JSX declarations");
+
+        File.ReadAllText(Path.Combine(remote, "src", "BillingPage.test.ts")).ShouldContain(".shadowRoot");
+    }
+
     /// <summary>Native federation shares a package only when its package.json names a version (web.ui-package-fields).</summary>
     [Theory]
     [InlineData("native-federation", true)]
@@ -86,10 +118,10 @@ public sealed class MicroFrontendsDesignSystemTests
         }
     }
 
-    private static GeneratedProject Project(string technique, string designSystem)
+    private static GeneratedProject Project(string technique, string designSystem, string framework = "react")
     {
         var project = new GeneratedProject(
-            "saas-standard-react",
+            $"saas-standard-{framework}",
             "frontend.architecture=micro-frontends",
             $"frontend.design-system={designSystem}",
             $"frontend.mfe-technique={technique}");

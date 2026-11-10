@@ -4,14 +4,24 @@ import { share, withNativeFederation } from '@softarc/native-federation/config';
 // bundles the shell loads at run time (docs/adr).
 export default withNativeFederation({
   name: '{{ module.name }}',
-  exposes: { './Page': './src/{{ module.namespace }}Page.tsx' },
+  exposes: { './Page': './src/{{ module.namespace }}Page.{{ if project["frontend.framework"] == "vue" }}vue{{ else }}tsx{{ end }}' },
   // One instance of each, the shell's (web/app/federation.ts shares the same). 'auto' takes each version from
   // package.json, where it is pinned exactly.
   shared: share({
+{{~ if project["frontend.framework"] == "vue" ~}}
+    vue: { singleton: true, strictVersion: true, requiredVersion: 'auto', includeSecondaries: false },
+{{~ else ~}}
     react: { singleton: true, strictVersion: true, requiredVersion: 'auto' },
     'react-dom': { singleton: true, strictVersion: true, requiredVersion: 'auto' },
+{{~ end ~}}
 {{~ if project["frontend.design-system"] != "tokens" ~}}
     '@{{ name }}/ui': { singleton: true, strictVersion: true, requiredVersion: 'auto' },
 {{~ end ~}}
   }),
+{{~ if project["frontend.framework"] == "vue" ~}}
+  // A page's compiled template imports vue, which native federation's scan of the sources does not see: it would drop
+  // vue as unused and bundle a copy of it into the page. So nothing listed above is dropped, and vue is shared without
+  // its secondary entry points (compiler, server renderer), which no page imports.
+  features: { ignoreUnusedDeps: false },
+{{~ end ~}}
 });

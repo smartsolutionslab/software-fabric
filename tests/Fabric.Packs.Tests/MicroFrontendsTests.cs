@@ -192,9 +192,12 @@ public sealed class MicroFrontendsTests
         remoteOutput.ShouldContain("A remote bundles only its own files and packages");
     }
 
-    /// <summary>Module federation is React only by catalog rule (D5); native federation's remotes are React only so far.</summary>
+    /// <summary>
+    /// Module federation is React only by catalog rule (D5); native federation builds Vue too: the shell's Vue runtime
+    /// mounts each module's remote, a Vue remote exposing its page and sharing the shell's vue.
+    /// </summary>
     [Fact]
-    public void A_remote_for_a_framework_the_pack_does_not_build_fails_loudly()
+    public void With_vue_native_federation_generates_a_vue_shell_runtime_and_a_vue_remote_per_module()
     {
         using var project = new GeneratedProject(
             "saas-standard-vue",
@@ -202,9 +205,64 @@ public sealed class MicroFrontendsTests
             "frontend.design-system=tokens",
             Technique("native-federation"));
         project.AddModule("billing");
+        var app = Path.Combine(project.ProjectDirectory, "web", "app");
+        var remote = Path.Combine(project.ProjectDirectory, "web", "modules", "billing");
 
-        File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "modules", "billing", "vite.config.ts"))
-            .ShouldStartWith("throw new Error('The native-federation pack builds React remotes only so far; frontend.framework is vue (docs/adr/0006 of the generator).');");
+        File.Exists(Path.Combine(app, "src", "remotes", "Remote.vue")).ShouldBeTrue("the shell's Vue component that mounts a remote");
+        File.Exists(Path.Combine(app, "src", "remotes", "Remote.tsx")).ShouldBeFalse();
+        File.ReadAllText(Path.Combine(app, "src", "modules", "billing", "BillingPage.vue")).ShouldContain("<Remote module=\"billing\" />");
+        File.ReadAllText(Path.Combine(app, "federation.ts")).ShouldContain("const shared = ['vue'];");
+
+        File.Exists(Path.Combine(remote, "src", "BillingPage.vue")).ShouldBeTrue("the remote's Vue page");
+        File.Exists(Path.Combine(remote, "src", "BillingPage.tsx")).ShouldBeFalse();
+        var federation = File.ReadAllText(Path.Combine(remote, "federation.config.js"));
+        federation.ShouldContain("exposes: { './Page': './src/BillingPage.vue' }");
+        federation.ShouldContain("vue: { singleton: true, strictVersion: true, requiredVersion: 'auto', includeSecondaries: false }");
+        federation.ShouldNotContain("react");
+
+        var package = File.ReadAllText(Path.Combine(remote, "package.json"));
+        package.ShouldContain("\"vue\": \"3.5.44\"");
+        package.ShouldNotContain("react");
+        File.ReadAllText(Path.Combine(app, "package.json")).ShouldNotContain("react");
+    }
+
+    /// <summary>A Vue remote keeps the shell's rules: another framework, a banned library and an unformatted file fail its lint.</summary>
+    [Fact]
+    public void With_vue_native_federation_a_remote_importing_another_framework_or_a_banned_library_or_unformatted_fails_lint()
+    {
+        using var project = new GeneratedProject(
+            "saas-standard-vue",
+            "frontend.architecture=micro-frontends",
+            "frontend.design-system=tokens",
+            Technique("native-federation"));
+        project.AddModule("billing");
+        RunWeb(project, "install");
+
+        project.Write("web/modules/billing/src/mixed.ts", """
+            import { useState } from 'react';
+
+            export const useCount = () => useState(0);
+            """);
+        project.Write("web/modules/billing/src/libraries.ts", """
+            import { object } from 'yup';
+
+            export const parts = [object];
+            """);
+
+        var billing = Path.Combine(project.ProjectDirectory, "web", "modules", "billing");
+        var (exitCode, output) = Shell.Run(billing, "pnpm", "lint");
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("mixed.ts");
+        output.ShouldContain("Every remote is written with the shell's framework, vue");
+        output.ShouldContain("'yup' import is restricted");
+
+        File.Delete(Path.Combine(billing, "src", "mixed.ts"));
+        File.Delete(Path.Combine(billing, "src", "libraries.ts"));
+        project.Write("web/modules/billing/src/unformatted.ts", "export const greeting = \"hello\"\n");
+
+        var (formatExitCode, formatOutput) = Shell.Run(billing, "pnpm", "lint");
+        formatExitCode.ShouldNotBe(0, formatOutput);
+        formatOutput.ShouldContain("src/unformatted.ts");
     }
 
     /// <summary>
