@@ -196,6 +196,8 @@ public sealed class DesignSystemWebComponentsTests
     [InlineData("color: var(--ds-color-accent-foreground);", "color: red")]
     // A colour equal to the browser's default is still a colour of its own.
     [InlineData("display: inline-flex;", "display: inline-flex; fill: black;")]
+    // Nor is the colour the gate itself starts unset properties from.
+    [InlineData("display: inline-flex;", "display: inline-flex; box-shadow: 0 0 4px rgb(1, 2, 3);")]
     // A state's colour counts as well, though no test hovers the badge.
     [InlineData(".primary {", ".accent:hover { color: red; } .primary {")]
     public void A_component_style_with_a_value_of_its_own_fails_the_ui_packages_tests(string declaration, string mutation)
