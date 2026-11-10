@@ -1,11 +1,18 @@
+{{~ tokens = project["frontend.design-system"] == "tokens" ~}}
+{{~ func colour(token, value)
+  if tokens
+    ret "var(--ds-color-" + token + ")"
+  end
+  ret value
+end ~}}
 .pending {
   display: flex;
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  border: 1px dashed #0f172a;
+  border: 1px dashed {{ colour "primary" "#0f172a" }};
   border-radius: 0.25rem;
-  background-color: #fff;
+  background-color: {{ colour "surface" "#fff" }};
   padding: 0.5rem;
 }
 
@@ -37,5 +44,5 @@
 .note {
   font-size: 0.75rem;
   line-height: 1rem;
-  color: #64748b;
+  color: {{ colour "muted-foreground" "#64748b" }};
 }

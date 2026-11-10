@@ -48,11 +48,21 @@ const sections: Record<string, string> = {
 };
 {{~ else if ui == "reka-ui" ~}}
 /**
+{{~ if project["frontend.design-system"] == "tokens" ~}}
+ * What every text input, textarea and select shares: the design tokens' colours, as BaseButton has them, since Reka UI
+ * has no theme of its own.
+{{~ else ~}}
  * What every text input, textarea and select shares: BaseButton's slate palette, since Reka UI has no theme of its own.
+{{~ end ~}}
  * FormKit marks the outer section of an input with errors data-errors, which the outer section's group passes on.
  */
+{{~ if project["frontend.design-system"] == "tokens" ~}}
+const field =
+  'w-full rounded-md border border-border bg-surface px-3 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm group-data-[errors=true]:border-destructive group-data-[errors=true]:ring-destructive/20';
+{{~ else ~}}
 const field =
   'w-full rounded-md border border-slate-300 bg-white px-3 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-slate-500 focus-visible:border-slate-400 focus-visible:ring-[3px] focus-visible:ring-slate-400/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm group-data-[errors=true]:border-red-600 group-data-[errors=true]:ring-red-600/20';
+{{~ end ~}}
 
 /** The classes of each FormKit section; FormKit's own formkit-* classes and themes are not used. */
 const sections: Record<string, string> = {
@@ -60,9 +70,9 @@ const sections: Record<string, string> = {
   wrapper: 'flex flex-col gap-2',
   label: 'flex items-center gap-2 text-sm leading-none font-medium select-none',
   input: `${field} h-9 min-w-0 py-1`,
-  help: 'text-sm text-slate-500',
+  {{ if project["frontend.design-system"] == "tokens" }}help: 'text-sm text-muted-foreground',{{ else }}help: 'text-sm text-slate-500',{{ end }}
   messages: 'flex flex-col gap-1',
-  message: 'text-sm text-red-600',
+  {{ if project["frontend.design-system"] == "tokens" }}message: 'text-sm text-destructive',{{ else }}message: 'text-sm text-red-600',{{ end }}
 };
 {{~ else ~}}
 /**

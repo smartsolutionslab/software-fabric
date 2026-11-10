@@ -1,11 +1,18 @@
+{{~ tokens = project["frontend.design-system"] == "tokens" ~}}
+{{~ func colour(token, value)
+  if tokens
+    ret "var(--ds-color-" + token + ")"
+  end
+  ret value
+end ~}}
 .widget {
   display: flex;
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid {{ colour "border" "#e2e8f0" }};
   border-radius: 0.25rem;
-  background-color: #fff;
+  background-color: {{ colour "surface" "#fff" }};
   padding: 0.5rem;
 }
 

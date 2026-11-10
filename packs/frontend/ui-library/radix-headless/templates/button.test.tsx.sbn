@@ -34,7 +34,7 @@ afterEach(cleanup);
 test('a button is a button with the default look', () => {
   render(<Button>Save</Button>);
 
-  expect(screen.getByRole('button', { name: 'Save' })).toHaveClass('bg-slate-900', 'text-white');
+  expect(screen.getByRole('button', { name: 'Save' })).{{ if project["frontend.design-system"] == "tokens" }}toHaveClass('bg-primary', 'text-primary-foreground'){{ else }}toHaveClass('bg-slate-900', 'text-white'){{ end }};
 });
 
 test("with asChild the child takes the button's look and stays what it is", () => {
@@ -44,7 +44,7 @@ test("with asChild the child takes the button's look and stays what it is", () =
     </Button>,
   );
 
-  expect(screen.getByRole('link', { name: 'Billing' })).toHaveClass('border-slate-300');
+  expect(screen.getByRole('link', { name: 'Billing' })).{{ if project["frontend.design-system"] == "tokens" }}toHaveClass('border-border'){{ else }}toHaveClass('border-slate-300'){{ end }};
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });
 {{~ end ~}}
