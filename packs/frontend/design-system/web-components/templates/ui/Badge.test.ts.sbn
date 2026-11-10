@@ -13,6 +13,12 @@ const tones: Record<BadgeTone, { background: string; text: string }> = {
 // shadow, a gradient or a filter may carry several.
 const coloursIn = (value: string) => value.match(/\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\([^()]*\)/g) ?? [];
 
+// Every colour in every property the browser computes, so a colour cannot hide in one a list would leave out.
+const coloursOf = (style: CSSStyleDeclaration) =>
+  [...style]
+    .filter((property) => !property.startsWith('--'))
+    .flatMap((property) => coloursIn(style.getPropertyValue(property)).map((colour) => ({ property, colour })));
+
 const colourTokens = () =>
   [...document.styleSheets]
     .flatMap((sheet) => [...sheet.cssRules])
@@ -30,7 +36,37 @@ const resolve = (token: string) => {
   return colour;
 };
 
-// Each colour the badge's host, its label and its shadow elements paint, with the colour an unstyled element in its place has.
+// Every colour property the component does not set starts from this colour instead of the browser's default, so a
+// colour of its own cannot pass for a default it happens to equal (fill: black).
+const unset = 'rgb(1, 2, 3)';
+
+const unsetSheet = () => {
+  const plain = document.createElement('span');
+  document.body.append(plain);
+  const style = getComputedStyle(plain);
+  const declarations = [...style]
+    .filter((property) => !property.startsWith('--') && coloursIn(style.getPropertyValue(property)).length > 0)
+    .map((property) => `${property}: ${unset};`)
+    .join(' ');
+  plain.remove();
+  // Ahead of the component's sheets and with no specificity of its own, so any rule of the component wins over it.
+  const sheet = new CSSStyleSheet();
+  for (const selector of [':host', ':host::before', ':host::after', '*', '*::before', '*::after', '::slotted(*)']) {
+    sheet.insertRule(`${selector} { ${declarations} }`, sheet.cssRules.length);
+  }
+  return sheet;
+};
+
+// Every declaration block in the component's styles, as the browser parsed them: each rule, whatever its selector or
+// state (:hover, :focus), each rule inside @media, @supports or a nested rule, and each keyframe.
+const blocksOf = (rules: CSSRuleList): CSSStyleDeclaration[] =>
+  [...rules].flatMap((rule) => [
+    ...('style' in rule && rule.style instanceof CSSStyleDeclaration ? [rule.style] : []),
+    ...('cssRules' in rule && rule.cssRules instanceof CSSRuleList ? blocksOf(rule.cssRules) : []),
+  ]);
+
+// Each colour the badge paints, where, for one tone: on its host, its label and its shadow elements as rendered, and on
+// an element inside it given each of the component's declaration blocks, so a state the test does not render counts.
 const paintedColours = async (tone: BadgeTone) => {
   const badge = document.createElement('ds-badge');
   badge.tone = tone;
@@ -38,41 +74,65 @@ const paintedColours = async (tone: BadgeTone) => {
   const label = document.createElement('span');
   label.textContent = 'New';
   badge.append(label);
-  const unstyled = document.createElement('span');
-  document.body.append(badge, unstyled);
+  document.body.append(badge);
   await badge.updateComplete;
-  const elements = [badge, label, ...(badge.shadowRoot?.querySelectorAll('*') ?? [])];
-  const painted = elements.flatMap((element) =>
+  const root = badge.shadowRoot;
+  const span = root?.querySelector('span');
+  if (!root || !span) {
+    throw new Error('ds-badge renders no span in a shadow root');
+  }
+  const own = [...root.adoptedStyleSheets, ...root.styleSheets];
+  root.adoptedStyleSheets = [unsetSheet(), ...root.adoptedStyleSheets];
+
+  const rendered = [badge, label, ...root.querySelectorAll('*')].flatMap((element) =>
     [null, '::before', '::after'].flatMap((pseudo) => {
       const style = getComputedStyle(element, pseudo);
-      const plain = getComputedStyle(unstyled, pseudo);
-      // Every property the browser computes, so a colour cannot hide in one a list would leave out.
-      return [...style]
-        .filter((property) => !property.startsWith('--'))
-        .map((property) => ({
-          where: `${element.localName}${pseudo ?? ''} ${property}`,
-          colours: coloursIn(style.getPropertyValue(property)),
-          unstyled: coloursIn(plain.getPropertyValue(property)),
-        }));
+      // A ::before or ::after without content is not generated, and paints nothing.
+      if (pseudo && style.content === 'none') {
+        return [];
+      }
+      return coloursOf(style).map(({ property, colour }) => ({
+        where: `${element.localName}${pseudo ?? ''} ${property}`,
+        colour,
+      }));
     }),
   );
-  const span = badge.shadowRoot?.querySelector('span');
-  const shown = span ? getComputedStyle(span) : undefined;
-  return { painted, background: shown?.backgroundColor, text: shown?.color };
+  const declared = own
+    .flatMap((sheet) => blocksOf(sheet.cssRules))
+    .flatMap((block) => {
+      const probe = document.createElement('i');
+      probe.style.cssText = block.cssText;
+      span.append(probe);
+      // A custom property of its own is a colour when a colour property can take it.
+      const custom = [...block]
+        .filter((property) => property.startsWith('--'))
+        .map((property) => {
+          const user = document.createElement('i');
+          user.style.color = `var(${property})`;
+          probe.append(user);
+          return { where: `{ ${block.cssText} } ${property}`, colour: getComputedStyle(user).color };
+        });
+      const colours = coloursOf(getComputedStyle(probe)).map(({ property, colour }) => ({
+        where: `{ ${block.cssText} } ${property}`,
+        colour,
+      }));
+      probe.remove();
+      return [...colours, ...custom];
+    });
+  const shown = getComputedStyle(span);
+  return { painted: [...rendered, ...declared], background: shown.backgroundColor, text: shown.color };
 };
 
 const expectOnlyTokens = async () => {
   const tokens = colourTokens();
   expect(tokens).toContain('--ds-color-primary');
-  const values = tokens.map(resolve);
+  const allowed = [...tokens.map(resolve), unset];
   for (const tone of Object.keys(tones) as BadgeTone[]) {
     const { painted, background, text } = await paintedColours(tone);
     expect(background, `${tone} background`).toBe(resolve(tones[tone].background));
     expect(text, `${tone} text`).toBe(resolve(tones[tone].text));
-    for (const { where, colours, unstyled } of painted) {
-      for (const colour of colours) {
-        expect([...values, ...unstyled], `${tone}: ${where}: ${colour}`).toContain(colour);
-      }
+    for (const { where, colour } of painted) {
+      expect(allowed, `${tone}: ${where}: ${colour}`).toContain(colour);
     }
     document.body.replaceChildren();
   }
@@ -96,13 +156,10 @@ test('a badge is styled only through the design tokens', async () => {
   const root = document.documentElement;
   await expectOnlyTokens();
 
-  // The page around the badge gets a colour of its own too, so one the badge sets cannot pass for the page's.
-  document.body.style.color = 'rgb(1, 2, 3)';
   colourTokens().forEach((token, index) => root.style.setProperty(token, `rgb(${index + 10}, 20, 30)`));
   try {
     await expectOnlyTokens();
   } finally {
     root.removeAttribute('style');
-    document.body.removeAttribute('style');
   }
 });
