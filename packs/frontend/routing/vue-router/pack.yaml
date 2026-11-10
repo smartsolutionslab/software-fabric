@@ -1,7 +1,7 @@
 option: frontend.routing.vue-router
 files:
   - { template: templates/App.vue.sbn, target: web/app/src/App.vue }
-  - { template: templates/App.module.css.sbn, target: web/app/src/App.module.css, when: 'project["frontend.styling"] == "css-modules"' }
+  - { template: templates/App.module.css.sbn, target: web/app/src/App.module.css, when: 'project["frontend.styling"] == "css-modules" && project["frontend.ui-library"] != "vuetify"' }
   - { template: templates/App.test.ts.sbn, target: web/app/src/App.test.ts }
   - { template: templates/router.ts.sbn, target: web/app/src/router.ts }
   - { template: templates/router-provider.ts.sbn, target: web/app/src/providers/router.ts }

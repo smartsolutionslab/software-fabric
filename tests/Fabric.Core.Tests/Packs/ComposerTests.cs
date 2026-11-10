@@ -84,6 +84,39 @@ public class ComposerTests
     }
 
     [Fact]
+    public void One_pack_giving_two_templates_the_same_target_is_an_error_whatever_their_conditions()
+    {
+        var composition = Composer.Compose(
+            Catalog,
+            Packs(
+                Pack(
+                    "base.core",
+                    files: [
+                        new("react.sbn", "web/app/src/App.tsx", false, When: "project[\"backend.database\"] == \"postgres\""),
+                        new("vue.sbn", "web/app/src/App.tsx", false, When: "project[\"backend.database\"] != \"postgres\""),
+                    ]),
+                Postgres,
+                Ddd),
+            Choices());
+
+        composition.Errors.ShouldBe(["web/app/src/App.tsx is claimed by both base.core and base.core."]);
+    }
+
+    [Fact]
+    public void Two_packs_may_not_share_a_target_by_giving_it_opposite_conditions()
+    {
+        var composition = Composer.Compose(
+            Catalog,
+            Packs(
+                Pack("base.core", files: [new("a.sbn", "README.md", false, When: "project[\"backend.database\"] == \"postgres\"")]),
+                Pack("backend.database.postgres", files: [new("b.sbn", "README.md", false, When: "project[\"backend.database\"] != \"postgres\"")]),
+                Ddd),
+            Choices());
+
+        composition.Errors.ShouldBe(["README.md is claimed by both base.core and backend.database.postgres."]);
+    }
+
+    [Fact]
     public void A_per_module_file_of_a_module_option_renders_only_for_modules_that_chose_it()
     {
         var composition = Composer.Compose(

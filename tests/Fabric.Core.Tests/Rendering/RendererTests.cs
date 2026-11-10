@@ -336,6 +336,44 @@ public sealed class RendererTests : IDisposable
 
         rendered.Files.ShouldHaveSingleItem().Content.ShouldBe("hi!");
     }
+    [Fact]
+    public void A_file_condition_cannot_call_the_contributed_functions()
+    {
+        var guards = Pack("backend.guards.ensure-that", ("functions.sbn", "func shout(text)\n  ret text + \"!\"\nend"));
+        var owner = Pack("base.core", ("t.sbn", "written"));
+        var file = new ComposedFile(owner, new PackFile("t.sbn", "out.txt", PerModule: false, When: "(shout \"hi\") == \"hi!\""), "out.txt", null);
+
+        var rendered = Renderer.Render(
+            Catalog,
+            Compose([file], new() { [Composer.TemplateFunctionsSlot] = [new(guards, new(Composer.TemplateFunctionsSlot, "functions.sbn", 0))] }),
+            Choices,
+            "shop");
+
+        rendered.Files.ShouldBeEmpty();
+        rendered.Errors.ShouldHaveSingleItem().ShouldStartWith("base.core: t.sbn (out.txt): when '(shout \"hi\") == \"hi!\"': ");
+    }
+
+    [Fact]
+    public void A_slot_contribution_does_not_see_the_slots()
+    {
+        var owner = Pack("base.core", ("t.sbn", "{{ slots[\"sections\"] }}"), ("section.sbn", "{{ slots[\"other\"] }}"));
+
+        var rendered = Renderer.Render(
+            Catalog,
+            Compose(
+                [Composed(owner, "t.sbn", "a.txt")],
+                new()
+                {
+                    ["sections"] = [new(owner, new("sections", "section.sbn", 0))],
+                    ["other"] = [],
+                }),
+            Choices,
+            "shop");
+
+        rendered.Files.ShouldBeEmpty();
+        rendered.Errors.ShouldHaveSingleItem().ShouldStartWith("base.core: section.sbn: ");
+    }
+
     [Theory]
     [InlineData("line one\nline two\n  {{ missing }}\n", "t.sbn(3,6)")]
     [InlineData("line one\nline two\n  {{ end }}\n", "t.sbn(3,8)")]

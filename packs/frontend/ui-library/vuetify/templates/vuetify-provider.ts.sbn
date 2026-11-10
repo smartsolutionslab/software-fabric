@@ -1,0 +1,9 @@
+import { type App, type Component, h } from 'vue';
+import { VApp } from 'vuetify/components';
+import { vuetify } from '@/vuetify';
+
+/** Installs Vuetify and renders the app inside VApp, the root Vuetify's layout and theme expect. */
+export const withVuetify = (app: App, root: Component): Component => {
+  app.use(vuetify);
+  return { name: 'VuetifyRoot', render: () => h(VApp, null, { default: () => h(root) }) };
+};

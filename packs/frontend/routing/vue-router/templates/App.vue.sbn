@@ -1,24 +1,41 @@
-{{~ func class_of(tailwind, module)
+{{~ vuetify = project["frontend.ui-library"] == "vuetify" ~}}
+{{~ func class_of(tailwind, module, material)
+  if vuetify
+    ret 'class="' + material + '"'
+  end
   if project["frontend.styling"] == "css-modules"
     ret ':class="styles.' + module + '"'
   end
   ret 'class="' + tailwind + '"'
 end ~}}
 <script setup lang="ts">
+{{~ if vuetify ~}}
+import { RouterView } from 'vue-router';
+import { VBtn } from 'vuetify/components';
+import { moduleRoutes } from '@/modules';
+{{~ else ~}}
 import { RouterLink, RouterView } from 'vue-router';
 import { moduleRoutes } from '@/modules';
-{{~ if project["frontend.styling"] == "css-modules" ~}}
+{{~ end ~}}
+{{~ if project["frontend.styling"] == "css-modules" && !vuetify ~}}
 import styles from './App.module.css';
 {{~ end ~}}
 </script>
 
 <template>
   <div>
-    <nav aria-label="Modules" {{ class_of "flex gap-4 p-2" "navigation" }}>
+    <nav aria-label="Modules" {{ class_of "flex gap-4 p-2" "navigation" "d-flex ga-4 pa-2" }}>
+{{~ if vuetify ~}}
+      <VBtn to="/" variant="text" color="primary">Home</VBtn>
+      <VBtn v-for="route in moduleRoutes" :key="route.path" :to="`/${route.path}`" variant="text" color="primary">
+        {{ "{{" }} route.title {{ "}}" }}
+      </VBtn>
+{{~ else ~}}
       <RouterLink to="/">Home</RouterLink>
       <RouterLink v-for="route in moduleRoutes" :key="route.path" :to="`/${route.path}`">
         {{ "{{" }} route.title {{ "}}" }}
       </RouterLink>
+{{~ end ~}}
     </nav>
     <RouterView />
   </div>

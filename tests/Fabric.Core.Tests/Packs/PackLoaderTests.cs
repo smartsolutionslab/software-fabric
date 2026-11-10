@@ -232,6 +232,38 @@ public sealed class PackLoaderTests : IDisposable
     }
 
     [Fact]
+    public void Rejects_a_pack_without_files()
+    {
+        packs.Add(
+            "backend.database.postgres",
+            PackFixture.DefaultManifest("backend.database.postgres").Replace(
+                """
+                files:
+                  - { template: templates/readme.md.sbn, target: docs/readme.md, per-module: false }
+
+                """,
+                string.Empty,
+                StringComparison.Ordinal),
+            PackFixture.DefaultFiles);
+
+        SingleError().ShouldContain("files");
+    }
+
+    [Fact]
+    public void A_pack_that_only_fills_slots_writes_files_as_an_empty_list()
+    {
+        packs.Add(
+            "backend.database.postgres",
+            PackFixture.DefaultManifest("backend.database.postgres").Replace(
+                "  - { template: templates/readme.md.sbn, target: docs/readme.md, per-module: false }\n",
+                string.Empty,
+                StringComparison.Ordinal).Replace("files:\n", "files: []\n", StringComparison.Ordinal),
+            PackFixture.DefaultFiles);
+
+        Load().Errors.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Rejects_a_pack_without_an_adr()
     {
         packs.Add(

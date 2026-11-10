@@ -1,0 +1,20 @@
+option: frontend.ui-library.vuetify
+files:
+  # One Vuetify instance, which the app installs and the tests render under (src/test-setup.ts).
+  - { template: templates/vuetify.ts.sbn, target: web/app/src/vuetify.ts }
+  - { template: templates/vuetify-provider.ts.sbn, target: web/app/src/providers/vuetify.ts }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  # FormKit's pack declares the same package, for the same reason, when it is chosen.
+  - { slot: web.dev-dependencies, template: templates/dev-dependencies.sbn }
+  - { slot: web.imports, template: templates/imports.sbn, order: -5 }
+  # Outside every other provider, so the sign-in and every page are inside Vuetify's VApp and take its theme.
+  - { slot: web.providers, template: templates/providers.sbn, order: -10 }
+  - { slot: web.test-setup, template: templates/test-setup.sbn }
+  - { slot: web.vite-plugins, template: templates/vite-plugins.sbn }
+  - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 20 }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: lint-rule, describes: "Importing another Vue component library or a headless one (PrimeVue, Quasar, Element Plus, Ant Design Vue, Naive UI, Headless UI, Radix Vue, Reka UI) fails lint.", file: templates/restricted.sbn }

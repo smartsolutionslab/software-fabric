@@ -1,4 +1,5 @@
-{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ vuetify = project["frontend.ui-library"] == "vuetify" ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" && !vuetify ~}}
 {{~ func class_of(tailwind, module)
   if css_modules
     ret ':class="styles.' + module + '"'
@@ -8,6 +9,9 @@ end ~}}
 <script setup lang="ts" generic="TRow extends RowData">
 import { type ColumnDef, FlexRender, type RowData, useTable } from '@tanstack/vue-table';
 import { toRef } from 'vue';
+{{~ if vuetify ~}}
+import { VTable } from 'vuetify/components';
+{{~ end ~}}
 import { features, type Features } from './data-table-columns';
 {{~ if css_modules ~}}
 import styles from './DataTable.module.css';
@@ -23,6 +27,24 @@ const table = useTable({ features, columns: props.columns, data: toRef(() => pro
 </script>
 
 <template>
+{{~ if vuetify ~}}
+  <VTable density="compact">
+    <thead>
+      <tr v-for="group in table.getHeaderGroups()" :key="group.id">
+        <th v-for="header in group.headers" :key="header.id" class="text-left font-weight-medium">
+          <FlexRender v-if="!header.isPlaceholder" :header="header" />
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="row in table.getRowModel().rows" :key="row.id">
+        <td v-for="cell in row.getAllCells()" :key="cell.id">
+          <FlexRender :cell="cell" />
+        </td>
+      </tr>
+    </tbody>
+  </VTable>
+{{~ else ~}}
   <table {{ class_of "w-full text-sm" "table" }}>
     <thead>
       <tr v-for="group in table.getHeaderGroups()" :key="group.id">
@@ -39,4 +61,5 @@ const table = useTable({ features, columns: props.columns, data: toRef(() => pro
       </tr>
     </tbody>
   </table>
+{{~ end ~}}
 </template>
