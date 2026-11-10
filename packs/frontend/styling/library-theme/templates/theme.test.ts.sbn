@@ -2,8 +2,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render, screen } from '@testing-library/vue';
+import ts from 'typescript';
 import { expect, test } from 'vitest';
 import { h } from 'vue';
+import { parse, type SFCDescriptor } from 'vue/compiler-sfc';
 import { VBtn } from 'vuetify/components';
 import { theme } from './theme';
 import { vuetify } from './vuetify';
@@ -13,6 +15,138 @@ const source = join(process.cwd(), 'src');
 
 /** A colour written out: #hex, or a CSS colour function. */
 const colour = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/i;
+
+/** The keys and attributes whose values are content, never a style: they may look like a colour (href="#add"). */
+const contentKeys = new Set(['label', 'title', 'href', 'to', 'alt', 'description', 'text', 'placeholder']);
+const content = (name: string): boolean => contentKeys.has(name) || name.startsWith('aria-');
+
+/** The name of the object property a value is given to, when it is written out. */
+function nameOf(node: ts.Node): string | undefined {
+  if (ts.isPropertyAssignment(node)) {
+    return ts.isIdentifier(node.name) || ts.isStringLiteral(node.name) ? node.name.text : undefined;
+  }
+  return undefined;
+}
+
+/** The operators whose result is made of their operands: 'Issue ' + id, hash || '#add', hash ?? '#add'. */
+const joining = new Set([
+  ts.SyntaxKind.PlusToken,
+  ts.SyntaxKind.BarBarToken,
+  ts.SyntaxKind.AmpersandAmpersandToken,
+  ts.SyntaxKind.QuestionQuestionToken,
+]);
+
+/** Whether an expression's value is its child's, or made of it: a conditional's branches, not its condition. */
+function carries(parent: ts.Node, child: ts.Node): boolean {
+  if (ts.isConditionalExpression(parent)) {
+    return parent.condition !== child;
+  }
+  if (ts.isBinaryExpression(parent)) {
+    return joining.has(parent.operatorToken.kind);
+  }
+  return (
+    ts.isParenthesizedExpression(parent) ||
+    ts.isAsExpression(parent) ||
+    ts.isSatisfiesExpression(parent) ||
+    ts.isNonNullExpression(parent) ||
+    ts.isTemplateSpan(parent) ||
+    ts.isTemplateExpression(parent)
+  );
+}
+
+/**
+ * Whether a literal is the value of a content key or attribute, through what carries it there: parentheses, template
+ * parts, type assertions, a conditional's branches, and +, ||, && and ??.
+ */
+function isContent(literal: ts.Node): boolean {
+  let node = literal;
+  while (carries(node.parent, node)) {
+    node = node.parent;
+  }
+  const owner = node.parent;
+  if (ts.isPropertyAssignment(owner) && owner.initializer !== node) {
+    return false;
+  }
+  const name = nameOf(owner);
+  return name !== undefined && content(name);
+}
+
+/**
+ * Whether a component writes a colour: any literal in its code that looks like one, wherever it is, unless it is content
+ * (the value of a content key or attribute). Text and comments are not code, so Issue #393 in either never counts.
+ */
+function writesColour(node: ts.Node): boolean {
+  if ((ts.isStringLiteralLike(node) || ts.isTemplateLiteralToken(node)) && colour.test(node.text) && !isContent(node)) {
+    return true;
+  }
+  return ts.forEachChild(node, writesColour) === true;
+}
+
+/** Whether TypeScript code writes a colour: a script block, or an expression in the template. */
+function codeWritesColour(code: string): boolean {
+  return writesColour(ts.createSourceFile('component.ts', code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS));
+}
+
+/** Whether an expression in the template writes a colour, read as the value of the attribute it is bound to, if any. */
+function expressionWritesColour(expression: string, attribute: string | undefined): boolean {
+  const value = `(${expression})`;
+  return codeWritesColour(attribute === undefined ? value : `({ ${JSON.stringify(attribute)}: ${value} })`);
+}
+
+type TemplateNode = NonNullable<NonNullable<SFCDescriptor['template']>['ast']>['children'][number];
+type Attribute = Extract<TemplateNode, { type: typeof elementNode }>['props'][number];
+
+/** The kinds of template node the check reads: NodeTypes in @vue/compiler-core, which vue/compiler-sfc does not export. */
+const elementNode = 1;
+const interpolationNode = 5;
+const attributeNode = 6;
+
+/** An expression of the template as Vue reads it, its HTML entities decoded (:color="&quot;#fff&quot;" is '#fff'). */
+function decoded(expression: Extract<TemplateNode, { type: typeof interpolationNode }>['content']): string {
+  return 'content' in expression ? expression.content : expression.loc.source;
+}
+
+/**
+ * Whether an attribute writes a colour. A written value is content under a content attribute (href="#add"), a style
+ * under any other; a bound one (:title, v-bind:style, v-bind="{ ... }") and every other directive's expression is code,
+ * read as the script is. A directive's dynamic argument (:[name]) is code too.
+ */
+function attributeWritesColour(attribute: Attribute): boolean {
+  if (attribute.type === attributeNode) {
+    return attribute.value !== undefined && colour.test(attribute.value.content) && !content(attribute.name);
+  }
+  const { name, arg, exp } = attribute;
+  const isStatic = arg !== undefined && 'isStatic' in arg && arg.isStatic;
+  if (arg !== undefined && !isStatic && expressionWritesColour(decoded(arg), undefined)) {
+    return true;
+  }
+  const bound = name === 'bind' && arg !== undefined && isStatic ? decoded(arg) : undefined;
+  return exp !== undefined && expressionWritesColour(decoded(exp), bound);
+}
+
+/** Whether a template writes a colour: in an attribute or an interpolation (a mustache). Text and comments never count. */
+function templateWritesColour(nodes: TemplateNode[]): boolean {
+  return nodes.some((node) => {
+    if (node.type === elementNode) {
+      return node.props.some(attributeWritesColour) || templateWritesColour(node.children);
+    }
+    return node.type === interpolationNode && expressionWritesColour(decoded(node.content), undefined);
+  });
+}
+
+/**
+ * Whether a component (*.vue) writes a colour: in its template, in its script blocks as a component in TypeScript does,
+ * or anywhere in a style block, which is all styling.
+ */
+function vueWritesColour(path: string, source: string): boolean {
+  const { template, script, scriptSetup, styles } = parse(source, { filename: path }).descriptor;
+  const scripts = [script, scriptSetup].flatMap((block) => (block === null ? [] : [block.content]));
+  return (
+    templateWritesColour(template?.ast?.children ?? []) ||
+    scripts.some(codeWritesColour) ||
+    styles.some((style) => colour.test(style.content))
+  );
+}
 
 /** A colour as Vuetify writes it into its theme's CSS variables: '37,99,235' for #2563eb. */
 function channels(hex: string): string {
@@ -33,7 +167,7 @@ test("Vuetify's components take their colours from the theme", () => {
 test('no component writes a colour of its own', () => {
   // Colours are the theme's, in src/theme.ts: a component names them through it (color="error", class="bg-primary").
   const components = readdirSync(source, { recursive: true, encoding: 'utf8' }).filter((path) => path.endsWith('.vue'));
-  const coloured = components.filter((path) => colour.test(readFileSync(join(source, path), 'utf8')));
+  const coloured = components.filter((path) => vueWritesColour(path, readFileSync(join(source, path), 'utf8')));
 
   expect(coloured, 'components that write a colour instead of taking it from src/theme.ts').toEqual([]);
 });
