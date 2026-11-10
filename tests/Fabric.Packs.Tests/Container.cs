@@ -273,9 +273,15 @@ internal sealed class Container : IDisposable
         return ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
     }
 
-    private void WaitUntil(string user, params string[] command)
+    private void WaitUntil(string user, params string[] command) => WaitUntil(90, user, command);
+
+    /// <summary>
+    /// Runs <paramref name="command"/> as <paramref name="user"/> once a second until it succeeds, at most
+    /// <paramref name="attempts"/> times; otherwise removes the container and throws.
+    /// </summary>
+    internal void WaitUntil(int attempts, string user, params string[] command)
     {
-        for (var attempt = 0; attempt < 90; attempt++)
+        for (var attempt = 0; attempt < attempts; attempt++)
         {
             if (TryDocker(["exec", "--user", user, id, .. command]))
             {
@@ -285,6 +291,8 @@ internal sealed class Container : IDisposable
             Thread.Sleep(1000);
         }
 
+        // Started, so it holds its anonymous volumes; the caller never receives it, so it is removed here before the failure goes on.
+        Dispose();
         throw new InvalidOperationException($"Container {id} did not become ready: {string.Join(' ', command)}");
     }
 

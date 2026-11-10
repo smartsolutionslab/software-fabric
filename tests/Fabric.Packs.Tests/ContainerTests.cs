@@ -76,6 +76,23 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    public void A_container_that_starts_but_never_becomes_ready_is_removed_with_its_anonymous_volumes()
+    {
+        var name = $"fabric-tests-never-ready-{Guid.NewGuid():N}";
+        var since = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+        var container = Container.Start("postgres:18.3", 5432, ["POSTGRES_PASSWORD=fabric-tests"], name: name);
+
+        var exception = Should.Throw<InvalidOperationException>(() => container.WaitUntil(1, "postgres", "false"));
+        exception.Message.ShouldContain("did not become ready");
+
+        var (containerLeft, volumes, volumesLeft) = Leftovers(since, name);
+
+        volumes.ShouldNotBeEmpty("postgres:18.3 declares /var/lib/postgresql, so its running container has an anonymous volume");
+        containerLeft.ShouldBeFalse($"container {name} is left behind");
+        volumesLeft.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void A_Service_Bus_emulator_whose_start_fails_at_networking_is_removed_with_its_SQL_Server_and_network()
     {
         var network = $"fabric-tests-failed-servicebus-{Guid.NewGuid():N}";
