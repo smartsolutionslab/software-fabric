@@ -8,6 +8,11 @@
 {{~ end ~}}
 - Style with MUI's props and `sx`, naming the theme's values (`color="error"`; `bgcolor: 'action.hover'` and `p: 1` in `sx`). No CSS files, no `className`, no inline `style`; `src/index.css` only imports the stylesheets a library needs.
 - A component that writes a colour of its own (`#hex`, `rgb()`) fails `src/theme.test.tsx`.
+{{~ if project["frontend.routing"] == "react-router" ~}}
+- A link to a route is MUI's `Link` drawn as the router's: `<Link component={NavLink} to="/path">`, so it takes the theme's colours.
+{{~ else if project["frontend.routing"] == "tanstack-router" ~}}
+- A link to a route is MUI's `Link` made a router link once with `createLink(Link)` from `@tanstack/react-router`, so it takes the theme's colours.
+{{~ end ~}}
 {{~ else ~}}
 - The theme for {{ project["frontend.ui-library"] }} is not built yet: `src/theme.ts` throws and `src/theme.test.ts` fails until the generator builds it.
 {{~ end ~}}

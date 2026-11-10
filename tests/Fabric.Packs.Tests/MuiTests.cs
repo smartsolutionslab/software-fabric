@@ -29,6 +29,65 @@ public sealed partial class MuiTests
         }
         """;
 
+    private const string ResolveColour = """
+        /** A value as the browser paints it: MUI sets some through its own custom properties. */
+        function resolve(style: CSSStyleDeclaration, value: string): string {
+          const custom = /^var\((--[\w-]+)\)$/.exec(value)?.[1];
+          return custom === undefined ? value : resolve(style, style.getPropertyValue(custom).trim());
+        }
+        """;
+
+    /// <summary>The app's navigation with React Router, under the theme whose primary colour the test changed.</summary>
+    private const string ReactRouterLinks = $$"""
+        import { ThemeProvider } from '@mui/material/styles';
+        import { render, screen } from '@testing-library/react';
+        import { MemoryRouter } from 'react-router';
+        import { expect, test } from 'vitest';
+        import { App } from './App';
+        import { theme } from './theme';
+
+        {{ResolveColour}}
+
+        test("the navigation links take the theme's primary colour", () => {
+          render(
+            <ThemeProvider theme={theme}>
+              <MemoryRouter>
+                <App />
+              </MemoryRouter>
+            </ThemeProvider>,
+          );
+
+          const style = getComputedStyle(screen.getByRole('link', { name: 'Home' }));
+          // #0b6e4f, as the browser serialises it.
+          expect(resolve(style, style.color)).toBe('rgb(11, 110, 79)');
+        });
+        """;
+
+    /// <summary>The app's navigation with TanStack Router, under the theme whose primary colour the test changed.</summary>
+    private const string TanStackLinks = $$"""
+        import { ThemeProvider } from '@mui/material/styles';
+        import { render, screen } from '@testing-library/react';
+        import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
+        import { expect, test } from 'vitest';
+        import { App } from './App';
+        import { createAppRouter } from './router';
+        import { theme } from './theme';
+
+        {{ResolveColour}}
+
+        test("the navigation links take the theme's primary colour", async () => {
+          render(
+            <ThemeProvider theme={theme}>
+              <RouterProvider router={createAppRouter(createMemoryHistory(), <App />)} />
+            </ThemeProvider>,
+          );
+
+          const style = getComputedStyle(await screen.findByRole('link', { name: 'Home' }));
+          // #0b6e4f, as the browser serialises it.
+          expect(resolve(style, style.color)).toBe('rgb(11, 110, 79)');
+        });
+        """;
+
     private const string OtherLibraries = """
         import { Button as AntButton } from 'antd';
         import { Button as MantineButton } from '@mantine/core';
@@ -218,6 +277,24 @@ public sealed partial class MuiTests
 
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("pages/Alarm.tsx");
+    }
+
+    [Theory]
+    [InlineData("frontend.routing=react-router")]
+    [InlineData("frontend.routing=tanstack-router")]
+    public void With_mui_the_navigation_links_take_the_theme_s_primary_colour(string routing)
+    {
+        using var project = new GeneratedProject(React, [.. Mui, routing]);
+        RunWeb(project, "install");
+        var themePath = Path.Combine(project.ProjectDirectory, "web", "app", "src", "theme.ts");
+        var theme = File.ReadAllText(themePath);
+        theme.ShouldContain("primary: { main: '#2563eb' }");
+        File.WriteAllText(themePath, theme.Replace("primary: { main: '#2563eb' }", "primary: { main: '#0b6e4f' }", StringComparison.Ordinal));
+        project.Write("web/app/src/links.test.tsx", routing.EndsWith("tanstack-router", StringComparison.Ordinal) ? TanStackLinks : ReactRouterLinks);
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "test", "src/links.test.tsx");
+
+        exitCode.ShouldBe(0, output);
     }
 
     private static void FormatIsClean(GeneratedProject project)
