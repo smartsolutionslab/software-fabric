@@ -31,21 +31,40 @@ function nameOf(node: ts.Node): string | undefined {
   return undefined;
 }
 
+/** The operators whose result is made of their operands: 'Issue ' + id, hash || '#add', hash ?? '#add'. */
+const joining = new Set([
+  ts.SyntaxKind.PlusToken,
+  ts.SyntaxKind.BarBarToken,
+  ts.SyntaxKind.AmpersandAmpersandToken,
+  ts.SyntaxKind.QuestionQuestionToken,
+]);
+
+/** Whether an expression's value is its child's, or made of it: a conditional's branches, not its condition. */
+function carries(parent: ts.Node, child: ts.Node): boolean {
+  if (ts.isConditionalExpression(parent)) {
+    return parent.condition !== child;
+  }
+  if (ts.isBinaryExpression(parent)) {
+    return joining.has(parent.operatorToken.kind);
+  }
+  return (
+    ts.isJsxExpression(parent) ||
+    ts.isParenthesizedExpression(parent) ||
+    ts.isAsExpression(parent) ||
+    ts.isSatisfiesExpression(parent) ||
+    ts.isNonNullExpression(parent) ||
+    ts.isTemplateSpan(parent) ||
+    ts.isTemplateExpression(parent)
+  );
+}
+
 /**
- * Whether a literal is the value of a content key or attribute, through braces, parentheses, template parts and type
- * assertions ('#add' as const, satisfies string).
+ * Whether a literal is the value of a content key or attribute, through what carries it there: braces, parentheses,
+ * template parts, type assertions, a conditional's branches, and +, ||, && and ??.
  */
 function isContent(literal: ts.Node): boolean {
   let node = literal;
-  while (
-    ts.isJsxExpression(node.parent) ||
-    ts.isParenthesizedExpression(node.parent) ||
-    ts.isAsExpression(node.parent) ||
-    ts.isSatisfiesExpression(node.parent) ||
-    ts.isNonNullExpression(node.parent) ||
-    ts.isTemplateSpan(node.parent) ||
-    ts.isTemplateExpression(node.parent)
-  ) {
+  while (carries(node.parent, node)) {
     node = node.parent;
   }
   const owner = node.parent;
