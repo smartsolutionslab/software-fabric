@@ -18,7 +18,7 @@ const setImportMap = vi.hoisted(() => vi.fn());
 
 vi.mock('virtual:federation', () => ({
   remotes: { billing: 'http://remote/remoteEntry.json' },
-  versions: { react: '19.3.1', 'react-dom': '19.3.1', '@{{ name }}/ui': '0.0.0' },
+  versions: { react: '19.3.1', 'react-dom': '19.3.1'{{ if project["frontend.design-system"] != "tokens" }}, '@{{ name }}/ui': '0.0.0'{{ end }} },
 }));
 vi.mock('@softarc/native-federation-orchestrator/options', () => ({ replaceInDOM: () => setImportMap }));
 
@@ -77,7 +77,9 @@ test('the shell is the host: its packages at its versions, as singletons the orc
   expect(entry.shared).toEqual([
     singleton('react', 'react.js', '19.3.1'),
     singleton('react-dom', 'react-dom.js', '19.3.1'),
+{{~ if project["frontend.design-system"] != "tokens" ~}}
     singleton('@{{ name }}/ui', '@{{ name }}_ui.js', '0.0.0'),
+{{~ end ~}}
   ]);
 });
 

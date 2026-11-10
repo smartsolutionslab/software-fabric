@@ -30,16 +30,17 @@ exactly.
   remote with native federation in watch mode, unminified, and then serves `dist`. Native federation has no dev server;
   a change is rebuilt in the background and shows after a reload of the shell, without hot module replacement.
 - **The shell is the host.** `src/remotes/federation.ts` starts the orchestrator once, with the shell's own
-  `remoteEntry.json`: `react`, `react-dom` and `@{{ name }}/ui` at the shell's installed versions (`web/app/federation.ts`
+  `remoteEntry.json`: `react`{{ if project["frontend.design-system"] == "tokens" }} and{{ else }},{{ end }} `react-dom`{{ if project["frontend.design-system"] == "tokens" }}{{ else }} and `@{{ name }}/ui`{{ end }} at the shell's installed versions (`web/app/federation.ts`
   reads them). The import map sends each of them to a module that exports the shell's own instance, so a remote renders
   with the shell's React and its hooks work. The shell itself is built and served by Vite as before; nothing about it
   is federated except what it shares.
-- **Shared as singletons with strict versions** by both sides: `react`, `react-dom` and `@{{ name }}/ui`, each with
+- **Shared as singletons with strict versions** by both sides: `react`{{ if project["frontend.design-system"] == "tokens" }} and{{ else }},{{ end }} `react-dom`{{ if project["frontend.design-system"] == "tokens" }}{{ else }} and `@{{ name }}/ui`{{ end }}, each with
   `singleton: true, strictVersion: true, requiredVersion: 'auto'`, so a remote's required version is the exact pin in
   its package.json. The orchestrator runs with `strictExternalCompatibility`: a remote built against another version
-  fails to load and the shell says so, instead of loading a second React whose hooks would fail at run time. The ui
+  fails to load and the shell says so, instead of loading a second React whose hooks would fail at run time.
+{{- if project["frontend.design-system"] != "tokens" }} The ui
   package is a workspace package; native federation shares a package only when its package.json names a version, so
-  this pack gives it `"version": "0.0.0"`, and its required version is `workspace:*`.
+  this pack gives it `"version": "0.0.0"`, and its required version is `workspace:*`.{{ end }}
 - `src/remotes/Remote.tsx` loads a module's `./Page` once, shows it, and shows that the module is unavailable when its
   remote cannot be loaded. The next time that page is opened it reads the remote's `remoteEntry.json` again, and imports
   a module that failed under a new address (`?retry=<n>`): the browser keeps a failed module import for good, so only a
@@ -50,6 +51,14 @@ exactly.
   again (orchestrator 4.9.0 answers a second `initRemoteEntry` for a known remote with a warning). A remote redeployed
   while the shell is open, with new content-hashed file names, is therefore picked up after a reload of the shell; until
   then a retry asks for the file names the shell first read.
+{{~ if project["frontend.design-system"] == "tokens" ~}}
+- **No ui package is shared**: the tokens design system has no components, so a remote shares only React with the
+  shell, and styles its screens with the tokens' CSS variables, which the shell's stylesheet defines.
+{{~ else if project["frontend.design-system"] == "web-components" ~}}
+- **The design system's elements are defined once**, by the shell's instance of `@{{ name }}/ui`: a remote's page imports
+  the package for its elements and renders them as tags (`<ds-badge>`), which its `src/design-system.d.ts` declares
+  for React's JSX as the shell's does.
+{{~ end ~}}
 - No type declarations are exchanged: a remote is loaded by name, and its page takes no props.
 - Each remote's `lint` runs ESLint, with the shell's library bans and test rules, and Prettier, and its tests run with
   Vitest.

@@ -1,0 +1,16 @@
+{%{#!/usr/bin/env bash
+# The verdict a pull request's diff already has (board protocol, docs/adr): when the last review that report-review.sh
+# posted on the pull request was of the same diff and by the same reviewing family, prints that verdict (pass or fail)
+# and the head it reviewed. Prints nothing otherwise, and then the diff is reviewed.
+# Usage: previous-verdict.sh <pull request> <diff fingerprint> <reviewing family>
+# Only the workflow's own reviews count: anyone can post a review, with any text in it.
+source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+reviews="$(gh api "repos/$repo/pulls/$1/reviews?per_page=100" --paginate | jq -s 'add // []')"
+jq -r --arg diff "$2" --arg family "$3" '
+  [.[] | select(.user.login == "github-actions[bot]") | .body // ""
+    | capture("<!-- cross-model-review diff=(?<diff>[0-9a-f]{64}) reviewer=(?<family>[a-z]+) head=(?<head>[^ ]+) verdict=(?<verdict>pass|fail) -->")]
+  | last // empty
+  | select(.diff == $diff and .family == $family)
+  | "\(.verdict) \(.head)"' <<< "$reviews"
+}%}

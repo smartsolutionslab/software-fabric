@@ -44,7 +44,10 @@ returns an issue to Todo when its branch's last commit is older than the
 lease period (default 2 h) and it has no open PR. Released, escalated and
 lapsed claims **park** the branch: a release commit goes on top, the work
 stays, and the next agent resumes it with a new claim commit. Branches are
-never renamed, deleted or force-pushed.
+never renamed, deleted or force-pushed. Labels and board fields have no
+compare-and-swap, so a stale write can mark an ended claim taken again: the
+branch is the only enforced lock, and until the janitor's next run resets a
+parked issue's `agent:claimed` and `Status=Claimed` it only looks claimed.
 
 **Escalation to a developer.** Three routes, each with a label and a
 concrete question or the verbatim failure in a comment:
@@ -115,3 +118,56 @@ before the first `-`, decides who reviews.
   branch afresh and posts it. The CLI cannot enforce the schema, so the
   findings are the last top-level object of that shape in the answer, and
   an answer without one still fails.
+
+## Amendment (2026-11-09, #474)
+
+The owner's decisions on #474, after Copilot's usage limit ("trust tier usage limit reached") crashed the review of
+every open pull request on 2026-11-09 and nothing ran them again. The text above stands; where this section differs,
+it takes precedence.
+
+**A usage limit postpones the review; it does not fail it.** A limit is not a finding. The review recognises
+Copilot's usage and rate limit errors and records the review as postponed: no job fails, and nothing is posted on the
+pull request, least of all "no findings". The gate stays closed, since a postponed review is never a pass and nothing
+merges unreviewed. So the verdict is no longer the review's jobs but the commit status `cross-model-review/verdict` on
+the pull request's head, which the report job sets: `success` when nothing blocks, `failure` when a finding blocks or
+the answer has no findings, and `pending` while the review is postponed. That status is "the review check" the
+default branch's protection requires.
+
+**No fallback model.** #474 first asked for one retry with another model of the reviewing family before
+postponing. The owner withdrew it in answer to the escalation on #478: the limit ("trust tier usage limit") is the
+account's, not a model's, so a limited review is postponed at once and the hourly retry takes it from there.
+
+**Postponed reviews are retried on a schedule.** The workflow `cross-model-review-retry` runs hourly and on demand.
+It finds the open pull requests whose verdict at their current head is pending as postponed and re-runs the review
+run that status links to. It uses REST only and holds `actions: write`, `statuses: write` and read access to pull
+requests, the least that works, and reviews nothing itself.
+
+**Exempt dependency updates get their verdict from the scheduled retry (#480).** Dependabot's runs get a read-only
+token, so no job of the review can set the status on an exempt dependency update, and a protection requiring it would
+hold that pull request forever. `cross-model-review-retry` sets it instead: for each open pull request that the base
+branch's `dependency-update.sh` exempts at its current head, `cross-model-review/verdict` becomes `success` with the
+exemption note, linking to the retry's run. The script comes from the base branch, never from the pull request, whose
+head is only fetched and diffed; a head already marked is not marked again. An exempt update therefore waits up to an
+hour for its verdict.
+
+**An unchanged diff keeps its verdict.** When the pull request's own diff (`git diff origin/<base>...<head>`) is
+identical to that of the last head that received a real verdict, after a push that only merged the base branch for
+example, that verdict, pass or fail, is carried over and Copilot is not called. Each review the workflow posts
+records the diff's fingerprint (SHA-256) with its verdict in a hidden line of its body. Any change to the pull
+request's own diff is reviewed afresh.
+
+The security properties above are kept: the reviewer's job still holds no token that can write to the pull request,
+and the gate's files come from the base branch. A gate script the base branch does not have yet is not run from the
+pull request: no verdict is kept and no status is set, and a postponed review then fails the report job. The review's
+jobs pass while a review is postponed, so a protection that requires them instead of the status does not gate.
+
+- *As built (#474):* the limit is recognised by Copilot's exit code together with its message (`usage limit`,
+  `rate limit` or `too many requests`); any other failure still fails the review. The review job's outputs come from
+  the job that reads the untrusted diff, so they can only hold the gate closed: a postponement leaves the status
+  pending. A verdict is kept only from the workflow's own reviews (`github-actions[bot]`), since anyone can post a
+  review, and only for the same reviewing family, so the family rule holds for every head.
+- *As built (#480):* only pull requests by `dependabot[bot]` are fetched and checked, since the script exempts no
+  other author; it is read from the commit `refs/remotes/origin/<base>` resolves to, by its full name so that a tag
+  named `origin/<base>` cannot stand in for the branch, in a full checkout, and the pull request's head from
+  `refs/pull/<number>/head`. A head that moved while the retry ran is left
+  to the next run.

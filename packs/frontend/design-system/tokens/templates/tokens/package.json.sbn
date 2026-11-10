@@ -6,6 +6,9 @@
 {{~ if project["frontend.styling"] == "tailwind" ~}}
     "./tokens.css": "./dist/tokens.css",
     "./theme.css": "./dist/theme.css"
+{{~ else if project["frontend.styling"] == "library-theme" ~}}
+    ".": "./dist/tokens.ts",
+    "./tokens.css": "./dist/tokens.css"
 {{~ else ~}}
     "./tokens.css": "./dist/tokens.css"
 {{~ end ~}}

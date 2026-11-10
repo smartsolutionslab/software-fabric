@@ -11,6 +11,18 @@ namespace Fabric.Packs.Tests;
 public sealed class DesignSystemWebComponentsTests
 {
     private const string Choice = "frontend.design-system=web-components";
+    private const string LibraryTheme = "frontend.styling=library-theme";
+
+    /// <summary>With MUI a screen takes no class names; the theme styles the page around the element.</summary>
+    private const string MuiScreen = """
+        export function Tokens() {
+          return (
+            <section>
+              <ds-badge tone="primary">New</ds-badge>
+            </section>
+          );
+        }
+        """;
 
     private const string ReactScreen = """
         export function Tokens() {
@@ -201,12 +213,39 @@ public sealed class DesignSystemWebComponentsTests
     [Theory]
     [InlineData("saas-standard-react", "frontend.ui-library=mui")]
     [InlineData("saas-standard-vue", "frontend.ui-library=vuetify")]
-    public void Web_components_for_a_styling_the_tokens_do_not_compile_to_fail_loudly(string profile, string library)
+    public void With_the_library_theme_the_tokens_package_is_the_tokens_options_and_the_app_imports_its_variables(string profile, string library)
     {
-        using var project = new GeneratedProject(profile, Choice, "frontend.styling=library-theme", library);
+        // Vuetify has no pack yet, so the projects are generated with stand-ins for it.
+        using var tokens = new GeneratedProject(profile, "frontend.design-system=tokens", LibraryTheme, library);
+        using var webComponents = new GeneratedProject(profile, Choice, LibraryTheme, library);
 
-        File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "packages", "tokens", "build.mjs"))
-            .ShouldStartWith("throw new Error('The tokens pack compiles tokens for Tailwind and CSS Modules only so far; frontend.styling is library-theme");
+        var package = TokensPackage(webComponents);
+        package.ShouldNotBeEmpty();
+        package.ShouldBe(TokensPackage(tokens));
+        File.ReadAllText(Path.Combine(webComponents.ProjectDirectory, "web", "app", "src", "index.css")).ShouldContain("@import '@shop/tokens/tokens.css';", customMessage: "the components' shadow styles read the --ds-* variables");
+    }
+
+    [Fact]
+    public void The_mui_workspace_with_a_screen_using_a_component_installs_builds_lints_passes_its_tests_and_its_format_check()
+    {
+        using var project = new GeneratedProject("saas-standard-react", Choice, LibraryTheme, "frontend.ui-library=mui");
+        project.Write("web/app/src/pages/Tokens.tsx", MuiScreen + "\n");
+        project.Write("web/app/src/pages/Tokens.test.tsx", ReactScreenTest + "\n");
+
+        RunWeb(project, "install", "build", "lint", "test");
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "format:check");
+        exitCode.ShouldBe(0, $"pnpm format:check:\n{output}");
+        var assets = Path.Combine(project.ProjectDirectory, "web", "app", "dist", "assets");
+        var css = string.Concat(Directory.GetFiles(assets, "*.css").Select(File.ReadAllText));
+        css.ShouldContain("--ds-color-primary:");
+    }
+
+    private static Dictionary<string, string> TokensPackage(GeneratedProject project)
+    {
+        var package = Path.Combine(project.ProjectDirectory, "web", "packages", "tokens");
+        return Directory.GetFiles(package, "*", SearchOption.AllDirectories)
+            .ToDictionary(path => Path.GetRelativePath(package, path), File.ReadAllText);
     }
 
     private static Dictionary<string, string> Files(string profile, params string[] overrides)

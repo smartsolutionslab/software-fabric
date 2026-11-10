@@ -829,6 +829,97 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Field(7, "EXECUTOR").ShouldBe(expectedExecutor);
     }
 
+    // Labels and board fields have no compare-and-swap, so a stale write can mark a parked issue claimed again after its
+    // claim ended (#402): the janitor repairs it, as it would a give-back that stopped half-way.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void The_janitor_returns_a_parked_issue_still_shown_as_claimed_to_todo(bool labelled)
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, .. labelled ? ["agent:claimed"] : Array.Empty<string>()]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddHours(-3));
+        Branch("agent/7", "chore(board): release #7", Now.AddHours(-2));
+        Directory.CreateDirectory(Path.Combine(state, "board"));
+        File.WriteAllText(Path.Combine(state, "board", "7.STATUS"), "Claimed");
+        File.WriteAllText(Path.Combine(state, "board", "7.EXECUTOR"), "codex-cloud/other");
+
+        var (exitCode, output) = Run("janitor.sh");
+
+        exitCode.ShouldBe(0, output);
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Todo");
+        Field(7, "EXECUTOR").ShouldBe("");
+        Head("agent/7").ShouldBe("chore(board): release #7");
+    }
+
+    // A claim whose Status write lands after an escalation parked the branch leaves an escalated issue shown as Claimed.
+    [Theory]
+    [InlineData("needs:decision", false)]
+    [InlineData("agent:blocked", false)]
+    [InlineData("needs:decision", true)]
+    public void The_janitor_shows_a_parked_escalated_issue_still_shown_as_claimed_as_blocked(string escalation, bool labelled)
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, escalation, .. labelled ? ["agent:claimed"] : Array.Empty<string>()]));
+        Branch("agent/7", "chore(board): claim #7", Now.AddHours(-3));
+        Branch("agent/7", "chore(board): release #7", Now.AddHours(-2));
+        Directory.CreateDirectory(Path.Combine(state, "board"));
+        File.WriteAllText(Path.Combine(state, "board", "7.STATUS"), "Claimed");
+        File.WriteAllText(Path.Combine(state, "board", "7.EXECUTOR"), "codex-cloud/other");
+
+        var (exitCode, output) = Run("janitor.sh");
+
+        exitCode.ShouldBe(0, output);
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+        Labels(IssueState(7)).ShouldContain(escalation);
+        Field(7, "STATUS").ShouldBe("Blocked");
+        Field(7, "EXECUTOR").ShouldBe("codex-cloud/other");
+        Head("agent/7").ShouldBe("chore(board): release #7");
+    }
+
+    [Fact]
+    public void The_janitor_leaves_a_live_claim_shown_as_claimed_alone()
+    {
+        Issues(Issue(7, "Pay an invoice", [.. ReadyBackend, "agent:claimed"]));
+        Branch("agent/7", "chore(board): release #7", Now.AddHours(-2));
+        Branch("agent/7", "chore(board): claim #7", Now.AddMinutes(-30));
+        Directory.CreateDirectory(Path.Combine(state, "board"));
+        File.WriteAllText(Path.Combine(state, "board", "7.STATUS"), "Claimed");
+        File.WriteAllText(Path.Combine(state, "board", "7.EXECUTOR"), "codex-cloud/other");
+
+        var (exitCode, output) = Run("janitor.sh");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldBeEmpty();
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Claimed");
+        Field(7, "EXECUTOR").ShouldBe("codex-cloud/other");
+        Head("agent/7").ShouldBe("chore(board): claim #7");
+    }
+
+    [Fact]
+    public void The_janitor_repairing_a_stale_claimed_status_keeps_a_claim_that_lands_meanwhile()
+    {
+        Issues(Issue(7, "Pay an invoice", ReadyBackend));
+        Branch("agent/7", "chore(board): claim #7", Now.AddHours(-3));
+        Branch("agent/7", "chore(board): release #7", Now.AddHours(-2));
+        Directory.CreateDirectory(Path.Combine(state, "board"));
+        File.WriteAllText(Path.Combine(state, "board", "7.STATUS"), "Claimed");
+        // Another agent claims the parked branch right after the janitor has read the board.
+        var concurrent = RightAfterTheGhCallWhere(
+            $"grep -q '^gh project item-list' '{Path.Combine(state, "log")}'",
+            Claim7("claude-cloud/two"));
+
+        var (exitCode, output) = Run("janitor.sh");
+
+        exitCode.ShouldBe(0, output);
+        File.ReadAllText(concurrent).ShouldBe("7 agent/7\nexit=0\n", File.ReadAllText(concurrent));
+        Head("agent/7").ShouldBe("chore(board): claim #7");
+        Executor("agent/7").ShouldBe("claude-cloud/two");
+        Labels(IssueState(7)).ShouldContain("agent:claimed");
+        Field(7, "STATUS").ShouldBe("Claimed");
+        Field(7, "EXECUTOR").ShouldBe("claude-cloud/two");
+    }
+
     [Fact]
     public void A_claim_made_under_the_old_branch_name_still_holds_the_issue()
     {

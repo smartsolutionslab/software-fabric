@@ -1,5 +1,5 @@
-{{~ if project["frontend.framework"] != "react" || project["frontend.design-system"] != "tokens-and-components" ~}}
-throw new Error('The native-federation pack builds React remotes on the tokens-and-components design system only so far; frontend.framework is {{ project["frontend.framework"] }}, frontend.design-system is {{ project["frontend.design-system"] }} (docs/adr/0006 of the generator).');
+{{~ if project["frontend.framework"] != "react" ~}}
+throw new Error('The native-federation pack builds React remotes only so far; frontend.framework is {{ project["frontend.framework"] }} (docs/adr/0006 of the generator).');
 {{~ end ~}}
 import react from '@vitejs/plugin-react';
 import type { Plugin } from 'vite';

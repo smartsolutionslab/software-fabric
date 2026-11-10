@@ -28,7 +28,15 @@ and work in development without building every remote first.
 - Built, a remote's chunks are content-hashed files a deployment serves. A chunk that failed to import there loads
   again after a reload of the shell; recovering it in place would need the deployment to serve each retry under its
   own path, which this project does not prescribe.
-- **Shared as singletons** by both sides: `react`, `react-dom` and `@{{ name }}/ui`. A remote gets them from the shell.
+- **Shared as singletons** by both sides: `react`{{ if project["frontend.design-system"] == "tokens" }} and{{ else }},{{ end }} `react-dom`{{ if project["frontend.design-system"] == "tokens" }}{{ else }} and `@{{ name }}/ui`{{ end }}. A remote gets them from the shell.
+{{~ if project["frontend.design-system"] == "tokens" ~}}
+- **No ui package is shared**: the tokens design system has no components, so a remote shares only React with the
+  shell, and styles its screens with the tokens' CSS variables, which the shell's stylesheet defines.
+{{~ else if project["frontend.design-system"] == "web-components" ~}}
+- **The design system's elements are defined once**, by the shell's instance of `@{{ name }}/ui`: a remote's page imports
+  the package for its elements and renders them as tags (`<ds-badge>`), which its `src/design-system.d.ts` declares
+  for React's JSX as the shell's does.
+{{~ end ~}}
 - No type declarations are exchanged (`dts: false`): a remote is loaded by name, and its page takes no props.
 - Each remote's `lint` runs ESLint, with the shell's library bans and test rules, and Prettier, its `build` type-checks it and builds `dist/remoteEntry.js`, and its
   tests run with Vitest.

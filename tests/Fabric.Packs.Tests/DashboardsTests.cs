@@ -448,6 +448,24 @@ public sealed class DashboardsTests
         output.ShouldNotContain("skipped: 1", customMessage: output);
     }
 
+    /// <summary>
+    /// With an authorization choice a widget's access asks ASP.NET Core's authorization service, whose implementation is
+    /// not public; Wolverine's mediator builds each handler's dependencies in generated code and refused it, so every
+    /// dashboard request answered 500 (#465).
+    /// </summary>
+    [Fact]
+    public void With_the_wolverine_mediator_and_roles_the_integration_tests_save_and_reload_a_dashboard()
+    {
+        using var project = new GeneratedProject("lean-crud", Dashboards, Roles, "backend.bus.transport=rabbitmq", "backend.mediator=wolverine");
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0", customMessage: output);
+        output.ShouldNotContain("skipped: 1", customMessage: output);
+    }
+
     private static string ArchitectureFailure(string profile, string directory, string source, params string[] overrides)
     {
         using var project = new GeneratedProject(profile, overrides);

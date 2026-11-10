@@ -3,6 +3,8 @@
 - Colours, radii and spacing are tokens in `web/packages/tokens/src/*.tokens.json` (W3C DTCG: `$value`, `$type`; reference another token as `{color.brand.700}`). Change a value there, never in a component.
 {{~ if project["frontend.styling"] == "tailwind" ~}}
 - In the app, use them through Tailwind's utilities (`bg-primary`, `rounded-md`, `p-4`) or as CSS variables (`var(--ds-color-primary)`).
+{{~ else if project["frontend.styling"] == "library-theme" ~}}
+- In the app, use them through the library's theme in `src/theme.ts`, which is built from the compiled tokens (`import { tokens } from '@{{ name }}/tokens'`, `tokens.color.primary`); a screen names the theme's values, never a token's.
 {{~ else ~}}
 - In the app, use them in CSS modules as custom properties: `color: var(--ds-color-primary)`, `padding: var(--ds-spacing-4)`.
 {{~ end ~}}
@@ -11,6 +13,6 @@
 - A reactive property is declared in `static properties` and with `declare` in the class, then set in the constructor; a class field would hide it.
 - Screens use the elements as tags (`<ds-badge tone="primary">New</ds-badge>`); the app's entry imports `@{{ name }}/ui` once, so never import a component file from a screen.
 {{~ if project["frontend.framework"] == "react" ~}}
-- A new element gets its JSX entry in `web/app/src/design-system.d.ts`, with the properties it takes, or the screens that use it do not type-check.
+- A new element gets its JSX entry in `web/app/src/design-system.d.ts`{{ if project["frontend.architecture"] == "micro-frontends" }} and in every remote's `src/design-system.d.ts`{{ end }}, with the properties it takes, or the screens that use it do not type-check.
 {{~ end ~}}
 - Browse the components with `pnpm --filter @{{ name }}/ui storybook` in `web/`; `pnpm build` builds Storybook, so a story that does not compile fails CI.

@@ -1,5 +1,5 @@
-{{~ if project["frontend.framework"] != "react" || project["frontend.design-system"] != "tokens-and-components" ~}}
-throw new Error('The module-federation pack builds React remotes on the tokens-and-components design system only so far; frontend.framework is {{ project["frontend.framework"] }}, frontend.design-system is {{ project["frontend.design-system"] }} (docs/adr/0006 of the generator).');
+{{~ if project["frontend.framework"] != "react" ~}}
+throw new Error('The module-federation pack builds React remotes only so far; frontend.framework is {{ project["frontend.framework"] }} (docs/adr/0006 of the generator).');
 {{~ end ~}}
 import { federation } from '@module-federation/vite';
 import react from '@vitejs/plugin-react';
@@ -25,8 +25,10 @@ export default defineConfig(({ command }) => ({
       shared: {
         react: { singleton: true },
         'react-dom': { singleton: true },
+{{~ if project["frontend.design-system"] != "tokens" ~}}
         // A workspace package without a version: both sides build it from the same source.
         '@{{ name }}/ui': { singleton: true, requiredVersion: false },
+{{~ end ~}}
       },
       dts: false,
     }),
