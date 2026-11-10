@@ -1,3 +1,6 @@
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using Fabric.Core.Catalog;
 using Fabric.Core.Choices;
 using Fabric.Core.Generation;
@@ -6,6 +9,17 @@ namespace Fabric.Core.Tests.Generation;
 
 public class FabricFileTests
 {
+    /// <summary>SemVer 2.0 without build metadata: a git SHA there would make every checkout write different bytes.</summary>
+    private const string SemVerLine = @"^generator: \d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$";
+
+    /// <summary>The version the generator's assembly reports, which every build of this checkout shares.</summary>
+    private static readonly string GeneratorVersion =
+        typeof(FabricFile).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+
+    /// <summary>SHA-256 of the fixture catalog's text, worked out here independently of the generator.</summary>
+    private static readonly string CatalogHash =
+        "sha256:" + Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(Path.Combine(Fixtures.MinimalRoot, "catalog.yaml"))));
+
     private static Dictionary<string, IReadOnlyList<string>> Values(params (string Dimension, string[] Options)[] values) =>
         values.ToDictionary(value => value.Dimension, value => (IReadOnlyList<string>)value.Options);
 
@@ -20,9 +34,11 @@ public class FabricFileTests
     [Fact]
     public void Writes_every_choice_with_multi_valued_dimensions_as_lists()
     {
-        FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices).ShouldBe("""
+        FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices).ShouldBe($"""
             # Written by fabric. These choices are fixed for this project (ADR-0001 of the generator).
             fabric: 1
+            generator: {GeneratorVersion}
+            catalog: {CatalogHash}
             name: shop
             profile: minimal
             project:
@@ -35,6 +51,45 @@ public class FabricFileTests
                 module.style: crud
 
             """);
+    }
+
+    [Fact]
+    public void Records_the_generator_version_as_semver_without_build_metadata()
+    {
+        var generator = FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices).Split('\n')[2];
+
+        generator.ShouldMatch(SemVerLine);
+    }
+
+    [Fact]
+    public void The_catalog_hash_does_not_depend_on_the_catalogs_line_endings()
+    {
+        var text = File.ReadAllText(Path.Combine(Fixtures.MinimalRoot, "catalog.yaml"));
+        var withLf = CatalogReader.Read(new StringReader(text), "catalog.yaml");
+        var withCrLf = CatalogReader.Read(new StringReader(text.Replace("\n", "\r\n", StringComparison.Ordinal)), "catalog.yaml");
+
+        var written = FabricFile.Write(withCrLf, "shop", "minimal", Choices);
+
+        written.ShouldContain($"\ncatalog: {CatalogHash}\n", Case.Sensitive);
+        written.ShouldBe(FabricFile.Write(withLf, "shop", "minimal", Choices));
+    }
+
+    [Fact]
+    public void The_catalog_hash_changes_with_any_change_to_the_catalogs_text()
+    {
+        var text = File.ReadAllText(Path.Combine(Fixtures.MinimalRoot, "catalog.yaml"));
+        var changed = CatalogReader.Read(new StringReader(text + "# a comment is a change too\n"), "catalog.yaml");
+        var expected = "sha256:" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text + "# a comment is a change too\n")));
+
+        FabricFile.Write(changed, "shop", "minimal", Choices).ShouldContain($"\ncatalog: {expected}\n", Case.Sensitive);
+    }
+
+    [Fact]
+    public void Reads_a_file_written_before_the_generator_and_catalog_were_recorded()
+    {
+        var record = FabricFile.Read(new StringReader("fabric: 1\nname: shop\nproject: {}\nmodule-defaults: {}\nmodules: {}\n"), "fabric.yaml");
+
+        record.Name.ShouldBe("shop");
     }
 
     [Fact]
@@ -85,9 +140,11 @@ public class FabricFileTests
             Settings = new Dictionary<string, decimal> { ["backend.api-protocols.rest.page-size"] = 50m, ["backend.api-protocols.rest.ratio"] = 2.50m },
         };
 
-        FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", choices).ShouldBe("""
+        FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", choices).ShouldBe($"""
             # Written by fabric. These choices are fixed for this project (ADR-0001 of the generator).
             fabric: 1
+            generator: {GeneratorVersion}
+            catalog: {CatalogHash}
             name: shop
             profile: minimal
             project:

@@ -26,6 +26,17 @@ public sealed class AddModuleCommandTests : IDisposable
     }
 
     [Fact]
+    public void Keeps_the_generator_version_and_catalog_hash_in_fabric_yaml()
+    {
+        var before = Stamp(File.ReadAllText(Path.Combine(project, "fabric.yaml")));
+
+        AddModule("billing").ExitCode.ShouldBe(0);
+
+        before.Length.ShouldBe(2);
+        Stamp(File.ReadAllText(Path.Combine(project, "fabric.yaml"))).ShouldBe(before);
+    }
+
+    [Fact]
     public void Adding_the_same_module_twice_fails()
     {
         AddModule("billing").ExitCode.ShouldBe(0);
@@ -83,4 +94,8 @@ public sealed class AddModuleCommandTests : IDisposable
             Directory.Delete(root, recursive: true);
         }
     }
+
+    /// <summary>The lines of fabric.yaml that say which generator and which catalog wrote it.</summary>
+    private static string[] Stamp(string fabricYaml) =>
+        [.. fabricYaml.Split('\n').Where(line => line.StartsWith("generator: ", StringComparison.Ordinal) || line.StartsWith("catalog: sha256:", StringComparison.Ordinal))];
 }
