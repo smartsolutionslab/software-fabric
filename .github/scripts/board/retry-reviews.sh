@@ -1,16 +1,74 @@
 #!/usr/bin/env bash
-# Re-runs the cross-model reviews that Copilot's usage limit postponed (board protocol, docs/adr).
-# Usage: retry-reviews.sh
+# Re-runs the cross-model reviews that Copilot's usage limit postponed, and sets the verdict of the dependency updates
+# exempt from review (board protocol, docs/adr).
+# Usage: retry-reviews.sh <this run's URL>
 # A review is postponed at a pull request's current head when that commit's status cross-model-review/verdict is
 # pending and says "Postponed"; its link is the review's run, which is re-run whole once it has finished. A head that
 # moved has a run of its own. Nothing is reviewed here, and a run that cannot be re-run is reported after the others.
+# An exempt dependency update gets no verdict from its own run, since Dependabot's runs get a read-only token (#480).
+# So a pull request by Dependabot that the base branch's dependency-update.sh exempts at its current head gets the
+# verdict success here, with the exemption note and this run as its link; the pull request's own copy of the script is
+# never run, and a head already marked is not marked again.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-pulls="$(gh api "repos/$repo/pulls?state=open&per_page=100" --paginate | jq -rs 'add // [] | .[] | "\(.number) \(.head.sha)"')"
+run_url="$1"
+
+# Prints the note and returns 0 when the base branch's dependency-update.sh exempts the pull request at its head;
+# returns 2 when it does not, and 1 when the pull request or its base branch could not be fetched.
+exemption() {
+  local pr="$1" head="$2" base="$3" author="$4" tip gate note
+  board_git fetch --quiet --no-tags origin "+refs/heads/$base:refs/remotes/origin/$base" \
+    "+refs/pull/$pr/head:refs/remotes/pull/$pr" || return 1
+  # By its full name and as a commit: a tag named origin/<base> would otherwise be preferred to the branch.
+  tip="$(board_git rev-parse --verify --quiet "refs/remotes/origin/$base^{commit}")" || return 1
+  if ! board_git cat-file -e "$head^{commit}" 2> /dev/null; then
+    echo "#$pr: its head $head moved while this ran; the next run checks the new one." >&2
+    return 2
+  fi
+  gate="$(mktemp)" || return 1
+  if ! board_git show "$tip:.github/scripts/board/dependency-update.sh" > "$gate" 2> /dev/null; then
+    echo "#$pr: the base branch $base has no dependency-update.sh, so nothing is exempt." >&2
+    rm -f "$gate"
+    return 2
+  fi
+  if note="$(cd "$board_root" && bash "$gate" "$author" "$tip" "$head")"; then
+    rm -f "$gate"
+    echo "$note"
+    return 0
+  fi
+  rm -f "$gate"
+  echo "#$pr: $note" >&2
+  return 2
+}
+
+pulls="$(gh api "repos/$repo/pulls?state=open&per_page=100" --paginate \
+  | jq -rs 'add // [] | .[] | "\(.number) \(.head.sha) \(.base.ref) \(.user.login)"')"
 failed=0
-while read -r pr head; do
+while read -r pr head base author; do
   [ -n "$pr" ] || continue
   status="$(gh api "repos/$repo/commits/$head/status")" || { failed=1; continue; }
+
+  # Only Dependabot's pull requests can be exempt, which spares fetching the others; the base branch's script decides.
+  if [ "$author" = "dependabot[bot]" ]; then
+    note="$(exemption "$pr" "$head" "$base" "$author")" && exempt=0 || exempt=$?
+    if [ "$exempt" -eq 1 ]; then
+      failed=1
+      continue
+    fi
+    if [ "$exempt" -eq 0 ]; then
+      if jq -e --arg note "$note" 'any(.statuses[]; .context == "cross-model-review/verdict" and .state == "success"
+        and .description == $note)' <<< "$status" > /dev/null; then
+        continue
+      fi
+      if bash "$(dirname "${BASH_SOURCE[0]}")/review-status.sh" "$head" success "$note" "$run_url"; then
+        echo "#$pr: $note"
+      else
+        failed=1
+      fi
+      continue
+    fi
+  fi
+
   url="$(jq -r '.statuses[] | select(.context == "cross-model-review/verdict" and .state == "pending"
     and (.description // "" | startswith("Postponed"))) | .target_url' <<< "$status")"
   [ -n "$url" ] || continue

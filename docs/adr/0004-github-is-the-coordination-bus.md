@@ -139,8 +139,16 @@ account's, not a model's, so a limited review is postponed at once and the hourl
 
 **Postponed reviews are retried on a schedule.** The workflow `cross-model-review-retry` runs hourly and on demand.
 It finds the open pull requests whose verdict at their current head is pending as postponed and re-runs the review
-run that status links to. It uses REST only and holds `actions: write` with read access to pull requests and
-statuses, the least that works, and reviews nothing itself.
+run that status links to. It uses REST only and holds `actions: write`, `statuses: write` and read access to pull
+requests, the least that works, and reviews nothing itself.
+
+**Exempt dependency updates get their verdict from the scheduled retry (#480).** Dependabot's runs get a read-only
+token, so no job of the review can set the status on an exempt dependency update, and a protection requiring it would
+hold that pull request forever. `cross-model-review-retry` sets it instead: for each open pull request that the base
+branch's `dependency-update.sh` exempts at its current head, `cross-model-review/verdict` becomes `success` with the
+exemption note, linking to the retry's run. The script comes from the base branch, never from the pull request, whose
+head is only fetched and diffed; a head already marked is not marked again. An exempt update therefore waits up to an
+hour for its verdict.
 
 **An unchanged diff keeps its verdict.** When the pull request's own diff (`git diff origin/<base>...<head>`) is
 identical to that of the last head that received a real verdict, after a push that only merged the base branch for
@@ -157,5 +165,9 @@ jobs pass while a review is postponed, so a protection that requires them instea
   `rate limit` or `too many requests`); any other failure still fails the review. The review job's outputs come from
   the job that reads the untrusted diff, so they can only hold the gate closed: a postponement leaves the status
   pending. A verdict is kept only from the workflow's own reviews (`github-actions[bot]`), since anyone can post a
-  review, and only for the same reviewing family, so the family rule holds for every head. A Dependabot update that is exempt from review gets no status,
-  because Dependabot's runs get a read-only token; #480 has the scheduled retry set it.
+  review, and only for the same reviewing family, so the family rule holds for every head.
+- *As built (#480):* only pull requests by `dependabot[bot]` are fetched and checked, since the script exempts no
+  other author; it is read from the commit `refs/remotes/origin/<base>` resolves to, by its full name so that a tag
+  named `origin/<base>` cannot stand in for the branch, in a full checkout, and the pull request's head from
+  `refs/pull/<number>/head`. A head that moved while the retry ran is left
+  to the next run.
