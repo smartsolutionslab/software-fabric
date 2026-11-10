@@ -21,7 +21,7 @@ const entry = (module: string) =>
   `${process.env[`REMOTE_${module.toUpperCase().replaceAll('-', '_')}_URL`] ?? `/modules/${module}`}/remoteEntry.json`;
 
 /** What the shell shares with every remote as one instance; each remote's federation.config.js shares the same. */
-const shared = ['react', 'react-dom', '@{{ name }}/ui'];
+const shared = ['react', 'react-dom'{{ if project["frontend.design-system"] != "tokens" }}, '@{{ name }}/ui'{{ end }}];
 
 /** A shared package's version as installed for the shell; native federation compares it with each remote's. */
 const versionOf = (name: string): string => {

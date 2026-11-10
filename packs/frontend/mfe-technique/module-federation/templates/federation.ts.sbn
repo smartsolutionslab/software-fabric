@@ -31,8 +31,10 @@ export const shellFederation: FederationOptions = {
   shared: {
     react: { singleton: true },
     'react-dom': { singleton: true },
+{{~ if project["frontend.design-system"] != "tokens" ~}}
     // A workspace package without a version: both sides build it from the same source.
     '@{{ name }}/ui': { singleton: true, requiredVersion: false },
+{{~ end ~}}
   },
   // Remotes are loaded by name (src/remotes/Remote.tsx), so no type declarations are fetched from them.
   dts: false,

@@ -13,6 +13,6 @@
 - A reactive property is declared in `static properties` and with `declare` in the class, then set in the constructor; a class field would hide it.
 - Screens use the elements as tags (`<ds-badge tone="primary">New</ds-badge>`); the app's entry imports `@{{ name }}/ui` once, so never import a component file from a screen.
 {{~ if project["frontend.framework"] == "react" ~}}
-- A new element gets its JSX entry in `web/app/src/design-system.d.ts`, with the properties it takes, or the screens that use it do not type-check.
+- A new element gets its JSX entry in `web/app/src/design-system.d.ts`{{ if project["frontend.architecture"] == "micro-frontends" }} and in every remote's `src/design-system.d.ts`{{ end }}, with the properties it takes, or the screens that use it do not type-check.
 {{~ end ~}}
 - Browse the components with `pnpm --filter @{{ name }}/ui storybook` in `web/`; `pnpm build` builds Storybook, so a story that does not compile fails CI.

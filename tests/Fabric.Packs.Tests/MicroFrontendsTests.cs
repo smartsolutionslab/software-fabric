@@ -192,20 +192,19 @@ public sealed class MicroFrontendsTests
         remoteOutput.ShouldContain("A remote bundles only its own files and packages");
     }
 
-    [Theory]
-    [InlineData("module-federation")]
-    [InlineData("native-federation")]
-    public void A_remote_for_a_design_system_the_pack_does_not_build_fails_loudly(string technique)
+    /// <summary>Module federation is React only by catalog rule (D5); native federation's remotes are React only so far.</summary>
+    [Fact]
+    public void A_remote_for_a_framework_the_pack_does_not_build_fails_loudly()
     {
         using var project = new GeneratedProject(
-            "saas-standard-react",
+            "saas-standard-vue",
             "frontend.architecture=micro-frontends",
             "frontend.design-system=tokens",
-            Technique(technique));
+            Technique("native-federation"));
         project.AddModule("billing");
 
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "modules", "billing", "vite.config.ts"))
-            .ShouldStartWith($"throw new Error('The {technique} pack builds React remotes on the tokens-and-components design system only so far; frontend.framework is react, frontend.design-system is tokens (docs/adr/0006 of the generator).');");
+            .ShouldStartWith("throw new Error('The native-federation pack builds React remotes only so far; frontend.framework is vue (docs/adr/0006 of the generator).');");
     }
 
     /// <summary>

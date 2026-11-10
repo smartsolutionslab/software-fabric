@@ -10,6 +10,8 @@ export default withNativeFederation({
   shared: share({
     react: { singleton: true, strictVersion: true, requiredVersion: 'auto' },
     'react-dom': { singleton: true, strictVersion: true, requiredVersion: 'auto' },
+{{~ if project["frontend.design-system"] != "tokens" ~}}
     '@{{ name }}/ui': { singleton: true, strictVersion: true, requiredVersion: 'auto' },
+{{~ end ~}}
   }),
 });
