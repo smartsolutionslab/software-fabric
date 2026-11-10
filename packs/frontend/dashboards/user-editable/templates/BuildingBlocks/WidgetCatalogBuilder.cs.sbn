@@ -70,7 +70,7 @@ public sealed class WidgetCatalogBuilder
         {{ not_null "query" }}
 
         // The names the rows are serialized with, so a [JsonPropertyName] or [JsonIgnore] on the row type holds for both.
-        List<string> columns = [.. JsonSerializerOptions.Web.GetTypeInfo(typeof(TRow)).Properties
+        List<string> columns = [.. JsonSerializerOptions.Web.GetTypeInfo<TRow>().Properties
             .Where(property => property.Get is not null)
             .Select(property => property.Name)];
         widgets.Add(new WidgetDefinition(

@@ -356,7 +356,7 @@ public static class PrimitiveBoundary
         private readonly HashSet<Type> seen = [];
         private readonly Dictionary<Type, Usage> usages = [];
         private readonly HashSet<(Type Definition, string Member, Type Primitive)> named = [];
-        private readonly SortedSet<string> violations = new(StringComparer.Ordinal);
+        private readonly SortedSet<string> violations = [with(StringComparer.Ordinal)];
         private int growth;
 
         public IReadOnlyList<string> From(IEnumerable<Type> roots)
