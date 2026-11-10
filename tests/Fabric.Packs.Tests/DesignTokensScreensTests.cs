@@ -108,6 +108,19 @@ public sealed partial class DesignTokensScreensTests
         css.ShouldContain(".border-border{border-color:var(--ds-color-border)}");
         css.ShouldContain(".text-muted-foreground{color:var(--ds-color-muted-foreground)}");
         css.ShouldContain(".text-destructive{color:var(--ds-color-destructive)}");
+        BareBorder().IsMatch(css).ShouldBeTrue("a bare border (border, border-b) takes the border token, not currentColor");
+    }
+
+    [Theory]
+    [InlineData("saas-standard-vue", RekaUi)]
+    [InlineData("saas-standard-react", RadixHeadless)]
+    [InlineData("saas-standard-react", "frontend.ui-library=shadcn")]
+    public void With_tailwind_a_bare_border_takes_the_border_token(string profile, string library)
+    {
+        var styles = Files(profile, Tokens, library)["web/app/src/index.css"];
+
+        styles.ShouldContain("border-color: var(--ds-color-border);");
+        Files(profile, library)["web/app/src/index.css"].ShouldNotContain("--ds-color-border");
     }
 
     /// <summary>The app's own styles and markup; the tokens package is where the colours live.</summary>
@@ -125,6 +138,9 @@ public sealed partial class DesignTokensScreensTests
         generated.Errors.ShouldBeEmpty();
         return generated.Files.ToDictionary(file => file.Path, file => file.Content);
     }
+
+    [GeneratedRegex(@"\*[^{}]*\{border-color:var\(--ds-color-border\)\}")]
+    private static partial Regex BareBorder();
 
     [GeneratedRegex(@"#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?(?:[0-9a-fA-F]{2})?(?![0-9a-zA-Z_-])")]
     private static partial Regex HexColour();
