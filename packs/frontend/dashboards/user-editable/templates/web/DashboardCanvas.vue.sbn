@@ -37,19 +37,13 @@ end ~}}
   end
   ret 'class="' + tailwind + '"'
 end ~}}
-{{~ func plain(tailwind, material)
-  if vuetify
-    ret 'class="' + material + '"'
-  end
-  ret 'class="' + tailwind + '"'
-end ~}}
 {{~ generative = array.contains project["frontend.dashboards"] "generative" ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
 {{~ formkit = project["frontend.forms"] == "formkit" ~}}
-{{~ if !((ui == "shadcn-vue" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form" || project["frontend.forms"] == "formkit")) || (ui == "reka-ui" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "formkit")) || (ui == "vuetify" && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form" || project["frontend.forms"] == "formkit"))) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+{{~ if !((ui == "shadcn-vue" || ui == "reka-ui" || ui == "vuetify") && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form" || project["frontend.forms"] == "formkit")) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue with vee-validate, TanStack Form or FormKit, reka-ui with vee-validate or FormKit, or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue, reka-ui or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
@@ -501,7 +495,7 @@ const tiles = computed(() =>
           <input
             :name="field.name"
             :value="field.state.value"
-            class="rounded border px-2 py-1"
+            }%}{{ class_of "rounded border px-2 py-1" "input" "rounded border px-2 py-1" }}{%{
             @blur="field.handleBlur"
             @input="field.handleChange(($event.target as HTMLInputElement).value)"
           />
@@ -524,7 +518,7 @@ const tiles = computed(() =>
           <select
             :name="field.name"
             :value="field.state.value"
-            class="rounded border px-2 py-1"
+            }%}{{ class_of "rounded border px-2 py-1" "input" "rounded border px-2 py-1" }}{%{
             :disabled="loading"
             @blur="field.handleBlur"
             @change="field.handleChange(($event.target as HTMLSelectElement).value)"
@@ -534,13 +528,13 @@ const tiles = computed(() =>
           </select>
         </adding.Field>
       </label>
-      <label }%}{{ plain "flex flex-col gap-1 text-sm" "d-flex flex-column ga-1 text-body-medium" }}{%{>
+      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" "d-flex flex-column ga-1 text-body-medium" }}{%{>
         Shown as
         <adding.Field v-slot="{ field }" name="visual">
           <select
             :name="field.name"
             :value="field.state.value"
-            class="rounded border px-2 py-1"
+            }%}{{ class_of "rounded border px-2 py-1" "input" "rounded border px-2 py-1" }}{%{
             :disabled="loading"
             @blur="field.handleBlur"
             @change="field.handleChange(($event.target as HTMLSelectElement).value)"
