@@ -63,6 +63,37 @@ public sealed class GeneratorSdkTests
         building.ShouldBe(["ci.yml tests", "ci.yml profile", "matrix.yml combination"], ignoreOrder: true);
     }
 
+    /// <summary>
+    /// <c>dotnet test</c> runs the tests with the generator's SDK in <c>MSBuildSDKsPath</c> and
+    /// <c>MSBuildExtensionsPath</c>; a generated project's build, started by a test, must not inherit them, or SDK 10's
+    /// MSBuild loads SDK 11's targets.
+    /// </summary>
+    [Fact]
+    public void A_dotnet_command_a_test_runs_in_a_generated_project_uses_the_SDK_its_global_json_pins()
+    {
+        var template = Path.Combine(Repository.Root, "packs", "base", "core", "templates", "global.json.sbn");
+        var pinned = (string?)JsonNode.Parse(File.ReadAllText(template))!["sdk"]?["version"];
+        pinned.ShouldNotBeNull();
+        var major = pinned.Split('.')[0];
+        var project = Directory.CreateTempSubdirectory("generator-sdk-test-");
+        try
+        {
+            File.Copy(template, Path.Combine(project.FullName, "global.json"));
+            File.WriteAllText(
+                Path.Combine(project.FullName, "Probe.csproj"),
+                $"""<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net{major}.0</TargetFramework></PropertyGroup></Project>""");
+
+            var (exitCode, output) = DotNet.Run(project.FullName, new Dictionary<string, string>(), "msbuild", "Probe.csproj", "-getProperty:NETCoreSdkVersion");
+
+            exitCode.ShouldBe(0, output);
+            output.Trim().ShouldStartWith($"{major}.", Case.Sensitive, $"the project's global.json pins {pinned}; its build took the SDK of {output.Trim()}.");
+        }
+        finally
+        {
+            project.Delete(recursive: true);
+        }
+    }
+
     private static string? Scalar(YamlMappingNode node, string key) =>
         node.Children.TryGetValue(new YamlScalarNode(key), out var value) ? ((YamlScalarNode)value).Value : null;
 }
