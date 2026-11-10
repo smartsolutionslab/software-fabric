@@ -165,6 +165,7 @@ public sealed partial class MuiTests
 
         const entry = { label: 'Issue #393', sx: { color: 'primary.main' } };
         const anchor = { href: '#add' };
+        const asserted = { label: 'Issue #393' as const, title: 'Issue #394' satisfies string };
         const { sx: themed } = { label: 'Issue #393', sx: { color: 'primary.main' } };
 
         function Content() {
@@ -183,6 +184,14 @@ public sealed partial class MuiTests
 
         export function Anchor() {
           return <Link {...anchor}>Add</Link>;
+        }
+
+        export function Asserted() {
+          return (
+            <Box title={'#add' as string} aria-label={'#bad' satisfies string}>
+              {asserted.label} {asserted.title}
+            </Box>
+          );
         }
         """;
 
