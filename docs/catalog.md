@@ -317,7 +317,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `ag-ui` | supported | `frontend.architecture == spa` | — | `saas-ai-react` | an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host |
+| `ag-ui` | experimental | `frontend.architecture == spa` | — | `saas-ai-react` | an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host |
 | `none` | experimental | — | — | — | no agent panel; agents are reached through the project's own endpoints |
 
 ### `frontend.api-client`
@@ -374,7 +374,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `generative` | supported | `frontend.dashboards has user-editable`, `frontend.agent-ui == ag-ui` | — | `saas-ai-react` | an agent in the agent panel proposes widgets from the same declared widgets; the user accepts and saves them (#185) |
+| `generative` | experimental | `frontend.dashboards has user-editable`, `frontend.agent-ui == ag-ui` | — | `saas-ai-react` | an agent in the agent panel proposes widgets from the same declared widgets; the user accepts and saves them (#185) |
 | `user-editable` | experimental | `backend.errors == result`, `backend.data-access == ef-core`, `backend.database == postgres` | — | `saas-ai-react` | users arrange, resize and save widgets on dashboards of their own |
 
 ### `frontend.data-grid`

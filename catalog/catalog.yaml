@@ -587,7 +587,7 @@ dimensions:
         note: "users arrange, resize and save widgets on dashboards of their own"
         requires: ["backend.errors == result", "backend.data-access == ef-core", "backend.database == postgres"]
       generative:
-        tier: supported  # nightly run 42800894655
+        tier: experimental
         note: "an agent in the agent panel proposes widgets from the same declared widgets; the user accepts and saves them (#185)"
         requires: ["frontend.dashboards has user-editable", "frontend.agent-ui == ag-ui"]
 
@@ -608,7 +608,7 @@ dimensions:
       none:  { tier: experimental, note: "no agent panel; agents are reached through the project's own endpoints" }
       # The agent panel is built for a single-page app; where it lives in a micro-frontend shell is a later design question (#518).
       ag-ui:
-        tier: supported  # nightly run 42800894655
+        tier: experimental
         note: "an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host"
         requires: ["frontend.architecture == spa"]
 
