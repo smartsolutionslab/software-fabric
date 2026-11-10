@@ -65,7 +65,7 @@ else
   run="$profile${sets[*]:+ ${sets[*]}}"
   summary="profile $run"
 fi
-cli="$repository/src/Fabric.Cli/bin/Release/net10.0/fabric.dll"
+cli="$repository/src/Fabric.Cli/bin/Release/net11.0/fabric.dll"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 

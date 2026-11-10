@@ -31,9 +31,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # The generator's SDK from global.json, and the one generated projects pin in their own global.json, for the
+      # tests that build them: rollForward does not cross a major version.
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           global-json-file: global.json
+          dotnet-version: 10.0.x
       # The frontend tests install, build, lint and test generated web apps.
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
@@ -83,7 +86,7 @@ jobs:
           assemblies=()
           for project in tests/*/*.Tests.csproj; do
             name="$(basename "$project" .csproj)"
-            assemblies+=("$(dirname "$project")/bin/Release/net10.0/$name.dll")
+            assemblies+=("$(dirname "$project")/bin/Release/net11.0/$name.dll")
           done
           build/tests-all-ran.sh "$RUNNER_TEMP/test-results" "${assemblies[@]}"
       - run: build/profiles.sh
@@ -147,10 +150,12 @@ jobs:
         run: echo "::notice title=profile CI::${{ matrix.profile }} selects no pack this pull request changes; its steps are skipped."
       - if: env.AFFECTED == 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # The generator's SDK, and the generated project's (see the tests job).
       - if: env.AFFECTED == 'true'
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           global-json-file: global.json
+          dotnet-version: 10.0.x
       - if: env.AFFECTED == 'true'
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
