@@ -93,7 +93,7 @@ public class CatalogReaderTests
         uiLibraries["mui"].Conflicts.Select(condition => condition.ToString()).ShouldBe(["frontend.styling == tailwind"]);
         uiLibraries["reka-ui"].Requires.Select(condition => condition.ToString()).ShouldBe(["frontend.framework == vue"]);
         uiLibraries.ShouldNotContainKey("primevue");
-        catalog.Dimensions["module.event-store"].Options["kurrentdb"].Tier.ShouldBe(SupportTier.Experimental);
+        uiLibraries["reka-ui"].Tier.ShouldBe(SupportTier.Experimental);
     }
 
     [Theory]
@@ -106,13 +106,10 @@ public class CatalogReaderTests
     }
 
     [Theory]
-    [InlineData("backend.llm", "anthropic")]
     [InlineData("backend.llm", "openai")]
-    [InlineData("backend.llm", "azure-openai")]
-    [InlineData("backend.llm", "ollama")]
     [InlineData("backend.mcp", "server")]
     [InlineData("backend.mcp", "client")]
-    public void An_llm_or_mcp_option_without_a_pack_is_experimental(string dimension, string option)
+    public void An_llm_or_mcp_option_a_nightly_run_has_not_passed_is_experimental(string dimension, string option)
     {
         ReadRepositoryCatalog().Dimensions[dimension].Options[option].Tier.ShouldBe(SupportTier.Experimental);
     }
@@ -128,9 +125,8 @@ public class CatalogReaderTests
     }
 
     [Theory]
-    [InlineData("none")]
     [InlineData("agent-framework")]
-    public void Every_agents_option_is_experimental_because_no_profile_calls_a_model(string option)
+    public void An_agents_option_a_nightly_run_has_not_passed_is_experimental(string option)
     {
         ReadRepositoryCatalog().Dimensions["backend.llm.agents"].Options[option].Tier.ShouldBe(SupportTier.Experimental);
     }
@@ -148,8 +144,7 @@ public class CatalogReaderTests
 
     [Theory]
     [InlineData("none")]
-    [InlineData("ag-ui")]
-    public void Every_agent_ui_option_is_experimental_because_no_profile_has_agents(string option)
+    public void An_agent_ui_option_a_nightly_run_has_not_passed_is_experimental(string option)
     {
         ReadRepositoryCatalog().Dimensions["frontend.agent-ui"].Options[option].Tier.ShouldBe(SupportTier.Experimental);
     }
@@ -181,7 +176,7 @@ public class CatalogReaderTests
         reads.Default.ShouldBe(["ef-core"]);
         reads.Options.Keys.ShouldBe(["ef-core", "dapper"]);
         reads.Options["ef-core"].Tier.ShouldBe(SupportTier.Supported);
-        reads.Options["dapper"].Tier.ShouldBe(SupportTier.Experimental);
+        reads.Options["dapper"].Tier.ShouldBe(SupportTier.Supported);
         reads.Options["dapper"].Requires.Select(condition => condition.ToString()).ShouldBe(["backend.tenancy == none"]);
         catalog.Dimensions["backend.data-access"].Options.Keys.ShouldBe(["ef-core"]);
         catalog.Dimensions.Keys.Last().ShouldBe("backend.data-access.reads");
@@ -209,10 +204,8 @@ public class CatalogReaderTests
 
     [Theory]
     [InlineData("backend.llm.extras", "rag")]
-    [InlineData("backend.llm.embeddings", "openai")]
     [InlineData("backend.llm.embeddings", "azure-openai")]
-    [InlineData("backend.llm.embeddings", "ollama")]
-    public void Every_rag_option_is_experimental_because_it_has_no_pack_yet(string dimension, string option)
+    public void A_rag_option_a_nightly_run_has_not_passed_is_experimental(string dimension, string option)
     {
         ReadRepositoryCatalog().Dimensions[dimension].Options[option].Tier.ShouldBe(SupportTier.Experimental);
     }
