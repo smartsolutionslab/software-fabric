@@ -95,16 +95,13 @@ public sealed class LeanCrudFrontendTests
         output.ShouldContain("'zustand' import is restricted from being used by a pattern. Server data: the generated TanStack Query hooks");
     }
 
+    /// <summary>Orval generates TanStack Query hooks or Pinia's plain functions, so the catalog refuses it with Redux Toolkit (#518).</summary>
     [Fact]
-    public void A_client_generated_for_another_state_library_than_tanstack_query_fails_loudly()
+    public void A_client_for_another_state_library_than_tanstack_query_is_refused_by_the_catalog()
     {
-        using var project = new GeneratedProject(Profile, "frontend.state=redux-toolkit");
-        RunWeb(project, "install");
+        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", Profile, ["frontend.state=redux-toolkit"]);
 
-        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "build");
-
-        exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("The orval pack generates TanStack Query hooks for React only so far");
+        generated.Errors.ShouldBe(["frontend.api-client=orval requires frontend.state in (zustand-tanstack-query, tanstack-query, pinia-tanstack-query, pinia), but frontend.state is redux-toolkit."]);
     }
 
     private static void RunWeb(GeneratedProject project, params string[] steps)

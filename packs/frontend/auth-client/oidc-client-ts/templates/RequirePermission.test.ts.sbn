@@ -1,0 +1,149 @@
+{{~ roles = project["backend.authorization"] | array.contains "roles" ~}}
+{{~ claims = project["backend.authorization"] | array.contains "claims" ~}}
+import { render, screen } from '@testing-library/vue';
+import type { User } from 'oidc-client-ts';
+import { expect, test } from 'vitest';
+import { computed, createApp } from 'vue';
+import RequirePermission from './RequirePermission.vue';
+import { type Auth, authKey } from './useAuth';
+{{~ if claims ~}}
+import { useHasClaim } from './useHasClaim';
+{{~ end ~}}
+{{~ if roles ~}}
+import { useHasRole } from './useHasRole';
+{{~ end ~}}
+
+{{ id_token_users_comment }}
+const users = {
+{{~ if roles ~}}
+  developer: {
+    preferred_username: 'developer',
+    {{ id_token_roles "'manager'" }},
+{{~ if claims ~}}
+    department: 'finance',
+{{~ end ~}}
+  },
+{{~ end ~}}
+{{~ if claims ~}}
+  analyst: {
+    preferred_username: 'analyst',
+    email_verified: true,
+    department: 'finance',
+  },
+  clerk: {
+    preferred_username: 'clerk',
+{{~ if roles ~}}
+    {{ id_token_roles "'manager'" }},
+{{~ end ~}}
+    department: 'sales',
+  },
+{{~ end ~}}
+  visitor: {
+    preferred_username: 'visitor',
+  },
+};
+
+type Name = keyof typeof users;
+
+/** useAuth() as the composables see it: a signed-in user whose ID token has the claims above. */
+function signedInAs(user: Name): Auth {
+  return { user: computed(() => ({ profile: users[user] }) as unknown as User) } as unknown as Auth;
+}
+
+/** Runs a composable as a component's setup would, with useAuth() answering for the user. */
+function asUser<T>(user: Name, composable: () => T): T {
+  const app = createApp({});
+  app.provide(authKey, signedInAs(user));
+  return app.runWithContext(composable);
+}
+
+function renderAs(user: Name, props: InstanceType<typeof RequirePermission>['$props'], slots: Record<string, string>) {
+  return render(RequirePermission, { props, slots, global: { provide: { [authKey]: signedInAs(user) } } });
+}
+{{~ if roles ~}}
+
+test('useHasRole answers true for the developer and false for the visitor', () => {
+  expect(asUser('developer', () => useHasRole('manager')).value).toBe(true);
+  expect(asUser('visitor', () => useHasRole('manager')).value).toBe(false);
+});
+
+test('an element that requires the manager role is shown to the developer', () => {
+  renderAs('developer', { role: 'manager' }, { default: '<button type="button">Manage</button>' });
+
+  expect(screen.getByRole('button', { name: 'Manage' })).toBeInTheDocument();
+});
+
+test('an element that requires the manager role is hidden from the visitor', () => {
+  renderAs('visitor', { role: 'manager' }, { default: '<button type="button">Manage</button>' });
+
+  expect(screen.queryByRole('button', { name: 'Manage' })).not.toBeInTheDocument();
+});
+
+test('the visitor sees the fallback instead', () => {
+  renderAs(
+    'visitor',
+    { role: 'manager' },
+    { default: '<button type="button">Manage</button>', fallback: '<p>Ask a manager.</p>' },
+  );
+
+  expect(screen.getByText('Ask a manager.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Manage' })).not.toBeInTheDocument();
+});
+{{~ end ~}}
+{{~ if claims ~}}
+
+test('useHasClaim answers true for the analyst and false for the clerk', () => {
+  expect(asUser('analyst', () => useHasClaim('department', 'finance')).value).toBe(true);
+  expect(asUser('clerk', () => useHasClaim('department', 'finance')).value).toBe(false);
+});
+
+test('useHasClaim compares a value as text, as the backend does: email_verified true is "true"', () => {
+  expect(asUser('analyst', () => useHasClaim('email_verified', 'true')).value).toBe(true);
+});
+
+test('an element that requires the finance department is shown to the analyst', () => {
+  renderAs('analyst', { claim: 'department', value: 'finance' }, { default: '<button type="button">Approve</button>' });
+
+  expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+});
+
+test('an element that requires the finance department is hidden from the clerk', () => {
+  renderAs('clerk', { claim: 'department', value: 'finance' }, { default: '<button type="button">Approve</button>' });
+
+  expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+});
+
+test('a claim without a value is met by any department: shown to the clerk, hidden from the visitor', () => {
+  const { unmount } = renderAs('clerk', { claim: 'department' }, { default: '<p>Your department</p>' });
+  expect(screen.getByText('Your department')).toBeInTheDocument();
+  unmount();
+
+  renderAs('visitor', { claim: 'department' }, { default: '<p>Your department</p>' });
+  expect(screen.queryByText('Your department')).not.toBeInTheDocument();
+});
+{{~ end ~}}
+{{~ if roles && claims ~}}
+
+test('an element that requires the manager role and the finance department is shown to the developer', () => {
+  renderAs(
+    'developer',
+    { role: 'manager', claim: 'department', value: 'finance' },
+    { default: '<button type="button">Approve</button>' },
+  );
+
+  expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+});
+
+test('an element that requires the manager role and the finance department is hidden from a user with only one of them', () => {
+  for (const user of ['clerk', 'analyst'] as const) {
+    const { unmount } = renderAs(
+      user,
+      { role: 'manager', claim: 'department', value: 'finance' },
+      { default: '<button type="button">Approve</button>' },
+    );
+
+    expect(screen.queryByRole('button', { name: 'Approve' }), user).not.toBeInTheDocument();
+    unmount();
+  }
+});
+{{~ end ~}}

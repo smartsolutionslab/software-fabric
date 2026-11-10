@@ -168,24 +168,6 @@ public sealed partial class VueSharedPacksTests
         output.ShouldContain("'vue-chartjs' import is restricted from being used by a pattern. Use DataChart from src/components/DataChart.vue (docs/adr)");
     }
 
-    [Fact]
-    public void Showing_and_hiding_by_role_or_claim_in_vue_fails_loudly_until_it_is_written()
-    {
-        var files = Files("backend.authorization=roles,claims");
-        files.Keys.ShouldNotContain("web/app/src/auth/useHasRole.ts");
-        files.Keys.ShouldNotContain("web/app/src/auth/useHasClaim.ts");
-
-        using var project = new GeneratedProject(Profile, "backend.authorization=roles,claims");
-        var web = Path.Combine(project.ProjectDirectory, "web");
-        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
-        installExitCode.ShouldBe(0, $"pnpm install:\n{installOutput}");
-
-        var (exitCode, output) = Shell.Run(web, "pnpm", "test");
-
-        exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("The oidc-client-ts pack shows and hides by role or claim (RequirePermission, useHasRole, useHasClaim) for React only so far");
-    }
-
     private static Dictionary<string, string> Files(params string[] overrides)
     {
         using var standIns = new StandIns();
