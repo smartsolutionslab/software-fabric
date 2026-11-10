@@ -95,14 +95,40 @@ public sealed partial class MuiTests
               return <Box {...alarm}>SpreadNamed</Box>;
             }
             """,
+        ["Destructured"] = """
+            import { Box } from '@mui/material';
+
+            const { sx } = { sx: { color: '#fff' } };
+
+            export function Destructured() {
+              return <Box sx={sx}>Destructured</Box>;
+            }
+            """,
+        ["Aliased"] = """
+            import { styled as themed } from '@mui/material/styles';
+
+            export const Aliased = themed('div')({ color: '#fff' });
+            """,
     };
 
     /// <summary>Components that style themselves only through the theme, beside content that looks like a colour (#398 review).</summary>
     private const string ThemedEntries = """
         import { Box, Link } from '@mui/material';
+        import { styled } from '@mui/material/styles';
 
         const entry = { label: 'Issue #393', sx: { color: 'primary.main' } };
         const anchor = { href: '#add' };
+        const { sx: themed } = { label: 'Issue #393', sx: { color: 'primary.main' } };
+
+        function Content() {
+          return <a href="#add">Add</a>;
+        }
+
+        export const ThemedContent = styled(Content)({ color: 'primary.main' });
+
+        export function Destructured() {
+          return <Box sx={themed}>Destructured</Box>;
+        }
 
         export function Entry() {
           return <Box sx={entry.sx}>{entry.label}</Box>;
