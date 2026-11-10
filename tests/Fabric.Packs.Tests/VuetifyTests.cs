@@ -287,7 +287,7 @@ public sealed partial class VuetifyTests
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "app"), "pnpm", "test", "src/theme.test.ts");
 
         exitCode.ShouldNotBe(0, output);
-        Escapes().Replace(output, string.Empty).ShouldContain("× src/theme.test.ts > Vuetify's components take their colours from the theme", customMessage: output);
+        Escapes().Replace(output, string.Empty).ShouldContain("FAIL  src/theme.test.ts > Vuetify's components take their colours from the theme", customMessage: output);
     }
 
     private static void FormatIsClean(GeneratedProject project)
