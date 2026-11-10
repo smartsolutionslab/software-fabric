@@ -1,21 +1,37 @@
 {{~ ui = project["frontend.ui-library"] ~}}
-{{~ css_modules = project["frontend.styling"] == "css-modules" ~}}
+{{~ vuetify = ui == "vuetify" ~}}
+{{~ css_modules = project["frontend.styling"] == "css-modules" && !vuetify ~}}
 {{~ if ui == "reka-ui"
   button = "BaseButton"
   button_import = "import BaseButton from '@/components/ui/BaseButton.vue';"
   secondary = "outline"
+else if vuetify
+  button = "VBtn"
+  button_import = "import { VBtn } from 'vuetify/components';"
+  secondary = "tonal"
 else
   button = "Button"
   button_import = "import { Button } from '@/components/ui/button';"
   secondary = "secondary"
 end ~}}
-{{~ func form_class(tailwind)
+{{~ if vuetify
+  primary = ' color="primary"'
+else
+  primary = ""
+end ~}}
+{{~ func form_class(tailwind, material)
+  if vuetify
+    ret 'form-class="' + material + '"'
+  end
   if css_modules
     ret ':form-class="styles.form"'
   end
   ret 'form-class="' + tailwind + '"'
 end ~}}
-{{~ func class_of(tailwind, module)
+{{~ func class_of(tailwind, module, material)
+  if vuetify
+    ret 'class="' + material + '"'
+  end
   if css_modules
     ret ':class="styles.' + module + '"'
   end
@@ -25,9 +41,9 @@ end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
 {{~ formkit = project["frontend.forms"] == "formkit" ~}}
-{{~ if !((ui == "shadcn-vue" || ui == "reka-ui") && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form" || project["frontend.forms"] == "formkit")) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
+{{~ if !((ui == "shadcn-vue" || ui == "reka-ui" || ui == "vuetify") && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form" || project["frontend.forms"] == "formkit")) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
-throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue or reka-ui with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
+throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue, reka-ui or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
 </script>
 
 {{~ end ~}}
@@ -435,7 +451,7 @@ const tiles = computed(() =>
 </script>
 
 <template>
-  <section aria-label="Dashboard" }%}{{ class_of "flex flex-col gap-4" "canvas" }}{%{>
+  <section aria-label="Dashboard" }%}{{ class_of "flex flex-col gap-4" "canvas" "d-flex flex-column ga-4" }}{%{>
 }%}{{~ if formkit ~}}
 {{~ if css_modules ~}}
 {%{    <FormKit type="form" :actions="false" :value="{ name: dashboard.name }" :form-class="styles.form" @submit="submit">
@@ -444,17 +460,17 @@ const tiles = computed(() =>
       type="form"
       :actions="false"
       :value="{ name: dashboard.name }"
-      form-class="flex flex-wrap items-end gap-2"
+      }%}{{ form_class "flex flex-wrap items-end gap-2" "d-flex flex-wrap align-end ga-2" }}{%{
       @submit="submit"
     >
 }%}{{~ end ~}}
 {%{      <FormKit type="text" name="name" label="Dashboard name" @input="edited" />
-      <}%}{{ button }}{%{ type="submit" :disabled="saving">Save dashboard</}%}{{ button }}{%{>
+      <}%}{{ button }}{{ primary }}{%{ type="submit" :disabled="saving">Save dashboard</}%}{{ button }}{%{>
       <p v-if="savedRevision === revision" role="status">Saved.</p>
       <p v-if="failed" role="alert">The dashboard could not be saved.</p>
     </FormKit>
 
-    <FormKit type="form" :actions="false" }%}{{ form_class "flex flex-wrap items-end gap-2" }}{%{ @node="addingNode" @submit="add">
+    <FormKit type="form" :actions="false" }%}{{ form_class "flex flex-wrap items-end gap-2" "d-flex flex-wrap align-end ga-2" }}{%{ @node="addingNode" @submit="add">
       <FormKit type="select" name="source" label="Widget" v-model="source" :options="sources" :disabled="loading" />
       <FormKit type="select" name="visual" label="Shown as" v-model="visual" :options="shownAs" :disabled="loading" />
       <}%}{{ button }}{%{ type="submit" variant="}%}{{ secondary }}{%{" :disabled="loading || full || !roomLeft">Add widget</}%}{{ button }}{%{>
@@ -471,38 +487,38 @@ const tiles = computed(() =>
       />
     </FormKit>
 }%}{{~ else ~}}
-{%{    <form novalidate }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{ @submit="submit">
-      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
+{%{    <form novalidate }%}{{ class_of "flex flex-wrap items-end gap-2" "form" "d-flex flex-wrap align-end ga-2" }}{%{ @submit="submit">
+      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" "d-flex flex-column ga-1 text-body-medium" }}{%{>
         Dashboard name
 }%}{{~ if tanstack ~}}
 {%{        <naming.Field v-slot="{ field }" name="name" :listeners="{ onChange: edited }">
           <input
             :name="field.name"
             :value="field.state.value"
-            }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{
+            }%}{{ class_of "rounded border px-2 py-1" "input" "rounded border px-2 py-1" }}{%{
             @blur="field.handleBlur"
             @input="field.handleChange(($event.target as HTMLInputElement).value)"
           />
         </naming.Field>
 }%}{{~ else ~}}
-{%{        <input v-model="name" v-bind="nameAttributes" }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{ @input="edited" />
+{%{        <input v-model="name" v-bind="nameAttributes" }%}{{ class_of "rounded border px-2 py-1" "input" "rounded border px-2 py-1" }}{%{ @input="edited" />
 }%}{{~ end ~}}
 {%{      </label>
-      <}%}{{ button }}{%{ type="submit" :disabled="saving">Save dashboard</}%}{{ button }}{%{>
+      <}%}{{ button }}{{ primary }}{%{ type="submit" :disabled="saving">Save dashboard</}%}{{ button }}{%{>
       <p v-if="nameErrors.name" role="alert">{{ nameErrors.name }}</p>
       <p v-if="savedRevision === revision" role="status">Saved.</p>
       <p v-if="failed" role="alert">The dashboard could not be saved.</p>
     </form>
 
-    <form novalidate }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{ @submit="add">
-      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
+    <form novalidate }%}{{ class_of "flex flex-wrap items-end gap-2" "form" "d-flex flex-wrap align-end ga-2" }}{%{ @submit="add">
+      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" "d-flex flex-column ga-1 text-body-medium" }}{%{>
         Widget
 }%}{{~ if tanstack ~}}
 {%{        <adding.Field v-slot="{ field }" name="source" :listeners="{ onChange: choose }">
           <select
             :name="field.name"
             :value="field.state.value"
-            }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{
+            }%}{{ class_of "rounded border px-2 py-1" "input" "rounded border px-2 py-1" }}{%{
             :disabled="loading"
             @blur="field.handleBlur"
             @change="field.handleChange(($event.target as HTMLSelectElement).value)"
@@ -512,13 +528,13 @@ const tiles = computed(() =>
           </select>
         </adding.Field>
       </label>
-      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
+      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" "d-flex flex-column ga-1 text-body-medium" }}{%{>
         Shown as
         <adding.Field v-slot="{ field }" name="visual">
           <select
             :name="field.name"
             :value="field.state.value"
-            }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{
+            }%}{{ class_of "rounded border px-2 py-1" "input" "rounded border px-2 py-1" }}{%{
             :disabled="loading"
             @blur="field.handleBlur"
             @change="field.handleChange(($event.target as HTMLSelectElement).value)"
@@ -534,9 +550,9 @@ const tiles = computed(() =>
           <option v-for="widget in catalog" :key="widget.id" :value="widget.id">{{ widget.title }}</option>
         </select>
       </label>
-      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
+      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" "d-flex flex-column ga-1 text-body-medium" }}{%{>
         Shown as
-        <select v-model="visual" v-bind="visualAttributes" }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{ :disabled="loading">
+        <select v-model="visual" v-bind="visualAttributes" }%}{{ class_of "rounded border px-2 py-1" "input" "rounded border px-2 py-1" }}{%{ :disabled="loading">
           <option v-for="shown in visuals[chosen?.kind ?? 'Chart']" :key="shown.value" :value="shown.value">
             {{ shown.label }}
           </option>
@@ -553,9 +569,9 @@ const tiles = computed(() =>
           <option v-for="widget in catalog" :key="widget.id" :value="widget.id">{{ widget.title }}</option>
         </select>
       </label>
-      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
+      <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" "d-flex flex-column ga-1 text-body-medium" }}{%{>
         Shown as
-        <select v-model="visual" v-bind="visualAttributes" }%}{{ class_of "rounded border px-2 py-1" "input" }}{%{ :disabled="loading">
+        <select v-model="visual" v-bind="visualAttributes" }%}{{ class_of "rounded border px-2 py-1" "input" "rounded border px-2 py-1" }}{%{ :disabled="loading">
           <option v-for="shown in visuals[chosen?.kind ?? 'Chart']" :key="shown.value" :value="shown.value">
             {{ shown.label }}
           </option>

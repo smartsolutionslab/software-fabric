@@ -1,5 +1,50 @@
-{{~ if project["frontend.ui-library"] != "mui" ~}}
-throw new Error('The library-theme pack builds the theme for MUI only so far; frontend.ui-library is {{ project["frontend.ui-library"] }} (docs/adr/0006 of the generator).');
+{{~ if project["frontend.ui-library"] == "vuetify" ~}}
+import type { VuetifyOptions } from 'vuetify';
+{{~ if project["frontend.design-system"] == "tokens" || project["frontend.design-system"] == "web-components" ~}}
+import { tokens } from '@{{ name }}/tokens';
+
+/**
+ * The app's look in one place: every Vuetify component takes its colours from this theme, and the theme takes them
+ * from the design tokens (web/packages/tokens/src, docs/adr). Change a value in its token, never here or per
+ * component; a screen names the theme's colours (`color="primary"`, `class="text-medium-emphasis"`).
+ */
+export const theme = {
+  defaultTheme: 'light',
+  themes: {
+    light: {
+      dark: false,
+      colors: {
+        primary: tokens.color.primary,
+        'on-primary': tokens.color['primary-foreground'],
+        secondary: tokens.color.accent,
+        'on-secondary': tokens.color['accent-foreground'],
+        background: tokens.color.surface,
+      },
+    },
+  },
+} satisfies VuetifyOptions['theme'];
+{{~ else ~}}
+
+/**
+ * The app's look in one place: the colours every Vuetify component takes (docs/adr). Change them here, never per
+ * component; a screen names them through the theme (`color="primary"`, `class="text-medium-emphasis"`).
+ */
+export const theme = {
+  defaultTheme: 'light',
+  themes: {
+    light: {
+      dark: false,
+      colors: {
+        primary: '#2563eb',
+        secondary: '#7c3aed',
+        error: '#dc2626',
+      },
+    },
+  },
+} satisfies VuetifyOptions['theme'];
+{{~ end ~}}
+{{~ else if project["frontend.ui-library"] != "mui" ~}}
+throw new Error('The library-theme pack builds the theme for MUI and Vuetify only so far; frontend.ui-library is {{ project["frontend.ui-library"] }} (docs/adr/0006 of the generator).');
 {{~ else if project["frontend.design-system"] == "tokens" || project["frontend.design-system"] == "web-components" ~}}
 import { createTheme } from '@mui/material/styles';
 import { tokens } from '@{{ name }}/tokens';

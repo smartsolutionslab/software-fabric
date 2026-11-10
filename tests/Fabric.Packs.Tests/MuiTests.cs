@@ -208,10 +208,10 @@ public sealed partial class MuiTests
     [Fact]
     public void The_library_theme_for_a_library_it_does_not_build_yet_fails_the_web_tests_saying_so()
     {
-        using var project = new GeneratedProject("saas-standard-vue", Mui[1], "frontend.ui-library=vuetify");
+        using var project = new GeneratedProject("saas-standard-vue", Mui[1], "frontend.ui-library=quasar");
 
         var theme = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", "src", "theme.ts"));
-        theme.ShouldStartWith("throw new Error('The library-theme pack builds the theme for MUI only so far; frontend.ui-library is vuetify (docs/adr/0006 of the generator).');");
+        theme.ShouldStartWith("throw new Error('The library-theme pack builds the theme for MUI and Vuetify only so far; frontend.ui-library is quasar (docs/adr/0006 of the generator).');");
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", "src", "theme.test.ts")).ShouldContain("import './theme';");
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", "src", "main.ts")).ShouldNotContain("ThemeProvider");
     }

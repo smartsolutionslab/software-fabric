@@ -13,6 +13,14 @@
 {{~ else if project["frontend.routing"] == "tanstack-router" ~}}
 - A link to a route is MUI's `Link` made a router link once with `createLink(Link)` from `@tanstack/react-router`, so it takes the theme's colours.
 {{~ end ~}}
+{{~ else if project["frontend.ui-library"] == "vuetify" ~}}
+{{~ if project["frontend.design-system"] == "tokens" || project["frontend.design-system"] == "web-components" ~}}
+- Colours live in one place, the design tokens, which the Vuetify theme in `src/theme.ts` is built from; change them in their token, never in the theme or per component.
+{{~ else ~}}
+- Colours live in one place, the Vuetify theme in `src/theme.ts`; change them there, never per component.
+{{~ end ~}}
+- Style with Vuetify's props and utility classes, naming the theme's colours (`color="error"`, `class="text-medium-emphasis pa-2"`). No CSS files, no `<style>` blocks, no inline `style`; `src/index.css` only imports the stylesheets a library needs.
+- A component that writes a colour of its own (`#hex`, `rgb()`) fails `src/theme.test.ts`.
 {{~ else ~}}
 - The theme for {{ project["frontend.ui-library"] }} is not built yet: `src/theme.ts` throws and `src/theme.test.ts` fails until the generator builds it.
 {{~ end ~}}
