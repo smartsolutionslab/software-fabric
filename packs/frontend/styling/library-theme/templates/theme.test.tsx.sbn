@@ -1,9 +1,8 @@
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Button } from '@mui/material';
 import { ThemeProvider } from '@mui/material/styles';
 import { cleanup, render, screen } from '@testing-library/react';
-import ts from 'typescript';
 import { afterEach, expect, test } from 'vitest';
 import { theme } from './theme';
 
@@ -15,125 +14,6 @@ const source = join(process.cwd(), 'src');
 
 /** A colour written out: #hex, or a CSS colour function. */
 const colour = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/i;
-
-/** The props a component styles itself with: sx, style, css, and the colour props (color, bgcolor, borderColor, fill). */
-const stylingProp = /^(?:sx|style|styles|css|fill|stroke|\w*colou?r)$/i;
-
-/** The calls that style a component: styled(...), styled.div`...`, css`...`, keyframes`...`. */
-const stylingCalls = new Set(['styled', 'css', 'keyframes']);
-
-/**
- * Whether a component writes a colour in a styling value: a styling prop (given directly or in a spread), or a styling
- * call, with what they name in the same file, resolved by the compiler in its scope (sx={alarm} reads that alarm, and
- * sx={entry.sx} only entry's sx). Text, comments, links and other props are content, not styling, even when they look
- * like a colour (Issue #393, href="#add").
- */
-function writesColour(file: ts.SourceFile, checker: ts.TypeChecker): boolean {
-  const read = new Set<ts.Node>();
-  /** What a name refers to, when it is declared in this file: the value it was given. */
-  const declared = (symbol: ts.Symbol | undefined): ts.Node[] =>
-    (symbol?.declarations ?? [])
-      .filter((declaration) => declaration.getSourceFile() === file)
-      .flatMap((declaration): ts.Node[] => {
-        if (ts.isVariableDeclaration(declaration) || ts.isPropertyAssignment(declaration)) {
-          return declaration.initializer === undefined ? [] : [declaration.initializer];
-        }
-        return ts.isBindingElement(declaration) ? bound(declaration) : [declaration];
-      });
-  /** What a destructured name takes: its default, and the member it selects (const { sx } = alarm reads alarm.sx). */
-  const bound = (element: ts.BindingElement): ts.Node[] => {
-    const defaults = element.initializer === undefined ? [] : [element.initializer];
-    const owner = element.parent.parent;
-    if (!ts.isVariableDeclaration(owner) || owner.initializer === undefined) {
-      return defaults;
-    }
-    const member = element.propertyName ?? element.name;
-    if (!ts.isObjectBindingPattern(element.parent) || !(ts.isIdentifier(member) || ts.isStringLiteral(member))) {
-      return [...defaults, owner.initializer];
-    }
-    return [...defaults, ...declared(checker.getTypeAtLocation(owner.initializer).getProperty(member.text))];
-  };
-  /** The styling API a name stands for, through an import alias: styled for import { styled as themed }. */
-  const api = (name: ts.Identifier): string => {
-    const declaration = checker.getSymbolAtLocation(name)?.declarations?.[0];
-    if (declaration !== undefined && ts.isImportSpecifier(declaration)) {
-      return (declaration.propertyName ?? declaration.name).text;
-    }
-    // A default import is its module's: @emotion/styled's is styled, whatever this file calls it.
-    if (declaration !== undefined && ts.isImportClause(declaration)) {
-      const from = declaration.parent.moduleSpecifier;
-      return ts.isStringLiteral(from) && from.text === '@emotion/styled' ? 'styled' : name.text;
-    }
-    return name.text;
-  };
-  /** The styling API a call or tagged template starts from: styled for styled('div')({...}) and styled.div`...`. */
-  const called = (node: ts.Expression): string => {
-    if (ts.isCallExpression(node)) {
-      return called(node.expression);
-    }
-    if (ts.isTaggedTemplateExpression(node)) {
-      return called(node.tag);
-    }
-    if (ts.isPropertyAccessExpression(node)) {
-      return stylingCalls.has(node.name.text) ? node.name.text : called(node.expression);
-    }
-    return ts.isIdentifier(node) ? api(node) : '';
-  };
-  /** What a styling call styles with: its arguments and template, not the component styled(Content) wraps. */
-  const styles = (node: ts.Expression): ts.Node[] => {
-    if (ts.isTaggedTemplateExpression(node)) {
-      return [node.template, ...styles(node.tag)];
-    }
-    if (!ts.isCallExpression(node)) {
-      return [];
-    }
-    const wraps = !ts.isCallExpression(node.expression) && called(node.expression) === 'styled';
-    return wraps ? node.arguments.slice(1) : [...node.arguments, ...styles(node.expression)];
-  };
-  const anyColoured = (nodes: ts.Node[]): boolean => nodes.some((node) => coloured(node));
-  const coloured = (node: ts.Node): boolean => {
-    if (read.has(node)) {
-      return false;
-    }
-    read.add(node);
-    if (ts.isStringLiteralLike(node) || ts.isTemplateLiteralToken(node)) {
-      return colour.test(node.text);
-    }
-    if (ts.isIdentifier(node)) {
-      return anyColoured(declared(checker.getSymbolAtLocation(node)));
-    }
-    if (ts.isShorthandPropertyAssignment(node)) {
-      return anyColoured(declared(checker.getShorthandAssignmentValueSymbol(node)));
-    }
-    if (ts.isPropertyAssignment(node)) {
-      return coloured(node.initializer) || (ts.isComputedPropertyName(node.name) && coloured(node.name));
-    }
-    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
-      const member = ts.isPropertyAccessExpression(node) ? node.name : node.argumentExpression;
-      const symbol = checker.getSymbolAtLocation(member);
-      // A member the compiler cannot find is read whole; one declared elsewhere (theme.palette) is not this file's.
-      return symbol === undefined ? ts.forEachChild(node, coloured) === true : anyColoured(declared(symbol));
-    }
-    if (ts.isJsxSpreadAttribute(node)) {
-      const props = checker.getTypeAtLocation(node.expression).getProperties();
-      return anyColoured(props.filter((prop) => stylingProp.test(prop.name)).flatMap(declared));
-    }
-    return ts.forEachChild(node, coloured) === true;
-  };
-  const styling = (node: ts.Node): boolean => {
-    if (ts.isJsxAttribute(node) && stylingProp.test(node.name.getText(file))) {
-      return node.initializer !== undefined && coloured(node.initializer);
-    }
-    if (ts.isJsxSpreadAttribute(node)) {
-      return coloured(node);
-    }
-    if ((ts.isCallExpression(node) || ts.isTaggedTemplateExpression(node)) && stylingCalls.has(called(node))) {
-      return anyColoured(styles(node));
-    }
-    return ts.forEachChild(node, styling) === true;
-  };
-  return styling(file);
-}
 
 /** A value as the browser paints it: MUI sets some through its own custom properties (var(--variant-containedBg)). */
 function resolve(style: CSSStyleDeclaration, value: string): string {
@@ -157,16 +37,7 @@ test('no component writes a colour of its own', () => {
   const components = readdirSync(source, { recursive: true, encoding: 'utf8' }).filter(
     (path) => path.endsWith('.tsx') && !path.endsWith('.test.tsx'),
   );
-  // One program for every component, without the libraries: names and members are resolved within the source alone.
-  const program = ts.createProgram(
-    components.map((path) => join(source, path)),
-    { noLib: true, noResolve: true, jsx: ts.JsxEmit.Preserve },
-  );
-  const checker = program.getTypeChecker();
-  const coloured = components.filter((path) => {
-    const file = program.getSourceFile(join(source, path));
-    return file !== undefined && writesColour(file, checker);
-  });
+  const coloured = components.filter((path) => colour.test(readFileSync(join(source, path), 'utf8')));
 
   expect(coloured, 'components that write a colour instead of taking it from src/theme.ts').toEqual([]);
 });
