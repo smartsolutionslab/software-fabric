@@ -29,8 +29,8 @@ public sealed class ZustandTanStackQueryTests
         files[Provider].ShouldContain("import { QueryClient, QueryClientProvider } from '@tanstack/react-query';");
         files[Provider].ShouldContain("<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>");
         files["web/app/src/main.tsx"].ShouldContain("import { withQueryClient } from './providers/query';");
-        files["web/app/package.json"].ShouldContain("\"@tanstack/react-query\": \"5.104.5\"");
-        files["web/app/package.json"].ShouldContain("\"zustand\": \"5.0.16\"");
+        files["web/app/package.json"].ShouldContain("\"@tanstack/react-query\": \"5.107.1\"");
+        files["web/app/package.json"].ShouldContain("\"zustand\": \"5.1.0\"");
         files["web/app/package.json"].ShouldNotContain("redux");
         files["web/app/orval.config.ts"].ShouldContain("client: 'react-query',");
         files.Keys.ShouldNotContain("web/app/src/store.ts");

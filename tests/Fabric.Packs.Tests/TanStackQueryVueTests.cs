@@ -31,7 +31,7 @@ public sealed class TanStackQueryVueTests
         files[Provider].ShouldContain("app.use(VueQueryPlugin, { queryClient });");
         files["web/app/src/main.ts"].ShouldContain("import { withQueryClient } from './providers/query';");
         files["web/app/src/main.ts"].ShouldContain("withQueryClient");
-        files["web/app/package.json"].ShouldContain("\"@tanstack/vue-query\": \"5.104.5\"");
+        files["web/app/package.json"].ShouldContain("\"@tanstack/vue-query\": \"5.107.1\"");
         files["web/app/package.json"].ShouldNotContain("react");
         files["web/app/package.json"].ShouldNotContain("pinia");
         files["web/app/orval.config.ts"].ShouldContain("client: 'vue-query',");

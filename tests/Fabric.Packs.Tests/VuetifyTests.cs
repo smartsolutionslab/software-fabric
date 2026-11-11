@@ -248,7 +248,7 @@ public sealed partial class VuetifyTests
         var files = Files(Vuetify);
 
         var package = files["web/app/package.json"];
-        package.ShouldContain("\"vuetify\": \"4.3.2\"");
+        package.ShouldContain("\"vuetify\": \"4.3.3\"");
         package.ShouldContain("\"@vue/test-utils\": \"2.5.1\"");
         foreach (var tailwind in new[] { "tailwindcss", "tailwind-merge", "tw-animate-css", "class-variance-authority", "reka-ui", "clsx" })
         {
