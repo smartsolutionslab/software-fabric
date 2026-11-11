@@ -70,6 +70,20 @@ public class ResultTests
         {{ `Describe(Result<int, ApiError>.Failure(NotFound))` | should_be `"billing.invoice-not-found"` }};
     }
 
+    {{ test_attribute }}
+    public void Every_result_holds_one_of_its_cases_and_the_case_converts_back_to_the_result()
+    {
+        Result<int, ApiError>.IUnionMembers success = Result<int, ApiError>.Success(42);
+        Result<int, ApiError>.IUnionMembers failure = Result<int, ApiError>.Failure(NotFound);
+
+        {{ `success.HasValue` | should_be_true }};
+        {{ `failure.HasValue` | should_be_true }};
+        Result<int, ApiError> successAgain = {{ `success.Value` | should_be_of_type `SuccessOutcome<int>` }};
+        Result<int, ApiError> failureAgain = {{ `failure.Value` | should_be_of_type `FailureOutcome<ApiError>` }};
+        {{ `successAgain.Value` | should_be `42` }};
+        {{ `failureAgain.Error` | should_be `NotFound` }};
+    }
+
     private static string Describe(Result<int, ApiError> result) =>
         result switch
         {

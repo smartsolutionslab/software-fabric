@@ -67,6 +67,20 @@ public class OptionTests
         {{ `Describe(default)` | should_be `"none"` }};
     }
 
+    {{ test_attribute }}
+    public void Every_option_holds_one_of_its_cases_and_the_case_converts_back_to_the_option()
+    {
+        Option<string>.IUnionMembers number = Number;
+        Option<string>.IUnionMembers nothing = Nothing;
+
+        {{ `number.HasValue` | should_be_true }};
+        {{ `nothing.HasValue` | should_be_true }};
+        Option<string> numberAgain = {{ `number.Value` | should_be_of_type `Some<string>` }};
+        Option<string> nothingAgain = {{ `nothing.Value` | should_be_of_type `None` }};
+        {{ `numberAgain` | should_be `Number` }};
+        {{ `nothingAgain` | should_be `Nothing` }};
+    }
+
     private static string Describe(Option<string> number) =>
         number switch
         {
