@@ -16,4 +16,4 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: architecture-test, describes: "The host's Program.cs calls AddAzureOpenAIEmbeddingGenerator, which registers the Azure OpenAI embedding deployment as the project's IEmbeddingGenerator<string, Embedding<float>> behind logging and OpenTelemetry, against <endpoint>/openai/v1/ with the endpoint, deployment and key the AppHost supplies; a missing endpoint or key fails naming its parameter. No request is sent.", file: templates/AzureOpenAIGeneratesTheProjectsEmbeddings.cs.sbn }
+  - { kind: architecture-test, describes: "The host's Program.cs calls AddAzureOpenAIEmbeddingGenerator, which registers the Azure OpenAI embedding deployment as the project's IEmbeddingGenerator<string, Embedding<float>> behind logging and OpenTelemetry, against <endpoint>/openai/v1/, or an endpoint ending in /v1 as is, with the endpoint, deployment and key the AppHost supplies; a missing endpoint or key fails naming its parameter. No request is sent.", file: templates/AzureOpenAIGeneratesTheProjectsEmbeddings.cs.sbn }
