@@ -108,7 +108,8 @@ public sealed class DeclarationFilesTests
         var (exitCode, output) = Build(project);
 
         exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("billing/src/design-system.d.ts");
+        // The remote's own build names its file relative to the remote; the shell's copy is intact.
+        output.ShouldContain("src/design-system.d.ts");
         output.ShouldContain("TS2315");
     }
 
