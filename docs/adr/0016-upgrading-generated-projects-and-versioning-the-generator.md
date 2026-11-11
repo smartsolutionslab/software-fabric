@@ -155,13 +155,22 @@ it is used.
 
 ### O3. A project whose base cannot be reproduced
 
-**Open — owner to decide.** Three cases exist today:
+**Open — owner to decide.** Three cases can be detected today:
 
 - no `generator:` line (written before #381; `fabric-pilot` is one);
 - a `-dev` version, which is never published, so no build can be shown to be
   the one that wrote it;
 - a `catalog:` hash that does not match the recorded version's catalog (the
-  project was generated with `--catalog` or `--packs` pointing elsewhere).
+  project was generated with `--catalog` pointing elsewhere).
+
+A fourth cannot: a project generated with `--packs` pointing at packs other
+than the ones the recorded version ships. The hash covers the catalog only
+(owner, #381) and `fabric.yaml` records no pack provenance, so the version
+and hash checks of O2 both pass while the base they reproduce is not the
+tree that was generated. **This is an unresolved limitation**: the options
+below apply to the three detectable cases only; detecting the fourth would
+need pack provenance in `fabric.yaml` (for example a hash over the packs, the
+alternative the owner set aside on #381), which is the owner's to reopen.
 
 Options:
 
