@@ -62,7 +62,7 @@ public sealed class AzureServiceBusTests
         appHost.ShouldNotContain("AddRabbitMQ");
 
         var versions = File.ReadAllText(Path.Combine(project.ProjectDirectory, "Directory.Packages.props"));
-        versions.ShouldContain("<PackageVersion Include=\"Aspire.Hosting.Azure.ServiceBus\" Version=\"13.6.4\" />");
+        versions.ShouldContain("<PackageVersion Include=\"Aspire.Hosting.Azure.ServiceBus\" Version=\"13.6.5\" />");
         versions.ShouldContain("<PackageVersion Include=\"WolverineFx.AzureServiceBus\" Version=\"6.59.1\" />");
 
         var messaging = File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "Host", "Wiring", "Messaging.cs"));
