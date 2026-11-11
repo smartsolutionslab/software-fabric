@@ -25,9 +25,17 @@ public sealed class ToolPackageTests
     public void The_packed_tool_installs_from_a_folder_feed_reports_its_package_version_and_generates_a_profile_that_builds()
     {
         var feed = Directory.CreateTempSubdirectory("fabric-feed-");
+        var cache = Directory.CreateTempSubdirectory("fabric-packages-");
         try
         {
-            var (exitCode, output) = Shell.Run(Repository.Root, "bash", "build/tool-check.sh", "lean-crud", feed.FullName);
+            // An empty package cache, as on a clean runner: the generated project restores everything from its sources.
+            var (exitCode, output) = Shell.Run(
+                Repository.Root,
+                new Dictionary<string, string> { ["NUGET_PACKAGES"] = cache.FullName },
+                "bash",
+                "build/tool-check.sh",
+                "lean-crud",
+                feed.FullName);
 
             exitCode.ShouldBe(0, output);
             output.ShouldContain(
@@ -48,6 +56,7 @@ public sealed class ToolPackageTests
         finally
         {
             feed.Delete(recursive: true);
+            cache.Delete(recursive: true);
         }
     }
 
