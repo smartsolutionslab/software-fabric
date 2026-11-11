@@ -486,6 +486,7 @@ AppHost's model with it, declares it instead (*#260*).
 | Slot | File | Separator | Filled by |
 |---|---|---|---|
 | `web.workspace-packages` *(added in M1-07; a role slot of `frontend.workspace` since #283, declared by pnpm-workspaces, nx and turborepo)* | `web/pnpm-workspace.yaml` | newline | spa (`  - app`), micro-frontends (`app`, `modules/*`), design-system tokens-and-components (`packages/tokens`, `packages/ui`), design-system tokens (`packages/tokens`), design-system web-components (`packages/tokens`, `packages/ui`) |
+| `web.pnpm-overrides` *(added for #569; a role slot of `frontend.workspace`, declared by pnpm-workspaces, nx and turborepo)* | `web/package.json` (`pnpm.overrides`: pnpm reads overrides only from the workspace root; rendered only with a contribution). An entry is a package name and the version every dependency in the workspace gets, indented six spaces: `      "swagger-parser": "12.1.0"` | `,` + newline | — |
 | `web.dependencies` | `web/app/package.json` | `,` + newline | react, redux, rtk, router, rhf, zod, tailwind, shadcn, tanstack-table, echarts, oidc, agent-ui ag-ui (`@ag-ui/client`), openapi-fetch |
 | `web.dev-dependencies` | 〃 | `,` + newline | vitest, testing-library, playwright, axe, rtk codegen, pwa yes (`vite-plugin-pwa`), openapi-fetch (`openapi-typescript`) |
 | `web.scripts` | 〃 | `,` + newline | rtk-query-codegen, orval, openapi-fetch (`codegen`) |
