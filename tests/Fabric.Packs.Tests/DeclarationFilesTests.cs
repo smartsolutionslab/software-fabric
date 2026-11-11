@@ -139,6 +139,47 @@ public sealed class DeclarationFilesTests
         output.ShouldContain("Cannot find name 'Missing'");
     }
 
+    // A declaration file outside the tsconfig's include joins the compilation when a source file imports it.
+    [Theory]
+    [InlineData("module-federation", "react")]
+    [InlineData("native-federation", "vue")]
+    public void A_type_error_in_a_declaration_file_a_remote_imports_fails_the_remotes_own_build(string technique, string framework)
+    {
+        using var project = new GeneratedProject(
+            $"saas-standard-{framework}",
+            "frontend.architecture=micro-frontends",
+            "frontend.design-system=tokens",
+            $"frontend.mfe-technique={technique}");
+        project.AddModule("billing");
+        project.Write("web/modules/billing/types/broken.d.ts", "export type Broken = Missing;\n");
+        project.Write("web/modules/billing/src/uses.ts", "export type { Broken } from '../types/broken';\n");
+        Install(project);
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "modules", "billing"), "pnpm", "build");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("types/broken.d.ts");
+        output.ShouldContain("Cannot find name 'Missing'");
+    }
+
+    // Over a megabyte of errors under node_modules comes before the app's own: the check reads all of the compiler's output.
+    [Fact]
+    public void A_type_error_in_the_apps_declarations_fails_the_build_after_a_megabyte_of_dependency_errors()
+    {
+        using var project = new GeneratedProject("saas-standard-react");
+        Install(project);
+        var declarations = string.Concat(Enumerable.Range(0, 30000).Select(index => $"export type Broken{index} = Missing{index};\n"));
+        project.Write("web/app/node_modules/broken-types/package.json", """{ "name": "broken-types", "types": "index.d.ts" }""" + "\n");
+        project.Write("web/app/node_modules/broken-types/index.d.ts", declarations);
+        project.Write("web/app/src/a-uses.ts", "export type { Broken0 } from 'broken-types';\n");
+        project.Write("web/app/src/zz-broken.d.ts", "export type Broken = Missing;\n");
+
+        var (exitCode, output) = Build(project);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("src/zz-broken.d.ts");
+    }
+
     [Fact]
     public void A_type_error_in_a_declaration_file_under_node_modules_still_builds()
     {
