@@ -6,5 +6,10 @@
     "build": "pnpm --recursive build",
     "lint": "pnpm --recursive lint",
     "test": "pnpm --recursive test"
-  }
+  }{{ if slots["web.pnpm-overrides"] != "" }},
+  "pnpm": {
+    "overrides": {
+{{ slots["web.pnpm-overrides"] }}
+    }
+  }{{ end }}
 }
