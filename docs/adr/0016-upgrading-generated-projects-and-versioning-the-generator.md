@@ -1,7 +1,7 @@
 # ADR-0016: Upgrading generated projects and versioning the generator
 
-**Status:** Proposed. The owner's review is pending; the points marked
-**Open — owner to decide** below are not decided by this ADR.
+**Status:** Accepted (owner, 2026-11-11, review of PR #572: every
+recommendation, D1 to D8, accepted).
 **Date:** 2026-11-11
 
 ## Context
@@ -24,7 +24,8 @@ CLI was built from source only, with no version.
 
 The owner decided both on 2026-11-08 (decisions E4 and E5 of the M4 plan;
 issue #380). This ADR records them, what is already built of them, and the
-questions they leave open.
+owner's decisions of 2026-11-11 on the questions they left open (D1 to D8),
+each with the alternatives that were weighed.
 
 ## Decision
 
@@ -83,8 +84,8 @@ version and a catalog hash. A versioned, published tool is what makes E4's
 - The format number stays 1, and both fields are optional when read: a
   `fabric.yaml` from before #381 has neither.
 - `fabric add-module` records the **running** generator's version and hash,
-  not the ones `fabric new` wrote. The merge base this implies is open point
-  O5 below.
+  not the ones `fabric new` wrote. The merge base this implies is settled
+  by D5 below.
 - `fabric --version` prints the same informational version.
 
 **Version (#381, #382).** The version is `VersionPrefix` in
@@ -106,16 +107,18 @@ the same check without publishing (`ToolPackageTests`). **No tag has been
 pushed yet** (2026-11-11), so no version is published, and no project yet
 records a version that can be installed.
 
-## Open points
+## Decisions on what E4 and E5 left open (owner, 2026-11-11)
 
-E4 and E5 leave the following unsettled. Each is set out with options and a
-recommendation; **none is decided here**. The tasks that build on this ADR
-(M4-12 `fabric upgrade`, M4-13 `fabric diff`, M4-14 upgrades in profile CI,
-M4-15 refusing a newer project) wait for these answers.
+E4 and E5 left the following unsettled. The draft of this ADR set each out
+as an open point with options and a recommendation; the owner accepted every
+recommendation on 2026-11-11 (review of PR #572, recorded in #380). Each
+section keeps the options that were weighed and states the decision. The
+tasks that build on this ADR (M4-12 `fabric upgrade`, M4-13 `fabric diff`,
+M4-14 upgrades in profile CI, M4-15 refusing a newer project) follow them.
 
-### O1. What an upgrade guarantees, and what it does not
+### D1. What an upgrade guarantees, and what it does not
 
-**Open — owner to decide.**
+**Options weighed:**
 
 - **(a) Nothing is lost silently.** Every local edit is either kept or shown
   as a conflict; every generator change is either applied or shown as a
@@ -128,16 +131,16 @@ M4-15 refusing a newer project) wait for these answers.
 - **(c) (b), and every upgraded project builds and passes its tests.** Not
   achievable in general: local code can depend on whatever a pack changed.
 
-**Recommendation: (b).** Not guaranteed, and printed in the summary when it
+**Decision: (b).** Not guaranteed, and printed in the summary when it
 applies: that an edited project builds; that lockfiles (`pnpm-lock.yaml`)
 match a changed `package.json` (the person or agent reinstalls); that a
 changed persistence model has its EF Core migration (the project adds it, as
 for any model change); and that the project's own ADRs and code agree with a
 changed pack ADR.
 
-### O2. Where the old generator comes from
+### D2. Where the old generator comes from
 
-**Open — owner to decide.**
+**Options weighed:**
 
 - **(a) Install the recorded version from the feed** into a temporary tool
   path and run it, as `build/tool-check.sh` already does with a folder feed.
@@ -148,14 +151,14 @@ changed pack ADR.
   grows with every release, and an old generator's code would still be
   missing.
 
-**Recommendation: (a)**, with (b) as an explicit override for a version that
-cannot be installed (see O3). Either way the old generator's own
+**Decision: (a)**, with (b) as an explicit override for a version that
+cannot be installed (see D3). Either way the old generator's own
 `fabric --version` and catalog hash are checked against `fabric.yaml` before
-it is used. Those checks do not detect a `--packs` override (O3).
+it is used. Those checks do not detect a `--packs` override (D3).
 
-### O3. A project whose base cannot be reproduced
+### D3. A project whose base cannot be reproduced
 
-**Open — owner to decide.** Three cases can be detected today:
+Three cases can be detected today:
 
 - no `generator:` line (written before #381; `fabric-pilot` is one);
 - a `-dev` version, which is never published, so no build can be shown to be
@@ -166,13 +169,14 @@ it is used. Those checks do not detect a `--packs` override (O3).
 A fourth cannot: a project generated with `--packs` pointing at packs other
 than the ones the recorded version ships. The hash covers the catalog only
 (owner, #381) and `fabric.yaml` records no pack provenance, so the version
-and hash checks of O2 both pass while the base they reproduce is not the
-tree that was generated. **This is an unresolved limitation**: the options
-below apply to the three detectable cases only; detecting the fourth would
-need pack provenance in `fabric.yaml` (for example a hash over the packs, the
-alternative the owner set aside on #381), which is the owner's to reopen.
+and hash checks of D2 both pass while the base they reproduce is not the
+tree that was generated. **This is a known limitation**, kept by the owner
+on 2026-11-11: the decision below applies to the three detectable cases only;
+detecting the fourth would need pack provenance in `fabric.yaml` (for example
+a hash over the packs, the alternative the owner set aside on #381), which
+only the owner can reopen.
 
-Options:
+**Options weighed:**
 
 - **(a) Refuse**, in one sentence naming the case.
 - **(b) Refuse by default, and accept `--base <released version>`**: the
@@ -190,15 +194,15 @@ Options:
   three-way. Costly (every edit of a generated file is a conflict), but
   nothing is taken on trust.
 
-**Recommendation: (a), with (c) as the explicit way in.** (b) silently
+**Decision: (a), with (c) as the explicit way in.** (b) silently
 loses exactly the fixes an upgrade exists to deliver. For `fabric-pilot`,
 and for the pilot if it is generated before the first release, (c) against
 the first release is the one-time cost; M4-40 generating the pilot from a
 released tool avoids the case altogether.
 
-### O4. Refusing a project from a newer generator (M4-15)
+### D4. Refusing a project from a newer generator (M4-15)
 
-**Open — owner to decide.**
+**Options weighed:**
 
 - **(a) `add-module` and `upgrade` refuse when the recorded version is newer
   than the running one by SemVer precedence**, pre-release included
@@ -208,24 +212,26 @@ released tool avoids the case altogether.
 - **(b) Refuse only when the major or minor version is newer.**
 - **(c) Warn and continue.**
 
-**Recommendation: (a).** An older generator cannot know what a newer one
+**Decision: (a).** An older generator cannot know what a newer one
 wrote, and `upgrade` to an older version would be a silent downgrade.
 `new`, `validate`, `matrix` and `profiles` do not read a project and are not
 affected.
 
-### O5. The merge base after `add-module` by a newer generator
+### D5. The merge base after `add-module` by a newer generator
 
-**Open — owner to decide.** Asked to be settled here by the owner on #381.
+Asked to be settled here by the owner on #381.
 As built, `add-module` records the running version. If a project written by
 version N gets a module from version N+1, `fabric.yaml` names N+1 while every
 file outside the new module came from N. An upgrade to N+2 then takes N+1's
 tree as base, so whatever changed between N and N+1 outside the module is
-treated as already applied, and is lost without a conflict. That breaks O1's
+treated as already applied, and is lost without a conflict. That breaks D1's
 "nothing is lost silently" under every option there.
+
+**Options weighed:**
 
 - **(a) `add-module` refuses a project recorded with any other version than
   the running one**, older or newer, and says to run `fabric upgrade` first.
-  The recorded version then always describes the whole tree, and O4 is the
+  The recorded version then always describes the whole tree, and D4 is the
   newer half of this rule. The as-built recording stays correct, since the
   two versions are equal.
 - **(b) Record a version per module** (a `generator:` under each module in
@@ -236,16 +242,16 @@ treated as already applied, and is lost without a conflict. That breaks O1's
   version of them. Changes the owner's #381 decision.
 - **(d) Keep as built** and document the loss.
 
-**Recommendation: (a).** It is the simplest rule that keeps one version per
+**Decision: (a).** It is the simplest rule that keeps one version per
 tree, it needs no format change, and it fits the owner's #381 decision.
 
-### O6. How profile CI tests upgrades (M4-14)
+### D6. How profile CI tests upgrades (M4-14)
 
-**Open — owner to decide.**
+**Options weighed:**
 
 - **(a) Every PR, every profile: generate with the previous release, upgrade
   with the PR's generator, and compare the result with a fresh generation**
-  (`diff -r`), which O1 (b) requires to be identical. No build: profile CI
+  (`diff -r`), which D1 (b) requires to be identical. No build: profile CI
   already builds the fresh generation. Cheap, since it is generation only.
 - **(b) As (a), plus building and testing the upgraded project** in each
   profile job. Duplicates the profile build; ADR-0003's capacity concern.
@@ -258,22 +264,22 @@ the job skips with that reason. Likewise a profile the previous release
 cannot generate (it is new, or it chooses an option the previous catalog
 lacks) has no upgrade path yet and is skipped with that reason; its path
 starts at the release that can generate it. A profile the previous release
-generated and the current catalog rejects is not skipped: that is O7's
+generated and the current catalog rejects is not skipped: that is D7's
 major change, and the job fails until the release is declared one.
 
-**Recommendation: (a).** A pack change that breaks the upgrade path (base not
+**Decision: (a).** A pack change that breaks the upgrade path (base not
 reproducible, a merge that does not converge on the fresh generation) fails
 the PR that makes it. A profile that is generated differently after upgrade
 than fresh is the defect worth catching; a build failure of the result is
 already caught by the profile's own job.
 
-### O7. What a version number promises
+### D7. What a version number promises
 
-**Open — owner to decide.** E5 chose SemVer but not what counts as breaking
-for a generator. Recommended reading:
+E5 chose SemVer but not what counts as breaking for a generator.
+**Decision:**
 
 - **major:** an upgrade may need work beyond resolving conflicts: an option
-  is removed or renamed in the catalog (so O1's refusal applies), the
+  is removed or renamed in the catalog (so D1's refusal applies), the
   `fabric.yaml` format number changes, or a pack restructures files a project
   is expected to edit;
 - **minor:** new options, packs, profiles or CLI commands; an upgrade of an
@@ -283,9 +289,9 @@ for a generator. Recommended reading:
 Before 1.0.0 every minor may break, as SemVer allows; the M4-50 release notes
 say which kind each release is.
 
-### O8. How git conflicts are left
+### D8. How git conflicts are left
 
-**Open — owner to decide.** E4 says conflicts are left as git conflicts.
+E4 says conflicts are left as git conflicts. **Options weighed:**
 
 - **(a) A git three-way merge with the generated base given explicitly.**
   `upgrade` requires a git repository with a clean working tree. It writes
@@ -305,10 +311,10 @@ say which kind each release is.
 - **(b) Conflict markers only** (`git merge-file` per file, with base as
   the common ancestor), with the index left alone; no clean tree needed.
 
-**Recommendation: (a).** It is what "git conflicts" means to a person or an
+**Decision: (a).** It is what "git conflicts" means to a person or an
 agent, and a clean tree means nothing unrelated is mixed into the upgrade.
-The exact plumbing is M4-12's to settle by test; the decision asked here is
-an explicit base and no synthetic history in the project.
+The exact plumbing is M4-12's to settle by test; the decision is an explicit
+base and no synthetic history in the project.
 
 ## Consequences
 
@@ -319,10 +325,10 @@ an explicit base and no synthetic history in the project.
   load-bearing beyond tests: a base tree that does not match what an old
   version wrote would misattribute every difference.
 - Every release is permanent: an upgrade from version N needs N to stay
-  installable from the feed (under O2 (a)). Unpublishing a version strands
+  installable from the feed (under D2 (a)). Unpublishing a version strands
   the projects that record it.
 - Packs that rewrite whole files will conflict more than packs that add
-  files or contribute to slots; the upgrade tests in profile CI (O6) show
+  files or contribute to slots; the upgrade tests in profile CI (D6) show
   this in the generator repository before it reaches the pilot.
 - The summary an upgrade prints is the agent's brief for resolving it: which
-  files were merged, which conflict, and what O1 says is not guaranteed.
+  files were merged, which conflict, and what D1 says is not guaranteed.
