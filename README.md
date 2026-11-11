@@ -82,6 +82,26 @@ runs one combination of the pairwise matrix (`build/matrix.json`, ADR-0003)
 instead of a profile, without the end-to-end tests: its choices go to
 `fabric new --choices`, a JSON file of dimension to option.
 
+### As a .NET tool
+
+A `v*` tag publishes the CLI, with the catalog and the packs inside it, to
+the organisation's GitHub Packages feed (`.github/workflows/release.yml`).
+Its version is `VersionPrefix` in `Directory.Build.props`, and the tag must
+be `v` and that version; bump the prefix after each release. Install it with
+a GitHub token that may read packages:
+
+```bash
+dotnet nuget add source https://nuget.pkg.github.com/smartsolutionslab/index.json --name smartsolutionslab \
+  --username <github user> --password <token> --store-password-in-clear-text
+dotnet tool install --global fabric --version <version>
+```
+
+`build/tool-check.sh lean-crud <folder>` packs the tool into a folder,
+installs it from there into an empty directory, checks `fabric --version`
+against the package, and generates and builds the profile with it. With
+`--release <tag>` it packs the version without its suffix, as a release
+does; the release workflow runs it before it publishes.
+
 ## Stack of the generator itself
 
 C# / .NET 11 CLI, distributed as a `dotnet tool`. Templates rendered with

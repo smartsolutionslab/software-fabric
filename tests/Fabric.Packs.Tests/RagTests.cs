@@ -150,7 +150,9 @@ public sealed class RagTests
         files[$"{Store}/VectorTables.cs"].ShouldContain($"public const int Dimensions = {dimensions};");
         var runner = files["src/MigrationRunner/Program.cs"];
         runner.ShouldContain("await host.Services.CreateVectorTablesAsync(contexts);");
-        runner.IndexOf("MigrateAsync()", StringComparison.Ordinal).ShouldBeLessThan(runner.IndexOf("CreateVectorTablesAsync", StringComparison.Ordinal));
+        var migrations = runner.IndexOf("MigrateModuleAsync()", StringComparison.Ordinal);
+        migrations.ShouldBeGreaterThanOrEqualTo(0);
+        migrations.ShouldBeLessThan(runner.IndexOf("CreateVectorTablesAsync", StringComparison.Ordinal));
         var tables = files[$"{Store}/VectorTables.cs"];
         tables.ShouldContain("CREATE EXTENSION IF NOT EXISTS vector");
         tables.ShouldContain("key text primary key, content text not null, embedding vector(");

@@ -1,0 +1,19 @@
+using Microsoft.AspNetCore.OpenApi;
+using Microsoft.OpenApi;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class OpenApiVersion
+{
+    /// <summary>
+    /// Serves the document as OpenAPI 3.1 (Microsoft.OpenApi writes 3.1.2), not ASP.NET Core 11's default 3.2, which
+    /// the frontend's client generators do not all read yet.
+    /// </summary>
+    public static OpenApiOptions DescribeAsOpenApi31(this OpenApiOptions options)
+    {
+        {{ not_null "options" }}
+
+        options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_1;
+        return options;
+    }
+}

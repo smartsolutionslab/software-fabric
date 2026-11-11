@@ -11,7 +11,9 @@ const people = columnsOf<Person>();
 const columns = people.columns([people.accessor('name', { header: 'Name' })]);
 const data: Person[] = [{ name: 'first' }, { name: 'second' }];
 
-test('the table shows a header and one row per item', async () => {
+// The file's first test: one row, but it pays for warming up jsdom, Vue and AG Grid, which under parallel load
+// approaches the default 5 s.
+test('the table shows a header and one row per item', { timeout: 20_000 }, async () => {
   // A generic component is rendered for one row type, as a template does it from its props.
   render(DataTable<Person>, { props: { columns, data } });
 

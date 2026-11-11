@@ -75,6 +75,8 @@ async function say(message: string) {
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
 }
 
+// The file's first test also pays for warming up jsdom and Vue, which under parallel load approaches the
+// default 5 s.
 test('the answer appears while it streams, after the tool call the agent made and its result', async () => {
   const run = eventStream();
   fetchMock.mockResolvedValueOnce(run.response);
@@ -105,7 +107,7 @@ test('the answer appears while it streams, after the tool call the agent made an
   await waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
   expect(screen.getByRole('status')).toHaveTextContent('');
   expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
-});
+}, 20_000);
 
 test({{ if signed_in }}"the run goes to the agent through /api with the signed-in user's token"{{ else }}'the run goes to the agent through /api'{{ end }}, async () => {
   const run = eventStream();

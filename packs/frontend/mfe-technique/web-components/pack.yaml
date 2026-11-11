@@ -16,6 +16,7 @@ files:
   - { template: templates/remote/styles.ts.sbn, target: "web/modules/{{ module.name }}/styles.ts", per-module: true }
   - { template: templates/remote/serve.test.ts.sbn, target: "web/modules/{{ module.name }}/src/serve.test.ts", per-module: true }
   - { template: templates/remote/tsconfig.json.sbn, target: "web/modules/{{ module.name }}/tsconfig.json", per-module: true }
+  - { template: templates/remote/check-declarations.mjs.sbn, target: "web/modules/{{ module.name }}/check-declarations.mjs", per-module: true }
   - { template: templates/remote/eslint.config.js.sbn, target: "web/modules/{{ module.name }}/eslint.config.js", per-module: true }
   - { template: templates/remote/prettierrc.json.sbn, target: "web/modules/{{ module.name }}/.prettierrc.json", per-module: true }
   - { template: templates/remote/gitignore.sbn, target: "web/modules/{{ module.name }}/.gitignore", per-module: true }
@@ -44,6 +45,7 @@ gates:
   - { kind: unit-test, describes: "A remote defines its page as <remote-<module>> with its framework's own wrapper, and the element shows the page when mounted and mounted again (web/modules/<module>/src/element.test.ts).", file: templates/remote/element.test.ts.sbn }
   - { kind: unit-test, describes: "A remote's `pnpm dev` (vite preview) serves once its watching build has written, and closes the watcher with the server (web/modules/<module>/src/serve.test.ts).", file: templates/remote/serve.test.ts.sbn }
   - { kind: ci-step, describes: "Every remote's build type-checks it and builds dist/remote.js, one script module with its own framework that links its own stylesheet, and its lint runs ESLint, with the library bans the shell has, and Prettier; the frontend job runs both for every package.", file: templates/remote/package.json.sbn }
+  - { kind: ci-step, describes: "Every remote's build checks the remote again with skipLibCheck off, as the shell's does; an error in a declaration file of the remote's own, included or imported, fails it, while those under node_modules stay skipped.", file: templates/remote/check-declarations.mjs.sbn }
   - { kind: ci-step, describes: "A file of another remote or of the shell loaded into a remote, by any import path, fails the remote's build and tests.", file: templates/remote/boundary.ts.sbn }
   - { kind: lint-rule, describes: "With the web-components design system, a remote importing @<project>/ui other than for its types fails its lint: the shell defines the elements once for the page.", file: templates/remote/eslint.config.js.sbn }
   - { kind: end-to-end-test, describes: "A signed-in browser opens each module and sees its page, the element its own remote defines, loaded from the remote's own server, again after the remote was down, and again when opened twice (e2e/remotes/<module>.spec.ts, run against the running AppHost).", file: templates/remote.spec.ts.sbn }

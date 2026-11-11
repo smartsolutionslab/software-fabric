@@ -4,6 +4,7 @@ files:
   - { template: templates/index.html.sbn, target: web/app/index.html }
   - { template: templates/vite.config.ts.sbn, target: web/app/vite.config.ts }
   - { template: templates/tsconfig.json.sbn, target: web/app/tsconfig.json }
+  - { template: templates/check-declarations.mjs.sbn, target: web/app/check-declarations.mjs }
   - { template: templates/eslint.config.js.sbn, target: web/app/eslint.config.js }
   - { template: templates/prettierrc.json.sbn, target: web/app/.prettierrc.json }
   - { template: templates/prettierignore.sbn, target: web/app/.prettierignore }
@@ -47,4 +48,5 @@ adr: docs/adr.md
 gates:
   - { kind: lint-rule, describes: "TypeScript strict (tsc -b in the build) and the strict typescript-eslint rules fail the frontend job.", file: templates/eslint.config.js.sbn }
   - { kind: lint-rule, describes: "In *.test.ts(x), a loop of awaited promises or a settle right before expect fails lint: tests wait for a condition (findBy*, waitFor), not a count.", file: templates/eslint.config.js.sbn }
+  - { kind: ci-step, describes: "After tsc -b the app's build checks the app again with skipLibCheck off; an error in a declaration file of the app's own, included or imported, fails the frontend job, while those under node_modules stay skipped.", file: templates/check-declarations.mjs.sbn }
   - { kind: ci-step, describes: "pnpm format:check (Prettier) runs in the frontend job; a file Prettier would change fails CI.", file: templates/ci-frontend-steps.sbn }
