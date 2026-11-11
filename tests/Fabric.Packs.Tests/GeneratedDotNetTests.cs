@@ -89,10 +89,26 @@ public sealed partial class GeneratedDotNetTests
         var versions = PackageVersions(Files("lean-crud", "backend.database=sqlserver"));
 
         versions.ShouldNotContainKey("Npgsql.EntityFrameworkCore.PostgreSQL");
-        foreach (var package in EfCore.Append("Microsoft.EntityFrameworkCore.SqlServer").Append("System.Security.Cryptography.Pkcs"))
+        foreach (var package in EfCore.Append("Microsoft.EntityFrameworkCore.SqlServer"))
         {
             versions[package].ShouldBe(Release, package);
         }
+    }
+
+    /// <summary>
+    /// On net11.0, System.Security.Cryptography.Pkcs is part of the ASP.NET Core shared framework. BuildingBlocks
+    /// references that framework, so the vulnerable copy SQL Server's provider asks for is pruned, and a reference to the
+    /// package fails its build (NU1510). The AppHost does not reference that framework and keeps its override.
+    /// </summary>
+    [Fact]
+    public void A_SQL_Server_project_overrides_System_Security_Cryptography_Pkcs_in_the_AppHost_alone()
+    {
+        var files = Files("lean-crud", "backend.database=sqlserver");
+
+        PackageVersions(files)["System.Security.Cryptography.Pkcs"].ShouldBe(Release);
+        files.Where(file => file.Key.EndsWith(".csproj", StringComparison.Ordinal) && file.Value.Contains("System.Security.Cryptography.Pkcs", StringComparison.Ordinal))
+            .Select(file => file.Key)
+            .ShouldBe(["src/AppHost/AppHost.csproj"]);
     }
 
     [Theory]
