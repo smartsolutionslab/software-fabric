@@ -12,10 +12,10 @@ namespace Fabric.Packs.Tests;
 /// </summary>
 public sealed class GeneratorSdkTests
 {
-    private static readonly string[] Workflows = ["ci.yml", "matrix.yml"];
+    private static readonly string[] Workflows = ["ci.yml", "matrix.yml", "release.yml"];
 
     /// <summary>The scripts that build a generated project; build/matrix-generate.sh only generates.</summary>
-    private static readonly string[] BuildingScripts = ["build/test-shard.sh", "build/profile-ci.sh", "build/matrix-combination.sh"];
+    private static readonly string[] BuildingScripts = ["build/test-shard.sh", "build/profile-ci.sh", "build/matrix-combination.sh", "build/tool-check.sh"];
 
     [Fact]
     public void The_generator_builds_with_SDK_11_and_runs_on_dotnet_11()
@@ -66,7 +66,7 @@ public sealed class GeneratorSdkTests
             }
         }
 
-        building.ShouldBe(["ci.yml tests", "ci.yml profile", "matrix.yml combination"], ignoreOrder: true);
+        building.ShouldBe(["ci.yml tests", "ci.yml profile", "matrix.yml combination", "release.yml release"], ignoreOrder: true);
     }
 
     /// <summary>
