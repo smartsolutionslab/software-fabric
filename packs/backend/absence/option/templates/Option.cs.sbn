@@ -32,11 +32,9 @@ public readonly struct Option<T> : IEquatable<Option<T>>, Option<T>.IUnionMember
 
         bool HasValue { get; }
 
-#pragma warning disable CA1000 // The union's conversions are static factories on the generic type by definition.
-        static Option<T> Create(Some<T> some) => Some(some.Value);
+        static abstract Option<T> Create(Some<T> some);
 
-        static Option<T> Create(None none) => None;
-#pragma warning restore CA1000
+        static abstract Option<T> Create(None none);
 
         bool TryGetValue(out Some<T> some);
 
@@ -51,6 +49,10 @@ public readonly struct Option<T> : IEquatable<Option<T>>, Option<T>.IUnionMember
     object? IUnionMembers.Value => hasValue ? new Some<T>(value) : default(Kernel.None);
 
     bool IUnionMembers.HasValue => true;
+
+    static Option<T> IUnionMembers.Create(Some<T> some) => Some(some.Value);
+
+    static Option<T> IUnionMembers.Create(None none) => None;
 
 #pragma warning disable CA1000 // Option<Invoice>.Some(invoice) / Option<Invoice>.None are the type's whole API.
     public static Option<T> Some(T value) =>

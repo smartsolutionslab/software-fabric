@@ -37,11 +37,9 @@ public sealed class Result<TValue, TError> : Result<TValue, TError>.IUnionMember
 
         bool HasValue { get; }
 
-#pragma warning disable CA1000 // The union's conversions are static factories on the generic type by definition.
-        static Result<TValue, TError> Create(SuccessOutcome<TValue> outcome) => Success(outcome.Value);
+        static abstract Result<TValue, TError> Create(SuccessOutcome<TValue> outcome);
 
-        static Result<TValue, TError> Create(FailureOutcome<TError> outcome) => Failure(outcome.Error);
-#pragma warning restore CA1000
+        static abstract Result<TValue, TError> Create(FailureOutcome<TError> outcome);
 
         bool TryGetValue(out SuccessOutcome<TValue> outcome);
 
@@ -57,6 +55,10 @@ public sealed class Result<TValue, TError> : Result<TValue, TError>.IUnionMember
     object? IUnionMembers.Value => IsSuccess ? new SuccessOutcome<TValue>(value!) : new FailureOutcome<TError>(error!);
 
     bool IUnionMembers.HasValue => true;
+
+    static Result<TValue, TError> IUnionMembers.Create(SuccessOutcome<TValue> outcome) => Success(outcome.Value);
+
+    static Result<TValue, TError> IUnionMembers.Create(FailureOutcome<TError> outcome) => Failure(outcome.Error);
 
 #pragma warning disable CA1000 // Static factories on the generic type are the point: Result<Invoice, ApiError>.Success(invoice).
     public static Result<TValue, TError> Success(TValue value) => new(value);

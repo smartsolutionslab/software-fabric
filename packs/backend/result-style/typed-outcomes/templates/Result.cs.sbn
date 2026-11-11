@@ -34,11 +34,9 @@ public readonly struct Result<TValue, TError> : Result<TValue, TError>.IUnionMem
 
         bool HasValue { get; }
 
-#pragma warning disable CA1000 // The union's conversions are static factories on the generic type by definition.
-        static Result<TValue, TError> Create(SuccessOutcome<TValue> outcome) => Success(outcome.Value);
+        static abstract Result<TValue, TError> Create(SuccessOutcome<TValue> outcome);
 
-        static Result<TValue, TError> Create(FailureOutcome<TError> outcome) => Failure(outcome.Error);
-#pragma warning restore CA1000
+        static abstract Result<TValue, TError> Create(FailureOutcome<TError> outcome);
 
         bool TryGetValue(out SuccessOutcome<TValue> outcome);
 
@@ -58,6 +56,10 @@ public readonly struct Result<TValue, TError> : Result<TValue, TError>.IUnionMem
     object? IUnionMembers.Value => isSuccess ? new SuccessOutcome<TValue>(value) : new FailureOutcome<TError>(error);
 
     bool IUnionMembers.HasValue => true;
+
+    static Result<TValue, TError> IUnionMembers.Create(SuccessOutcome<TValue> outcome) => Success(outcome.Value);
+
+    static Result<TValue, TError> IUnionMembers.Create(FailureOutcome<TError> outcome) => Failure(outcome.Error);
 
 #pragma warning disable CA1000 // Static factories on the generic type: Result<InvoiceDto, ApiError>.Success(dto) where no return type infers it.
     public static Result<TValue, TError> Success(TValue value) => new(value, default!, isSuccess: true);
