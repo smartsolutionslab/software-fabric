@@ -21,7 +21,7 @@ public sealed class NxTests
         package.ShouldContain("\"build\": \"nx run-many -t build\"");
         package.ShouldContain("\"lint\": \"nx run-many -t lint\"");
         package.ShouldContain("\"test\": \"nx run-many -t test\"");
-        package.ShouldContain("\"nx\": \"24.0.5\"");
+        package.ShouldContain("\"nx\": \"24.0.6\"");
         package.ShouldContain("\"packageManager\": \"pnpm@10.0.0\"");
         package.ShouldNotContain("--recursive");
     }

@@ -226,7 +226,7 @@ public sealed class MicroFrontendsTests
         federation.ShouldNotContain("react");
 
         var package = File.ReadAllText(Path.Combine(remote, "package.json"));
-        package.ShouldContain("\"vue\": \"3.5.44\"");
+        package.ShouldContain("\"vue\": \"3.5.45\"");
         package.ShouldNotContain("react");
         File.ReadAllText(Path.Combine(app, "package.json")).ShouldNotContain("react");
     }

@@ -54,7 +54,7 @@ public sealed class AgUiVueTests
     {
         var files = Files(Profile, With(Anthropic, AgentFramework, AgUi));
 
-        files["web/app/package.json"].ShouldContain("\"@ag-ui/client\": \"1.0.3\"");
+        files["web/app/package.json"].ShouldContain("\"@ag-ui/client\": \"1.0.4\"");
         files[AssistantPage].ShouldContain("import AgentPanel from '@/agents/AgentPanel.vue';");
         files[AssistantPage].ShouldContain("<AgentPanel agent=\"assistant\" />");
         files[Panel].ShouldContain("<AgentConversation :key=\"agent\" :agent=\"agent\" />");

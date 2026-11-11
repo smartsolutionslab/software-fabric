@@ -104,12 +104,12 @@ public sealed partial class MsalTests
         var package = JsonNode.Parse(files["web/app/package.json"])!["dependencies"]!.AsObject();
 
         package.Select(dependency => dependency.Key).ShouldContain("@azure/msal-browser");
-        ((string?)package["@azure/msal-browser"]).ShouldBe("5.27.0");
+        ((string?)package["@azure/msal-browser"]).ShouldBe("5.29.0");
         package.Select(dependency => dependency.Key).ShouldNotContain("oidc-client-ts");
         package.Select(dependency => dependency.Key).ShouldNotContain("react-oidc-context");
         if (profile.EndsWith("react", StringComparison.Ordinal))
         {
-            ((string?)package["@azure/msal-react"]).ShouldBe("5.7.4");
+            ((string?)package["@azure/msal-react"]).ShouldBe("5.8.1");
         }
         else
         {
