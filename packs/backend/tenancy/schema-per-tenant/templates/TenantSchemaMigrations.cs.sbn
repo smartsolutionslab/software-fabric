@@ -74,7 +74,7 @@ public static class TenantSchemaMigrations
     /// </summary>
     private static void RefuseSharedSchemas(List<Type> modules, IReadOnlyList<string> tenants)
     {
-        Dictionary<string, string> owners = new(StringComparer.Ordinal);
+        Dictionary<string, string> owners = [with(StringComparer.Ordinal)];
         foreach (var module in modules)
         {
             var schema = ModuleSchema(module);

@@ -12,7 +12,7 @@ namespace {{ namespace }}.BuildingBlocks.Mcp;
 internal sealed class McpClients(IReadOnlyList<McpServerDeclaration> servers, ILoggerFactory loggerFactory) : IMcpTools, IAsyncDisposable
 {
     private readonly SemaphoreSlim connecting = new(1, 1);
-    private readonly Dictionary<string, McpClient> connected = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, McpClient> connected = [with(StringComparer.Ordinal)];
 
     public async Task<IReadOnlyList<McpToolDescription>> ListAsync(CancellationToken cancellationToken) =>
         [.. (await ToolsByServerAsync(cancellationToken)).Select(entry => new McpToolDescription(entry.Server, entry.Tool.Name, entry.Tool.Description))];
