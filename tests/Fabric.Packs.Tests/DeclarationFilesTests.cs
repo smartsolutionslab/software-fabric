@@ -112,6 +112,32 @@ public sealed class DeclarationFilesTests
         output.ShouldContain("TS2315");
     }
 
+    // Each remote checks its own declarations: Nx and Turborepo can restore the shell's build from their cache when only a
+    // remote changed, since a remote is not one of the shell's dependencies.
+    [Theory]
+    [InlineData("module-federation", "react")]
+    [InlineData("native-federation", "react")]
+    [InlineData("native-federation", "vue")]
+    [InlineData("web-components", "react")]
+    [InlineData("web-components", "vue")]
+    public void A_type_error_in_a_remotes_declarations_fails_the_remotes_own_build(string technique, string framework)
+    {
+        using var project = new GeneratedProject(
+            $"saas-standard-{framework}",
+            "frontend.architecture=micro-frontends",
+            "frontend.design-system=tokens",
+            $"frontend.mfe-technique={technique}");
+        project.AddModule("billing");
+        project.Write("web/modules/billing/src/broken.d.ts", "export type Broken = Missing;\n");
+        Install(project);
+
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web", "modules", "billing"), "pnpm", "build");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("src/broken.d.ts");
+        output.ShouldContain("Cannot find name 'Missing'");
+    }
+
     [Fact]
     public void A_type_error_in_a_declaration_file_under_node_modules_still_builds()
     {
