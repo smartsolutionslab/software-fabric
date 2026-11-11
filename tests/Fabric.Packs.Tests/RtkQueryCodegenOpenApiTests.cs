@@ -6,7 +6,8 @@ namespace Fabric.Packs.Tests;
 /// <summary>
 /// The host's document is OpenAPI 3.1.2 (#550). @rtk-query/codegen-openapi 2.2.0, its newest release, asks for
 /// @apidevtools/swagger-parser ^10.1.1, which reads 3.1.0 and 3.1.1 only; 12.1.0 reads 3.1.2. Owner's decision on #550
-/// (option A): rtk-query-codegen overrides it to 12.1.0 at the workspace root, through web.pnpm-overrides (#569).
+/// (option A): rtk-query-codegen overrides it at the workspace root, through web.pnpm-overrides (#569), to 13.1.0 since
+/// #592.
 /// </summary>
 public sealed class RtkQueryCodegenOpenApiTests
 {
@@ -26,7 +27,7 @@ public sealed class RtkQueryCodegenOpenApiTests
     {
         var root = RootPackage(profile);
 
-        ((string?)root["pnpm"]?["overrides"]?[SwaggerParser]).ShouldBe("12.1.0");
+        ((string?)root["pnpm"]?["overrides"]?[SwaggerParser]).ShouldBe("13.1.0");
     }
 
     [Theory]
