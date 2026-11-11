@@ -40,7 +40,7 @@ containers.
 | [`docs/catalog.md`](docs/catalog.md) | Every dimension and option, generated from the catalog by `fabric reference` |
 | [`docs/packs.md`](docs/packs.md) | How to write a pack: layout, targets, template model, slots |
 | [`schema/pack.schema.json`](schema/pack.schema.json) | What an option pack must declare |
-| [`docs/adr/`](docs/adr/) | Decisions 0001–0008 |
+| [`docs/adr/`](docs/adr/) | Decisions 0001–0016 |
 | [`docs/roadmap.md`](docs/roadmap.md) | M0–M4 and the M0 task list |
 
 ## Using it

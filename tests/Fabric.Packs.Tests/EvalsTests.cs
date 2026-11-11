@@ -65,13 +65,13 @@ public sealed partial class EvalsTests
 
         foreach (var package in new[] { "Microsoft.Extensions.AI.Evaluation", "Microsoft.Extensions.AI.Evaluation.Quality", "Microsoft.Extensions.AI.Evaluation.Reporting" })
         {
-            Count(files["Directory.Packages.props"], $"<PackageVersion Include=\"{package}\" Version=\"10.11.0\" />").ShouldBe(1, package);
+            Count(files["Directory.Packages.props"], $"<PackageVersion Include=\"{package}\" Version=\"11.0.0\" />").ShouldBe(1, package);
             files[EvalProject].ShouldContain($"<PackageReference Include=\"{package}\" />");
         }
 
         var tools = files[".config/dotnet-tools.json"];
         tools.ShouldContain("\"microsoft.extensions.ai.evaluation.console\": {");
-        tools.ShouldContain("\"version\": \"10.11.0\"");
+        tools.ShouldContain("\"version\": \"11.0.0\"");
         tools.ShouldContain("\"commands\": [\"aieval\"]");
         files.Keys.ShouldContain("tests/Fakes/FakeJudge.cs");
         files["Solution.slnx"].ShouldContain(EvalProject);
