@@ -79,8 +79,8 @@ public sealed class OpenAITests
         appHost.ShouldContain(".WithEnvironment(\"OpenAI__ApiKey\", openAIApiKey)");
         appHost.ShouldContain(".WithEnvironment(\"OpenAI__Model\", openAIModel)");
         var packages = files["Directory.Packages.props"];
-        packages.ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI.OpenAI\" Version=\"10.11.0\" />");
-        packages.ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI\" Version=\"10.11.0\" />");
+        packages.ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI.OpenAI\" Version=\"11.0.0\" />");
+        packages.ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI\" Version=\"11.0.0\" />");
         files["src/BuildingBlocks/BuildingBlocks.csproj"].ShouldContain("<PackageReference Include=\"Microsoft.Extensions.AI.OpenAI\" />");
         files["src/BuildingBlocks/Llm/Wiring/OpenAIChatClient.cs"].ShouldContain(".AsIChatClient()");
         files.Keys.ShouldNotContain("src/BuildingBlocks/Llm/Wiring/AnthropicChatClient.cs");

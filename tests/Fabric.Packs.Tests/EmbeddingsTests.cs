@@ -136,7 +136,7 @@ public sealed class EmbeddingsTests
         appHost.ShouldContain(".WithEnvironment(\"OpenAI__EmbeddingModel\", openAIEmbeddingModel)");
         appHost.ShouldContain("builder.AddParameter(\"openai-api-key\", secret: true)");
         appHost.ShouldContain(".WithEnvironment(\"OpenAI__ApiKey\", openAIApiKey)");
-        files["Directory.Packages.props"].ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI.OpenAI\" Version=\"10.11.0\" />");
+        files["Directory.Packages.props"].ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI.OpenAI\" Version=\"11.0.0\" />");
         files["src/BuildingBlocks/BuildingBlocks.csproj"].ShouldContain("<PackageReference Include=\"Microsoft.Extensions.AI.OpenAI\" />");
         files["tests/Integration.Tests/AspireFixture.cs"].ShouldContain("builder.Configuration[\"Parameters:openai-api-key\"] = \"not-a-real-key\";");
         files[$"{Wiring}/OpenAIEmbeddingGenerator.cs"].ShouldContain(".GetEmbeddingClient(");
@@ -159,7 +159,7 @@ public sealed class EmbeddingsTests
         appHost.ShouldContain("builder.AddParameter(\"azure-openai-api-key\", secret: true)");
         appHost.ShouldContain(".WithEnvironment(\"AzureOpenAI__Endpoint\", azureOpenAIEndpoint)");
         appHost.ShouldContain(".WithEnvironment(\"AzureOpenAI__ApiKey\", azureOpenAIApiKey)");
-        files["Directory.Packages.props"].ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI.OpenAI\" Version=\"10.11.0\" />");
+        files["Directory.Packages.props"].ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI.OpenAI\" Version=\"11.0.0\" />");
         var fixture = files["tests/Integration.Tests/AspireFixture.cs"];
         fixture.ShouldContain("builder.Configuration[\"Parameters:azure-openai-endpoint\"] = \"https://not-a-real-resource.openai.azure.com\";");
         fixture.ShouldContain("builder.Configuration[\"Parameters:azure-openai-api-key\"] = \"not-a-real-key\";");

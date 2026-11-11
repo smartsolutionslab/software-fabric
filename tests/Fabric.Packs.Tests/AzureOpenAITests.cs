@@ -86,8 +86,8 @@ public sealed class AzureOpenAITests
         appHost.ShouldContain(".WithEnvironment(\"AzureOpenAI__Deployment\", azureOpenAIDeployment)");
         appHost.ShouldNotContain("AddAzureOpenAI(");
         var packages = files["Directory.Packages.props"];
-        packages.ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI.OpenAI\" Version=\"10.11.0\" />");
-        packages.ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI\" Version=\"10.11.0\" />");
+        packages.ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI.OpenAI\" Version=\"11.0.0\" />");
+        packages.ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI\" Version=\"11.0.0\" />");
         packages.ShouldNotContain("Azure.AI.OpenAI");
         packages.ShouldNotContain("Azure.Identity");
         files["src/BuildingBlocks/BuildingBlocks.csproj"].ShouldContain("<PackageReference Include=\"Microsoft.Extensions.AI.OpenAI\" />");
