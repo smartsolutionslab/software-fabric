@@ -10,11 +10,11 @@ public static class AzureOpenAIChatClient
     /// <summary>
     /// Registers a model deployed in an Azure OpenAI resource as the project's <see cref="IChatClient"/>, through the
     /// official <c>OpenAI</c> package and Microsoft's adapter (<c>Microsoft.Extensions.AI.OpenAI</c>) calling the
-    /// resource's OpenAI v1 endpoint, <c>&lt;endpoint&gt;/openai/v1/</c>. The endpoint, the deployment and the key come
-    /// from the AppHost's parameters <c>azure-openai-endpoint</c>, <c>azure-openai-deployment</c> and
-    /// <c>azure-openai-api-key</c> (<c>AzureOpenAI:Endpoint</c>, <c>AzureOpenAI:Deployment</c>, <c>AzureOpenAI:ApiKey</c>).
-    /// They are read when the client is first needed, and a missing one fails there, naming its parameter; registering
-    /// sends nothing.
+    /// resource's OpenAI v1 endpoint, <c>&lt;endpoint&gt;/openai/v1/</c>, or an OpenAI-compatible endpoint that already
+    /// ends in <c>/v1</c>, as is. The endpoint, the deployment and the key come from the AppHost's parameters
+    /// <c>azure-openai-endpoint</c>, <c>azure-openai-deployment</c> and <c>azure-openai-api-key</c>
+    /// (<c>AzureOpenAI:Endpoint</c>, <c>AzureOpenAI:Deployment</c>, <c>AzureOpenAI:ApiKey</c>). They are read when the
+    /// client is first needed, and a missing one fails there, naming its parameter; registering sends nothing.
     /// </summary>
     public static ChatClientBuilder AddAzureOpenAIChatClient(this IServiceCollection services, IConfiguration configuration)
     {
@@ -22,13 +22,24 @@ public static class AzureOpenAIChatClient
 
         return services.AddModelChatClient(_ =>
         {
-            var endpoint = new Uri(Required(configuration, "AzureOpenAI:Endpoint", "azure-openai-endpoint").TrimEnd('/') + "/openai/v1/");
+            var endpoint = Endpoint(Required(configuration, "AzureOpenAI:Endpoint", "azure-openai-endpoint"));
             return new OpenAIClient(
                     new ApiKeyCredential(Required(configuration, "AzureOpenAI:ApiKey", "azure-openai-api-key")),
                     new OpenAIClientOptions { Endpoint = endpoint })
                 .GetChatClient(Required(configuration, "AzureOpenAI:Deployment", "azure-openai-deployment"))
                 .AsIChatClient();
         });
+    }
+
+    /// <summary>
+    /// An endpoint that already ends in <c>/v1</c>, such as OpenAI's own <c>https://api.openai.com/v1</c>, is an
+    /// OpenAI-compatible v1 endpoint and is used as is; any other is an Azure OpenAI resource, whose v1 endpoint is
+    /// <c>&lt;endpoint&gt;/openai/v1/</c>.
+    /// </summary>
+    private static Uri Endpoint(string configured)
+    {
+        var trimmed = configured.TrimEnd('/');
+        return new Uri(trimmed.EndsWith("/v1", StringComparison.Ordinal) ? trimmed : trimmed + "/openai/v1/");
     }
 
     private static string Required(IConfiguration configuration, string key, string parameter) =>
