@@ -92,6 +92,16 @@ function resolve(style: CSSStyleDeclaration, value: string): string {
   return custom === undefined ? value : resolve(style, style.getPropertyValue(custom).trim());
 }
 
+/** A colour as the browser serialises it once computed: jsdom 31 and browsers answer rgb(...), never the hex a theme holds. */
+function painted(colour: string): string {
+  const probe = document.createElement('span');
+  probe.style.color = colour;
+  document.body.append(probe);
+  const computed = getComputedStyle(probe).color;
+  probe.remove();
+  return computed;
+}
+
 test("MUI's components take their colours from the theme", () => {
   render(
     <ThemeProvider theme={theme}>
@@ -100,7 +110,7 @@ test("MUI's components take their colours from the theme", () => {
   );
 
   const style = getComputedStyle(screen.getByRole('button', { name: 'Save' }));
-  expect(resolve(style, style.backgroundColor)).toBe(theme.palette.primary.main);
+  expect(painted(resolve(style, style.backgroundColor))).toBe(painted(theme.palette.primary.main));
 });
 
 test('no component writes a colour of its own', () => {
