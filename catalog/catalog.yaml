@@ -201,7 +201,7 @@ dimensions:
     note: "Agents on the provider's IChatClient: defined in a module's Application project, run by a command or query, calling use cases through the dispatcher. ADR-0011."
     options:
       none:            { tier: supported, note: "use cases call the model directly; no agent framework" }  # nightly run 42800894655
-      agent-framework: { tier: experimental, note: "Microsoft Agent Framework (Microsoft.Agents.AI)" }
+      agent-framework: { tier: supported, note: "Microsoft Agent Framework (Microsoft.Agents.AI)" }  # nightly run 42998190693
 
   backend.llm.extras:
     scope: project
@@ -429,7 +429,7 @@ dimensions:
         requires: ["frontend.framework == react"]
       tanstack-query: { tier: supported }
       pinia-tanstack-query:
-        tier: experimental
+        tier: supported  # nightly run 42998190693
         requires: ["frontend.framework == vue"]
       pinia:
         tier: supported  # nightly run 42800894655
@@ -531,10 +531,10 @@ dimensions:
         tier: experimental
         requires: ["frontend.framework == react"]
       reka-ui:
-        tier: experimental
+        tier: supported  # nightly run 42998190693
         requires: ["frontend.framework == vue"]
       vuetify:
-        tier: experimental
+        tier: supported  # nightly run 42998190693
         requires: ["frontend.framework == vue"]
       quasar:
         tier: experimental
@@ -585,11 +585,11 @@ dimensions:
     note: "Empty: no dashboards. A dashboard is saved per user and tenant, and shows only the widgets the modules declare. ADR-0015."
     options:
       user-editable:
-        tier: experimental
+        tier: supported  # nightly run 42998190693
         note: "users arrange, resize and save widgets on dashboards of their own"
         requires: ["backend.errors == result", "backend.data-access == ef-core", "backend.database == postgres"]
       generative:
-        tier: experimental
+        tier: supported  # nightly run 42998190693
         note: "an agent in the agent panel proposes widgets from the same declared widgets; the user accepts and saves them (#185)"
         requires: ["frontend.dashboards has user-editable", "frontend.agent-ui == ag-ui"]
 
@@ -607,10 +607,10 @@ dimensions:
     default: none
     note: "How users talk to the backend's agents. AG-UI over the host's POST /agents/{name}, which runs an agent's query through the dispatcher. ADR-0013."
     options:
-      none:  { tier: experimental, note: "no agent panel; agents are reached through the project's own endpoints" }
+      none:  { tier: supported, note: "no agent panel; agents are reached through the project's own endpoints" }  # nightly run 42998190693
       # The agent panel is built for a single-page app; where it lives in a micro-frontend shell is a later design question (#518).
       ag-ui:
-        tier: experimental
+        tier: supported  # nightly run 42998190693
         note: "an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host"
         requires: ["frontend.architecture == spa"]
 

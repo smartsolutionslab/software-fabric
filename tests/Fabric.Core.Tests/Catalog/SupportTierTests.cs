@@ -94,8 +94,30 @@ public class SupportTierTests
     }
 
     /// <summary>
+    /// ADR-0003 (amended 2026-11-06), owner decisions on #287: nightly run 42998190693 (main c3aa53b, 2026-11-11, the
+    /// first full run on .NET 11) passed 52 of 57 combinations; these are the experimental options with a pack that are in
+    /// no failing combination (pairwise-4, -11, -17, -18 and -20) and whose pack is unchanged on main since the run.
+    /// </summary>
+    [Theory]
+    [InlineData("backend.llm.agents", "agent-framework")]
+    [InlineData("frontend.state", "pinia-tanstack-query")]
+    [InlineData("frontend.ui-library", "reka-ui")]
+    [InlineData("frontend.ui-library", "vuetify")]
+    [InlineData("frontend.dashboards", "user-editable")]
+    [InlineData("frontend.dashboards", "generative")]
+    [InlineData("frontend.agent-ui", "none")]
+    [InlineData("frontend.agent-ui", "ag-ui")]
+    public void An_option_every_combination_of_nightly_run_42998190693_passed_with_is_supported(string dimension, string option)
+    {
+        var catalog = CatalogReader.ReadFile(RepositoryRoot.File("catalog", "catalog.yaml"));
+
+        catalog.Dimensions[dimension].Options[option].Tier.ShouldBe(SupportTier.Supported);
+    }
+
+    /// <summary>
     /// Owner decision on #240: these also passed every combination of nightly run 42800894655, but their packs changed on
     /// main after it, so the run did not build what main generates; they stay experimental until a run that does.
+    /// generative and ag-ui left this list when nightly run 42998190693 promoted them.
     /// </summary>
     [Theory]
     [InlineData("backend.auth", "none")]
@@ -106,8 +128,6 @@ public class SupportTierTests
     [InlineData("frontend.realtime", "sse")]
     [InlineData("frontend.routing", "tanstack-router")]
     [InlineData("frontend.styling", "library-theme")]
-    [InlineData("frontend.dashboards", "generative")]
-    [InlineData("frontend.agent-ui", "ag-ui")]
     public void An_option_whose_pack_changed_after_nightly_run_42800894655_stays_experimental(string dimension, string option)
     {
         var catalog = CatalogReader.ReadFile(RepositoryRoot.File("catalog", "catalog.yaml"));
