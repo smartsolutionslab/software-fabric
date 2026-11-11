@@ -14,7 +14,7 @@ concurrency:
 # The Playwright whose Chromium the jobs install and cache, in one place so the cache key cannot drift from what is
 # installed. It matches the @playwright/test the frontend packs generate.
 env:
-  PLAYWRIGHT_VERSION: 1.63.0
+  PLAYWRIGHT_VERSION: 1.65.0
 
 jobs:
   # The solution's tests, in shards that run in parallel (#166). In one job they took 45-60 min, nearly all of it
