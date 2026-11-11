@@ -1,7 +1,15 @@
+using System.Runtime.CompilerServices;
+
 namespace {{ namespace }}.Kernel;
 
-/// <summary>Either a value or an expected failure. Read <see cref="Value"/> or <see cref="Error"/> only after checking <see cref="IsSuccess"/>, or use <see cref="Match{TResult}"/>.</summary>
-public sealed class Result<TValue, TError>
+/// <summary>
+/// Either a value or an expected failure. Read <see cref="Value"/> or <see cref="Error"/> only after checking
+/// <see cref="IsSuccess"/>, or use <see cref="Match{TResult}"/>, or <c>switch</c> on it: a union of
+/// <see cref="SuccessOutcome{TValue}"/> and <see cref="FailureOutcome{TError}"/>, so a <c>switch</c> that misses either
+/// case does not compile.
+/// </summary>
+[Union]
+public sealed class Result<TValue, TError> : Result<TValue, TError>.IUnionMembers
     where TValue : notnull
     where TError : notnull
 {
@@ -19,11 +27,38 @@ public sealed class Result<TValue, TError>
         this.error = error;
     }
 
+    /// <summary>
+    /// What makes the result a union, kept apart so that <see cref="Value"/> stays the success's value: the compiler
+    /// turns a case into a result with <c>Create</c> and matches a case with <c>TryGetValue</c>, without boxing it.
+    /// </summary>
+    public interface IUnionMembers
+    {
+        object? Value { get; }
+
+        bool HasValue { get; }
+
+        static abstract Result<TValue, TError> Create(SuccessOutcome<TValue> outcome);
+
+        static abstract Result<TValue, TError> Create(FailureOutcome<TError> outcome);
+
+        bool TryGetValue(out SuccessOutcome<TValue> outcome);
+
+        bool TryGetValue(out FailureOutcome<TError> outcome);
+    }
+
     public bool IsSuccess { get; }
 
     public TValue Value => IsSuccess ? value! : throw new InvalidOperationException("A failed result has no value.");
 
     public TError Error => IsSuccess ? throw new InvalidOperationException("A successful result has no error.") : error!;
+
+    object? IUnionMembers.Value => IsSuccess ? new SuccessOutcome<TValue>(value!) : new FailureOutcome<TError>(error!);
+
+    bool IUnionMembers.HasValue => true;
+
+    static Result<TValue, TError> IUnionMembers.Create(SuccessOutcome<TValue> outcome) => Success(outcome.Value);
+
+    static Result<TValue, TError> IUnionMembers.Create(FailureOutcome<TError> outcome) => Failure(outcome.Error);
 
 #pragma warning disable CA1000 // Static factories on the generic type are the point: Result<Invoice, ApiError>.Success(invoice).
     public static Result<TValue, TError> Success(TValue value) => new(value);
@@ -55,5 +90,17 @@ public sealed class Result<TValue, TError>
         {{ not_null "map" }}
 
         return IsSuccess ? Result<TValue, TOut>.Success(value!) : Result<TValue, TOut>.Failure(map(error!));
+    }
+
+    bool IUnionMembers.TryGetValue(out SuccessOutcome<TValue> outcome)
+    {
+        outcome = IsSuccess ? new SuccessOutcome<TValue>(value!) : default;
+        return IsSuccess;
+    }
+
+    bool IUnionMembers.TryGetValue(out FailureOutcome<TError> outcome)
+    {
+        outcome = IsSuccess ? default : new FailureOutcome<TError>(error!);
+        return !IsSuccess;
     }
 }

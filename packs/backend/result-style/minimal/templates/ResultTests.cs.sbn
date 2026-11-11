@@ -63,5 +63,19 @@ public class ResultTests
         {{ `Unit.Value` | should_be `default(Unit)` }};
     }
 
+    {{ test_attribute }}
+    public void A_switch_takes_the_case_of_the_outcome()
+    {
+        {{ `Describe(Result<int, ApiError>.Success(42))` | should_be `"42"` }};
+        {{ `Describe(Result<int, ApiError>.Failure(NotFound))` | should_be `"billing.invoice-not-found"` }};
+    }
+
+    private static string Describe(Result<int, ApiError> result) =>
+        result switch
+        {
+            SuccessOutcome<int> success => success.Value.ToString(CultureInfo.InvariantCulture),
+            FailureOutcome<ApiError> failure => failure.Error.Code,
+        };
+
     private sealed record InvoiceOverdue() : DomainError("billing.invoice-overdue", "The invoice is overdue.");
 }

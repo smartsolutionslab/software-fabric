@@ -1,11 +1,15 @@
+using System.Runtime.CompilerServices;
+
 namespace {{ namespace }}.Kernel;
 
 /// <summary>
 /// An explicit absence (docs/adr): says what absent means and makes the caller handle it, where a nullable reference
-/// only says a value may be null.
+/// only says a value may be null. A union of <see cref="Some{T}"/> and <see cref="Kernel.None"/>, so a <c>switch</c> on an
+/// option that misses either case does not compile.
 /// </summary>
 #pragma warning disable CA1716 // Option is a keyword in Visual Basic only; the name is the point here.
-public readonly struct Option<T> : IEquatable<Option<T>>
+[Union]
+public readonly struct Option<T> : IEquatable<Option<T>>, Option<T>.IUnionMembers
     where T : notnull
 {
     private readonly T value;
@@ -17,10 +21,38 @@ public readonly struct Option<T> : IEquatable<Option<T>>
         this.hasValue = hasValue;
     }
 
+    /// <summary>
+    /// What makes the option a union, kept apart so that <see cref="HasValue"/> and <see cref="Value"/> stay the
+    /// option's own: the compiler turns a case into an option with <c>Create</c> and matches a case with
+    /// <c>TryGetValue</c>, without boxing it. Every option is one of its cases, the default one <see cref="Kernel.None"/>.
+    /// </summary>
+    public interface IUnionMembers
+    {
+        object? Value { get; }
+
+        bool HasValue { get; }
+
+        static abstract Option<T> Create(Some<T> some);
+
+        static abstract Option<T> Create(None none);
+
+        bool TryGetValue(out Some<T> some);
+
+        bool TryGetValue(out None none);
+    }
+
     public bool HasValue => hasValue;
 
     public T Value =>
         hasValue ? value : throw new InvalidOperationException("Option has no value.");
+
+    object? IUnionMembers.Value => hasValue ? new Some<T>(value) : default(Kernel.None);
+
+    bool IUnionMembers.HasValue => true;
+
+    static Option<T> IUnionMembers.Create(Some<T> some) => Some(some.Value);
+
+    static Option<T> IUnionMembers.Create(None none) => None;
 
 #pragma warning disable CA1000 // Option<Invoice>.Some(invoice) / Option<Invoice>.None are the type's whole API.
     public static Option<T> Some(T value) =>
@@ -53,5 +85,17 @@ public readonly struct Option<T> : IEquatable<Option<T>>
     public static bool operator !=(Option<T> left, Option<T> right) => !left.Equals(right);
 
     public override string ToString() => hasValue ? $"Some({value})" : "None";
+
+    bool IUnionMembers.TryGetValue(out Some<T> some)
+    {
+        some = hasValue ? new Some<T>(value) : default;
+        return hasValue;
+    }
+
+    bool IUnionMembers.TryGetValue(out None none)
+    {
+        none = default;
+        return !hasValue;
+    }
 }
 #pragma warning restore CA1716

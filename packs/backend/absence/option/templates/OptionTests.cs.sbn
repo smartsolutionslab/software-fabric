@@ -58,4 +58,19 @@ public class OptionTests
         {{ `Number.ToString()` | should_be `"Some(INV-1)"` }};
         {{ `Nothing.ToString()` | should_be `"None"` }};
     }
+
+    {{ test_attribute }}
+    public void A_switch_takes_the_case_of_the_option_and_the_default_is_none()
+    {
+        {{ `Describe(Number)` | should_be `"INV-1"` }};
+        {{ `Describe(Nothing)` | should_be `"none"` }};
+        {{ `Describe(default)` | should_be `"none"` }};
+    }
+
+    private static string Describe(Option<string> number) =>
+        number switch
+        {
+            Some<string> some => some.Value,
+            None => "none",
+        };
 }
