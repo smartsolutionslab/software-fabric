@@ -93,7 +93,7 @@ public class CatalogReaderTests
         uiLibraries["mui"].Conflicts.Select(condition => condition.ToString()).ShouldBe(["frontend.styling == tailwind"]);
         uiLibraries["reka-ui"].Requires.Select(condition => condition.ToString()).ShouldBe(["frontend.framework == vue"]);
         uiLibraries.ShouldNotContainKey("primevue");
-        uiLibraries["reka-ui"].Tier.ShouldBe(SupportTier.Experimental);
+        uiLibraries["mantine"].Tier.ShouldBe(SupportTier.Experimental);
     }
 
     [Theory]
@@ -124,13 +124,6 @@ public class CatalogReaderTests
         agents.Options.Keys.ShouldBe(["none", "agent-framework"]);
     }
 
-    [Theory]
-    [InlineData("agent-framework")]
-    public void An_agents_option_a_nightly_run_has_not_passed_is_experimental(string option)
-    {
-        ReadRepositoryCatalog().Dimensions["backend.llm.agents"].Options[option].Tier.ShouldBe(SupportTier.Experimental);
-    }
-
     [Fact]
     public void Agent_ui_is_a_choice_only_for_a_project_with_agents_and_defaults_to_none()
     {
@@ -140,13 +133,6 @@ public class CatalogReaderTests
         agentUi.Multi.ShouldBeFalse();
         agentUi.Default.ShouldBe(["none"]);
         agentUi.Options.Keys.ShouldBe(["none", "ag-ui"]);
-    }
-
-    [Theory]
-    [InlineData("none")]
-    public void An_agent_ui_option_a_nightly_run_has_not_passed_is_experimental(string option)
-    {
-        ReadRepositoryCatalog().Dimensions["frontend.agent-ui"].Options[option].Tier.ShouldBe(SupportTier.Experimental);
     }
 
     [Fact]

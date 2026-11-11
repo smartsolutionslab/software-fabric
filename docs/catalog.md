@@ -172,7 +172,7 @@ resolved choices contain it: set by the profile or one it extends, or taken as a
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `agent-framework` | experimental | — | — | `saas-ai-react` | Microsoft Agent Framework (Microsoft.Agents.AI) |
+| `agent-framework` | supported | — | — | `saas-ai-react` | Microsoft Agent Framework (Microsoft.Agents.AI) |
 | `none` | supported | — | — | — | use cases call the model directly; no agent framework |
 
 ### `backend.llm.embeddings`
@@ -317,8 +317,8 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `ag-ui` | experimental | `frontend.architecture == spa` | — | `saas-ai-react` | an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host |
-| `none` | experimental | — | — | — | no agent panel; agents are reached through the project's own endpoints |
+| `ag-ui` | supported | `frontend.architecture == spa` | — | `saas-ai-react` | an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host |
+| `none` | supported | — | — | — | no agent panel; agents are reached through the project's own endpoints |
 
 ### `frontend.api-client`
 
@@ -374,8 +374,8 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `generative` | experimental | `frontend.dashboards has user-editable`, `frontend.agent-ui == ag-ui` | — | `saas-ai-react` | an agent in the agent panel proposes widgets from the same declared widgets; the user accepts and saves them (#185) |
-| `user-editable` | experimental | `backend.errors == result`, `backend.data-access == ef-core`, `backend.database == postgres` | — | `saas-ai-react` | users arrange, resize and save widgets on dashboards of their own |
+| `generative` | supported | `frontend.dashboards has user-editable`, `frontend.agent-ui == ag-ui` | — | `saas-ai-react` | an agent in the agent panel proposes widgets from the same declared widgets; the user accepts and saves them (#185) |
+| `user-editable` | supported | `backend.errors == result`, `backend.data-access == ef-core`, `backend.database == postgres` | — | `saas-ai-react` | users arrange, resize and save widgets on dashboards of their own |
 
 ### `frontend.data-grid`
 
@@ -484,7 +484,7 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `pinia` | supported | `frontend.framework == vue` | — | — | — |
-| `pinia-tanstack-query` | experimental | `frontend.framework == vue` | — | `saas-standard-vue` | — |
+| `pinia-tanstack-query` | supported | `frontend.framework == vue` | — | `saas-standard-vue` | — |
 | `redux-toolkit` | supported | `frontend.framework == react` | — | `saas-ai-react`, `saas-standard-react`, `saas-strict-react` | — |
 | `tanstack-query` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud` | — |
 | `zustand-tanstack-query` | supported | `frontend.framework == react` | — | — | — |
@@ -526,10 +526,10 @@ Settings:
 | `mui` | supported | `frontend.framework == react` | `frontend.styling == tailwind` | — | — |
 | `quasar` | experimental | `frontend.framework == vue` | — | — | — |
 | `radix-headless` | supported | `frontend.framework == react` | — | — | — |
-| `reka-ui` | experimental | `frontend.framework == vue` | — | — | — |
+| `reka-ui` | supported | `frontend.framework == vue` | — | — | — |
 | `shadcn` | supported | `frontend.framework == react`, `frontend.styling == tailwind` | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-strict-react` | — |
 | `shadcn-vue` | supported | `frontend.framework == vue`, `frontend.styling == tailwind` | — | `saas-standard-vue` | — |
-| `vuetify` | experimental | `frontend.framework == vue` | — | — | — |
+| `vuetify` | supported | `frontend.framework == vue` | — | — | — |
 
 ### `frontend.validation`
 
