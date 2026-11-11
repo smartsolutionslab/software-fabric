@@ -55,7 +55,7 @@ jobs:
         with:
           node-version: 22
       # Generated AppHosts, which the integration tests start, use the Aspire CLI bundle.
-      - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
+      - run: dnx --yes aspire.cli@13.6.5 -- setup --install-path "$HOME/.aspire"
       - run: dotnet build src/Fabric.Cli/Fabric.Cli.csproj -c Release
       - run: build/matrix-combination.sh "${{ matrix.combination }}" "$RUNNER_TEMP/matrix-results"
       - if: always()

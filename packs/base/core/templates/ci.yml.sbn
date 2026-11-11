@@ -20,7 +20,7 @@ jobs:
         with:
           global-json-file: global.json
       # The AppHost uses the Aspire CLI bundle (DCP and dashboard); set it up before anything builds the AppHost.
-      - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
+      - run: dnx --yes aspire.cli@13.6.5 -- setup --install-path "$HOME/.aspire"
       - name: Check formatting
         run: bash .github/scripts/format.sh --verify-no-changes
       - run: dotnet build build.proj -c Release
@@ -40,6 +40,6 @@ jobs:
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           global-json-file: global.json
-      - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
+      - run: dnx --yes aspire.cli@13.6.5 -- setup --install-path "$HOME/.aspire"
 {{ slots["ci.e2e-steps"] }}
 {{ end }}

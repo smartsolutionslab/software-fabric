@@ -6,11 +6,11 @@
 
 Azure Service Bus carries messages between modules (and later between services). In development Aspire runs the Azure Service Bus emulator (`RunAsEmulator()`) with the SQL Server it keeps its entities in; the host receives the emulator's address as the connection string `messaging`. Queues follow the messaging library's conventions and are created on startup through the management API. The emulator answers management requests on a port of its own, so in run mode the AppHost also passes `messaging-management`. A published AppHost runs no emulator and passes no management address: against Azure the one connection string serves both, and the host uses `messaging` for management when `messaging-management` is not set.
 
-Versions and licences, checked on 2026-11-08; each version had been published for more than a week:
+Versions and licences, checked on 2026-11-08; each version had been published for more than a week, except Aspire's patch release 13.6.5, which every Aspire package of the project took on 2026-11-11:
 
 | Component | Version | Published | Licence |
 |---|---|---|---|
-| `Aspire.Hosting.Azure.ServiceBus` (AppHost) | 13.6.4 | 2026-10-24 | MIT |
+| `Aspire.Hosting.Azure.ServiceBus` (AppHost) | 13.6.5 | 2026-11-10 | MIT |
 | `WolverineFx.AzureServiceBus` (host), with `Azure.Messaging.ServiceBus` 7.20.1 | 6.59.1 | 2026-10-30 | MIT |
 | `Testcontainers.ServiceBus` (with `backend.test.integration` testcontainers) | 4.16.0 | 2026-10-08 | MIT |
 | Emulator image `mcr.microsoft.com/azure-messaging/servicebus-emulator`, chosen by Aspire | 2.0.0 | 2026-01-12 | Microsoft's emulator licence (EULA), not open source |

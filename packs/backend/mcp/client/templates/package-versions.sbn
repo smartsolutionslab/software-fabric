@@ -1,2 +1,2 @@
     <PackageVersion Include="ModelContextProtocol.Core" Version="2.3.0" />{{ if project["backend.test.integration"] != "aspire-fixture" }}
-    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.6.4" />{{ end }}
+    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.6.5" />{{ end }}

@@ -47,7 +47,7 @@ jobs:
         with:
           version: ${{ env.PLAYWRIGHT_VERSION }}
       # Generated AppHosts use the Aspire CLI bundle; set it up once instead of letting parallel builds race to do it.
-      - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
+      - run: dnx --yes aspire.cli@13.6.5 -- setup --install-path "$HOME/.aspire"
       - run: dotnet build Fabric.slnx -c Release
       # Each test assembly writes an xUnit XML report: what ran, and per-class and per-test times.
       - run: build/test-shard.sh "${{ matrix.shard }}" "$RUNNER_TEMP/test-results"
@@ -167,7 +167,7 @@ jobs:
         with:
           version: ${{ env.PLAYWRIGHT_VERSION }}
       - if: env.AFFECTED == 'true'
-        run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
+        run: dnx --yes aspire.cli@13.6.5 -- setup --install-path "$HOME/.aspire"
       - if: env.AFFECTED == 'true'
         run: dotnet build Fabric.slnx -c Release
       - if: env.AFFECTED == 'true'
