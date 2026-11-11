@@ -62,6 +62,38 @@ public sealed class DeclarationFilesTests
     }
 
     [Fact]
+    public void A_type_error_in_a_module_declaration_file_fails_the_react_build()
+    {
+        using var project = new GeneratedProject("saas-standard-react");
+        project.Write("web/app/src/greeting.d.mts", "export type Greeting = Missing;\n");
+        Install(project);
+
+        var (exitCode, output) = Build(project);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("src/greeting.d.mts");
+        output.ShouldContain("Cannot find name 'Missing'");
+    }
+
+    // The check is Vue-aware, as vue-tsc is: a declaration file may name a single-file component's type.
+    [Fact]
+    public void A_declaration_file_that_imports_a_vue_component_builds()
+    {
+        using var project = new GeneratedProject("saas-standard-vue");
+        project.Write("web/app/src/components.d.ts", """
+            import App from './App.vue';
+
+            export type AppInstance = InstanceType<typeof App>;
+
+            """);
+        Install(project);
+
+        var (exitCode, output) = Build(project);
+
+        exitCode.ShouldBe(0, output);
+    }
+
+    [Fact]
     public void A_type_error_in_a_remotes_declarations_fails_the_build()
     {
         using var project = new GeneratedProject(
