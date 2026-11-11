@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && node check-declarations.mjs && vite build",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "test": "vitest run"

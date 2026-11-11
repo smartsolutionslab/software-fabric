@@ -129,7 +129,7 @@ public sealed class SqlCommandsAreNotLoggedAtInformation : IArchitectureRule
     /// </summary>
     private static bool LogsSql(IConfigurationSection logging, string? provider)
     {
-        Dictionary<string, string?> levels = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string?> levels = [with(StringComparer.OrdinalIgnoreCase)];
         foreach (var (key, value) in logging.GetSection("LogLevel").AsEnumerable(makePathsRelative: true).Where(level => level.Value is not null))
         {
             levels[$"LogLevel:{key}"] = value;

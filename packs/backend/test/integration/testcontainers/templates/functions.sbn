@@ -52,7 +52,7 @@ public sealed class ApplicationDatabase : ` + test_lifetime + `
 
     private readonly List<IContainer> containers = [];
 
-    private readonly Dictionary<string, string?> settings = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string?> settings = [with(StringComparer.Ordinal)];
 
     public string ConnectionString => settings.GetValueOrDefault("ConnectionStrings:database")
         ?? throw new InvalidOperationException("The database has not started.");

@@ -1,6 +1,8 @@
 option: backend.result-style.minimal
 files:
   - { template: templates/Result.cs.sbn, target: src/Kernel/Result.cs }
+  - { template: templates/SuccessOutcome.cs.sbn, target: src/Kernel/SuccessOutcome.cs }
+  - { template: templates/FailureOutcome.cs.sbn, target: src/Kernel/FailureOutcome.cs }
   - { template: templates/ApiError.cs.sbn, target: src/Kernel/ApiError.cs }
   - { template: templates/DomainError.cs.sbn, target: src/Kernel/DomainError.cs }
   - { template: templates/Unit.cs.sbn, target: src/Kernel/Unit.cs }

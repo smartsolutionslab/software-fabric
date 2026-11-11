@@ -18,7 +18,7 @@ public sealed class ModulePolicyOwners
     private const string ApiSuffix = ".Api";
 
     // The host's policy table ignores case, so BILLING.APPROVE and billing.approve are one policy.
-    private readonly Dictionary<string, (string Module, string Name)> owners = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (string Module, string Name)> owners = [with(StringComparer.OrdinalIgnoreCase)];
 
     /// <summary>
     /// Registers the policies of every <see cref="IModulePolicies"/> in a module's Api assembly into the services, and

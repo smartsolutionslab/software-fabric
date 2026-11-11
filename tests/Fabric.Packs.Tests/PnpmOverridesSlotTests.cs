@@ -11,7 +11,7 @@ namespace Fabric.Packs.Tests;
 /// </summary>
 public sealed class PnpmOverridesSlotTests
 {
-    private const string Profile = "saas-standard-react";
+    private const string Profile = "lean-crud";
     private const string RootPackage = "web/package.json";
 
     public static readonly TheoryData<string> Workspaces = new() { "pnpm-workspaces", "nx", "turborepo" };

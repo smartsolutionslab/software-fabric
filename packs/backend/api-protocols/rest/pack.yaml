@@ -1,6 +1,7 @@
 option: backend.api-protocols.rest
 files:
   - { template: templates/OpenApiPaging.cs.sbn, target: src/Host/Wiring/OpenApiPaging.cs }
+  - { template: templates/OpenApiVersion.cs.sbn, target: src/Host/Wiring/OpenApiVersion.cs }
   - { template: templates/ListEndpointsArePagedTests.cs.sbn, target: tests/Integration.Tests/ListEndpointsArePagedTests.cs }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-version.sbn }

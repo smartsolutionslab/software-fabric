@@ -44,12 +44,10 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      # The generator's SDK from global.json, and the one the combination's own global.json pins: rollForward does not
-      # cross a major version.
+      # The generator's SDK from global.json, which the combination's own global.json pins too.
       - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           global-json-file: global.json
-          dotnet-version: 10.0.x
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           version: 10.0.0
@@ -57,7 +55,7 @@ jobs:
         with:
           node-version: 22
       # Generated AppHosts, which the integration tests start, use the Aspire CLI bundle.
-      - run: dnx --yes aspire.cli@13.6.4 -- setup --install-path "$HOME/.aspire"
+      - run: dnx --yes aspire.cli@13.6.5 -- setup --install-path "$HOME/.aspire"
       - run: dotnet build src/Fabric.Cli/Fabric.Cli.csproj -c Release
       - run: build/matrix-combination.sh "${{ matrix.combination }}" "$RUNNER_TEMP/matrix-results"
       - if: always()

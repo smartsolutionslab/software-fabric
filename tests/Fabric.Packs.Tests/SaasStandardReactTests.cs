@@ -73,7 +73,7 @@ public sealed class SaasStandardReactTests
         project.AddModule("billing");
         project.Build();
 
-        File.Exists(Path.Combine(project.ProjectDirectory, "src", "Modules", "Billing", "Billing.Api", "bin", "Release", "net10.0", "Shop.Modules.Billing.Api.dll")).ShouldBeTrue();
+        File.Exists(Path.Combine(project.ProjectDirectory, "src", "Modules", "Billing", "Billing.Api", "bin", "Release", GeneratedProject.TargetFramework, "Shop.Modules.Billing.Api.dll")).ShouldBeTrue();
     }
 
     [Fact]

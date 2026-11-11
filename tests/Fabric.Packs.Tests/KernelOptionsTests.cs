@@ -1,7 +1,9 @@
+using System.Text.RegularExpressions;
+
 namespace Fabric.Packs.Tests;
 
 /// <summary>Guards, result style and absence: Smart Sentinel Eye's conventions by default, the plain ones on request.</summary>
-public sealed class KernelOptionsTests
+public sealed partial class KernelOptionsTests
 {
     private const string Profile = "saas-standard-react";
 
@@ -38,6 +40,84 @@ public sealed class KernelOptionsTests
 
         var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         exitCode.ShouldBe(0, output);
+    }
+
+    [Fact]
+    public void A_switch_on_a_result_or_an_option_that_misses_a_case_does_not_compile()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Application/InvoiceDescriptions.cs", """
+            namespace Shop.Modules.Billing.Application;
+
+            public static class InvoiceDescriptions
+            {
+                public static string Describe(Result<string, ApiError> result) =>
+                    result switch
+                    {
+                        SuccessOutcome<string> success => success.Value,
+                        FailureOutcome<ApiError> failure => failure.Error.Code,
+                    };
+
+                public static string Describe(Option<string> number) =>
+                    number switch
+                    {
+                        Some<string> some => some.Value,
+                        None => "none",
+                    };
+
+                public static string Forget(Result<string, ApiError> result) =>
+                    result switch
+                    {
+                        SuccessOutcome<string> success => success.Value,
+                    };
+
+                public static string Forget(Option<string> number) =>
+                    number switch
+                    {
+                        Some<string> some => some.Value,
+                    };
+            }
+            """);
+
+        var (exitCode, output) = project.TryBuild();
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("the pattern 'Shop.Kernel.FailureOutcome<Shop.Kernel.ApiError>' is not covered");
+        output.ShouldContain("the pattern 'Shop.Kernel.None' is not covered");
+        Errors(output).ShouldBe(["CS8509"], output);
+    }
+
+    [Fact]
+    public void A_switch_on_a_minimal_result_that_misses_a_case_does_not_compile()
+    {
+        using var project = new GeneratedProject(Profile, "backend.result-style=minimal");
+        project.AddModule("billing");
+        project.Write("src/Modules/Billing/Billing.Application/InvoiceDescriptions.cs", """
+            namespace Shop.Modules.Billing.Application;
+
+            public static class InvoiceDescriptions
+            {
+                public static string Describe(Result<string, ApiError> result) =>
+                    result switch
+                    {
+                        SuccessOutcome<string> success => success.Value,
+                        FailureOutcome<ApiError> failure => failure.Error.Code,
+                    };
+
+                public static string Forget(Result<string, ApiError> result) =>
+                    result switch
+                    {
+                        FailureOutcome<ApiError> failure => failure.Error.Code,
+                    };
+            }
+            """);
+
+        var (exitCode, output) = project.TryBuild();
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("the pattern 'Shop.Kernel.SuccessOutcome<string>' is not covered");
+        Errors(output).ShouldBe(["CS8509"], output);
     }
 
     [Fact]
@@ -183,4 +263,11 @@ public sealed class KernelOptionsTests
         var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         exitCode.ShouldBe(0, output);
     }
+
+    /// <summary>The distinct compiler and analyzer error codes in a build's output.</summary>
+    private static string[] Errors(string output) =>
+        [.. ErrorCode().Matches(output).Select(match => match.Groups["code"].Value).Distinct()];
+
+    [GeneratedRegex("error (?<code>[A-Z]+[0-9]+):")]
+    private static partial Regex ErrorCode();
 }

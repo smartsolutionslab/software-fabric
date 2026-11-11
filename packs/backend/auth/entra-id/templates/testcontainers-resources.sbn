@@ -2,8 +2,8 @@
         // own, with its two directories, one per tenant.
         var standInConfiguration = typeof(ContainerFixture).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration ?? "Debug";
         var identity = await StartAsync(
-            new ContainerBuilder("mcr.microsoft.com/dotnet/aspnet:10.0")
-                .WithResourceMapping(new DirectoryInfo(Path.Combine(RepositoryDirectory(), "src/IdentityStandIn/bin", standInConfiguration, "net10.0")), "/app/")
+            new ContainerBuilder("mcr.microsoft.com/dotnet/aspnet:11.0")
+                .WithResourceMapping(new DirectoryInfo(Path.Combine(RepositoryDirectory(), "src/IdentityStandIn/bin", standInConfiguration, "net11.0")), "/app/")
                 .WithWorkingDirectory("/app")
                 .WithEntrypoint("dotnet", "IdentityStandIn.dll")
                 .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")

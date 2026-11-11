@@ -21,7 +21,7 @@ public class TalkToTheDashboardsTests
         var updates = await RunAsync(model, null);
 
         {{ `model.Offered[0]` | should_be `["list_widgets", "propose_widget"]` }};
-        var proposal = JsonDocument.Parse(updates.SelectMany(update => update.Contents).OfType<FunctionResultContent>().Single().Result!.ToString()!).RootElement;
+        var proposal = JsonElement.Parse(updates.SelectMany(update => update.Contents).OfType<FunctionResultContent>().Single().Result!.ToString()!);
         {{ `proposal.GetProperty("title").GetString()` | should_be `"Widgets per dashboard"` }};
         {{ `proposal.GetProperty("visual").GetString()` | should_be `"bar"` }};
     }
@@ -37,7 +37,7 @@ public class TalkToTheDashboardsTests
             ] }
             """;
 
-        await RunAsync(model, JsonDocument.Parse(Draft).RootElement);
+        await RunAsync(model, JsonElement.Parse(Draft));
 
         var messages = model.Requests[0].Where(message => message.Role == ChatRole.User).ToList();
         {{ `messages.Count` | should_be `2` }};
@@ -52,7 +52,7 @@ public class TalkToTheDashboardsTests
     {
         using var model = new RecordingChatClient();
 
-        await RunAsync(model, JsonDocument.Parse("{}").RootElement);
+        await RunAsync(model, JsonElement.Parse("{}"));
 
         {{ `model.Requests[0].Where(message => message.Role == ChatRole.User).Select(message => message.Text)` | should_be `["Make the chart a pie."]` }};
     }
@@ -69,7 +69,7 @@ public class TalkToTheDashboardsTests
         await using var scope = services.CreateAsyncScope();
 
         var result = await scope.ServiceProvider.GetRequiredService<IDispatcher>().QueryAsync(
-            TalkToTheDashboards.Start([new ChatMessage(ChatRole.User, "Make the chart a pie.")], JsonDocument.Parse(draft).RootElement),
+            TalkToTheDashboards.Start([new ChatMessage(ChatRole.User, "Make the chart a pie.")], JsonElement.Parse(draft)),
             {{ test_cancellation_token }});
 
         {{ `result.IsSuccess` | should_be_false }};
@@ -85,7 +85,7 @@ public class TalkToTheDashboardsTests
         await using var scope = services.CreateAsyncScope();
 
         var result = await scope.ServiceProvider.GetRequiredService<IDispatcher>().QueryAsync(
-            TalkToTheDashboards.Start([new ChatMessage(ChatRole.User, "Make the chart a pie.")], JsonDocument.Parse("{ \"widgets\": [" + widgets + "] }").RootElement),
+            TalkToTheDashboards.Start([new ChatMessage(ChatRole.User, "Make the chart a pie.")], JsonElement.Parse("{ \"widgets\": [" + widgets + "] }")),
             {{ test_cancellation_token }});
 
         {{ `result.Error.Code` | should_be `"dashboards.invalid-draft"` }};

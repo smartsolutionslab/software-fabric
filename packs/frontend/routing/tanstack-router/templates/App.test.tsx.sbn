@@ -4,7 +4,9 @@ import { expect, test } from 'vitest';
 import { App } from './App';
 import { createAppRouter } from './router';
 
-test('the start page names the application', async () => {
+// The file's first test also pays for warming up jsdom, React and whatever the app's providers load, which in a
+// larger project under parallel load passes 2.5 s of the default 5 s.
+test('the start page names the application', { timeout: 20_000 }, async () => {
   render(<RouterProvider router={createAppRouter(createMemoryHistory(), <App />)} />);
 
   expect(await screen.findByRole('heading', { name: '{{ name }}' })).toBeInTheDocument();

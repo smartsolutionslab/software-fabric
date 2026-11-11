@@ -1,0 +1,10 @@
+namespace {{ namespace }}.Kernel;
+
+/// <summary>A <see cref="Result{TValue,TError}"/>'s failure case, matched in a <c>switch</c> on a result: <c>FailureOutcome&lt;ApiError&gt; failure =&gt; ...</c>.</summary>
+public readonly struct FailureOutcome<TError>
+    where TError : notnull
+{
+    internal FailureOutcome(TError error) => Error = error;
+
+    public TError Error { get; }
+}

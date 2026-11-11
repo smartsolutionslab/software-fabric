@@ -1,3 +1,4 @@
+using {{ namespace }}.BuildingBlocks.Persistence;
 using {{ namespace }}.BuildingBlocks.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -61,7 +62,7 @@ public static class TenantSchemaMigrations
             foreach (var context in modules)
             {
                 await using var scope = services.CreateAsyncScope();
-                await ((DbContext)scope.ServiceProvider.GetRequiredService(context)).Database.MigrateAsync(cancellationToken);
+                await ((ModuleDbContext)scope.ServiceProvider.GetRequiredService(context)).MigrateModuleAsync(cancellationToken);
             }
         }
     }
@@ -73,7 +74,7 @@ public static class TenantSchemaMigrations
     /// </summary>
     private static void RefuseSharedSchemas(List<Type> modules, IReadOnlyList<string> tenants)
     {
-        Dictionary<string, string> owners = new(StringComparer.Ordinal);
+        Dictionary<string, string> owners = [with(StringComparer.Ordinal)];
         foreach (var module in modules)
         {
             var schema = ModuleSchema(module);

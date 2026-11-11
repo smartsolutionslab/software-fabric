@@ -289,7 +289,7 @@ public sealed class {{ module.namespace }}EventsTakeValueObjectsByConstructor : 
         private IEnumerable<(string Member, string Problem)> Violations(Type holder)
         {
             // System.Text.Json matches a constructor parameter to a property by name, ignoring case.
-            Dictionary<string, ParameterInfo> parameters = new(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, ParameterInfo> parameters = [with(StringComparer.OrdinalIgnoreCase)];
             foreach (var parameter in JsonConstructor(holder)?.GetParameters() ?? [])
             {
                 parameters[parameter.Name!] = parameter;
