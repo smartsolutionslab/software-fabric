@@ -117,7 +117,7 @@ public sealed partial class ScreenshotTests
             var (exitCode, output) = Shell.Run(root, "bash", script);
 
             exitCode.ShouldBe(1, output);
-            output.ShouldContain("@playwright/test is 9.9.9, but .github/scripts/screenshots.sh runs Playwright 1.63.0's image: change both together.");
+            output.ShouldContain("@playwright/test is 9.9.9, but .github/scripts/screenshots.sh runs Playwright 1.65.0's image: change both together.");
         }
         finally
         {

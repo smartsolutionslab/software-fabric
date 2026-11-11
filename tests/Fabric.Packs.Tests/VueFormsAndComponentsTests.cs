@@ -176,8 +176,8 @@ public sealed partial class VueFormsAndComponentsTests
         var package = files["web/app/package.json"];
         package.ShouldContain("\"vee-validate\": \"4.15.1\"");
         package.ShouldContain("\"reka-ui\": \"2.11.0\"");
-        package.ShouldContain("\"@lucide/vue\": \"1.65.0\"");
-        package.ShouldContain("\"tailwindcss\": \"4.3.3\"");
+        package.ShouldContain("\"@lucide/vue\": \"1.72.0\"");
+        package.ShouldContain("\"tailwindcss\": \"4.3.5\"");
         package.ShouldNotContain("primevue");
         package.ShouldNotContain("@vee-validate/zod");
         package.ShouldNotContain("react");

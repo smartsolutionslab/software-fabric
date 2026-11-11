@@ -276,7 +276,7 @@ public sealed class AgUiTests
     {
         var files = Files(Profile, Anthropic, AgentFramework, AgUi);
 
-        files["web/app/package.json"].ShouldContain("\"@ag-ui/client\": \"1.0.3\"");
+        files["web/app/package.json"].ShouldContain("\"@ag-ui/client\": \"1.0.4\"");
         files["web/app/src/modules/assistant/AssistantPage.tsx"].ShouldContain("<AgentPanel agent=\"assistant\" />");
         files[Panel].ShouldContain("from '@/components/ui/button'");
         files[Panel].ShouldContain("zodResolver(");
