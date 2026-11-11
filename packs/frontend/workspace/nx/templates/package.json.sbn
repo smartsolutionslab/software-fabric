@@ -9,5 +9,10 @@
   },
   "devDependencies": {
     "nx": "24.0.5"
-  }
+  }{{ if slots["web.pnpm-overrides"] != "" }},
+  "pnpm": {
+    "overrides": {
+{{ slots["web.pnpm-overrides"] }}
+    }
+  }{{ end }}
 }

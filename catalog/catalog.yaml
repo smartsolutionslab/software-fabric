@@ -408,8 +408,10 @@ dimensions:
     scope: project
     default: pnpm-workspaces
     # Role slots (ADR-0008): every workspace tool's pack owns pnpm-workspace.yaml; architecture and design-system fill it.
+    # The root package.json is the workspace tool's too, and pnpm reads overrides only there: a pack pinning a transitive dependency fills web.pnpm-overrides.
     role-slots:
       web.workspace-packages: { description: "Lines of pnpm-workspace.yaml's packages list ('  - app')." }
+      web.pnpm-overrides: { description: "Entries of the workspace root's pnpm overrides, one package name and the version every dependency gets, indented six spaces ('      \"swagger-parser\": \"12.1.0\"'). Rendered only with a contribution.", separator: ",\n" }
     options:
       pnpm-workspaces: { tier: supported }
       nx:              { tier: supported }  # nightly run 42800894655
