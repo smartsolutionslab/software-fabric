@@ -7,6 +7,9 @@ namespace Fabric.Packs.Tests;
 /// The NuGet minor and patch releases of #588, one family at a time so a breakage points at its family: every pin of a
 /// package in the packs, and the generator's own in <c>Directory.Packages.props</c>, names the release below, and so
 /// does every profile's generated <c>Directory.Packages.props</c>. StyleCop and Npgsql are not part of it.
+/// <c>Microsoft.CodeAnalysis.CSharp</c> is held at 5.0.0: Wolverine 6.64.0 takes <c>JasperFx.RuntimeCompiler</c> 5.1.0,
+/// whose Roslyn packages require exactly 5.0.0, so 5.9.0 fails the restore of every project with Wolverine (NU1608). It
+/// moves when Wolverine takes a runtime compiler built on a later Roslyn.
 /// </summary>
 public sealed partial class NuGetReleaseTests
 {
@@ -36,7 +39,7 @@ public sealed partial class NuGetReleaseTests
         ("identity", "Microsoft.IdentityModel.JsonWebTokens", "8.23.0"),
         ("testing", "TUnit.Engine", "1.83.0"),
         ("testing", "xunit.v3", "4.0.3"),
-        ("testing", "Microsoft.CodeAnalysis.CSharp", "5.9.0"),
+        ("held", "Microsoft.CodeAnalysis.CSharp", "5.0.0"),
         (GeneratorFamily, "Scriban", "7.6.1"),
         (GeneratorFamily, "JsonSchema.Net", "9.6.0"),
         (GeneratorFamily, "xunit.v3", "4.0.3"),
