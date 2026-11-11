@@ -246,7 +246,7 @@ public sealed partial class EntraIdTests
         var output = Path.Combine(project.ProjectDirectory, "publish");
 
         var (exitCode, publishOutput) = DotNet.Run(
-            Path.Combine(project.ProjectDirectory, "src", "AppHost", "bin", "Release", "net10.0"),
+            Path.Combine(project.ProjectDirectory, "src", "AppHost", "bin", "Release", GeneratedProject.TargetFramework),
             new Dictionary<string, string> { ["DOTNET_ENVIRONMENT"] = "Development" },
             "AppHost.dll",
             "--operation",
@@ -379,7 +379,7 @@ public sealed partial class EntraIdTests
 
             var start = new ProcessStartInfo("dotnet")
             {
-                WorkingDirectory = Path.Combine(projectDirectory, "src", "IdentityStandIn", "bin", "Release", "net10.0"),
+                WorkingDirectory = Path.Combine(projectDirectory, "src", "IdentityStandIn", "bin", "Release", GeneratedProject.TargetFramework),
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };

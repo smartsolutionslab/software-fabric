@@ -228,7 +228,7 @@ public sealed class StrictEventSourcedTests
 
         using var postgres = Container.Postgres(DatabasePassword);
         var database = Database(postgres);
-        var (runnerExitCode, runnerOutput) = project.DotNetCommand(database, "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+        var (runnerExitCode, runnerOutput) = project.DotNetCommand(database, $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
         runnerExitCode.ShouldBe(0, runnerOutput);
 
         var (exitCode, output) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj", database);

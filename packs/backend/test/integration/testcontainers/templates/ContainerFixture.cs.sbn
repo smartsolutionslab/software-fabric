@@ -30,7 +30,7 @@ public sealed class ContainerFixture : {{ test_lifetime }}
 
     private readonly List<IContainer> containers = [];
 
-    private readonly Dictionary<string, string?> settings = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string?> settings = [with(StringComparer.Ordinal)];
 
     private WebApplicationFactory<Program>? host;
 

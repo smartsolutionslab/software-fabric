@@ -101,7 +101,7 @@ public sealed class SaveDashboardHandler(IDashboardStore dashboards, WidgetCatal
             return DashboardsFailures.TooManyWidgets(MaximumWidgets);
         }
 
-        HashSet<string> keys = new(StringComparer.Ordinal);
+        HashSet<string> keys = [with(StringComparer.Ordinal)];
         foreach (var placement in command.Widgets)
         {
             if (placement is null || string.IsNullOrWhiteSpace(placement.Key) || placement.Key.Length > 64 || !keys.Add(placement.Key))

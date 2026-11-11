@@ -6,9 +6,9 @@ using YamlDotNet.RepresentationModel;
 namespace Fabric.Packs.Tests;
 
 /// <summary>
-/// The generator builds and runs on .NET 11 (#549), while the projects it generates keep the SDK their own global.json
-/// pins. <c>rollForward: latestFeature</c> does not cross a major version, so a CI job that builds a generated project
-/// sets up that SDK beside the generator's.
+/// The generator builds and runs on .NET 11 (#549), and the projects it generates pin the same SDK (#550), so a CI job
+/// that builds a generated project sets up the generator's SDK and no other. A generated project's build still takes
+/// the SDK its own global.json pins, not the one that runs the tests.
 /// </summary>
 public sealed class GeneratorSdkTests
 {
@@ -30,12 +30,17 @@ public sealed class GeneratorSdkTests
     }
 
     [Fact]
-    public void Every_job_that_builds_a_generated_project_sets_up_the_SDK_generated_projects_pin_beside_the_generators()
+    public void Generated_projects_pin_the_generators_SDK()
     {
-        var pinned = (string?)JsonNode.Parse(File.ReadAllText(Path.Combine(Repository.Root, "packs", "base", "core", "templates", "global.json.sbn")))!["sdk"]?["version"];
-        pinned.ShouldNotBeNull();
-        var band = string.Join('.', pinned.Split('.')[..2]) + ".x";
+        var generator = (string?)JsonNode.Parse(File.ReadAllText(Path.Combine(Repository.Root, "global.json")))!["sdk"]?["version"];
+        var generated = (string?)JsonNode.Parse(File.ReadAllText(Path.Combine(Repository.Root, "packs", "base", "core", "templates", "global.json.sbn")))!["sdk"]?["version"];
 
+        generated.ShouldBe(generator);
+    }
+
+    [Fact]
+    public void Every_job_that_builds_a_generated_project_sets_up_the_generators_SDK_alone()
+    {
         var building = new List<string>();
         foreach (var workflow in Workflows)
         {
@@ -57,8 +62,7 @@ public sealed class GeneratorSdkTests
                 setup.ShouldNotBeNull($"{job} builds a generated project and sets up no SDK.");
                 var with = (YamlMappingNode)setup["with"];
                 Scalar(with, "global-json-file").ShouldBe("global.json", $"{job} takes the generator's SDK from global.json.");
-                (Scalar(with, "dotnet-version") ?? string.Empty).Split('\n', StringSplitOptions.TrimEntries)
-                    .ShouldContain(band, $"{job} builds a generated project, whose global.json pins {pinned}; it sets up {band} as well.");
+                Scalar(with, "dotnet-version").ShouldBeNull($"{job} builds generated projects, which pin the generator's SDK; it needs no other.");
             }
         }
 

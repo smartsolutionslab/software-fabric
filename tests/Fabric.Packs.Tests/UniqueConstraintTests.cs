@@ -81,7 +81,7 @@ public sealed class UniqueConstraintTests
         var connectionString = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}";
         var (migrateExitCode, migrateOutput) = project.DotNetCommand(
             new Dictionary<string, string> { ["ConnectionStrings__database"] = connectionString },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
         migrateExitCode.ShouldBe(0, migrateOutput);
         postgres.Psql(DatabasePassword, "create table billing.notes (id uuid primary key, text varchar(10) not null constraint ux_notes_text unique)");
 

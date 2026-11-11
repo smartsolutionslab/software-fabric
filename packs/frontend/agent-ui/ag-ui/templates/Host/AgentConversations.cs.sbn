@@ -22,7 +22,7 @@ public sealed partial class AgentConversations
         {{ not_null "registered" }}
 
         List<string> problems = [];
-        Dictionary<string, AgentConversation> byName = new(StringComparer.Ordinal);
+        Dictionary<string, AgentConversation> byName = [with(StringComparer.Ordinal)];
         foreach (var conversation in registered)
         {
             if (!KebabCase().IsMatch(conversation.AgentName))

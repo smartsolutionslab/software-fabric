@@ -125,7 +125,7 @@ public sealed class AgentTests
         var tool = DispatcherTool.For<BrowseWords>(dispatcher, "Browses the words of a text.");
 
         var answer = await tool.InvokeAsync(
-            new AIFunctionArguments(new Dictionary<string, object?> { ["text"] = "a b c", ["page"] = null, ["pageSize"] = 2 }),
+            [with(new Dictionary<string, object?> { ["text"] = "a b c", ["page"] = null, ["pageSize"] = 2 })],
             {{ test_cancellation_token }});
 
         {{ `answer?.ToString()` | should_be `"{\"items\":[\"a\",\"b\"],\"totalCount\":3,\"page\":1,\"pageSize\":2}"` }};
@@ -173,7 +173,7 @@ public sealed class AgentTests
         var tool = DispatcherTool.For<FindShelf>(dispatcher, "Finds a shelf.");
 
         var answer = await tool.InvokeAsync(
-            new AIFunctionArguments(new Dictionary<string, object?> { ["code"] = new Dictionary<string, object?> { ["value"] = "A1" } }),
+            [with(new Dictionary<string, object?> { ["code"] = new Dictionary<string, object?> { ["value"] = "A1" } })],
             {{ test_cancellation_token }});
 
         {{ (`answer?.ToString()` | should_not_be_null) | should_start_with `"The arguments are not a FindShelf"` }};
@@ -187,7 +187,7 @@ public sealed class AgentTests
         var tool = DispatcherTool.For<LabelShelf>(dispatcher, "Labels a shelf.");
 
         var answer = await tool.InvokeAsync(
-            new AIFunctionArguments(new Dictionary<string, object?> { ["label"] = new Dictionary<string, object?> { ["value"] = " " } }),
+            [with(new Dictionary<string, object?> { ["label"] = new Dictionary<string, object?> { ["value"] = " " } })],
             {{ test_cancellation_token }});
 
         {{ (`answer?.ToString()` | should_not_be_null) | should_start_with `"The arguments are not a LabelShelf"` }};
@@ -281,7 +281,7 @@ public sealed class AgentTests
         var dispatcher = new RecordingDispatcher(new Dispatcher(new ServiceCollection().BuildServiceProvider()));
         var tool = DispatcherTool.For<Search>(dispatcher, "Searches.");
 
-        var answer = await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?> { ["text"] = "invoices" }), {{ test_cancellation_token }});
+        var answer = await tool.InvokeAsync([with(new Dictionary<string, object?> { ["text"] = "invoices" })], {{ test_cancellation_token }});
 
         {{ `tool.JsonSchema.GetProperty("required").EnumerateArray().Select(name => name.GetString())` | should_be_ignoring_order `["text", "limit"]` }};
         {{ (`answer?.ToString()` | should_not_be_null) | should_start_with `"The arguments are not a Search"` }};

@@ -1,4 +1,6 @@
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.14" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.14" />
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.14" />
+{{~ # Npgsql.EntityFrameworkCore.PostgreSQL 11.0.0-rc.3 requires exactly this EF Core build; 11.0.0 once Npgsql 11.0.0 ships (#551). ~}}
+{{~ ef_core = project["backend.database"] == "postgres" ? "11.0.0-rc.3.26522.148" : "11.0.0" ~}}
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="{{ ef_core }}" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="{{ ef_core }}" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="{{ ef_core }}" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="{{ ef_core }}" />
