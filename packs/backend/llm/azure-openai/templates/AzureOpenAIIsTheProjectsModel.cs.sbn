@@ -8,10 +8,11 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 
 /// <summary>
 /// The host's <see cref="IChatClient"/> is the Azure OpenAI deployment the AppHost names, called through the resource's
-/// OpenAI v1 endpoint, behind the logging and OpenTelemetry every model call gets; and a host started without the
-/// endpoint or the key says which parameter is missing. The client is resolved and inspected, never called. The host's
-/// <c>Program.cs</c> is parsed, not run, to find the registration: module tests register a stand-in model, so without it
-/// a use case that takes <see cref="IChatClient"/> would pass its tests and fail in the host.
+/// OpenAI v1 endpoint, or through an OpenAI-compatible endpoint used as is when it already ends in <c>/v1</c>, behind the
+/// logging and OpenTelemetry every model call gets; and a host started without the endpoint or the key says which
+/// parameter is missing. The client is resolved and inspected, never called. The host's <c>Program.cs</c> is parsed, not
+/// run, to find the registration: module tests register a stand-in model, so without it a use case that takes
+/// <see cref="IChatClient"/> would pass its tests and fail in the host.
 /// </summary>
 public sealed class AzureOpenAIIsTheProjectsModel : IArchitectureRule
 {
@@ -19,11 +20,13 @@ public sealed class AzureOpenAIIsTheProjectsModel : IArchitectureRule
 
     private const string Endpoint = "https://not-a-real-resource.openai.azure.com";
 
+    private const string CompatibleEndpoint = "https://api.openai.com/v1";
+
     private const string Registration = "AddAzureOpenAIChatClient";
 
     private const string HostProgram = "src/Host/Program.cs";
 
-    public string Description => "The host calls AddAzureOpenAIChatClient, which registers the AppHost's Azure OpenAI deployment behind logging and OpenTelemetry, against <endpoint>/openai/v1/; a missing endpoint or key fails naming its parameter.";
+    public string Description => "The host calls AddAzureOpenAIChatClient, which registers the AppHost's Azure OpenAI deployment behind logging and OpenTelemetry, against <endpoint>/openai/v1/, or against an endpoint ending in /v1 as is; a missing endpoint or key fails naming its parameter.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -35,14 +38,14 @@ public sealed class AzureOpenAIIsTheProjectsModel : IArchitectureRule
             violations.Add($"{HostProgram} never calls {Registration}: the host has no IChatClient, and a use case that takes one fails to resolve.");
         }
 
-        using (var services = Services(new() { ["AzureOpenAI:Endpoint"] = Endpoint, ["AzureOpenAI:Deployment"] = Deployment, ["AzureOpenAI:ApiKey"] = "not-a-real-key" }))
+        foreach (var (endpoint, expected) in new[] { (Endpoint, new Uri($"{Endpoint}/openai/v1/")), (CompatibleEndpoint, new Uri(CompatibleEndpoint)) })
         {
+            using var services = Services(new() { ["AzureOpenAI:Endpoint"] = endpoint, ["AzureOpenAI:Deployment"] = Deployment, ["AzureOpenAI:ApiKey"] = "not-a-real-key" });
             var client = services.GetRequiredService<IChatClient>();
             var metadata = client.GetService<ChatClientMetadata>();
-            var expected = new Uri($"{Endpoint}/openai/v1/");
             if (metadata is not { DefaultModelId: Deployment } || metadata.ProviderUri != expected)
             {
-                violations.Add($"The registered IChatClient calls '{metadata?.DefaultModelId}' at '{metadata?.ProviderUri}', not the deployment '{Deployment}' from AzureOpenAI:Deployment at '{expected}'.");
+                violations.Add($"With AzureOpenAI:Endpoint '{endpoint}' the registered IChatClient calls '{metadata?.DefaultModelId}' at '{metadata?.ProviderUri}', not the deployment '{Deployment}' from AzureOpenAI:Deployment at '{expected}'.");
             }
 
             if (client.GetService<LoggingChatClient>() is null || client.GetService<OpenTelemetryChatClient>() is null)

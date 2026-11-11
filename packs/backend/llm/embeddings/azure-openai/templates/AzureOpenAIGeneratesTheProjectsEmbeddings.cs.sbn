@@ -8,7 +8,8 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 
 /// <summary>
 /// The host's <see cref="IEmbeddingGenerator{TInput, TEmbedding}"/> is the Azure OpenAI embedding deployment the AppHost
-/// names, called through the resource's OpenAI v1 endpoint, behind the logging and OpenTelemetry every model call gets;
+/// names, called through the resource's OpenAI v1 endpoint, or through an OpenAI-compatible endpoint used as is when it
+/// already ends in <c>/v1</c>, behind the logging and OpenTelemetry every model call gets;
 /// and a host started without the endpoint or the key says which parameter is missing. The generator is resolved and
 /// inspected, never called. The host's <c>Program.cs</c> is parsed, not run, to find the registration: tests stand in
 /// for the generator, so without it code that takes one would pass its tests and fail in the host.
@@ -19,11 +20,13 @@ public sealed class AzureOpenAIGeneratesTheProjectsEmbeddings : IArchitectureRul
 
     private const string Endpoint = "https://not-a-real-resource.openai.azure.com";
 
+    private const string CompatibleEndpoint = "https://api.openai.com/v1";
+
     private const string Registration = "AddAzureOpenAIEmbeddingGenerator";
 
     private const string HostProgram = "src/Host/Program.cs";
 
-    public string Description => "The host calls AddAzureOpenAIEmbeddingGenerator, which registers the AppHost's Azure OpenAI embedding deployment behind logging and OpenTelemetry, against <endpoint>/openai/v1/; a missing endpoint or key fails naming its parameter.";
+    public string Description => "The host calls AddAzureOpenAIEmbeddingGenerator, which registers the AppHost's Azure OpenAI embedding deployment behind logging and OpenTelemetry, against <endpoint>/openai/v1/, or against an endpoint ending in /v1 as is; a missing endpoint or key fails naming its parameter.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -35,14 +38,16 @@ public sealed class AzureOpenAIGeneratesTheProjectsEmbeddings : IArchitectureRul
             violations.Add($"{HostProgram} never calls {Registration}: the host has no IEmbeddingGenerator, and code that takes one fails to resolve.");
         }
 
-        using (var services = Services(Settings()))
+        foreach (var (endpoint, expected) in new[] { (Endpoint, new Uri($"{Endpoint}/openai/v1/")), (CompatibleEndpoint, new Uri(CompatibleEndpoint)) })
         {
+            var settings = Settings();
+            settings["AzureOpenAI:Endpoint"] = endpoint;
+            using var services = Services(settings);
             var generator = services.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
             var metadata = generator.GetService<EmbeddingGeneratorMetadata>();
-            var expected = new Uri($"{Endpoint}/openai/v1/");
             if (metadata is not { DefaultModelId: Deployment } || metadata.ProviderUri != expected)
             {
-                violations.Add($"The registered IEmbeddingGenerator calls '{metadata?.DefaultModelId}' at '{metadata?.ProviderUri}', not the deployment '{Deployment}' from AzureOpenAI:EmbeddingDeployment at '{expected}'.");
+                violations.Add($"With AzureOpenAI:Endpoint '{endpoint}' the registered IEmbeddingGenerator calls '{metadata?.DefaultModelId}' at '{metadata?.ProviderUri}', not the deployment '{Deployment}' from AzureOpenAI:EmbeddingDeployment at '{expected}'.");
             }
 
             if (generator.GetService<LoggingEmbeddingGenerator<string, Embedding<float>>>() is null
