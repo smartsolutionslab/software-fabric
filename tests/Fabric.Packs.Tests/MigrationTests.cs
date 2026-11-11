@@ -16,11 +16,45 @@ public sealed class MigrationTests
         using var postgres = Container.Postgres(DatabasePassword);
         var (runExitCode, runOutput) = project.DotNetCommand(
             new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
         runExitCode.ShouldBe(0, runOutput);
 
         postgres.Psql(DatabasePassword, "select count(*) from information_schema.tables where table_schema = 'billing' and table_name = 'notes'").ShouldBe("1");
         postgres.Psql(DatabasePassword, "select \"MigrationId\" from billing.\"__EFMigrationsHistory\"").ShouldEndWith("_Initial");
+    }
+
+    /// <summary>
+    /// A module starts without migrations (fabric add-module makes none). EF Core 11 refuses to migrate a context
+    /// with no migrations by default (MigrationsNotFound); the runner still takes such a module as EF Core 10 did,
+    /// creating its history table and nothing else.
+    /// </summary>
+    [Fact]
+    public void The_migration_runner_takes_a_module_with_no_migrations_yet_and_gives_it_its_history_table()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = RunMigrationRunner(project, postgres);
+
+        exitCode.ShouldBe(0, output);
+        postgres.Psql(DatabasePassword, "select count(*) from information_schema.tables where table_schema = 'billing' and table_name = '__EFMigrationsHistory'").ShouldBe("1");
+    }
+
+    /// <summary>What lets a module without migrations through must not let a model without its migration through.</summary>
+    [Fact]
+    public void A_module_whose_model_has_no_migration_still_fails_the_migration_runner()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        AddNotesWithAMigration(project, withMigration: false);
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        var (exitCode, output) = RunMigrationRunner(project, postgres);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("No migrations were found in assembly 'Shop.Modules.Billing.Infrastructure'. A migration needs to be added before the database can be updated.");
     }
 
     [Fact]
@@ -48,7 +82,7 @@ public sealed class MigrationTests
         using var postgres = Container.Postgres(DatabasePassword);
         var (exitCode, output) = project.DotNetCommand(
             new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("probe step ran after the migrations; database configured: True");
@@ -74,7 +108,7 @@ public sealed class MigrationTests
         using var postgres = Container.Postgres(DatabasePassword);
         var (exitCode, output) = project.DotNetCommand(
             new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
 
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("probe preflight refused 1 contexts");
@@ -110,7 +144,7 @@ public sealed class MigrationTests
         using var postgres = Container.Postgres(DatabasePassword);
         var (exitCode, output) = project.DotNetCommand(
             new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
 
         exitCode.ShouldBe(0, output);
         postgres.Psql(DatabasePassword, "select \"Text\" from billing_one.notes").ShouldBe("billing_one");
@@ -159,7 +193,7 @@ public sealed class MigrationTests
         using var postgres = Container.Postgres(DatabasePassword);
         var (exitCode, output) = project.DotNetCommand(
             new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
 
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("20990101000000_Mood");
@@ -189,7 +223,7 @@ public sealed class MigrationTests
         var runner = File.ReadAllText(Path.Combine(project.ProjectDirectory, "src", "MigrationRunner", "Program.cs"));
         runner.ShouldContain("using var host = builder.Build();\nforeach (var context in contexts)");
         runner.ShouldEndWith("""
-                await ((DbContext)scope.ServiceProvider.GetRequiredService(context)).Database.MigrateAsync();
+                await ((ModuleDbContext)scope.ServiceProvider.GetRequiredService(context)).MigrateModuleAsync();
             }
 
             """);
@@ -197,7 +231,8 @@ public sealed class MigrationTests
 
     /// <summary>A Note entity in billing, a migration creating its table made with the EF tool, and a build.</summary>
     /// <param name="tableNamesTheModulesSchema">Maps the table with ToTable("notes", BillingDbContext.Schema), not by the default schema.</param>
-    internal static void AddNotesWithAMigration(GeneratedProject project, bool tableNamesTheModulesSchema = false)
+    /// <param name="withMigration">Adds the migration; without it, the model has an entity no migration creates.</param>
+    internal static void AddNotesWithAMigration(GeneratedProject project, bool tableNamesTheModulesSchema = false, bool withMigration = true)
     {
         project.Write("src/Modules/Billing/Billing.Domain/Note.cs", """
             using Shop.BuildingBlocks.Domain;
@@ -227,6 +262,10 @@ public sealed class MigrationTests
             }
             """.Replace("{{TABLE}}", tableNamesTheModulesSchema ? "\"notes\", BillingDbContext.Schema" : "\"notes\"", StringComparison.Ordinal));
         project.Build();
+        if (!withMigration)
+        {
+            return;
+        }
 
         var none = new Dictionary<string, string>();
         var (restoreExitCode, restoreOutput) = project.DotNetCommand(none, "tool", "restore");
@@ -240,4 +279,9 @@ public sealed class MigrationTests
         addExitCode.ShouldBe(0, addOutput);
         project.Build();
     }
+
+    private static (int ExitCode, string Output) RunMigrationRunner(GeneratedProject project, Container postgres) =>
+        project.DotNetCommand(
+            new Dictionary<string, string> { ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}" },
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
 }

@@ -241,7 +241,7 @@ public sealed class EventDrivenBackendTests
 
         using var postgres = Container.Postgres(DatabasePassword);
         var database = Database(postgres);
-        var (runnerExitCode, runnerOutput) = project.DotNetCommand(database, "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+        var (runnerExitCode, runnerOutput) = project.DotNetCommand(database, $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
         runnerExitCode.ShouldBe(0, runnerOutput);
 
         var (exitCode, output) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj", database);
@@ -273,7 +273,7 @@ public sealed class EventDrivenBackendTests
         beforeExitCode.ShouldNotBe(0, beforeOutput);
         beforeOutput.ShouldContain("42P01");
 
-        var (runnerExitCode, runnerOutput) = project.DotNetCommand(database, "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+        var (runnerExitCode, runnerOutput) = project.DotNetCommand(database, $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
         runnerExitCode.ShouldBe(0, runnerOutput);
 
         postgres.Psql(
@@ -526,7 +526,7 @@ public sealed class EventDrivenBackendTests
             .ShouldContain("public const string Schema = \"billing_2\";");
 
         using var postgres = Container.Postgres(DatabasePassword);
-        var (runnerExitCode, runnerOutput) = project.DotNetCommand(Database(postgres), "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+        var (runnerExitCode, runnerOutput) = project.DotNetCommand(Database(postgres), $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
         runnerExitCode.ShouldBe(0, runnerOutput);
 
         postgres.Psql(DatabasePassword, "select string_agg(table_schema, ',') from information_schema.tables where table_name = 'mt_events'")

@@ -20,12 +20,15 @@ public sealed class SchemaMigrationsAssembly(ICurrentDbContext currentContext, I
 
     private readonly ModuleDbContext context = (ModuleDbContext)currentContext.Context;
 
+    private readonly List<Assembly> additionalAssemblies = [];
+
     private IReadOnlyDictionary<string, TypeInfo>? migrations;
 
     /// <summary>The context's own assembly, where <c>dotnet ef</c> writes a module's migrations.</summary>
     public Assembly Assembly => context.GetType().Assembly;
 
-    public IReadOnlyDictionary<string, TypeInfo> Migrations => migrations ??= Assembly.DefinedTypes
+    public IReadOnlyDictionary<string, TypeInfo> Migrations => migrations ??= additionalAssemblies.Prepend(Assembly).Distinct()
+        .SelectMany(assembly => assembly.DefinedTypes)
         .Where(type => type.IsSubclassOf(typeof(Migration)) && !type.IsAbstract && IsForThisContext(type))
         .Select(type => (Id: type.GetCustomAttribute<MigrationAttribute>()?.Id, Type: type))
         .Where(migration => migration.Id is not null)
@@ -36,6 +39,15 @@ public sealed class SchemaMigrationsAssembly(ICurrentDbContext currentContext, I
         .Where(type => type.IsSubclassOf(typeof(ModelSnapshot)) && !type.IsAbstract && IsForThisContext(type))
         .Select(type => (ModelSnapshot)Activator.CreateInstance(type)!)
         .FirstOrDefault();
+
+    /// <summary>Migrations of this context in another assembly are found, and moved, like its own.</summary>
+    public void AddMigrations(Assembly additionalMigrationsAssembly)
+    {
+        {{ not_null "additionalMigrationsAssembly" }}
+
+        additionalAssemblies.Add(additionalMigrationsAssembly);
+        migrations = null;
+    }
 
     public string? FindMigrationId(string nameOrId)
     {

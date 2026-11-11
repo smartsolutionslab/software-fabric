@@ -25,7 +25,7 @@ public sealed class LeanCrudBackendTests
     {
         var (exitCode, output) = project.DotNetCommand(
             new Dictionary<string, string> { ["ConnectionStrings__database"] = Dependencies(postgres)["ConnectionStrings__database"] },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
         exitCode.ShouldBe(0, output);
     }
 

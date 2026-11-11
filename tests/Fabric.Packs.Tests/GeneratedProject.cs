@@ -35,6 +35,10 @@ internal sealed partial class GeneratedProject : IDisposable
         ProjectWriter.Write(ProjectDirectory, generated.Files).ShouldBeNull();
     }
 
+    /// <summary>The target framework a generated project builds for, as the core pack's Directory.Build.props sets it.</summary>
+    public static string TargetFramework { get; } = TargetFrameworkElement().Match(
+        File.ReadAllText(Path.Combine(Repository.Root, "packs", "base", "core", "templates", "Directory.Build.props.sbn"))).Groups[1].Value;
+
     public string ProjectDirectory { get; }
 
     public void AddModule(string name)
@@ -113,7 +117,7 @@ internal sealed partial class GeneratedProject : IDisposable
         var port = FreePort();
         var start = new ProcessStartInfo("dotnet")
         {
-            WorkingDirectory = Path.Combine(ProjectDirectory, "src", "Host", "bin", "Release", "net10.0"),
+            WorkingDirectory = Path.Combine(ProjectDirectory, "src", "Host", "bin", "Release", TargetFramework),
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
@@ -156,4 +160,7 @@ internal sealed partial class GeneratedProject : IDisposable
         listener.Start();
         return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
+
+    [GeneratedRegex("<TargetFramework>([^<]+)</TargetFramework>")]
+    private static partial Regex TargetFrameworkElement();
 }

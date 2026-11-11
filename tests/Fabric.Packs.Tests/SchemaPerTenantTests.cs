@@ -796,7 +796,7 @@ public sealed class SchemaPerTenantTests
                 ["Tenancy__Tenants__0"] = "tenant-a",
                 ["Tenancy__Tenants__1"] = "tenant-b",
             },
-            "src/MigrationRunner/bin/Release/net10.0/MigrationRunner.dll");
+            $"src/MigrationRunner/bin/Release/{GeneratedProject.TargetFramework}/MigrationRunner.dll");
 
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
     {

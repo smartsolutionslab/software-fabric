@@ -2,9 +2,10 @@
 using Microsoft.EntityFrameworkCore;
 {{~ if moves ~}}
 using Microsoft.EntityFrameworkCore.Diagnostics;
+{{~ end ~}}
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
-{{~ end ~}}
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace {{ namespace }}.BuildingBlocks.Persistence;
@@ -46,6 +47,27 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
     }
 {{~ end ~}}
 
+    /// <summary>
+    /// Applies the module's migrations. A module starts with none, and EF Core 11 refuses to migrate a context that has
+    /// none (MigrationsNotFound): with nothing to migrate, the module gets its database and its migrations history table,
+    /// as EF Core 10 gave it. A model that has no migration still fails, in MigrateAsync.
+    /// </summary>
+    public async Task MigrateModuleAsync(CancellationToken cancellationToken = default)
+    {
+        if (Database.GetMigrations().Any() || Database.HasPendingModelChanges())
+        {
+            await Database.MigrateAsync(cancellationToken);
+            return;
+        }
+
+        var database = Database.GetService<IRelationalDatabaseCreator>();
+        if (!await database.ExistsAsync(cancellationToken))
+        {
+            await database.CreateAsync(cancellationToken);
+        }
+
+        await Database.GetService<IHistoryRepository>().CreateIfNotExistsAsync(cancellationToken);
+    }
 {{~ if slots["persistence.interceptors"] != "" || moves ~}}
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
