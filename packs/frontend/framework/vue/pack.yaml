@@ -50,5 +50,5 @@ adr: docs/adr.md
 gates:
   - { kind: lint-rule, describes: "TypeScript strict (vue-tsc -b in the build, .vue files included) and eslint-plugin-vue's essential rules with typescript-eslint's strict ones fail the frontend job.", file: templates/eslint.config.js.sbn }
   - { kind: lint-rule, describes: "In *.test.ts, a loop of awaited promises or a settle right before expect fails lint: tests wait for a condition (findBy*, waitFor), not a count.", file: templates/eslint.config.js.sbn }
-  - { kind: ci-step, describes: "The build type-checks every declaration file the workspace owns (each package's .d.ts under its tsconfig.json, after vue-tsc -b), which skipLibCheck skips; one with a type error fails the frontend job, while those under node_modules stay skipped.", file: templates/check-declarations.mjs.sbn }
+  - { kind: ci-step, describes: "After vue-tsc -b the build checks again, with skipLibCheck off, every package whose tsconfig.json includes a declaration file; an error in a file the workspace owns, a .d.ts above all, fails the frontend job, while those under node_modules stay skipped.", file: templates/check-declarations.mjs.sbn }
   - { kind: ci-step, describes: "pnpm format:check (Prettier) runs in the frontend job; a file Prettier would change fails CI.", file: templates/ci-frontend-steps.sbn }
