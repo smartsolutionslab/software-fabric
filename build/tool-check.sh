@@ -49,7 +49,9 @@ version="${version#fabric.}"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-cat >"$work/nuget.config" <<EOF
+# The install's nuget.config sits beside the tool, not above the generated projects, which restore from their own sources.
+mkdir "$work/install"
+cat >"$work/install/nuget.config" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <packageSources>
@@ -58,9 +60,9 @@ cat >"$work/nuget.config" <<EOF
   </packageSources>
 </configuration>
 EOF
-cd "$work"
-NUGET_PACKAGES="$work/packages" dotnet tool install fabric --version "$version" --tool-path "$work/tools" --configfile "$work/nuget.config"
-installed="$work/tools/fabric"
+cd "$work/install"
+NUGET_PACKAGES="$work/install/packages" dotnet tool install fabric --version "$version" --tool-path "$work/install/tools" --configfile "$work/install/nuget.config"
+installed="$work/install/tools/fabric"
 
 reported="$("$installed" --version)"
 if [[ $reported != "$version" ]]; then
@@ -68,6 +70,7 @@ if [[ $reported != "$version" ]]; then
   exit 1
 fi
 
+cd "$work"
 mkdir "$work/installed" "$work/repository"
 "$installed" new "$work/installed/shop" --profile "$profile"
 dotnet "$cli" new "$work/repository/shop" --profile "$profile"
