@@ -151,7 +151,7 @@ changed pack ADR.
 **Recommendation: (a)**, with (b) as an explicit override for a version that
 cannot be installed (see O3). Either way the old generator's own
 `fabric --version` and catalog hash are checked against `fabric.yaml` before
-it is used.
+it is used. Those checks do not detect a `--packs` override (O3).
 
 ### O3. A project whose base cannot be reproduced
 
@@ -177,13 +177,24 @@ Options:
 - **(a) Refuse**, in one sentence naming the case.
 - **(b) Refuse by default, and accept `--base <released version>`**: the
   person asserts which release the project matches, and the merge uses it as
-  base.
-- **(c) Merge two-way** (every difference becomes a conflict).
+  base. **Unsafe unless the assertion is exact:** wherever the asserted
+  release differs from what really wrote the project, the difference is
+  taken as already applied. If that release fixed a generated file and is
+  also the upgrade's target, base equals theirs for that file, so the
+  project keeps its old, defective file without a conflict while
+  `fabric.yaml` records the new version.
+- **(c) Reconcile once, two-way**: `upgrade --reconcile <released version>`
+  generates the project's `fabric.yaml` with that release and shows every
+  difference from the project as a conflict, with no base to hide any. Once
+  resolved, `fabric.yaml` records that release, and later upgrades are
+  three-way. Costly (every edit of a generated file is a conflict), but
+  nothing is taken on trust.
 
-**Recommendation: (b).** (c) buries real changes among thousands of
-conflicts. For `fabric-pilot`, and for the pilot if it is generated before
-the first release, (b) with the first release as base is the way in; M4-40
-generating the pilot from a released tool avoids the case altogether.
+**Recommendation: (a), with (c) as the explicit way in.** (b) silently
+loses exactly the fixes an upgrade exists to deliver. For `fabric-pilot`,
+and for the pilot if it is generated before the first release, (c) against
+the first release is the one-time cost; M4-40 generating the pilot from a
+released tool avoids the case altogether.
 
 ### O4. Refusing a project from a newer generator (M4-15)
 
@@ -243,7 +254,12 @@ tree, it needs no format change, and it fits the owner's #381 decision.
 In every option, M4-12's fixture tests cover edited projects: an edit
 merged with a pack change and kept, and a conflicting edit reported, not
 lost. Until the first release is published there is no previous release, and
-the job skips with that reason.
+the job skips with that reason. Likewise a profile the previous release
+cannot generate (it is new, or it chooses an option the previous catalog
+lacks) has no upgrade path yet and is skipped with that reason; its path
+starts at the release that can generate it. A profile the previous release
+generated and the current catalog rejects is not skipped: that is O7's
+major change, and the job fails until the release is declared one.
 
 **Recommendation: (a).** A pack change that breaks the upgrade path (base not
 reproducible, a merge that does not converge on the fresh generation) fails
@@ -271,15 +287,28 @@ say which kind each release is.
 
 **Open — owner to decide.** E4 says conflicts are left as git conflicts.
 
-- **(a) A real git merge.** `upgrade` requires a git repository with a clean
-  working tree, commits base and theirs on a temporary branch from the
-  project's history, and merges it, so conflicts are unmerged paths that
-  `git status`, `git mergetool` and an agent see as in any merge.
-- **(b) Conflict markers only** (`git merge-file` per file), with the index
-  left alone; no clean tree needed.
+- **(a) A git three-way merge with the generated base given explicitly.**
+  `upgrade` requires a git repository with a clean working tree. It writes
+  base and theirs as tree objects that are not in the project's history (base
+  is never an ancestor of the project's HEAD, so nothing can fast-forward),
+  then merges the three trees E4 defines with base named as the merge base:
+  `git read-tree -m -u <base> HEAD <theirs>` followed by
+  `git merge-index -o git-merge-one-file -a`. Conflicts are unmerged index
+  entries with markers in the working tree, which `git status`,
+  `git mergetool` and an agent see as in any merge. Files only the project
+  has are absent from base and theirs and stay as they are. The person or
+  agent commits the result as an ordinary commit on the project's branch;
+  base and theirs leave no commit behind. (A temporary branch holding base
+  and theirs merged into the project would not do this: git would take the
+  project's history, not the generated base, as the merge base, and could
+  fast-forward over local edits.)
+- **(b) Conflict markers only** (`git merge-file` per file, with base as
+  the common ancestor), with the index left alone; no clean tree needed.
 
 **Recommendation: (a).** It is what "git conflicts" means to a person or an
 agent, and a clean tree means nothing unrelated is mixed into the upgrade.
+The exact plumbing is M4-12's to settle by test; the decision asked here is
+an explicit base and no synthetic history in the project.
 
 ## Consequences
 
