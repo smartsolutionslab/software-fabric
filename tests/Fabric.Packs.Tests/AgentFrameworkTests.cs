@@ -14,7 +14,7 @@ public sealed class AgentFrameworkTests
     private const string Profile = "lean-crud";
     private const string Anthropic = "backend.llm=anthropic";
     private const string AgentFramework = "backend.llm.agents=agent-framework";
-    private const string Sdk = "<PackageVersion Include=\"Microsoft.Agents.AI\" Version=\"1.26.0\" />";
+    private const string Sdk = "<PackageVersion Include=\"Microsoft.Agents.AI\" Version=\"1.28.0\" />";
 
     private const string AgentInApplication = """
         using Shop.BuildingBlocks.Agents;
@@ -178,7 +178,7 @@ public sealed class AgentFrameworkTests
     private const string ApplicationReferencingTheFramework = """
         <Project Sdk="Microsoft.NET.Sdk">
           <ItemGroup>
-            <PackageReference Include="Microsoft.Agents.AI" VersionOverride="1.26.0" />
+            <PackageReference Include="Microsoft.Agents.AI" VersionOverride="1.28.0" />
           </ItemGroup>
         </Project>
         """;

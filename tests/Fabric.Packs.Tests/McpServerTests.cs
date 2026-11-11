@@ -14,7 +14,7 @@ public sealed class McpServerTests
     private const string Profile = "lean-crud";
     private const string McpServer = "backend.mcp=server";
     private const string Roles = "backend.authorization=roles";
-    private const string Sdk = "<PackageVersion Include=\"ModelContextProtocol.AspNetCore\" Version=\"2.3.0\" />";
+    private const string Sdk = "<PackageVersion Include=\"ModelContextProtocol.AspNetCore\" Version=\"2.4.0\" />";
 
     private const string MarkedQuery = """
         using Shop.BuildingBlocks.Mcp;

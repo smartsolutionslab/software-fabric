@@ -77,7 +77,7 @@ public sealed class AnthropicTests
         appHost.ShouldContain("builder.AddParameter(\"anthropic-model\", \"claude-haiku-5-5\", publishValueAsDefault: true)");
         appHost.ShouldContain(".WithEnvironment(\"Anthropic__ApiKey\", anthropicApiKey)");
         appHost.ShouldContain(".WithEnvironment(\"Anthropic__Model\", anthropicModel)");
-        files["Directory.Packages.props"].ShouldContain("<PackageVersion Include=\"Anthropic\" Version=\"13.4.0\" />");
+        files["Directory.Packages.props"].ShouldContain("<PackageVersion Include=\"Anthropic\" Version=\"13.8.0\" />");
         files["src/BuildingBlocks/Llm/Wiring/AnthropicChatClient.cs"].ShouldContain(".AsIChatClient(");
         files.Where(file => Path.GetFileName(file.Key).StartsWith("appsettings", StringComparison.Ordinal))
             .ShouldAllBe(file => !file.Value.Contains("anthropic", StringComparison.OrdinalIgnoreCase));

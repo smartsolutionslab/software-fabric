@@ -121,7 +121,7 @@ public sealed class OllamaTests
         appHost.ShouldNotContain("WithGPUSupport(");
         files["src/AppHost/AppHost.csproj"].ShouldContain("<PackageReference Include=\"CommunityToolkit.Aspire.Hosting.Ollama\" />");
         var packages = files["Directory.Packages.props"];
-        packages.ShouldContain("<PackageVersion Include=\"OllamaSharp\" Version=\"5.5.0\" />");
+        packages.ShouldContain("<PackageVersion Include=\"OllamaSharp\" Version=\"5.5.2\" />");
         packages.ShouldContain("<PackageVersion Include=\"CommunityToolkit.Aspire.Hosting.Ollama\" Version=\"13.6.1\" />");
         packages.ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI\" Version=\"11.0.0\" />");
         packages.ShouldNotContain("Microsoft.Extensions.AI.Ollama");

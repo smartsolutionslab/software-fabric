@@ -183,7 +183,7 @@ public sealed class EmbeddingsTests
         appHost.IndexOf("var ollama = ", StringComparison.Ordinal).ShouldBeLessThan(appHost.IndexOf("var ollamaEmbeddingModel = ", StringComparison.Ordinal));
         files["src/AppHost/AppHost.csproj"].ShouldContain("<PackageReference Include=\"CommunityToolkit.Aspire.Hosting.Ollama\" />");
         var packages = files["Directory.Packages.props"];
-        packages.ShouldContain("<PackageVersion Include=\"OllamaSharp\" Version=\"5.5.0\" />");
+        packages.ShouldContain("<PackageVersion Include=\"OllamaSharp\" Version=\"5.5.2\" />");
         packages.ShouldContain("<PackageVersion Include=\"CommunityToolkit.Aspire.Hosting.Ollama\" Version=\"13.6.1\" />");
         var fixture = files["tests/Integration.Tests/AspireFixture.cs"];
         fixture.ShouldContain("\"ollama-embedding-model\"");
