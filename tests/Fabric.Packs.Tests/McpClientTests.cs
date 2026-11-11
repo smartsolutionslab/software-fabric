@@ -48,7 +48,7 @@ public sealed class McpClientTests
         files.Keys.ShouldContain("tests/Architecture.Tests/Rules/McpClientsAreCreatedOnlyByTheBuildingBlocks.cs");
         files.Keys.ShouldContain("tests/Architecture.Tests/Rules/NoModelClients.cs");
         files["Solution.slnx"].ShouldContain("tests/Mcp.Tests/Mcp.Tests.csproj");
-        files["Directory.Packages.props"].ShouldContain("<PackageVersion Include=\"ModelContextProtocol.Core\" Version=\"2.3.0\" />");
+        files["Directory.Packages.props"].ShouldContain("<PackageVersion Include=\"ModelContextProtocol.Core\" Version=\"2.4.0\" />");
     }
 
     [Fact]
