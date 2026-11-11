@@ -12,4 +12,4 @@ The document is checked in rather than produced while building: the host only st
 
 - Changing an endpoint means: run the integration tests (or fetch `/openapi/v1.json` from the running host), commit the rewritten `openapi.json`, run `pnpm codegen`, adapt the frontend.
 - Hand-written `fetch` calls to the API are not used; the types would drift.
-- The host serves OpenAPI 3.1.2. `@rtk-query/codegen-openapi` 2.2.0 asks for `@apidevtools/swagger-parser` 10, which refuses that version, so the workspace root's `package.json` overrides it to 12.1.0 (`pnpm.overrides`). Remove the override once a codegen release depends on a parser that reads the host's version.
+- The host serves OpenAPI 3.1.2. `@rtk-query/codegen-openapi` 2.2.0 asks for `@apidevtools/swagger-parser` 10, which refuses that version, so the workspace root's `package.json` overrides it to 13.1.0 (`pnpm.overrides`); 12.1.0 was the first to read it. Remove the override once a codegen release depends on a parser that reads the host's version: 2.2.0, still the newest, does not.
