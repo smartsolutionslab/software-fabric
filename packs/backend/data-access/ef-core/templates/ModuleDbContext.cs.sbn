@@ -49,12 +49,12 @@ public abstract class ModuleDbContext(DbContextOptions options, IServiceProvider
 
     /// <summary>
     /// Applies the module's migrations. A module starts with none, and EF Core 11 refuses to migrate a context that has
-    /// none (MigrationsNotFound): with nothing to migrate, the module gets its database and its migrations history table,
-    /// as EF Core 10 gave it. A model that has no migration still fails, in MigrateAsync.
+    /// none (MigrationsNotFound). Without migrations the module gets its database and its migrations history table, as
+    /// EF Core 10 gave it; with them, a model that changed since the last one still fails, in MigrateAsync.
     /// </summary>
     public async Task MigrateModuleAsync(CancellationToken cancellationToken = default)
     {
-        if (Database.GetMigrations().Any() || Database.HasPendingModelChanges())
+        if (Database.GetMigrations().Any())
         {
             await Database.MigrateAsync(cancellationToken);
             return;
