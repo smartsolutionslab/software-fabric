@@ -56,6 +56,18 @@ public sealed partial class GeneratedDotNetTests
         others.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void No_pack_runs_a_generated_project_in_a_dotnet_image_other_than_11_0()
+    {
+        var others = Directory.EnumerateFiles(Path.Combine(Repository.Root, "packs"), "*", SearchOption.AllDirectories)
+            .SelectMany(path => DotNetImage().Matches(File.ReadAllText(path))
+                .Where(match => match.Groups["tag"].Value != "11.0")
+                .Select(match => $"{Path.GetRelativePath(Repository.Root, path)}: {match.Value}"))
+            .ToList();
+
+        others.ShouldBeEmpty();
+    }
+
     [Theory]
     [MemberData(nameof(PostgresProfiles))]
     public void A_postgres_profile_takes_the_EF_Core_build_Npgsql_11_0_0_rc_3_requires(string profile)
@@ -121,6 +133,9 @@ public sealed partial class GeneratedDotNetTests
 
     [GeneratedRegex("""<PackageVersion Include="(?<id>[^"]+)" Version="(?<version>[^"]+)" />""")]
     private static partial Regex PackageVersion();
+
+    [GeneratedRegex(@"mcr\.microsoft\.com/dotnet/[a-z-]+:(?<tag>[0-9][^""\s]*)")]
+    private static partial Regex DotNetImage();
 
     [GeneratedRegex(@"\bnet\d+\.\d+\b")]
     private static partial Regex TargetFrameworkName();
