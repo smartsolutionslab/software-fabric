@@ -12,6 +12,7 @@ declares-slots:
   - { slot: web.openapi-schemas, description: "Entries of web/app/openapi.json's components.schemas, one per contribution, indented six spaces; sorted by name with the host's own. Every api-client pack declares it.", separator: "\n\n" }
 slots:
   - { slot: web.dev-dependencies, template: templates/dev-dependency.sbn }
+  - { slot: web.pnpm-overrides, template: templates/pnpm-override.sbn }
   - { slot: web.scripts, template: templates/scripts.sbn }
   - { slot: web.prepare, template: templates/prepare.sbn }
   - { slot: web.lint-ignores, template: templates/lint-ignore.sbn }
