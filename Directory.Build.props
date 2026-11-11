@@ -10,7 +10,7 @@
     <Deterministic>true</Deterministic>
     <!-- The generator's SemVer, recorded in every fabric.yaml. No git SHA in the informational version: the same
          version must write the same bytes from any checkout (AGENTS.md: same input, same output). -->
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionPrefix>0.2.0</VersionPrefix>
     <VersionSuffix>dev</VersionSuffix>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
