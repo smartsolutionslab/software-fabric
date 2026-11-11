@@ -56,6 +56,18 @@ public sealed partial class GeneratedDotNetTests
         others.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void No_pack_runs_a_generated_project_in_a_dotnet_image_other_than_11_0()
+    {
+        var others = Directory.EnumerateFiles(Path.Combine(Repository.Root, "packs"), "*", SearchOption.AllDirectories)
+            .SelectMany(path => DotNetImage().Matches(File.ReadAllText(path))
+                .Where(match => match.Groups["tag"].Value != "11.0")
+                .Select(match => $"{Path.GetRelativePath(Repository.Root, path)}: {match.Value}"))
+            .ToList();
+
+        others.ShouldBeEmpty();
+    }
+
     [Theory]
     [MemberData(nameof(PostgresProfiles))]
     public void A_postgres_profile_takes_the_EF_Core_build_Npgsql_11_0_0_rc_3_requires(string profile)
@@ -77,10 +89,26 @@ public sealed partial class GeneratedDotNetTests
         var versions = PackageVersions(Files("lean-crud", "backend.database=sqlserver"));
 
         versions.ShouldNotContainKey("Npgsql.EntityFrameworkCore.PostgreSQL");
-        foreach (var package in EfCore.Append("Microsoft.EntityFrameworkCore.SqlServer").Append("System.Security.Cryptography.Pkcs"))
+        foreach (var package in EfCore.Append("Microsoft.EntityFrameworkCore.SqlServer"))
         {
             versions[package].ShouldBe(Release, package);
         }
+    }
+
+    /// <summary>
+    /// On net11.0, System.Security.Cryptography.Pkcs is part of the ASP.NET Core shared framework. BuildingBlocks
+    /// references that framework, so the vulnerable copy SQL Server's provider asks for is pruned, and a reference to the
+    /// package fails its build (NU1510). The AppHost does not reference that framework and keeps its override.
+    /// </summary>
+    [Fact]
+    public void A_SQL_Server_project_overrides_System_Security_Cryptography_Pkcs_in_the_AppHost_alone()
+    {
+        var files = Files("lean-crud", "backend.database=sqlserver");
+
+        PackageVersions(files)["System.Security.Cryptography.Pkcs"].ShouldBe(Release);
+        files.Where(file => file.Key.EndsWith(".csproj", StringComparison.Ordinal) && file.Value.Contains("System.Security.Cryptography.Pkcs", StringComparison.Ordinal))
+            .Select(file => file.Key)
+            .ShouldBe(["src/AppHost/AppHost.csproj"]);
     }
 
     [Theory]
@@ -121,6 +149,9 @@ public sealed partial class GeneratedDotNetTests
 
     [GeneratedRegex("""<PackageVersion Include="(?<id>[^"]+)" Version="(?<version>[^"]+)" />""")]
     private static partial Regex PackageVersion();
+
+    [GeneratedRegex(@"mcr\.microsoft\.com/dotnet/[a-z-]+:(?<tag>[0-9][^""\s]*)")]
+    private static partial Regex DotNetImage();
 
     [GeneratedRegex(@"\bnet\d+\.\d+\b")]
     private static partial Regex TargetFrameworkName();
