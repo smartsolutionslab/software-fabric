@@ -147,11 +147,25 @@ public sealed class PackLoaderTests : IDisposable
     {
         packs.Add(
             "frontend.workspace.nx",
-            FrameworkManifest("frontend.workspace.nx", Declaration("web.workspace-files", separator: null)),
+            FrameworkManifest("frontend.workspace.nx", Declaration("web.workspace-files", separator: null) + "\n" + Declaration("web.pnpm-overrides", ",\n")),
             FrameworkFiles);
 
         PackLoader.Load(packs.Root, RepositoryCatalog).Errors.ShouldHaveSingleItem()
             .ShouldEndWith("does not declare the role slot 'web.workspace-packages' that every frontend.workspace option declares (catalog).");
+    }
+
+    // pnpm reads overrides only from the workspace root, which the workspace tool owns; a pack pinning a transitive
+    // dependency fills them whichever tool is chosen (#569).
+    [Fact]
+    public void A_workspace_pack_without_the_pnpm_overrides_slot_is_rejected_by_the_repository_catalog()
+    {
+        packs.Add(
+            "frontend.workspace.nx",
+            FrameworkManifest("frontend.workspace.nx", Declaration("web.workspace-packages", separator: null)),
+            FrameworkFiles);
+
+        PackLoader.Load(packs.Root, RepositoryCatalog).Errors.ShouldHaveSingleItem()
+            .ShouldEndWith("does not declare the role slot 'web.pnpm-overrides' that every frontend.workspace option declares (catalog).");
     }
 
     private static readonly CatalogModel RepositoryCatalog = CatalogReader.ReadFile(RepositoryRoot.File("catalog", "catalog.yaml"));
