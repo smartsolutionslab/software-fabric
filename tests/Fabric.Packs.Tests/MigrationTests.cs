@@ -42,19 +42,47 @@ public sealed class MigrationTests
         postgres.Psql(DatabasePassword, "select count(*) from information_schema.tables where table_schema = 'billing' and table_name = '__EFMigrationsHistory'").ShouldBe("1");
     }
 
-    /// <summary>What lets a module without migrations through must not let a model without its migration through.</summary>
+    /// <summary>What lets a module without migrations through must not let a model that moved past its migrations through.</summary>
     [Fact]
-    public void A_module_whose_model_has_no_migration_still_fails_the_migration_runner()
+    public void A_module_whose_model_changed_since_its_last_migration_still_fails_the_migration_runner()
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
-        AddNotesWithAMigration(project, withMigration: false);
+        AddNotesWithAMigration(project);
+        project.Write("src/Modules/Billing/Billing.Domain/Remark.cs", """
+            using Shop.BuildingBlocks.Domain;
+
+            namespace Shop.Modules.Billing.Domain;
+
+            public sealed class Remark(Guid id, string text) : Entity<Guid>(id)
+            {
+                public string Text { get; private set; } = text;
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/RemarkConfiguration.cs", """
+            using Microsoft.EntityFrameworkCore;
+            using Microsoft.EntityFrameworkCore.Metadata.Builders;
+            using Shop.Modules.Billing.Domain;
+
+            namespace Shop.Modules.Billing.Infrastructure.Persistence;
+
+            public sealed class RemarkConfiguration : IEntityTypeConfiguration<Remark>
+            {
+                public void Configure(EntityTypeBuilder<Remark> builder)
+                {
+                    builder.ToTable("remarks");
+                    builder.HasKey(remark => remark.Id);
+                    builder.Property(remark => remark.Text);
+                }
+            }
+            """);
+        project.Build();
 
         using var postgres = Container.Postgres(DatabasePassword);
         var (exitCode, output) = RunMigrationRunner(project, postgres);
 
         exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("No migrations were found in assembly 'Shop.Modules.Billing.Infrastructure'. A migration needs to be added before the database can be updated.");
+        output.ShouldContain("The model for context 'BillingDbContext' has pending changes.");
     }
 
     [Fact]
@@ -231,8 +259,7 @@ public sealed class MigrationTests
 
     /// <summary>A Note entity in billing, a migration creating its table made with the EF tool, and a build.</summary>
     /// <param name="tableNamesTheModulesSchema">Maps the table with ToTable("notes", BillingDbContext.Schema), not by the default schema.</param>
-    /// <param name="withMigration">Adds the migration; without it, the model has an entity no migration creates.</param>
-    internal static void AddNotesWithAMigration(GeneratedProject project, bool tableNamesTheModulesSchema = false, bool withMigration = true)
+    internal static void AddNotesWithAMigration(GeneratedProject project, bool tableNamesTheModulesSchema = false)
     {
         project.Write("src/Modules/Billing/Billing.Domain/Note.cs", """
             using Shop.BuildingBlocks.Domain;
@@ -262,10 +289,6 @@ public sealed class MigrationTests
             }
             """.Replace("{{TABLE}}", tableNamesTheModulesSchema ? "\"notes\", BillingDbContext.Schema" : "\"notes\"", StringComparison.Ordinal));
         project.Build();
-        if (!withMigration)
-        {
-            return;
-        }
 
         var none = new Dictionary<string, string>();
         var (restoreExitCode, restoreOutput) = project.DotNetCommand(none, "tool", "restore");
