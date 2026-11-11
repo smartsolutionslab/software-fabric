@@ -20,7 +20,8 @@ public sealed class CoverageGateTests
     };
 
     /// <summary>
-    /// The Kernel's packs: the defaults, and the other option of each dimension that has one with a pack;
+    /// The Kernel's packs: the defaults, and the other option of each dimension that has one with a pack; the minimal
+    /// result style with the option absence, the pair whose union members the Kernel tests must reach themselves;
     /// saas-standard-react, whose Wolverine source generator writes code into each module's Application; and the
     /// tests on NUnit and on TUnit, whose packs carry the same gate.
     /// </summary>
@@ -28,6 +29,7 @@ public sealed class CoverageGateTests
     {
         { Profile, string.Empty },
         { Profile, "backend.guards=bcl backend.absence=nullable backend.result-style=minimal" },
+        { Profile, "backend.guards=bcl backend.result-style=minimal" },
         { "saas-standard-react", string.Empty },
         { Profile, "backend.test.framework=nunit" },
         { Profile, "backend.test.framework=tunit" },
