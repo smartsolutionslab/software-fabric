@@ -1,0 +1,25 @@
+// skipLibCheck skips every declaration file: this package's own, those under node_modules, and those a source file
+// imports from outside the tsconfig's include. This checks the package again, by vue-tsc with skipLibCheck off, and
+// fails only on errors outside node_modules, so theirs stay skipped. Each package runs it in its own build, which a
+// workspace's cache keys on that package alone.
+import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import process from 'node:process';
+
+const checker = createRequire(import.meta.url).resolve('vue-tsc/bin/vue-tsc.js');
+const arguments_ = ['--project', 'tsconfig.json', '--skipLibCheck', 'false', '--noEmit', '--pretty', 'false'];
+// The whole output is read, however long: a check cut short reads as one that found nothing of ours.
+const options = { encoding: 'utf8', maxBuffer: Number.POSITIVE_INFINITY };
+const { status, signal, error, stdout, stderr } = spawnSync(process.execPath, [checker, ...arguments_], options);
+if (error !== undefined || signal !== null) {
+  process.stderr.write(`The declaration check did not finish: ${error?.message ?? signal}\n${stderr ?? ''}`);
+  process.exitCode = 1;
+} else {
+  // One error per line, with its details indented beneath it; the file it is in comes first.
+  const errors = stdout.split(/\n(?=\S)/).filter((line) => /error TS\d+/.test(line));
+  const own = errors.filter((line) => !line.slice(0, line.indexOf('(')).includes('node_modules/'));
+  if (own.length > 0 || (status !== 0 && errors.length === 0)) {
+    process.stderr.write(own.length > 0 ? `${own.join('\n')}\n` : stdout + stderr);
+    process.exitCode = 1;
+  }
+}
