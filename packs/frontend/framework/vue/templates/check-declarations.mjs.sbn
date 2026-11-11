@@ -1,24 +1,16 @@
-// skipLibCheck skips every declaration file, the workspace's own as well as those under node_modules. This checks the
-// workspace's own: each package whose tsconfig.json includes a declaration file is checked again, by vue-tsc with
-// skipLibCheck off, and only the errors outside node_modules fail the build, so theirs stay skipped.
+// skipLibCheck skips every declaration file, this package's own as well as those under node_modules. When the package
+// includes one, this checks it again, by vue-tsc with skipLibCheck off, and fails only on errors outside node_modules,
+// so theirs stay skipped. Each package runs it in its own build, which a workspace's cache keys on that package alone.
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import path from 'node:path';
 import process from 'node:process';
 import ts from 'typescript';
 
-const checker = createRequire(import.meta.url).resolve('vue-tsc/bin/vue-tsc.js');
-const workspace = path.resolve('..');
-const configs = ts.sys.readDirectory(workspace, ['.json'], ['**/node_modules', '**/dist'], ['**/tsconfig.json']);
-
-for (const config of configs) {
-  const { config: json } = ts.readConfigFile(config, ts.sys.readFile);
-  const { fileNames } = ts.parseJsonConfigFileContent(json, ts.sys, path.dirname(config));
-  if (!fileNames.some((file) => ts.isDeclarationFileName(file))) {
-    continue;
-  }
-
-  const arguments_ = ['--project', config, '--skipLibCheck', 'false', '--noEmit', '--pretty', 'false'];
+const { config } = ts.readConfigFile('tsconfig.json', ts.sys.readFile);
+const { fileNames } = ts.parseJsonConfigFileContent(config, ts.sys, process.cwd());
+if (fileNames.some((file) => ts.isDeclarationFileName(file))) {
+  const checker = createRequire(import.meta.url).resolve('vue-tsc/bin/vue-tsc.js');
+  const arguments_ = ['--project', 'tsconfig.json', '--skipLibCheck', 'false', '--noEmit', '--pretty', 'false'];
   const { status, stdout, stderr } = spawnSync(process.execPath, [checker, ...arguments_], { encoding: 'utf8' });
   // One error per line, with its details indented beneath it; the file it is in comes first.
   const errors = stdout.split(/\n(?=\S)/).filter((error) => /error TS\d+/.test(error));

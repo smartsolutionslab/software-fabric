@@ -7,6 +7,7 @@ files:
   - { template: templates/remote/package.json.sbn, target: "web/modules/{{ module.name }}/package.json", per-module: true }
   - { template: templates/remote/vite.config.ts.sbn, target: "web/modules/{{ module.name }}/vite.config.ts", per-module: true }
   - { template: templates/remote/tsconfig.json.sbn, target: "web/modules/{{ module.name }}/tsconfig.json", per-module: true }
+  - { template: templates/remote/check-declarations.mjs.sbn, target: "web/modules/{{ module.name }}/check-declarations.mjs", per-module: true }
   - { template: templates/remote/eslint.config.js.sbn, target: "web/modules/{{ module.name }}/eslint.config.js", per-module: true }
   - { template: templates/remote/prettierrc.json.sbn, target: "web/modules/{{ module.name }}/.prettierrc.json", per-module: true }
   - { template: templates/remote/gitignore.sbn, target: "web/modules/{{ module.name }}/.gitignore", per-module: true }
@@ -30,5 +31,6 @@ adr: docs/adr.md
 gates:
   - { kind: unit-test, describes: "Remote shows the page a module's remote exposes and says the module is unavailable when its remote cannot be loaded (src/remotes/Remote.test.tsx).", file: templates/Remote.test.tsx.sbn }
   - { kind: ci-step, describes: "Every remote's build type-checks it and builds its remoteEntry.js, and its lint runs ESLint, with the library bans the shell has, and Prettier; the frontend job runs both for every package.", file: templates/remote/package.json.sbn }
+  - { kind: ci-step, describes: "Every remote's build checks the remote again with skipLibCheck off when it includes a declaration file, as the shell's does; an error in a file of the remote's own, a .d.ts above all, fails it, while those under node_modules stay skipped.", file: templates/remote/check-declarations.mjs.sbn }
   - { kind: ci-step, describes: "A file of another remote or of the shell loaded into a remote, by any import path, fails the remote's build, dev server and tests.", file: templates/remote/boundary.ts.sbn }
   - { kind: end-to-end-test, describes: "A signed-in browser opens each module and sees its page, loaded from the module's own remote (e2e/remotes/<module>.spec.ts, run against the running AppHost).", file: templates/remote.spec.ts.sbn }
