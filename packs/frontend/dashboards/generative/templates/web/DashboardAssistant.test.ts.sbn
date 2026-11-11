@@ -193,6 +193,8 @@ const widgetReads = (id: string) =>
     new URL(String(input), 'http://localhost').pathname.endsWith(`/dashboards/widgets/${id}`),
   ).length;
 
+// The file's first test: besides the agent's run and the grid, it pays for warming up jsdom, Vue and the grid, which
+// under parallel load passes the default 5 s.
 test('a proposed widget shows on the grid as pending with its data, and Accept only puts it on the draft', async () => {
   const user = userEvent.setup();
   const answer = proposalRun(
@@ -239,7 +241,7 @@ test('a proposed widget shows on the grid as pending with its data, and Accept o
       ],
     },
   });
-});
+}, 20_000);
 
 test('two proposals of one run both wait on the grid, and each is accepted or discarded on its own', async () => {
   const user = userEvent.setup();

@@ -15,7 +15,9 @@ const data: Person[] = [{ name: 'first' }, { name: 'second' }];
 // cancels its timers before jsdom is torn down.
 afterEach(cleanup);
 
-test('the table shows a header and one row per item', async () => {
+// The file's first test: one row, but it pays for warming up jsdom, React and AG Grid, which under parallel load
+// approaches the default 5 s.
+test('the table shows a header and one row per item', { timeout: 20_000 }, async () => {
   render(<DataTable columns={columns} data={data} />);
 
   // AG Grid renders after mounting, so the first query waits for it.
