@@ -123,7 +123,7 @@ public sealed class OllamaTests
         var packages = files["Directory.Packages.props"];
         packages.ShouldContain("<PackageVersion Include=\"OllamaSharp\" Version=\"5.5.0\" />");
         packages.ShouldContain("<PackageVersion Include=\"CommunityToolkit.Aspire.Hosting.Ollama\" Version=\"13.6.1\" />");
-        packages.ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI\" Version=\"10.11.0\" />");
+        packages.ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI\" Version=\"11.0.0\" />");
         packages.ShouldNotContain("Microsoft.Extensions.AI.Ollama");
         packages.ShouldNotContain("CommunityToolkit.Aspire.OllamaSharp");
         files["src/BuildingBlocks/BuildingBlocks.csproj"].ShouldContain("<PackageReference Include=\"OllamaSharp\" />");

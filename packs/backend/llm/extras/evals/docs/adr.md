@@ -7,7 +7,7 @@
 
 The project evaluates the answers of its LLM use cases with `Microsoft.Extensions.AI.Evaluation` (ADR-0014 of the generator): a set of examples per use case, answered by the project's own model and scored against a threshold in `fabric.yaml`.
 
-- **`tests/Evals` is the eval project**, with `Microsoft.Extensions.AI.Evaluation`, `.Quality` and `.Reporting` 10.11.0. `UseCases.All` lists the use cases, each with its examples; the sample stands in for a module's.
+- **`tests/Evals` is the eval project**, with `Microsoft.Extensions.AI.Evaluation`, `.Quality` and `.Reporting` 11.0.0. `UseCases.All` lists the use cases, each with its examples; the sample stands in for a module's.
 - **Every example is scored for relevance** (`RelevanceEvaluator`), **for groundedness where it supplies context** (`GroundednessEvaluator` with `GroundednessEvaluatorContext`), and by the project's own checks, each an `IEvaluator` scoring from 1 to 5 (`AnsweredEvaluator` is the sample).
 - **The judge is the project's own `IChatClient`**, registered as the host registers it. The quality evaluators are tuned on GPT-4o, and their documentation warns that their judgement "can be especially poor when a smaller / local model is used"{{ if provider == "ollama" }}, which matters for this project's `llama3.2:1b`{{ end }}.
 - **The judge is asked without `Temperature` or `TopP`**: the evaluators would send 0 and 1, which some models refuse, so every provider's defaults apply. A score that is not a finite number from 1 to 5, or missing, fails the run, naming the use case, the metric and the example, before any mean is taken.
@@ -22,7 +22,7 @@ The project evaluates the answers of its LLM use cases with `Microsoft.Extension
 {{~ else ~}}
   It runs `ollama/ollama:0.34.4`, the image the AppHost runs, as a service, pulls the model and needs no secret.
 {{~ end ~}}
-  The results are uploaded as an artifact with the HTML report of `dotnet aieval report` (`Microsoft.Extensions.AI.Evaluation.Console` 10.11.0, a local tool).
+  The results are uploaded as an artifact with the HTML report of `dotnet aieval report` (`Microsoft.Extensions.AI.Evaluation.Console` 11.0.0, a local tool).
 - **The regular tests never call a model**: they do not run `tests/Evals`, whose name does not end in `.Tests`. They run `tests/Evals.Tests`, which runs the same eval code with a stand-in model and the fake judge `tests/Fakes/FakeJudge.cs`.
 
 ## Consequences

@@ -4,15 +4,17 @@ using Fabric.Core.Generation;
 namespace Fabric.Packs.Tests;
 
 /// <summary>
-/// Generated projects take Aspire 13.6.5 and the 10.11.0 release of the Microsoft.Extensions packages the base pins
-/// (#562): every Aspire package, the AppHost SDK and the Aspire CLI that sets up its bundle, in the packs and in this
-/// repository's own workflows, which set the bundle up for the projects they generate. Community Toolkit integrations
-/// are versioned on their own and are not Aspire's.
+/// Generated projects take Aspire 13.6.5 (#562): every Aspire package, the AppHost SDK and the Aspire CLI that sets up
+/// its bundle, in the packs and in this repository's own workflows, which set the bundle up for the projects they
+/// generate. Community Toolkit integrations are versioned on their own and are not Aspire's. Every Microsoft.Extensions
+/// package takes 11.0.0 (#574), the AI packages included; the one exception is the EF Core health check, which moves
+/// with EF Core (see <see cref="GeneratedDotNetTests"/>).
 /// </summary>
 public sealed partial class AspireReleaseTests
 {
     private const string Aspire = "13.6.5";
-    private const string Extensions = "10.11.0";
+    private const string Extensions = "11.0.0";
+    private const string EfCoreHealthCheck = "Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore";
 
     private static readonly string[] ExtensionsPackages =
     [
@@ -38,9 +40,21 @@ public sealed partial class AspireReleaseTests
         others.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void No_pack_pins_a_Microsoft_Extensions_package_at_a_version_other_than_11_0_0()
+    {
+        var others = Directory.EnumerateFiles(Path.Combine(Repository.Root, "packs"), "*", SearchOption.AllDirectories)
+            .SelectMany(path => ExtensionsVersion().Matches(File.ReadAllText(path))
+                .Where(match => match.Groups["version"].Value != Extensions)
+                .Select(match => $"{Path.GetRelativePath(Repository.Root, path)}: {match.Value}"))
+            .ToList();
+
+        others.ShouldBeEmpty();
+    }
+
     [Theory]
     [MemberData(nameof(Profiles))]
-    public void Every_profile_takes_Aspire_13_6_5_and_the_Microsoft_Extensions_10_11_0_packages(string profile)
+    public void Every_profile_takes_Aspire_13_6_5_and_Microsoft_Extensions_11_0_0(string profile)
     {
         var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, []);
         generated.Errors.ShouldBeEmpty();
@@ -53,6 +67,10 @@ public sealed partial class AspireReleaseTests
             versions[package].ShouldBe(Extensions, package);
         }
 
+        versions.Where(version => version.Key.StartsWith("Microsoft.Extensions.", StringComparison.Ordinal))
+            .Where(version => version.Key != EfCoreHealthCheck)
+            .ShouldAllBe(version => version.Value == Extensions);
+
         versions.Where(version => version.Key.StartsWith("Aspire.", StringComparison.Ordinal))
             .ShouldAllBe(version => version.Value == Aspire);
         files["src/AppHost/AppHost.csproj"].ShouldStartWith($"<Project Sdk=\"Aspire.AppHost.Sdk/{Aspire}\">");
@@ -64,4 +82,7 @@ public sealed partial class AspireReleaseTests
 
     [GeneratedRegex("""(?<![\w.])(?:Aspire\.[A-Za-z.]+" Version="|Aspire\.AppHost\.Sdk/|aspire\.cli@)(?<version>[0-9][^"\s]*)""")]
     private static partial Regex AspireVersion();
+
+    [GeneratedRegex("""(?:Include="Microsoft\.Extensions\.[A-Za-z.]+" Version="|"microsoft\.extensions\.[a-z.]+": \{\s*"version": ")(?<version>[0-9][^"]*)""")]
+    private static partial Regex ExtensionsVersion();
 }
