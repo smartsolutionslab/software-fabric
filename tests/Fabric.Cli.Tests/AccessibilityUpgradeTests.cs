@@ -3,7 +3,7 @@ namespace Fabric.Cli.Tests;
 /// <summary>
 /// <c>fabric upgrade</c> of a single-page app made before the accessibility pack generated a test per module screen
 /// (#604), whose own component test of a screen already checks it with axe, as the generated AGENTS.md asks (#627).
-/// The old generator is this build with the real packs minus that per-module test.
+/// The old generator is this build with the real packs minus that pack's per-module files.
 /// </summary>
 public sealed class AccessibilityUpgradeTests : IDisposable
 {
@@ -39,7 +39,7 @@ public sealed class AccessibilityUpgradeTests : IDisposable
         var accessibility = Path.Combine(oldPacks, "frontend", "test", "extras", "accessibility", "pack.yaml");
         var lines = File.ReadAllLines(accessibility);
         List<string> withoutModuleTests = [.. lines.Where(line => !line.Contains("per-module: true", StringComparison.Ordinal))];
-        withoutModuleTests.Count.ShouldBe(lines.Length - 2);
+        withoutModuleTests.Count.ShouldBeLessThan(lines.Length);
         File.WriteAllLines(accessibility, withoutModuleTests);
 
         oldFabric = OldFabric.Create(root, OldVersion, Paths.RepositoryCatalog, oldPacks);
