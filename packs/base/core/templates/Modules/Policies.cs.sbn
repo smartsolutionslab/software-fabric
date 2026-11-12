@@ -37,6 +37,7 @@ public sealed class {{ module.namespace }}Policies : IModulePolicies
 {{~ if across ~}}
         policies.AddPolicy({{ module.namespace }}PolicyNames.ReadAllTenants, policy => policy.RequireRole(CrossTenantRole.Name));
         policies.AddPolicy({{ module.namespace }}PolicyNames.WriteSharedRecords, policy => policy.RequireRole(CrossTenantRole.Name));
+        policies.AddPolicy({{ module.namespace }}PolicyNames.WriteForTenants, policy => policy.RequireRole(CrossTenantRole.Name));
 {{~ end ~}}
     }
 }

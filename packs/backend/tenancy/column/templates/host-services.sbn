@@ -1,1 +1,2 @@
-builder.Services.AddTenancy();
+builder.Services.AddTenancy();{{ if writes_for_tenants }}
+builder.Services.AddTenantDirectory();{{ end }}

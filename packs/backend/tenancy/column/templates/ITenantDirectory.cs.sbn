@@ -1,0 +1,17 @@
+namespace {{ namespace }}.BuildingBlocks.Tenancy;
+
+/// <summary>
+/// The tenants the project serves, so that staff writing for a tenant name one that exists: an endpoint mapped with
+/// <c>ForTenant()</c> answers 404 for any other, and <c>GET /tenants</c> lists them for a picker. The identity provider
+/// keeps its own tenant groups; the two lists name the same tenants.
+/// </summary>
+public interface ITenantDirectory
+{
+    /// <summary>The tenants, in the order they are configured.</summary>
+    IReadOnlyList<string> Tenants { get; }
+
+    bool Contains(string tenantId);
+
+    /// <summary>One page of <see cref="Tenants"/>, as <c>GET /tenants</c> answers it.</summary>
+    PagedResult<string> List(Page page, PageSize pageSize);
+}

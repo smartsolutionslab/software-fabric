@@ -21,5 +21,8 @@ public static class {{ module.namespace }}PolicyNames
 
     /// <summary>Staff write the records shared by all tenants: name it on an endpoint mapped with <c>WritesSharedRecords()</c>.</summary>
     public const string WriteSharedRecords = "{{ module.name }}.write-shared-records";
+
+    /// <summary>Staff write into the tenant the route names: name it on an endpoint mapped with <c>ForTenant()</c>.</summary>
+    public const string WriteForTenants = "{{ module.name }}.write-for-tenants";
 {{~ end ~}}
 }

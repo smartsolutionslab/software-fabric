@@ -1,0 +1,2 @@
+{{ if writes_for_tenants }}
+    .WithTenants(tenants){{ end }}
