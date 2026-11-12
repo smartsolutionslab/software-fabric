@@ -1,3 +1,10 @@
+{{~
+  # shared_records is the tenant-column pack's; no other tenancy defines it.
+  shared = false
+  if project["backend.tenancy"] == "column"
+    shared = shared_records
+  end
+~}}
 using System.Reflection;
 using System.Reflection.Emit;
 using {{ namespace }}.BuildingBlocks.Rag;
@@ -5,7 +12,12 @@ using {{ namespace }}.BuildingBlocks.Rag;
 namespace {{ namespace }}.Architecture.Tests.Rules;
 
 /// <summary>
+{{~ if shared ~}}
+/// A module's vectors are its own: every <see cref="ModuleVectorIndex{TContext}"/> and
+/// <see cref="SharedVectorIndex{TContext}"/> a module's type names, in a field,
+{{~ else ~}}
 /// A module's vectors are its own: every <see cref="ModuleVectorIndex{TContext}"/> a module's type names, in a field,
+{{~ end ~}}
 /// property, signature, local or method body, has that module's own DbContext as its context, never a generic
 /// parameter a caller could fill with another's; and no module passes another module's DbContext to a generic type or
 /// method, which could reach that module's vectors for it. Another module's records are reached through
@@ -20,14 +32,22 @@ public sealed class ModulesSearchOnlyTheirOwnVectors : IArchitectureRule
     private const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
 
     /// <summary>Compared by name: the module assemblies are loaded from the test output, beside this one.</summary>
+{{~ if shared ~}}
+    private static readonly string[] Indexes = [typeof(ModuleVectorIndex<>).FullName!, typeof(SharedVectorIndex<>).FullName!];
+{{~ else ~}}
     private static readonly string Index = typeof(ModuleVectorIndex<>).FullName!;
+{{~ end ~}}
 
     private static readonly Dictionary<short, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
         .Select(field => (OpCode)field.GetValue(null)!)
         .ToDictionary(code => code.Value);
 
+{{~ if shared ~}}
+    public string Description => "A module uses ModuleVectorIndex<TContext> and SharedVectorIndex<TContext> only with its own DbContext, never over a generic parameter, and passes no other module's DbContext to a generic type or method: no module searches another module's vectors.";
+{{~ else ~}}
     public string Description => "A module uses ModuleVectorIndex<TContext> only with its own DbContext, never over a generic parameter, and passes no other module's DbContext to a generic type or method: no module searches another module's vectors.";
+{{~ end ~}}
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -223,6 +243,21 @@ public sealed class ModulesSearchOnlyTheirOwnVectors : IArchitectureRule
         var arguments = used.GetGenericArguments();
         var definition = used.GetGenericTypeDefinition();
         List<string> findings = [];
+{{~ if shared ~}}
+        if (Indexes.Contains(definition.FullName))
+        {
+            var index = definition.Name.Split('`')[0];
+            var context = arguments[0];
+            if (context.IsGenericParameter)
+            {
+                findings.Add($"{type.FullName} (module {module}) uses {index}<{context.Name}> over a generic parameter, which a caller could fill with another module's DbContext. A module's index names its own DbContext.");
+            }
+            else if (OwnerOf(context) is { } owner && owner != module)
+            {
+                findings.Add($"{type.FullName} (module {module}) uses {index}<{context.Name}>, module {owner}'s vectors. A module searches only its own vectors; reach another module's records through src/Contracts.");
+            }
+        }
+{{~ else ~}}
         if (definition.FullName == Index)
         {
             var context = arguments[0];
@@ -235,6 +270,7 @@ public sealed class ModulesSearchOnlyTheirOwnVectors : IArchitectureRule
                 findings.Add($"{type.FullName} (module {module}) uses ModuleVectorIndex<{context.Name}>, module {owner}'s vectors. A module searches only its own vectors; reach another module's records through src/Contracts.");
             }
         }
+{{~ end ~}}
         else
         {
             var name = definition.Name.Split('`')[0];

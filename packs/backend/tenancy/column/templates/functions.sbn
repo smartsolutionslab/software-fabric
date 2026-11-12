@@ -12,3 +12,9 @@ end
 func cross_tenant_role
   ret "staff"
 end
+
+# Whether staff write records shared by all tenants through WritesSharedRecords() (#623, owner decisions of 2026-11-12):
+# the same choices as cross_tenant_reads, since the writers are the staff who read across tenants.
+func shared_records
+  ret cross_tenant_reads
+end

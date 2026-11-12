@@ -1,0 +1,29 @@
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using Microsoft.AspNetCore.Http;
+
+namespace Microsoft.AspNetCore.Builder;
+
+public static class SharedRecordsEndpoints
+{
+    /// <summary>
+    /// The endpoint writes the records shared by all tenants (types configured with <c>SharedByAllTenants()</c>): its
+    /// handler runs inside <see cref="TenantScope.SharedRecords"/>, where it has no tenant, saves changes to shared types
+    /// only, and may publish integration events, which carry no tenant. Everywhere else, saving or bulk-writing a shared
+    /// type fails. The filter runs after authorization, so name a policy that requires <see cref="CrossTenantRole"/> as
+    /// well, as <c>.RequireAuthorization(&lt;Module&gt;PolicyNames.WriteSharedRecords).WritesSharedRecords()</c> does; the
+    /// architecture rule <c>WritesSharedRecordsRequiresTheCrossTenantRole</c> fails the build otherwise, and for an
+    /// endpoint also mapped with <c>AcrossTenants()</c>.
+    /// </summary>
+    public static RouteHandlerBuilder WritesSharedRecords(this RouteHandlerBuilder endpoint)
+    {
+        {{ not_null "endpoint" }}
+
+        return endpoint
+            .WithMetadata(new SharedRecordsWriter())
+            .AddEndpointFilter(async (context, next) =>
+            {
+                using var sharedRecords = TenantScope.SharedRecords();
+                return await next(context);
+            });
+    }
+}

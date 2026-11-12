@@ -1,0 +1,104 @@
+using System.Data.Common;
+using System.Text.RegularExpressions;
+using {{ namespace }}.BuildingBlocks.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
+
+namespace {{ namespace }}.BuildingBlocks.Tenancy;
+
+/// <summary>
+/// Refuses ExecuteUpdate and ExecuteDelete on the table of a type shared by all tenants outside WritesSharedRecords().
+/// SaveChanges refuses such a write before it sends anything; a bulk write bypasses it, and a shared type has no tenant
+/// filter to narrow it, so one tenant's ExecuteDelete would erase every tenant's shared records. The statement's target
+/// is a table of the module's model, its whole name rendered by the provider as in the statement, right after UPDATE or
+/// DELETE FROM (past the comments EF Core writes for query tags), or aliased by the identifier there. A statement whose
+/// target is none of them is refused when it names a shared table anywhere. SQL a module writes itself (ExecuteSql) is
+/// not checked here: it is never filtered by tenant either.
+/// </summary>
+public sealed partial class SharedRecordsBulkWriteGuard(ModuleDbContext context) : DbCommandInterceptor
+{
+    private List<Table>? tables;
+
+    public override InterceptionResult<int> NonQueryExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
+    {
+        Refuse(command, eventData);
+        return base.NonQueryExecuting(command, eventData, result);
+    }
+
+    public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+        DbCommand command,
+        CommandEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken cancellationToken = default)
+    {
+        Refuse(command, eventData);
+        return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+    }
+
+    /// <summary>Every table of the module's model, by the delimited name the provider renders for it.</summary>
+    private List<Table> Tables => tables ??= TablesOf(context);
+
+    private static List<Table> TablesOf(ModuleDbContext context)
+    {
+        var names = context.GetService<ISqlGenerationHelper>();
+
+        // A hierarchy and its owned types share their root's table.
+        return [.. context.Model.GetEntityTypes()
+            .Where(entity => entity.GetTableName() is not null)
+            .Select(entity => new Table(names.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema()), entity.GetRootType().ClrType.Name, entity.IsSharedByAllTenants()))
+            .DistinctBy(table => table.Name, StringComparer.Ordinal)];
+    }
+
+    private void Refuse(DbCommand command, CommandEventData eventData)
+    {
+        if (eventData.CommandSource is not (CommandSource.ExecuteUpdate or CommandSource.ExecuteDelete) || context.WritesSharedRecords)
+        {
+            return;
+        }
+
+        var sql = command.CommandText;
+        var target = Tables.FirstOrDefault(table => Targets(sql, table.Name));
+        var shared = target is null ? Tables.FirstOrDefault(table => table.Shared && sql.Contains(table.Name, StringComparison.Ordinal)) : target.Shared ? target : null;
+        if (shared is not null)
+        {
+            throw new InvalidOperationException(
+                $"Cannot {(eventData.CommandSource == CommandSource.ExecuteDelete ? "delete" : "update")} {shared.Type} records outside WritesSharedRecords(): records shared by all tenants are written only on an endpoint mapped with it.");
+        }
+    }
+
+    /// <summary>Whether the statement updates or deletes from the table: named right after UPDATE or DELETE FROM, or aliased by the identifier there.</summary>
+    private static bool Targets(string sql, string table)
+    {
+        // EF Core writes a query's tags (TagWith) as comment lines before the statement.
+        var statement = sql[LeadingComments().Match(sql).Length..];
+        var start = Start().Match(statement);
+        if (!start.Success)
+        {
+            return false;
+        }
+
+        var rest = statement[start.Length..];
+        if (rest.StartsWith(table, StringComparison.Ordinal) && (rest.Length == table.Length || char.IsWhiteSpace(rest[table.Length])))
+        {
+            return true;
+        }
+
+        var alias = Alias().Match(rest);
+        return alias.Success && statement.Contains($"{table} AS {alias.Value}", StringComparison.Ordinal);
+    }
+
+    /// <summary>Whitespace, <c>--</c> comment lines and <c>/* */</c> comments at the start of a statement.</summary>
+    [GeneratedRegex(@"^(?:\s+|--[^\n]*(?:\n|$)|/\*.*?\*/)*", RegexOptions.Singleline | RegexOptions.CultureInvariant)]
+    private static partial Regex LeadingComments();
+
+    [GeneratedRegex(@"^\s*(?:UPDATE|DELETE\s+FROM)\s+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex Start();
+
+    /// <summary>An alias as EF Core writes one: a plain word, or one in brackets, followed by whitespace.</summary>
+    [GeneratedRegex(@"^(?:\[\w+\]|\w+)(?=\s)", RegexOptions.CultureInvariant)]
+    private static partial Regex Alias();
+
+    private sealed record Table(string Name, string Type, bool Shared);
+}

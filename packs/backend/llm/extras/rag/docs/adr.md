@@ -1,3 +1,10 @@
+{{~
+  # shared_records is the tenant-column pack's; no other tenancy defines it.
+  shared = false
+  if project["backend.tenancy"] == "column"
+    shared = shared_records
+  end
+~}}
 # Retrieval: pgvector
 
 **Status:** Accepted (generated)
@@ -9,6 +16,9 @@ A module can index its own records as vectors and retrieve the ones nearest to a
 - **Vectors live in PostgreSQL with pgvector**, through the AppHost's database: the PostgreSQL resource runs the image `pgvector/pgvector:0.8.7-pg18` (pgvector 0.8.7 on PostgreSQL 18). Each module keeps one table, `embeddings (key text primary key, content text not null, embedding vector(N) not null)`, in its own schema, with an HNSW index for cosine distance (`vector_cosine_ops`, `<=>`). N is the embeddings model's size, `VectorTables.Dimensions`.
 {{~ if project["backend.tenancy"] == "column" ~}}
 - **Each tenant's vectors are its own** (tenancy: a tenant column). The table is `embeddings (tenant_id text not null, key text not null, content text not null, embedding vector(N) not null, primary key (tenant_id, key))`: a key is unique within a tenant, and the primary key's index, led by `tenant_id`, also finds one tenant's records. The index takes the tenant from `ITenantContext`, the source the module's DbContext filters by, never from its caller; it is scoped, as that source is. `IndexAsync` stores under the current tenant and fails without one; `RemoveAsync` removes only the current tenant's record; `SearchAsync` returns only the current tenant's records, and nothing without a tenant. The HNSW index covers every tenant's vectors and the tenant filter is applied during its scan. That scan stops after `hnsw.max_scan_tuples` (20,000 by default) even when iterative, so where other tenants' records lie nearer it can come back short. A search that returns fewer records than asked therefore ranks the tenant's records exactly instead, read through the primary key's index.
+{{~ if shared ~}}
+- **Records shared by all tenants have a vector table and an index of their own** (the repository owner's decisions on #623, 2026-11-12). Beside `embeddings`, each module's schema holds `shared_embeddings (key text primary key, content text not null, embedding vector(N) not null)` with its own HNSW cosine index, and `SharedVectorIndex<TContext>` (`src/BuildingBlocks/Rag`) reads and writes it. `IndexAsync` and `RemoveAsync` work only inside `WritesSharedRecords()`, where staff write the shared records, and fail everywhere else; `SearchAsync` works for any tenant, for staff inside `AcrossTenants()`, and without a tenant, ranking exactly when the index answers short. No tenant's vectors are in that table, so none crowd the shared ones out of a scan, and `ModuleVectorIndex` and its table are unchanged. A RAG answer's sources are the shared base and the current tenant's own records, never another tenant's: a use case that wants both runs both searches and merges them by `Distance`, and which index returned a passage says where it came from. Staff have no tenant, so their own index finds nothing; a handler that also needs one tenant's records begins `TenantScope.Begin(tenantId)` for that tenant.
+{{~ end ~}}
 {{~ else if project["backend.tenancy"] == "schema-per-tenant" ~}}
 - **Each tenant's vectors are its own** (tenancy: a schema per tenant). The table has no tenant column: each module's `embeddings` table lies in each listed tenant's schema of the module, `<module>_<tenant>`, beside the module's other tables there, and not in the module's own schema. The index works in the schema the module's DbContext would choose, `TenantSchemas.Of`, from `ITenantContext` or a `TenantScope`, never from its caller, read at each call; it is scoped, as that source is. `IndexAsync` stores in the current tenant's table and fails without a tenant listed in `Tenancy:Tenants`; `RemoveAsync` removes only from that table; `SearchAsync` searches only that table, and returns nothing without a listed tenant. Each tenant's table has its own HNSW index, so other tenants' records never crowd a tenant's out of a scan.
 {{~ end ~}}
@@ -20,12 +30,15 @@ A module can index its own records as vectors and retrieve the ones nearest to a
 
 ## Consequences
 
-- An architecture rule, `ModulesSearchOnlyTheirOwnVectors`, fails the build when a module's type uses `ModuleVectorIndex<T>` with another module's DbContext or over a generic parameter, or passes another module's DbContext to a generic type or method, in a signature, a field, a local or a method body, naming the type and both modules.
+- An architecture rule, `ModulesSearchOnlyTheirOwnVectors`, fails the build when a module's type uses `ModuleVectorIndex<T>`{{ if shared }} or `SharedVectorIndex<T>`{{ end }} with another module's DbContext or over a generic parameter, or passes another module's DbContext to a generic type or method, in a signature, a field, a local or a method body, naming the type and both modules.
 - `tests/Rag.Tests` starts the AppHost's database alone, runs the MigrationRunner against it, and checks every module's table and index, that a search returns the nearest records first, also more of them than HNSW's default breadth of 40, {{ if project["backend.tenancy"] != "column" }}that a search the index answers short still returns as many as asked, {{ end }}and that indexing a key again replaces it; no host, no model, no network.
 - What the gates cannot see: whether the text a module indexes is fit to be sent to the embeddings provider, and whether a prompt keeps retrieved text apart from instructions. Every indexed record and every query is a request to the provider: it costs money and sends its content there.
 - Changing the embeddings model to one of another size means tables of that size, made by a migration step of the project's own, and every record indexed again.
 {{~ if project["backend.tenancy"] == "column" ~}}
 - Work outside a request indexes and searches only inside a `TenantScope`; without one it finds nothing and cannot index.
+{{~ if shared ~}}
+- Shared records are indexed where they are written, inside `WritesSharedRecords()`, never by a consumer: their events carry no tenant, and the scope a consumer begins for one writes nothing. Retrieved shared text is untrusted as any other: staff wrote it, possibly pasting from a ticket. `tests/Rag.Tests` checks that every tenant, staff and work without a tenant find what staff indexed, that a tenant's own index never returns it, and that indexing or removing outside the scope fails.
+{{~ end ~}}
 - One HNSW index serves every tenant. A search that the index answers short, because a tenant has fewer records than asked or other tenants' records crowd its own out, costs an exact ranking of that tenant's records. A project whose tenants grow large and very unequal may want partial indexes or partitions per tenant; that is a decision of its own.
 - This pack keeps vectors apart by a tenant column or a schema per tenant: with `database-per-tenant` tenancy the build fails rather than sharing vectors between tenants.
 {{~ else if project["backend.tenancy"] == "schema-per-tenant" ~}}
