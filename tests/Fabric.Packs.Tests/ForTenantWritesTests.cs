@@ -137,7 +137,8 @@ public sealed class ForTenantWritesTests
     /// The decision against the running Aspire stack, in the pilot's choices: staff write into a tenant the route names
     /// and only that tenant's users see it, a bulk write there reaches that tenant's rows alone, an unknown tenant answers
     /// 404 and saves nothing, a tenant's user is refused, staff save nothing on an endpoint without the opt-in, and only
-    /// staff list the tenants. The generated OpenApiDocumentTests check the frontend's copy of the document as well.
+    /// staff list the tenants, a page at a time like every list endpoint. The generated OpenApiDocumentTests check the
+    /// frontend's copy of the document as well.
     /// </summary>
     [Fact]
     public void Staff_write_into_the_tenant_an_endpoint_names_and_nowhere_else()
@@ -379,7 +380,13 @@ public sealed class ForTenantWritesTests
                 var cancellationToken = TestContext.Current.CancellationToken;
                 using var developer = await aspire.CreateHostClientAsync("developer");
 
-                (await TextsAsync("staff", Tenants, cancellationToken)).ShouldBe(["tenant-a", "tenant-b"]);
+                using var staff = await aspire.CreateHostClientAsync("staff");
+
+                var tenants = await staff.GetFromJsonAsync<TenantPage>(Tenants, cancellationToken);
+
+                tenants.ShouldNotBeNull();
+                tenants.Items.ShouldBe(["tenant-a", "tenant-b"]);
+                tenants.TotalCount.ShouldBe(2);
                 using var response = await developer.GetAsync(Tenants, cancellationToken);
                 response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
             }
@@ -398,6 +405,8 @@ public sealed class ForTenantWritesTests
                 texts.ShouldNotBeNull();
                 return texts;
             }
+
+            private sealed record TenantPage(string[] Items, int TotalCount);
         }
         """;
 
