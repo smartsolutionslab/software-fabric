@@ -133,6 +133,97 @@ public sealed class RegenerateTests : IDisposable
             written.Single(file => file.Path == FabricFile.FileName).Content[fabricYaml.IndexOf("\nname: ", StringComparison.Ordinal)..]);
     }
 
+    /// <summary>The fixture catalog with replacements applied to its text, in order.</summary>
+    private static CatalogModel Catalog(params (string OldText, string NewText)[] replacements)
+    {
+        var text = File.ReadAllText(Path.Combine(Fixtures.MinimalRoot, "catalog.yaml"));
+        foreach (var (oldText, newText) in replacements)
+        {
+            text.ShouldContain(oldText);
+            text = text.Replace(oldText, newText, StringComparison.Ordinal);
+        }
+
+        return CatalogReader.Read(new StringReader(text), "catalog.yaml");
+    }
+
+    private const string CacheDimension =
+        "dimensions:\n  backend.cache:\n    scope: project\n    default: none\n    options:\n      none: { tier: supported }\n      redis: { tier: supported }\n";
+
+    /// <summary>The packs with an empty pack for each <c>backend.cache</c> option, loaded against <paramref name="catalog"/>.</summary>
+    private IReadOnlyDictionary<string, PackManifest> CachePacks(CatalogModel catalog)
+    {
+        foreach (var option in (string[])["none", "redis"])
+        {
+            var directory = Path.Combine(packsRoot, "backend", "cache", option);
+            Directory.CreateDirectory(Path.Combine(directory, "docs"));
+            File.WriteAllText(Path.Combine(directory, "docs", "agents.md"), string.Empty);
+            File.WriteAllText(Path.Combine(directory, "docs", "adr.md"), string.Empty);
+            File.WriteAllText(Path.Combine(directory, "pack.yaml"), $$"""
+                option: backend.cache.{{option}}
+                files: []
+                agents: { agents-md: docs/agents.md }
+                adr: docs/adr.md
+                gates:
+                  - { kind: unit-test, describes: "Fixture gate." }
+                """);
+        }
+
+        var loaded = PackLoader.Load(packsRoot, catalog);
+        loaded.Errors.ShouldBeEmpty();
+        return loaded.Packs;
+    }
+
+    private static string ProjectLine(GenerationResult generated, string dimension) =>
+        generated.Files.Single(file => file.Path == FabricFile.FileName).Content.Split('\n')
+            .Single(line => line.StartsWith($"  {dimension}: ", StringComparison.Ordinal));
+
+    [Fact]
+    public void A_dimension_the_record_lacks_takes_the_recorded_profiles_value_while_the_profile_exists()
+    {
+        var written = NewThenAdd(Fixtures.MinimalPacks, "minimal", []);
+        var catalog = Catalog(
+            ("dimensions:\n", CacheDimension),
+            ("  minimal:\n    backend.database: postgres\n", "  minimal:\n    backend.database: postgres\n    backend.cache: redis\n"));
+
+        var regenerated = Generator.Regenerate(catalog, CachePacks(catalog), Record(written));
+
+        regenerated.Errors.ShouldBeEmpty();
+        ProjectLine(regenerated, "backend.cache").ShouldBe("  backend.cache: redis");
+    }
+
+    [Fact]
+    public void A_dimension_the_record_lacks_takes_the_catalog_default_once_the_profile_is_gone()
+    {
+        var written = NewThenAdd(Fixtures.MinimalPacks, "minimal", []);
+        var catalog = Catalog(
+            ("dimensions:\n", CacheDimension),
+            ("  minimal:\n    backend.database: postgres\n", "  smallest:\n    backend.database: postgres\n    backend.cache: redis\n"));
+
+        var regenerated = Generator.Regenerate(catalog, CachePacks(catalog), Record(written));
+
+        regenerated.Errors.ShouldBeEmpty();
+        ProjectLine(regenerated, "backend.cache").ShouldBe("  backend.cache: none");
+        regenerated.Files.Single(file => file.Path == FabricFile.FileName).Content.ShouldContain("\nprofile: minimal\n", Case.Sensitive);
+    }
+
+    [Fact]
+    public void A_module_dimension_the_catalog_added_reaches_a_module_a_pack_brings_as_it_reaches_one_added_by_hand()
+    {
+        var manifest = Path.Combine(packsRoot, "backend", "api-protocols", "rest", "pack.yaml");
+        File.WriteAllText(manifest, "modules: { reports: { module.style: crud } }\n" + File.ReadAllText(manifest));
+        var loaded = PackLoader.Load(packsRoot, Fixtures.MinimalCatalog);
+        loaded.Errors.ShouldBeEmpty();
+        var written = NewThenAdd(loaded.Packs, "minimal", [], "billing");
+        var catalog = Catalog(("dimensions:\n",
+            "dimensions:\n  module.audit:\n    scope: module\n    multi: true\n    default: []\n    options:\n      events: { tier: supported }\n"));
+
+        var regenerated = Generator.Regenerate(catalog, loaded.Packs, Record(written));
+
+        regenerated.Errors.ShouldBeEmpty();
+        regenerated.Files.Single(file => file.Path == FabricFile.FileName).Content.ShouldEndWith(
+            "modules:\n  reports:\n    module.audit: []\n    module.style: crud\n  billing:\n    module.audit: []\n    module.style: ddd\n");
+    }
+
     [Fact]
     public void A_choice_set_the_catalog_rejects_is_not_regenerated_and_the_catalog_says_why()
     {
