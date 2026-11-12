@@ -112,6 +112,7 @@ public sealed class ModuleScreenAccessibilityTests
         Screens(project).ShouldNotBeEmpty();
         UncheckedScreens(project).ShouldBeEmpty();
         Screens(project).ShouldAllBe(screen => !File.Exists(Path.Combine(project.ProjectDirectory, OwnTestOf(screen))));
+        Screens(project).ShouldAllBe(screen => File.ReadAllText(Path.Combine(project.ProjectDirectory, DataOf(screen))).Contains("export const examples"));
     }
 
     [Fact]
@@ -130,6 +131,88 @@ public sealed class ModuleScreenAccessibilityTests
 
         Screens(project).Count.ShouldBe(2);
         UncheckedScreens(project).ShouldBeEmpty();
+    }
+
+    /// <summary>A screen that shows an unlabelled field only once its data has come.</summary>
+    private const string ReactScreenBehindLoading = """
+        import { HOOK } from '@/api/generated';
+
+        export function BillingPage() {
+          const { isLoading } = HOOK();
+          return (
+            <main>
+              <h1>Billing</h1>
+              {isLoading ? <p>Loading</p> : <input type="text" />}
+            </main>
+          );
+        }
+
+        """;
+
+    private const string VueScreenBehindLoading = """
+        <script setup lang="ts">
+        import { useGetMe } from '@/api/generated';
+
+        const { isLoading } = useGetMe();
+        </script>
+
+        <template>
+          <main>
+            <h1>Billing</h1>
+            <p v-if="isLoading">Loading</p>
+            <input v-else type="text" />
+          </main>
+        </template>
+
+        """;
+
+    /// <summary>Each client the axe check stands in for, by the hook of the generated client that asks who is signed in.</summary>
+    public static TheoryData<string, string[], string> Clients => new()
+    {
+        { "saas-standard-react", ["frontend.routing=react-router"], "useGetMeQuery" },
+        { "saas-standard-react", ["frontend.routing=tanstack-router"], "useGetMeQuery" },
+        { "saas-standard-react", ["frontend.state=tanstack-query", "frontend.api-client=orval"], "useGetMe" },
+        { "saas-standard-vue", ["frontend.routing=vue-router"], "useGetMe" },
+    };
+
+    [Theory]
+    [MemberData(nameof(Clients))]
+    public void Once_its_data_file_has_an_example_the_axe_check_also_checks_the_screen_as_it_shows_that_data(
+        string profile,
+        string[] overrides,
+        string hook)
+    {
+        using var project = new GeneratedProject(profile, overrides);
+        project.AddModule("billing");
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var screen = Screens(project).ShouldHaveSingleItem();
+        var vue = screen.EndsWith(".vue", StringComparison.Ordinal);
+        var generated = TestOf(screen);
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, $"pnpm install:\n{installOutput}");
+        var behindLoading = vue ? VueScreenBehindLoading : ReactScreenBehindLoading.Replace("HOOK", hook, StringComparison.Ordinal);
+        var example = $$"""
+            export const examples: Record<string, unknown> = { {{hook}}: { name: 'Ada' } };
+
+            """;
+
+        project.Write(screen, behindLoading);
+        project.Write(DataOf(screen), example);
+        var (populatedExitCode, populatedOutput, populated) = Statuses(project);
+        populatedExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label behind the loading branch:\n{populatedOutput}");
+        populated.GetValueOrDefault(generated).ShouldBe(["passed", "failed"], populatedOutput);
+
+        project.Write(screen, behindLoading.Replace(UnlabelledField, """<input type="text" aria-label="Invoice number" />""", StringComparison.Ordinal)
+            .Replace("<input v-else type=\"text\" />", "<input v-else type=\"text\" aria-label=\"Invoice number\" />", StringComparison.Ordinal));
+        var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
+        labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
+        labelled.GetValueOrDefault(generated).ShouldBe(["passed", "passed"]);
+
+        project.Write(screen, behindLoading);
+        project.Write(DataOf(screen), "export const examples: Record<string, unknown> = {};\n");
+        var (loadingExitCode, loadingOutput, loading) = Statuses(project);
+        loadingExitCode.ShouldBe(0, $"pnpm test:\n{loadingOutput}");
+        loading.GetValueOrDefault(generated).ShouldBe(["passed", "skipped"]);
     }
 
     /// <summary>Each router, with the screen's own test skipping its axe check or with it commented out.</summary>
@@ -163,12 +246,12 @@ public sealed class ModuleScreenAccessibilityTests
         project.Write(OwnTestOf(screen), ownTest == "skipped" ? (vue ? VueSkippedOwnTest : ReactSkippedOwnTest) : CommentedOutOwnTest);
         var (violationExitCode, violationOutput, violation) = Statuses(project);
         violationExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label:\n{violationOutput}");
-        violation.GetValueOrDefault(generated).ShouldBe(["failed"], violationOutput);
+        violation.GetValueOrDefault(generated).ShouldBe(["failed", "skipped"], violationOutput);
 
         project.Write(screen, (vue ? VueScreen : ReactScreen).Replace(UnlabelledField, """<input type="text" aria-label="Invoice number" />""", StringComparison.Ordinal));
         var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
         labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
-        labelled.GetValueOrDefault(generated).ShouldBe(["passed"]);
+        labelled.GetValueOrDefault(generated).ShouldBe(["passed", "skipped"]);
 
         File.Delete(Path.Combine(project.ProjectDirectory, generated));
         var (uncheckedExitCode, uncheckedOutput) = Shell.Run(web, "pnpm", "test");
@@ -216,6 +299,10 @@ public sealed class ModuleScreenAccessibilityTests
     /// <summary>The axe check the generator writes beside a screen: <c>BillingPage.axe.test.tsx</c>.</summary>
     private static string TestOf(string screen) =>
         screen.EndsWith(".vue", StringComparison.Ordinal) ? screen[..^".vue".Length] + ".axe.test.ts" : screen[..^".tsx".Length] + ".axe.test.tsx";
+
+    /// <summary>The example data the axe check shows a screen with, which the project fills in: <c>BillingPage.data.ts</c>.</summary>
+    private static string DataOf(string screen) =>
+        screen.EndsWith(".vue", StringComparison.Ordinal) ? screen[..^".vue".Length] + ".data.ts" : screen[..^".tsx".Length] + ".data.ts";
 
     /// <summary>The screen's own component test, which the generator leaves to the project: <c>BillingPage.test.tsx</c>.</summary>
     private static string OwnTestOf(string screen) =>
