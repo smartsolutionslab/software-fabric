@@ -26,6 +26,7 @@ declares-slots:
   - { slot: migration-runner.steps, description: "Top-level statements of src/MigrationRunner/Program.cs, run after every module's EF Core migrations and before the runner exits; IHost host (its Services and configuration, with the connection string 'database') and List<Type> contexts (every module's DbContext type) are in scope, and await is allowed. For schema that is not an EF Core migration (an event store's tables), so the host never migrates." }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: dependabot.nuget-ignore, template: templates/dependabot-nuget-ignore.sbn }
   - { slot: buildingblocks.packages, template: templates/buildingblocks-packages.sbn }
   - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn }
   - { slot: dotnet.tools, template: templates/dotnet-tool.sbn }
