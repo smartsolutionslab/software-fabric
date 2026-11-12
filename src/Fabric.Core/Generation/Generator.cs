@@ -192,6 +192,57 @@ public static class Generator
         };
     }
 
+    /// <summary>
+    /// Writes a project again from its <c>fabric.yaml</c> alone (ADR-0016 E4), with the calls <see cref="Regeneration"/>
+    /// spells out: <see cref="New"/>, then <see cref="AddModule"/> for each module <c>new</c> did not bring, in order.
+    /// A choice set this catalog rejects fails with the catalog's own errors, as <c>fabric new</c> would.
+    /// </summary>
+    public static GenerationResult Regenerate(CatalogModel catalog, IReadOnlyDictionary<string, PackManifest> packs, FabricRecord project)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(packs);
+        ArgumentNullException.ThrowIfNull(project);
+
+        var regeneration = Regeneration.From(project);
+        var generated = New(catalog, packs, regeneration.Name, regeneration.Profile, regeneration.Overrides);
+        if (generated.Errors.Count > 0)
+        {
+            return generated;
+        }
+
+        var files = generated.Files.ToDictionary(file => file.Path, StringComparer.Ordinal);
+        var experimental = generated.Experimental;
+        foreach (var module in regeneration.Modules)
+        {
+            var current = FabricFile.Read(new StringReader(files[FabricFile.FileName].Content), FabricFile.FileName);
+            if (current.Choices.Modules.ContainsKey(module.Name))
+            {
+                continue;
+            }
+
+            var addition = AddModule(catalog, packs, current, module.Name, module.Overrides);
+            if (addition.FabricYaml is not { } fabricYaml)
+            {
+                return Failure([.. addition.Errors.Select(error => $"add-module {module.Name}: {error}")]);
+            }
+
+            if (addition.Created.FirstOrDefault(file => files.ContainsKey(file.Path)) is { } existing)
+            {
+                return Failure([$"add-module {module.Name}: {existing.Path} already exists; add-module does not overwrite files."]);
+            }
+
+            foreach (var file in addition.Created)
+            {
+                files.Add(file.Path, file);
+            }
+
+            files[FabricFile.FileName] = new RenderedFile(FabricFile.FileName, fabricYaml);
+            experimental = addition.Experimental;
+        }
+
+        return new GenerationResult([.. files.Values.OrderBy(file => file.Path, StringComparer.Ordinal)], []) { Experimental = experimental };
+    }
+
     /// <summary>Puts the packs that bring a module in front of a rule violation reported for that module.</summary>
     private static List<string> NameDeclarers(IReadOnlyList<string> violations, Dictionary<string, List<string>> declarers) =>
         [.. violations.Select(violation => declarers

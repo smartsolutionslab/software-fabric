@@ -122,7 +122,11 @@ public static partial class FabricFile
                 modules)
             {
                 Settings = settings,
-            });
+            })
+        {
+            Generator = fields.Optional("generator") is { } generator ? source.Scalar(generator, FileName) : null,
+            Catalog = fields.Optional("catalog") is { } catalog ? source.Scalar(catalog, FileName) : null,
+        };
     }
 
     private static void AppendValues(
