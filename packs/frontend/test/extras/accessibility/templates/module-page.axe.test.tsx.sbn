@@ -1,18 +1,23 @@
 {{~ editor = module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains(project["frontend.dashboards"], "user-editable") && project["frontend.api-client"] == "rtk-query-codegen" ~}}
 {{~ tanstack = project["frontend.routing"] == "tanstack-router" ~}}
 {{~ client = object.has_key(project, "frontend.api-client") ? project["frontend.api-client"] : "" ~}}
-import { render, screen } from '@testing-library/react';
+{{~ stands_in = client == "rtk-query-codegen" || client == "orval" ~}}
+import { cleanup, render, screen } from '@testing-library/react';
 {{~ if tanstack ~}}
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 {{~ else ~}}
 import { MemoryRouter } from 'react-router';
 {{~ end ~}}
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 {{~ if tanstack ~}}
 import { App } from '@/App';
 import { createAppRouter } from '@/router';
-{{~ else ~}}
+{{~ end ~}}
+{{~ if stands_in ~}}
+import { examples } from './{{ module.namespace }}Page.data';
+{{~ end ~}}
+{{~ if !tanstack ~}}
 import { {{ module.namespace }}Page } from './{{ module.namespace }}Page';
 {{~ end ~}}
 
@@ -24,59 +29,64 @@ import { {{ module.namespace }}Page } from './{{ module.namespace }}Page';
 // its data. Here it stands in, so this test checks the page around it.
 vi.mock('@/dashboards/DashboardEditor', () => ({ DashboardEditor: () => <p>The dashboard editor</p> }));
 {{~ end ~}}
-{{~ if client == "rtk-query-codegen" ~}}
+{{~ if stands_in ~}}
 
-// The page renders on its own, without the store or the host: each hook of the generated client answers as if its
-// request were still on its way.
+// The page renders on its own, without {{ if client == "orval" }}a query client{{ else }}the store{{ end }} or the host. Each hook of the generated client answers
+// as if its request were still on its way or, once the page is shown with its data, with its example in the data file.
+const shown = vi.hoisted(() => ({ withExamples: false }));
 vi.mock('@/api/generated', async (importOriginal) => {
-  const pending = {
-    data: undefined,
-    error: undefined,
-    isLoading: true,
-    isFetching: true,
-    isSuccess: false,
+  const { examples } = await import('@/modules/{{ module.name }}/{{ module.namespace }}Page.data');
+{{~ if client == "orval" ~}}
+  const state = (data: unknown, loading: boolean) => ({
+    data,
+    error: null,
+    isLoading: loading,
+    isPending: loading,
+    isFetching: loading,
+    isSuccess: !loading,
     isError: false,
-  };
+    status: loading ? 'pending' : 'success',
+    refetch: vi.fn(),
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+  });
+  const answer = (hook: string) =>
+    shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
+  const generated = await importOriginal<Record<string, unknown>>();
+  return Object.fromEntries(
+    Object.entries(generated).map(([name, value]) => [name, /^use[A-Z]/.test(name) ? () => answer(name) : value]),
+  );
+{{~ else ~}}
+  const state = (data: unknown, loading: boolean) => ({
+    data,
+    error: undefined,
+    isLoading: loading,
+    isFetching: loading,
+    isSuccess: !loading,
+    isError: false,
+  });
+  const answer = (hook: string) =>
+    shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
   const generated = await importOriginal<Record<string, unknown>>();
   return Object.fromEntries(
     Object.entries(generated).map(([name, value]) => {
       if (/^use\w*Mutation$|^useLazy\w*Query$/.test(name)) {
-        return [name, () => [vi.fn(), pending]];
+        return [name, () => [vi.fn(), state(undefined, true)]];
       }
-      return [name, /^use\w*Query$/.test(name) ? () => pending : value];
+      return [name, /^use\w*Query$/.test(name) ? () => answer(name) : value];
     }),
   );
-});
-{{~ else if client == "orval" ~}}
-
-// The page renders on its own, without a query client or the host: each hook of the generated client answers as if its
-// request were still on its way.
-vi.mock('@/api/generated', async (importOriginal) => {
-  const pending = {
-    data: undefined,
-    error: null,
-    isLoading: true,
-    isPending: true,
-    isFetching: true,
-    isSuccess: false,
-    isError: false,
-    refetch: vi.fn(),
-    mutate: vi.fn(),
-    mutateAsync: vi.fn(),
-  };
-  const generated = await importOriginal<Record<string, unknown>>();
-  return Object.fromEntries(
-    Object.entries(generated).map(([name, value]) => [name, /^use[A-Z]/.test(name) ? () => pending : value]),
-  );
+{{~ end ~}}
 });
 {{~ end ~}}
 
-// Whatever else asks the host waits for an answer that never comes, so the page is checked as it first shows.
+// Whatever else asks the host waits for an answer that never comes.
 vi.stubGlobal('fetch', () => new Promise<Response>(() => undefined));
 
-// Whichever test renders first in a file also pays for warming up jsdom, React and axe, which in a larger project under
-// parallel load passes 2.5 s of the default 5 s.
-test('the {{ module.namespace }} page has no accessibility violations axe can find', { timeout: 20_000 }, async () => {
+// Without Vitest's globals, Testing Library does not unmount between tests by itself.
+afterEach(cleanup);
+
+async function renderPage() {
 {{~ if tanstack ~}}
   const { container } = render(
     <RouterProvider router={createAppRouter(createMemoryHistory({ initialEntries: ['/{{ module.name }}'] }), <App />)} />,
@@ -93,6 +103,23 @@ test('the {{ module.namespace }} page has no accessibility violations axe can fi
 {{~ else ~}}
   expect(await screen.findByRole('heading', { name: '{{ module.namespace }}' })).toBeInTheDocument();
 {{~ end ~}}
+  return container;
+}
+
+// Whichever test renders first in a file also pays for warming up jsdom, React and axe, which in a larger project under
+// parallel load passes 2.5 s of the default 5 s.
+test('the {{ module.namespace }} page has no accessibility violations axe can find', { timeout: 20_000 }, async () => {
+  const container = await renderPage();
 
   expect(await axe(container)).toHaveNoViolations();
 });
+{{~ if stands_in ~}}
+
+// Until {{ module.namespace }}Page.data.ts has an example (AGENTS.md), the page is checked only as it loads.
+test.runIf(Object.keys(examples).length > 0)('the {{ module.namespace }} page passes axe with its example data', async () => {
+  shown.withExamples = true;
+  const container = await renderPage();
+
+  expect(await axe(container)).toHaveNoViolations();
+});
+{{~ end ~}}
