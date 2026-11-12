@@ -1,0 +1,16 @@
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using Microsoft.AspNetCore.Authorization;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class TenantDirectoryRegistration
+{
+    /// <summary>The tenants staff may write for (<see cref="ConfiguredTenants"/>) and the policy of the host's list of them.</summary>
+    public static IServiceCollection AddTenantDirectory(this IServiceCollection services)
+    {
+        {{ not_null "services" }}
+
+        new TenantDirectoryPolicies().AddPolicies(new AuthorizationBuilder(services.AddAuthorizationCore()));
+        return services.AddSingleton<ITenantDirectory, ConfiguredTenants>();
+    }
+}

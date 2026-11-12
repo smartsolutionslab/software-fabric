@@ -1,0 +1,21 @@
+using {{ namespace }}.BuildingBlocks.Modules;
+using Microsoft.AspNetCore.Authorization;
+
+namespace {{ namespace }}.BuildingBlocks.Tenancy;
+
+/// <summary>
+/// The policy of the host's tenant list, <c>GET /tenants</c>: staff alone, who choose a tenant to write for. It belongs
+/// to no module, so the host registers it with the tenant directory (<c>AddTenantDirectory()</c>); like a module's
+/// policies, it is the one place its role is checked.
+/// </summary>
+public sealed class TenantDirectoryPolicies : IModulePolicies
+{
+    public const string ListTenants = "tenancy.list-tenants";
+
+    public void AddPolicies(AuthorizationBuilder policies)
+    {
+        {{ not_null "policies" }}
+
+        policies.AddPolicy(ListTenants, policy => policy.RequireRole(CrossTenantRole.Name));
+    }
+}
