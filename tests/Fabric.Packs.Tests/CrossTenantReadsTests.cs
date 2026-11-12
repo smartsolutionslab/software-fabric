@@ -20,6 +20,7 @@ public sealed class CrossTenantReadsTests
     [
         "src/BuildingBlocks/Tenancy/CrossTenantRole.cs",
         "src/BuildingBlocks/Tenancy/ReadsAcrossTenants.cs",
+        "src/BuildingBlocks/Tenancy/AllTenantsWriteNothing.cs",
         "src/BuildingBlocks/Tenancy/Wiring/AcrossTenantsEndpoints.cs",
         "tests/Architecture.Tests/Rules/AcrossTenantsRequiresTheCrossTenantRole.cs",
     ];
@@ -139,6 +140,7 @@ public sealed class CrossTenantReadsTests
         project.WriteTypes("src/Modules/Billing/Billing.Api/Endpoints", NotesEndpoints("""
             endpoints.MapGet("/notes/all-tenants", ListAsync).RequireAuthorization(BillingPolicyNames.ReadAllTenants).AcrossTenants().ExcludeFromDescription();
             endpoints.MapPost("/notes/all-tenants", AddAsync).RequireAuthorization(BillingPolicyNames.ReadAllTenants).AcrossTenants().ExcludeFromDescription();
+            endpoints.MapDelete("/notes/all-tenants", DeleteAllAsync).RequireAuthorization(BillingPolicyNames.ReadAllTenants).AcrossTenants().ExcludeFromDescription();
             """));
         project.Write("tests/Integration.Tests/CrossTenantTests.cs", CrossTenantIntegrationTests);
         MigrationTests.AddNotesWithAMigration(project);
@@ -156,6 +158,7 @@ public sealed class CrossTenantReadsTests
         project.AddModule("billing");
         project.WriteTypes("src/Modules/Billing/Billing.Api/Endpoints", NotesEndpoints("""
             endpoints.MapGet("/notes/all-tenants", ListAsync).RequireAuthorization(BillingPolicyNames.ReadAllTenants).AcrossTenants().ExcludeFromDescription();
+            endpoints.MapDelete("/notes/all-tenants", DeleteAllAsync).RequireAuthorization(BillingPolicyNames.ReadAllTenants).AcrossTenants().ExcludeFromDescription();
             endpoints.MapGet("/notes/managed", ListAsync).RequireAuthorization(BillingPolicyNames.Manage).AcrossTenants().ExcludeFromDescription();
             endpoints.MapGet("/notes/signed-in", ListAsync).AcrossTenants().ExcludeFromDescription();
             endpoints.MapGet("/notes/anonymous", ListAsync).RequireAuthorization(BillingPolicyNames.ReadAllTenants).AllowAnonymous().AcrossTenants().ExcludeFromDescription();
@@ -216,6 +219,10 @@ public sealed class CrossTenantReadsTests
                 await context.SaveChangesAsync(cancellationToken);
                 return TypedResults.NoContent();
             }
+
+            // A bulk write bypasses SaveChanges and the change tracker, but not the query filter.
+            private static async Task<IResult> DeleteAllAsync(BillingDbContext context, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await context.Set<Note>().ExecuteDeleteAsync(cancellationToken));
 
             private static async Task<IResult> ListAsync(BillingDbContext context, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await context.Set<Note>().Select(note => note.Text).Order().ToListAsync(cancellationToken));
@@ -283,6 +290,21 @@ public sealed class CrossTenantReadsTests
                 var notes = await staff.GetFromJsonAsync<string[]>(AllTenants, cancellationToken);
                 notes.ShouldNotBeNull();
                 notes.ShouldNotContain("a note of no tenant");
+            }
+
+            [Fact]
+            public async Task A_bulk_delete_inside_an_endpoint_that_opts_in_fails_and_deletes_nothing()
+            {
+                var cancellationToken = TestContext.Current.CancellationToken;
+                await AddAsync("developer", "a note bulk deletes must not reach", cancellationToken);
+                using var staff = await aspire.CreateHostClientAsync("staff");
+
+                using var response = await staff.DeleteAsync(AllTenants, cancellationToken);
+
+                response.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
+                var notes = await staff.GetFromJsonAsync<string[]>(AllTenants, cancellationToken);
+                notes.ShouldNotBeNull();
+                notes.ShouldContain("a note bulk deletes must not reach");
             }
 
             private async Task AddAsync(string user, string text, CancellationToken cancellationToken)
