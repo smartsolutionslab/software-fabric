@@ -307,6 +307,46 @@ public sealed class UpgradeCommandTests : IDisposable
         run.Output.ShouldContain("that the project builds and passes its tests: it has edits of its own");
         run.Output.ShouldNotContain("pnpm-lock.yaml");
         run.Output.ShouldNotContain("migration");
+        run.Output.ShouldNotContain("openapi.json");
+    }
+
+    [Fact]
+    public void Names_the_openapi_document_and_its_client_when_csharp_under_src_changed_in_a_project_that_has_the_document()
+    {
+        AddFile(Path.Combine(newPacks, "base", "core"), "openapi.sbn", "web/app/openapi.json", perModule: false, "{}\n");
+        AddFile(Path.Combine(newPacks, "module", "style", "ddd"), "endpoint.sbn", "src/{{ module.name }}/Endpoint.cs", perModule: true, "// endpoint\n");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldContain(
+            "  - that web/app/openapi.json and the client generated from it match what the host serves: C# under src/ changed; " +
+            "run the integration tests, which rewrite the document, commit it, then run pnpm codegen in web/app and adapt the screens.\n");
+    }
+
+    [Fact]
+    public void Does_not_name_the_openapi_document_for_a_project_without_one()
+    {
+        AddFile(Path.Combine(newPacks, "module", "style", "ddd"), "endpoint.sbn", "src/{{ module.name }}/Endpoint.cs", perModule: true, "// endpoint\n");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldContain("migration");
+        run.Output.ShouldNotContain("openapi.json");
+    }
+
+    [Fact]
+    public void Does_not_name_the_openapi_document_when_no_csharp_under_src_changed()
+    {
+        AddFile(Path.Combine(newPacks, "base", "core"), "openapi.sbn", "web/app/openapi.json", perModule: false, "{}\n");
+        AddFile(Path.Combine(newPacks, "base", "core"), "test.sbn", "tests/Integration.Tests/SomethingTests.cs", perModule: false, "// a test\n");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldContain("migration");
+        run.Output.ShouldNotContain("that web/app/openapi.json");
     }
 
     [Fact]

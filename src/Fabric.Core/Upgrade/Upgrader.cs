@@ -82,7 +82,8 @@ public static class Upgrader
                 theirsTree,
                 ("project", $"fabric {recorded}", $"fabric {GeneratorVersion.Current}"),
                 Path.Combine(scratch, "merge"));
-            return new UpgradeResult(UpgradeSummary.Write(record.Name, recorded, GeneratorVersion.Current, outcome), [])
+            var servesOpenApiDocument = theirs.Files.Any(file => file.Path == UpgradeSummary.OpenApiDocument);
+            return new UpgradeResult(UpgradeSummary.Write(record.Name, recorded, GeneratorVersion.Current, outcome, servesOpenApiDocument), [])
             {
                 Experimental = theirs.Experimental,
             };
