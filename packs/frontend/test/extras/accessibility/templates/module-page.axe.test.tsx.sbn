@@ -1,12 +1,13 @@
 {{~ editor = module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains(project["frontend.dashboards"], "user-editable") && project["frontend.api-client"] == "rtk-query-codegen" ~}}
 {{~ tanstack = project["frontend.routing"] == "tanstack-router" ~}}
+{{~ client = object.has_key(project, "frontend.api-client") ? project["frontend.api-client"] : "" ~}}
 import { render, screen } from '@testing-library/react';
 {{~ if tanstack ~}}
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 {{~ else ~}}
 import { MemoryRouter } from 'react-router';
 {{~ end ~}}
-import { expect, test{{ if editor }}, vi{{ end }} } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 {{~ if tanstack ~}}
 import { App } from '@/App';
@@ -14,27 +15,68 @@ import { createAppRouter } from '@/router';
 {{~ else ~}}
 import { {{ module.namespace }}Page } from './{{ module.namespace }}Page';
 {{~ end ~}}
+
+// The screen's axe check, generated with it. It runs whatever the screen's own component test does, so a check skipped
+// or commented out there never leaves the screen unchecked.
 {{~ if editor ~}}
 
 // The page is the dashboard editor, which needs the store and the generated client; its own test checks it with axe on
 // its data. Here it stands in, so this test checks the page around it.
 vi.mock('@/dashboards/DashboardEditor', () => ({ DashboardEditor: () => <p>The dashboard editor</p> }));
 {{~ end ~}}
+{{~ if client == "rtk-query-codegen" ~}}
 
-// The screen's own component test beside it is the project's. Once that test checks the screen with axe, as AGENTS.md
-// asks, this generated check skips itself, so the screen is checked once.
-const ownTest = import.meta.glob<string>('./{{ module.namespace }}Page.test.tsx', {
-  query: '?raw',
-  import: 'default',
-  eager: true,
+// The page renders on its own, without the store or the host: each hook of the generated client answers as if its
+// request were still on its way.
+vi.mock('@/api/generated', async (importOriginal) => {
+  const pending = {
+    data: undefined,
+    error: undefined,
+    isLoading: true,
+    isFetching: true,
+    isSuccess: false,
+    isError: false,
+  };
+  const generated = await importOriginal<Record<string, unknown>>();
+  return Object.fromEntries(
+    Object.entries(generated).map(([name, value]) => {
+      if (/^use\w*Mutation$|^useLazy\w*Query$/.test(name)) {
+        return [name, () => [vi.fn(), pending]];
+      }
+      return [name, /^use\w*Query$/.test(name) ? () => pending : value];
+    }),
+  );
 });
-const checkedByOwnTest = Object.values(ownTest).some((source) => source.includes('toHaveNoViolations()'));
+{{~ else if client == "orval" ~}}
+
+// The page renders on its own, without a query client or the host: each hook of the generated client answers as if its
+// request were still on its way.
+vi.mock('@/api/generated', async (importOriginal) => {
+  const pending = {
+    data: undefined,
+    error: null,
+    isLoading: true,
+    isPending: true,
+    isFetching: true,
+    isSuccess: false,
+    isError: false,
+    refetch: vi.fn(),
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+  };
+  const generated = await importOriginal<Record<string, unknown>>();
+  return Object.fromEntries(
+    Object.entries(generated).map(([name, value]) => [name, /^use[A-Z]/.test(name) ? () => pending : value]),
+  );
+});
+{{~ end ~}}
+
+// Whatever else asks the host waits for an answer that never comes, so the page is checked as it first shows.
+vi.stubGlobal('fetch', () => new Promise<Response>(() => undefined));
 
 // Whichever test renders first in a file also pays for warming up jsdom, React and axe, which in a larger project under
 // parallel load passes 2.5 s of the default 5 s.
-test('the {{ module.namespace }} page has no accessibility violations axe can find', { timeout: 20_000 }, async ({ skip }) => {
-  skip(checkedByOwnTest, '{{ module.namespace }}Page.test.tsx checks the page with axe');
-
+test('the {{ module.namespace }} page has no accessibility violations axe can find', { timeout: 20_000 }, async () => {
 {{~ if tanstack ~}}
   const { container } = render(
     <RouterProvider router={createAppRouter(createMemoryHistory({ initialEntries: ['/{{ module.name }}'] }), <App />)} />,

@@ -1,23 +1,21 @@
 {{~ screen = project["frontend.framework"] == "vue" ? "Page.vue" : "Page.tsx" ~}}
-{{~ test = project["frontend.framework"] == "vue" ? "Page.test.ts" : "Page.test.tsx" ~}}
-{{~ generated = project["frontend.framework"] == "vue" ? "Page.axe.test.ts" : "Page.axe.test.tsx" ~}}
+{{~ check = project["frontend.framework"] == "vue" ? "Page.axe.test.ts" : "Page.axe.test.tsx" ~}}
 import { expect, test } from 'vitest';
 
-// AGENTS.md asks for an axe check in the component test of every new screen; a module's screen, <Name>{{ screen }}, has
-// one beside it: in its own test, <Name>{{ test }}, or in the one fabric generates, <Name>{{ generated }}.
+// Every module screen, <Name>{{ screen }}, has its axe check beside it in <Name>{{ check }} (AGENTS.md): add-module
+// generates it with a module's page, and a screen written by hand gets one too. An axe assertion in another test does
+// not count, since it can be skipped or commented out.
 const screens = Object.keys(import.meta.glob('./modules/**/*{{ screen }}'));
-const tests = import.meta.glob<string>(['./modules/**/*{{ test }}', './modules/**/*{{ generated }}'], {
+const checks = import.meta.glob<string>('./modules/**/*{{ check }}', {
   query: '?raw',
   import: 'default',
   eager: true,
 });
 
 test('every module screen has an axe check beside it', () => {
-  const unchecked = screens.filter((screen) =>
-    ['{{ test }}', '{{ generated }}'].every(
-      (suffix) => !tests[screen.replace(/{{ screen | string.replace "." "\\." }}$/, suffix)]?.includes('toHaveNoViolations()'),
-    ),
+  const unchecked = screens.filter(
+    (screen) => !checks[screen.replace(/{{ screen | string.replace "." "\\." }}$/, '{{ check }}')]?.includes('toHaveNoViolations()'),
   );
 
-  expect(unchecked, 'module screens without an axe check beside them').toEqual([]);
+  expect(unchecked, 'module screens without <Name>{{ check }} checking them with axe').toEqual([]);
 });
