@@ -3,6 +3,9 @@ files:
   - { template: templates/accessibility.test.tsx.sbn, target: web/app/src/accessibility.test.tsx, when: 'project["frontend.framework"] == "react"' }
   - { template: templates/accessibility.test.ts.sbn, target: web/app/src/accessibility.test.ts, when: 'project["frontend.framework"] == "vue"' }
   - { template: templates/vitest-axe.d.ts.sbn, target: web/app/src/vitest-axe.d.ts }
+  - { template: templates/screens.test.ts.sbn, target: web/app/src/screens.test.ts, when: 'project["frontend.architecture"] == "spa"' }
+  - { template: templates/module-page.test.tsx.sbn, target: "web/app/src/modules/{{ module.name }}/{{ module.namespace }}Page.test.tsx", per-module: true, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa"' }
+  - { template: templates/module-page.test.ts.sbn, target: "web/app/src/modules/{{ module.name }}/{{ module.namespace }}Page.test.ts", per-module: true, when: 'project["frontend.framework"] == "vue" && project["frontend.architecture"] == "spa"' }
 slots:
   - { slot: web.dev-dependencies, template: templates/dev-dependencies.sbn }
   - { slot: web.test-setup, template: templates/test-setup.sbn }
@@ -12,3 +15,4 @@ adr: docs/adr.md
 gates:
   - { kind: unit-test, describes: "axe finds no violations on the start page; any new screen gets the same check.", file: templates/accessibility.test.tsx.sbn }
   - { kind: unit-test, describes: "With Vue, axe finds no violations on the start page rendered through the router (src/accessibility.test.ts).", file: templates/accessibility.test.ts.sbn }
+  - { kind: unit-test, describes: "In a single-page app, a module screen (src/modules/**/*Page.tsx or *Page.vue) without a component test beside it that checks it with axe fails src/screens.test.ts; add-module writes that test with every module's page.", file: templates/screens.test.ts.sbn }

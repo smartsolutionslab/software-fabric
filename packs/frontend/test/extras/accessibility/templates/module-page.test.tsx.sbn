@@ -1,0 +1,45 @@
+{{~ editor = module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains(project["frontend.dashboards"], "user-editable") && project["frontend.api-client"] == "rtk-query-codegen" ~}}
+{{~ tanstack = project["frontend.routing"] == "tanstack-router" ~}}
+import { render, screen } from '@testing-library/react';
+{{~ if tanstack ~}}
+import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
+{{~ else ~}}
+import { MemoryRouter } from 'react-router';
+{{~ end ~}}
+import { expect, test{{ if editor }}, vi{{ end }} } from 'vitest';
+import { axe } from 'vitest-axe';
+{{~ if tanstack ~}}
+import { App } from '@/App';
+import { createAppRouter } from '@/router';
+{{~ else ~}}
+import { {{ module.namespace }}Page } from './{{ module.namespace }}Page';
+{{~ end ~}}
+{{~ if editor ~}}
+
+// The page is the dashboard editor, which needs the store and the generated client; its own test checks it with axe on
+// its data. Here it stands in, so this test checks the page around it.
+vi.mock('@/dashboards/DashboardEditor', () => ({ DashboardEditor: () => <p>The dashboard editor</p> }));
+{{~ end ~}}
+
+// The file's first test also pays for warming up jsdom, React and axe, which in a larger project under parallel load
+// passes 2.5 s of the default 5 s.
+test('the {{ module.namespace }} page has no accessibility violations axe can find', { timeout: 20_000 }, async () => {
+{{~ if tanstack ~}}
+  const { container } = render(
+    <RouterProvider router={createAppRouter(createMemoryHistory({ initialEntries: ['/{{ module.name }}'] }), <App />)} />,
+  );
+{{~ else ~}}
+  const { container } = render(
+    <MemoryRouter>
+      <{{ module.namespace }}Page />
+    </MemoryRouter>,
+  );
+{{~ end ~}}
+{{~ if editor ~}}
+  expect(await screen.findByText('The dashboard editor')).toBeInTheDocument();
+{{~ else ~}}
+  expect(await screen.findByRole('heading', { name: '{{ module.namespace }}' })).toBeInTheDocument();
+{{~ end ~}}
+
+  expect(await axe(container)).toHaveNoViolations();
+});
