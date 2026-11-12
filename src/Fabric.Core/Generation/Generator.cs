@@ -236,7 +236,7 @@ public static class Generator
             if (current.Choices.Modules.TryGetValue(module.Name, out var brought))
             {
                 var recorded = project.Choices.Modules[module.Name];
-                if (!SameValues(recorded, brought))
+                if (!KeepsRecorded(recorded, brought))
                 {
                     return Failure([
                         $"module '{module.Name}' records {Describe(recorded)}, but a pack brings it with {Describe(brought)}; " +
@@ -270,8 +270,12 @@ public static class Generator
         return new GenerationResult([.. files.Values.OrderBy(file => file.Path, StringComparer.Ordinal)], []) { Experimental = experimental };
     }
 
-    private static bool SameValues(IReadOnlyDictionary<string, IReadOnlyList<string>> first, IReadOnlyDictionary<string, IReadOnlyList<string>> second) =>
-        first.Count == second.Count && first.All(entry => second.TryGetValue(entry.Key, out var other) && other.SequenceEqual(entry.Value));
+    /// <summary>
+    /// Whether the module a pack brings keeps every value the record holds. A dimension the catalog added since is not
+    /// recorded, and takes its value as it would in a module added by hand.
+    /// </summary>
+    private static bool KeepsRecorded(IReadOnlyDictionary<string, IReadOnlyList<string>> recorded, IReadOnlyDictionary<string, IReadOnlyList<string>> brought) =>
+        recorded.All(entry => brought.TryGetValue(entry.Key, out var value) && value.SequenceEqual(entry.Value));
 
     private static string Describe(IReadOnlyDictionary<string, IReadOnlyList<string>> values) =>
         string.Join(", ", values.Select(value => $"{value.Key}={string.Join(',', value.Value)}"));
