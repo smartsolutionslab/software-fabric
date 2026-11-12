@@ -194,6 +194,7 @@ public sealed class SharedRecordsTests
         project.WriteTypes("src/Modules/Billing/Billing.Api/Endpoints", """
             using Microsoft.AspNetCore.Builder;
             using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Http.HttpResults;
             using Microsoft.AspNetCore.Routing;
             using Shop.BuildingBlocks.Api;
             using Shop.Modules.Billing.Application;
@@ -211,7 +212,7 @@ public sealed class SharedRecordsTests
                     endpoints.MapPost("/articles/both", Nothing).RequireAuthorization(BillingPolicyNames.WriteSharedRecords).WritesSharedRecords().AcrossTenants().ExcludeFromDescription();
                 }
 
-                private static IResult Nothing() => TypedResults.NoContent();
+                private static NoContent Nothing() => TypedResults.NoContent();
             }
             """);
         project.Build();
@@ -350,12 +351,14 @@ public sealed class SharedRecordsTests
 
         public sealed class ArticlePublishedConsumer
         {
+            private readonly ConcurrentQueue<string> deliveries = Deliveries;
+
             public static ConcurrentQueue<string> Deliveries { get; } = [];
 
             public void Handle(ArticlePublishedV1 message, ITenantContext tenants)
             {
                 using var tenant = TenantScope.Begin(message.Metadata);
-                Deliveries.Enqueue($"{message.Title}: published in tenant {message.Metadata.TenantId ?? "none"}, handled in tenant {tenants.TenantId ?? "none"}");
+                deliveries.Enqueue($"{message.Title}: published in tenant {message.Metadata.TenantId ?? "none"}, handled in tenant {tenants.TenantId ?? "none"}");
             }
         }
         """;
@@ -574,15 +577,15 @@ public sealed class SharedRecordsTests
                 using var response = await staff.PostAsJsonAsync(new Uri("/billing/articles/published", UriKind.Relative), new { Title = "a published article" }, cancellationToken);
 
                 response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
-                const string Expected = "a published article: published in tenant none, handled in tenant none";
+                var expected = "a published article: published in tenant none, handled in tenant none";
                 string[] deliveries = [];
-                for (var attempt = 0; attempt < 60 && !deliveries.Contains(Expected); attempt++)
+                for (var attempt = 0; attempt < 60 && !deliveries.Contains(expected); attempt++)
                 {
                     await Task.Delay(500, cancellationToken);
                     deliveries = await TitlesAsync("developer", new Uri("/billing/articles/deliveries", UriKind.Relative), cancellationToken);
                 }
 
-                deliveries.ShouldContain(Expected);
+                deliveries.ShouldContain(expected);
             }
 
             private async Task AddAsync(string title, CancellationToken cancellationToken)
