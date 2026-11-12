@@ -135,8 +135,16 @@ M4-14 upgrades in profile CI, M4-15 refusing a newer project) follow them.
 applies: that an edited project builds; that lockfiles (`pnpm-lock.yaml`)
 match a changed `package.json` (the person or agent reinstalls); that a
 changed persistence model has its EF Core migration (the project adds it, as
-for any model change); and that the project's own ADRs and code agree with a
-changed pack ADR.
+for any model change); that the committed OpenAPI document
+(`web/app/openapi.json`) and the client generated from it match what the host
+serves, when C# under `src/` changed in a project that has the document (the
+integration tests rewrite it, and `pnpm codegen` regenerates the client); and
+that the project's own ADRs and code agree with a changed pack ADR.
+
+The OpenAPI line is not a further choice: it is the same "may not build" that
+(b) leaves to the project, named because the pilot's first upgrade (0.1.0 to
+0.3.0, fabric-pilot#33) changed the served document through a Kernel type and
+the summary did not say so (#628).
 
 ### D2. Where the old generator comes from
 
