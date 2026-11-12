@@ -72,7 +72,7 @@ public sealed partial class GenericOidcTests
         ((string?)claims["tenant"]["full.path"]).ShouldBe("false");
 
         var users = realm["users"]!.AsArray().ToDictionary(user => (string)user!["username"]!);
-        users.Keys.ShouldBe(["developer", "developer-b", "visitor", "clerk", "analyst"], ignoreOrder: true);
+        users.Keys.ShouldBe(["developer", "developer-b", "visitor", "clerk", "analyst", "staff"], ignoreOrder: true);
         users["developer-b"]!["groups"]!.AsArray().Select(group => (string?)group).ShouldBe(["/tenant-b"]);
         users["visitor"]!["groups"]!.AsArray().Select(group => (string?)group).ShouldBe(["/tenant-a"]);
     }
