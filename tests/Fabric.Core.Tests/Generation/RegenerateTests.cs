@@ -93,6 +93,27 @@ public sealed class RegenerateTests : IDisposable
     }
 
     [Fact]
+    public void A_module_a_pack_now_brings_with_other_choices_than_recorded_is_refused_not_silently_changed()
+    {
+        var manifest = Path.Combine(packsRoot, "backend", "api-protocols", "rest", "pack.yaml");
+        var original = File.ReadAllText(manifest);
+        File.WriteAllText(manifest, "modules: { reports: { module.style: crud } }\n" + original);
+        var before = PackLoader.Load(packsRoot, Fixtures.MinimalCatalog);
+        before.Errors.ShouldBeEmpty();
+        var written = NewThenAdd(before.Packs, "minimal", []);
+        File.WriteAllText(manifest, "modules: { reports: { module.style: ddd } }\n" + original);
+        var after = PackLoader.Load(packsRoot, Fixtures.MinimalCatalog);
+        after.Errors.ShouldBeEmpty();
+
+        var regenerated = Generator.Regenerate(Fixtures.MinimalCatalog, after.Packs, Record(written));
+
+        regenerated.Files.ShouldBeEmpty();
+        regenerated.Errors.ShouldBe([
+            "module 'reports' records module.style=crud, but a pack brings it with module.style=ddd; a module's choices are fixed (ADR-0001), so it cannot be regenerated.",
+        ]);
+    }
+
+    [Fact]
     public void A_choice_set_the_catalog_rejects_is_not_regenerated_and_the_catalog_says_why()
     {
         var written = NewThenAdd(Fixtures.MinimalPacks, "minimal", []);

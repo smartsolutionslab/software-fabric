@@ -228,6 +228,39 @@ public sealed class UpgradeCommandTests : IDisposable
     }
 
     [Fact]
+    public void A_file_the_project_made_a_symlink_is_left_as_a_conflict_and_its_target_never_written()
+    {
+        var outside = Path.Combine(root, "outside.md");
+        File.WriteAllText(outside, "Outside the project.\n");
+        File.Delete(Path.Combine(project, "README.md"));
+        File.CreateSymbolicLink(Path.Combine(project, "README.md"), outside);
+        Git.Commit(project, "readme is a link");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        File.ReadAllText(outside).ShouldBe("Outside the project.\n");
+        new FileInfo(Path.Combine(project, "README.md")).LinkTarget.ShouldBe(outside);
+        Stages("README.md").ShouldBe(["1", "2", "3"]);
+        run.Output.ShouldContain("  both changed: README.md");
+    }
+
+    [Fact]
+    public void Choices_recorded_in_another_key_order_are_the_same_choices()
+    {
+        Write("fabric.yaml", Read("fabric.yaml").Replace(
+            "  backend.database: postgres\n  backend.api-protocols: [rest, grpc]\n",
+            "  backend.api-protocols: [rest, grpc]\n  backend.database: postgres\n",
+            StringComparison.Ordinal));
+        Git.Commit(project, "keys in another order");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        Unmerged().ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Upgrading_the_same_project_twice_gives_the_same_bytes()
     {
         Write("README.md", Read("README.md").Replace("# Generated project\n", "# Our shop\n", StringComparison.Ordinal));
