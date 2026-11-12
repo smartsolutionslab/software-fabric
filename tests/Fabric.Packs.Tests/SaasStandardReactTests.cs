@@ -478,7 +478,7 @@ public sealed class SaasStandardReactTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 9");
+        output.ShouldContain("succeeded: 10");
     }
 
     [Theory]
