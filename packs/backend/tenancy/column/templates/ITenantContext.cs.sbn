@@ -4,4 +4,9 @@ namespace {{ namespace }}.BuildingBlocks.Tenancy;
 public interface ITenantContext
 {
     string? TenantId { get; }
+{{~ if cross_tenant_reads ~}}
+
+    /// <summary>Whether the current work reads every tenant's rows (an endpoint mapped with AcrossTenants()); it then has no tenant and saves nothing.</summary>
+    bool ReadsAllTenants => false;
+{{~ end ~}}
 }

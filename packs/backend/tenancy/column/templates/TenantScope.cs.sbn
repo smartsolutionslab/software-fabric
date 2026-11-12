@@ -1,16 +1,54 @@
+{{~ across = cross_tenant_reads ~}}
 namespace {{ namespace }}.BuildingBlocks.Tenancy;
 
 /// <summary>Sets the tenant for work outside a request (consumers, jobs, tests) until disposed.</summary>
 public static class TenantScope
 {
     private static readonly AsyncLocal<string?> Current = new();
+{{~ if across ~}}
+
+    private static readonly AsyncLocal<bool> All = new();
+{{~ end ~}}
 
     internal static string? TenantId => Current.Value;
+{{~ if across ~}}
+
+    /// <summary>Whether the current work reads every tenant's rows: inside <see cref="AllTenants"/>, until a <see cref="Begin"/> narrows it.</summary>
+    internal static bool ReadsAllTenants => All.Value;
+{{~ end ~}}
 
     public static IDisposable Begin(string tenantId)
     {
         {{ not_blank "tenantId" }}
 
+{{~ if across ~}}
+        var restore = new Restore(Current.Value, All.Value);
+        Current.Value = tenantId;
+        All.Value = false;
+        return restore;
+    }
+
+    /// <summary>
+    /// Reads every tenant's rows, and saves nothing, until disposed: there is no tenant to save for. Only an endpoint
+    /// mapped with <c>AcrossTenants()</c> opens it, after its policy has required the role in <see cref="CrossTenantRole"/>.
+    /// </summary>
+    internal static IDisposable AllTenants()
+    {
+        var restore = new Restore(Current.Value, All.Value);
+        Current.Value = null;
+        All.Value = true;
+        return restore;
+    }
+
+    private sealed class Restore(string? previous, bool previousAll) : IDisposable
+    {
+        public void Dispose()
+        {
+            Current.Value = previous;
+            All.Value = previousAll;
+        }
+    }
+{{~ else ~}}
         var previous = Current.Value;
         Current.Value = tenantId;
         return new Restore(previous);
@@ -20,4 +58,5 @@ public static class TenantScope
     {
         public void Dispose() => Current.Value = previous;
     }
+{{~ end ~}}
 }

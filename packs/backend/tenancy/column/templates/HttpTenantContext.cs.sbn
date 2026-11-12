@@ -7,7 +7,14 @@ public sealed class HttpTenantContext(IHttpContextAccessor accessor) : ITenantCo
 {
     {{ tenant_claim_members }}
 
+{{~ if cross_tenant_reads ~}}
+    /// <summary>None inside <see cref="TenantScope.AllTenants"/>: work that reads every tenant belongs to none of them.</summary>
+    public string? TenantId => TenantScope.ReadsAllTenants ? null : TenantScope.TenantId ?? FromToken();
+
+    public bool ReadsAllTenants => TenantScope.ReadsAllTenants;
+{{~ else ~}}
     public string? TenantId => TenantScope.TenantId ?? FromToken();
+{{~ end ~}}
 
     private string? FromToken()
     {

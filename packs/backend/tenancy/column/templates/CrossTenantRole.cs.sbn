@@ -1,0 +1,11 @@
+namespace {{ namespace }}.BuildingBlocks.Tenancy;
+
+/// <summary>
+/// The role of staff who read every tenant's rows: each module's <c>&lt;Module&gt;PolicyNames.ReadAllTenants</c>
+/// requires it, and an endpoint mapped with <c>AcrossTenants()</c> must name such a policy. The identity provider grants
+/// it; a user holding it belongs to no tenant.
+/// </summary>
+public static class CrossTenantRole
+{
+    public const string Name = "{{ cross_tenant_role }}";
+}

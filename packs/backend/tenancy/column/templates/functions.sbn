@@ -1,0 +1,14 @@
+# Whether staff read across tenants through AcrossTenants() (#610, owner decisions of 2026-11-12): a tenant column, the
+# roles that name them, and an identity provider where a user can be in no tenant. Entra ID makes every accepted
+# directory a tenant, so it has no such user yet (#614).
+func cross_tenant_reads
+  if !object.has_key(project, "backend.authorization") || !array.contains(project["backend.authorization"], "roles")
+    ret false
+  end
+  ret project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc"
+end
+
+# The role that reads across tenants, named once: CrossTenantRole.Name in the code, the realm's role and its local user.
+func cross_tenant_role
+  ret "staff"
+end

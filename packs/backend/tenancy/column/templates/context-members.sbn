@@ -1,3 +1,8 @@
 
     /// <summary>The tenant whose rows this context sees (tenancy: column).</summary>
     public string? CurrentTenantId => Services.GetService<{{ namespace }}.BuildingBlocks.Tenancy.ITenantContext>()?.TenantId;
+{{~ if cross_tenant_reads ~}}
+
+    /// <summary>Whether this context sees every tenant's rows: inside an endpoint mapped with AcrossTenants(). It then saves nothing.</summary>
+    public bool ReadsAllTenants => Services.GetService<{{ namespace }}.BuildingBlocks.Tenancy.ITenantContext>()?.ReadsAllTenants ?? false;
+{{~ end ~}}

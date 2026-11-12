@@ -1,3 +1,10 @@
+{{~
+  # cross_tenant_reads is the tenant-column pack's; no other tenancy defines it.
+  across = false
+  if project["backend.tenancy"] == "column"
+    across = cross_tenant_reads
+  end
+~}}
 namespace {{ namespace }}.Modules.{{ module.namespace }}.Application;
 
 /// <summary>
@@ -7,4 +14,9 @@ namespace {{ namespace }}.Modules.{{ module.namespace }}.Application;
 public static class {{ module.namespace }}PolicyNames
 {
     public const string Manage = "{{ module.name }}.manage";
+{{~ if across ~}}
+
+    /// <summary>Staff read every tenant's rows: name it on an endpoint mapped with <c>AcrossTenants()</c>.</summary>
+    public const string ReadAllTenants = "{{ module.name }}.read-all-tenants";
+{{~ end ~}}
 }

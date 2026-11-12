@@ -6,14 +6,24 @@ files:
   - { template: templates/TenancyRegistration.cs.sbn, target: src/BuildingBlocks/Tenancy/Wiring/TenancyRegistration.cs }
   - { template: templates/CurrentTenant.cs.sbn, target: src/Host/CurrentTenant.cs }
   - { template: templates/TenantColumn.cs.sbn, target: src/BuildingBlocks/Tenancy/Wiring/TenantColumn.cs }
+  # Staff read across tenants (#610): with roles and an identity provider where a user can be in no tenant, as cross_tenant_reads says.
+  - { template: templates/CrossTenantRole.cs.sbn, target: src/BuildingBlocks/Tenancy/CrossTenantRole.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
+  - { template: templates/ReadsAcrossTenants.cs.sbn, target: src/BuildingBlocks/Tenancy/ReadsAcrossTenants.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
+  - { template: templates/AcrossTenantsEndpoints.cs.sbn, target: src/BuildingBlocks/Tenancy/Wiring/AcrossTenantsEndpoints.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
+  - { template: templates/AllTenantsWriteNothing.cs.sbn, target: src/BuildingBlocks/Tenancy/AllTenantsWriteNothing.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
+  - { template: templates/AcrossTenantsRequiresTheCrossTenantRole.cs.sbn, target: tests/Architecture.Tests/Rules/AcrossTenantsRequiresTheCrossTenantRole.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
 slots:
+  - { slot: templates.functions, template: templates/functions.sbn }
   - { slot: host.services, template: templates/host-services.sbn, order: 10 }
   - { slot: persistence.context-members, template: templates/context-members.sbn }
   - { slot: persistence.model-conventions, template: templates/model-conventions.sbn }
   - { slot: persistence.save-changes, template: templates/save-changes.sbn }
+  # With cross-tenant reads only: refuses ExecuteUpdate, ExecuteDelete and ExecuteSql inside AcrossTenants().
+  - { slot: persistence.interceptors, template: templates/persistence-interceptor.sbn }
   - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 20 }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
   - { kind: ci-step, describes: "A tenant cannot read another tenant's rows; checked by the integration tests of the aspire-fixture pack against the running stack and by each module's tenancy tests." }
+  - { kind: architecture-test, describes: "With roles and Keycloak or generic OIDC: an endpoint mapped with AcrossTenants() requires the role staff (CrossTenantRole.Name) through its authorization, and is not anonymous; the rule names the endpoint otherwise.", file: templates/AcrossTenantsRequiresTheCrossTenantRole.cs.sbn }

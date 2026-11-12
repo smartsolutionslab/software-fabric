@@ -1,4 +1,11 @@
 {{~ roles = project["backend.authorization"] | array.contains "roles" ~}}
+{{~
+  # cross_tenant_reads is the tenant-column pack's; no other tenancy defines it.
+  staff = false
+  if project["backend.tenancy"] == "column"
+    staff = cross_tenant_reads
+  end
+~}}
 {{~ claims = project["backend.authorization"] | array.contains "claims" ~}}
 {
   "realm": "{{ name }}",
@@ -7,7 +14,8 @@
 {{~ if roles ~}}
   "roles": {
     "realm": [
-      { "name": "manager", "description": "Sample role: each module's sample policy <module>.manage requires it." }
+      { "name": "manager", "description": "Sample role: each module's sample policy <module>.manage requires it." }{{ if staff }},
+      { "name": "{{ cross_tenant_role }}", "description": "Reads every tenant's rows on an endpoint mapped with AcrossTenants(); each module's policy <module>.read-all-tenants requires it." }{{ end }}
     ]
   },
 {{~ end ~}}
@@ -109,18 +117,22 @@
   if claims
     developers_department = "finance"
   end
-  users = [{ name: "developer", last: "Developer", roles: roles, department: developers_department, tenant: "tenant-a" }]
+  users = [{ name: "developer", last: "Developer", roles: roles ? ["manager"] : [], department: developers_department, tenant: "tenant-a" }]
   if tenancy
-    users = users | array.add { name: "developer-b", last: "Developer B", roles: roles, department: developers_department, tenant: "tenant-b" }
+    users = users | array.add { name: "developer-b", last: "Developer B", roles: roles ? ["manager"] : [], department: developers_department, tenant: "tenant-b" }
   end
   # A second user of the first tenant: without roles or claims, the one dashboards show they are their owner's alone.
   dashboards = object.has_key(project, "frontend.dashboards") && array.size(project["frontend.dashboards"]) > 0
   if roles || claims || dashboards
-    users = users | array.add { name: "visitor", last: "Visitor", roles: false, department: null, tenant: "tenant-a" }
+    users = users | array.add { name: "visitor", last: "Visitor", roles: [], department: null, tenant: "tenant-a" }
   end
   if claims
-    users = users | array.add { name: "clerk", last: "Clerk", roles: roles, department: "sales", tenant: "tenant-a" }
-    users = users | array.add { name: "analyst", last: "Analyst", roles: false, department: "finance", tenant: "tenant-a" }
+    users = users | array.add { name: "clerk", last: "Clerk", roles: roles ? ["manager"] : [], department: "sales", tenant: "tenant-a" }
+    users = users | array.add { name: "analyst", last: "Analyst", roles: [], department: "finance", tenant: "tenant-a" }
+  end
+  # Staff belong to no tenant: they read every tenant's rows on endpoints that opt in, and nothing elsewhere.
+  if staff
+    users = users | array.add { name: cross_tenant_role, last: "Staff", roles: [cross_tenant_role], department: null, tenant: null }
   end
 ~}}
   "users": [
@@ -132,9 +144,9 @@
       "emailVerified": true,
       "firstName": "Local",
       "lastName": "{{ user.last }}",
-      "credentials": [{ "type": "password", "value": "{{ user.name }}", "temporary": false }]{{ if user.roles }},
-      "realmRoles": ["manager"]{{ end }}{{ if user.department }},
-      "attributes": { "department": ["{{ user.department }}"] }{{ end }}{{ if tenancy }},
+      "credentials": [{ "type": "password", "value": "{{ user.name }}", "temporary": false }]{{ if user.roles.size > 0 }},
+      "realmRoles": [{{ for role in user.roles }}"{{ role }}"{{ if !for.last }}, {{ end }}{{ end }}]{{ end }}{{ if user.department }},
+      "attributes": { "department": ["{{ user.department }}"] }{{ end }}{{ if tenancy && user.tenant }},
       "groups": ["/{{ user.tenant }}"]{{ end }}
     }{{ if !for.last }},{{ end }}
 {{~ end ~}}

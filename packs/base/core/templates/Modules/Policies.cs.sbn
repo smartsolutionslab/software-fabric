@@ -1,4 +1,11 @@
 {{~
+  # cross_tenant_reads is the tenant-column pack's; no other tenancy defines it.
+  across = false
+  if project["backend.tenancy"] == "column"
+    across = cross_tenant_reads
+  end
+~}}
+{{~
   requirements = []
   if project["backend.authorization"] | array.contains "roles"
     requirements = requirements | array.add "RequireRole(\"manager\")"
@@ -8,6 +15,9 @@
   end
 ~}}
 using {{ namespace }}.BuildingBlocks.Modules;
+{{~ if across ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
 using {{ namespace }}.Modules.{{ module.namespace }}.Application;
 using Microsoft.AspNetCore.Authorization;
 
@@ -24,5 +34,8 @@ public sealed class {{ module.namespace }}Policies : IModulePolicies
         {{ not_null "policies" }}
 
         policies.AddPolicy({{ module.namespace }}PolicyNames.Manage, policy => policy.{{ requirements | array.join "." }});
+{{~ if across ~}}
+        policies.AddPolicy({{ module.namespace }}PolicyNames.ReadAllTenants, policy => policy.RequireRole(CrossTenantRole.Name));
+{{~ end ~}}
     }
 }
