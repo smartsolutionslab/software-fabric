@@ -28,7 +28,6 @@ files:
   - { template: templates/tests/LedgerParameterConsumer.cs.sbn, target: tests/Tenancy.Tests/LedgerParameterConsumer.cs, when: 'project["backend.bus.transport"] != "none"' }
   - { template: templates/tests/TenantConsumerTests.cs.sbn, target: tests/Tenancy.Tests/TenantConsumerTests.cs, when: 'project["backend.bus.transport"] != "none"' }
 slots:
-  - { slot: templates.functions, template: templates/functions.sbn }
   - { slot: host.services, template: templates/host-services.sbn, order: 10 }
   - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 20 }
   - { slot: persistence.schema, template: templates/persistence-schema.sbn }

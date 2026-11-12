@@ -1,5 +1,11 @@
 {{~ roles = project["backend.authorization"] | array.contains "roles" ~}}
-{{~ staff = cross_tenant_reads ~}}
+{{~
+  # cross_tenant_reads is the tenant-column pack's; no other tenancy defines it.
+  staff = false
+  if project["backend.tenancy"] == "column"
+    staff = cross_tenant_reads
+  end
+~}}
 {{~ claims = project["backend.authorization"] | array.contains "claims" ~}}
 {
   "realm": "{{ name }}",
