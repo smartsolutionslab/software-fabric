@@ -261,6 +261,21 @@ public sealed class UpgradeCommandTests : IDisposable
     }
 
     [Fact]
+    public void An_experimental_option_is_warned_about_as_new_and_add_module_warn()
+    {
+        var catalog = Path.Combine(root, "catalog.yaml");
+        File.WriteAllText(catalog, File.ReadAllText(Paths.FixtureCatalog).Replace(
+            "      grpc:\n        tier: supported\n",
+            "      grpc:\n        tier: experimental\n",
+            StringComparison.Ordinal));
+
+        var run = CliRun.Of("upgrade", "--project", project, "--from", oldFabric, "--catalog", catalog, "--packs", newPacks);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Error.ShouldContain("warning: backend.api-protocols=grpc is experimental (ADR-0003)");
+    }
+
+    [Fact]
     public void Upgrading_the_same_project_twice_gives_the_same_bytes()
     {
         Write("README.md", Read("README.md").Replace("# Generated project\n", "# Our shop\n", StringComparison.Ordinal));

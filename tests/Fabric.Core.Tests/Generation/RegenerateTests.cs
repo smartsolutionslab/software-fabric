@@ -1,3 +1,4 @@
+using Fabric.Core.Catalog;
 using Fabric.Core.Generation;
 using Fabric.Core.Packs;
 using Fabric.Core.Rendering;
@@ -111,6 +112,25 @@ public sealed class RegenerateTests : IDisposable
         regenerated.Errors.ShouldBe([
             "module 'reports' records module.style=crud, but a pack brings it with module.style=ddd; a module's choices are fixed (ADR-0001), so it cannot be regenerated.",
         ]);
+    }
+
+    [Fact]
+    public void A_profile_the_catalog_no_longer_has_is_kept_as_the_record_says_and_the_recorded_choices_regenerated()
+    {
+        var written = NewThenAdd(Fixtures.MinimalPacks, "minimal", ["backend.api-protocols=rest,grpc"], "billing");
+        var renamed = CatalogReader.Read(
+            new StringReader(File.ReadAllText(Path.Combine(Fixtures.MinimalRoot, "catalog.yaml")).Replace("  minimal:\n", "  smallest:\n", StringComparison.Ordinal)),
+            "catalog.yaml");
+        renamed.Profiles.ContainsKey("minimal").ShouldBeFalse();
+
+        var regenerated = Generator.Regenerate(renamed, Fixtures.MinimalPacks, Record(written));
+
+        regenerated.Errors.ShouldBeEmpty();
+        regenerated.Files.Where(file => file.Path != FabricFile.FileName).ShouldBe(written.Where(file => file.Path != FabricFile.FileName));
+        var fabricYaml = regenerated.Files.Single(file => file.Path == FabricFile.FileName).Content;
+        fabricYaml.ShouldContain("\nprofile: minimal\n", Case.Sensitive);
+        fabricYaml[fabricYaml.IndexOf("\nname: ", StringComparison.Ordinal)..].ShouldBe(
+            written.Single(file => file.Path == FabricFile.FileName).Content[fabricYaml.IndexOf("\nname: ", StringComparison.Ordinal)..]);
     }
 
     [Fact]
