@@ -59,6 +59,20 @@ fabric matrix --catalog catalog/catalog.yaml --packs packs --extra build/matrix-
 fabric reference --catalog catalog/catalog.yaml --output docs/catalog.md
 ```
 
+`fabric upgrade` brings a generated project up to the running fabric
+(ADR-0016). In the project, the top of a git repository with a clean working
+tree, it writes the project again from `fabric.yaml` twice: with the running
+fabric, and with the version `fabric.yaml` records, installed from the feed
+below (or `--from <path to that fabric>`, a tool or its `fabric.dll`, for one
+that cannot be installed). It then merges the first into the project
+three-way, with the second as the merge base: a file only the generator
+changed is taken, one both changed is merged, and where the edits overlap it
+is left as a git conflict. Nothing is committed; the summary it prints lists
+each file and what the upgrade does not guarantee. A `fabric.yaml` without a
+generator version, with a `-dev` version, or with a catalog hash the
+recorded version does not write is refused, because the tree that generated
+it cannot be reproduced.
+
 `fabric matrix` writes the pairwise matrix (ADR-0003): full choice sets
 without a profile, each one's `choices` ready for `fabric new --choices`,
 that together contain every pair of options with a pack that some valid

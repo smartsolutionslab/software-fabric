@@ -123,6 +123,21 @@ public static class Generator
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(overrides);
 
+        return New(catalog, packs, name, profile, profile, overrides);
+    }
+
+    /// <param name="profile">The profile the choices are resolved from, if any.</param>
+    /// <param name="recordedProfile">The profile <c>fabric.yaml</c> names, which a regeneration keeps even when the
+    /// catalog no longer has it.</param>
+    private static GenerationResult New(
+        CatalogModel catalog,
+        IReadOnlyDictionary<string, PackManifest> packs,
+        string name,
+        string? profile,
+        string? recordedProfile,
+        IReadOnlyList<string> overrides)
+    {
+
         if (!Names.IsValid(name))
         {
             return Failure([$"project name '{name}' must be lower-case letters, digits and hyphens, starting with a letter."]);
@@ -185,12 +200,85 @@ public static class Generator
             return Failure(rendered.Errors);
         }
 
-        var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, name, profile, choices));
+        var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, name, recordedProfile, choices));
         return new GenerationResult([.. rendered.Files.Append(fabricFile).OrderBy(file => file.Path, StringComparer.Ordinal)], [])
         {
             Experimental = ExperimentalOptions.Chosen(catalog, choices),
         };
     }
+
+    /// <summary>
+    /// Writes a project again from its <c>fabric.yaml</c> alone (ADR-0016 E4), with the calls <see cref="Regeneration"/>
+    /// spells out: <see cref="New"/>, then <see cref="AddModule"/> for each module <c>new</c> did not bring, in order.
+    /// A choice set this catalog rejects fails with the catalog's own errors, as <c>fabric new</c> would.
+    /// </summary>
+    public static GenerationResult Regenerate(CatalogModel catalog, IReadOnlyDictionary<string, PackManifest> packs, FabricRecord project)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(packs);
+        ArgumentNullException.ThrowIfNull(project);
+
+        var regeneration = Regeneration.From(project);
+        // Every recorded choice is an override, so the profile only fills what fabric.yaml does not record. A profile the
+        // catalog no longer has cannot do that, and the record still names it.
+        var profile = regeneration.Profile is { } named && catalog.Profiles.ContainsKey(named) ? named : null;
+        var generated = New(catalog, packs, regeneration.Name, profile, regeneration.Profile, regeneration.Overrides);
+        if (generated.Errors.Count > 0)
+        {
+            return generated;
+        }
+
+        var files = generated.Files.ToDictionary(file => file.Path, StringComparer.Ordinal);
+        var experimental = generated.Experimental;
+        foreach (var module in regeneration.Modules)
+        {
+            var current = FabricFile.Read(new StringReader(files[FabricFile.FileName].Content), FabricFile.FileName);
+            if (current.Choices.Modules.TryGetValue(module.Name, out var brought))
+            {
+                var recorded = project.Choices.Modules[module.Name];
+                if (!KeepsRecorded(recorded, brought))
+                {
+                    return Failure([
+                        $"module '{module.Name}' records {Describe(recorded)}, but a pack brings it with {Describe(brought)}; " +
+                        "a module's choices are fixed (ADR-0001), so it cannot be regenerated.",
+                    ]);
+                }
+
+                continue;
+            }
+
+            var addition = AddModule(catalog, packs, current, module.Name, module.Overrides);
+            if (addition.FabricYaml is not { } fabricYaml)
+            {
+                return Failure([.. addition.Errors.Select(error => $"add-module {module.Name}: {error}")]);
+            }
+
+            if (addition.Created.FirstOrDefault(file => files.ContainsKey(file.Path)) is { } existing)
+            {
+                return Failure([$"add-module {module.Name}: {existing.Path} already exists; add-module does not overwrite files."]);
+            }
+
+            foreach (var file in addition.Created)
+            {
+                files.Add(file.Path, file);
+            }
+
+            files[FabricFile.FileName] = new RenderedFile(FabricFile.FileName, fabricYaml);
+            experimental = addition.Experimental;
+        }
+
+        return new GenerationResult([.. files.Values.OrderBy(file => file.Path, StringComparer.Ordinal)], []) { Experimental = experimental };
+    }
+
+    /// <summary>
+    /// Whether the module a pack brings keeps every value the record holds. A dimension the catalog added since is not
+    /// recorded, and takes its value as it would in a module added by hand.
+    /// </summary>
+    private static bool KeepsRecorded(IReadOnlyDictionary<string, IReadOnlyList<string>> recorded, IReadOnlyDictionary<string, IReadOnlyList<string>> brought) =>
+        recorded.All(entry => brought.TryGetValue(entry.Key, out var value) && value.SequenceEqual(entry.Value));
+
+    private static string Describe(IReadOnlyDictionary<string, IReadOnlyList<string>> values) =>
+        string.Join(", ", values.Select(value => $"{value.Key}={string.Join(',', value.Value)}"));
 
     /// <summary>Puts the packs that bring a module in front of a rule violation reported for that module.</summary>
     private static List<string> NameDeclarers(IReadOnlyList<string> violations, Dictionary<string, List<string>> declarers) =>

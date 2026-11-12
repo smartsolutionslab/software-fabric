@@ -92,6 +92,17 @@ public class FabricFileTests
         var record = FabricFile.Read(new StringReader("fabric: 1\nname: shop\nproject: {}\nmodule-defaults: {}\nmodules: {}\n"), "fabric.yaml");
 
         record.Name.ShouldBe("shop");
+        record.Generator.ShouldBeNull();
+        record.Catalog.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Reads_back_the_generator_version_and_catalog_hash_it_wrote()
+    {
+        var record = FabricFile.Read(new StringReader(FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices)), "fabric.yaml");
+
+        record.Generator.ShouldBe(GeneratorVersion);
+        record.Catalog.ShouldBe(CatalogHash);
     }
 
     [Fact]
