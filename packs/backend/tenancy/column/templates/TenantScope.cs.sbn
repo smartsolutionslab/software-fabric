@@ -24,13 +24,20 @@ public static class TenantScope
     /// <summary>Whether a scope chose the current work's tenant, or that it has none; the user's token decides otherwise.</summary>
     internal static bool ChoosesTheTenant => Chosen.Value;
 
-    /// <summary>Whether the current work reads every tenant's rows: inside <see cref="AllTenants"/>, until a <see cref="Begin(string)"/> narrows it.</summary>
+    /// <summary>Whether the current work reads every tenant's rows: inside <see cref="AllTenants"/>.</summary>
     internal static bool ReadsAllTenants => All.Value;
 
     /// <summary>Whether the current work writes the records shared by all tenants: inside <see cref="SharedRecords"/>.</summary>
     internal static bool WritesSharedRecords => Shared.Value;
 {{~ end ~}}
 
+{{~ if across ~}}
+    /// <summary>
+    /// The scope of work outside a request, in one tenant. Request code never calls it: an endpoint that writes for a
+    /// tenant is mapped with <c>ForTenant()</c>, and the architecture rule <c>TenantScopeBeginsOnlyOutsideRequests</c>
+    /// fails the build for a call in an Api project or a command or query handler.
+    /// </summary>
+{{~ end ~}}
     public static IDisposable Begin(string tenantId)
     {
         {{ not_blank "tenantId" }}
@@ -63,6 +70,19 @@ public static class TenantScope
     /// <see cref="CrossTenantRole"/>.
     /// </summary>
     internal static IDisposable SharedRecords() => Open(null, all: false, shared: true);
+
+    /// <summary>
+    /// Works in one named tenant, as that tenant's own users do, until disposed: its rows alone are read, and what is
+    /// saved or published belongs to it. Only an endpoint mapped with <c>ForTenant()</c> opens it, for the tenant its
+    /// route names, after its policy has required the role in <see cref="CrossTenantRole"/> and the tenant was found
+    /// in <see cref="ITenantDirectory"/>.
+    /// </summary>
+    internal static IDisposable ForTenant(string tenantId)
+    {
+        {{ not_blank "tenantId" }}
+
+        return Open(tenantId, all: false, shared: false);
+    }
 
     private static Restore Open(string? tenantId, bool all, bool shared)
     {

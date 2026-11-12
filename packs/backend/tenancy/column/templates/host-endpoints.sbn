@@ -1,2 +1,4 @@
 app.MapGet("/me/tenant", ({{ namespace }}.BuildingBlocks.Tenancy.ITenantContext tenant) => TypedResults.Ok(new {{ namespace }}.Host.CurrentTenant(tenant.TenantId)))
-    .RequireAuthorization();
+    .RequireAuthorization();{{ if writes_for_tenants }}
+app.MapGet("/tenants", (Page? page, PageSize? pageSize, {{ namespace }}.BuildingBlocks.Tenancy.ITenantDirectory directory) => TypedResults.Ok(directory.List(page ?? Page.First, pageSize ?? PageSize.Default)))
+    .RequireAuthorization({{ namespace }}.BuildingBlocks.Tenancy.TenantDirectoryPolicies.ListTenants);{{ end }}

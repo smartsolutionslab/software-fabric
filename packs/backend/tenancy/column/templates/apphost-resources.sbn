@@ -1,0 +1,5 @@
+{{~ if writes_for_tenants ~}}
+// Tenancy, a tenant column: the tenants staff may write for, given to the host. The identity provider's local users
+// belong to them.
+string[] tenants = ["tenant-a", "tenant-b"];
+{{~ end ~}}
