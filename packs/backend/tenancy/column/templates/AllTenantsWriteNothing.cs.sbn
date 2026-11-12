@@ -6,8 +6,8 @@ namespace {{ namespace }}.BuildingBlocks.Tenancy;
 
 /// <summary>
 /// Refuses every command that is not a query while its context reads all tenants (AcrossTenants()). SaveChanges fails
-/// there before it sends anything; this catches what bypasses it, ExecuteUpdate, ExecuteDelete and raw SQL, to which the
-/// query filter that lets every tenant through would apply too.
+/// there before it sends anything; this catches what bypasses it, ExecuteUpdate, ExecuteDelete and ExecuteSql. SQL that
+/// returns rows (SqlQuery, FromSql) goes through a reader and runs as written, as it does outside the scope.
 /// </summary>
 public sealed class AllTenantsWriteNothing(ModuleDbContext context) : DbCommandInterceptor
 {

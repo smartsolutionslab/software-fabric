@@ -3,7 +3,7 @@
 
 - Never add a `TenantId` to domain classes; the persistence layer adds and filters it.
 {{~ if across ~}}
-- To let staff read every tenant's rows, map the endpoint with `.RequireAuthorization(<Module>PolicyNames.ReadAllTenants).AcrossTenants()` and read in its handler; never call `IgnoreQueryFilters()` for it. Such an endpoint writes nothing: saving, publishing, `ExecuteUpdate`, `ExecuteDelete` or raw SQL inside it fails. The rule `AcrossTenantsRequiresTheCrossTenantRole` fails the build for one whose policy does not require `CrossTenantRole.Name`.
+- To let staff read every tenant's rows, map the endpoint with `.RequireAuthorization(<Module>PolicyNames.ReadAllTenants).AcrossTenants()` and read in its handler; never call `IgnoreQueryFilters()` for it. Such an endpoint writes nothing: saving, publishing, `ExecuteUpdate`, `ExecuteDelete` or `ExecuteSql` inside it fails. SQL you write yourself is never filtered by tenant, here or anywhere: never write with `SqlQuery` or `FromSql`. The rule `AcrossTenantsRequiresTheCrossTenantRole` fails the build for one whose policy does not require `CrossTenantRole.Name`.
 - Never call `IgnoreQueryFilters()` without a reason written in the PR.
 {{~ else ~}}
 - Never call `IgnoreQueryFilters()` without a reason written in the PR.
