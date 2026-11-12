@@ -5,4 +5,7 @@
 
     /// <summary>Whether this context sees every tenant's rows: inside an endpoint mapped with AcrossTenants(). It then saves nothing.</summary>
     public bool ReadsAllTenants => Services.GetService<{{ namespace }}.BuildingBlocks.Tenancy.ITenantContext>()?.ReadsAllTenants ?? false;
+
+    /// <summary>Whether this context writes the records shared by all tenants: inside an endpoint mapped with WritesSharedRecords(). It then saves nothing else.</summary>
+    public bool WritesSharedRecords => Services.GetService<{{ namespace }}.BuildingBlocks.Tenancy.ITenantContext>()?.WritesSharedRecords ?? false;
 {{~ end ~}}

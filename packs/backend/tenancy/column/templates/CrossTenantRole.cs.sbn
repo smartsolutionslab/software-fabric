@@ -1,9 +1,10 @@
 namespace {{ namespace }}.BuildingBlocks.Tenancy;
 
 /// <summary>
-/// The role of staff who read every tenant's rows: each module's <c>&lt;Module&gt;PolicyNames.ReadAllTenants</c>
-/// requires it, and an endpoint mapped with <c>AcrossTenants()</c> must name such a policy. The identity provider grants
-/// it; a user holding it belongs to no tenant.
+/// The role of staff who read every tenant's rows and write the records shared by all tenants: each module's
+/// <c>&lt;Module&gt;PolicyNames.ReadAllTenants</c> and <c>&lt;Module&gt;PolicyNames.WriteSharedRecords</c> require it,
+/// and an endpoint mapped with <c>AcrossTenants()</c> or <c>WritesSharedRecords()</c> must name such a policy. The
+/// identity provider grants it; a user holding it belongs to no tenant.
 /// </summary>
 public static class CrossTenantRole
 {

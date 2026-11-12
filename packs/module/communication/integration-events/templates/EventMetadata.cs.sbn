@@ -1,3 +1,10 @@
+{{~
+  # shared_records is the tenant-column pack's; no other tenancy defines it.
+  shared = false
+  if project["backend.tenancy"] == "column"
+    shared = shared_records
+  end
+~}}
 namespace {{ namespace }}.Contracts;
 
 /// <summary>
@@ -6,7 +13,13 @@ namespace {{ namespace }}.Contracts;
 /// </summary>
 /// <param name="EventIdentifier">Guid v7, one per published event; the same on every delivery of it.</param>
 /// <param name="OccurredAt">When the event was published.</param>
-{{~ if project["backend.tenancy"] != "none" ~}}
+{{~ if shared ~}}
+/// <param name="TenantId">
+/// The tenant whose work published the event; null for an event that a write of records shared by all tenants published
+/// (an endpoint mapped with <c>WritesSharedRecords()</c>), which concerns every tenant and belongs to none.
+/// </param>
+public sealed record EventMetadata(Guid EventIdentifier, DateTimeOffset OccurredAt, string? TenantId);
+{{~ else if project["backend.tenancy"] != "none" ~}}
 /// <param name="TenantId">The tenant whose work published the event.</param>
 public sealed record EventMetadata(Guid EventIdentifier, DateTimeOffset OccurredAt, string TenantId);
 {{~ else ~}}

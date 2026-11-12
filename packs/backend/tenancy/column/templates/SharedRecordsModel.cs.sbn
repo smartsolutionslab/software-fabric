@@ -1,0 +1,82 @@
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace Microsoft.EntityFrameworkCore;
+
+/// <summary>
+/// Entity types whose records every tenant shares, such as a knowledge base the operator's staff write: no TenantId
+/// column and no tenant filter, so every tenant's users, staff and work without a tenant read them. Only an endpoint
+/// mapped with <c>WritesSharedRecords()</c> writes them.
+/// </summary>
+public static class SharedRecordsModel
+{
+    private const string Annotation = "Tenancy:SharedByAllTenants";
+
+    /// <summary>
+    /// Every tenant reads this entity type's records, and only an endpoint mapped with <c>WritesSharedRecords()</c> writes
+    /// them. Declare it in the type's <c>IEntityTypeConfiguration</c>, on the root of its hierarchy; its owned types
+    /// follow it. A shared type never references a tenant's type: building the model fails if it does.
+    /// </summary>
+    public static EntityTypeBuilder<TEntity> SharedByAllTenants<TEntity>(this EntityTypeBuilder<TEntity> builder)
+        where TEntity : class
+    {
+        {{ not_null "builder" }}
+
+        builder.HasAnnotation(Annotation, true);
+        return builder;
+    }
+
+    /// <summary>Whether the type's records are shared by all tenants: its hierarchy's root declares it, or, for an owned type, its owner.</summary>
+    public static bool IsSharedByAllTenants(this IReadOnlyEntityType entity)
+    {
+        {{ not_null "entity" }}
+
+        var root = entity.GetRootType();
+        while (root.FindOwnership() is { } ownership)
+        {
+            root = ownership.PrincipalEntityType.GetRootType();
+        }
+
+        return root.FindAnnotation(Annotation)?.Value is true;
+    }
+
+    /// <summary>
+    /// Fails for a type declared shared below the root of its hierarchy or as an owned type, where the declaration would
+    /// be ignored, and for a shared type that references a tenant's type, through which a record every tenant reads
+    /// would point at one tenant's.
+    /// </summary>
+    internal static void CheckSharedRecords(this IReadOnlyModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var entity in model.GetEntityTypes())
+        {
+            if (entity.FindAnnotation(Annotation) is not null && entity.BaseType is { } baseType)
+            {
+                var root = entity.GetRootType();
+                throw new InvalidOperationException(
+                    $"{entity.ClrType.Name} is declared shared by all tenants, but derives from {baseType.ClrType.Name}: declare SharedByAllTenants() on {root.ClrType.Name}, the root of its hierarchy.");
+            }
+
+            if (entity.FindAnnotation(Annotation) is not null && entity.IsOwned())
+            {
+                throw new InvalidOperationException(
+                    $"{entity.ClrType.Name} is declared shared by all tenants, but is owned: an owned type follows its owner; declare SharedByAllTenants() on the owner.");
+            }
+
+            if (!entity.IsSharedByAllTenants())
+            {
+                continue;
+            }
+
+            var references = entity.GetForeignKeys().Where(key => !key.IsOwnership).Select(key => key.PrincipalEntityType)
+                .Concat(entity.GetNavigations().Where(navigation => !navigation.ForeignKey.IsOwnership).Select(navigation => navigation.TargetEntityType))
+                .Concat(entity.GetSkipNavigations().Select(navigation => navigation.TargetEntityType));
+            if (references.FirstOrDefault(referenced => !referenced.IsSharedByAllTenants()) is { } tenantType)
+            {
+                throw new InvalidOperationException(
+                    $"{entity.ClrType.Name} is shared by all tenants, but references {tenantType.ClrType.Name}, whose records each belong to one tenant. A tenant's record may reference a shared one, never the other way round.");
+            }
+        }
+    }
+}

@@ -18,5 +18,8 @@ public static class {{ module.namespace }}PolicyNames
 
     /// <summary>Staff read every tenant's rows: name it on an endpoint mapped with <c>AcrossTenants()</c>.</summary>
     public const string ReadAllTenants = "{{ module.name }}.read-all-tenants";
+
+    /// <summary>Staff write the records shared by all tenants: name it on an endpoint mapped with <c>WritesSharedRecords()</c>.</summary>
+    public const string WriteSharedRecords = "{{ module.name }}.write-shared-records";
 {{~ end ~}}
 }

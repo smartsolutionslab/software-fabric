@@ -1,0 +1,74 @@
+using System.Data.Common;
+using System.Text.RegularExpressions;
+using {{ namespace }}.BuildingBlocks.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
+
+namespace {{ namespace }}.BuildingBlocks.Tenancy;
+
+/// <summary>
+/// Refuses ExecuteUpdate and ExecuteDelete on the table of a type shared by all tenants outside WritesSharedRecords().
+/// SaveChanges refuses such a write before it sends anything; a bulk write bypasses it, and a shared type has no tenant
+/// filter to narrow it, so one tenant's ExecuteDelete would erase every tenant's shared records. The statement's target
+/// is the table right after UPDATE or DELETE FROM, or the one aliased there, its name rendered by the provider as in
+/// the statement. SQL a module writes itself (ExecuteSql) is not checked here: it is never filtered by tenant either.
+/// </summary>
+public sealed partial class SharedRecordsBulkWriteGuard(ModuleDbContext context) : DbCommandInterceptor
+{
+    private Dictionary<string, string>? sharedTables;
+
+    public override InterceptionResult<int> NonQueryExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
+    {
+        Refuse(command, eventData);
+        return base.NonQueryExecuting(command, eventData, result);
+    }
+
+    public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+        DbCommand command,
+        CommandEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken cancellationToken = default)
+    {
+        Refuse(command, eventData);
+        return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+    }
+
+    /// <summary>The delimited name of every shared type's table, to the type's name.</summary>
+    private Dictionary<string, string> SharedTables => sharedTables ??= SharedTablesOf(context);
+
+    private static Dictionary<string, string> SharedTablesOf(ModuleDbContext context)
+    {
+        var names = context.GetService<ISqlGenerationHelper>();
+
+        // A hierarchy and its owned types share their root's table.
+        return context.Model.GetEntityTypes()
+            .Where(entity => entity.IsSharedByAllTenants() && entity.GetTableName() is not null)
+            .Select(entity => (Table: names.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema()), Type: entity.GetRootType().ClrType.Name))
+            .DistinctBy(shared => shared.Table, StringComparer.Ordinal)
+            .ToDictionary(shared => shared.Table, shared => shared.Type, StringComparer.Ordinal);
+    }
+
+    private void Refuse(DbCommand command, CommandEventData eventData)
+    {
+        if (eventData.CommandSource is not (CommandSource.ExecuteUpdate or CommandSource.ExecuteDelete) || context.WritesSharedRecords)
+        {
+            return;
+        }
+
+        var sql = command.CommandText;
+        var target = Target().Match(sql);
+        var shared = target.Success
+            ? SharedTables.FirstOrDefault(table => table.Key == target.Groups["target"].Value || sql.Contains($"{table.Key} AS {target.Groups["target"].Value}", StringComparison.Ordinal))
+            : SharedTables.FirstOrDefault(table => sql.Contains(table.Key, StringComparison.Ordinal));
+        if (shared.Value is { } type)
+        {
+            throw new InvalidOperationException(
+                $"Cannot {(eventData.CommandSource == CommandSource.ExecuteDelete ? "delete" : "update")} {type} records outside WritesSharedRecords(): records shared by all tenants are written only on an endpoint mapped with it.");
+        }
+    }
+
+    [GeneratedRegex(@"^\s*(?:UPDATE|DELETE\s+FROM)\s+(?<target>\S+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex Target();
+}

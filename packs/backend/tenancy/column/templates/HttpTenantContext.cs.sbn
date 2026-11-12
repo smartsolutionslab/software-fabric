@@ -8,10 +8,15 @@ public sealed class HttpTenantContext(IHttpContextAccessor accessor) : ITenantCo
     {{ tenant_claim_members }}
 
 {{~ if cross_tenant_reads ~}}
-    /// <summary>None inside <see cref="TenantScope.AllTenants"/>: work that reads every tenant belongs to none of them.</summary>
-    public string? TenantId => TenantScope.ReadsAllTenants ? null : TenantScope.TenantId ?? FromToken();
+    /// <summary>
+    /// The scope's, where one chose it: none inside <see cref="TenantScope.AllTenants"/> or
+    /// <see cref="TenantScope.SharedRecords"/>, whose work belongs to no tenant, and none for an event without one.
+    /// </summary>
+    public string? TenantId => TenantScope.ChoosesTheTenant ? TenantScope.TenantId : FromToken();
 
     public bool ReadsAllTenants => TenantScope.ReadsAllTenants;
+
+    public bool WritesSharedRecords => TenantScope.WritesSharedRecords;
 {{~ else ~}}
     public string? TenantId => TenantScope.TenantId ?? FromToken();
 {{~ end ~}}

@@ -1,3 +1,10 @@
+{{~
+  # shared_records is the tenant-column pack's; no other tenancy defines it.
+  shared = false
+  if project["backend.tenancy"] == "column"
+    shared = shared_records
+  end
+~}}
 {{~ dimensions = 0
 model = ""
 case project["backend.llm.embeddings"]
@@ -20,6 +27,10 @@ namespace {{ namespace }}.BuildingBlocks.Rag;
 {{~ if project["backend.tenancy"] == "column" ~}}
 /// Each record belongs to a tenant: <c>tenant_id</c> leads the primary key, so a key is unique within a tenant and
 /// the key's index also finds one tenant's records.
+{{~ if shared ~}}
+/// Beside it, a <c>shared_embeddings</c> table holds the module's records shared by all tenants, with an HNSW index of
+/// its own, so no tenant's vectors crowd them out of a search.
+{{~ end ~}}
 {{~ else if project["backend.tenancy"] == "schema-per-tenant" ~}}
 /// Each tenant has its own: the table lies in each listed tenant's schema of the module, not in the module's own schema.
 {{~ end ~}}
@@ -57,6 +68,16 @@ public static class VectorTables
 
         return $"{Quote(schema)}.embeddings";
     }
+{{~ if shared ~}}
+
+    /// <summary>The quoted name of the schema's table of records shared by all tenants.</summary>
+    public static string SharedTable(string schema)
+    {
+        {{ not_blank "schema" }}
+
+        return $"{Quote(schema)}.shared_embeddings";
+    }
+{{~ end ~}}
 
     /// <summary>
     /// Creates the <c>vector</c> extension, then each schema's <c>embeddings</c> table and its index; what exists
@@ -83,6 +104,11 @@ public static class VectorTables
             await ExecuteAsync(connection, $"CREATE TABLE IF NOT EXISTS {table} (key text primary key, content text not null, embedding vector({Dimensions}) not null)", cancellationToken);
 {{~ end ~}}
             await ExecuteAsync(connection, $"CREATE INDEX IF NOT EXISTS embeddings_embedding_hnsw ON {table} USING hnsw (embedding vector_cosine_ops)", cancellationToken);
+{{~ if shared ~}}
+            var shared = SharedTable(schema);
+            await ExecuteAsync(connection, $"CREATE TABLE IF NOT EXISTS {shared} (key text primary key, content text not null, embedding vector({Dimensions}) not null)", cancellationToken);
+            await ExecuteAsync(connection, $"CREATE INDEX IF NOT EXISTS shared_embeddings_embedding_hnsw ON {shared} USING hnsw (embedding vector_cosine_ops)", cancellationToken);
+{{~ end ~}}
         }
 
         await transaction.CommitAsync(cancellationToken);
