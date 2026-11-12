@@ -128,6 +128,6 @@ public sealed class RegenerateTests : IDisposable
             "module.style=ddd",
         ]);
         regeneration.Modules.Select(module => module.Name).ShouldBe(["shipping", "billing"]);
-        regeneration.Modules.Select(module => module.Overrides).ShouldAllBe(overrides => overrides.SequenceEqual(new[] { "module.style=ddd" }));
+        regeneration.Modules.Select(module => string.Join(' ', module.Overrides)).ShouldBe(["module.style=ddd", "module.style=ddd"]);
     }
 }

@@ -300,7 +300,7 @@ public sealed class UpgradeCommandTests : IDisposable
         var run = UpgradeFromOld();
 
         run.ExitCode.ShouldBe(1);
-        run.Error.ShouldContain($"fabric.yaml records catalog sha256:{new string('0', 64)}, but fabric {OldVersion} writes {recorded}");
+        run.Error.ShouldContain($"fabric.yaml records catalog sha256:{new string('0', 64)}, but fabric {OldVersion} writes catalog {recorded["catalog: ".Length..]}");
         ShouldBeUntouched(head);
     }
 
