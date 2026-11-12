@@ -15,7 +15,7 @@
   "roles": {
     "realm": [
       { "name": "manager", "description": "Sample role: each module's sample policy <module>.manage requires it." }{{ if staff }},
-      { "name": "{{ cross_tenant_role }}", "description": "Reads every tenant's rows on an endpoint mapped with AcrossTenants(); each module's policy <module>.read-all-tenants requires it." }{{ end }}
+      { "name": "{{ cross_tenant_role }}", "description": "Reads every tenant's rows on an endpoint mapped with AcrossTenants() and writes the records shared by all tenants on one mapped with WritesSharedRecords(); each module's policies <module>.read-all-tenants and <module>.write-shared-records require it." }{{ end }}
     ]
   },
 {{~ end ~}}

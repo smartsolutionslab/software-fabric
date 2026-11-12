@@ -12,13 +12,20 @@ files:
   - { template: templates/AcrossTenantsEndpoints.cs.sbn, target: src/BuildingBlocks/Tenancy/Wiring/AcrossTenantsEndpoints.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
   - { template: templates/AllTenantsWriteNothing.cs.sbn, target: src/BuildingBlocks/Tenancy/AllTenantsWriteNothing.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
   - { template: templates/AcrossTenantsRequiresTheCrossTenantRole.cs.sbn, target: tests/Architecture.Tests/Rules/AcrossTenantsRequiresTheCrossTenantRole.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
+  # Staff write records shared by all tenants (#623): the same choices, as shared_records says.
+  - { template: templates/SharedRecordsModel.cs.sbn, target: src/BuildingBlocks/Tenancy/Wiring/SharedRecordsModel.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
+  - { template: templates/SharedRecordsWriter.cs.sbn, target: src/BuildingBlocks/Tenancy/SharedRecordsWriter.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
+  - { template: templates/SharedRecordsEndpoints.cs.sbn, target: src/BuildingBlocks/Tenancy/Wiring/SharedRecordsEndpoints.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
+  - { template: templates/SharedRecordsBulkWriteGuard.cs.sbn, target: src/BuildingBlocks/Tenancy/SharedRecordsBulkWriteGuard.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
+  - { template: templates/WritesSharedRecordsRequiresTheCrossTenantRole.cs.sbn, target: tests/Architecture.Tests/Rules/WritesSharedRecordsRequiresTheCrossTenantRole.cs, when: 'object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") && (project["backend.auth"] == "keycloak" || project["backend.auth"] == "generic-oidc")' }
 slots:
   - { slot: templates.functions, template: templates/functions.sbn }
   - { slot: host.services, template: templates/host-services.sbn, order: 10 }
   - { slot: persistence.context-members, template: templates/context-members.sbn }
   - { slot: persistence.model-conventions, template: templates/model-conventions.sbn }
   - { slot: persistence.save-changes, template: templates/save-changes.sbn }
-  # With cross-tenant reads only: refuses ExecuteUpdate, ExecuteDelete and ExecuteSql inside AcrossTenants().
+  # With cross-tenant reads only: refuses ExecuteUpdate, ExecuteDelete and ExecuteSql inside AcrossTenants(), and
+  # ExecuteUpdate and ExecuteDelete on a shared type's table outside WritesSharedRecords().
   - { slot: persistence.interceptors, template: templates/persistence-interceptor.sbn }
   - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 20 }
 agents:
@@ -27,3 +34,5 @@ adr: docs/adr.md
 gates:
   - { kind: ci-step, describes: "A tenant cannot read another tenant's rows; checked by the integration tests of the aspire-fixture pack against the running stack and by each module's tenancy tests." }
   - { kind: architecture-test, describes: "With roles and Keycloak or generic OIDC: an endpoint mapped with AcrossTenants() requires the role staff (CrossTenantRole.Name) through its authorization, and is not anonymous; the rule names the endpoint otherwise.", file: templates/AcrossTenantsRequiresTheCrossTenantRole.cs.sbn }
+  - { kind: architecture-test, describes: "With roles and Keycloak or generic OIDC: an endpoint mapped with WritesSharedRecords() requires the role staff (CrossTenantRole.Name) through its authorization, is not anonymous, and is not also mapped with AcrossTenants(); the rule names the endpoint otherwise.", file: templates/WritesSharedRecordsRequiresTheCrossTenantRole.cs.sbn }
+  - { kind: ci-step, describes: "With roles and Keycloak or generic OIDC: building a module's model (dotnet ef, the MigrationRunner, the host) fails for a type declared SharedByAllTenants() below the root of its hierarchy or as an owned type, or for a shared type that references a tenant's type, naming both." }

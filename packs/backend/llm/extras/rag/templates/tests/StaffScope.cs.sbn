@@ -1,0 +1,16 @@
+using {{ namespace }}.BuildingBlocks.Tenancy;
+
+namespace {{ namespace }}.Rag.Tests;
+
+/// <summary>
+/// The tenant source of staff, who belong to no tenant, on an endpoint mapped with <c>WritesSharedRecords()</c> or with
+/// <c>AcrossTenants()</c>: the scopes only such an endpoint opens, which a test cannot.
+/// </summary>
+public sealed class StaffScope(bool writesSharedRecords) : ITenantContext
+{
+    public string? TenantId => null;
+
+    public bool ReadsAllTenants => !writesSharedRecords;
+
+    public bool WritesSharedRecords => writesSharedRecords;
+}

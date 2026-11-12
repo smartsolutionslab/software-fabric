@@ -9,7 +9,10 @@ public static class TenantColumn
     private const string Column = "TenantId";
 
 {{~ if across ~}}
-    /// <summary>A TenantId shadow column on every entity and a filter to the context's current tenant, or to every tenant inside AcrossTenants().</summary>
+    /// <summary>
+    /// A TenantId shadow column on every entity and a filter to the context's current tenant, or to every tenant inside
+    /// AcrossTenants(); an entity shared by all tenants (SharedByAllTenants()) has neither.
+    /// </summary>
 {{~ else ~}}
     /// <summary>A TenantId shadow column on every entity and a filter to the context's current tenant.</summary>
 {{~ end ~}}
@@ -20,8 +23,11 @@ public static class TenantColumn
         var currentTenant = Expression.Property(Expression.Constant(context), nameof(ModuleDbContext.CurrentTenantId));
 {{~ if across ~}}
         var allTenants = Expression.Property(Expression.Constant(context), nameof(ModuleDbContext.ReadsAllTenants));
-{{~ end ~}}
+        modelBuilder.Model.CheckSharedRecords();
+        foreach (var entity in modelBuilder.Model.GetEntityTypes().Where(entity => !entity.IsOwned() && entity.BaseType is null && !entity.IsSharedByAllTenants()))
+{{~ else ~}}
         foreach (var entity in modelBuilder.Model.GetEntityTypes().Where(entity => !entity.IsOwned() && entity.BaseType is null))
+{{~ end ~}}
         {
             modelBuilder.Entity(entity.ClrType).Property<string>(Column).HasMaxLength(64).IsRequired();
             modelBuilder.Entity(entity.ClrType).HasIndex(Column);
@@ -39,7 +45,10 @@ public static class TenantColumn
     }
 
 {{~ if across ~}}
-    /// <summary>Stamps new rows with the current tenant; saving one without a tenant fails, and so does saving anything inside AcrossTenants().</summary>
+    /// <summary>
+    /// Stamps new rows with the current tenant; saving one without a tenant fails, and so does saving anything inside
+    /// AcrossTenants(). Records shared by all tenants are saved only inside WritesSharedRecords(), and nothing else is.
+    /// </summary>
 {{~ else ~}}
     /// <summary>Stamps new rows with the current tenant; saving one without a tenant fails.</summary>
 {{~ end ~}}
@@ -52,6 +61,23 @@ public static class TenantColumn
         if (context.ReadsAllTenants && context.ChangeTracker.HasChanges())
         {
             throw new InvalidOperationException("Cannot save inside AcrossTenants(): reading every tenant's rows writes for none of them.");
+        }
+
+        // A shared record is every tenant's, so only staff write it; and staff writing them have no tenant to write for.
+        foreach (var entry in context.ChangeTracker.Entries().Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
+        {
+            var shared = entry.Metadata.IsSharedByAllTenants();
+            if (shared && !context.WritesSharedRecords)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot save a {entry.Metadata.ClrType.Name} outside WritesSharedRecords(): records shared by all tenants are written only on an endpoint mapped with it.");
+            }
+
+            if (!shared && context.WritesSharedRecords)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot save a {entry.Metadata.ClrType.Name} inside WritesSharedRecords(): it writes the records shared by all tenants, for no tenant.");
+            }
         }
 
 {{~ end ~}}

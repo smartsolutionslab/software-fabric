@@ -136,7 +136,7 @@ pack fill a slot of a choice it can be combined with but does not need
 
 | Slot | File | Filled by |
 |---|---|---|
-| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11); the integration pack (the integration-fixture vocabulary below, M3-12); the identity-provider and auth-client packs (the identity-provider vocabulary below, M3-13); the tenant-column pack (`cross_tenant_reads` and `cross_tenant_role`: staff read across tenants, #610; others call them only with `backend.tenancy=column`) |
+| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11); the integration pack (the integration-fixture vocabulary below, M3-12); the identity-provider and auth-client packs (the identity-provider vocabulary below, M3-13); the tenant-column pack (`cross_tenant_reads` and `cross_tenant_role`: staff read across tenants, #610; `shared_records`: staff write records shared by all tenants, #623; others call them only with `backend.tenancy=column`) |
 | `dotnet.build-items` *(added with the kernel options)* | `Directory.Build.props` | ensure-that (ban list), typed-outcomes (`using static Outcome`) |
 | `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |

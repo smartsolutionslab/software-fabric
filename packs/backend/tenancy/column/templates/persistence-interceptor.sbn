@@ -1,2 +1,3 @@
 {{~ if cross_tenant_reads ~}}
-            new {{ namespace }}.BuildingBlocks.Tenancy.AllTenantsWriteNothing(this){{ end }}
+            new {{ namespace }}.BuildingBlocks.Tenancy.AllTenantsWriteNothing(this),
+            new {{ namespace }}.BuildingBlocks.Tenancy.SharedRecordsBulkWriteGuard(this){{ end }}

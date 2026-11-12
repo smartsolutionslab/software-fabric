@@ -1,3 +1,10 @@
+{{~
+  # shared_records is the tenant-column pack's; no other tenancy defines it.
+  shared = false
+  if project["backend.tenancy"] == "column"
+    shared = shared_records
+  end
+~}}
 {{~ schemas = project["backend.tenancy"] == "schema-per-tenant" ~}}
 using {{ namespace }}.BuildingBlocks.Rag;
 {{~ if schemas ~}}
@@ -13,7 +20,12 @@ public static class VectorIndexRegistration
     private const string ConnectionStringName = "database";
 
     /// <summary>
+{{~ if shared ~}}
+    /// Registers <see cref="ModuleVectorIndex{TContext}"/> and <see cref="SharedVectorIndex{TContext}"/> for every module,
+    /// over a data source of the connection
+{{~ else ~}}
     /// Registers <see cref="ModuleVectorIndex{TContext}"/> for every module, over a data source of the connection
+{{~ end ~}}
     /// string <c>database</c> that knows the <c>vector</c> type. The connection string is read when an index is first
     /// needed; registering connects to nothing.
 {{~ if project["backend.tenancy"] == "column" || schemas ~}}
@@ -26,7 +38,10 @@ public static class VectorIndexRegistration
 
         return services
             .AddKeyedSingleton(VectorTables.DataSourceKey, (_, _) => VectorTables.DataSource(ConnectionString(configuration)))
-{{~ if project["backend.tenancy"] == "column" || schemas ~}}
+{{~ if shared ~}}
+            .AddScoped(typeof(ModuleVectorIndex<>))
+            .AddScoped(typeof(SharedVectorIndex<>));
+{{~ else if project["backend.tenancy"] == "column" || schemas ~}}
             .AddScoped(typeof(ModuleVectorIndex<>));
 {{~ else ~}}
             .AddSingleton(typeof(ModuleVectorIndex<>));
@@ -39,7 +54,12 @@ public static class VectorIndexRegistration
     /// tenant listed in Tenancy:Tenants. A step of the MigrationRunner, after the modules' migrations, so hosts never
     /// create tables.
 {{~ else ~}}
+{{~ if shared ~}}
+    /// Creates the vector extension and each module's <c>embeddings</c> and <c>shared_embeddings</c> tables, in the
+    /// schema of its DbContext. A step
+{{~ else ~}}
     /// Creates the vector extension and each module's <c>embeddings</c> table, in the schema of its DbContext. A step
+{{~ end ~}}
     /// of the MigrationRunner, after the modules' migrations, so hosts never create tables.
 {{~ end ~}}
     /// </summary>

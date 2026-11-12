@@ -1,0 +1,127 @@
+using {{ namespace }}.BuildingBlocks.Rag;
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using {{ namespace }}.Tests.Fakes;
+using Microsoft.AspNetCore.Http;
+
+namespace {{ namespace }}.Rag.Tests;
+
+/// <summary>
+/// The records shared by all tenants: only work inside <c>WritesSharedRecords()</c> indexes or removes them; every
+/// tenant, staff reading across tenants and work without a tenant find them; and a tenant's own index never returns
+/// them, nor another tenant's records. No test calls a real model.
+/// </summary>
+{{~ database_fixture_attributes ~}}
+public sealed class SharedVectorIndexTests({{ database_fixture }}) : {{ test_lifetime }}
+{
+    private const string TenantA = "tenant-a";
+
+    private const string TenantB = "tenant-b";
+
+    private readonly FakeEmbeddingGenerator generator = new(VectorTables.Dimensions);
+
+    private readonly HttpTenantContext tenants = new(new HttpContextAccessor());
+
+    private Npgsql.NpgsqlDataSource? dataSource;
+
+    private Npgsql.NpgsqlDataSource DataSource => dataSource ?? throw new InvalidOperationException("The data source has not been created.");
+
+    {{ test_setup }}
+    {
+        await VectorTables.CreateAsync({{ database_connection_string }}, [SampleSharedArticlesDbContext.Schema], {{ test_cancellation_token }});
+        dataSource = VectorTables.DataSource({{ database_connection_string }});
+    }
+
+    {{ test_attribute }}
+    public async Task Records_staff_index_are_found_by_every_tenant_by_staff_reading_all_tenants_and_without_a_tenant()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var writer = new SharedVectorIndex<SampleSharedArticlesDbContext>(DataSource, generator, new StaffScope(writesSharedRecords: true));
+        await writer.IndexAsync("article-chairs", "returning office chairs bought by mistake", cancellationToken);
+
+        var articles = new SharedVectorIndex<SampleSharedArticlesDbContext>(DataSource, generator, tenants);
+        using (TenantScope.Begin(TenantA))
+        {
+            {{ `(await articles.SearchAsync("returning office chairs", 10, cancellationToken)).Select(passage => passage.Key)` | should_contain `"article-chairs"` }};
+        }
+
+        using (TenantScope.Begin(TenantB))
+        {
+            {{ `(await articles.SearchAsync("returning office chairs", 10, cancellationToken)).Select(passage => passage.Key)` | should_contain `"article-chairs"` }};
+        }
+
+        {{ `(await articles.SearchAsync("returning office chairs", 10, cancellationToken)).Select(passage => passage.Key)` | should_contain `"article-chairs"` }};
+        var staff = new SharedVectorIndex<SampleSharedArticlesDbContext>(DataSource, generator, new StaffScope(writesSharedRecords: false));
+        {{ `(await staff.SearchAsync("returning office chairs", 10, cancellationToken)).Select(passage => passage.Key)` | should_contain `"article-chairs"` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_tenants_own_index_returns_only_its_own_records_never_the_shared_ones_nor_another_tenants()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var writer = new SharedVectorIndex<SampleSharedArticlesDbContext>(DataSource, generator, new StaffScope(writesSharedRecords: true));
+        await writer.IndexAsync("article-desks", "standing desks for the whole team", cancellationToken);
+        var notes = new ModuleVectorIndex<SampleSharedArticlesDbContext>(DataSource, generator, tenants);
+        using (TenantScope.Begin(TenantA))
+        {
+            await notes.IndexAsync("note-desks", "standing desks for tenant a", cancellationToken);
+        }
+
+        var articles = new SharedVectorIndex<SampleSharedArticlesDbContext>(DataSource, generator, tenants);
+        using (TenantScope.Begin(TenantA))
+        {
+            {{ `(await notes.SearchAsync("standing desks", 10, cancellationToken)).Select(passage => passage.Key)` | should_be `["note-desks"]` }};
+            {{ `(await articles.SearchAsync("standing desks", 10, cancellationToken)).Select(passage => passage.Key)` | should_not_contain `"note-desks"` }};
+        }
+
+        using (TenantScope.Begin(TenantB))
+        {
+            {{ `(await notes.SearchAsync("standing desks", 10, cancellationToken))` | should_be_empty }};
+            {{ `(await articles.SearchAsync("standing desks", 10, cancellationToken)).Select(passage => passage.Key)` | should_contain `"article-desks"` }};
+        }
+    }
+
+    {{ test_attribute }}
+    public async Task Outside_WritesSharedRecords_indexing_and_removing_fail_and_change_nothing()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var writer = new SharedVectorIndex<SampleSharedArticlesDbContext>(DataSource, generator, new StaffScope(writesSharedRecords: true));
+        await writer.IndexAsync("article-kept", "an article no tenant may change", cancellationToken);
+        var articles = new SharedVectorIndex<SampleSharedArticlesDbContext>(DataSource, generator, tenants);
+        var staff = new SharedVectorIndex<SampleSharedArticlesDbContext>(DataSource, generator, new StaffScope(writesSharedRecords: false));
+
+        using (TenantScope.Begin(TenantA))
+        {
+            await {{ should_throw_async `InvalidOperationException` `() => articles.IndexAsync("article-kept", "rewritten by a tenant", cancellationToken)` }};
+            await {{ should_throw_async `InvalidOperationException` `() => articles.RemoveAsync("article-kept", cancellationToken)` }};
+        }
+
+        await {{ should_throw_async `InvalidOperationException` `() => staff.IndexAsync("article-kept", "rewritten reading all tenants", cancellationToken)` }};
+        await {{ should_throw_async `InvalidOperationException` `() => staff.RemoveAsync("article-kept", cancellationToken)` }};
+        {{ `(await articles.SearchAsync("an article no tenant may change", 10, cancellationToken)).Select(passage => (passage.Key, passage.Text))` | should_contain `("article-kept", "an article no tenant may change")` }};
+    }
+
+    {{ test_attribute }}
+    public async Task Inside_WritesSharedRecords_removing_a_record_removes_it_for_every_tenant()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var writer = new SharedVectorIndex<SampleSharedArticlesDbContext>(DataSource, generator, new StaffScope(writesSharedRecords: true));
+        await writer.IndexAsync("article-retired", "a retired article about printers", cancellationToken);
+
+        await writer.RemoveAsync("article-retired", cancellationToken);
+
+        var articles = new SharedVectorIndex<SampleSharedArticlesDbContext>(DataSource, generator, tenants);
+        using (TenantScope.Begin(TenantA))
+        {
+            {{ `(await articles.SearchAsync("a retired article about printers", 10, cancellationToken)).Select(passage => passage.Key)` | should_not_contain `"article-retired"` }};
+        }
+    }
+
+    {{ test_teardown }}
+    {
+        generator.Dispose();
+        if (dataSource is not null)
+        {
+            await dataSource.DisposeAsync();
+        }
+    }
+}
