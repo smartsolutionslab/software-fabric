@@ -1,5 +1,12 @@
+using System.Text.Json.Serialization;
+
 namespace {{ namespace }}.Kernel;
 
+/// <summary>
+/// Which way a <see cref="Sorting{TField}"/> runs. It travels by name, as JSON and in the OpenAPI document, so a
+/// generated client offers <c>Ascending</c> and <c>Descending</c> rather than numbers (docs/adr).
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<SortDirection>))]
 public enum SortDirection
 {
     Ascending,

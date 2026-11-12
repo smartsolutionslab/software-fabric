@@ -218,6 +218,7 @@ public sealed class PagingTests
         output.ShouldNotContain("GET /billing/invoice-numbers answers");
         output.ShouldNotContain("GET /billing/invoice-count");
         output.ShouldContain("failed: 1");
-        output.ShouldContain("succeeded: 7");
+        // ListEndpointsArePagedTests' sorting check passes too: none of these endpoints sorts.
+        output.ShouldContain("succeeded: 8");
     }
 }
