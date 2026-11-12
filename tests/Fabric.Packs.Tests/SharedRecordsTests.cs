@@ -312,6 +312,18 @@ public sealed class SharedRecordsTests
         }
         """;
 
+    /// <summary>A shared type whose table name the provider must quote, as it holds a space.</summary>
+    private const string Manual = """
+        using Shop.BuildingBlocks.Domain;
+
+        namespace Shop.Modules.Billing.Domain;
+
+        public sealed class Manual(Guid id, string title) : Entity<Guid>(id)
+        {
+            public string Title { get; private set; } = title;
+        }
+        """;
+
     private const string ArticleAndNoteConfigurations = """
         public sealed class ArticleConfiguration : IEntityTypeConfiguration<Article>
         {
@@ -331,6 +343,17 @@ public sealed class SharedRecordsTests
                 builder.ToTable("notes");
                 builder.HasKey(note => note.Id);
                 builder.Property(note => note.Text);
+            }
+        }
+
+        public sealed class ManualConfiguration : IEntityTypeConfiguration<Manual>
+        {
+            public void Configure(EntityTypeBuilder<Manual> builder)
+            {
+                builder.ToTable("Shared Manuals");
+                builder.HasKey(manual => manual.Id);
+                builder.Property(manual => manual.Title);
+                builder.SharedByAllTenants();
             }
         }
         """;
@@ -398,6 +421,10 @@ public sealed class SharedRecordsTests
                 endpoints.MapGet("/articles", ListAsync).RequireAuthorization().ExcludeFromDescription();
                 endpoints.MapGet("/articles/all-tenants", ListAsync).RequireAuthorization(BillingPolicyNames.ReadAllTenants).AcrossTenants().ExcludeFromDescription();
                 endpoints.MapGet("/articles/deliveries", () => ArticlePublishedConsumer.Deliveries.ToArray()).RequireAuthorization().ExcludeFromDescription();
+                endpoints.MapPost("/manuals", AddManualAsync).RequireAuthorization(BillingPolicyNames.WriteSharedRecords).WritesSharedRecords().ExcludeFromDescription();
+                endpoints.MapGet("/manuals", ListManualsAsync).RequireAuthorization().ExcludeFromDescription();
+                endpoints.MapPut("/manuals/by-a-tenant", RenameManualsAsync).RequireAuthorization().ExcludeFromDescription();
+                endpoints.MapDelete("/manuals/by-a-tenant", DeleteManualsAsync).RequireAuthorization().ExcludeFromDescription();
                 endpoints.MapPost("/notes", AddNoteAsync).RequireAuthorization().ExcludeFromDescription();
                 endpoints.MapGet("/notes", ListNotesAsync).RequireAuthorization().ExcludeFromDescription();
             }
@@ -442,6 +469,22 @@ public sealed class SharedRecordsTests
 
             private static async Task<IResult> ListAsync(BillingDbContext context, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await context.Set<Article>().Select(article => article.Title).Order().ToListAsync(cancellationToken));
+
+            private static async Task<IResult> AddManualAsync(NewArticle manual, BillingDbContext context, CancellationToken cancellationToken)
+            {
+                context.Add(new Manual(Guid.CreateVersion7(), manual.Title));
+                await context.SaveChangesAsync(cancellationToken);
+                return TypedResults.NoContent();
+            }
+
+            private static async Task<IResult> ListManualsAsync(BillingDbContext context, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await context.Set<Manual>().Select(manual => manual.Title).Order().ToListAsync(cancellationToken));
+
+            private static async Task<IResult> RenameManualsAsync(BillingDbContext context, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await context.Set<Manual>().ExecuteUpdateAsync(manual => manual.SetProperty(row => row.Title, "renamed by a tenant"), cancellationToken));
+
+            private static async Task<IResult> DeleteManualsAsync(BillingDbContext context, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await context.Set<Manual>().ExecuteDeleteAsync(cancellationToken));
 
             private static async Task<IResult> AddNoteAsync(NewNote note, BillingDbContext context, CancellationToken cancellationToken)
             {
@@ -545,6 +588,30 @@ public sealed class SharedRecordsTests
             }
 
             [Fact]
+            public async Task A_tenants_bulk_update_and_delete_of_a_table_whose_name_needs_quoting_fail_and_change_nothing()
+            {
+                var cancellationToken = TestContext.Current.CancellationToken;
+                var manuals = new Uri("/billing/manuals", UriKind.Relative);
+                var byATenant = new Uri("/billing/manuals/by-a-tenant", UriKind.Relative);
+                using var staff = await aspire.CreateHostClientAsync("staff");
+                using (var added = await staff.PostAsJsonAsync(manuals, new { Title = "a manual no tenant changes" }, cancellationToken))
+                {
+                    added.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+                }
+
+                using var developer = await aspire.CreateHostClientAsync("developer");
+
+                using var renamed = await developer.PutAsync(byATenant, null, cancellationToken);
+                using var deleted = await developer.DeleteAsync(byATenant, cancellationToken);
+
+                renamed.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
+                deleted.StatusCode.ShouldBe(HttpStatusCode.InternalServerError);
+                var titles = await TitlesAsync("developer-b", manuals, cancellationToken);
+                titles.ShouldContain("a manual no tenant changes");
+                titles.ShouldNotContain("renamed by a tenant");
+            }
+
+            [Fact]
             public async Task Staff_cannot_write_an_article_on_an_endpoint_that_does_not_opt_in()
             {
                 var cancellationToken = TestContext.Current.CancellationToken;
@@ -608,6 +675,7 @@ public sealed class SharedRecordsTests
     private static void AddArticlesAndNotesWithAMigration(GeneratedProject project)
     {
         project.WriteTypes("src/Modules/Billing/Billing.Domain", ArticleAndNote);
+        project.WriteTypes("src/Modules/Billing/Billing.Domain", Manual);
         WriteConfigurations(project, ArticleAndNoteConfigurations);
         var (exitCode, output) = AddMigration(project);
         exitCode.ShouldBe(0, output);
