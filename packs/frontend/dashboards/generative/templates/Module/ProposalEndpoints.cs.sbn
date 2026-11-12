@@ -1,0 +1,30 @@
+{{~ option = project["backend.absence"] == "option" ~}}
+using {{ namespace }}.BuildingBlocks.Api;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.ProposeWidget;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+
+namespace {{ namespace }}.Modules.Dashboards.Api.Endpoints;
+
+/// <summary>
+/// Proposing a widget: the endpoint that sends the dashboards agent's tool <c>propose_widget</c>, so the tool requires of
+/// its caller what this endpoint requires. It stays out of the OpenAPI document; the page reaches it through the agent.
+/// </summary>
+public sealed class ProposalEndpoints : IEndpoint
+{
+    public void Map(IEndpointRouteBuilder endpoints)
+    {
+        {{ not_null "endpoints" }}
+
+        endpoints.MapGet("/widget-proposals", async (string source, string visual, string? replaces, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+{{~ if option ~}}
+            (await dispatcher.QueryAsync(new ProposeWidget(source, visual, replaces is null ? Option<string>.None : Option<string>.Some(replaces)), cancellationToken)).ToHttpResult())
+{{~ else ~}}
+            (await dispatcher.QueryAsync(new ProposeWidget(source, visual, replaces), cancellationToken)).ToHttpResult())
+{{~ end ~}}
+            .Sends<ProposeWidget>()
+            .ExcludeFromDescription();
+    }
+}

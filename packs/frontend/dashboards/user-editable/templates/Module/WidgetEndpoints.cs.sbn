@@ -17,7 +17,8 @@ public sealed class WidgetEndpoints : IEndpoint
         {{ not_null "endpoints" }}
 
         endpoints.MapGet("/widgets", async (Page page, PageSize pageSize, IDispatcher dispatcher, CancellationToken cancellationToken) =>
-            (await dispatcher.QueryAsync(new ListWidgets(page, pageSize), cancellationToken)).ToHttpResult());
+            (await dispatcher.QueryAsync(new ListWidgets(page, pageSize), cancellationToken)).ToHttpResult()){{ if array.contains project["frontend.dashboards"] "generative" }}
+            .Sends<ListWidgets>(){{ end }};
         endpoints.MapGet("/widget-declarations/{id}", async (string id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
             (await dispatcher.QueryAsync(new DescribeWidget(id), cancellationToken)).ToHttpResult());
         endpoints.MapGet("/widgets/{id}", async (string id, Page page, PageSize pageSize, IDispatcher dispatcher, CancellationToken cancellationToken) =>
