@@ -12,12 +12,14 @@ namespace {{ namespace }}.BuildingBlocks.Tenancy;
 /// Refuses ExecuteUpdate and ExecuteDelete on the table of a type shared by all tenants outside WritesSharedRecords().
 /// SaveChanges refuses such a write before it sends anything; a bulk write bypasses it, and a shared type has no tenant
 /// filter to narrow it, so one tenant's ExecuteDelete would erase every tenant's shared records. The statement's target
-/// is the table right after UPDATE or DELETE FROM, or the one aliased there, its name rendered by the provider as in
-/// the statement. SQL a module writes itself (ExecuteSql) is not checked here: it is never filtered by tenant either.
+/// is a table of the module's model, its whole name rendered by the provider as in the statement, right after UPDATE or
+/// DELETE FROM, or aliased by the identifier there. A statement whose target is none of them is refused when it names a
+/// shared table anywhere. SQL a module writes itself (ExecuteSql) is not checked here: it is never filtered by tenant
+/// either.
 /// </summary>
 public sealed partial class SharedRecordsBulkWriteGuard(ModuleDbContext context) : DbCommandInterceptor
 {
-    private Dictionary<string, string>? sharedTables;
+    private List<Table>? tables;
 
     public override InterceptionResult<int> NonQueryExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
     {
@@ -35,19 +37,18 @@ public sealed partial class SharedRecordsBulkWriteGuard(ModuleDbContext context)
         return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
     }
 
-    /// <summary>The delimited name of every shared type's table, to the type's name.</summary>
-    private Dictionary<string, string> SharedTables => sharedTables ??= SharedTablesOf(context);
+    /// <summary>Every table of the module's model, by the delimited name the provider renders for it.</summary>
+    private List<Table> Tables => tables ??= TablesOf(context);
 
-    private static Dictionary<string, string> SharedTablesOf(ModuleDbContext context)
+    private static List<Table> TablesOf(ModuleDbContext context)
     {
         var names = context.GetService<ISqlGenerationHelper>();
 
         // A hierarchy and its owned types share their root's table.
-        return context.Model.GetEntityTypes()
-            .Where(entity => entity.IsSharedByAllTenants() && entity.GetTableName() is not null)
-            .Select(entity => (Table: names.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema()), Type: entity.GetRootType().ClrType.Name))
-            .DistinctBy(shared => shared.Table, StringComparer.Ordinal)
-            .ToDictionary(shared => shared.Table, shared => shared.Type, StringComparer.Ordinal);
+        return [.. context.Model.GetEntityTypes()
+            .Where(entity => entity.GetTableName() is not null)
+            .Select(entity => new Table(names.DelimitIdentifier(entity.GetTableName()!, entity.GetSchema()), entity.GetRootType().ClrType.Name, entity.IsSharedByAllTenants()))
+            .DistinctBy(table => table.Name, StringComparer.Ordinal)];
     }
 
     private void Refuse(DbCommand command, CommandEventData eventData)
@@ -58,17 +59,40 @@ public sealed partial class SharedRecordsBulkWriteGuard(ModuleDbContext context)
         }
 
         var sql = command.CommandText;
-        var target = Target().Match(sql);
-        var shared = target.Success
-            ? SharedTables.FirstOrDefault(table => table.Key == target.Groups["target"].Value || sql.Contains($"{table.Key} AS {target.Groups["target"].Value}", StringComparison.Ordinal))
-            : SharedTables.FirstOrDefault(table => sql.Contains(table.Key, StringComparison.Ordinal));
-        if (shared.Value is { } type)
+        var target = Tables.FirstOrDefault(table => Targets(sql, table.Name));
+        var shared = target is null ? Tables.FirstOrDefault(table => table.Shared && sql.Contains(table.Name, StringComparison.Ordinal)) : target.Shared ? target : null;
+        if (shared is not null)
         {
             throw new InvalidOperationException(
-                $"Cannot {(eventData.CommandSource == CommandSource.ExecuteDelete ? "delete" : "update")} {type} records outside WritesSharedRecords(): records shared by all tenants are written only on an endpoint mapped with it.");
+                $"Cannot {(eventData.CommandSource == CommandSource.ExecuteDelete ? "delete" : "update")} {shared.Type} records outside WritesSharedRecords(): records shared by all tenants are written only on an endpoint mapped with it.");
         }
     }
 
-    [GeneratedRegex(@"^\s*(?:UPDATE|DELETE\s+FROM)\s+(?<target>\S+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
-    private static partial Regex Target();
+    /// <summary>Whether the statement updates or deletes from the table: named right after UPDATE or DELETE FROM, or aliased by the identifier there.</summary>
+    private static bool Targets(string sql, string table)
+    {
+        var start = Start().Match(sql);
+        if (!start.Success)
+        {
+            return false;
+        }
+
+        var rest = sql[start.Length..];
+        if (rest.StartsWith(table, StringComparison.Ordinal) && (rest.Length == table.Length || char.IsWhiteSpace(rest[table.Length])))
+        {
+            return true;
+        }
+
+        var alias = Alias().Match(rest);
+        return alias.Success && sql.Contains($"{table} AS {alias.Value}", StringComparison.Ordinal);
+    }
+
+    [GeneratedRegex(@"^\s*(?:UPDATE|DELETE\s+FROM)\s+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex Start();
+
+    /// <summary>An alias as EF Core writes one: a plain word, or one in brackets, followed by whitespace.</summary>
+    [GeneratedRegex(@"^(?:\[\w+\]|\w+)(?=\s)", RegexOptions.CultureInvariant)]
+    private static partial Regex Alias();
+
+    private sealed record Table(string Name, string Type, bool Shared);
 }
