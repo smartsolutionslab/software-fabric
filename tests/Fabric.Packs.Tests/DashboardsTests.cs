@@ -169,12 +169,12 @@ public sealed class DashboardsTests
     }
 
     [Fact]
-    public void The_pack_brings_a_dashboards_module_with_crud_and_logical_cqrs_and_declares_widgets_in_the_building_blocks()
+    public void The_pack_brings_a_dashboards_module_with_the_projects_module_style_and_logical_cqrs_and_declares_widgets_in_the_building_blocks()
     {
         var files = Files(Profile, Dashboards);
 
         files["fabric.yaml"].ShouldContain("  frontend.dashboards: [user-editable]\n");
-        files["fabric.yaml"].ShouldContain("modules:\n  dashboards:\n    module.style: crud\n    module.cqrs: logical\n");
+        files["fabric.yaml"].ShouldContain("modules:\n  dashboards:\n    module.style: ddd\n    module.ddd-depth: light\n    module.cqrs: logical\n");
         files.Keys.ShouldContain("src/Modules/Dashboards/Dashboards.Domain/Dashboard.cs");
         files.Keys.ShouldContain("src/Modules/Dashboards/Dashboards.Api/DashboardsModule.cs");
         files.Keys.ShouldContain("tests/Modules/Dashboards.Tests/DashboardsModuleTests.cs");
@@ -183,6 +183,67 @@ public sealed class DashboardsTests
         files.Keys.ShouldContain("tests/Architecture.Tests/Rules/EveryWidgetIsADeclaredModuleQuery.cs");
         files.Keys.ShouldContain("tests/Integration.Tests/DashboardsTests.cs");
         files["Solution.slnx"].ShouldContain("src/Modules/Dashboards/Dashboards.Api/Dashboards.Api.csproj");
+    }
+
+    /// <summary>
+    /// The module follows the project's module style like any other module (#608): under ddd a dashboard is an aggregate
+    /// root with a typed id, changed only through methods named after what happens.
+    /// </summary>
+    [Fact]
+    public void In_a_ddd_project_a_dashboard_is_an_aggregate_root_with_a_typed_id_and_no_public_setters()
+    {
+        var files = Files(Profile, Dashboards);
+        const string Domain = "src/Modules/Dashboards/Dashboards.Domain/Dashboards/";
+
+        files[Domain + "Dashboard.cs"].ShouldContain("public sealed class Dashboard : AggregateRoot<DashboardId>");
+        files[Domain + "Dashboard.cs"].ShouldNotContain("{ get; set; }");
+        files[Domain + "DashboardId.cs"].ShouldContain("public sealed record DashboardId");
+        files.Keys.ShouldNotContain("src/Modules/Dashboards/Dashboards.Domain/Dashboard.cs");
+    }
+
+    /// <summary>Under ddd the name, widget count, key and grid rules are the aggregate's, and a save commits the module's unit of work (#608).</summary>
+    [Fact]
+    public void In_a_ddd_project_the_invariants_live_in_the_aggregate_and_saving_goes_through_the_modules_unit_of_work()
+    {
+        var files = Files(Profile, Dashboards);
+        const string Commands = "src/Modules/Dashboards/Dashboards.Application/Commands/";
+
+        var dashboard = files["src/Modules/Dashboards/Dashboards.Domain/Dashboards/Dashboard.cs"];
+        dashboard.ShouldContain("public const int MaximumNameLength = 100;");
+        dashboard.ShouldContain("public const int MaximumWidgets = 50;");
+        dashboard.ShouldContain("public const int Columns = 12;");
+        dashboard.ShouldContain("Result<Dashboard, DomainError>");
+        foreach (var handler in new[] { "SaveDashboard/SaveDashboardHandler.cs", "RemoveDashboard/RemoveDashboardHandler.cs" })
+        {
+            files[Commands + handler].ShouldContain("IDashboardsUnitOfWork", customMessage: handler);
+            files[Commands + handler].ShouldContain(".CommitAsync(cancellationToken)", customMessage: handler);
+            files[Commands + handler].ShouldNotContain("SaveAsync(", customMessage: handler);
+        }
+
+        files[Commands + "SaveDashboard/SaveDashboardHandler.cs"].ShouldNotContain("MaximumNameLength");
+        files[Commands + "SaveDashboard/SaveDashboardHandler.cs"].ShouldNotContain("placement.X < 0");
+        files["src/Modules/Dashboards/Dashboards.Application/IDashboardStore.cs"].ShouldNotContain("SaveAsync");
+    }
+
+    [Fact]
+    public void In_a_crud_project_the_dashboards_module_stays_crud()
+    {
+        var files = Files("lean-crud", Dashboards);
+
+        files["fabric.yaml"].ShouldContain("modules:\n  dashboards:\n    module.style: crud\n    module.cqrs: logical\n");
+        files["src/Modules/Dashboards/Dashboards.Domain/Dashboard.cs"].ShouldContain("public sealed class Dashboard\n");
+        files["src/Modules/Dashboards/Dashboards.Application/IDashboardStore.cs"].ShouldContain("Task SaveAsync(CancellationToken cancellationToken);");
+    }
+
+    /// <summary>Under event-sourced the module is event-sourced like the project's others (#608, the owner's decision).</summary>
+    [Fact]
+    public void In_an_event_sourced_project_the_dashboards_module_is_event_sourced_like_every_other_module()
+    {
+        var files = Files("industrial-event-driven-mfe", Dashboards);
+
+        files["fabric.yaml"].ShouldContain("modules:\n  dashboards:\n    module.style: event-sourced\n");
+        files.Keys.ShouldContain("src/Modules/Dashboards/Dashboards.Application/IDashboardsAggregateStore.cs");
+        files["src/Modules/Dashboards/Dashboards.Domain/Dashboards/Dashboard.cs"].ShouldContain("public sealed class Dashboard : EventSourcedAggregate<DashboardId>");
     }
 
     [Fact]
@@ -354,6 +415,43 @@ public sealed class DashboardsTests
         using var project = new GeneratedProject(Profile, Dashboards);
         project.AddModule("billing");
         project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/Revenue", RevenueWidget);
+        project.Build();
+
+        var (moduleExitCode, moduleOutput) = project.Test("tests/Modules/Dashboards.Tests/Dashboards.Tests.csproj");
+        moduleExitCode.ShouldBe(0, moduleOutput);
+        moduleOutput.ShouldContain("failed: 0");
+
+        var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        architectureExitCode.ShouldBe(0, architectureOutput);
+        architectureOutput.ShouldContain("failed: 0");
+    }
+
+    /// <summary>
+    /// Under strict DDD the module's strict rules (no primitives on its aggregate, commands or events, no public setters,
+    /// no nullable type parameters) apply to it like to any other module, and hold (#608).
+    /// </summary>
+    [Fact]
+    public void In_a_strict_ddd_project_the_dashboards_module_passes_its_strict_rules_and_its_tests()
+    {
+        using var project = new GeneratedProject("saas-strict-react", Dashboards);
+        File.Exists(Path.Combine(project.ProjectDirectory, "tests/Architecture.Tests/Rules/DashboardsHoldsNoPrimitives.cs")).ShouldBeTrue();
+        project.Build();
+
+        var (moduleExitCode, moduleOutput) = project.Test("tests/Modules/Dashboards.Tests/Dashboards.Tests.csproj");
+        moduleExitCode.ShouldBe(0, moduleOutput);
+        moduleOutput.ShouldContain("failed: 0");
+
+        var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+        architectureExitCode.ShouldBe(0, architectureOutput);
+        architectureOutput.ShouldContain("failed: 0");
+    }
+
+    /// <summary>Under event-sourced the module's events, aggregate and Domain project pass the event-sourced rules (#608).</summary>
+    [Fact]
+    public void In_an_event_sourced_project_the_dashboards_module_builds_and_passes_its_rules_and_its_tests()
+    {
+        using var project = new GeneratedProject("industrial-event-driven-mfe", Dashboards);
+        File.Exists(Path.Combine(project.ProjectDirectory, "src/Modules/Dashboards/Dashboards.Application/IDashboardsAggregateStore.cs")).ShouldBeTrue();
         project.Build();
 
         var (moduleExitCode, moduleOutput) = project.Test("tests/Modules/Dashboards.Tests/Dashboards.Tests.csproj");
