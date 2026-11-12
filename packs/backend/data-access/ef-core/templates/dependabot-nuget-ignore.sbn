@@ -1,0 +1,13 @@
+{{~ if project["backend.database"] == "postgres" ~}}
+      # EF Core stays at 11.0.0-rc.3.26522.148, the build Npgsql.EntityFrameworkCore.PostgreSQL 11.0.0-rc.3 requires
+      # exactly, so a newer one fails restore. Lifted by smartsolutionslab/software-fabric#551 (Npgsql 11.0.0), which
+      # removes these entries.
+      - dependency-name: Microsoft.EntityFrameworkCore
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: Microsoft.EntityFrameworkCore.Design
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: Microsoft.EntityFrameworkCore.Relational
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+{{~ end ~}}

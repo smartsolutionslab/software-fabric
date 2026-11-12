@@ -1,0 +1,4 @@
+      # Microsoft.CodeAnalysis.CSharp stays at 5.0.0: Wolverine's runtime compiler requires exactly Roslyn 5.0.0, so a
+      # newer one fails restore (NU1608). Lifted by smartsolutionslab/software-fabric#615, which removes this entry.
+      - dependency-name: Microsoft.CodeAnalysis.CSharp
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]

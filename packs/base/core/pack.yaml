@@ -131,6 +131,7 @@ slots:
   # With an identity provider: GET /me, reading the claim the provider names (user_name_claim).
   - { slot: host.endpoints, template: templates/Host/host-endpoints.sbn, order: 10 }
   - { slot: tests.module-host-services, template: templates/Llm/module-host-services.sbn }
+  - { slot: dependabot.nuget-ignore, template: templates/dependabot-nuget-ignore.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
