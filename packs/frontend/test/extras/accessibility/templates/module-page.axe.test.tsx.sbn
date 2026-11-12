@@ -21,9 +21,20 @@ import { {{ module.namespace }}Page } from './{{ module.namespace }}Page';
 vi.mock('@/dashboards/DashboardEditor', () => ({ DashboardEditor: () => <p>The dashboard editor</p> }));
 {{~ end ~}}
 
-// The file's first test also pays for warming up jsdom, React and axe, which in a larger project under parallel load
-// passes 2.5 s of the default 5 s.
-test('the {{ module.namespace }} page has no accessibility violations axe can find', { timeout: 20_000 }, async () => {
+// The screen's own component test beside it is the project's. Once that test checks the screen with axe, as AGENTS.md
+// asks, this generated check skips itself, so the screen is checked once.
+const ownTest = import.meta.glob<string>('./{{ module.namespace }}Page.test.tsx', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+const checkedByOwnTest = Object.values(ownTest).some((source) => source.includes('toHaveNoViolations()'));
+
+// Whichever test renders first in a file also pays for warming up jsdom, React and axe, which in a larger project under
+// parallel load passes 2.5 s of the default 5 s.
+test('the {{ module.namespace }} page has no accessibility violations axe can find', { timeout: 20_000 }, async ({ skip }) => {
+  skip(checkedByOwnTest, '{{ module.namespace }}Page.test.tsx checks the page with axe');
+
 {{~ if tanstack ~}}
   const { container } = render(
     <RouterProvider router={createAppRouter(createMemoryHistory({ initialEntries: ['/{{ module.name }}'] }), <App />)} />,

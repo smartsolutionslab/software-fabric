@@ -1,20 +1,23 @@
 {{~ screen = project["frontend.framework"] == "vue" ? "Page.vue" : "Page.tsx" ~}}
 {{~ test = project["frontend.framework"] == "vue" ? "Page.test.ts" : "Page.test.tsx" ~}}
+{{~ generated = project["frontend.framework"] == "vue" ? "Page.axe.test.ts" : "Page.axe.test.tsx" ~}}
 import { expect, test } from 'vitest';
 
 // AGENTS.md asks for an axe check in the component test of every new screen; a module's screen, <Name>{{ screen }}, has
-// that test beside it, <Name>{{ test }}.
+// one beside it: in its own test, <Name>{{ test }}, or in the one fabric generates, <Name>{{ generated }}.
 const screens = Object.keys(import.meta.glob('./modules/**/*{{ screen }}'));
-const tests = import.meta.glob<string>('./modules/**/*{{ test }}', {
+const tests = import.meta.glob<string>(['./modules/**/*{{ test }}', './modules/**/*{{ generated }}'], {
   query: '?raw',
   import: 'default',
   eager: true,
 });
 
-test('every module screen has an axe check in the component test beside it', () => {
-  const unchecked = screens.filter(
-    (screen) => !tests[screen.replace(/{{ screen | string.replace "." "\\." }}$/, '{{ test }}')]?.includes('toHaveNoViolations()'),
+test('every module screen has an axe check beside it', () => {
+  const unchecked = screens.filter((screen) =>
+    ['{{ test }}', '{{ generated }}'].every(
+      (suffix) => !tests[screen.replace(/{{ screen | string.replace "." "\\." }}$/, suffix)]?.includes('toHaveNoViolations()'),
+    ),
   );
 
-  expect(unchecked, 'module screens without <Name>{{ test }} checking them with axe').toEqual([]);
+  expect(unchecked, 'module screens without an axe check beside them').toEqual([]);
 });
