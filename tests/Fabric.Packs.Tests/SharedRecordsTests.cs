@@ -258,6 +258,62 @@ public sealed class SharedRecordsTests
         output.ShouldContain("Guide is shared by all tenants, but references Note, whose records each belong to one tenant.", Case.Sensitive, output);
     }
 
+    /// <summary>
+    /// A tenant's record may reference a shared one, but not with a delete that cascades in the database: deleting the
+    /// shared record inside WritesSharedRecords() would delete every tenant's referencing rows, none of them loaded.
+    /// </summary>
+    [Fact]
+    public void A_tenants_type_whose_reference_to_a_shared_type_cascades_on_delete_fails_the_model_build_and_a_restricted_one_does_not()
+    {
+        using var project = new GeneratedProject(Profile, Roles);
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Domain", """
+            using Shop.BuildingBlocks.Domain;
+
+            namespace Shop.Modules.Billing.Domain;
+
+            public sealed class Article(Guid id) : Entity<Guid>(id);
+
+            public sealed class Citation(Guid id, Guid articleId) : Entity<Guid>(id)
+            {
+                public Guid ArticleId { get; private set; } = articleId;
+            }
+            """);
+        string Configurations(string onDelete) => $$"""
+            public sealed class ArticleConfiguration : IEntityTypeConfiguration<Article>
+            {
+                public void Configure(EntityTypeBuilder<Article> builder)
+                {
+                    builder.ToTable("articles");
+                    builder.HasKey(article => article.Id);
+                    builder.SharedByAllTenants();
+                }
+            }
+
+            public sealed class CitationConfiguration : IEntityTypeConfiguration<Citation>
+            {
+                public void Configure(EntityTypeBuilder<Citation> builder)
+                {
+                    builder.ToTable("citations");
+                    builder.HasKey(citation => citation.Id);
+                    builder.HasOne<Article>().WithMany().HasForeignKey(citation => citation.ArticleId){{onDelete}};
+                }
+            }
+            """;
+        WriteConfigurations(project, Configurations(string.Empty));
+
+        var (cascadeExitCode, cascadeOutput) = AddMigration(project);
+
+        cascadeExitCode.ShouldNotBe(0, cascadeOutput);
+        cascadeOutput.ShouldContain("Citation references Article, which is shared by all tenants, with a delete that cascades (Cascade):", Case.Sensitive, cascadeOutput);
+
+        WriteConfigurations(project, Configurations(".OnDelete(DeleteBehavior.Restrict)"));
+
+        var (restrictExitCode, restrictOutput) = AddMigration(project);
+
+        restrictExitCode.ShouldBe(0, restrictOutput);
+    }
+
     [Fact]
     public void A_type_declared_shared_below_the_root_of_its_hierarchy_fails_the_model_build()
     {
@@ -425,6 +481,7 @@ public sealed class SharedRecordsTests
                 endpoints.MapGet("/manuals", ListManualsAsync).RequireAuthorization().ExcludeFromDescription();
                 endpoints.MapPut("/manuals/by-a-tenant", RenameManualsAsync).RequireAuthorization().ExcludeFromDescription();
                 endpoints.MapDelete("/manuals/by-a-tenant", DeleteManualsAsync).RequireAuthorization().ExcludeFromDescription();
+                endpoints.MapDelete("/notes/citing-articles", DeleteNotesCitingArticlesAsync).RequireAuthorization().ExcludeFromDescription();
                 endpoints.MapPost("/notes", AddNoteAsync).RequireAuthorization().ExcludeFromDescription();
                 endpoints.MapGet("/notes", ListNotesAsync).RequireAuthorization().ExcludeFromDescription();
             }
@@ -485,6 +542,13 @@ public sealed class SharedRecordsTests
 
             private static async Task<IResult> DeleteManualsAsync(BillingDbContext context, CancellationToken cancellationToken) =>
                 TypedResults.Ok(await context.Set<Manual>().ExecuteDeleteAsync(cancellationToken));
+
+            // A tenant's own bulk delete, tagged, that only reads the shared table: the tenant filter narrows it.
+            private static async Task<IResult> DeleteNotesCitingArticlesAsync(BillingDbContext context, CancellationToken cancellationToken) =>
+                TypedResults.Ok(await context.Set<Note>()
+                    .Where(note => context.Set<Article>().Any(article => article.Title == note.Text))
+                    .TagWith("notes citing articles")
+                    .ExecuteDeleteAsync(cancellationToken));
 
             private static async Task<IResult> AddNoteAsync(NewNote note, BillingDbContext context, CancellationToken cancellationToken)
             {
@@ -612,6 +676,23 @@ public sealed class SharedRecordsTests
             }
 
             [Fact]
+            public async Task A_tenants_tagged_bulk_delete_of_its_own_rows_that_reads_the_shared_table_deletes_only_its_rows()
+            {
+                var cancellationToken = TestContext.Current.CancellationToken;
+                await AddAsync("an article tenants' notes cite", cancellationToken);
+                await AddNoteAsync("developer", "an article tenants' notes cite", cancellationToken);
+                await AddNoteAsync("developer-b", "an article tenants' notes cite", cancellationToken);
+                using var developer = await aspire.CreateHostClientAsync("developer");
+
+                using var response = await developer.DeleteAsync(new Uri("/billing/notes/citing-articles", UriKind.Relative), cancellationToken);
+
+                response.StatusCode.ShouldBe(HttpStatusCode.OK);
+                (await TitlesAsync("developer", Notes, cancellationToken)).ShouldNotContain("an article tenants' notes cite");
+                (await TitlesAsync("developer-b", Notes, cancellationToken)).ShouldContain("an article tenants' notes cite");
+                (await TitlesAsync("developer", Articles, cancellationToken)).ShouldContain("an article tenants' notes cite");
+            }
+
+            [Fact]
             public async Task Staff_cannot_write_an_article_on_an_endpoint_that_does_not_opt_in()
             {
                 var cancellationToken = TestContext.Current.CancellationToken;
@@ -659,6 +740,13 @@ public sealed class SharedRecordsTests
             {
                 using var staff = await aspire.CreateHostClientAsync("staff");
                 using var response = await staff.PostAsJsonAsync(Articles, new { Title = title }, cancellationToken);
+                response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+            }
+
+            private async Task AddNoteAsync(string user, string text, CancellationToken cancellationToken)
+            {
+                using var client = await aspire.CreateHostClientAsync(user);
+                using var response = await client.PostAsJsonAsync(Notes, new { Text = text }, cancellationToken);
                 response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
             }
 
