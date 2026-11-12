@@ -1,0 +1,4 @@
+# Staff read across tenants (AcrossTenants()) with a tenant column only; see this pack's ADR.
+func cross_tenant_reads
+  ret false
+end

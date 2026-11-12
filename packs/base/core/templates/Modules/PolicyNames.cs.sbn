@@ -7,4 +7,9 @@ namespace {{ namespace }}.Modules.{{ module.namespace }}.Application;
 public static class {{ module.namespace }}PolicyNames
 {
     public const string Manage = "{{ module.name }}.manage";
+{{~ if cross_tenant_reads ~}}
+
+    /// <summary>Staff read every tenant's rows: name it on an endpoint mapped with <c>AcrossTenants()</c>.</summary>
+    public const string ReadAllTenants = "{{ module.name }}.read-all-tenants";
+{{~ end ~}}
 }

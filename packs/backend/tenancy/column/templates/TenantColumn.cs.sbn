@@ -1,3 +1,4 @@
+{{~ across = cross_tenant_reads ~}}
 using System.Linq.Expressions;
 using {{ namespace }}.BuildingBlocks.Persistence;
 
@@ -7,12 +8,19 @@ public static class TenantColumn
 {
     private const string Column = "TenantId";
 
+{{~ if across ~}}
+    /// <summary>A TenantId shadow column on every entity and a filter to the context's current tenant, or to every tenant inside AcrossTenants().</summary>
+{{~ else ~}}
     /// <summary>A TenantId shadow column on every entity and a filter to the context's current tenant.</summary>
+{{~ end ~}}
     public static ModelBuilder ApplyTenantColumn(this ModelBuilder modelBuilder, ModuleDbContext context)
     {
         {{ not_null "modelBuilder" }}
 
         var currentTenant = Expression.Property(Expression.Constant(context), nameof(ModuleDbContext.CurrentTenantId));
+{{~ if across ~}}
+        var allTenants = Expression.Property(Expression.Constant(context), nameof(ModuleDbContext.ReadsAllTenants));
+{{~ end ~}}
         foreach (var entity in modelBuilder.Model.GetEntityTypes().Where(entity => !entity.IsOwned() && entity.BaseType is null))
         {
             modelBuilder.Entity(entity.ClrType).Property<string>(Column).HasMaxLength(64).IsRequired();
@@ -20,17 +28,33 @@ public static class TenantColumn
 
             var row = Expression.Parameter(entity.ClrType, "row");
             var rowTenant = Expression.Call(typeof(EF), nameof(EF.Property), [typeof(string)], row, Expression.Constant(Column));
+{{~ if across ~}}
+            modelBuilder.Entity(entity.ClrType).HasQueryFilter(Expression.Lambda(Expression.OrElse(allTenants, Expression.Equal(rowTenant, currentTenant)), row));
+{{~ else ~}}
             modelBuilder.Entity(entity.ClrType).HasQueryFilter(Expression.Lambda(Expression.Equal(rowTenant, currentTenant), row));
+{{~ end ~}}
         }
 
         return modelBuilder;
     }
 
+{{~ if across ~}}
+    /// <summary>Stamps new rows with the current tenant; saving one without a tenant fails, and so does saving anything inside AcrossTenants().</summary>
+{{~ else ~}}
     /// <summary>Stamps new rows with the current tenant; saving one without a tenant fails.</summary>
+{{~ end ~}}
     public static void StampTenant(this ModuleDbContext context)
     {
         {{ not_null "context" }}
 
+{{~ if across ~}}
+        // Rows read across tenants belong to several of them, and a write needs exactly one.
+        if (context.ReadsAllTenants && context.ChangeTracker.HasChanges())
+        {
+            throw new InvalidOperationException("Cannot save inside AcrossTenants(): reading every tenant's rows writes for none of them.");
+        }
+
+{{~ end ~}}
         foreach (var entry in context.ChangeTracker.Entries().Where(entry => entry.State == EntityState.Added && entry.Metadata.FindProperty(Column) is not null))
         {
             entry.Property(Column).CurrentValue = context.CurrentTenantId

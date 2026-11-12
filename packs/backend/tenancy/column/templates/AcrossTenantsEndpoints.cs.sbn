@@ -1,0 +1,27 @@
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using Microsoft.AspNetCore.Http;
+
+namespace Microsoft.AspNetCore.Builder;
+
+public static class AcrossTenantsEndpoints
+{
+    /// <summary>
+    /// The endpoint reads every tenant's rows: its handler runs inside <see cref="TenantScope.AllTenants"/>, where every
+    /// module's query filter lets all tenants' rows through and saving or publishing fails. The filter runs after
+    /// authorization, so name a policy that requires <see cref="CrossTenantRole"/> as well, as
+    /// <c>.RequireAuthorization(&lt;Module&gt;PolicyNames.ReadAllTenants).AcrossTenants()</c> does; the architecture rule
+    /// <c>AcrossTenantsRequiresTheCrossTenantRole</c> fails the build otherwise.
+    /// </summary>
+    public static RouteHandlerBuilder AcrossTenants(this RouteHandlerBuilder endpoint)
+    {
+        {{ not_null "endpoint" }}
+
+        return endpoint
+            .WithMetadata(new ReadsAcrossTenants())
+            .AddEndpointFilter(async (context, next) =>
+            {
+                using var allTenants = TenantScope.AllTenants();
+                return await next(context);
+            });
+    }
+}

@@ -1,6 +1,8 @@
 option: backend.tenancy.none
 files:
   - { template: templates/NoTenantIds.cs.sbn, target: tests/Architecture.Tests/Rules/NoTenantIds.cs }
+slots:
+  - { slot: templates.functions, template: templates/functions.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

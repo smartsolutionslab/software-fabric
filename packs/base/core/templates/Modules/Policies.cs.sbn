@@ -8,6 +8,9 @@
   end
 ~}}
 using {{ namespace }}.BuildingBlocks.Modules;
+{{~ if cross_tenant_reads ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
 using {{ namespace }}.Modules.{{ module.namespace }}.Application;
 using Microsoft.AspNetCore.Authorization;
 
@@ -24,5 +27,8 @@ public sealed class {{ module.namespace }}Policies : IModulePolicies
         {{ not_null "policies" }}
 
         policies.AddPolicy({{ module.namespace }}PolicyNames.Manage, policy => policy.{{ requirements | array.join "." }});
+{{~ if cross_tenant_reads ~}}
+        policies.AddPolicy({{ module.namespace }}PolicyNames.ReadAllTenants, policy => policy.RequireRole(CrossTenantRole.Name));
+{{~ end ~}}
     }
 }
