@@ -134,6 +134,6 @@ public sealed class AzureServiceBusTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 10");
+        output.ShouldContain("succeeded: 11");
     }
 }

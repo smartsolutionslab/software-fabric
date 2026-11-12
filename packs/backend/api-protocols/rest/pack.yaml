@@ -13,4 +13,4 @@ agents:
 adr: docs/adr.md
 gates:
   - { kind: ci-step, describes: "GET /openapi/v1.json answers with the API description; checked by the integration tests of the aspire-fixture pack against the running stack." }
-  - { kind: unit-test, describes: "A list endpoint (a GET whose success is a JSON array or a PagedResult in the served OpenAPI document) answers PagedResult<T> and takes page and pageSize from the query; an integration test reads the document from the running host.", file: templates/ListEndpointsArePagedTests.cs.sbn }
+  - { kind: unit-test, describes: "A list endpoint (a GET whose success is a JSON array or a PagedResult in the served OpenAPI document) answers PagedResult<T> and takes page and pageSize from the query, and one that sorts takes sortBy and sortDirection, both enums the document names; an integration test reads the document from the running host.", file: templates/ListEndpointsArePagedTests.cs.sbn }
