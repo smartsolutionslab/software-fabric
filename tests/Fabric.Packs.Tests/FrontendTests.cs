@@ -7,16 +7,34 @@ public sealed class FrontendTests
     private const string Profile = "saas-standard-react";
 
     [Fact]
-    public void The_generated_web_app_installs_builds_lints_and_passes_its_tests()
+    public void The_generated_web_app_installs_builds_lints_passes_its_tests_and_leaves_the_working_tree_clean()
     {
         using var project = new GeneratedProject(Profile);
         var web = Path.Combine(project.ProjectDirectory, "web");
 
-        foreach (var step in new[] { "install", "build", "lint", "test" })
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, $"pnpm install:\n{installOutput}");
+
+        // The generated project with its lockfile, as a developer commits it after the first install.
+        Git(project.ProjectDirectory, "init", "--quiet");
+        Git(project.ProjectDirectory, "add", "--all");
+        Git(project.ProjectDirectory, "-c", "user.name=fabric", "-c", "user.email=fabric@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "--no-verify", "-m", "generated");
+
+        foreach (var step in new[] { "build", "lint", "test" })
         {
             var (exitCode, output) = Shell.Run(web, "pnpm", step);
             exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
         }
+
+        // An agent's clean-tree check runs right after these steps: whatever they write must be ignored, not left untracked.
+        Git(project.ProjectDirectory, "status", "--porcelain", "--untracked-files=all").ShouldBeEmpty();
+    }
+
+    private static string Git(string directory, params string[] arguments)
+    {
+        var (exitCode, output) = Shell.Run(directory, "git", arguments);
+        exitCode.ShouldBe(0, $"git {string.Join(' ', arguments)}:\n{output}");
+        return output.Trim();
     }
 
     [Fact]

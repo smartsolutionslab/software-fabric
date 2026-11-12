@@ -2,6 +2,7 @@ option: frontend.workspace.pnpm-workspaces
 files:
   - { template: templates/package.json.sbn, target: web/package.json }
   - { template: templates/pnpm-workspace.yaml.sbn, target: web/pnpm-workspace.yaml }
+  - { template: templates/gitignore.sbn, target: web/.gitignore }
 declares-slots:
   - { slot: web.workspace-packages, description: "Lines of pnpm-workspace.yaml's packages list ('  - app')." }
   - { slot: web.pnpm-overrides, description: "Entries of web/package.json's pnpm.overrides ('      \"swagger-parser\": \"12.1.0\"'): pnpm reads overrides only from the workspace root. Rendered only with a contribution.", separator: ",\n" }
