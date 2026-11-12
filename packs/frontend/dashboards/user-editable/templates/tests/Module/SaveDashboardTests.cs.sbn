@@ -1,3 +1,7 @@
+{{~ ddd = module.values["module.style"] == "ddd" ~}}
+{{~ if ddd ~}}
+using {{ namespace }}.Modules.Dashboards.Api.Endpoints;
+{{~ end ~}}
 using {{ namespace }}.Modules.Dashboards.Application.Commands.SaveDashboard;
 using {{ namespace }}.Modules.Dashboards.Application.Queries.GetDashboard;
 
@@ -20,7 +24,7 @@ public class SaveDashboardTests
         {{ `read.Value.Id` | should_be `Id` }};
         {{ `read.Value.Name` | should_be `"Sales"` }};
         {{ `read.Value.Widgets.Select(widget => $"{widget.Key} {widget.Source} {widget.Visual} {widget.X},{widget.Y} {widget.Width}x{widget.Height}")` | should_be `["w-1 dashboards.widget-counts pie 2,3 4x5", "w-2 dashboards.my-dashboards table 0,8 12x6"]` }};
-        {{ `module.Store.Stored.Single().Owner` | should_be `DashboardsModuleUnderTest.Owner` }};
+        {{ (ddd ? `module.Store.Stored.Single().Owner.Value` : `module.Store.Stored.Single().Owner`) | should_be `DashboardsModuleUnderTest.Owner` }};
     }
 
     {{ test_attribute }}
@@ -32,7 +36,7 @@ public class SaveDashboardTests
         await module.SendAsync(Save("Costs", new WidgetPlacement("w-2", "dashboards.widget-counts", "line", 6, 0, 6, 4)), {{ test_cancellation_token }});
 
         var dashboard = module.Store.Stored.Single();
-        {{ `dashboard.Name` | should_be `"Costs"` }};
+        {{ (ddd ? `dashboard.Name.Value` : `dashboard.Name`) | should_be `"Costs"` }};
         {{ `dashboard.Widgets.Select(widget => widget.Key)` | should_be `["w-2"]` }};
     }
 
@@ -52,9 +56,13 @@ public class SaveDashboardTests
     {
         await using var module = new DashboardsModuleUnderTest();
 
+{{~ if ddd ~}}
+        {{ should_throw (project["backend.guards"] == "ensure-that" ? "GuardException" : "ArgumentException") `() => new SaveDashboardRequest("Sales", []).ToCommand(Guid.Empty)` }};
+{{~ else ~}}
         var result = await module.SendAsync(new SaveDashboard(Guid.Empty, "Sales", []), {{ test_cancellation_token }});
 
         {{ `result.Error.Code` | should_be `"dashboards.invalid-id"` }};
+{{~ end ~}}
         {{ `module.Store.Saves` | should_be `0` }};
     }
 
@@ -156,5 +164,9 @@ public class SaveDashboardTests
         {{ `module.Store.Saves` | should_be `0` }};
     }
 
+{{~ if ddd ~}}
+    private static SaveDashboard Save(string name, params WidgetPlacement[] widgets) => new SaveDashboardRequest(name, widgets).ToCommand(Id);
+{{~ else ~}}
     private static SaveDashboard Save(string name, params WidgetPlacement[] widgets) => new(Id, name, widgets);
+{{~ end ~}}
 }

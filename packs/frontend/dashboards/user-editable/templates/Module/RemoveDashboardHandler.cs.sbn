@@ -1,3 +1,4 @@
+{{~ if module.values["module.style"] == "crud" ~}}
 {{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
 {{~ option = project["backend.absence"] == "option" ~}}
 {{~ func ok(type, value)
@@ -49,3 +50,58 @@ public sealed class RemoveDashboardHandler(IDashboardStore dashboards, ICurrentU
         return {{ ok "Unit" "Unit.Value" }};
     }
 }
+{{ else ~}}
+{{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+{{~ func ok(type, value)
+  if typed
+    ret "Success(" + value + ")"
+  end
+  ret "Result<" + type + ", ApiError>.Success(" + value + ")"
+end ~}}
+{{~ func fail(type, error)
+  if typed
+    ret "Failure(" + error + ")"
+  end
+  ret "Result<" + type + ", ApiError>.Failure(" + error + ")"
+end ~}}
+using {{ namespace }}.BuildingBlocks.Identity;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Commands.RemoveDashboard;
+
+public sealed class RemoveDashboardHandler(IDashboardStore dashboards, IDashboardsUnitOfWork unitOfWork, ICurrentUser user)
+    : ICommandHandler<RemoveDashboard, Result<Unit, ApiError>>
+{
+    public async Task<Result<Unit, ApiError>> HandleAsync(RemoveDashboard command, CancellationToken cancellationToken)
+    {
+        {{ not_null "command" }}
+
+        if (user.Subject is not { } subject)
+        {
+            return {{ fail "Unit" "DashboardsFailures.NotSignedIn()" }};
+        }
+
+{{~ if option ~}}
+        var found = await dashboards.FindAsync(command.Id, DashboardOwner.From(subject), cancellationToken);
+        if (!found.HasValue)
+        {
+            return {{ fail "Unit" "DashboardsFailures.NotFound(command.Id.Value)" }};
+        }
+
+        dashboards.Remove(found.Value);
+{{~ else ~}}
+        var dashboard = await dashboards.FindAsync(command.Id, DashboardOwner.From(subject), cancellationToken);
+        if (dashboard is null)
+        {
+            return {{ fail "Unit" "DashboardsFailures.NotFound(command.Id.Value)" }};
+        }
+
+        dashboards.Remove(dashboard);
+{{~ end ~}}
+        await unitOfWork.CommitAsync(cancellationToken);
+        return {{ ok "Unit" "Unit.Value" }};
+    }
+}
+{{ end ~}}

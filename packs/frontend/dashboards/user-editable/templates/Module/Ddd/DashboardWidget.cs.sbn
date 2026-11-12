@@ -1,0 +1,40 @@
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+/// <summary>
+/// A widget placed on a dashboard's grid: which declared widget it shows, how, and where. It is a value, compared by
+/// what it holds; whether it fits the dashboard is the dashboard's rule (<see cref="Dashboard.Rearrange"/>).
+/// </summary>
+public sealed record DashboardWidget{{ if strict }} : IValueObject{{ end }}
+{
+    private DashboardWidget(string key, string source, string visual, int x, int y, int width, int height)
+    {
+        Key = key;
+        Source = source;
+        Visual = visual;
+        X = x;
+        Y = y;
+        Width = width;
+        Height = height;
+    }
+
+    /// <summary>Tells the widgets of one dashboard apart, as the grid does.</summary>
+    public string Key { get; }
+
+    /// <summary>The id of the declared widget whose query it runs, e.g. <c>billing.monthly-revenue</c>.</summary>
+    public string Source { get; }
+
+    /// <summary><c>bar</c>, <c>line</c> or <c>pie</c> for a chart; <c>table</c> for a table.</summary>
+    public string Visual { get; }
+
+    public int X { get; }
+
+    public int Y { get; }
+
+    public int Width { get; }
+
+    public int Height { get; }
+
+    public static DashboardWidget From(string key, string source, string visual, int x, int y, int width, int height) =>
+        new(key, source, visual, x, y, width, height);
+}

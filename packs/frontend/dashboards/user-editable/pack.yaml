@@ -1,6 +1,7 @@
 option: frontend.dashboards.user-editable
 modules:
-  dashboards: { module.style: crud, module.cqrs: logical }
+  # The module takes the project's module style like any other module (#608); its CQRS stays logical.
+  dashboards: { module.cqrs: logical }
 files:
   - { template: templates/BuildingBlocks/IModuleWidgets.cs.sbn, target: src/BuildingBlocks/Dashboards/IModuleWidgets.cs }
   - { template: templates/BuildingBlocks/WidgetCatalogBuilder.cs.sbn, target: src/BuildingBlocks/Dashboards/WidgetCatalogBuilder.cs }
@@ -18,15 +19,24 @@ files:
   - { template: templates/BuildingBlocks/HttpCurrentUser.cs.sbn, target: src/BuildingBlocks/Identity/HttpCurrentUser.cs }
   - { template: templates/BuildingBlocks/DashboardWidgetsRegistration.cs.sbn, target: src/BuildingBlocks/Dashboards/Wiring/DashboardWidgetsRegistration.cs }
   - { template: templates/BuildingBlocks/ModuleAdapterRegistration.cs.sbn, target: src/BuildingBlocks/Persistence/Wiring/ModuleAdapterRegistration.cs }
-  - { template: templates/Module/Dashboard.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboard.cs", per-module: true, when: 'module.name == "dashboards"' }
-  - { template: templates/Module/DashboardWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/DashboardWidget.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/Dashboard.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboard.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "crud"' }
+  - { template: templates/Module/DashboardWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/DashboardWidget.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "crud"' }
+  - { template: templates/Module/Ddd/Dashboard.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboards/Dashboard.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "ddd"' }
+  - { template: templates/Module/Ddd/DashboardId.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboards/DashboardId.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "ddd"' }
+  - { template: templates/Module/Ddd/DashboardName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboards/DashboardName.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "ddd"' }
+  - { template: templates/Module/Ddd/DashboardOwner.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboards/DashboardOwner.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "ddd"' }
+  - { template: templates/Module/Ddd/DashboardWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboards/DashboardWidget.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "ddd"' }
+  - { template: templates/Module/Ddd/DashboardErrors.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboards/DashboardErrors.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "ddd"' }
+  - { template: templates/Module/Ddd/InvalidDashboardName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboards/InvalidDashboardName.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "ddd"' }
+  - { template: templates/Module/Ddd/TooManyWidgets.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboards/TooManyWidgets.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "ddd"' }
+  - { template: templates/Module/Ddd/MisplacedWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboards/MisplacedWidget.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "ddd"' }
   - { template: templates/Module/IDashboardStore.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/IDashboardStore.cs", per-module: true, when: 'module.name == "dashboards"' }
   - { template: templates/Module/DashboardsWidgets.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DashboardsWidgets.cs", per-module: true, when: 'module.name == "dashboards"' }
   - { template: templates/Module/DashboardsFailures.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DashboardsFailures.cs", per-module: true, when: 'module.name == "dashboards"' }
   - { template: templates/Module/NotSignedIn.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/NotSignedIn.cs", per-module: true, when: 'module.name == "dashboards"' }
-  - { template: templates/Module/InvalidDashboardId.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidDashboardId.cs", per-module: true, when: 'module.name == "dashboards"' }
-  - { template: templates/Module/InvalidDashboardName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidDashboardName.cs", per-module: true, when: 'module.name == "dashboards"' }
-  - { template: templates/Module/TooManyWidgets.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/TooManyWidgets.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/InvalidDashboardId.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidDashboardId.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "crud"' }
+  - { template: templates/Module/InvalidDashboardName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidDashboardName.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "crud"' }
+  - { template: templates/Module/TooManyWidgets.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/TooManyWidgets.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "crud"' }
   - { template: templates/Module/InvalidWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidWidget.cs", per-module: true, when: 'module.name == "dashboards"' }
   - { template: templates/Module/UnknownWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/UnknownWidget.cs", per-module: true, when: 'module.name == "dashboards"' }
   - { template: templates/Module/DashboardNotFound.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DashboardNotFound.cs", per-module: true, when: 'module.name == "dashboards"' }

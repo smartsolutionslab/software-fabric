@@ -1,0 +1,119 @@
+{{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
+{{~ func ok(type, value)
+  if typed
+    ret "Success(" + value + ")"
+  end
+  ret "Result<" + type + ", DomainError>.Success(" + value + ")"
+end ~}}
+{{~ func fail(type, error)
+  if typed
+    ret "Failure(" + error + ")"
+  end
+  ret "Result<" + type + ", DomainError>.Failure(" + error + ")"
+end ~}}
+using {{ namespace }}.BuildingBlocks.Domain;
+
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+/// <summary>
+/// One user's arrangement of widgets, saved in their tenant. Only its owner reads, changes or removes it; its name, how
+/// many widgets it holds and where they lie on its grid are its own rules, checked whenever it is created or rearranged.
+/// </summary>
+public sealed class Dashboard : AggregateRoot<DashboardId>
+{
+    public const int MaximumNameLength = 100;
+
+    public const int MaximumWidgets = 50;
+
+    public const int MaximumKeyLength = 64;
+
+    public const int Columns = 12;
+
+    public const int MaximumRow = 1000;
+
+    public const int MaximumHeight = 24;
+
+    private static readonly string[] Visuals = ["bar", "line", "pie", "table"];
+
+    private readonly List<DashboardWidget> widgets = [];
+
+    // A field, not a property with a private setter: EF Core would take such a property for a navigation to an entity.
+    private DashboardName name;
+
+    private Dashboard(DashboardId id, DashboardOwner owner, DashboardName name)
+        : base(id)
+    {
+        Owner = owner;
+        this.name = name;
+    }
+
+    /// <summary>The user it belongs to.</summary>
+    public DashboardOwner Owner { get; }
+
+    public DashboardName Name => name;
+
+    public IReadOnlyList<DashboardWidget> Widgets => widgets;
+
+    /// <summary>A new dashboard of the owner's with this name and these widgets, or the first rule they break.</summary>
+    public static Result<Dashboard, DomainError> Create(DashboardId id, DashboardOwner owner, DashboardName name, IReadOnlyList<DashboardWidget> widgets)
+    {
+        {{ not_null "id" }}
+        {{ not_null "owner" }}
+
+        var dashboard = new Dashboard(id, owner, name);
+        var arranged = dashboard.Rearrange(name, widgets);
+        if (!arranged.IsSuccess)
+        {
+            return {{ fail "Dashboard" "arranged.Error" }};
+        }
+
+        return {{ ok "Dashboard" "dashboard" }};
+    }
+
+    /// <summary>Renames the dashboard and puts these widgets in place of its own, or changes nothing and names the first rule they break.</summary>
+    public Result<Unit, DomainError> Rearrange(DashboardName name, IReadOnlyList<DashboardWidget> widgets)
+    {
+        {{ not_null "name" }}
+        {{ not_null "widgets" }}
+
+        var trimmed = name.Value.Trim();
+        if (trimmed.Length == 0 || trimmed.Length > MaximumNameLength)
+        {
+            return {{ fail "Unit" "DashboardErrors.InvalidName(MaximumNameLength)" }};
+        }
+
+        if (widgets.Count > MaximumWidgets)
+        {
+            return {{ fail "Unit" "DashboardErrors.TooManyWidgets(MaximumWidgets)" }};
+        }
+
+        HashSet<string> keys = [with(StringComparer.Ordinal)];
+        foreach (var widget in widgets)
+        {
+            if (widget is null || string.IsNullOrWhiteSpace(widget.Key) || widget.Key.Length > MaximumKeyLength || !keys.Add(widget.Key))
+            {
+                return {{ fail "Unit" "DashboardErrors.MisplacedWidget(widget?.Key ?? string.Empty, $\"needs a key of 1 to {MaximumKeyLength} characters that no other widget on the dashboard has.\")" }};
+            }
+
+            if (!Visuals.Contains(widget.Visual, StringComparer.Ordinal))
+            {
+                return {{ fail "Unit" "DashboardErrors.MisplacedWidget(widget.Key, \"shows bar, line, pie or table.\")" }};
+            }
+
+            if (!FitsTheGrid(widget))
+            {
+                return {{ fail "Unit" "DashboardErrors.MisplacedWidget(widget.Key, $\"must lie within the grid's {Columns} columns, at most {MaximumHeight} rows high.\")" }};
+            }
+        }
+
+        this.name = DashboardName.From(trimmed);
+        this.widgets.Clear();
+        this.widgets.AddRange(widgets);
+        return {{ ok "Unit" "Unit.Value" }};
+    }
+
+    // Each bound on its own, never a sum: X + Width would wrap around for values near int.MaxValue.
+    private static bool FitsTheGrid(DashboardWidget widget) =>
+        widget.X >= 0 && widget.Width >= 1 && widget.Width <= Columns && widget.X <= Columns - widget.Width
+        && widget.Y >= 0 && widget.Y <= MaximumRow && widget.Height >= 1 && widget.Height <= MaximumHeight;
+}

@@ -1,3 +1,4 @@
+{{~ if module.values["module.style"] == "crud" ~}}
 {{~ option = project["backend.absence"] == "option" ~}}
 using {{ namespace }}.Modules.Dashboards.Application;
 using {{ namespace }}.Modules.Dashboards.Domain;
@@ -59,3 +60,71 @@ internal sealed class InMemoryDashboardStore : IDashboardStore
     private IEnumerable<Dashboard> Owned(string owner) =>
         stored.Where(dashboard => dashboard.Owner == owner).OrderBy(dashboard => dashboard.Name, StringComparer.Ordinal).ThenBy(dashboard => dashboard.Id);
 }
+{{ else ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+using {{ namespace }}.Contracts;
+using {{ namespace }}.Modules.Dashboards.Application;
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Tests;
+
+/// <summary>
+/// The dashboards table in memory, read one owner's rows at a time as the module's store reads it, and the module's
+/// unit of work over it: what is added or removed counts once it is committed, and a found dashboard is the stored one,
+/// so committing keeps what a command changed.
+/// </summary>
+internal sealed class InMemoryDashboardStore : IDashboardStore, IDashboardsUnitOfWork
+{
+    private readonly List<Dashboard> stored = [];
+    private readonly List<Dashboard> added = [];
+    private readonly List<Dashboard> removed = [];
+
+    public IReadOnlyList<Dashboard> Stored => stored;
+
+    public int Saves { get; private set; }
+
+{{~ if option ~}}
+    public Task<Option<Dashboard>> FindAsync(DashboardId id, DashboardOwner owner, CancellationToken cancellationToken) =>
+        Task.FromResult(Owned(owner).Where(dashboard => dashboard.Id == id).Select(Option<Dashboard>.Some).SingleOrDefault());
+
+    public Task<Option<Dashboard>> ReadAsync(DashboardId id, DashboardOwner owner, CancellationToken cancellationToken) =>
+        FindAsync(id, owner, cancellationToken);
+{{~ else ~}}
+    public Task<Dashboard?> FindAsync(DashboardId id, DashboardOwner owner, CancellationToken cancellationToken) =>
+        Task.FromResult(Owned(owner).SingleOrDefault(dashboard => dashboard.Id == id));
+
+    public Task<Dashboard?> ReadAsync(DashboardId id, DashboardOwner owner, CancellationToken cancellationToken) =>
+        FindAsync(id, owner, cancellationToken);
+{{~ end ~}}
+
+    public Task<PagedResult<Dashboard>> ListAsync(DashboardOwner owner, Page page, PageSize pageSize, CancellationToken cancellationToken)
+    {
+        List<Dashboard> owned = [.. Owned(owner)];
+        List<Dashboard> items = [.. owned.Skip(page.Skip(pageSize)).Take(pageSize.Value)];
+        return Task.FromResult(new PagedResult<Dashboard>(items, owned.Count, page.Value, pageSize.Value));
+    }
+
+    public Task<IReadOnlyList<Dashboard>> AllAsync(DashboardOwner owner, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Dashboard>>([.. Owned(owner)]);
+
+    public void Add(Dashboard dashboard) => added.Add(dashboard);
+
+    public void Remove(Dashboard dashboard) => removed.Add(dashboard);
+
+    public Task PublishAsync(IntegrationEvent integrationEvent) =>
+        throw new NotSupportedException("The dashboards module publishes no integration events.");
+
+    public Task CommitAsync(CancellationToken cancellationToken)
+    {
+        stored.AddRange(added);
+        stored.RemoveAll(removed.Contains);
+        added.Clear();
+        removed.Clear();
+        Saves++;
+        return Task.CompletedTask;
+    }
+
+    private IEnumerable<Dashboard> Owned(DashboardOwner owner) =>
+        stored.Where(dashboard => dashboard.Owner == owner).OrderBy(dashboard => dashboard.Name.Value, StringComparer.Ordinal).ThenBy(dashboard => dashboard.Id.Value);
+}
+{{ end ~}}

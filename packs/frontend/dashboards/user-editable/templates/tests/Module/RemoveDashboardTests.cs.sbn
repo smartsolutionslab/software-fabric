@@ -1,4 +1,8 @@
+{{~ ddd = module.values["module.style"] == "ddd" ~}}
 using {{ namespace }}.Modules.Dashboards.Application.Commands.RemoveDashboard;
+{{~ if ddd ~}}
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+{{~ end ~}}
 
 namespace {{ namespace }}.Modules.Dashboards.Tests.Commands;
 
@@ -11,7 +15,7 @@ public class RemoveDashboardTests
         await using var module = new DashboardsModuleUnderTest();
         var id = await SavedDashboards.SaveAsync(module, "Sales", 1, {{ test_cancellation_token }});
 
-        var result = await module.SendAsync(new RemoveDashboard(id), {{ test_cancellation_token }});
+        var result = await module.SendAsync(new RemoveDashboard({{ if ddd }}DashboardId.From(id){{ else }}id{{ end }}), {{ test_cancellation_token }});
 
         {{ `result.IsSuccess` | should_be_true }};
         {{ `module.Store.Stored` | should_be_empty }};
@@ -22,7 +26,7 @@ public class RemoveDashboardTests
     {
         await using var module = new DashboardsModuleUnderTest();
 
-        var result = await module.SendAsync(new RemoveDashboard(Guid.CreateVersion7()), {{ test_cancellation_token }});
+        var result = await module.SendAsync(new RemoveDashboard({{ if ddd }}DashboardId.New(){{ else }}Guid.CreateVersion7(){{ end }}), {{ test_cancellation_token }});
 
         {{ `result.Error.Code` | should_be `"dashboards.dashboard-not-found"` }};
     }
@@ -34,10 +38,10 @@ public class RemoveDashboardTests
         await using var other = module.SignedInAs(DashboardsModuleUnderTest.OtherOwner);
         var id = await SavedDashboards.SaveAsync(other, "Sales", 1, {{ test_cancellation_token }});
 
-        var result = await module.SendAsync(new RemoveDashboard(id), {{ test_cancellation_token }});
+        var result = await module.SendAsync(new RemoveDashboard({{ if ddd }}DashboardId.From(id){{ else }}id{{ end }}), {{ test_cancellation_token }});
 
         {{ `result.Error.Code` | should_be `"dashboards.dashboard-not-found"` }};
-        {{ `module.Store.Stored.Single().Owner` | should_be `DashboardsModuleUnderTest.OtherOwner` }};
+        {{ (ddd ? `module.Store.Stored.Single().Owner.Value` : `module.Store.Stored.Single().Owner`) | should_be `DashboardsModuleUnderTest.OtherOwner` }};
     }
 
     {{ test_attribute }}
@@ -45,7 +49,7 @@ public class RemoveDashboardTests
     {
         await using var module = new DashboardsModuleUnderTest(null);
 
-        var result = await module.SendAsync(new RemoveDashboard(Guid.CreateVersion7()), {{ test_cancellation_token }});
+        var result = await module.SendAsync(new RemoveDashboard({{ if ddd }}DashboardId.New(){{ else }}Guid.CreateVersion7(){{ end }}), {{ test_cancellation_token }});
 
         {{ `result.Error.Code` | should_be `"dashboards.not-signed-in"` }};
         {{ `module.Store.Saves` | should_be `0` }};

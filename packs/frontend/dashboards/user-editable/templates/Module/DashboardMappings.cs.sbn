@@ -1,4 +1,5 @@
-using {{ namespace }}.Modules.Dashboards.Domain;
+{{~ ddd = module.values["module.style"] == "ddd" ~}}
+using {{ namespace }}.Modules.Dashboards.Domain{{ if ddd }}.Dashboards{{ end }};
 
 namespace {{ namespace }}.Modules.Dashboards.Application.DTOs;
 
@@ -7,12 +8,12 @@ public static class DashboardMappings
     public static DashboardDto ToDashboardDto(this Dashboard dashboard)
     {
         {{ not_null "dashboard" }}
-        return new DashboardDto(dashboard.Id, dashboard.Name, [.. dashboard.Widgets.Select(widget => widget.ToDto())]);
+        return new DashboardDto(dashboard.Id{{ if ddd }}.Value{{ end }}, dashboard.Name{{ if ddd }}.Value{{ end }}, [.. dashboard.Widgets.Select(widget => widget.ToDto())]);
     }
 
     public static DashboardSummaryDto ToDashboardSummaryDto(this Dashboard dashboard)
     {
         {{ not_null "dashboard" }}
-        return new DashboardSummaryDto(dashboard.Id, dashboard.Name, dashboard.Widgets.Count);
+        return new DashboardSummaryDto(dashboard.Id{{ if ddd }}.Value{{ end }}, dashboard.Name{{ if ddd }}.Value{{ end }}, dashboard.Widgets.Count);
     }
 }

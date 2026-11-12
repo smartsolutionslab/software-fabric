@@ -83,13 +83,30 @@ The owner chose this over an attribute on the query (`[Widget]`, like
 `[McpTool]`), whose result type only an architecture rule could check.
 
 **The dashboards live in a module the pack brings** (ADR-0005): `dashboards`,
-with `module.style: crud` and `module.cqrs: logical` pinned. `fabric new`
-records it in `fabric.yaml` like any module, so the base and the module packs
-give it the normal skeleton (projects, `DashboardsModule`, DbContext, tests,
-tenant column), and the pack adds its code as per-module files for that module
-only. A dashboard is a document saved per user, with no invariants beyond its
-shape, so CRUD is its style; pinning it keeps the pack's branches to the
-project-wide choices.
+with `module.cqrs: logical` pinned. `fabric new` records it in `fabric.yaml`
+like any module, so the base and the module packs give it the normal skeleton
+(projects, `DashboardsModule`, DbContext, tests, tenant column), and the pack
+adds its code as per-module files for that module only.
+
+The module takes the project's `module.style`, like every other module, with
+no exception for the pack (#608, the owner's decision of 2026-11-12). It was
+first pinned to `crud`, which gave a DDD project a module that broke the
+project's own rules: plain classes with public setters and a raw `Guid` id,
+invariants in a handler, saves outside the unit of work.
+
+- Under `crud` a dashboard is a plain entity, and the save use case checks the
+  request before it changes one.
+- Under `ddd` a dashboard is an aggregate root, `Dashboard :
+  AggregateRoot<DashboardId>`, changed only by `Dashboard.Create` and
+  `Rearrange`. They keep its rules (a name of 1 to 100 characters, at most 50
+  widgets, unique keys, the 12-column grid) and answer a broken one with a
+  `DomainError`, which the Application turns into the same `400` and code the
+  CRUD module answers. Whether a widget is one the modules declare for the
+  caller stays the use case's, since it asks the widget catalogue. Commands
+  carry the module's value objects, and the use cases commit through
+  `IDashboardsUnitOfWork`. With `module.ddd-depth: strict`, the identifier and
+  the value objects map by convention and the module's strict rules hold for
+  it.
 
 - A dashboard row holds its owner (the token's `sub`, read through
   `ICurrentUser`), its name and its widgets as one JSON column. Every read

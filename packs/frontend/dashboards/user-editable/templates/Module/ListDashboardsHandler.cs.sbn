@@ -1,3 +1,4 @@
+{{~ ddd = module.values["module.style"] == "ddd" ~}}
 {{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
 {{~ option = project["backend.absence"] == "option" ~}}
 {{~ func ok(type, value)
@@ -15,6 +16,9 @@ end ~}}
 using {{ namespace }}.BuildingBlocks.Identity;
 using {{ namespace }}.BuildingBlocks.Messaging;
 using {{ namespace }}.Modules.Dashboards.Application.DTOs;
+{{~ if ddd ~}}
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+{{~ end ~}}
 
 namespace {{ namespace }}.Modules.Dashboards.Application.Queries.ListDashboards;
 
@@ -30,7 +34,7 @@ public sealed class ListDashboardsHandler(IDashboardStore dashboards, ICurrentUs
             return {{ fail "PagedResult<DashboardSummaryDto>" "DashboardsFailures.NotSignedIn()" }};
         }
 
-        var page = await dashboards.ListAsync(owner, query.Page, query.PageSize, cancellationToken);
+        var page = await dashboards.ListAsync({{ if ddd }}DashboardOwner.From(owner){{ else }}owner{{ end }}, query.Page, query.PageSize, cancellationToken);
         return {{ ok "PagedResult<DashboardSummaryDto>" "new PagedResult<DashboardSummaryDto>([.. page.Items.Select(dashboard => dashboard.ToDashboardSummaryDto())], page.TotalCount, page.Page, page.PageSize)" }};
     }
 }

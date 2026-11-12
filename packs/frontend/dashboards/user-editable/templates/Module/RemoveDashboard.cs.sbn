@@ -1,5 +1,14 @@
+{{~ if module.values["module.style"] == "crud" ~}}
 using {{ namespace }}.BuildingBlocks.Messaging;
 
 namespace {{ namespace }}.Modules.Dashboards.Application.Commands.RemoveDashboard;
 
 public sealed record RemoveDashboard(Guid Id) : ICommand<Result<Unit, ApiError>>;
+{{ else ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Commands.RemoveDashboard;
+
+public sealed record RemoveDashboard(DashboardId Id) : ICommand<Result<Unit, ApiError>>;
+{{ end ~}}

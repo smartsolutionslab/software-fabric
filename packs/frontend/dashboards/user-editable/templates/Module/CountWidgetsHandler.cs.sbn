@@ -1,3 +1,4 @@
+{{~ ddd = module.values["module.style"] == "ddd" ~}}
 {{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
 {{~ option = project["backend.absence"] == "option" ~}}
 {{~ func ok(type, value)
@@ -15,6 +16,9 @@ end ~}}
 using {{ namespace }}.BuildingBlocks.Dashboards;
 using {{ namespace }}.BuildingBlocks.Identity;
 using {{ namespace }}.BuildingBlocks.Messaging;
+{{~ if ddd ~}}
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+{{~ end ~}}
 
 namespace {{ namespace }}.Modules.Dashboards.Application.Queries.CountWidgets;
 
@@ -30,7 +34,7 @@ public sealed class CountWidgetsHandler(IDashboardStore dashboards, ICurrentUser
         }
 
         // All of them: a chart's query takes no page, so a chart that showed only the first would hide the rest for good.
-        var owned = await dashboards.AllAsync(owner, cancellationToken);
-        return {{ ok "ChartSeries" "new ChartSeries([.. owned.Select(dashboard => dashboard.Name)], [new ChartValues(\"Widgets\", [.. owned.Select(dashboard => (decimal)dashboard.Widgets.Count)])])" }};
+        var owned = await dashboards.AllAsync({{ if ddd }}DashboardOwner.From(owner){{ else }}owner{{ end }}, cancellationToken);
+        return {{ ok "ChartSeries" ("new ChartSeries([.. owned.Select(dashboard => dashboard.Name" + (ddd ? ".Value" : "") + ")], [new ChartValues(\"Widgets\", [.. owned.Select(dashboard => (decimal)dashboard.Widgets.Count)])])") }};
     }
 }
