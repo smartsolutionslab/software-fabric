@@ -175,7 +175,7 @@ public sealed class DashboardsTests
 
         files["fabric.yaml"].ShouldContain("  frontend.dashboards: [user-editable]\n");
         files["fabric.yaml"].ShouldContain("modules:\n  dashboards:\n    module.style: ddd\n    module.ddd-depth: light\n    module.cqrs: logical\n");
-        files.Keys.ShouldContain("src/Modules/Dashboards/Dashboards.Domain/Dashboard.cs");
+        files.Keys.ShouldContain("src/Modules/Dashboards/Dashboards.Domain/Dashboards/Dashboard.cs");
         files.Keys.ShouldContain("src/Modules/Dashboards/Dashboards.Api/DashboardsModule.cs");
         files.Keys.ShouldContain("tests/Modules/Dashboards.Tests/DashboardsModuleTests.cs");
         files["src/BuildingBlocks/Dashboards/IModuleWidgets.cs"].ShouldContain("public interface IModuleWidgets");
