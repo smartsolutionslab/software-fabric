@@ -250,6 +250,7 @@ public static class FabricCli
             }
 
             output.Write(summary);
+            WarnExperimental(error, upgrade.Experimental);
             return 0;
         }));
 

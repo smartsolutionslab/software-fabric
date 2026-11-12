@@ -82,7 +82,10 @@ public static class Upgrader
                 theirsTree,
                 ("project", $"fabric {recorded}", $"fabric {GeneratorVersion.Current}"),
                 Path.Combine(scratch, "merge"));
-            return new UpgradeResult(UpgradeSummary.Write(record.Name, recorded, GeneratorVersion.Current, outcome), []);
+            return new UpgradeResult(UpgradeSummary.Write(record.Name, recorded, GeneratorVersion.Current, outcome), [])
+            {
+                Experimental = theirs.Experimental,
+            };
         }
         finally
         {

@@ -123,6 +123,21 @@ public static class Generator
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(overrides);
 
+        return New(catalog, packs, name, profile, profile, overrides);
+    }
+
+    /// <param name="profile">The profile the choices are resolved from, if any.</param>
+    /// <param name="recordedProfile">The profile <c>fabric.yaml</c> names, which a regeneration keeps even when the
+    /// catalog no longer has it.</param>
+    private static GenerationResult New(
+        CatalogModel catalog,
+        IReadOnlyDictionary<string, PackManifest> packs,
+        string name,
+        string? profile,
+        string? recordedProfile,
+        IReadOnlyList<string> overrides)
+    {
+
         if (!Names.IsValid(name))
         {
             return Failure([$"project name '{name}' must be lower-case letters, digits and hyphens, starting with a letter."]);
@@ -185,7 +200,7 @@ public static class Generator
             return Failure(rendered.Errors);
         }
 
-        var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, name, profile, choices));
+        var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, name, recordedProfile, choices));
         return new GenerationResult([.. rendered.Files.Append(fabricFile).OrderBy(file => file.Path, StringComparer.Ordinal)], [])
         {
             Experimental = ExperimentalOptions.Chosen(catalog, choices),
@@ -204,7 +219,10 @@ public static class Generator
         ArgumentNullException.ThrowIfNull(project);
 
         var regeneration = Regeneration.From(project);
-        var generated = New(catalog, packs, regeneration.Name, regeneration.Profile, regeneration.Overrides);
+        // Every recorded choice is an override, so the profile only fills what fabric.yaml does not record. A profile the
+        // catalog no longer has cannot do that, and the record still names it.
+        var profile = regeneration.Profile is { } named && catalog.Profiles.ContainsKey(named) ? named : null;
+        var generated = New(catalog, packs, regeneration.Name, profile, regeneration.Profile, regeneration.Overrides);
         if (generated.Errors.Count > 0)
         {
             return generated;
