@@ -174,17 +174,20 @@ public static class Upgrader
         return FabricFile.Read(reader, path);
     }
 
-    /// <summary>What a record chose, as text: two records are the same project when these are equal.</summary>
+    /// <summary>
+    /// What a record chose, as text: two records are the same project when these are equal. The order of keys inside a
+    /// mapping is not a choice; the order of the modules is, since they are added in it.
+    /// </summary>
     private static string Choices(FabricRecord record)
     {
         var regeneration = Regeneration.From(record);
         var text = new StringBuilder()
             .AppendLine(CultureInfo.InvariantCulture, $"name {regeneration.Name}")
             .AppendLine(CultureInfo.InvariantCulture, $"profile {regeneration.Profile}")
-            .AppendLine(string.Join(' ', regeneration.Overrides));
+            .AppendLine(string.Join(' ', regeneration.Overrides.Order(StringComparer.Ordinal)));
         foreach (var module in regeneration.Modules)
         {
-            text.AppendLine(CultureInfo.InvariantCulture, $"module {module.Name} {string.Join(' ', module.Overrides)}");
+            text.AppendLine(CultureInfo.InvariantCulture, $"module {module.Name} {string.Join(' ', module.Overrides.Order(StringComparer.Ordinal))}");
         }
 
         return text.ToString();

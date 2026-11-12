@@ -215,8 +215,17 @@ public static class Generator
         foreach (var module in regeneration.Modules)
         {
             var current = FabricFile.Read(new StringReader(files[FabricFile.FileName].Content), FabricFile.FileName);
-            if (current.Choices.Modules.ContainsKey(module.Name))
+            if (current.Choices.Modules.TryGetValue(module.Name, out var brought))
             {
+                var recorded = project.Choices.Modules[module.Name];
+                if (!SameValues(recorded, brought))
+                {
+                    return Failure([
+                        $"module '{module.Name}' records {Describe(recorded)}, but a pack brings it with {Describe(brought)}; " +
+                        "a module's choices are fixed (ADR-0001), so it cannot be regenerated.",
+                    ]);
+                }
+
                 continue;
             }
 
@@ -242,6 +251,12 @@ public static class Generator
 
         return new GenerationResult([.. files.Values.OrderBy(file => file.Path, StringComparer.Ordinal)], []) { Experimental = experimental };
     }
+
+    private static bool SameValues(IReadOnlyDictionary<string, IReadOnlyList<string>> first, IReadOnlyDictionary<string, IReadOnlyList<string>> second) =>
+        first.Count == second.Count && first.All(entry => second.TryGetValue(entry.Key, out var other) && other.SequenceEqual(entry.Value));
+
+    private static string Describe(IReadOnlyDictionary<string, IReadOnlyList<string>> values) =>
+        string.Join(", ", values.Select(value => $"{value.Key}={string.Join(',', value.Value)}"));
 
     /// <summary>Puts the packs that bring a module in front of a rule violation reported for that module.</summary>
     private static List<string> NameDeclarers(IReadOnlyList<string> violations, Dictionary<string, List<string>> declarers) =>

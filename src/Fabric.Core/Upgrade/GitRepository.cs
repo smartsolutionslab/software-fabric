@@ -70,7 +70,8 @@ internal sealed class GitRepository
 
         List<ChangedFile> merged = [];
         List<UpgradeConflict> conflicts = [];
-        foreach (var (path, stages) in Unmerged())
+        var (unmerged, notRegularFiles) = Unmerged();
+        foreach (var (path, stages) in unmerged)
         {
             var kind = stages switch
             {
@@ -80,7 +81,10 @@ internal sealed class GitRepository
                 _ => ConflictKind.DeletedByGenerator,
             };
 
-            if (kind is ConflictKind.BothChanged or ConflictKind.BothAdded && MergeFile(path, stages.Contains(1), labels, scratch))
+            // A symlink or submodule on any side is a type change, never merged as text: writing the result through a
+            // link would change whatever it points at.
+            if (kind is ConflictKind.BothChanged or ConflictKind.BothAdded && !notRegularFiles.Contains(path) &&
+                MergeFile(path, stages.Contains(1), labels, scratch))
             {
                 merged.Add(new ChangedFile(kind == ConflictKind.BothAdded ? 'A' : 'M', path));
             }
@@ -109,14 +113,24 @@ internal sealed class GitRepository
             edited);
     }
 
-    /// <summary>Every unmerged path, ordered, with the stages git holds for it.</summary>
-    private SortedDictionary<string, List<int>> Unmerged()
+    /// <summary>
+    /// Every unmerged path, ordered, with the stages git holds for it, and the paths where a stage is anything but a
+    /// regular file (a symlink, a submodule).
+    /// </summary>
+    private (SortedDictionary<string, List<int>> Paths, HashSet<string> NotRegularFiles) Unmerged()
     {
         SortedDictionary<string, List<int>> paths = new(StringComparer.Ordinal);
+        HashSet<string> notRegularFiles = new(StringComparer.Ordinal);
         foreach (var entry in Required(Git(top, "ls-files", "--unmerged", "-z")).Split('\0', StringSplitOptions.RemoveEmptyEntries))
         {
             var (info, path) = (entry[..entry.IndexOf('\t', StringComparison.Ordinal)], entry[(entry.IndexOf('\t', StringComparison.Ordinal) + 1)..]);
-            var stage = info.Split(' ')[2][0] - '0';
+            var fields = info.Split(' ');
+            var stage = fields[2][0] - '0';
+            if (fields[0] is not ("100644" or "100755"))
+            {
+                notRegularFiles.Add(path);
+            }
+
             if (!paths.TryGetValue(path, out var stages))
             {
                 paths.Add(path, stages = []);
@@ -130,7 +144,7 @@ internal sealed class GitRepository
             stages.Sort();
         }
 
-        return paths;
+        return (paths, notRegularFiles);
     }
 
     /// <summary>
@@ -159,7 +173,13 @@ internal sealed class GitRepository
             return false;
         }
 
-        File.WriteAllBytes(Path.Combine(top, path), File.ReadAllBytes(project));
+        var target = Path.Combine(top, path);
+        if (new FileInfo(target).LinkTarget is not null)
+        {
+            return false;
+        }
+
+        File.WriteAllBytes(target, File.ReadAllBytes(project));
         if (result.ExitCode != 0)
         {
             return false;
