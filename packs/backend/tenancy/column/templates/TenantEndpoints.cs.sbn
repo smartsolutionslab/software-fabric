@@ -8,14 +8,14 @@ namespace Microsoft.AspNetCore.Builder;
 
 public static class TenantEndpoints
 {
-    /// <summary>The route parameter that names the tenant: <c>/tenants/{tenant}/...</c>.</summary>
+    /// <summary>The route parameter that names the tenant: <c>{tenant}</c>, as in <c>/contracts/{tenant}</c>.</summary>
     public const string TenantParameter = "tenant";
 
     /// <summary>The <c>code</c> of the problem a tenant missing from <see cref="ITenantDirectory"/> answers.</summary>
     public const string TenantNotFound = "tenant-not-found";
 
     /// <summary>
-    /// The endpoint writes for the tenant its route names (<c>/tenants/{tenant}/...</c>): its handler runs inside
+    /// The endpoint writes for the tenant its route names (a <c>{tenant}</c> parameter): its handler runs inside
     /// <see cref="TenantScope.ForTenant"/>, as that tenant's own users' requests do, so it reads that tenant's rows alone,
     /// and what it saves or publishes belongs to that tenant. The command stays free of a tenant. A tenant
     /// <see cref="ITenantDirectory"/> does not list answers <c>404</c> problem details with the code
@@ -33,7 +33,7 @@ public static class TenantEndpoints
         {
             if (builder is RouteEndpointBuilder route && route.RoutePattern.GetParameter(TenantParameter) is null)
             {
-                throw new InvalidOperationException($"{Name(route)} is mapped with ForTenant(), but its route has no {{ "{{" }}{TenantParameter}{{ "}}" }} parameter: name the tenant in the route, as /tenants/{{ "{{" }}{TenantParameter}{{ "}}" }}/... does.");
+                throw new InvalidOperationException($"{Name(route)} is mapped with ForTenant(), but its route has no {{ "{{" }}{TenantParameter}{{ "}}" }} parameter: name the tenant in the route, as /contracts/{{ "{{" }}{TenantParameter}{{ "}}" }} does.");
             }
         });
 
