@@ -12,6 +12,11 @@ updates:
     groups:
       nuget-minor-and-patch:
         update-types: [minor, patch]
+{{~ if slots["dependabot.nuget-ignore"] != "" ~}}
+    # Versions the generator holds back on purpose: a newer one fails restore. Each says why and which issue lifts it.
+    ignore:
+{{ slots["dependabot.nuget-ignore"] }}
+{{~ end ~}}
 
   - package-ecosystem: github-actions
     directory: /

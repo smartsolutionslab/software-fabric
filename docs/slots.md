@@ -49,7 +49,7 @@ web/
   app/                          frontend.framework.react
   modules/<module>/             frontend.mfe-technique.module-federation or .native-federation (per module: the module's remote; micro-frontends only)
 .github/workflows/ci.yml        base; steps by slot
-.github/dependabot.yml          base; an entry per package ecosystem by slot
+.github/dependabot.yml          base; an entry per package ecosystem by slot, held NuGet versions ignored by slot
 ```
 
 ## Modules register by convention, never by list
@@ -552,6 +552,7 @@ Tailwind palette class.
 | `e2e.after-tests` *(added for #282; a role slot of `frontend.framework`)* | `.github/scripts/e2e.sh` (after `pnpm e2e`, while the AppHost still runs; rendered only with a contribution) | screenshot-tests (the screenshot tests, in Playwright's pinned container) |
 | `ci.e2e-steps` *(added in M1-09)* | `.github/workflows/ci.yml` | react (builds, then `.github/scripts/e2e.sh` starts the AppHost and runs Playwright); without a contribution there is no e2e job |
 | `dependabot.updates` *(added for #55)* | `.github/dependabot.yml` (base writes the NuGet and GitHub Actions entries) | pnpm (npm for `/web`); a pack that adds a package ecosystem adds its entry here |
+| `dependabot.nuget-ignore` *(added for #613)* | `.github/dependabot.yml` (the NuGet entry's `ignore` list; rendered only with a contribution) | base (`Microsoft.CodeAnalysis.CSharp` at 5.0.0 for Wolverine, #615), ef-core (EF Core at Npgsql's rc.3 build, PostgreSQL only, #551); a pack that holds a package version back on purpose ignores its updates here, with a comment naming the issue that lifts the hold, and that issue's change removes the entry |
 
 ## Generator changes this needs
 
