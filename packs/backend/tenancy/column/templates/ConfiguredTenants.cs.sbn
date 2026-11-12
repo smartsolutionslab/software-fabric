@@ -1,0 +1,45 @@
+using Microsoft.Extensions.Configuration;
+
+namespace {{ namespace }}.BuildingBlocks.Tenancy;
+
+/// <summary>
+/// The tenants in the configuration's <see cref="Key"/>, one entry each, read once when the host first needs them: the
+/// AppHost sets them locally, a deployment beside its identity provider's tenant groups. A tenant added there is known
+/// once the host restarts. Without the key, no tenant is known, so every endpoint mapped with <c>ForTenant()</c>
+/// answers 404.
+/// </summary>
+public sealed class ConfiguredTenants(IConfiguration configuration) : ITenantDirectory
+{
+    /// <summary>The configuration key of the tenants.</summary>
+    public const string Key = "Tenancy:Tenants";
+
+    public IReadOnlyList<string> Tenants { get; } = Read(configuration);
+
+    public bool Contains(string tenantId) => Tenants.Contains(tenantId, StringComparer.Ordinal);
+
+    public PagedResult<string> List(Page page, PageSize pageSize)
+    {
+        {{ not_null "page" }}
+        {{ not_null "pageSize" }}
+
+        return new PagedResult<string>([.. Tenants.Skip(page.Skip(pageSize)).Take(pageSize.Value)], Tenants.Count, page.Value, pageSize.Value);
+    }
+
+    private static List<string> Read(IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        List<string> tenants = [];
+        foreach (var entry in configuration.GetSection(Key).GetChildren())
+        {
+            if (string.IsNullOrWhiteSpace(entry.Value))
+            {
+                throw new InvalidOperationException($"{Key}:{entry.Key} is empty; name a tenant there or remove the entry.");
+            }
+
+            tenants.Add(entry.Value);
+        }
+
+        return tenants;
+    }
+}

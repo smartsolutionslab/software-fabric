@@ -1,0 +1,5 @@
+{{~ if writes_for_tenants ~}}
+        // The AppHost's tenants (tenancy: a tenant column), which staff may write for.
+        settings["Tenancy:Tenants:0"] = "tenant-a";
+        settings["Tenancy:Tenants:1"] = "tenant-b";
+{{~ end ~}}

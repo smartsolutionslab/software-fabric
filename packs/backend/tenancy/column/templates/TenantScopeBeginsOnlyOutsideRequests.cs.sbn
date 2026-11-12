@@ -1,0 +1,83 @@
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// <c>TenantScope.Begin</c> sets the tenant for work outside a request: consumers, domain-event reactions in their own
+/// scope, background work and tests. Request code never calls it: in a request the tenant comes from the user's token,
+/// or, for staff writing for a tenant, from an endpoint mapped with <c>ForTenant()</c>, whose policy requires the staff
+/// role and whose tenant must be listed. A <c>Begin</c> in an Api project or in a command or query handler would let a
+/// request write into any tenant it names, past both. Sources under <c>src/Modules</c> are parsed, not grepped: a comment
+/// or a string that spells the call is prose.
+/// </summary>
+public sealed class TenantScopeBeginsOnlyOutsideRequests : IArchitectureRule
+{
+    private static readonly string[] Handlers = ["ICommandHandler", "IQueryHandler"];
+
+    public string Description => "TenantScope.Begin is called only outside requests: never in a module's Api project, nor in a command or query handler.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var root = RepositoryRoot();
+        List<string> violations = [];
+        foreach (var path in Directory.EnumerateFiles(Path.Combine(root, "src", "Modules"), "*.cs", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
+            .Where(path => !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal))
+        {
+            var inApi = path.Split('/').Any(segment => segment.EndsWith(".Api", StringComparison.Ordinal));
+            var source = CSharpSyntaxTree.ParseText(File.ReadAllText(Path.Combine(root, path))).GetRoot();
+            foreach (var call in source.DescendantNodes().OfType<InvocationExpressionSyntax>().Where(IsBegin))
+            {
+                var where = inApi ? "an Api project" : Handler(call) is { } handler ? $"the handler {handler}" : null;
+                if (where is not null)
+                {
+                    var line = call.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+                    violations.Add($"{path}:{line}: calls TenantScope.Begin in request code ({where}). To write for a tenant the request names, map the endpoint with .RequireAuthorization(<Module>PolicyNames.WriteForTenants).ForTenant(); Begin is for consumers and background work.");
+                }
+            }
+        }
+
+        return violations;
+    }
+
+    /// <summary><c>TenantScope.Begin(...)</c>, the type named plainly or qualified.</summary>
+    private static bool IsBegin(InvocationExpressionSyntax invocation) =>
+        invocation.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Begin" } access
+        && access.Expression switch
+        {
+            SimpleNameSyntax simple => simple.Identifier.ValueText == "TenantScope",
+            MemberAccessExpressionSyntax qualified => qualified.Name.Identifier.ValueText == "TenantScope",
+            _ => false,
+        };
+
+    /// <summary>The name of the command or query handler the call is in, if it is in one.</summary>
+    private static string? Handler(SyntaxNode node) =>
+        node.Ancestors().OfType<TypeDeclarationSyntax>()
+            .FirstOrDefault(type => type.BaseList?.Types.Any(baseType => RightmostTypeName(baseType.Type) is { } name && Handlers.Contains(name, StringComparer.Ordinal)) == true)?
+            .Identifier.ValueText;
+
+    private static string? RightmostTypeName(TypeSyntax type) =>
+        type switch
+        {
+            SimpleNameSyntax simple => simple.Identifier.ValueText,
+            QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
+            _ => null,
+        };
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+}

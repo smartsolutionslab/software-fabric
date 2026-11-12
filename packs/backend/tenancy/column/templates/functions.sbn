@@ -18,3 +18,10 @@ end
 func shared_records
   ret cross_tenant_reads
 end
+
+# Whether staff write into one tenant's rows through ForTenant() (#629, owner decisions of 2026-11-12): the same choices
+# as cross_tenant_reads, since the writers are the staff who read across tenants. It brings the tenant list
+# (Tenancy:Tenants behind ITenantDirectory) and GET /tenants.
+func writes_for_tenants
+  ret cross_tenant_reads
+end
