@@ -13,7 +13,7 @@ The current tenant comes from the user's token: {{ tenant_claim_adr }}. Work out
 
 **Staff read across tenants on endpoints that opt in** (the repository owner's decision, 2026-11-12). An endpoint mapped with `.RequireAuthorization(<Module>PolicyNames.ReadAllTenants).AcrossTenants()` runs its handler inside `TenantScope.AllTenants()`: the query filter becomes "every tenant, or this row's tenant", so the handler reads every tenant's rows without `IgnoreQueryFilters()`. `AcrossTenants()` adds an endpoint filter, which runs after authorization, and is the only way to open that scope. Each module's `<Module>PolicyNames.ReadAllTenants` (`<module>.read-all-tenants`) requires the role named once, in `CrossTenantRole.Name` (`{{ cross_tenant_role }}`), which the identity provider grants to staff who belong to no tenant; a user in a tenant is refused the endpoint (403), and staff see nothing on an endpoint without `AcrossTenants()`.
 
-**Writes still need one tenant.** Inside the scope there is no current tenant: saving any change fails, as does publishing an integration event, as both do without a tenant. A `TenantScope.Begin(tenantId)` inside it narrows the work to that tenant again.
+**Writes still need one tenant.** Inside the scope there is no current tenant: saving any change fails, as does publishing an integration event, as both do without a tenant. So does every command that is not a query (`ExecuteUpdate`, `ExecuteDelete`, raw SQL), which bypasses `SaveChanges` but not the query filter: a module context's interceptor, `AllTenantsWriteNothing`, refuses it. A `TenantScope.Begin(tenantId)` inside it narrows the work to that tenant again.
 
 ## Gates
 

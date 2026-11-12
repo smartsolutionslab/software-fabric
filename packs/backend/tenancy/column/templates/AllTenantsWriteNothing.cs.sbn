@@ -1,0 +1,37 @@
+using System.Data.Common;
+using {{ namespace }}.BuildingBlocks.Persistence;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+
+namespace {{ namespace }}.BuildingBlocks.Tenancy;
+
+/// <summary>
+/// Refuses every command that is not a query while its context reads all tenants (AcrossTenants()). SaveChanges fails
+/// there before it sends anything; this catches what bypasses it, ExecuteUpdate, ExecuteDelete and raw SQL, to which the
+/// query filter that lets every tenant through would apply too.
+/// </summary>
+public sealed class AllTenantsWriteNothing(ModuleDbContext context) : DbCommandInterceptor
+{
+    public override InterceptionResult<int> NonQueryExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
+    {
+        RefuseAcrossTenants();
+        return base.NonQueryExecuting(command, eventData, result);
+    }
+
+    public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+        DbCommand command,
+        CommandEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken cancellationToken = default)
+    {
+        RefuseAcrossTenants();
+        return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+    }
+
+    private void RefuseAcrossTenants()
+    {
+        if (context.ReadsAllTenants)
+        {
+            throw new InvalidOperationException("Cannot write inside AcrossTenants(): reading every tenant's rows writes for none of them.");
+        }
+    }
+}

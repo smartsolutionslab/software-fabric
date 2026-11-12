@@ -1,0 +1,2 @@
+{{~ if cross_tenant_reads ~}}
+            new {{ namespace }}.BuildingBlocks.Tenancy.AllTenantsWriteNothing(this){{ end }}
