@@ -1,0 +1,11 @@
+namespace {{ namespace }}.BuildingBlocks.Modules;
+
+public static class PermissionMappings
+{
+    /// <summary>The permission a module's policy name stands for.</summary>
+    public static PermissionDto ToDto(this string policyName)
+    {
+        {{ not_null "policyName" }}
+        return new PermissionDto(policyName);
+    }
+}

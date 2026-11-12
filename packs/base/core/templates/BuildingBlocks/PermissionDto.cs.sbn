@@ -1,0 +1,7 @@
+namespace {{ namespace }}.BuildingBlocks.Modules;
+
+/// <summary>
+/// A permission the caller holds, by its policy name (<c>billing.manage</c>). Every module's probe answers it, so the
+/// OpenAPI document describes it once, whichever modules the project has.
+/// </summary>
+public sealed record PermissionDto(string Name);
