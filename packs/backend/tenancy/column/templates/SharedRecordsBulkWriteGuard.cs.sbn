@@ -13,9 +13,9 @@ namespace {{ namespace }}.BuildingBlocks.Tenancy;
 /// SaveChanges refuses such a write before it sends anything; a bulk write bypasses it, and a shared type has no tenant
 /// filter to narrow it, so one tenant's ExecuteDelete would erase every tenant's shared records. The statement's target
 /// is a table of the module's model, its whole name rendered by the provider as in the statement, right after UPDATE or
-/// DELETE FROM, or aliased by the identifier there. A statement whose target is none of them is refused when it names a
-/// shared table anywhere. SQL a module writes itself (ExecuteSql) is not checked here: it is never filtered by tenant
-/// either.
+/// DELETE FROM (past the comments EF Core writes for query tags), or aliased by the identifier there. A statement whose
+/// target is none of them is refused when it names a shared table anywhere. SQL a module writes itself (ExecuteSql) is
+/// not checked here: it is never filtered by tenant either.
 /// </summary>
 public sealed partial class SharedRecordsBulkWriteGuard(ModuleDbContext context) : DbCommandInterceptor
 {
@@ -71,21 +71,27 @@ public sealed partial class SharedRecordsBulkWriteGuard(ModuleDbContext context)
     /// <summary>Whether the statement updates or deletes from the table: named right after UPDATE or DELETE FROM, or aliased by the identifier there.</summary>
     private static bool Targets(string sql, string table)
     {
-        var start = Start().Match(sql);
+        // EF Core writes a query's tags (TagWith) as comment lines before the statement.
+        var statement = sql[LeadingComments().Match(sql).Length..];
+        var start = Start().Match(statement);
         if (!start.Success)
         {
             return false;
         }
 
-        var rest = sql[start.Length..];
+        var rest = statement[start.Length..];
         if (rest.StartsWith(table, StringComparison.Ordinal) && (rest.Length == table.Length || char.IsWhiteSpace(rest[table.Length])))
         {
             return true;
         }
 
         var alias = Alias().Match(rest);
-        return alias.Success && sql.Contains($"{table} AS {alias.Value}", StringComparison.Ordinal);
+        return alias.Success && statement.Contains($"{table} AS {alias.Value}", StringComparison.Ordinal);
     }
+
+    /// <summary>Whitespace, <c>--</c> comment lines and <c>/* */</c> comments at the start of a statement.</summary>
+    [GeneratedRegex(@"^(?:\s+|--[^\n]*(?:\n|$)|/\*.*?\*/)*", RegexOptions.Singleline | RegexOptions.CultureInvariant)]
+    private static partial Regex LeadingComments();
 
     [GeneratedRegex(@"^\s*(?:UPDATE|DELETE\s+FROM)\s+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex Start();

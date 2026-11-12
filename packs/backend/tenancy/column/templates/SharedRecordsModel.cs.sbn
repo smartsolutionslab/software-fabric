@@ -42,8 +42,8 @@ public static class SharedRecordsModel
 
     /// <summary>
     /// Fails for a type declared shared below the root of its hierarchy or as an owned type, where the declaration would
-    /// be ignored, and for a shared type that references a tenant's type, through which a record every tenant reads
-    /// would point at one tenant's.
+    /// be ignored; for a shared type that references a tenant's type, through which a record every tenant reads would
+    /// point at one tenant's; and for a tenant's type whose reference to a shared type cascades on delete.
     /// </summary>
     internal static void CheckSharedRecords(this IReadOnlyModel model)
     {
@@ -66,6 +66,14 @@ public static class SharedRecordsModel
 
             if (!entity.IsSharedByAllTenants())
             {
+                // Deleting a shared record must not reach the tenants' rows that reference it, which no change tracker
+                // has loaded: the database itself would delete or change every tenant's.
+                if (entity.GetForeignKeys().FirstOrDefault(key => !key.IsOwnership && key.PrincipalEntityType.IsSharedByAllTenants() && ChangesDependents(key.DeleteBehavior)) is { } cascading)
+                {
+                    throw new InvalidOperationException(
+                        $"{entity.ClrType.Name} references {cascading.PrincipalEntityType.ClrType.Name}, which is shared by all tenants, with a delete that cascades ({cascading.DeleteBehavior}): deleting a shared record would change every tenant's {entity.ClrType.Name} records. Configure OnDelete(DeleteBehavior.Restrict), NoAction or ClientSetNull.");
+                }
+
                 continue;
             }
 
@@ -79,4 +87,8 @@ public static class SharedRecordsModel
             }
         }
     }
+
+    /// <summary>Whether deleting the principal deletes or changes its dependents in the database (or through EF Core for the ones it has loaded, ClientCascade).</summary>
+    private static bool ChangesDependents(DeleteBehavior behavior) =>
+        behavior is DeleteBehavior.Cascade or DeleteBehavior.ClientCascade or DeleteBehavior.SetNull;
 }
