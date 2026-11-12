@@ -1,0 +1,30 @@
+{{~ editor = module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains(project["frontend.dashboards"], "user-editable") && project["frontend.api-client"] == "orval" && (!object.has_key(project, "frontend.state") || project["frontend.state"] != "pinia") ~}}
+import { render, screen } from '@testing-library/vue';
+import { expect, test{{ if editor }}, vi{{ end }} } from 'vitest';
+import { axe } from 'vitest-axe';
+import { createMemoryHistory } from 'vue-router';
+import { createAppRouter } from '@/router';
+import {{ module.namespace }}Page from './{{ module.namespace }}Page.vue';
+{{~ if editor ~}}
+
+// The page is the dashboard editor, which needs the query client and the generated client; its own test checks it with
+// axe on its data. Here it stands in, so this test checks the page around it.
+vi.mock('@/dashboards/DashboardEditor.vue', async () => {
+  const { h } = await import('vue');
+  return { default: { render: () => h('p', 'The dashboard editor') } };
+});
+{{~ end ~}}
+
+test('the {{ module.namespace }} page has no accessibility violations axe can find', async () => {
+  const router = createAppRouter(createMemoryHistory());
+  await router.push('/{{ module.name }}');
+
+  const { container } = render({{ module.namespace }}Page, { global: { plugins: [router] } });
+{{~ if editor ~}}
+  expect(await screen.findByText('The dashboard editor')).toBeInTheDocument();
+{{~ else ~}}
+  expect(await screen.findByRole('heading', { name: '{{ module.namespace }}' })).toBeInTheDocument();
+{{~ end ~}}
+
+  expect(await axe(container)).toHaveNoViolations();
+});

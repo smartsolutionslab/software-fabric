@@ -106,6 +106,25 @@ public sealed class TanStackRouterTests
         }
         """;
 
+    /// <summary>The invoice page's own component test: every module screen has one with an axe check (#604).</summary>
+    private const string NestedPageTest = """
+        import { render, screen } from '@testing-library/react';
+        import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
+        import { expect, test } from 'vitest';
+        import { axe } from 'vitest-axe';
+        import { App } from '@/App';
+        import { createAppRouter } from '@/router';
+
+        test('the invoice page has no accessibility violations axe can find', { timeout: 20_000 }, async () => {
+          const { container } = render(
+            <RouterProvider router={createAppRouter(createMemoryHistory({ initialEntries: ['/billing/invoices/42'] }), <App />)} />,
+          );
+          expect(await screen.findByRole('heading', { name: 'Invoice 42' })).toBeInTheDocument();
+
+          expect(await axe(container)).toHaveNoViolations();
+        });
+        """;
+
     private const string NestedRouteTest = """
         import { render, screen } from '@testing-library/react';
         import userEvent from '@testing-library/user-event';
@@ -179,6 +198,7 @@ public sealed class TanStackRouterTests
         project.Write("web/app/src/modules/billing/routes.tsx", NestedRoutes);
         project.Write("web/app/src/modules/billing/BillingPage.tsx", NestingPage);
         project.Write("web/app/src/modules/billing/InvoicePage.tsx", NestedPage);
+        project.Write("web/app/src/modules/billing/InvoicePage.test.tsx", NestedPageTest);
         project.Write("web/app/src/modules/billing/nested.test.tsx", NestedRouteTest);
 
         RunWeb(project, "install", "build", "lint", "test");

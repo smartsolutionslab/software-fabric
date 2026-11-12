@@ -250,7 +250,8 @@ public sealed class DashboardsTests
             var files = Files(profile, overrides);
 
             files.Keys.ShouldNotContain(path => path.StartsWith("web/app/src/dashboards/", StringComparison.Ordinal), profile);
-            files.Single(file => file.Key.StartsWith("web/app/src/modules/dashboards/DashboardsPage.", StringComparison.Ordinal)).Value
+            files.Single(file => file.Key.StartsWith("web/app/src/modules/dashboards/DashboardsPage.", StringComparison.Ordinal)
+                    && !file.Key.Contains(".test.", StringComparison.Ordinal)).Value
                 .ShouldNotContain("DashboardEditor", customMessage: profile);
         }
     }
