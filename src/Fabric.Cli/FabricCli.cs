@@ -5,6 +5,7 @@ using Fabric.Core.Generation;
 using Fabric.Core.Matrix;
 using Fabric.Core.Packs;
 using Fabric.Core.Reference;
+using Fabric.Core.Upgrade;
 
 namespace Fabric.Cli;
 
@@ -24,6 +25,7 @@ public static class FabricCli
             ValidateCommand(output, error),
             NewCommand(output, error),
             AddModuleCommand(output, error),
+            UpgradeCommand(output, error),
             ProfilesCommand(output, error),
             MatrixCommand(output, error),
             ReferenceCommand(output, error),
@@ -202,6 +204,52 @@ public static class FabricCli
 
             output.WriteLine($"added module {moduleName} with {Files(addition.Created.Count)}.");
             WarnExperimental(error, addition.Experimental);
+            return 0;
+        }));
+
+        return command;
+    }
+
+    private static Command UpgradeCommand(TextWriter output, TextWriter error)
+    {
+        var (catalog, packs) = (CatalogOption(), PacksOption());
+        var project = new Option<string>("--project")
+        {
+            Description = "The generated project to upgrade: the top of a git repository with a clean working tree. Defaults to the current directory.",
+            DefaultValueFactory = _ => ".",
+        };
+        var from = new Option<string?>("--from")
+        {
+            Description = "The fabric that wrote the project (a tool or its fabric.dll), for a version that cannot be installed. " +
+                "Without it, the version fabric.yaml records is installed from the organisation's feed.",
+        };
+        var command = new Command(
+            "upgrade",
+            "Merge what this fabric writes for the project's fabric.yaml into the project, three-way against what the recorded " +
+            "version writes (ADR-0016). Conflicts are left as git conflicts; nothing is committed.")
+        {
+            project,
+            from,
+            catalog,
+            packs,
+        };
+
+        command.SetAction(result => Guarded(error, () =>
+        {
+            var catalogModel = CatalogReader.ReadFile(result.GetValue(catalog)!);
+            var loaded = PackLoader.Load(result.GetValue(packs)!, catalogModel);
+            if (loaded.Errors.Count > 0)
+            {
+                return Fail(error, loaded.Errors);
+            }
+
+            var upgrade = Upgrader.Upgrade(result.GetValue(project)!, result.GetValue(from), catalogModel, loaded.Packs);
+            if (upgrade.Summary is not { } summary)
+            {
+                return Fail(error, upgrade.Errors);
+            }
+
+            output.Write(summary);
             return 0;
         }));
 
