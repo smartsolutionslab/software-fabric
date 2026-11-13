@@ -99,6 +99,42 @@ public sealed class AgUiTests
 
         """;
 
+    /// <summary>
+    /// The header written through a member, by name and computed, then words that say authorization without setting a
+    /// header: a constant and a field of unrelated data.
+    /// </summary>
+    private const string HeaderWrittenThroughAMember = """
+        export const section = 'authorization';
+
+        export function setToken(headers: { Authorization?: string }, token: string) {
+          const assigned = headers;
+          assigned.Authorization = token;
+        }
+
+        export function setLowerCase(headers: Record<string, string>, token: string) {
+          headers['authorization'] = token;
+        }
+
+        export const permissions = { scope: 'authorization', role: 'manager' };
+
+        """;
+
+    /// <summary>A component whose template builds a second <c>HttpAgent</c> and sets the header by hand.</summary>
+    private const string CallToTheHostInATemplate = """
+        <script setup lang="ts">
+        import { HttpAgent } from '@ag-ui/client';
+
+        const headers = new Headers();
+        defineExpose({ HttpAgent, headers });
+        </script>
+
+        <template>
+          <button type="button" @click="new HttpAgent({ url: '/api/agents/assistant' })">Ask</button>
+          <button type="button" @click="headers.set('Authorization', 'Bearer not-a-token')">Sign</button>
+        </template>
+
+        """;
+
     /// <summary>The rules eslint names for <see cref="SecondCallToTheHost"/>, in the order of its lines.</summary>
     private const string SecondCallToTheHostFindings =
         "no-restricted-globals, no-restricted-syntax, no-restricted-syntax, no-restricted-properties, no-restricted-syntax, no-restricted-globals";
@@ -405,6 +441,43 @@ public sealed class AgUiTests
         exitCode.ShouldNotBe(0, output);
         LintFindings(output).ShouldBe(SecondCallToTheHostFindings, output);
         output.ShouldContain("only src/agents/connectAgent.ts calls the host by hand");
+    }
+
+    /// <summary>
+    /// Review of #638: a header written through a member fails lint as one written by a literal does, and a word that
+    /// merely says authorization does not.
+    /// </summary>
+    [Fact]
+    public void An_authorization_header_written_through_a_member_fails_the_web_apps_lint_and_other_authorization_words_do_not()
+    {
+        using var project = NewProject(Anthropic, AgentFramework, AgUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+
+        project.Write("web/app/src/pages/token.ts", HeaderWrittenThroughAMember);
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        LintFindings(output).ShouldBe("no-restricted-syntax, no-restricted-syntax", output);
+        output.ShouldContain("5:3 ");
+        output.ShouldContain("9:3 ");
+    }
+
+    /// <summary>Review of #638: eslint's own rules do not read a Vue template, so the gate holds there too.</summary>
+    [Fact]
+    public void With_vue_a_hand_written_call_to_the_host_in_a_components_template_fails_the_web_apps_lint()
+    {
+        using var project = new GeneratedProject("saas-standard-vue", Anthropic, AgentFramework, AgUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+
+        project.Write("web/app/src/pages/NotesPage.vue", CallToTheHostInATemplate);
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        LintFindings(output).ShouldBe("vue/no-restricted-syntax, vue/no-restricted-syntax", output);
     }
 
     [Fact]
