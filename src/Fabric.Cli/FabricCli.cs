@@ -197,12 +197,16 @@ public static class FabricCli
                 return Fail(error, addition.Errors);
             }
 
-            if (ProjectWriter.Add(projectDirectory, addition.Created, fabricYaml) is { } writeError)
+            if (ProjectWriter.Add(projectDirectory, addition.Created, fabricYaml, addition.OpenApi) is { } writeError)
             {
                 return Fail(error, [writeError]);
             }
 
             output.WriteLine($"added module {moduleName} with {Files(addition.Created.Count)}.");
+            if (addition.OpenApi is { } openApi)
+            {
+                output.WriteLine($"{OpenApiAdditions.DocumentPath}: added {Describe(openApi)}.");
+            }
             WarnExperimental(error, addition.Experimental);
             return 0;
         }));
@@ -367,6 +371,18 @@ public static class FabricCli
     private static string Count(int count, string noun) => count == 1 ? $"1 {noun}" : $"{count} {noun}s";
 
     private static string Files(int count) => count == 1 ? "1 file" : $"{count} files";
+
+    /// <summary>"/billing/permissions/manage and the schema PermissionDto": what add-module put into the OpenAPI copy.</summary>
+    private static string Describe(OpenApiAdditions openApi)
+    {
+        var parts = openApi.Paths.Select(path => path.Key).ToList();
+        if (openApi.Schemas.Count > 0)
+        {
+            parts.Add((openApi.Schemas.Count == 1 ? "the schema " : "the schemas ") + string.Join(", ", openApi.Schemas.Select(schema => schema.Key)));
+        }
+
+        return parts.Count == 1 ? parts[0] : string.Join(", ", parts[..^1]) + " and " + parts[^1];
+    }
 
     /// <summary>The generated README's "## First steps" section, which packs fill through readme.first-steps.</summary>
     private static string? FirstSteps(IReadOnlyList<Core.Rendering.RenderedFile> files)

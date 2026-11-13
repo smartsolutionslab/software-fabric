@@ -435,7 +435,12 @@ All three are templates and see the same model as any other.
 
 ## Adding a module later
 
-`fabric add-module` only creates files. If a module chooses an option
+`fabric add-module` only creates files, and inserts the paths and schemas
+the new module adds into the frontend's copy of the OpenAPI document,
+`web/app/openapi.json` (ADR-0005, amended for #609): a pack whose
+`web.openapi-paths` or `web.openapi-schemas` contribution loops over
+`modules` gets a later module's entries there without rewriting the copy.
+If a module chooses an option
 whose pack the project does not use yet, and that pack has project files
 or slot contributions, add-module refuses: that content would have to be
 merged into files that may have changed

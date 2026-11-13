@@ -43,6 +43,8 @@ files:
   - { template: templates/BuildingBlocks/IModulePolicies.cs.sbn, target: src/BuildingBlocks/Modules/IModulePolicies.cs, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/BuildingBlocks/ModulePolicyRegistration.cs.sbn, target: src/BuildingBlocks/Modules/Wiring/ModulePolicyRegistration.cs, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/BuildingBlocks/ModulePolicyOwners.cs.sbn, target: src/BuildingBlocks/Modules/ModulePolicyOwners.cs, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/BuildingBlocks/PermissionDto.cs.sbn, target: src/BuildingBlocks/Modules/PermissionDto.cs, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/BuildingBlocks/PermissionMappings.cs.sbn, target: src/BuildingBlocks/Modules/PermissionMappings.cs, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/Contracts/Contracts.csproj.sbn, target: src/Contracts/Contracts.csproj }
   - { template: templates/Kernel/Kernel.csproj.sbn, target: src/Kernel/Kernel.csproj }
   - { template: templates/Kernel/Page.cs.sbn, target: src/Kernel/Page.cs }
@@ -74,7 +76,10 @@ files:
   - { template: templates/Modules/Module.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}Module.cs", per-module: true }
   - { template: templates/Modules/Policies.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}Policies.cs", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/Modules/PolicyNames.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/{{ module.namespace }}PolicyNames.cs", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
-  - { template: templates/Modules/CanManage.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/CanManage.cs", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/Modules/CanManageEndpoint.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/CanManageEndpoint.cs", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/Modules/CanManage.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/CanManage/CanManage.cs", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/Modules/CanManageHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/CanManage/CanManageHandler.cs", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/Modules/CanManageTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Queries/CanManageTests.cs", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/Modules/Tests.csproj.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/{{ module.namespace }}.Tests.csproj", per-module: true }
   - { template: templates/Llm/ChatClientRegistration.cs.sbn, target: src/BuildingBlocks/Llm/Wiring/ChatClientRegistration.cs, when: 'project["backend.llm"] != "none"' }
   - { template: templates/Llm/FakeChatClient.cs.sbn, target: tests/Fakes/FakeChatClient.cs, when: 'project["backend.llm"] != "none"' }
@@ -132,6 +137,11 @@ slots:
   - { slot: host.endpoints, template: templates/Host/host-endpoints.sbn, order: 10 }
   - { slot: tests.module-host-services, template: templates/Llm/module-host-services.sbn }
   - { slot: dependabot.nuget-ignore, template: templates/dependabot-nuget-ignore.sbn }
+  # With authorization choices: every module's GET /<module>/permissions/manage and the PermissionDto it answers (#609).
+  # After the host's own paths (tenancy's, option id backend.tenancy.column) and before the dashboards module's own
+  # (frontend.dashboards.user-editable), as the host maps them; add-module inserts a later module's (ADR-0005).
+  - { slot: web.openapi-paths, template: templates/openapi-paths.sbn, optional: true }
+  - { slot: web.openapi-schemas, template: templates/openapi-schemas.sbn, optional: true }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

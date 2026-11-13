@@ -98,4 +98,18 @@ public sealed class AddModuleCommandTests : IDisposable
     /// <summary>The lines of fabric.yaml that say which generator and which catalog wrote it.</summary>
     private static string[] Stamp(string fabricYaml) =>
         [.. fabricYaml.Split('\n').Where(line => line.StartsWith("generator: ", StringComparison.Ordinal) || line.StartsWith("catalog: sha256:", StringComparison.Ordinal))];
+    [Fact]
+    public void With_authorization_choices_add_module_adds_the_modules_probe_to_the_frontends_openapi_copy()
+    {
+        var root = Path.GetDirectoryName(project)!;
+        var shop = Path.Combine(root, "with-roles");
+        CliRun.Of("new", shop, "--name", "shop", "--profile", "lean-crud", "--set", "backend.authorization=roles", "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks)
+            .ExitCode.ShouldBe(0);
+
+        var run = CliRun.Of("add-module", "billing", "--project", shop, "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldContain("web/app/openapi.json: added /billing/permissions/manage and the schema PermissionDto.");
+        File.ReadAllText(Path.Combine(shop, "web", "app", "openapi.json")).ShouldContain("\"/billing/permissions/manage\"");
+    }
 }
