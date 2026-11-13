@@ -14,6 +14,8 @@ The option needs the Wolverine messaging library (`backend.bus.library == wolver
 
 A handler may itself take `IDispatcher`, as one that runs an agent or a dashboard widget's query does. Wolverine gets it from the message's scope rather than building it, and the dispatcher takes the bus when it is created, so a result that sends requests after the handler has returned, a stream of an agent's updates, still reaches the bus once Wolverine has disposed that scope.
 
+A handler also takes its module's own services: its unit of work, its aggregate store in an event-sourced module, any interface the module's Application project declares and its Infrastructure project implements. Wolverine cannot build some of them in its generated code, since the unit of work takes the service provider and an event store's adapters are made by a factory; it would then refuse the handler (`InvalidServiceLocationException`, a 500 for every request it handles). So the host has Wolverine take every such interface of every module from the message's scope (`ResolveModuleServicesFromScope`), found by convention like the handlers, so a new module needs no entry anywhere; one scope also keeps a handler's services on one DbContext.
+
 Tests that send requests through `IDispatcher` start Wolverine in process, with no broker and no message store: the agents', the assistant's and the dashboards' tests in a service container of their own, and the gRPC and MCP server tests in the host, where every other hosted service stays removed. Each finds its handlers with the host's discovery, `DiscoverRequestHandlers()`.
 
 ## Consequences
