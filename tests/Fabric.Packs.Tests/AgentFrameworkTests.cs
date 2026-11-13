@@ -35,6 +35,25 @@ public sealed class AgentFrameworkTests
         }
         """;
 
+    private const string EndpointSendingTheToolsRequest = """
+        using Microsoft.AspNetCore.Builder;
+        using Microsoft.AspNetCore.Http;
+        using Microsoft.AspNetCore.Routing;
+        using Shop.BuildingBlocks.Api;
+        using Shop.BuildingBlocks.Messaging;
+        using Shop.Modules.Billing.Application.Queries.AskTheModel;
+
+        namespace Shop.Modules.Billing.Api.Endpoints;
+
+        public sealed class Ask : IEndpoint
+        {
+            public void Map(IEndpointRouteBuilder endpoints) =>
+                endpoints.MapGet("/ask", async (string question, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+                    (await dispatcher.QueryAsync(new AskTheModel(question), cancellationToken)).ToHttpResult())
+                    .Sends<AskTheModel>();
+        }
+        """;
+
     private const string EndpointRunningAnAgent = """
         using Microsoft.Agents.AI;
         using Microsoft.AspNetCore.Builder;
@@ -256,12 +275,13 @@ public sealed class AgentFrameworkTests
         using var project = NewProject(Anthropic, AgentFramework);
         project.AddModule("billing");
         project.WriteTypes("src/Modules/Billing/Billing.Application/Agents", AgentInApplication);
+        project.WriteTypes("src/Modules/Billing/Billing.Api/Endpoints", EndpointSendingTheToolsRequest);
         project.Build();
 
         var (agentsExitCode, agentsOutput) = project.Test("tests/Agents.Tests/Agents.Tests.csproj");
         agentsExitCode.ShouldBe(0, agentsOutput);
         agentsOutput.ShouldContain("failed: 0");
-        agentsOutput.ShouldContain("succeeded: 23");
+        agentsOutput.ShouldContain("succeeded: 30");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
@@ -281,11 +301,25 @@ public sealed class AgentFrameworkTests
         var (agentsExitCode, agentsOutput) = project.Test("tests/Agents.Tests/Agents.Tests.csproj");
         agentsExitCode.ShouldBe(0, agentsOutput);
         agentsOutput.ShouldContain("failed: 0");
-        agentsOutput.ShouldContain("succeeded: 24");
+        agentsOutput.ShouldContain("succeeded: 31");
 
         var (mcpExitCode, mcpOutput) = project.Test("tests/Mcp.Tests/Mcp.Tests.csproj");
         mcpExitCode.ShouldBe(0, mcpOutput);
         mcpOutput.ShouldContain("failed: 0");
+    }
+
+    [Fact]
+    public void Without_authentication_a_tool_runs_without_an_http_caller_and_the_generated_agent_tests_pass()
+    {
+        using var project = NewProject(Anthropic, AgentFramework, "backend.auth=none");
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Agents.Tests/Agents.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+        output.ShouldContain("succeeded: 30");
+        output.ShouldNotContain("Without_an_http_caller_a_tool_is_refused");
     }
 
     [Fact]
@@ -299,7 +333,7 @@ public sealed class AgentFrameworkTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 13");
+        output.ShouldContain("succeeded: 20");
     }
 
     [Fact]
@@ -308,6 +342,14 @@ public sealed class AgentFrameworkTests
         var output = ArchitectureFailure("src/Modules/Billing/Billing.Api/Endpoints", EndpointRunningAnAgent);
 
         output.ShouldContain("Shop.Modules.Billing.Api references Microsoft.Agents.AI, but an agent lives in a module's Application project");
+    }
+
+    [Fact]
+    public void A_tool_whose_request_no_endpoint_sends_fails_the_architecture_tests_naming_the_request()
+    {
+        var output = ArchitectureFailure("src/Modules/Billing/Billing.Application/Agents", AgentInApplication);
+
+        output.ShouldContain("Shop.Modules.Billing.Application.Queries.AskTheModel.AskTheModel is an agent's tool, but no endpoint sends it");
     }
 
     [Fact]

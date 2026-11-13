@@ -12,7 +12,7 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 /// </summary>
 public sealed class EveryAgentToolRequestIsValid : IArchitectureRule
 {
-    private const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+    internal const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
 
     private static readonly Dictionary<short, OpCode> OpCodesByValue = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
@@ -36,7 +36,7 @@ public sealed class EveryAgentToolRequestIsValid : IArchitectureRule
     }
 
     /// <summary>The <c>TRequest</c> of every <c>DispatcherTool.For&lt;TRequest&gt;</c> a method body calls.</summary>
-    private static IEnumerable<Type> ToolRequests(MethodBase method)
+    internal static IEnumerable<Type> ToolRequests(MethodBase method)
     {
         var il = method.GetMethodBody()?.GetILAsByteArray() ?? [];
         var typeArguments = method.DeclaringType is { IsGenericType: true } declaring ? declaring.GetGenericArguments() : null;

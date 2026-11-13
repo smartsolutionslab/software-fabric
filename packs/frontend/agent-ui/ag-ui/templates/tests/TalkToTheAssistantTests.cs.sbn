@@ -25,6 +25,7 @@ public class TalkToTheAssistantTests
     public async Task The_assistant_streams_a_word_count_its_tool_got_through_the_dispatcher()
     {
         var cancellationToken = {{ test_cancellation_token }};
+        using var caller = AgentCaller.SignedIn("developer", AgentCaller.Sending<CountWords>());
         var model = new ToolCallingChatClient("count_words", new Dictionary<string, object?> { ["text"] = "one two three" });
         await using var services = Services(model);
         await using var scope = services.CreateAsyncScope();

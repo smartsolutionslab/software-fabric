@@ -11,6 +11,7 @@ files:
   - { template: templates/Module/DraftWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/TalkToTheDashboards/DraftWidget.cs", per-module: true, when: 'module.name == "dashboards"' }
   - { template: templates/Module/InvalidDraft.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidDraft.cs", per-module: true, when: 'module.name == "dashboards"' }
   - { template: templates/Module/DashboardAgentFailures.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DashboardAgentFailures.cs", per-module: true, when: 'module.name == "dashboards"' }
+  - { template: templates/Module/ProposalEndpoints.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/ProposalEndpoints.cs", per-module: true, when: 'module.name == "dashboards"' }
   - { template: templates/tests/DashboardServices.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Queries/DashboardServices.cs", per-module: true, when: 'module.name == "dashboards"' }
   - { template: templates/tests/RecordingChatClient.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Queries/RecordingChatClient.cs", per-module: true, when: 'module.name == "dashboards"' }
   - { template: templates/tests/ProposeWidgetTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Queries/ProposeWidgetTests.cs", per-module: true, when: 'module.name == "dashboards"' }

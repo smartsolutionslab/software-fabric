@@ -1,0 +1,25 @@
+using {{ namespace }}.BuildingBlocks.Api;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Assistant.Application.Queries.CountWords;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+
+namespace {{ namespace }}.Modules.Assistant.Api.Endpoints;
+
+/// <summary>
+/// Counting a text's words: the endpoint that sends the assistant's tool <c>count_words</c>, so the tool requires of its
+/// caller what this endpoint requires. It stays out of the OpenAPI document; the panel reaches it through the assistant.
+/// </summary>
+public sealed class WordEndpoints : IEndpoint
+{
+    public void Map(IEndpointRouteBuilder endpoints)
+    {
+        {{ not_null "endpoints" }}
+
+        endpoints.MapGet("/words/count", async (string text, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+            (await dispatcher.QueryAsync(new CountWords(text), cancellationToken)).ToHttpResult())
+            .Sends<CountWords>()
+            .ExcludeFromDescription();
+    }
+}
