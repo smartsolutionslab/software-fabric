@@ -192,7 +192,8 @@ public sealed class GenerativeDashboardsTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 56");
+        // 56, and the module's CanManage handler test that roles bring (#609).
+        output.ShouldContain("succeeded: 57");
     }
 
     [Fact]

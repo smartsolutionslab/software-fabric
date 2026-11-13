@@ -46,7 +46,7 @@ internal sealed partial class GeneratedProject : IDisposable
         var record = FabricFile.Read(new StringReader(File.ReadAllText(Path.Combine(ProjectDirectory, FabricFile.FileName))), FabricFile.FileName);
         var addition = Generator.AddModule(Repository.Catalog, packs, record, name, []);
         addition.Errors.ShouldBeEmpty();
-        ProjectWriter.Add(ProjectDirectory, addition.Created, addition.FabricYaml!).ShouldBeNull();
+        ProjectWriter.Add(ProjectDirectory, addition.Created, addition.FabricYaml!, addition.OpenApi).ShouldBeNull();
     }
 
     public void Write(string relativePath, string content)

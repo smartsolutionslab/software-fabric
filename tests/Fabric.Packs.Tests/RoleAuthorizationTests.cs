@@ -163,37 +163,6 @@ public sealed class RoleAuthorizationTests
         output.ShouldContain("src/Modules/Billing/Billing.Api/Endpoints/RoleChecks.cs:16: checks a role (RequireRole)");
     }
 
-    /// <summary>
-    /// Every module a project is generated with gets the sample endpoint GET /&lt;module&gt;/permissions/manage once it has
-    /// authorization choices, but the endpoint stays out of the OpenAPI document: a module added after generation then
-    /// adds nothing to it, so the frontend's copy, which add-module never rewrites (ADR-0005), stays current (#463).
-    /// </summary>
-    [Theory]
-    [InlineData("saas-ai-react", new[] { Roles })]
-    [InlineData("saas-ai-react", new[] { "backend.authorization=claims" })]
-    [InlineData("saas-ai-react", new[] { "backend.authorization=roles,claims" })]
-    [InlineData("saas-standard-vue", new[] { Roles, "backend.llm=openai", "backend.llm.agents=agent-framework", "frontend.agent-ui=ag-ui", "frontend.dashboards=user-editable" })]
-    public void Every_generated_module_has_a_permission_endpoint_the_frontends_openapi_copy_does_not_list(string profile, string[] overrides)
-    {
-        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, overrides);
-        generated.Errors.ShouldBeEmpty();
-        var files = generated.Files.ToDictionary(file => file.Path, file => file.Content);
-        var endpoints = files
-            .Where(file => System.Text.RegularExpressions.Regex.IsMatch(file.Key, "^src/Modules/[^/]+/[^/]+\\.Api/Endpoints/CanManage\\.cs$"))
-            .ToList();
-        endpoints.Count.ShouldBeGreaterThan(1);
-
-        var paths = System.Text.Json.Nodes.JsonNode.Parse(files["web/app/openapi.json"])!["paths"]!.AsObject()
-            .Select(path => path.Key)
-            .ToList();
-
-        paths.Where(path => path.EndsWith("/permissions/manage", StringComparison.Ordinal)).ShouldBeEmpty();
-        foreach (var (path, content) in endpoints)
-        {
-            content.ShouldContain(".ExcludeFromDescription()", customMessage: path);
-        }
-    }
-
     [Fact]
     public void The_generated_integration_tests_give_a_manager_200_a_visitor_403_and_an_anonymous_caller_401()
     {
@@ -203,7 +172,7 @@ public sealed class RoleAuthorizationTests
             .ShouldContain("HttpStatusCode.Forbidden");
         project.Build();
 
-        // The new module's sample endpoint is not in the OpenAPI document, so the frontend's copy stays current (#463).
+        // add-module puts the new module's probe into the frontend's copy, so it stays current (#463, #609).
         var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
 
         // Before the exit code: the copy failing is a failed test too, and this names the cause.

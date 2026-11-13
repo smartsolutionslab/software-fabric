@@ -68,3 +68,34 @@ own, a dashboards module for example. Such a pack declares the module in
   test, not by reading `Program.cs`. The base ships an architecture test
   that every module assembly has exactly one `IModule`.
 - IDE users run one `dotnet sln add` after `add-module`.
+
+## Amendment (2026-11-12, #609)
+
+The owner's decision on #609. The text above stands; where this section
+differs, it takes precedence.
+
+**`add-module` also extends the frontend's copy of the OpenAPI document**,
+`web/app/openapi.json`, with the paths and schemas the new module adds to
+it. Every module's permission probe, `GET /<module>/permissions/manage`, is
+an ordinary endpoint described in the document, and the module's page calls
+it through the generated client; that client is generated from the copy, so
+the copy must have the path the moment the module's files exist.
+
+- What the module adds is what the generator writes for the copy with the
+  module and not without it: add-module renders the copy for both choice
+  sets and takes the difference. Nothing else in the copy changes, so what a
+  person or the integration tests wrote there stays.
+- The new paths go where the host serves them: before the first path of a
+  module the host maps after the new one (modules are mapped in the order of
+  their namespaces, each under `/<module>`), or last. The new schemas go in
+  name order.
+- add-module refuses, and writes nothing, when the copy already has one of
+  those paths or schemas, or when the project has the copy among its
+  generated files but not on disk.
+- `fabric upgrade` regenerates a project the same way (ADR-0016), so a
+  module recorded in `fabric.yaml` has its paths in the regenerated copy too.
+
+The consequence above, that add-module stays a pure file creator, holds for
+every file but this one: the copy is a file a tool writes, never one people
+edit by hand, and inserting new keys into it cannot conflict with parallel
+module work any more than the integration tests rewriting it can.
