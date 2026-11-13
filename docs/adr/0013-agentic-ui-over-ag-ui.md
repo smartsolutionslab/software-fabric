@@ -246,9 +246,9 @@ is a bounded exception rather than a breach:
   through the `frontend.framework` role slot `web.lint-configs` added for it:
   outside `baseApi.ts`, `connectAgent.ts` and tests, `fetch`,
   `globalThis.fetch` or `window.fetch`, `XMLHttpRequest`, `new HttpAgent` or
-  an `Authorization` header set by name fails. Only a project with
-  `frontend.agent-ui: ag-ui` gets the rule; without the panel there is no
-  exception to hold.
+  an `Authorization` header set by hand fails, in a Vue template too. Only a
+  project with `frontend.agent-ui: ag-ui` gets the rule; without the panel
+  there is no exception to hold.
 
 **Delivered in three steps** (owner's decision on #182): first this
 dimension, this ADR and the `none` pack; then the `ag-ui` pack's backend; then

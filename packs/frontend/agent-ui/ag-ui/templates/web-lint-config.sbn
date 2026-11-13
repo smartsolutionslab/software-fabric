@@ -35,9 +35,34 @@
           message: 'Talk to an agent through connectAgent; only src/agents/connectAgent.ts calls the host by hand.',
         },
         {
-          selector: 'Literal[value=/^authorization$/i], Property[key.name=/^authorization$/i]',
+          selector:
+            'CallExpression[callee.property.name=/^(set|append)$/] > Literal[value=/^authorization$/i], ' +
+            'Property[key.name=/^authorization$/i], Property[key.value=/^authorization$/i], ' +
+            'AssignmentExpression > MemberExpression.left[property.name=/^authorization$/i], ' +
+            'AssignmentExpression > MemberExpression.left[property.value=/^authorization$/i]',
           message: 'Only src/api/baseApi.ts and src/agents/connectAgent.ts set the Authorization header.',
         },
       ],
     },
-  }
+  }{{ if project["frontend.framework"] == "vue" }},
+  {
+    // eslint's own rules do not read a template, whose expressions reach what <script setup> imports.
+    files: ['src/**/*.vue'],
+    rules: {
+      'vue/no-restricted-syntax': [
+        'error',
+        {
+          selector: "NewExpression[callee.name='HttpAgent']",
+          message: 'Talk to an agent through connectAgent; only src/agents/connectAgent.ts calls the host by hand.',
+        },
+        {
+          selector:
+            'CallExpression[callee.property.name=/^(set|append)$/] > Literal[value=/^authorization$/i], ' +
+            'Property[key.name=/^authorization$/i], Property[key.value=/^authorization$/i], ' +
+            'AssignmentExpression > MemberExpression.left[property.name=/^authorization$/i], ' +
+            'AssignmentExpression > MemberExpression.left[property.value=/^authorization$/i]',
+          message: 'Only src/api/baseApi.ts and src/agents/connectAgent.ts set the Authorization header.',
+        },
+      ],
+    },
+  }{{ end }}
