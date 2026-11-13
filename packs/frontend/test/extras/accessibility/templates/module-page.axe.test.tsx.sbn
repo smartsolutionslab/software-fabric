@@ -59,6 +59,7 @@ vi.mock('@/api/generated', async (importOriginal) => {
 {{~ else ~}}
   const state = (data: unknown, loading: boolean) => ({
     data,
+    currentData: data,
     error: undefined,
     isLoading: loading,
     isFetching: loading,
@@ -70,8 +71,11 @@ vi.mock('@/api/generated', async (importOriginal) => {
   const generated = await importOriginal<Record<string, unknown>>();
   return Object.fromEntries(
     Object.entries(generated).map(([name, value]) => {
-      if (/^use\w*Mutation$|^useLazy\w*Query$/.test(name)) {
+      if (/^use\w*Mutation$/.test(name)) {
         return [name, () => [vi.fn(), state(undefined, true)]];
+      }
+      if (/^useLazy\w*Query$/.test(name)) {
+        return [name, () => [vi.fn(), answer(name)]];
       }
       return [name, /^use\w*Query$/.test(name) ? () => answer(name) : value];
     }),
