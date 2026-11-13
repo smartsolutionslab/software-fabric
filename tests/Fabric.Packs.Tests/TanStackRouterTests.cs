@@ -106,7 +106,7 @@ public sealed class TanStackRouterTests
         }
         """;
 
-    /// <summary>The invoice page's own component test: every module screen has one with an axe check (#604).</summary>
+    /// <summary>The invoice page's axe check: every module screen has one in <c>&lt;Name&gt;Page.axe.test.tsx</c> (#604, #627).</summary>
     private const string NestedPageTest = """
         import { render, screen } from '@testing-library/react';
         import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
@@ -198,7 +198,7 @@ public sealed class TanStackRouterTests
         project.Write("web/app/src/modules/billing/routes.tsx", NestedRoutes);
         project.Write("web/app/src/modules/billing/BillingPage.tsx", NestingPage);
         project.Write("web/app/src/modules/billing/InvoicePage.tsx", NestedPage);
-        project.Write("web/app/src/modules/billing/InvoicePage.test.tsx", NestedPageTest);
+        project.Write("web/app/src/modules/billing/InvoicePage.axe.test.tsx", NestedPageTest);
         project.Write("web/app/src/modules/billing/nested.test.tsx", NestedRouteTest);
 
         RunWeb(project, "install", "build", "lint", "test");
