@@ -36,8 +36,10 @@
         },
         {
           selector:
-            'CallExpression[callee.property.name=/^(set|append)$/] > Literal[value=/^authorization$/i], ' +
-            'Property[key.name=/^authorization$/i], Property[key.value=/^authorization$/i], ' +
+            'CallExpression[callee.property.name=/^(set|append)$/] > Literal.arguments:first-child[value=/^authorization$/i], ' +
+            ':matches(Property[key.name=/^headers$/i], Property[key.value=/^headers$/i], VariableDeclarator[id.name=/headers$/i], ' +
+            "NewExpression[callee.name='Headers']) > ObjectExpression > " +
+            'Property:matches([key.name=/^authorization$/i], [key.value=/^authorization$/i]), ' +
             'AssignmentExpression > MemberExpression.left[property.name=/^authorization$/i], ' +
             'AssignmentExpression > MemberExpression.left[property.value=/^authorization$/i]',
           message: 'Only src/api/baseApi.ts and src/agents/connectAgent.ts set the Authorization header.',
@@ -52,13 +54,21 @@
       'vue/no-restricted-syntax': [
         'error',
         {
+          selector:
+            "CallExpression[callee.name='fetch'], NewExpression[callee.name='XMLHttpRequest'], " +
+            "MemberExpression[property.name='fetch'][object.name=/^(globalThis|window)$/]",
+          message: 'Call the host through src/api; only src/agents/connectAgent.ts calls the host by hand.',
+        },
+        {
           selector: "NewExpression[callee.name='HttpAgent']",
           message: 'Talk to an agent through connectAgent; only src/agents/connectAgent.ts calls the host by hand.',
         },
         {
           selector:
-            'CallExpression[callee.property.name=/^(set|append)$/] > Literal[value=/^authorization$/i], ' +
-            'Property[key.name=/^authorization$/i], Property[key.value=/^authorization$/i], ' +
+            'CallExpression[callee.property.name=/^(set|append)$/] > Literal.arguments:first-child[value=/^authorization$/i], ' +
+            ':matches(Property[key.name=/^headers$/i], Property[key.value=/^headers$/i], VariableDeclarator[id.name=/headers$/i], ' +
+            "NewExpression[callee.name='Headers']) > ObjectExpression > " +
+            'Property:matches([key.name=/^authorization$/i], [key.value=/^authorization$/i]), ' +
             'AssignmentExpression > MemberExpression.left[property.name=/^authorization$/i], ' +
             'AssignmentExpression > MemberExpression.left[property.value=/^authorization$/i]',
           message: 'Only src/api/baseApi.ts and src/agents/connectAgent.ts set the Authorization header.',
