@@ -1,0 +1,5 @@
+{{~ hook = project["frontend.api-client"] == "rtk-query-codegen" ? "useGetInvoicesQuery" : "useGetInvoices" ~}}
+// The example data {{ module.namespace }}Page's axe check shows the page with, by hook of the generated client, for
+// instance { {{ hook }}: { items: [{ number: 'INV-1' }], totalCount: 1, page: 1, pageSize: 20 } }. Without an
+// example, {{ module.namespace }}Page.axe.test.{{ if project["frontend.framework"] == "vue" }}ts{{ else }}tsx{{ end }} checks the page only as it loads.
+export const examples: Record<string, unknown> = {};
