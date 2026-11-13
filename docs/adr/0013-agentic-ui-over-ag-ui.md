@@ -230,6 +230,26 @@ changes for React.
   before it submits. The end-to-end test is React's file,
   `e2e/agent-panel.spec.ts`: the page's roles and names are the same.
 
+**The one hand-written call to the host (owner's decision on #607,
+2026-11-12).** The api-client packs' rule is that the web app never writes
+`fetch` to the backend, and the auth-client packs' that only
+`src/api/baseApi.ts` sets the `Authorization` header. An AG-UI run is a
+server-sent event stream that no generated client models, so `connectAgent`
+is a bounded exception rather than a breach:
+
+- `src/agents/connectAgent.ts` alone may call `/api/agents/{name}` and read
+  its stream, taking the token from `accessToken()` (`@/auth/accessToken`),
+  where `baseApi.ts`'s headers read it. `POST /agents/{name}` stays out of
+  the OpenAPI document. Moving it in, with a generated client for the
+  request, was the alternative: the stream would still be read by hand.
+- The pack's agent rules and ADR state the exception, and its gate is lint,
+  through the `frontend.framework` role slot `web.lint-configs` added for it:
+  outside `baseApi.ts`, `connectAgent.ts` and tests, `fetch`,
+  `globalThis.fetch` or `window.fetch`, `XMLHttpRequest`, `new HttpAgent` or
+  an `Authorization` header set by name fails. Only a project with
+  `frontend.agent-ui: ag-ui` gets the rule; without the panel there is no
+  exception to hold.
+
 **Delivered in three steps** (owner's decision on #182): first this
 dimension, this ADR and the `none` pack; then the `ag-ui` pack's backend; then
 its React panel with the end-to-end test. The Vue panel followed as #183, a
