@@ -194,6 +194,44 @@ public sealed class AgentFrameworkTests
         }
         """;
 
+    // The agents.md example, in a module's own tests: the tool's endpoint names the module's policy, which the module's
+    // Api project registers, and the caller does not hold it.
+    private const string ModuleToolAccessTest = """
+        using Shop.BuildingBlocks.Agents;
+        using Shop.BuildingBlocks.Messaging;
+        using Shop.Modules.Billing.Application;
+        using Shop.Modules.Billing.Application.Queries.CanManage;
+        using Shop.Tests.Fakes;
+        using Microsoft.Extensions.AI;
+        using Shouldly;
+        using Xunit;
+
+        namespace Shop.Modules.Billing.Tests.Agents;
+
+        public sealed class CanManageToolTests
+        {
+            [Fact]
+            public async Task A_caller_without_the_modules_policy_is_refused()
+            {
+                using var caller = AgentCaller.SignedIn("visitor", AgentCaller.Sending<CanManage>(BillingPolicyNames.Manage));
+                var tool = DispatcherTool.For<CanManage>(new UnusedDispatcher(), "Whether the caller may manage billing.");
+
+                var answer = await tool.InvokeAsync([], TestContext.Current.CancellationToken);
+
+                answer?.ToString().ShouldBe("Refused: CanManage, which sends CanManage, requires the policy billing.manage, and the caller does not meet it.");
+            }
+        }
+
+        public sealed class UnusedDispatcher : IDispatcher
+        {
+            public Task<TResult> SendAsync<TResult>(ICommand<TResult> command, CancellationToken cancellationToken) =>
+                throw new InvalidOperationException("A refused tool never dispatches.");
+
+            public Task<TResult> QueryAsync<TResult>(IQuery<TResult> query, CancellationToken cancellationToken) =>
+                throw new InvalidOperationException("A refused tool never dispatches.");
+        }
+        """;
+
     private const string ApplicationReferencingTheFramework = """
         <Project Sdk="Microsoft.NET.Sdk">
           <ItemGroup>
@@ -290,6 +328,20 @@ public sealed class AgentFrameworkTests
         var (moduleExitCode, moduleOutput) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj");
         moduleExitCode.ShouldBe(0, moduleOutput);
         moduleOutput.ShouldContain("failed: 0");
+    }
+
+    [Fact]
+    public void A_module_test_following_the_documented_example_with_its_modules_policy_refuses_the_caller()
+    {
+        using var project = NewProject(Anthropic, AgentFramework, "backend.authorization=roles");
+        project.AddModule("billing");
+        project.WriteTypes("tests/Modules/Billing.Tests/Agents", ModuleToolAccessTest);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
     }
 
     [Fact]
