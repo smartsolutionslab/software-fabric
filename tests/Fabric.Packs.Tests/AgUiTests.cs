@@ -135,6 +135,42 @@ public sealed class AgUiTests
 
         """;
 
+    /// <summary>
+    /// Data that says authorization without being a header, a map entry and a field, then the header set in an object
+    /// held as headers and in one given to <c>new Headers</c>.
+    /// </summary>
+    private const string AuthorizationOutsideAndInsideHeaders = """
+        export const sections = new Map<string, string>().set('section', 'authorization');
+
+        export const grant = { authorization: 'manager' };
+
+        export function sign(token: string) {
+          const requestHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };
+          return new Headers({ authorization: token, ...requestHeaders });
+        }
+
+        """;
+
+    /// <summary>
+    /// A component whose template calls the host through <c>window.fetch</c>, <c>fetch</c> and an
+    /// <c>XMLHttpRequest</c>, and fills a map entry that merely says authorization.
+    /// </summary>
+    private const string FetchInATemplate = """
+        <script setup lang="ts">
+        const window = globalThis.window;
+        const grants = new Map<string, string>();
+        defineExpose({ window, grants });
+        </script>
+
+        <template>
+          <button type="button" @click="window.fetch('/api/agents/assistant', { method: 'POST' })">Ask</button>
+          <button type="button" @click="fetch('/api/billing/notes')">Load</button>
+          <button type="button" @click="new XMLHttpRequest()">Open</button>
+          <button type="button" @click="grants.set('section', 'authorization')">Grant</button>
+        </template>
+
+        """;
+
     /// <summary>The rules eslint names for <see cref="SecondCallToTheHost"/>, in the order of its lines.</summary>
     private const string SecondCallToTheHostFindings =
         "no-restricted-globals, no-restricted-syntax, no-restricted-syntax, no-restricted-properties, no-restricted-syntax, no-restricted-globals";
@@ -478,6 +514,44 @@ public sealed class AgUiTests
 
         exitCode.ShouldNotBe(0, output);
         LintFindings(output).ShouldBe("vue/no-restricted-syntax, vue/no-restricted-syntax", output);
+    }
+
+    /// <summary>
+    /// Second review of #638: only a header's name is refused, so a map entry or a field that says authorization
+    /// passes, while an object of headers that sets it still fails.
+    /// </summary>
+    [Fact]
+    public void Data_that_merely_says_authorization_passes_the_web_apps_lint_and_an_object_of_headers_setting_it_does_not()
+    {
+        using var project = NewProject(Anthropic, AgentFramework, AgUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+
+        project.Write("web/app/src/pages/grants.ts", AuthorizationOutsideAndInsideHeaders);
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        LintFindings(output).ShouldBe("no-restricted-syntax, no-restricted-syntax", output);
+        output.ShouldContain("6:52 ");
+        output.ShouldContain("7:24 ");
+    }
+
+    /// <summary>Second review of #638: a Vue template cannot call the host by hand either.</summary>
+    [Fact]
+    public void With_vue_a_fetch_in_a_components_template_fails_the_web_apps_lint_and_a_map_entry_saying_authorization_does_not()
+    {
+        using var project = new GeneratedProject("saas-standard-vue", Anthropic, AgentFramework, AgUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+
+        project.Write("web/app/src/pages/AskPage.vue", FetchInATemplate);
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        LintFindings(output).ShouldBe("vue/no-restricted-syntax, vue/no-restricted-syntax, vue/no-restricted-syntax", output);
+        output.ShouldContain("only src/agents/connectAgent.ts calls the host by hand");
     }
 
     [Fact]
