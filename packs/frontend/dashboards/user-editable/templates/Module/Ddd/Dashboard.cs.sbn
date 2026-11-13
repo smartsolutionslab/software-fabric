@@ -307,9 +307,11 @@ public sealed class Dashboard : AggregateRoot<DashboardId>
             }
         }
 
+        // Copied before the clear: the caller may pass this dashboard's own Widgets, which is the list being cleared.
+        List<DashboardWidget> arranged = [.. widgets];
         this.name = DashboardName.From(trimmed);
         this.widgets.Clear();
-        this.widgets.AddRange(widgets);
+        this.widgets.AddRange(arranged);
         return {{ ok "Unit" "Unit.Value" }};
     }
 

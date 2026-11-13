@@ -1,0 +1,23 @@
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Tests;
+
+/// <summary>The dashboard aggregate on its own, without the dispatcher.</summary>
+public class DashboardTests
+{
+    {{ test_attribute }}
+    public void Rearranging_with_the_dashboards_own_widgets_renames_it_and_keeps_them()
+    {
+        var dashboard = Dashboard.Create(
+            DashboardId.From(Guid.CreateVersion7()),
+            DashboardOwner.From("owner"),
+            DashboardName.From("Sales"),
+            [DashboardWidget.From("w-1", "dashboards.widget-counts", "pie", 2, 3, 4, 5), DashboardWidget.From("w-2", "dashboards.my-dashboards", "table", 0, 8, 12, 6)]).Value;
+
+        var result = dashboard.Rearrange(DashboardName.From("Renamed"), dashboard.Widgets);
+
+        {{ `result.IsSuccess` | should_be_true }};
+        {{ `dashboard.Name.Value` | should_be `"Renamed"` }};
+        {{ `dashboard.Widgets.Select(widget => $"{widget.Key} {widget.Source} {widget.Visual} {widget.X},{widget.Y} {widget.Width}x{widget.Height}")` | should_be `["w-1 dashboards.widget-counts pie 2,3 4x5", "w-2 dashboards.my-dashboards table 0,8 12x6"]` }};
+    }
+}
