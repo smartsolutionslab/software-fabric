@@ -113,6 +113,11 @@ internal sealed class UseCaseFunction : AIFunction
             return $"The arguments are not a {request.Name}.";
         }
 
+        if (await ToolAccess.RefusalAsync(request) is { } refusal)
+        {
+            return $"Refused: {refusal}";
+        }
+
         var dispatch = typeof(IDispatcher)
             .GetMethod(readsOnly ? nameof(IDispatcher.QueryAsync) : nameof(IDispatcher.SendAsync))!
             .MakeGenericMethod(result);

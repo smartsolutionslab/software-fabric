@@ -2,6 +2,9 @@ option: backend.llm.agents.agent-framework
 files:
   - { template: templates/DispatcherTool.cs.sbn, target: src/BuildingBlocks/Agents/DispatcherTool.cs }
   - { template: templates/UseCaseFunction.cs.sbn, target: src/BuildingBlocks/Agents/UseCaseFunction.cs }
+  - { template: templates/ToolAccess.cs.sbn, target: src/BuildingBlocks/Agents/ToolAccess.cs }
+  - { template: templates/SendsRequest.cs.sbn, target: src/BuildingBlocks/Agents/SendsRequest.cs }
+  - { template: templates/SendsConventions.cs.sbn, target: src/BuildingBlocks/Agents/Wiring/SendsConventions.cs }
   - { template: templates/PageJsonConverter.cs.sbn, target: src/BuildingBlocks/Agents/PageJsonConverter.cs }
   - { template: templates/PageSizeJsonConverter.cs.sbn, target: src/BuildingBlocks/Agents/PageSizeJsonConverter.cs }
   - { template: templates/OptionJsonConverter.cs.sbn, target: src/BuildingBlocks/Agents/OptionJsonConverter.cs, when: 'project["backend.absence"] == "option"' }
@@ -12,7 +15,9 @@ files:
   - { template: templates/AgentsLiveInApplication.cs.sbn, target: tests/Architecture.Tests/Rules/AgentsLiveInApplication.cs }
   - { template: templates/AgentToolsGoThroughTheDispatcher.cs.sbn, target: tests/Architecture.Tests/Rules/AgentToolsGoThroughTheDispatcher.cs }
   - { template: templates/EveryAgentToolRequestIsValid.cs.sbn, target: tests/Architecture.Tests/Rules/EveryAgentToolRequestIsValid.cs }
+  - { template: templates/EveryAgentToolRequestHasAnEndpoint.cs.sbn, target: tests/Architecture.Tests/Rules/EveryAgentToolRequestHasAnEndpoint.cs }
   - { template: templates/tests/ToolCallingChatClient.cs.sbn, target: tests/Fakes/ToolCallingChatClient.cs }
+  - { template: templates/tests/AgentCaller.cs.sbn, target: tests/Fakes/AgentCaller.cs }
   - { template: templates/tests/Agents.Tests.csproj.sbn, target: tests/Agents.Tests/Agents.Tests.csproj }
   - { template: templates/tests/WordsAgent.cs.sbn, target: tests/Agents.Tests/WordsAgent.cs }
   - { template: templates/tests/AskAboutWords.cs.sbn, target: tests/Agents.Tests/AskAboutWords.cs }
@@ -58,4 +63,5 @@ gates:
   - { kind: architecture-test, describes: "Only a module's Application project references Microsoft Agent Framework (Microsoft.Agents.AI*): an agent defined, created or run in a module's Domain, Infrastructure or Api, or in the BuildingBlocks, fails the build naming the assembly.", file: templates/AgentsLiveInApplication.cs.sbn }
   - { kind: architecture-test, describes: "Every tool a module gives an agent is a command or query made with DispatcherTool.For, sent through IDispatcher: a module type deriving from AITool, or code that makes one another way (new, AIFunctionFactory.Create, an agent's AsAIFunction), fails the build naming the type.", file: templates/AgentToolsGoThroughTheDispatcher.cs.sbn }
   - { kind: architecture-test, describes: "Every command or query a module makes an agent's tool of with DispatcherTool.For is one DispatcherTool.Problems accepts, the definition the tool itself checks: a command or query, and with Option absence no Option inside a collection or dictionary; otherwise the build fails naming the request and the property.", file: templates/EveryAgentToolRequestIsValid.cs.sbn }
-  - { kind: unit-test, describes: "A query runs a sample agent against a stand-in model that asks for a tool call; the tool's query goes through the dispatcher to its handler and the agent answers with its result. Arguments that do not fit, that no constructor can build the request from or that a constructor refuses never reach the handler and the run goes on; a paged query is a tool whose Page and PageSize are whole numbers within their bounds; a failed Result reaches the model as its error code, and with the MCP client an agent calls a declared server's tool.", file: templates/tests/AgentTests.cs.sbn }
+  - { kind: architecture-test, describes: "Every command or query a module makes an agent's tool of with DispatcherTool.For is sent by an endpoint marked .Sends<TRequest>(), in Development or Production: otherwise the build fails naming the request, since the tool would be refused at every call.", file: templates/EveryAgentToolRequestHasAnEndpoint.cs.sbn }
+  - { kind: unit-test, describes: "A query runs a sample agent against a stand-in model that asks for a tool call; the tool's query goes through the dispatcher to its handler and the agent answers with its result. Arguments that do not fit, that no constructor can build the request from or that a constructor refuses never reach the handler and the run goes on; a paged query is a tool whose Page and PageSize are whole numbers within their bounds; a failed Result reaches the model as its error code; a caller who does not meet the policies of every endpoint that sends a tool's request, an anonymous caller of a sign-in endpoint, a tool whose request no endpoint sends and (with authentication) an agent run without an HTTP caller are refused before dispatch, while a caller who meets them, and any signed-in caller of a sign-in-only endpoint, gets the answer; and with the MCP client an agent calls a declared server's tool.", file: templates/tests/AgentTests.cs.sbn }
