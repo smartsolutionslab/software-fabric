@@ -1,4 +1,4 @@
-{{ sse = project["frontend.realtime"] == "sse" -}}
+{{ sse = project["frontend.realtime"] == "sse" ~}}
   {
     // AG-UI's run is a server-sent event stream the generated client cannot make, so connectAgent is the one call to
     // the host written by hand (docs/adr). Everywhere else a call goes through src/api, which sets the token. Lint bans
