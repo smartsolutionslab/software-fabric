@@ -1,0 +1,164 @@
+{{~ editor = module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains(project["frontend.dashboards"], "user-editable") && project["frontend.api-client"] == "orval" && (!object.has_key(project, "frontend.state") || project["frontend.state"] != "pinia") ~}}
+{{~ stands_in = object.has_key(project, "frontend.api-client") && project["frontend.api-client"] == "orval" && (!object.has_key(project, "frontend.state") || project["frontend.state"] != "pinia") ~}}
+{{~ probe = !editor && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+{{~ permissions = "useGet" + module.namespace + "PermissionsManage" ~}}
+import { cleanup, render, screen } from '@testing-library/vue';
+import { afterEach, expect, test, vi } from 'vitest';
+import { axe } from 'vitest-axe';
+import { createMemoryHistory } from 'vue-router';
+import { createAppRouter } from '@/router';
+{{~ if stands_in ~}}
+import { examples } from './{{ module.namespace }}Page.data';
+{{~ end ~}}
+import {{ module.namespace }}Page from './{{ module.namespace }}Page.vue';
+
+// The screen's axe check, generated with it. It runs whatever the screen's own component test does, so a check skipped
+// or commented out there never leaves the screen unchecked.
+{{~ if editor ~}}
+
+// The page is the dashboard editor, which needs the query client and the generated client; its own test checks it with
+// axe on its data. Here it stands in, so this test checks the page around it.
+vi.mock('@/dashboards/DashboardEditor.vue', async () => {
+  const { h } = await import('vue');
+  return { default: { render: () => h('p', 'The dashboard editor') } };
+});
+{{~ end ~}}
+{{~ if stands_in ~}}
+
+// The page renders on its own, without a query client or the host. Each hook of the generated client answers as if its
+// request were still on its way or, once the page is shown with its data, with its example in the data file.
+const shown = vi.hoisted(() => ({ withExamples: false, refusing: '' }));
+vi.mock('@/api/generated', async (importOriginal) => {
+  const { ref } = await import('vue');
+  const { examples } = await import('@/modules/{{ module.name }}/{{ module.namespace }}Page.data');
+  const state = (data: unknown, loading: boolean) => ({
+    data: ref(data),
+    error: ref(null),
+    isLoading: ref(loading),
+    isPending: ref(loading),
+    isFetching: ref(loading),
+    isSuccess: ref(!loading),
+    isError: ref(false),
+    status: ref(loading ? 'pending' : 'success'),
+    refetch: vi.fn(),
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+  });
+  // A request the host refused: what a permission probe answers a caller without the permission.
+  const refused = () => ({
+    ...state(undefined, false),
+    error: ref({ status: 403 }),
+    isSuccess: ref(false),
+    isError: ref(true),
+    status: ref('error'),
+  });
+  const answer = (hook: string) => {
+    if (hook === shown.refusing) {
+      return refused();
+    }
+    return shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
+  };
+  // A mutation nobody has triggered is idle, not saving: the page shows as it first does.
+  const idle = () => ({
+    data: ref(undefined),
+    error: ref(null),
+    isIdle: ref(true),
+    isPending: ref(false),
+    isSuccess: ref(false),
+    isError: ref(false),
+    status: ref('idle'),
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    reset: vi.fn(),
+  });
+  const generated = await importOriginal<Record<string, unknown>>();
+  const isMutation = (hook: string) => `get${hook.slice('use'.length)}MutationOptions` in generated;
+  return Object.fromEntries(
+    Object.entries(generated).map(([name, value]) => {
+      if (!/^use[A-Z]/.test(name)) {
+        return [name, value];
+      }
+      return [name, isMutation(name) ? idle : () => answer(name)];
+    }),
+  );
+});
+{{~ end ~}}
+{{~ if probe && !stands_in ~}}
+
+// The page asks the module's permission probe; without a stand-in for the client, the answer is the test's.
+const probe = vi.hoisted(() => ({ canManage: true }));
+vi.mock('./useCanManage', () => ({ useCanManage: () => probe.canManage }));
+{{~ end ~}}
+
+// Whatever else asks the host waits for an answer that never comes.
+vi.stubGlobal('fetch', () => new Promise<Response>(() => undefined));
+
+// Without Vitest's globals, Testing Library does not unmount between tests by itself.
+afterEach(cleanup);
+{{~ if stands_in ~}}
+afterEach(() => {
+  shown.withExamples = false;
+  shown.refusing = '';
+});
+{{~ end ~}}
+
+async function renderPage() {
+  const router = createAppRouter(createMemoryHistory());
+  await router.push('/{{ module.name }}');
+
+  const { container } = render({{ module.namespace }}Page, { global: { plugins: [router] } });
+{{~ if editor ~}}
+  expect(await screen.findByText('The dashboard editor')).toBeInTheDocument();
+{{~ else ~}}
+  expect(await screen.findByRole('heading', { name: '{{ module.namespace }}' })).toBeInTheDocument();
+{{~ end ~}}
+  return container;
+}
+
+test('the {{ module.namespace }} page has no accessibility violations axe can find', async () => {
+  const container = await renderPage();
+{{~ if probe && !stands_in ~}}
+  expect(screen.getByRole('heading', { name: 'Manage' })).toBeInTheDocument();
+{{~ end ~}}
+
+  expect(await axe(container)).toHaveNoViolations();
+});
+{{~ if stands_in ~}}
+
+// Until {{ module.namespace }}Page.data.ts has an example (AGENTS.md), the page is checked only as it loads.
+test.runIf(Object.keys(examples).length > 0)('the {{ module.namespace }} page passes axe with its example data', async () => {
+  shown.withExamples = true;
+  const container = await renderPage();
+
+  expect(await axe(container)).toHaveNoViolations();
+});
+{{~ end ~}}
+{{~ if probe && stands_in ~}}
+
+// With an example for {{ permissions }} in {{ module.namespace }}Page.data.ts, the probe answers 200 and the page
+// shows "Manage".
+const probeAnswers = '{{ permissions }}' in examples;
+
+test.runIf(probeAnswers)('the {{ module.namespace }} page offers Manage once its probe answers', async () => {
+  shown.withExamples = true;
+  await renderPage();
+
+  expect(screen.getByRole('heading', { name: 'Manage' })).toBeInTheDocument();
+});
+
+test('the {{ module.namespace }} page offers no Manage when the probe refuses', async () => {
+  shown.withExamples = true;
+  shown.refusing = '{{ permissions }}';
+  await renderPage();
+
+  expect(screen.queryByRole('heading', { name: 'Manage' })).not.toBeInTheDocument();
+});
+{{~ else if probe ~}}
+
+test('the {{ module.namespace }} page offers no Manage when the probe refuses', async () => {
+  probe.canManage = false;
+  await renderPage();
+
+  expect(screen.queryByRole('heading', { name: 'Manage' })).not.toBeInTheDocument();
+});
+{{~ end ~}}
