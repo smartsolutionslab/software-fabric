@@ -74,144 +74,82 @@ public sealed class AgUiTests
         """;
 
     /// <summary>
-    /// A screen calling the host by hand: <c>fetch</c> with a bearer token it sets itself, <c>globalThis.fetch</c> with a
-    /// header set by name, a second <c>HttpAgent</c> and an <c>XMLHttpRequest</c>.
+    /// Every name that calls the host: bare (<c>HttpAgent</c> as it is imported), then through <c>window</c>,
+    /// <c>globalThis</c> and <c>self</c>, then through a namespace import.
     /// </summary>
-    private const string SecondCallToTheHost = """
-        import { HttpAgent } from '@ag-ui/client';
+    private const string NamesThatCallTheHost = """
+        import { HttpAgent as Agent } from '@ag-ui/client';
+        import * as agui from '@ag-ui/client';
 
-        export async function loadNotes(token: string) {
-          const response = await fetch('/api/billing/notes', { headers: { Authorization: `Bearer ${token}` } });
-          return (await response.json()) as unknown;
-        }
-
-        export async function loadNote(id: string) {
-          const headers = new Headers();
-          headers.set('Authorization', 'Bearer not-a-token');
-          return globalThis.fetch(`/api/billing/notes/${id}`, { headers });
-        }
-
-        export const secondAgent = new HttpAgent({ url: '/api/agents/assistant' });
-
-        export function request() {
-          return new XMLHttpRequest();
-        }
+        export const bare = [fetch, XMLHttpRequest, Headers, EventSource, Agent];
+        export const throughWindow = [window.fetch, window.XMLHttpRequest, window.Headers, window.HttpAgent, window.EventSource];
+        export const throughGlobalThis = [globalThis.fetch, globalThis.XMLHttpRequest, globalThis.Headers, globalThis.HttpAgent, globalThis.EventSource];
+        export const throughSelf = [self.fetch, self.XMLHttpRequest, self.Headers, self.HttpAgent, self.EventSource];
+        export const throughTheNamespace = agui.HttpAgent;
 
         """;
 
-    /// <summary>
-    /// The header written through a member, by name and computed, then words that say authorization without setting a
-    /// header: a constant and a field of unrelated data.
-    /// </summary>
-    private const string HeaderWrittenThroughAMember = """
-        export const section = 'authorization';
+    /// <summary>The rules eslint names for <see cref="NamesThatCallTheHost"/>, in the order of its lines.</summary>
+    private const string NamesThatCallTheHostFindings =
+        "no-restricted-syntax, "
+        + "no-restricted-globals, no-restricted-globals, no-restricted-globals, no-restricted-globals, "
+        + "no-restricted-properties, no-restricted-properties, no-restricted-properties, no-restricted-properties, no-restricted-properties, "
+        + "no-restricted-properties, no-restricted-properties, no-restricted-properties, no-restricted-properties, no-restricted-properties, "
+        + "no-restricted-properties, no-restricted-properties, no-restricted-properties, no-restricted-properties, no-restricted-properties, "
+        + "no-restricted-properties";
 
-        export function setToken(headers: { Authorization?: string }, token: string) {
-          const assigned = headers;
-          assigned.Authorization = token;
-        }
-
-        export function setLowerCase(headers: Record<string, string>, token: string) {
-          headers['authorization'] = token;
-        }
-
-        export const permissions = { scope: 'authorization', role: 'manager' };
-
-        """;
-
-    /// <summary>A component whose template builds a second <c>HttpAgent</c> and sets the header by hand.</summary>
-    private const string CallToTheHostInATemplate = """
-        <script setup lang="ts">
-        import { HttpAgent } from '@ag-ui/client';
-
-        const headers = new Headers();
-        defineExpose({ HttpAgent, headers });
-        </script>
-
+    /// <summary>A component whose template reaches every name that calls the host, bare and through each global object.</summary>
+    private const string NamesThatCallTheHostInATemplate = """
         <template>
-          <button type="button" @click="new HttpAgent({ url: '/api/agents/assistant' })">Ask</button>
-          <button type="button" @click="headers.set('Authorization', 'Bearer not-a-token')">Sign</button>
+          <button type="button" @click="[fetch, XMLHttpRequest, Headers, HttpAgent, EventSource]">Bare</button>
+          <button type="button" @click="[window.fetch, window.XMLHttpRequest, window.Headers, window.HttpAgent, window.EventSource]">Window</button>
+          <button type="button" @click="[globalThis.fetch, globalThis.XMLHttpRequest, globalThis.Headers, globalThis.HttpAgent, globalThis.EventSource]">GlobalThis</button>
+          <button type="button" @click="[self.fetch, self.XMLHttpRequest, self.Headers, self.HttpAgent, self.EventSource]">Self</button>
         </template>
 
         """;
 
-    /// <summary>
-    /// Data that says authorization without being a header, a map entry and a field, then the header set in an object
-    /// held as headers and in one given to <c>new Headers</c>.
-    /// </summary>
-    private const string AuthorizationOutsideAndInsideHeaders = """
-        export const sections = new Map<string, string>().set('section', 'authorization');
-
-        export const grant = { authorization: 'manager' };
-
-        export function sign(token: string) {
-          const requestHeaders: Record<string, string> = { Authorization: `Bearer ${token}` };
-          return new Headers({ authorization: token, ...requestHeaders });
-        }
-
-        """;
+    /// <summary>Twenty findings, one per name in <see cref="NamesThatCallTheHostInATemplate"/>.</summary>
+    private static readonly string NamesThatCallTheHostInATemplateFindings =
+        string.Join(", ", Enumerable.Repeat("vue/no-restricted-syntax", 20));
 
     /// <summary>
-    /// A component whose template calls the host through <c>window.fetch</c>, <c>fetch</c> and an
-    /// <c>XMLHttpRequest</c>, and fills a map entry that merely says authorization.
+    /// Data that says authorization without calling the host, keyed, assigned and in a map, and a fetch that belongs
+    /// to another object.
     /// </summary>
-    private const string FetchInATemplate = """
-        <script setup lang="ts">
-        const window = globalThis.window;
-        const grants = new Map<string, string>();
-        defineExpose({ window, grants });
-        </script>
-
-        <template>
-          <button type="button" @click="window.fetch('/api/agents/assistant', { method: 'POST' })">Ask</button>
-          <button type="button" @click="fetch('/api/billing/notes')">Load</button>
-          <button type="button" @click="new XMLHttpRequest()">Open</button>
-          <button type="button" @click="grants.set('section', 'authorization')">Grant</button>
-        </template>
-
-        """;
-
-    /// <summary>
-    /// A map keyed authorization and a field of that name assigned, neither a header, then the header set on a
-    /// <c>Headers</c> and on a fetch init's headers.
-    /// </summary>
-    private const string AuthorizationKeysOutsideAndInsideHeaders = """
+    private const string DataThatSaysAuthorization = """
         export const roles = new Map<string, string>().set('authorization', 'x');
 
-        export function revoke(grant: { authorization?: string }) {
-          grant.authorization = 'x';
+        export const grant = { authorization: 'manager', Authorization: 'x' };
+
+        export function revoke(record: { authorization?: string; Authorization?: string }) {
+          record.authorization = 'x';
+          record.Authorization = 'x';
         }
 
-        export function sign(headers: Headers, init: { headers: Headers }, token: string) {
-          headers.append('authorization', token);
-          init.headers.set('Authorization', token);
-        }
+        export const store = { fetch: () => 'cached' };
+
+        export const cached = store.fetch();
 
         """;
 
-    /// <summary>
-    /// A component whose template keys a map and a field authorization, neither a header, and sets the header on the
-    /// <c>Headers</c> its script exposes.
-    /// </summary>
-    private const string AuthorizationKeysInATemplate = """
+    /// <summary>The same in a component's template.</summary>
+    private const string DataThatSaysAuthorizationInATemplate = """
         <script setup lang="ts">
         const roles = new Map<string, string>();
-        const grant: { authorization?: string } = {};
-        const requestHeaders = new Headers();
-        defineExpose({ roles, grant, requestHeaders });
+        const grant: { authorization?: string; Authorization?: string } = {};
+        const store = { fetch: () => 'cached' };
+        defineExpose({ roles, grant, store });
         </script>
 
         <template>
           <button type="button" @click="roles.set('authorization', 'x')">Role</button>
           <button type="button" @click="grant.authorization = 'x'">Grant</button>
-          <button type="button" @click="requestHeaders.set('authorization', 'x')">Sign</button>
+          <button type="button" @click="grant.Authorization = 'x'">Grant again</button>
+          <button type="button" @click="store.fetch()">Load</button>
         </template>
 
         """;
-
-    /// <summary>The rules eslint names for <see cref="SecondCallToTheHost"/>, in the order of its lines.</summary>
-    private const string SecondCallToTheHostFindings =
-        "no-restricted-globals, no-restricted-syntax, no-restricted-syntax, no-restricted-properties, no-restricted-syntax, no-restricted-globals";
 
     /// <summary>
     /// Runs the AG-UI SDK's own stream over updates that fail mid-stream, with the tracer <c>AddServiceDefaults()</c>
@@ -481,8 +419,13 @@ public sealed class AgUiTests
         Files(Profile, Anthropic, AgentFramework)["web/app/eslint.config.js"].ShouldNotContain("no-restricted-globals");
     }
 
+    /// <summary>
+    /// Owner decision on #607 (2026-11-13): lint bans the names that call the host, not call shapes. Words and data
+    /// that only say authorization, and a fetch of another object's, pass; then every banned name fails, bare and
+    /// through window, globalThis or self.
+    /// </summary>
     [Fact]
-    public void A_second_hand_written_call_to_the_host_or_a_hand_set_authorization_header_fails_the_web_apps_lint()
+    public void Every_name_that_calls_the_host_fails_the_web_apps_lint_bare_or_through_the_global_object_and_other_data_passes()
     {
         using var project = NewProject(Anthropic, AgentFramework, AgUi);
         var web = Path.Combine(project.ProjectDirectory, "web");
@@ -491,16 +434,21 @@ public sealed class AgUiTests
         var (untouchedExitCode, untouchedOutput) = Shell.Run(web, "pnpm", "lint");
         untouchedExitCode.ShouldBe(0, untouchedOutput);
 
-        project.Write("web/app/src/pages/notes.ts", SecondCallToTheHost);
+        project.Write("web/app/src/pages/grants.ts", DataThatSaysAuthorization);
+        var (passingExitCode, passingOutput) = Shell.Run(web, "pnpm", "lint");
+        passingExitCode.ShouldBe(0, passingOutput);
+
+        project.Write("web/app/src/pages/calls.ts", NamesThatCallTheHost);
         var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
 
         exitCode.ShouldNotBe(0, output);
-        LintFindings(output).ShouldBe(SecondCallToTheHostFindings, output);
+        LintFindings(output).ShouldBe(NamesThatCallTheHostFindings, output);
         output.ShouldContain("only src/agents/connectAgent.ts calls the host by hand");
     }
 
+    /// <summary>The same in a Vue project, in its scripts and in a component's template.</summary>
     [Fact]
-    public void With_vue_a_second_hand_written_call_to_the_host_or_a_hand_set_authorization_header_fails_the_web_apps_lint()
+    public void With_vue_every_name_that_calls_the_host_fails_the_web_apps_lint_in_a_script_or_a_template_and_other_data_passes()
     {
         using var project = new GeneratedProject("saas-standard-vue", Anthropic, AgentFramework, AgUi);
         var web = Path.Combine(project.ProjectDirectory, "web");
@@ -509,124 +457,48 @@ public sealed class AgUiTests
         var (untouchedExitCode, untouchedOutput) = Shell.Run(web, "pnpm", "lint");
         untouchedExitCode.ShouldBe(0, untouchedOutput);
 
-        project.Write("web/app/src/pages/notes.ts", SecondCallToTheHost);
+        project.Write("web/app/src/pages/grants.ts", DataThatSaysAuthorization);
+        project.Write("web/app/src/pages/GrantsPage.vue", DataThatSaysAuthorizationInATemplate);
+        var (passingExitCode, passingOutput) = Shell.Run(web, "pnpm", "lint");
+        passingExitCode.ShouldBe(0, passingOutput);
+
+        project.Write("web/app/src/pages/calls.ts", NamesThatCallTheHost);
+        project.Write("web/app/src/pages/CallsPage.vue", NamesThatCallTheHostInATemplate);
         var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
 
         exitCode.ShouldNotBe(0, output);
-        LintFindings(output).ShouldBe(SecondCallToTheHostFindings, output);
+        LintFindings(output).ShouldBe(
+            NamesThatCallTheHostInATemplateFindings + ", " + NamesThatCallTheHostFindings,
+            output);
         output.ShouldContain("only src/agents/connectAgent.ts calls the host by hand");
     }
 
-    /// <summary>
-    /// Review of #638: a header written through a member fails lint as one written by a literal does, and a word that
-    /// merely says authorization does not.
-    /// </summary>
+    /// <summary>The realtime stream's own EventSource, the third call to the host by hand, keeps passing.</summary>
     [Fact]
-    public void An_authorization_header_written_through_a_member_fails_the_web_apps_lint_and_other_authorization_words_do_not()
+    public void With_the_server_sent_event_stream_the_untouched_web_app_passes_lint()
     {
-        using var project = NewProject(Anthropic, AgentFramework, AgUi);
+        using var project = NewProject(Anthropic, AgentFramework, AgUi, "frontend.realtime=sse");
         var web = Path.Combine(project.ProjectDirectory, "web");
         var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
         installExitCode.ShouldBe(0, installOutput);
 
-        project.Write("web/app/src/pages/token.ts", HeaderWrittenThroughAMember);
         var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
 
-        exitCode.ShouldNotBe(0, output);
-        LintFindings(output).ShouldBe("no-restricted-syntax, no-restricted-syntax", output);
-        output.ShouldContain("5:3 ");
-        output.ShouldContain("9:3 ");
+        exitCode.ShouldBe(0, output);
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "web/app/src/realtime/connection.ts")).ShouldContain("new EventSource(");
     }
 
-    /// <summary>Review of #638: eslint's own rules do not read a Vue template, so the gate holds there too.</summary>
     [Fact]
-    public void With_vue_a_hand_written_call_to_the_host_in_a_components_template_fails_the_web_apps_lint()
+    public void The_agent_panels_adr_says_what_lint_cannot_see_and_that_the_backend_policy_protects_the_host()
     {
-        using var project = new GeneratedProject("saas-standard-vue", Anthropic, AgentFramework, AgUi);
-        var web = Path.Combine(project.ProjectDirectory, "web");
-        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
-        installExitCode.ShouldBe(0, installOutput);
+        var adr = AgentUiAdr(Files(Profile, Anthropic, AgentFramework, AgUi));
 
-        project.Write("web/app/src/pages/NotesPage.vue", CallToTheHostInATemplate);
-        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
-
-        exitCode.ShouldNotBe(0, output);
-        LintFindings(output).ShouldBe("vue/no-restricted-syntax, vue/no-restricted-syntax", output);
-    }
-
-    /// <summary>
-    /// Second review of #638: only a header's name is refused, so a map entry or a field that says authorization
-    /// passes, while an object of headers that sets it still fails.
-    /// </summary>
-    [Fact]
-    public void Data_that_merely_says_authorization_passes_the_web_apps_lint_and_an_object_of_headers_setting_it_does_not()
-    {
-        using var project = NewProject(Anthropic, AgentFramework, AgUi);
-        var web = Path.Combine(project.ProjectDirectory, "web");
-        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
-        installExitCode.ShouldBe(0, installOutput);
-
-        project.Write("web/app/src/pages/grants.ts", AuthorizationOutsideAndInsideHeaders);
-        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
-
-        exitCode.ShouldNotBe(0, output);
-        LintFindings(output).ShouldBe("no-restricted-syntax, no-restricted-syntax", output);
-        output.ShouldContain("6:52 ");
-        output.ShouldContain("7:24 ");
-    }
-
-    /// <summary>Second review of #638: a Vue template cannot call the host by hand either.</summary>
-    [Fact]
-    public void With_vue_a_fetch_in_a_components_template_fails_the_web_apps_lint_and_a_map_entry_saying_authorization_does_not()
-    {
-        using var project = new GeneratedProject("saas-standard-vue", Anthropic, AgentFramework, AgUi);
-        var web = Path.Combine(project.ProjectDirectory, "web");
-        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
-        installExitCode.ShouldBe(0, installOutput);
-
-        project.Write("web/app/src/pages/AskPage.vue", FetchInATemplate);
-        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
-
-        exitCode.ShouldNotBe(0, output);
-        LintFindings(output).ShouldBe("vue/no-restricted-syntax, vue/no-restricted-syntax, vue/no-restricted-syntax", output);
-        output.ShouldContain("only src/agents/connectAgent.ts calls the host by hand");
-    }
-
-    /// <summary>
-    /// Third review of #638: a map keyed authorization or a field of that name passes; the header set on headers fails.
-    /// </summary>
-    [Fact]
-    public void A_map_or_a_field_keyed_authorization_passes_the_web_apps_lint_and_the_header_set_on_headers_does_not()
-    {
-        using var project = NewProject(Anthropic, AgentFramework, AgUi);
-        var web = Path.Combine(project.ProjectDirectory, "web");
-        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
-        installExitCode.ShouldBe(0, installOutput);
-
-        project.Write("web/app/src/pages/roles.ts", AuthorizationKeysOutsideAndInsideHeaders);
-        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
-
-        exitCode.ShouldNotBe(0, output);
-        LintFindings(output).ShouldBe("no-restricted-syntax, no-restricted-syntax", output);
-        output.ShouldContain("8:18 ");
-        output.ShouldContain("9:20 ");
-    }
-
-    /// <summary>Third review of #638: in a Vue template too, only the header set on headers fails.</summary>
-    [Fact]
-    public void With_vue_a_map_or_a_field_keyed_authorization_in_a_template_passes_the_web_apps_lint_and_the_header_does_not()
-    {
-        using var project = new GeneratedProject("saas-standard-vue", Anthropic, AgentFramework, AgUi);
-        var web = Path.Combine(project.ProjectDirectory, "web");
-        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
-        installExitCode.ShouldBe(0, installOutput);
-
-        project.Write("web/app/src/pages/RolesPage.vue", AuthorizationKeysInATemplate);
-        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
-
-        exitCode.ShouldNotBe(0, output);
-        LintFindings(output).ShouldBe("vue/no-restricted-syntax", output);
-        output.ShouldContain("11:");
+        adr.ShouldContain("Lint bans names, not calls:");
+        adr.ShouldContain("What lint cannot see:");
+        adr.ShouldContain("a name reached through a variable");
+        adr.ShouldContain("a property name computed at run time");
+        adr.ShouldContain("an HTTP library not on the list");
+        adr.ShouldContain("The protection is the backend's policy");
     }
 
     [Fact]
