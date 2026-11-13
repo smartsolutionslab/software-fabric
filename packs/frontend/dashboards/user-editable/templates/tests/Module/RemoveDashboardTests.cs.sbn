@@ -1,4 +1,6 @@
-{{~ ddd = module.values["module.style"] == "ddd" ~}}
+{{~ # Under ddd and event-sourced a command carries the module's value objects; the store holds aggregates under ddd only, rows otherwise. ~}}
+{{~ ddd = module.values["module.style"] != "crud" ~}}
+{{~ aggregates = module.values["module.style"] == "ddd" ~}}
 using {{ namespace }}.Modules.Dashboards.Application.Commands.RemoveDashboard;
 {{~ if ddd ~}}
 using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
@@ -41,7 +43,7 @@ public class RemoveDashboardTests
         var result = await module.SendAsync(new RemoveDashboard({{ if ddd }}DashboardId.From(id){{ else }}id{{ end }}), {{ test_cancellation_token }});
 
         {{ `result.Error.Code` | should_be `"dashboards.dashboard-not-found"` }};
-        {{ (ddd ? `module.Store.Stored.Single().Owner.Value` : `module.Store.Stored.Single().Owner`) | should_be `DashboardsModuleUnderTest.OtherOwner` }};
+        {{ (aggregates ? `module.Store.Stored.Single().Owner.Value` : `module.Store.Stored.Single().Owner`) | should_be `DashboardsModuleUnderTest.OtherOwner` }};
     }
 
     {{ test_attribute }}

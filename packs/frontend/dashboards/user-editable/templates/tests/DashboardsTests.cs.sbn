@@ -100,6 +100,26 @@ public class DashboardsTests({{ integration_fixture }})
         {{ `(await developer.GetAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.NotFound` }};
     }
 
+{{~ if module_defaults["module.style"] != "crud" ~}}
+    {{ test_attribute }}
+    public async Task The_owner_saves_a_removed_dashboards_id_again_and_lists_it()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var id = Guid.CreateVersion7();
+        using var developer = await {{ signed_in_host_client `"developer"` }};
+        {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("Before", (Chart, "bar")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
+        {{ `(await developer.DeleteAsync(new Uri(Path(id), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
+        {{ `(await Ids(developer, cancellationToken))` | should_not_contain `id` }};
+
+        {{ `(await developer.PutAsJsonAsync(Path(id), Dashboard("After", (Chart, "pie")), cancellationToken)).StatusCode` | should_be `HttpStatusCode.OK` }};
+
+        var dashboard = await developer.GetFromJsonAsync<JsonObject>(Path(id), cancellationToken);
+        {{ `dashboard!["name"]!.GetValue<string>()` | should_be `"After"` }};
+        {{ `dashboard["widgets"]!.AsArray().Single()!["visual"]!.GetValue<string>()` | should_be `"pie"` }};
+        {{ `(await Ids(developer, cancellationToken)).Count(listed => listed == id)` | should_be `1` }};
+    }
+
+{{~ end ~}}
     {{ test_attribute }}
     public async Task A_widget_the_modules_do_not_declare_is_refused_when_saving_and_when_run()
     {

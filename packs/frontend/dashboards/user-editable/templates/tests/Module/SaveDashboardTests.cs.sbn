@@ -1,9 +1,18 @@
-{{~ ddd = module.values["module.style"] == "ddd" ~}}
+{{~ style = module.values["module.style"] ~}}
+{{~ # Under ddd and event-sourced a command carries the module's value objects; the store holds aggregates under ddd only, rows otherwise. ~}}
+{{~ ddd = style != "crud" ~}}
+{{~ aggregates = style == "ddd" ~}}
 {{~ if ddd ~}}
 using {{ namespace }}.Modules.Dashboards.Api.Endpoints;
 {{~ end ~}}
+{{~ if ddd ~}}
+using {{ namespace }}.Modules.Dashboards.Application.Commands.RemoveDashboard;
+{{~ end ~}}
 using {{ namespace }}.Modules.Dashboards.Application.Commands.SaveDashboard;
 using {{ namespace }}.Modules.Dashboards.Application.Queries.GetDashboard;
+{{~ if ddd ~}}
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+{{~ end ~}}
 
 namespace {{ namespace }}.Modules.Dashboards.Tests.Commands;
 
@@ -24,7 +33,7 @@ public class SaveDashboardTests
         {{ `read.Value.Id` | should_be `Id` }};
         {{ `read.Value.Name` | should_be `"Sales"` }};
         {{ `read.Value.Widgets.Select(widget => $"{widget.Key} {widget.Source} {widget.Visual} {widget.X},{widget.Y} {widget.Width}x{widget.Height}")` | should_be `["w-1 dashboards.widget-counts pie 2,3 4x5", "w-2 dashboards.my-dashboards table 0,8 12x6"]` }};
-        {{ (ddd ? `module.Store.Stored.Single().Owner.Value` : `module.Store.Stored.Single().Owner`) | should_be `DashboardsModuleUnderTest.Owner` }};
+        {{ (aggregates ? `module.Store.Stored.Single().Owner.Value` : `module.Store.Stored.Single().Owner`) | should_be `DashboardsModuleUnderTest.Owner` }};
     }
 
     {{ test_attribute }}
@@ -36,10 +45,60 @@ public class SaveDashboardTests
         await module.SendAsync(Save("Costs", new WidgetPlacement("w-2", "dashboards.widget-counts", "line", 6, 0, 6, 4)), {{ test_cancellation_token }});
 
         var dashboard = module.Store.Stored.Single();
-        {{ (ddd ? `dashboard.Name.Value` : `dashboard.Name`) | should_be `"Costs"` }};
+        {{ (aggregates ? `dashboard.Name.Value` : `dashboard.Name`) | should_be `"Costs"` }};
         {{ `dashboard.Widgets.Select(widget => widget.Key)` | should_be `["w-2"]` }};
     }
 
+{{~ if ddd ~}}
+    {{ test_attribute }}
+    public async Task The_owner_saves_a_removed_dashboards_id_again()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+        await module.SendAsync(Save("Before", new WidgetPlacement("w-1", "dashboards.widget-counts", "bar", 0, 0, 6, 4)), {{ test_cancellation_token }});
+        await module.SendAsync(new RemoveDashboard(DashboardId.From(Id)), {{ test_cancellation_token }});
+
+        var saved = await module.SendAsync(Save("After", new WidgetPlacement("w-2", "dashboards.widget-counts", "pie", 6, 0, 6, 4)), {{ test_cancellation_token }});
+        var read = await module.QueryAsync(new GetDashboard(Id), {{ test_cancellation_token }});
+
+        {{ `saved.Value` | should_be `Id` }};
+        {{ `read.Value.Name` | should_be `"After"` }};
+        {{ `read.Value.Widgets.Select(widget => widget.Key)` | should_be `["w-2"]` }};
+        {{ (aggregates ? `module.Store.Stored.Single().Name.Value` : `module.Store.Stored.Single().Name`) | should_be `"After"` }};
+    }
+{{~ end ~}}
+{{~ if style == "event-sourced" ~}}
+
+    {{ test_attribute }}
+    public async Task Another_users_dashboard_id_is_refused_and_their_dashboard_stays()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+        await using var other = module.SignedInAs(DashboardsModuleUnderTest.OtherOwner);
+        await other.SendAsync(Save("Theirs", new WidgetPlacement("w-1", "dashboards.widget-counts", "bar", 0, 0, 6, 4)), {{ test_cancellation_token }});
+
+        var result = await module.SendAsync(Save("Mine", new WidgetPlacement("w-1", "dashboards.widget-counts", "pie", 0, 0, 6, 4)), {{ test_cancellation_token }});
+
+        {{ `result.Error.Code` | should_be `"dashboards.already-exists"` }};
+        {{ `module.Store.Stored.Single().Owner` | should_be `DashboardsModuleUnderTest.OtherOwner` }};
+        {{ `module.Store.Stored.Single().Name` | should_be `"Theirs"` }};
+    }
+
+    {{ test_attribute }}
+    public async Task Another_users_removed_dashboard_id_is_still_refused()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+        await using var other = module.SignedInAs(DashboardsModuleUnderTest.OtherOwner);
+        await other.SendAsync(Save("Theirs", new WidgetPlacement("w-1", "dashboards.widget-counts", "bar", 0, 0, 6, 4)), {{ test_cancellation_token }});
+        await other.SendAsync(new RemoveDashboard(DashboardId.From(Id)), {{ test_cancellation_token }});
+
+        var result = await module.SendAsync(Save("Mine", new WidgetPlacement("w-1", "dashboards.widget-counts", "pie", 0, 0, 6, 4)), {{ test_cancellation_token }});
+
+        {{ `result.Error.Code` | should_be `"dashboards.already-exists"` }};
+        {{ `module.Store.Stored` | should_be_empty }};
+    }
+{{~ end ~}}
+{{~ if ddd ~}}
+
+{{~ end ~}}
     {{ test_attribute }}
     public async Task Without_a_signed_in_user_nothing_is_saved()
     {

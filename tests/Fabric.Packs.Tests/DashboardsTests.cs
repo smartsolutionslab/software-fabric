@@ -246,6 +246,86 @@ public sealed class DashboardsTests
         files["src/Modules/Dashboards/Dashboards.Domain/Dashboards/Dashboard.cs"].ShouldContain("public sealed class Dashboard : EventSourcedAggregate<DashboardId>");
     }
 
+    /// <summary>
+    /// Event-sourced dashboards read a table of their own (#608, the owner's decision of 2026-11-13): the command
+    /// handler writes the existing <c>dashboards</c> table right after it saves the aggregate's events, the same on
+    /// Marten and KurrentDB, and commits it through the unit of work. A page and the chart read that table; one
+    /// dashboard is read from its stream.
+    /// </summary>
+    [Theory]
+    [InlineData("marten")]
+    [InlineData("kurrentdb")]
+    public void In_an_event_sourced_project_a_command_writes_the_dashboards_table_right_after_the_aggregates_events(string store)
+    {
+        var files = Files("industrial-event-driven-mfe", Dashboards, $"module.event-store={store}", "module.cqrs=logical");
+        const string Application = "src/Modules/Dashboards/Dashboards.Application/";
+
+        files["fabric.yaml"].ShouldContain($"    module.style: event-sourced\n    module.event-store: {store}\n");
+        foreach (var handler in new[] { "Commands/SaveDashboard/SaveDashboardHandler.cs", "Commands/RemoveDashboard/RemoveDashboardHandler.cs" })
+        {
+            var code = files[Application + handler];
+            var events = code.IndexOf("await aggregates.SaveAsync(", StringComparison.Ordinal);
+            var table = code.IndexOf("await dashboards.RecordAsync(", StringComparison.Ordinal);
+            var commit = code.IndexOf("await unitOfWork.CommitAsync(cancellationToken);", StringComparison.Ordinal);
+            events.ShouldBeGreaterThan(-1, handler);
+            table.ShouldBeGreaterThan(events, handler);
+            commit.ShouldBeGreaterThan(table, handler);
+        }
+
+        files[Application + "Queries/ListDashboards/ListDashboardsHandler.cs"].ShouldContain("IDashboardStore dashboards");
+        files[Application + "Queries/CountWidgets/CountWidgetsHandler.cs"].ShouldContain("IDashboardStore dashboards");
+        files[Application + "Queries/GetDashboard/GetDashboardHandler.cs"].ShouldContain("IDashboardsAggregateStore aggregates");
+        files[Application + "ReadModels/DashboardRow.cs"].ShouldContain("public sealed class DashboardRow");
+        var configuration = files["src/Modules/Dashboards/Dashboards.Infrastructure/Persistence/Configurations/DashboardConfiguration.cs"];
+        configuration.ShouldContain("IEntityTypeConfiguration<DashboardRow>");
+        configuration.ShouldContain("builder.ToTable(\"dashboards\");");
+        files["src/Modules/Dashboards/Dashboards.Infrastructure/Migrations/20261105000000_CreateDashboards.cs"]
+            .ShouldBe(Files(Profile, Dashboards, "backend.tenancy=none")["src/Modules/Dashboards/Dashboards.Infrastructure/Migrations/20261105000000_CreateDashboards.cs"]);
+        files.Single(file => file.Key.EndsWith("-frontend-dashboards-user-editable.md", StringComparison.Ordinal)).Value
+            .ShouldContain("not in one transaction");
+    }
+
+    /// <summary>
+    /// Under strict, an event-sourced module's value objects hold one value each, and its events take them by
+    /// constructor: a placed widget is a record of value objects, not a value object over seven values (#608).
+    /// </summary>
+    [Fact]
+    public void In_a_strict_event_sourced_project_a_placed_widget_is_a_record_of_single_value_objects()
+    {
+        var files = Files("industrial-event-driven-mfe", Dashboards, "module.ddd-depth=strict");
+        const string Domain = "src/Modules/Dashboards/Dashboards.Domain/Dashboards/";
+
+        files[Domain + "DashboardWidget.cs"].ShouldContain("public sealed record DashboardWidget(\n    WidgetKey Key,");
+        files[Domain + "DashboardWidget.cs"].ShouldNotContain("IValueObject");
+        files[Domain + "DashboardId.cs"].ShouldContain("public sealed record DashboardId : IValueObject<Guid>, IAggregateId");
+        files[Domain + "Events/DashboardCreated.cs"].ShouldContain("public sealed record DashboardCreated(DashboardId Id, DashboardOwner Owner, DashboardName Name, IReadOnlyList<DashboardWidget> Widgets) : IDomainEvent;");
+    }
+
+    /// <summary>
+    /// In every module style the owner may save a removed dashboard's id again (#608, the owner's decision of
+    /// 2026-11-13): under ddd and event-sourced the module's own tests and the integration tests say so. A CRUD
+    /// module deletes the row, so its id is free again, and its tests stay as they are (crud output is unchanged).
+    /// Another user's id answers 409, as the integration tests already check in every style.
+    /// </summary>
+    [Theory]
+    [InlineData(Profile)]
+    [InlineData("industrial-event-driven-mfe")]
+    public void Under_ddd_and_event_sourced_the_tests_save_a_removed_id_again(string profile)
+    {
+        var files = Files(profile, Dashboards);
+
+        files["tests/Modules/Dashboards.Tests/Commands/SaveDashboardTests.cs"].ShouldContain("public async Task The_owner_saves_a_removed_dashboards_id_again()");
+        files["tests/Integration.Tests/DashboardsTests.cs"].ShouldContain("public async Task The_owner_saves_a_removed_dashboards_id_again_and_lists_it()");
+    }
+
+    [Fact]
+    public void In_an_event_sourced_project_another_users_dashboard_id_is_refused_by_the_module_itself()
+    {
+        var files = Files("industrial-event-driven-mfe", Dashboards);
+
+        files["tests/Modules/Dashboards.Tests/Commands/SaveDashboardTests.cs"].ShouldContain("public async Task Another_users_dashboard_id_is_refused_and_their_dashboard_stays()");
+    }
+
     [Fact]
     public void The_frontends_openapi_document_describes_the_dashboards_endpoints()
     {

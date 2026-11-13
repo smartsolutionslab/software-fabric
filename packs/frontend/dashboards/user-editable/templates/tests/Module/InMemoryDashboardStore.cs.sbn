@@ -60,7 +60,7 @@ internal sealed class InMemoryDashboardStore : IDashboardStore
     private IEnumerable<Dashboard> Owned(string owner) =>
         stored.Where(dashboard => dashboard.Owner == owner).OrderBy(dashboard => dashboard.Name, StringComparer.Ordinal).ThenBy(dashboard => dashboard.Id);
 }
-{{ else ~}}
+{{ else if module.values["module.style"] == "ddd" ~}}
 {{~ option = project["backend.absence"] == "option" ~}}
 using {{ namespace }}.Contracts;
 using {{ namespace }}.Modules.Dashboards.Application;
@@ -126,5 +126,114 @@ internal sealed class InMemoryDashboardStore : IDashboardStore, IDashboardsUnitO
 
     private IEnumerable<Dashboard> Owned(DashboardOwner owner) =>
         stored.Where(dashboard => dashboard.Owner == owner).OrderBy(dashboard => dashboard.Name.Value, StringComparer.Ordinal).ThenBy(dashboard => dashboard.Id.Value);
+}
+{{ else ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+{{~ value = module.values["module.ddd-depth"] == "strict" ? ".Value" : "" ~}}
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+using {{ namespace }}.Contracts;
+using {{ namespace }}.Modules.Dashboards.Application;
+using {{ namespace }}.Modules.Dashboards.Application.ReadModels;
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Tests;
+
+/// <summary>
+/// The module's event streams and its dashboards table in memory, with its unit of work over the table: events count
+/// once they are saved, a row once it is committed, and a stale save is refused, as the event store refuses it.
+/// </summary>
+internal sealed class InMemoryDashboardStore : IDashboardStore, IDashboardsUnitOfWork, IDashboardsAggregateStore
+{
+    private readonly Dictionary<Guid, List<IDomainEvent>> streams = [];
+    private readonly List<DashboardRow> stored = [];
+    private readonly Dictionary<Guid, DashboardRow?> recorded = [];
+
+    /// <summary>The dashboards table's rows.</summary>
+    public IReadOnlyList<DashboardRow> Stored => stored;
+
+    /// <summary>How many times the unit of work was committed.</summary>
+    public int Saves { get; private set; }
+
+{{~ if option ~}}
+    public Task<Option<TAggregate>> LoadAsync<TAggregate>(IAggregateId id, CancellationToken cancellationToken)
+{{~ else ~}}
+    public Task<TAggregate?> LoadAsync<TAggregate>(IAggregateId id, CancellationToken cancellationToken)
+{{~ end ~}}
+        where TAggregate : class, IEventSourced
+    {
+        if (!streams.TryGetValue(id.Value, out var history))
+        {
+{{~ if option ~}}
+            return Task.FromResult(Option<TAggregate>.None);
+{{~ else ~}}
+            return Task.FromResult<TAggregate?>(null);
+{{~ end ~}}
+        }
+
+        var aggregate = (TAggregate)Activator.CreateInstance(typeof(TAggregate), nonPublic: true)!;
+        aggregate.Replay(history);
+{{~ if option ~}}
+        return Task.FromResult(Option<TAggregate>.Some(aggregate));
+{{~ else ~}}
+        return Task.FromResult<TAggregate?>(aggregate);
+{{~ end ~}}
+    }
+
+    public Task SaveAsync(IEventSourced aggregate, CancellationToken cancellationToken)
+    {
+        var history = streams.GetValueOrDefault(aggregate.Id.Value) ?? [];
+        if (history.Count != aggregate.Version)
+        {
+            throw new InvalidOperationException($"The stream {aggregate.Id.Value} moved on since it was loaded.");
+        }
+
+        streams[aggregate.Id.Value] = [.. history, .. aggregate.PendingEvents];
+        aggregate.MarkStored();
+        return Task.CompletedTask;
+    }
+
+    public Task<PagedResult<DashboardRow>> ListAsync(DashboardOwner owner, Page page, PageSize pageSize, CancellationToken cancellationToken)
+    {
+        List<DashboardRow> owned = [.. Owned(owner)];
+        List<DashboardRow> items = [.. owned.Skip(page.Skip(pageSize)).Take(pageSize.Value)];
+        return Task.FromResult(new PagedResult<DashboardRow>(items, owned.Count, page.Value, pageSize.Value));
+    }
+
+    public Task<IReadOnlyList<DashboardRow>> AllAsync(DashboardOwner owner, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<DashboardRow>>([.. Owned(owner)]);
+
+    public Task RecordAsync(Dashboard dashboard, CancellationToken cancellationToken)
+    {
+        recorded[dashboard.Id.Value] = dashboard.IsRemoved() ? null : new DashboardRow
+        {
+            Id = dashboard.Id.Value,
+            Owner = dashboard.Owner.Value,
+            Name = dashboard.Name.Value,
+            Widgets = [.. dashboard.Widgets.Select(widget => new DashboardRowWidget { Key = widget.Key{{ value }}, Source = widget.Source{{ value }}, Visual = widget.Visual{{ value }}, X = widget.X{{ value }}, Y = widget.Y{{ value }}, Width = widget.Width{{ value }}, Height = widget.Height{{ value }} })],
+        };
+        return Task.CompletedTask;
+    }
+
+    public Task PublishAsync(IntegrationEvent integrationEvent) =>
+        throw new NotSupportedException("The dashboards module publishes no integration events.");
+
+    public Task CommitAsync(CancellationToken cancellationToken)
+    {
+        foreach (var (id, row) in recorded)
+        {
+            stored.RemoveAll(existing => existing.Id == id);
+            if (row is not null)
+            {
+                stored.Add(row);
+            }
+        }
+
+        recorded.Clear();
+        Saves++;
+        return Task.CompletedTask;
+    }
+
+    private IEnumerable<DashboardRow> Owned(DashboardOwner owner) =>
+        stored.Where(row => row.Owner == owner.Value).OrderBy(row => row.Name, StringComparer.Ordinal).ThenBy(row => row.Id);
 }
 {{ end ~}}
