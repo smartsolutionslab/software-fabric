@@ -1,4 +1,7 @@
-using {{ namespace }}.Modules.Dashboards.Domain;
+{{~ ddd = module.values["module.style"] != "crud" ~}}
+{{~ # Under a strict event-sourced module each of a widget's parts is a value object over one value. ~}}
+{{~ value = module.values["module.style"] == "event-sourced" && module.values["module.ddd-depth"] == "strict" ? ".Value" : "" ~}}
+using {{ namespace }}.Modules.Dashboards.Domain{{ if ddd }}.Dashboards{{ end }};
 
 namespace {{ namespace }}.Modules.Dashboards.Application.DTOs;
 
@@ -7,6 +10,6 @@ public static class DashboardWidgetMappings
     public static DashboardWidgetDto ToDto(this DashboardWidget widget)
     {
         {{ not_null "widget" }}
-        return new DashboardWidgetDto(widget.Key, widget.Source, widget.Visual, widget.X, widget.Y, widget.Width, widget.Height);
+        return new DashboardWidgetDto(widget.Key{{ value }}, widget.Source{{ value }}, widget.Visual{{ value }}, widget.X{{ value }}, widget.Y{{ value }}, widget.Width{{ value }}, widget.Height{{ value }});
     }
 }

@@ -1,3 +1,6 @@
+{{~ # Under ddd and event-sourced an id and an owner are value objects; under event-sourced a dashboard is read from its stream. ~}}
+{{~ ddd = module.values["module.style"] != "crud" ~}}
+{{~ event_sourced = module.values["module.style"] == "event-sourced" ~}}
 {{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
 {{~ option = project["backend.absence"] == "option" ~}}
 {{~ func ok(type, value)
@@ -15,10 +18,17 @@ end ~}}
 using {{ namespace }}.BuildingBlocks.Identity;
 using {{ namespace }}.BuildingBlocks.Messaging;
 using {{ namespace }}.Modules.Dashboards.Application.DTOs;
+{{~ if ddd ~}}
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+{{~ end ~}}
 
 namespace {{ namespace }}.Modules.Dashboards.Application.Queries.GetDashboard;
 
+{{~ if event_sourced ~}}
+public sealed class GetDashboardHandler(IDashboardsAggregateStore aggregates, ICurrentUser user) : IQueryHandler<GetDashboard, Result<DashboardDto, ApiError>>
+{{~ else ~}}
 public sealed class GetDashboardHandler(IDashboardStore dashboards, ICurrentUser user) : IQueryHandler<GetDashboard, Result<DashboardDto, ApiError>>
+{{~ end ~}}
 {
     public async Task<Result<DashboardDto, ApiError>> HandleAsync(GetDashboard query, CancellationToken cancellationToken)
     {
@@ -28,9 +38,33 @@ public sealed class GetDashboardHandler(IDashboardStore dashboards, ICurrentUser
         {
             return {{ fail "DashboardDto" "DashboardsFailures.NotSignedIn()" }};
         }
+{{~ if ddd ~}}
 
-{{~ if option ~}}
-        var found = await dashboards.ReadAsync(query.Id, owner, cancellationToken);
+        // The empty Guid is no one's dashboard, and no dashboard's id can be made of it.
+        if (query.Id == Guid.Empty)
+        {
+            return {{ fail "DashboardDto" "DashboardsFailures.NotFound(query.Id)" }};
+        }
+{{~ end ~}}
+
+{{~ if event_sourced && option ~}}
+        var found = await aggregates.LoadAsync<Dashboard>(DashboardId.From(query.Id), cancellationToken);
+        if (!found.HasValue || found.Value.IsRemoved() || found.Value.Owner != DashboardOwner.From(owner))
+        {
+            return {{ fail "DashboardDto" "DashboardsFailures.NotFound(query.Id)" }};
+        }
+
+        return {{ ok "DashboardDto" "found.Value.ToDashboardDto()" }};
+{{~ else if event_sourced ~}}
+        var dashboard = await aggregates.LoadAsync<Dashboard>(DashboardId.From(query.Id), cancellationToken);
+        if (dashboard is null || dashboard.IsRemoved() || dashboard.Owner != DashboardOwner.From(owner))
+        {
+            return {{ fail "DashboardDto" "DashboardsFailures.NotFound(query.Id)" }};
+        }
+
+        return {{ ok "DashboardDto" "dashboard.ToDashboardDto()" }};
+{{~ else if option ~}}
+        var found = await dashboards.ReadAsync({{ if ddd }}DashboardId.From(query.Id), DashboardOwner.From(owner){{ else }}query.Id, owner{{ end }}, cancellationToken);
         if (!found.HasValue)
         {
             return {{ fail "DashboardDto" "DashboardsFailures.NotFound(query.Id)" }};
@@ -38,7 +72,7 @@ public sealed class GetDashboardHandler(IDashboardStore dashboards, ICurrentUser
 
         return {{ ok "DashboardDto" "found.Value.ToDashboardDto()" }};
 {{~ else ~}}
-        var dashboard = await dashboards.ReadAsync(query.Id, owner, cancellationToken);
+        var dashboard = await dashboards.ReadAsync({{ if ddd }}DashboardId.From(query.Id), DashboardOwner.From(owner){{ else }}query.Id, owner{{ end }}, cancellationToken);
         if (dashboard is null)
         {
             return {{ fail "DashboardDto" "DashboardsFailures.NotFound(query.Id)" }};

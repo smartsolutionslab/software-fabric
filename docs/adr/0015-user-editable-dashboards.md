@@ -83,13 +83,47 @@ The owner chose this over an attribute on the query (`[Widget]`, like
 `[McpTool]`), whose result type only an architecture rule could check.
 
 **The dashboards live in a module the pack brings** (ADR-0005): `dashboards`,
-with `module.style: crud` and `module.cqrs: logical` pinned. `fabric new`
-records it in `fabric.yaml` like any module, so the base and the module packs
-give it the normal skeleton (projects, `DashboardsModule`, DbContext, tests,
-tenant column), and the pack adds its code as per-module files for that module
-only. A dashboard is a document saved per user, with no invariants beyond its
-shape, so CRUD is its style; pinning it keeps the pack's branches to the
-project-wide choices.
+with `module.cqrs: logical` pinned. `fabric new` records it in `fabric.yaml`
+like any module, so the base and the module packs give it the normal skeleton
+(projects, `DashboardsModule`, DbContext, tests, tenant column), and the pack
+adds its code as per-module files for that module only.
+
+The module takes the project's `module.style`, like every other module, with
+no exception for the pack: `crud`, `ddd` and `event-sourced` alike (#608, the
+owner's decisions of 2026-11-12). It was first pinned to `crud`, which gave a
+DDD project a module that broke the project's own rules: plain classes with
+public setters and a raw `Guid` id, invariants in a handler, saves outside the
+unit of work.
+
+- Under `crud` a dashboard is a plain entity, and the save use case checks the
+  request before it changes one.
+- Under `ddd` a dashboard is an aggregate root, `Dashboard :
+  AggregateRoot<DashboardId>`, changed only by `Dashboard.Create` and
+  `Rearrange`. They keep its rules (a name of 1 to 100 characters, at most 50
+  widgets, unique keys, the 12-column grid) and answer a broken one with a
+  `DomainError`, which the Application turns into the same `400` and code the
+  CRUD module answers. Whether a widget is one the modules declare for the
+  caller stays the use case's, since it asks the widget catalogue. Commands
+  carry the module's value objects, and the use cases commit through
+  `IDashboardsUnitOfWork`. With `module.ddd-depth: strict`, the identifier and
+  the value objects map by convention and the module's strict rules hold for
+  it.
+- Under `event-sourced` a dashboard is `Dashboard :
+  EventSourcedAggregate<DashboardId>`, with the same rules, raising
+  `DashboardCreated`, `DashboardRearranged` and `DashboardRemoved`; its stream,
+  keyed by the dashboard's id, is loaded and saved through
+  `IDashboardsAggregateStore`, on Marten or KurrentDB. Pages of dashboards and
+  the widget-count chart read the existing `dashboards` table, a read model the
+  save and remove use cases write right after they save the aggregate's events
+  and commit through `IDashboardsUnitOfWork`, the same on both stores (the
+  owner's decision of 2026-11-13); one dashboard is read from its stream. The
+  two writes are not in one transaction: a crash between them, or two requests
+  for one dashboard whose writes interleave (a save's row written after a
+  removal's), leaves the table stale, a dashboard missing from, outdated in or
+  left over in the list, until its owner next saves it. The stream keeps its owner after a removal, so another user's id
+  answers 409 `dashboards.already-exists` from the use case itself. With
+  `module.ddd-depth: strict`, a placed widget's parts are value objects over one
+  value each, since the event store writes a value object as its one value.
 
 - A dashboard row holds its owner (the token's `sub`, read through
   `ICurrentUser`), its name and its widgets as one JSON column. Every read
@@ -99,7 +133,9 @@ project-wide choices.
   /dashboards/{id}`, which creates or replaces, and removing is `DELETE`, so
   every write is idempotent and the base's retry policy (retry only idempotent
   methods) stays correct. Another user's id is not found for the caller, and
-  inserting it fails on the primary key: 409, never an overwrite.
+  saving it answers 409, never an overwrite: under `crud` and `ddd` inserting it
+  fails on the primary key, under `event-sourced` its stream names another
+  owner. The owner may save a removed dashboard's id again, in every style.
 - `GET /dashboards` and `GET /dashboards/widgets` are paged.
   `GET /dashboards/widgets/{id}` runs a widget's query as the calling user.
   Saving a dashboard that names a widget that is not declared (or not for the

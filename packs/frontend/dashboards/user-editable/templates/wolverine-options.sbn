@@ -1,3 +1,11 @@
 {{~ if project["backend.mediator"] == "wolverine" && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
             options.ResolveWidgetAccessFromScope();
 {{~ end ~}}
+{{~ if project["backend.mediator"] == "wolverine" && module_defaults["module.style"] != "crud" ~}}
+            // The dashboards module's unit of work{{ if module_defaults["module.style"] == "event-sourced" }} and aggregate store{{ end }} reach the request's scope, which a handler's generated
+            // code cannot build: its handlers take them from the message's scope.
+            options.CodeGeneration.AlwaysUseServiceLocationFor<{{ namespace }}.Modules.Dashboards.Application.IDashboardsUnitOfWork>();
+{{~ if module_defaults["module.style"] == "event-sourced" ~}}
+            options.CodeGeneration.AlwaysUseServiceLocationFor<{{ namespace }}.Modules.Dashboards.Application.IDashboardsAggregateStore>();
+{{~ end ~}}
+{{~ end ~}}

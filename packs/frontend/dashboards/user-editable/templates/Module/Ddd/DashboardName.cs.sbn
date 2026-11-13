@@ -1,0 +1,18 @@
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+/// <summary>What a dashboard is called; how long it may be is the dashboard's rule (<see cref="Dashboard.MaximumNameLength"/>).</summary>
+public sealed record DashboardName{{ if strict }} : IValueObject<string>{{ end }}
+{
+    private DashboardName(string value) => Value = value;
+
+    public string Value { get; }
+
+    public static DashboardName From(string value)
+    {
+        {{ not_null "value" }}
+        return new DashboardName(value);
+    }
+
+    public override string ToString() => Value;
+}
