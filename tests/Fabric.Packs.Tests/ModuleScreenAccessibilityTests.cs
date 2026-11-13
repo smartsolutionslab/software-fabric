@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Fabric.Packs.Tests;
 
@@ -301,6 +302,103 @@ public sealed class ModuleScreenAccessibilityTests
         var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
         labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
         labelled.GetValueOrDefault(generated).ShouldBe(["passed", "passed"]);
+    }
+
+    /// <summary>A form whose field shows unless its mutation is saving: on first render, nothing is.</summary>
+    private const string ReactRtkFormBehindSaving = """
+        import { useSaveMutation } from '@/api/generated';
+
+        export function BillingPage() {
+          const [save, { isLoading }] = useSaveMutation();
+          return (
+            <main>
+              <h1>Billing</h1>
+              {isLoading ? <p>Saving...</p> : <input type="text" onChange={() => void save()} />}
+            </main>
+          );
+        }
+
+        """;
+
+    private const string ReactOrvalFormBehindSaving = """
+        import { useSave } from '@/api/generated';
+
+        export function BillingPage() {
+          const { mutate, isPending } = useSave();
+          return (
+            <main>
+              <h1>Billing</h1>
+              {isPending ? <p>Saving...</p> : <input type="text" onChange={() => mutate()} />}
+            </main>
+          );
+        }
+
+        """;
+
+    private const string VueOrvalFormBehindSaving = """
+        <script setup lang="ts">
+        import { useSave } from '@/api/generated';
+
+        const { mutate, isPending } = useSave();
+        </script>
+
+        <template>
+          <main>
+            <h1>Billing</h1>
+            <p v-if="isPending">Saving...</p>
+            <input v-else type="text" @input="mutate()" />
+          </main>
+        </template>
+
+        """;
+
+    /// <summary>Each client the axe check stands in for, by the screen that saves through the generated client's mutation.</summary>
+    public static TheoryData<string, string[], string> MutationClients => new()
+    {
+        { "saas-standard-react", ["frontend.routing=react-router"], "rtk" },
+        { "saas-standard-react", ["frontend.routing=tanstack-router"], "rtk" },
+        { "saas-standard-react", ["frontend.state=tanstack-query", "frontend.api-client=orval"], "orval-react" },
+        { "saas-standard-vue", ["frontend.routing=vue-router"], "orval-vue" },
+    };
+
+    [Theory]
+    [MemberData(nameof(MutationClients))]
+    public void A_mutation_nobody_has_triggered_is_idle_so_the_axe_check_sees_the_form_as_it_first_shows(
+        string profile,
+        string[] overrides,
+        string client)
+    {
+        using var project = new GeneratedProject(profile, overrides);
+        project.AddModule("billing");
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var screen = Screens(project).ShouldHaveSingleItem();
+        var generated = TestOf(screen);
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, $"pnpm install:\n{installOutput}");
+
+        // The generated client gains a mutation, as it does once the host maps a POST: save, answered with 204.
+        var document = Path.Combine(project.ProjectDirectory, "web", "app", "openapi.json");
+        var openApi = JsonNode.Parse(File.ReadAllText(document))!;
+        openApi["paths"]!["/save"] = JsonNode.Parse(
+            """{ "post": { "operationId": "save", "tags": ["Host"], "responses": { "204": { "description": "No Content" } } } }""");
+        File.WriteAllText(document, openApi.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        var form = client switch
+        {
+            "rtk" => ReactRtkFormBehindSaving,
+            "orval-react" => ReactOrvalFormBehindSaving,
+            _ => VueOrvalFormBehindSaving,
+        };
+
+        project.Write(screen, form);
+        var (violationExitCode, violationOutput, violation) = Statuses(project);
+        violationExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label on a form nobody has submitted:\n{violationOutput}");
+        violation.GetValueOrDefault(generated).ShouldBe(["failed", "skipped"], violationOutput);
+
+        project.Write(screen, form.Replace("<input type=\"text\"", "<input type=\"text\" aria-label=\"Invoice number\"", StringComparison.Ordinal)
+            .Replace("<input v-else type=\"text\"", "<input v-else type=\"text\" aria-label=\"Invoice number\"", StringComparison.Ordinal));
+        var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
+        labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
+        labelled.GetValueOrDefault(generated).ShouldBe(["passed", "skipped"]);
     }
 
     /// <summary>Each router, with the screen's own test skipping its axe check or with it commented out.</summary>
