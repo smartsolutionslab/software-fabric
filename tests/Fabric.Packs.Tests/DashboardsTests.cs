@@ -322,6 +322,29 @@ public sealed class DashboardsTests
         files["tests/Integration.Tests/DashboardsTests.cs"].ShouldContain("public async Task The_owner_saves_a_removed_dashboards_id_again_and_lists_it()");
     }
 
+    /// <summary>
+    /// Rearranging a dashboard with its own <c>Widgets</c> keeps them (#643): under ddd the list it reads is the one it
+    /// replaces, so it must take them before clearing it. A domain test in the module says so under ddd and
+    /// event-sourced, light and strict; a crud module has no aggregate, and its output stays as it is.
+    /// </summary>
+    [Theory]
+    [InlineData(Profile, "light")]
+    [InlineData(Profile, "strict")]
+    [InlineData("industrial-event-driven-mfe", "light")]
+    [InlineData("industrial-event-driven-mfe", "strict")]
+    public void Under_ddd_and_event_sourced_a_domain_test_rearranges_a_dashboard_with_its_own_widgets(string profile, string depth)
+    {
+        var files = Files(profile, Dashboards, $"module.ddd-depth={depth}");
+
+        files["tests/Modules/Dashboards.Tests/DashboardTests.cs"].ShouldContain("dashboard.Rearrange(DashboardName.From(\"Renamed\"), dashboard.Widgets);");
+    }
+
+    [Fact]
+    public void In_a_crud_project_there_is_no_domain_test_of_the_dashboard()
+    {
+        Files("lean-crud", Dashboards).Keys.ShouldNotContain("tests/Modules/Dashboards.Tests/DashboardTests.cs");
+    }
+
     [Fact]
     public void In_an_event_sourced_project_another_users_dashboard_id_is_refused_by_the_module_itself()
     {
