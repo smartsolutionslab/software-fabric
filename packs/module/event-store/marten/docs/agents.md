@@ -4,5 +4,6 @@
 - Each event-sourced module has its own Marten store in its own schema; never read another module's streams or documents.
 - A projection is a class in the module's Infrastructure project deriving from a Marten projection type (`SingleStreamProjection<InvoiceSummary, Guid>`); it is picked up and runs inline by itself. Never register one by hand.
 - Event store tables come from `src/MigrationRunner` (`dotnet run --project src/AppHost` runs it first); never let the host create them. A new projection or event type needs the runner run again.
+- A command that creates an aggregate looks for its id first and returns a `Result` failure with its own code when it exists. If another save creates the same id in between, the store refuses the second stream and the host answers `409` with the code `already-exists`; never catch that exception yourself.
 - Save the aggregate before publishing the integration event that announces it.
 - Never edit or delete stored events, and never rename an event type without a Marten alias for the old name.
