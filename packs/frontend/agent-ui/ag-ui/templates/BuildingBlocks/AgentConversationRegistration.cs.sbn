@@ -1,6 +1,8 @@
 using System.Reflection;
+using System.Text.Json;
 using {{ namespace }}.BuildingBlocks.Agents;
 using {{ namespace }}.BuildingBlocks.Modules;
+using Microsoft.Extensions.AI;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -33,5 +35,12 @@ public static class AgentConversationRegistration
 
     private static AgentConversation Describe<TConversation>()
         where TConversation : IAgentConversation<TConversation> =>
-        new(TConversation.AgentName, typeof(TConversation), (messages, state) => TConversation.Start(messages, state));
+        new(TConversation.AgentName, typeof(TConversation), Start<TConversation>);
+
+    // A method, not a lambda: code coverage, which instruments the host when the integration tests run it in-process
+    // (testcontainers), rewrites a lambda calling a static abstract member into IL the runtime rejects
+    // (InvalidProgramException), and POST /agents/{name} answered 500.
+    private static IAgentConversation Start<TConversation>(IReadOnlyList<ChatMessage> messages, JsonElement? state)
+        where TConversation : IAgentConversation<TConversation> =>
+        TConversation.Start(messages, state);
 }

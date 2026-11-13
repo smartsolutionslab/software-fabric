@@ -1,4 +1,5 @@
 using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.BuildingBlocks.Modules;
 using Wolverine;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -19,6 +20,34 @@ public static class RequestHandlerDiscovery
         options.Discovery.CustomizeHandlerDiscovery(query => query.Includes.WithCondition("command and query handlers", IsRequestHandler));
         options.CodeGeneration.AlwaysUseServiceLocationFor<IDispatcher>();
         return options;
+    }
+
+    /// <summary>
+    /// Gives a handler each module's own services from the message's scope: every interface a module's Application
+    /// project declares and its Infrastructure project implements, its unit of work and aggregate store among them.
+    /// Wolverine's generated code cannot build those itself (the unit of work takes the service provider, an event
+    /// store's adapters are made by a factory), and taking them all from one scope keeps them on one DbContext.
+    /// </summary>
+    public static WolverineOptions ResolveModuleServicesFromScope(this WolverineOptions options, IEnumerable<IModule> modules)
+    {
+        {{ not_null "options" }}
+        {{ not_null "modules" }}
+
+        foreach (var service in modules.SelectMany(ModuleServices).Distinct())
+        {
+            options.CodeGeneration.AlwaysUseServiceLocationFor(service);
+        }
+
+        return options;
+    }
+
+    private static IEnumerable<Type> ModuleServices(IModule module)
+    {
+        var application = ModuleAssemblies.Of(module, "Application");
+        return ModuleAssemblies.Of(module, "Infrastructure").GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false })
+            .SelectMany(type => type.GetInterfaces())
+            .Where(contract => contract.Assembly == application);
     }
 
     private static bool IsRequestHandler(Type type) =>
