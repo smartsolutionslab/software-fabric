@@ -6,6 +6,8 @@ files:
   - { template: templates/VectorIndexRegistration.cs.sbn, target: src/BuildingBlocks/Rag/Wiring/VectorIndexRegistration.cs }
   - { template: templates/ModulesSearchOnlyTheirOwnVectors.cs.sbn, target: tests/Architecture.Tests/Rules/ModulesSearchOnlyTheirOwnVectors.cs }
   - { template: templates/tests/FakeEmbeddingGenerator.cs.sbn, target: tests/Fakes/FakeEmbeddingGenerator.cs }
+  # The application's integration tests embed through the host against a stand-in of the provider (#633).
+  - { template: templates/tests/FakeEmbeddingsServer.cs.sbn, target: tests/Integration.Tests/FakeEmbeddingsServer.cs }
   - { template: templates/tests/Rag.Tests.csproj.sbn, target: tests/Rag.Tests/Rag.Tests.csproj }
   - { template: templates/tests/ApplicationDatabase.cs.sbn, target: tests/Rag.Tests/ApplicationDatabase.cs }
   - { template: templates/tests/SampleNotesDbContext.cs.sbn, target: tests/Rag.Tests/SampleNotesDbContext.cs }
@@ -33,6 +35,9 @@ slots:
   - { slot: tests.module-host-services, template: templates/module-host-services.sbn }
   - { slot: solution.projects, template: templates/solution-projects.sbn }
   - { slot: readme.sections, template: templates/readme-section.sbn }
+  - { slot: integration-tests.members, template: templates/integration-tests-members.sbn, optional: true }
+  - { slot: integration-tests.teardown, template: templates/integration-tests-teardown.sbn, optional: true }
+  - { slot: integration-tests.references, template: templates/integration-tests-references.sbn, optional: true }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

@@ -1,0 +1,7 @@
+{{ if project["backend.test.integration"] == "aspire-fixture" ~}}
+    <!-- The fake embeddings server answers with FakeEmbeddingGenerator's vectors, of the vector tables' size. -->
+    <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />
+{{ else ~}}
+    <!-- The fake embeddings server answers with FakeEmbeddingGenerator's vectors. -->
+{{ end ~}}
+    <Compile Include="../Fakes/FakeEmbeddingGenerator.cs" Link="Fakes/FakeEmbeddingGenerator.cs" />

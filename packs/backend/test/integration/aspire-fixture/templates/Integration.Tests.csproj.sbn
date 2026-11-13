@@ -9,7 +9,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/AppHost/AppHost.csproj" />
+    <ProjectReference Include="../../src/AppHost/AppHost.csproj" />{{ if slots["integration-tests.references"] != "" }}
+{{ slots["integration-tests.references"] }}{{ end }}
   </ItemGroup>
 
 </Project>

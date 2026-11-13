@@ -1,3 +1,4 @@
+using System.ClientModel;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using OpenAI;
@@ -12,19 +13,23 @@ public static class OpenAIEmbeddingGenerator
     /// with logging and OpenTelemetry around it. The key and the model come from the AppHost's parameters
     /// <c>openai-api-key</c> and <c>openai-embedding-model</c> (<c>OpenAI:ApiKey</c>, <c>OpenAI:EmbeddingModel</c>).
     /// They are read when the generator is first needed, and a missing one fails there, naming its parameter;
-    /// registering sends nothing.
+    /// registering sends nothing. The generator calls OpenAI's API, unless <c>OpenAI:EmbeddingEndpoint</c> names another
+    /// OpenAI-compatible endpoint: the AppHost sets none, and the integration tests give the host their stand-in.
     /// </summary>
     public static EmbeddingGeneratorBuilder<string, Embedding<float>> AddOpenAIEmbeddingGenerator(this IServiceCollection services, IConfiguration configuration)
     {
         {{ not_null "configuration" }}
 
         return services.AddEmbeddingGenerator(_ =>
-                new OpenAIClient(Required(configuration, "OpenAI:ApiKey", "openai-api-key"))
+                new OpenAIClient(new ApiKeyCredential(Required(configuration, "OpenAI:ApiKey", "openai-api-key")), Options(configuration))
                     .GetEmbeddingClient(Required(configuration, "OpenAI:EmbeddingModel", "openai-embedding-model"))
                     .AsIEmbeddingGenerator())
             .UseLogging()
             .UseOpenTelemetry();
     }
+
+    private static OpenAIClientOptions Options(IConfiguration configuration) =>
+        configuration["OpenAI:EmbeddingEndpoint"] is { Length: > 0 } endpoint ? new() { Endpoint = new Uri(endpoint) } : new();
 
     private static string Required(IConfiguration configuration, string key, string parameter) =>
         configuration[key] is { Length: > 0 } value

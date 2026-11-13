@@ -1,4 +1,13 @@
+{{~ stand_in = false
+if object.has_key(project, "backend.llm.extras") && (array.contains project["backend.llm.extras"] "rag")
+  stand_in = project["backend.llm.embeddings"] == "ollama"
+end ~}}
+{{~ if stand_in ~}}
+        // No Ollama container: it would pull the model, gigabytes, and the integration tests never call the model. The host's
+        // endpoint is the fixture's embeddings stand-in, given below, which answers chat requests with a 404.
+{{~ else ~}}
         // No Ollama container: it would pull the model, gigabytes, and the integration tests never call the model. The host
         // gets an endpoint nothing listens on, and the AppHost's model.
         settings["Ollama:Endpoint"] = "http://localhost:9";
+{{~ end ~}}
         settings["Ollama:Model"] = "llama3.2:1b";

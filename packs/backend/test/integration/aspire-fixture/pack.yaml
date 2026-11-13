@@ -5,6 +5,9 @@ files:
   - { template: templates/HostTests.cs.sbn, target: tests/Integration.Tests/HostTests.cs }
 declares-slots:
   - { slot: integration-tests.parameters, description: "Statements on the testing builder (builder) giving AppHost parameters their values for the test run: builder.Configuration[\"Parameters:<name>\"] = \"...\";. Never a real secret." }
+  - { slot: integration-tests.members, description: "Members of the application's fixture class, each line indented four spaces, for test-run helpers the fixture owns: a field it starts in its declaration (private readonly <Type> <name> = new();) and a property tests reach it by. The integration-tests.parameters (or .resources) statements may use such a field; integration-tests.teardown disposes of it." }
+  - { slot: integration-tests.teardown, description: "Statements at the end of the fixture's teardown, each line indented eight spaces, after the application has stopped: await <name>.DisposeAsync(); for what integration-tests.members started." }
+  - { slot: integration-tests.references, description: "Items of the application's integration-test project, each line indented four spaces, beside its project reference: a <ProjectReference> of the solution, or a <Compile Include=\"../<Dir>/<File>.cs\" Link=\"...\" /> of a shared test file, that the integration-tests.members types need." }
 slots:
   - { slot: templates.functions, template: templates/functions.sbn }
   - { slot: dotnet.package-versions, template: templates/package-version.sbn }

@@ -1,4 +1,6 @@
 {{ if project["backend.llm"] == "openai" ~}}
-        // Embeddings use the chat model's openai-api-key, given its value above.{{ else ~}}
-        // A key-shaped value OpenAI does not accept: the integration tests never call the embedding model.
+        // Embeddings use the chat model's openai-api-key, given its value above, against the fixture's stand-in.{{ else ~}}
+        // A key-shaped value OpenAI does not accept: the host embeds against the fixture's stand-in, never OpenAI.
         builder.Configuration["Parameters:openai-api-key"] = "not-a-real-key";{{ end }}
+        builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "host"))
+            .WithEnvironment("OpenAI__EmbeddingEndpoint", embeddings.Endpoint);
