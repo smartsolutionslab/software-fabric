@@ -1,0 +1,43 @@
+  {
+    // AG-UI's run is a server-sent event stream the generated client cannot make, so connectAgent is the one call to
+    // the host written by hand (docs/adr). Everywhere else a call goes through src/api, which sets the token.
+    files: ['src/**/*.{ts,{{ if project["frontend.framework"] == "vue" }}vue{{ else }}tsx{{ end }}}'],
+    ignores: ['src/api/baseApi.ts', 'src/agents/connectAgent.ts', '**/*.test.*'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'fetch',
+          message: 'Call the host through src/api; only src/agents/connectAgent.ts calls the host by hand.',
+        },
+        {
+          name: 'XMLHttpRequest',
+          message: 'Call the host through src/api; only src/agents/connectAgent.ts calls the host by hand.',
+        },
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'globalThis',
+          property: 'fetch',
+          message: 'Call the host through src/api; only src/agents/connectAgent.ts calls the host by hand.',
+        },
+        {
+          object: 'window',
+          property: 'fetch',
+          message: 'Call the host through src/api; only src/agents/connectAgent.ts calls the host by hand.',
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "NewExpression[callee.name='HttpAgent']",
+          message: 'Talk to an agent through connectAgent; only src/agents/connectAgent.ts calls the host by hand.',
+        },
+        {
+          selector: 'Literal[value=/^authorization$/i], Property[key.name=/^authorization$/i]',
+          message: 'Only src/api/baseApi.ts and src/agents/connectAgent.ts set the Authorization header.',
+        },
+      ],
+    },
+  }
