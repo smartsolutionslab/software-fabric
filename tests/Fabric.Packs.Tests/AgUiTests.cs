@@ -504,7 +504,7 @@ public sealed class AgUiTests
 
         exitCode.ShouldNotBe(0, output);
         LintFindings(output).ShouldBe("vue/no-restricted-syntax", output);
-        output.ShouldContain("9:");
+        output.ShouldContain(" 8:");
     }
 
     /// <summary>The realtime stream's own EventSource, the third call to the host by hand, keeps passing.</summary>
