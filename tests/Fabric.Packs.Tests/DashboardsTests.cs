@@ -316,6 +316,9 @@ public sealed class DashboardsTests
 
         files["tests/Modules/Dashboards.Tests/Commands/SaveDashboardTests.cs"].ShouldContain("public async Task The_owner_saves_a_removed_dashboards_id_again()");
         files["tests/Modules/Dashboards.Tests/Commands/SaveDashboardTests.cs"].ShouldContain("public async Task A_request_without_a_widget_list_is_refused_and_keeps_the_saved_widgets()");
+        files["tests/Modules/Dashboards.Tests/Commands/SaveDashboardTests.cs"].ShouldContain("public async Task A_widget_without_a_source_is_refused_as_unknown_and_one_without_a_key_or_visual_as_invalid()");
+        files["tests/Modules/Dashboards.Tests/Queries/DashboardQueriesTests.cs"].ShouldContain("public async Task The_empty_id_is_no_ones_dashboard()");
+        files["tests/Integration.Tests/DashboardsTests.cs"].ShouldContain("public async Task An_empty_id_or_a_widget_missing_its_fields_is_refused_as_the_callers_mistake()");
         files["tests/Integration.Tests/DashboardsTests.cs"].ShouldContain("public async Task The_owner_saves_a_removed_dashboards_id_again_and_lists_it()");
     }
 

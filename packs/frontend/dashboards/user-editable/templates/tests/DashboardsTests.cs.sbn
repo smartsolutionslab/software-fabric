@@ -119,6 +119,27 @@ public class DashboardsTests({{ integration_fixture }})
         {{ `(await Ids(developer, cancellationToken)).Count(listed => listed == id)` | should_be `1` }};
     }
 
+    {{ test_attribute }}
+    public async Task An_empty_id_or_a_widget_missing_its_fields_is_refused_as_the_callers_mistake()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        using var developer = await {{ signed_in_host_client `"developer"` }};
+
+        var empty = await developer.PutAsJsonAsync(Path(Guid.Empty), Dashboard("Sales", (Chart, "bar")), cancellationToken);
+        {{ `empty.StatusCode` | should_be `HttpStatusCode.BadRequest` }};
+        {{ `(await empty.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["code"]!.GetValue<string>()` | should_be `"dashboards.invalid-id"` }};
+        {{ `(await developer.GetAsync(new Uri(Path(Guid.Empty), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.NotFound` }};
+        {{ `(await developer.DeleteAsync(new Uri(Path(Guid.Empty), UriKind.Relative), cancellationToken)).StatusCode` | should_be `HttpStatusCode.NotFound` }};
+
+        var noSource = await developer.PutAsJsonAsync(Path(Guid.CreateVersion7()), new { name = "Sales", widgets = new[] { new { key = "w0", source = (string?)null, visual = "bar", x = 0, y = 0, width = 6, height = 4 } } }, cancellationToken);
+        {{ `noSource.StatusCode` | should_be `HttpStatusCode.BadRequest` }};
+        {{ `(await noSource.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["code"]!.GetValue<string>()` | should_be `"dashboards.unknown-widget"` }};
+
+        var noKey = await developer.PutAsJsonAsync(Path(Guid.CreateVersion7()), new { name = "Sales", widgets = new[] { new { key = (string?)null, source = Chart, visual = "bar", x = 0, y = 0, width = 6, height = 4 } } }, cancellationToken);
+        {{ `noKey.StatusCode` | should_be `HttpStatusCode.BadRequest` }};
+        {{ `(await noKey.Content.ReadFromJsonAsync<JsonObject>(cancellationToken))!["code"]!.GetValue<string>()` | should_be `"dashboards.invalid-widget"` }};
+    }
+
 {{~ end ~}}
     {{ test_attribute }}
     public async Task A_widget_the_modules_do_not_declare_is_refused_when_saving_and_when_run()

@@ -152,6 +152,21 @@ public class SaveDashboardTests
 {{~ if ddd ~}}
 
     {{ test_attribute }}
+    public async Task A_widget_without_a_source_is_refused_as_unknown_and_one_without_a_key_or_visual_as_invalid()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+
+        var noSource = await module.SendAsync(Save("Sales", new WidgetPlacement("w-1", null!, "bar", 0, 0, 1, 1)), {{ test_cancellation_token }});
+        var noKey = await module.SendAsync(Save("Sales", new WidgetPlacement(null!, "dashboards.widget-counts", "bar", 0, 0, 1, 1)), {{ test_cancellation_token }});
+        var noVisual = await module.SendAsync(Save("Sales", new WidgetPlacement("w-1", "dashboards.widget-counts", null!, 0, 0, 1, 1)), {{ test_cancellation_token }});
+
+        {{ `noSource.Error.Code` | should_be `"dashboards.unknown-widget"` }};
+        {{ `noKey.Error.Code` | should_be `"dashboards.invalid-widget"` }};
+        {{ `noVisual.Error.Code` | should_be `"dashboards.invalid-widget"` }};
+        {{ `module.Store.Saves` | should_be `0` }};
+    }
+
+    {{ test_attribute }}
     public async Task A_request_without_a_widget_list_is_refused_and_keeps_the_saved_widgets()
     {
         await using var module = new DashboardsModuleUnderTest();
