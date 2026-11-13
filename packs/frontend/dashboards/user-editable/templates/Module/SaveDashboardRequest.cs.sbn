@@ -15,8 +15,9 @@ namespace {{ namespace }}.Modules.Dashboards.Api.Endpoints;
 public sealed record SaveDashboardRequest(string Name, IReadOnlyList<WidgetPlacement> Widgets)
 {
     /// <summary>
-    /// The command, its values made from the body's. A missing name or widget is passed on empty, for the dashboard to
-    /// refuse with its own code; a missing list of widgets is passed on as none, for the use case to refuse.
+    /// The command, its values made from the body's. A missing name, widget or widget field is passed on empty, for the
+    /// dashboard or the use case to refuse with its own code; a missing list of widgets is passed on as none, for the use
+    /// case to refuse. The id must not be the empty Guid; the endpoint refuses that before it calls this.
     /// </summary>
     public SaveDashboard ToCommand(Guid id) =>
         new(
@@ -24,6 +25,6 @@ public sealed record SaveDashboardRequest(string Name, IReadOnlyList<WidgetPlace
             DashboardName.From(Name ?? string.Empty),
             Widgets is null ? null : [.. Widgets.Select(placement => placement is null
                 ? DashboardWidget.From(string.Empty, string.Empty, string.Empty, 0, 0, 0, 0)
-                : DashboardWidget.From(placement.Key, placement.Source, placement.Visual, placement.X, placement.Y, placement.Width, placement.Height))]);
+                : DashboardWidget.From(placement.Key ?? string.Empty, placement.Source ?? string.Empty, placement.Visual ?? string.Empty, placement.X, placement.Y, placement.Width, placement.Height))]);
 }
 {{ end ~}}

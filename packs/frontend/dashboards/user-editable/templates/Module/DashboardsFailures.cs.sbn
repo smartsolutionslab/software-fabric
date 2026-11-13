@@ -30,6 +30,8 @@ public static class DashboardsFailures
 {
     public static ApiError NotSignedIn() => new NotSignedIn();
 
+    public static ApiError InvalidId() => new InvalidDashboardId();
+
     public static ApiError InvalidWidget(string key, string reason) => new InvalidWidget(key, reason);
 
     public static ApiError UnknownWidget(string source) => new UnknownWidget(source);

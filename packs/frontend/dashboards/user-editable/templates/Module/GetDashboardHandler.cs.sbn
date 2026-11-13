@@ -38,6 +38,14 @@ public sealed class GetDashboardHandler(IDashboardStore dashboards, ICurrentUser
         {
             return {{ fail "DashboardDto" "DashboardsFailures.NotSignedIn()" }};
         }
+{{~ if ddd ~}}
+
+        // The empty Guid is no one's dashboard, and no dashboard's id can be made of it.
+        if (query.Id == Guid.Empty)
+        {
+            return {{ fail "DashboardDto" "DashboardsFailures.NotFound(query.Id)" }};
+        }
+{{~ end ~}}
 
 {{~ if event_sourced && option ~}}
         var found = await aggregates.LoadAsync<Dashboard>(DashboardId.From(query.Id), cancellationToken);
