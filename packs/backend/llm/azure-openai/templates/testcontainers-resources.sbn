@@ -1,5 +1,14 @@
+{{~ stand_in = false
+if object.has_key(project, "backend.llm.extras") && (array.contains project["backend.llm.extras"] "rag")
+  stand_in = project["backend.llm.embeddings"] == "azure-openai"
+end ~}}
+{{~ if stand_in ~}}
+        // A key-shaped value Azure does not accept, and the AppHost's default deployment: the integration tests never call the
+        // model. The endpoint is the fixture's embeddings stand-in, given below, which answers chat requests with a 404.
+{{~ else ~}}
         // A resource that does not exist, a key-shaped value Azure does not accept, and the AppHost's default deployment: the
         // integration tests never call the model.
         settings["AzureOpenAI:Endpoint"] = "https://not-a-real-resource.openai.azure.com";
+{{~ end ~}}
         settings["AzureOpenAI:Deployment"] = "gpt-5-mini";
         settings["AzureOpenAI:ApiKey"] = "not-a-real-key";

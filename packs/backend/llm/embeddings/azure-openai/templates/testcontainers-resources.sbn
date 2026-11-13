@@ -1,9 +1,10 @@
 {{ if project["backend.llm"] == "azure-openai" ~}}
-        // Embeddings use the chat model's endpoint and key, given their values above; the AppHost's default deployment.
+        // Embeddings use the chat model's key, given its value above, the AppHost's default deployment, and the endpoint the
+        // chat model shares: the fixture's stand-in, which answers embeddings only; chat requests get a 404.
 {{~ else ~}}
-        // A resource that does not exist, a key-shaped value Azure does not accept, and the AppHost's default deployment: the
-        // integration tests never call the embedding model.
-        settings["AzureOpenAI:Endpoint"] = "https://not-a-real-resource.openai.azure.com";
+        // The fixture's stand-in, a key-shaped value Azure does not accept, and the AppHost's default deployment: the host
+        // embeds against the stand-in, never Azure.
         settings["AzureOpenAI:ApiKey"] = "not-a-real-key";
 {{~ end }}
+        settings["AzureOpenAI:Endpoint"] = embeddings.Endpoint;
         settings["AzureOpenAI:EmbeddingDeployment"] = "text-embedding-3-small";

@@ -1,0 +1,4 @@
+    private readonly FakeEmbeddingsServer embeddings = new();
+
+    /// <summary>The host's embeddings model: a stand-in on this machine, which a test can hold an answer back from.</summary>
+    public FakeEmbeddingsServer Embeddings => embeddings;
