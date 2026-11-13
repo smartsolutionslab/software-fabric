@@ -171,6 +171,44 @@ public sealed class AgUiTests
 
         """;
 
+    /// <summary>
+    /// A map keyed authorization and a field of that name assigned, neither a header, then the header set on a
+    /// <c>Headers</c> and on a fetch init's headers.
+    /// </summary>
+    private const string AuthorizationKeysOutsideAndInsideHeaders = """
+        export const roles = new Map<string, string>().set('authorization', 'x');
+
+        export function revoke(grant: { authorization?: string }) {
+          grant.authorization = 'x';
+        }
+
+        export function sign(headers: Headers, init: { headers: Headers }, token: string) {
+          headers.append('authorization', token);
+          init.headers.set('Authorization', token);
+        }
+
+        """;
+
+    /// <summary>
+    /// A component whose template keys a map and a field authorization, neither a header, and sets the header on the
+    /// <c>Headers</c> its script exposes.
+    /// </summary>
+    private const string AuthorizationKeysInATemplate = """
+        <script setup lang="ts">
+        const roles = new Map<string, string>();
+        const grant: { authorization?: string } = {};
+        const requestHeaders = new Headers();
+        defineExpose({ roles, grant, requestHeaders });
+        </script>
+
+        <template>
+          <button type="button" @click="roles.set('authorization', 'x')">Role</button>
+          <button type="button" @click="grant.authorization = 'x'">Grant</button>
+          <button type="button" @click="requestHeaders.set('authorization', 'x')">Sign</button>
+        </template>
+
+        """;
+
     /// <summary>The rules eslint names for <see cref="SecondCallToTheHost"/>, in the order of its lines.</summary>
     private const string SecondCallToTheHostFindings =
         "no-restricted-globals, no-restricted-syntax, no-restricted-syntax, no-restricted-properties, no-restricted-syntax, no-restricted-globals";
@@ -552,6 +590,43 @@ public sealed class AgUiTests
         exitCode.ShouldNotBe(0, output);
         LintFindings(output).ShouldBe("vue/no-restricted-syntax, vue/no-restricted-syntax, vue/no-restricted-syntax", output);
         output.ShouldContain("only src/agents/connectAgent.ts calls the host by hand");
+    }
+
+    /// <summary>
+    /// Third review of #638: a map keyed authorization or a field of that name passes; the header set on headers fails.
+    /// </summary>
+    [Fact]
+    public void A_map_or_a_field_keyed_authorization_passes_the_web_apps_lint_and_the_header_set_on_headers_does_not()
+    {
+        using var project = NewProject(Anthropic, AgentFramework, AgUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+
+        project.Write("web/app/src/pages/roles.ts", AuthorizationKeysOutsideAndInsideHeaders);
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        LintFindings(output).ShouldBe("no-restricted-syntax, no-restricted-syntax", output);
+        output.ShouldContain("8:18 ");
+        output.ShouldContain("9:20 ");
+    }
+
+    /// <summary>Third review of #638: in a Vue template too, only the header set on headers fails.</summary>
+    [Fact]
+    public void With_vue_a_map_or_a_field_keyed_authorization_in_a_template_passes_the_web_apps_lint_and_the_header_does_not()
+    {
+        using var project = new GeneratedProject("saas-standard-vue", Anthropic, AgentFramework, AgUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+
+        project.Write("web/app/src/pages/RolesPage.vue", AuthorizationKeysInATemplate);
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        LintFindings(output).ShouldBe("vue/no-restricted-syntax", output);
+        output.ShouldContain("11:");
     }
 
     [Fact]
