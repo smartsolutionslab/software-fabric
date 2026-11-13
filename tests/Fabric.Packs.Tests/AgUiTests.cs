@@ -74,6 +74,36 @@ public sealed class AgUiTests
         """;
 
     /// <summary>
+    /// A screen calling the host by hand: <c>fetch</c> with a bearer token it sets itself, <c>globalThis.fetch</c> with a
+    /// header set by name, a second <c>HttpAgent</c> and an <c>XMLHttpRequest</c>.
+    /// </summary>
+    private const string SecondCallToTheHost = """
+        import { HttpAgent } from '@ag-ui/client';
+
+        export async function loadNotes(token: string) {
+          const response = await fetch('/api/billing/notes', { headers: { Authorization: `Bearer ${token}` } });
+          return (await response.json()) as unknown;
+        }
+
+        export async function loadNote(id: string) {
+          const headers = new Headers();
+          headers.set('Authorization', 'Bearer not-a-token');
+          return globalThis.fetch(`/api/billing/notes/${id}`, { headers });
+        }
+
+        export const secondAgent = new HttpAgent({ url: '/api/agents/assistant' });
+
+        export function request() {
+          return new XMLHttpRequest();
+        }
+
+        """;
+
+    /// <summary>The rules eslint names for <see cref="SecondCallToTheHost"/>, in the order of its lines.</summary>
+    private const string SecondCallToTheHostFindings =
+        "no-restricted-globals, no-restricted-syntax, no-restricted-syntax, no-restricted-properties, no-restricted-syntax, no-restricted-globals";
+
+    /// <summary>
     /// Runs the AG-UI SDK's own stream over updates that fail mid-stream, with the tracer <c>AddServiceDefaults()</c>
     /// builds. The browser's RUN_ERROR says only that the run failed; the <c>agui.run</c> span is where the cause is.
     /// The architecture tests reference the host, and through it the SDK, because keycloak's endpoint rule needs it.
@@ -310,6 +340,73 @@ public sealed class AgUiTests
         files["web/app/eslint.config.js"].ShouldNotContain("'@ag-ui/*'");
     }
 
+    /// <summary>
+    /// The owner's decision on #607: AG-UI's run is a server-sent event stream the generated client cannot make, so
+    /// <c>connectAgent</c> alone calls the host by hand, with the token from where <c>src/api/baseApi.ts</c> reads it.
+    /// </summary>
+    [Fact]
+    public void The_agent_panels_client_is_the_one_hand_written_call_to_the_host_and_reads_the_token_where_the_api_client_does()
+    {
+        foreach (var (description, files) in new[]
+        {
+            ("oidc-client-ts", Files(Profile, Anthropic, AgentFramework, AgUi)),
+            ("msal", Files(Profile, Anthropic, AgentFramework, AgUi, "backend.auth=entra-id", "frontend.auth-client=msal")),
+        })
+        {
+            const string TokenImport = "import { accessToken } from '@/auth/accessToken';";
+            files["web/app/src/api/baseApi.ts"].ShouldContain(TokenImport, customMessage: description);
+            files[Client].ShouldContain(TokenImport, customMessage: description);
+            files[Client].ShouldContain("const token = accessToken();", customMessage: description);
+        }
+
+        var react = Files(Profile, Anthropic, AgentFramework, AgUi);
+        react["web/app/eslint.config.js"].ShouldContain("files: ['src/**/*.{ts,tsx}'],");
+        react["web/app/eslint.config.js"].ShouldContain("ignores: ['src/api/baseApi.ts', 'src/agents/connectAgent.ts', '**/*.test.*'],");
+        react["AGENTS.md"].ShouldContain("`src/agents/connectAgent.ts` is the one exception to the API client's rule");
+        AgentUiAdr(react).ShouldContain("`connectAgent` is the one call to the host the generated client does not make");
+
+        Files("saas-standard-vue", Anthropic, AgentFramework, AgUi)["web/app/eslint.config.js"].ShouldContain("files: ['src/**/*.{ts,vue}'],");
+
+        // Without the panel, nothing is excepted, so nothing is added.
+        Files(Profile, Anthropic, AgentFramework)["web/app/eslint.config.js"].ShouldNotContain("no-restricted-globals");
+    }
+
+    [Fact]
+    public void A_second_hand_written_call_to_the_host_or_a_hand_set_authorization_header_fails_the_web_apps_lint()
+    {
+        using var project = NewProject(Anthropic, AgentFramework, AgUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+        var (untouchedExitCode, untouchedOutput) = Shell.Run(web, "pnpm", "lint");
+        untouchedExitCode.ShouldBe(0, untouchedOutput);
+
+        project.Write("web/app/src/pages/notes.ts", SecondCallToTheHost);
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        LintFindings(output).ShouldBe(SecondCallToTheHostFindings, output);
+        output.ShouldContain("only src/agents/connectAgent.ts calls the host by hand");
+    }
+
+    [Fact]
+    public void With_vue_a_second_hand_written_call_to_the_host_or_a_hand_set_authorization_header_fails_the_web_apps_lint()
+    {
+        using var project = new GeneratedProject("saas-standard-vue", Anthropic, AgentFramework, AgUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+        var (untouchedExitCode, untouchedOutput) = Shell.Run(web, "pnpm", "lint");
+        untouchedExitCode.ShouldBe(0, untouchedOutput);
+
+        project.Write("web/app/src/pages/notes.ts", SecondCallToTheHost);
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        LintFindings(output).ShouldBe(SecondCallToTheHostFindings, output);
+        output.ShouldContain("only src/agents/connectAgent.ts calls the host by hand");
+    }
+
     [Fact]
     public void The_end_to_end_script_starts_the_apphost_with_the_stand_in_model()
     {
@@ -513,6 +610,17 @@ public sealed class AgUiTests
         project.Write("src/Host/Agents/StandInChatClient.cs", inOneChunk);
         return project;
     }
+
+    /// <summary>The agent panel's ADR, whatever number the generated project gives it.</summary>
+    private static string AgentUiAdr(Dictionary<string, string> files) =>
+        files[files.Keys.Single(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("-frontend-agent-ui-ag-ui.md", StringComparison.Ordinal))];
+
+    /// <summary>The rule of every error eslint's stylish output lists (<c>  4:26  error  message  rule</c>), in order.</summary>
+    private static string LintFindings(string output) =>
+        string.Join(", ", output.Split('\n')
+            .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Where(words => words.Length > 2 && words[0].Contains(':', StringComparison.Ordinal) && words[0].All(c => char.IsDigit(c) || c == ':') && words[1] == "error")
+            .Select(words => words[^1]));
 
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
     {
