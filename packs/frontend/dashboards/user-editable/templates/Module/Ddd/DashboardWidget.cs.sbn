@@ -1,0 +1,82 @@
+{{~ if module.values["module.style"] == "event-sourced" ~}}
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+/// <summary>
+/// A widget placed on a dashboard's grid: which declared widget it shows, how, and where. It is stored inside the
+/// dashboard's events, so it is built through its public constructor; whether it fits the dashboard is the dashboard's
+/// rule (<see cref="Dashboard.Rearrange"/>).
+/// </summary>
+{{~ if strict ~}}
+/// <remarks>
+/// Each of its parts is a value object over one value: the event store writes a value object as that value, so a
+/// value object over seven would not be stored.
+/// </remarks>
+public sealed record DashboardWidget(
+    WidgetKey Key,
+    WidgetSource Source,
+    WidgetVisual Visual,
+    GridCells X,
+    GridCells Y,
+    GridCells Width,
+    GridCells Height)
+{
+    public static DashboardWidget From(string key, string source, string visual, int x, int y, int width, int height) =>
+        new(WidgetKey.From(key), WidgetSource.From(source), WidgetVisual.From(visual), GridCells.From(x), GridCells.From(y), GridCells.From(width), GridCells.From(height));
+}
+{{~ else ~}}
+/// <param name="Key">Tells the widgets of one dashboard apart, as the grid does.</param>
+/// <param name="Source">The id of the declared widget whose query it runs, e.g. <c>billing.monthly-revenue</c>.</param>
+/// <param name="Visual"><c>bar</c>, <c>line</c> or <c>pie</c> for a chart; <c>table</c> for a table.</param>
+/// <param name="X">The first of its grid's columns it covers, from 0.</param>
+/// <param name="Y">The first of its grid's rows it covers, from 0.</param>
+/// <param name="Width">How many columns it covers.</param>
+/// <param name="Height">How many rows it covers.</param>
+public sealed record DashboardWidget(string Key, string Source, string Visual, int X, int Y, int Width, int Height)
+{
+    public static DashboardWidget From(string key, string source, string visual, int x, int y, int width, int height) =>
+        new(key, source, visual, x, y, width, height);
+}
+{{~ end ~}}
+{{ else ~}}
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+/// <summary>
+/// A widget placed on a dashboard's grid: which declared widget it shows, how, and where. It is a value, compared by
+/// what it holds; whether it fits the dashboard is the dashboard's rule (<see cref="Dashboard.Rearrange"/>).
+/// </summary>
+public sealed record DashboardWidget{{ if strict }} : IValueObject{{ end }}
+{
+    private DashboardWidget(string key, string source, string visual, int x, int y, int width, int height)
+    {
+        Key = key;
+        Source = source;
+        Visual = visual;
+        X = x;
+        Y = y;
+        Width = width;
+        Height = height;
+    }
+
+    /// <summary>Tells the widgets of one dashboard apart, as the grid does.</summary>
+    public string Key { get; }
+
+    /// <summary>The id of the declared widget whose query it runs, e.g. <c>billing.monthly-revenue</c>.</summary>
+    public string Source { get; }
+
+    /// <summary><c>bar</c>, <c>line</c> or <c>pie</c> for a chart; <c>table</c> for a table.</summary>
+    public string Visual { get; }
+
+    public int X { get; }
+
+    public int Y { get; }
+
+    public int Width { get; }
+
+    public int Height { get; }
+
+    public static DashboardWidget From(string key, string source, string visual, int x, int y, int width, int height) =>
+        new(key, source, visual, x, y, width, height);
+}
+{{ end ~}}

@@ -1,0 +1,16 @@
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+/// <summary>
+/// A number of a dashboard grid's cells: where a placed widget starts, counted from 0, or how far it reaches. Which
+/// numbers fit the grid is the dashboard's rule (<see cref="Dashboard.Columns"/>).
+/// </summary>
+public sealed record GridCells : IValueObject<int>
+{
+    private GridCells(int value) => Value = value;
+
+    public int Value { get; }
+
+    public static GridCells From(int value) => new(value);
+
+    public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}

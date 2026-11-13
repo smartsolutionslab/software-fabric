@@ -1,3 +1,4 @@
+{{~ if module.values["module.style"] == "crud" ~}}
 using {{ namespace }}.BuildingBlocks.Messaging;
 
 namespace {{ namespace }}.Modules.Dashboards.Application.Commands.SaveDashboard;
@@ -7,3 +8,16 @@ namespace {{ namespace }}.Modules.Dashboards.Application.Commands.SaveDashboard;
 /// same request twice saves the same dashboard once, and a retried PUT cannot apply twice.
 /// </summary>
 public sealed record SaveDashboard(Guid Id, string Name, IReadOnlyList<WidgetPlacement> Widgets) : ICommand<Result<Guid, ApiError>>;
+{{ else ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Commands.SaveDashboard;
+
+/// <summary>
+/// Creates the caller's dashboard with this id, or replaces its name and widgets: the client chooses the id (a Guid v7),
+/// so sending the same request twice saves the same dashboard once, and a retried PUT cannot apply twice. Widgets is
+/// null when the request had no list of them, which is refused rather than taken for an empty one.
+/// </summary>
+public sealed record SaveDashboard(DashboardId Id, DashboardName Name, IReadOnlyList<DashboardWidget>? Widgets) : ICommand<Result<Guid, ApiError>>;
+{{ end ~}}

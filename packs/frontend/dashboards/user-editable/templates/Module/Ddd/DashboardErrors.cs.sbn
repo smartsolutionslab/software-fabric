@@ -1,0 +1,11 @@
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+/// <summary>Every rule of a dashboard it can break, each with its own code.</summary>
+public static class DashboardErrors
+{
+    public static DomainError InvalidName(int maximum) => new InvalidDashboardName(maximum);
+
+    public static DomainError TooManyWidgets(int maximum) => new TooManyWidgets(maximum);
+
+    public static DomainError MisplacedWidget(string key, string reason) => new MisplacedWidget(key, reason);
+}
