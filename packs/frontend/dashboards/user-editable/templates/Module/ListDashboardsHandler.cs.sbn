@@ -1,4 +1,5 @@
-{{~ ddd = module.values["module.style"] == "ddd" ~}}
+{{~ # Under ddd and event-sourced an owner is a value object. ~}}
+{{~ ddd = module.values["module.style"] != "crud" ~}}
 {{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
 {{~ option = project["backend.absence"] == "option" ~}}
 {{~ func ok(type, value)

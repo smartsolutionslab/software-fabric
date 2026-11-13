@@ -1,0 +1,12 @@
+using {{ namespace }}.Modules.Dashboards.Application.ReadModels;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.DTOs;
+
+public static class DashboardRowMappings
+{
+    public static DashboardSummaryDto ToDashboardSummaryDto(this DashboardRow row)
+    {
+        {{ not_null "row" }}
+        return new DashboardSummaryDto(row.Id, row.Name, row.Widgets.Count);
+    }
+}

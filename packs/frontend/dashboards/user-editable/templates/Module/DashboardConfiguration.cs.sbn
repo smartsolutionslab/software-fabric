@@ -31,7 +31,7 @@ public sealed class DashboardConfiguration : IEntityTypeConfiguration<Dashboard>
         });
     }
 }
-{{ else ~}}
+{{ else if module.values["module.style"] == "ddd" ~}}
 {{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
 using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
 using Microsoft.EntityFrameworkCore;
@@ -63,6 +63,42 @@ public sealed class DashboardConfiguration : IEntityTypeConfiguration<Dashboard>
 {{~ end ~}}
         builder.HasIndex(dashboard => dashboard.Owner);
         builder.OwnsMany(dashboard => dashboard.Widgets, widgets =>
+        {
+            widgets.ToJson("widgets");
+            widgets.Property(widget => widget.Key).HasJsonPropertyName("key");
+            widgets.Property(widget => widget.Source).HasJsonPropertyName("source");
+            widgets.Property(widget => widget.Visual).HasJsonPropertyName("visual");
+            widgets.Property(widget => widget.X).HasJsonPropertyName("x");
+            widgets.Property(widget => widget.Y).HasJsonPropertyName("y");
+            widgets.Property(widget => widget.Width).HasJsonPropertyName("width");
+            widgets.Property(widget => widget.Height).HasJsonPropertyName("height");
+        });
+    }
+}
+{{ else ~}}
+using {{ namespace }}.Modules.Dashboards.Application.ReadModels;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace {{ namespace }}.Modules.Dashboards.Infrastructure.Persistence.Configurations;
+
+/// <summary>
+/// One row per dashboard that is not removed, written after its events; its widgets are one JSON document, saved and read
+/// with it. The dashboards themselves are their event streams.
+/// </summary>
+public sealed class DashboardConfiguration : IEntityTypeConfiguration<DashboardRow>
+{
+    public void Configure(EntityTypeBuilder<DashboardRow> builder)
+    {
+        {{ not_null "builder" }}
+
+        builder.ToTable("dashboards");
+        builder.HasKey(row => row.Id);
+        builder.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(row => row.Owner).HasColumnName("owner").HasMaxLength(255).IsRequired();
+        builder.Property(row => row.Name).HasColumnName("name").HasMaxLength(100).IsRequired();
+        builder.HasIndex(row => row.Owner);
+        builder.OwnsMany(row => row.Widgets, widgets =>
         {
             widgets.ToJson("widgets");
             widgets.Property(widget => widget.Key).HasJsonPropertyName("key");

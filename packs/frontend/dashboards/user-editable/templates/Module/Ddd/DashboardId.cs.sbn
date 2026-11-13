@@ -1,8 +1,18 @@
 {{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+{{~ event_sourced = module.values["module.style"] == "event-sourced" ~}}
+{{~ if event_sourced ~}}
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+
+{{~ end ~}}
 namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
 
 /// <summary>A dashboard's identity: a Guid the client chooses (a v7), never the empty one.</summary>
+{{~ if event_sourced ~}}
+/// <remarks>It is the id of the dashboard's event stream.</remarks>
+public sealed record DashboardId : {{ if strict }}IValueObject<Guid>, {{ end }}IAggregateId
+{{~ else ~}}
 public sealed record DashboardId{{ if strict }} : IValueObject<Guid>{{ end }}
+{{~ end ~}}
 {
     private DashboardId(Guid value) => Value = value;
 

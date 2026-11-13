@@ -89,10 +89,11 @@ like any module, so the base and the module packs give it the normal skeleton
 adds its code as per-module files for that module only.
 
 The module takes the project's `module.style`, like every other module, with
-no exception for the pack (#608, the owner's decision of 2026-11-12). It was
-first pinned to `crud`, which gave a DDD project a module that broke the
-project's own rules: plain classes with public setters and a raw `Guid` id,
-invariants in a handler, saves outside the unit of work.
+no exception for the pack: `crud`, `ddd` and `event-sourced` alike (#608, the
+owner's decisions of 2026-11-12). It was first pinned to `crud`, which gave a
+DDD project a module that broke the project's own rules: plain classes with
+public setters and a raw `Guid` id, invariants in a handler, saves outside the
+unit of work.
 
 - Under `crud` a dashboard is a plain entity, and the save use case checks the
   request before it changes one.
@@ -107,6 +108,21 @@ invariants in a handler, saves outside the unit of work.
   `IDashboardsUnitOfWork`. With `module.ddd-depth: strict`, the identifier and
   the value objects map by convention and the module's strict rules hold for
   it.
+- Under `event-sourced` a dashboard is `Dashboard :
+  EventSourcedAggregate<DashboardId>`, with the same rules, raising
+  `DashboardCreated`, `DashboardRearranged` and `DashboardRemoved`; its stream,
+  keyed by the dashboard's id, is loaded and saved through
+  `IDashboardsAggregateStore`, on Marten or KurrentDB. Pages of dashboards and
+  the widget-count chart read the existing `dashboards` table, a read model the
+  save and remove use cases write right after they save the aggregate's events
+  and commit through `IDashboardsUnitOfWork`, the same on both stores (the
+  owner's decision of 2026-11-13); one dashboard is read from its stream. The
+  two writes are not in one transaction: a crash between them leaves the table
+  stale, a dashboard missing from or outdated in the list, until it is next
+  saved. The stream keeps its owner after a removal, so another user's id
+  answers 409 `dashboards.already-exists` from the use case itself. With
+  `module.ddd-depth: strict`, a placed widget's parts are value objects over one
+  value each, since the event store writes a value object as its one value.
 
 - A dashboard row holds its owner (the token's `sub`, read through
   `ICurrentUser`), its name and its widgets as one JSON column. Every read
@@ -116,7 +132,9 @@ invariants in a handler, saves outside the unit of work.
   /dashboards/{id}`, which creates or replaces, and removing is `DELETE`, so
   every write is idempotent and the base's retry policy (retry only idempotent
   methods) stays correct. Another user's id is not found for the caller, and
-  inserting it fails on the primary key: 409, never an overwrite.
+  saving it answers 409, never an overwrite: under `crud` and `ddd` inserting it
+  fails on the primary key, under `event-sourced` its stream names another
+  owner. The owner may save a removed dashboard's id again, in every style.
 - `GET /dashboards` and `GET /dashboards/widgets` are paged.
   `GET /dashboards/widgets/{id}` runs a widget's query as the calling user.
   Saving a dashboard that names a widget that is not declared (or not for the

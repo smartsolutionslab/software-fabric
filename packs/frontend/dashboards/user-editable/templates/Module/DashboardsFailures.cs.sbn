@@ -35,6 +35,11 @@ public static class DashboardsFailures
     public static ApiError UnknownWidget(string source) => new UnknownWidget(source);
 
     public static ApiError NotFound(Guid id) => new DashboardNotFound(id);
+{{~ if module.values["module.style"] == "event-sourced" ~}}
+
+    /// <summary>The id is another user's dashboard, removed or not: its stream keeps its owner.</summary>
+    public static ApiError AlreadyExists(Guid id) => new DashboardAlreadyExists(id);
+{{~ end ~}}
 
     public static ApiError WidgetNotFound(string id) => new WidgetNotFound(id);
 

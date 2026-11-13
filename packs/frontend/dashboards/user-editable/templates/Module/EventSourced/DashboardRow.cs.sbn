@@ -1,0 +1,18 @@
+namespace {{ namespace }}.Modules.Dashboards.Application.ReadModels;
+
+/// <summary>
+/// A dashboard's row in the dashboards table, which pages of dashboards and the widget-count chart read. The save and
+/// remove use cases write it right after they store the dashboard's events, not in one transaction with them: a crash
+/// in between leaves the row stale until the dashboard is saved again. One dashboard is read from its stream.
+/// </summary>
+public sealed class DashboardRow
+{
+    public Guid Id { get; set; }
+
+    /// <summary>The user it belongs to: the identity provider's subject.</summary>
+    public string Owner { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    public List<DashboardRowWidget> Widgets { get; set; } = [];
+}

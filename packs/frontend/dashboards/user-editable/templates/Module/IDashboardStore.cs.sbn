@@ -25,7 +25,7 @@ public interface IDashboardStore
 
     Task SaveAsync(CancellationToken cancellationToken);
 }
-{{ else ~}}
+{{ else if module.values["module.style"] == "ddd" ~}}
 {{~ option = project["backend.absence"] == "option" ~}}
 using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
 
@@ -52,5 +52,29 @@ public interface IDashboardStore
     void Add(Dashboard dashboard);
 
     void Remove(Dashboard dashboard);
+}
+{{ else ~}}
+using {{ namespace }}.Modules.Dashboards.Application.ReadModels;
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Application;
+
+/// <summary>
+/// The dashboards table, the module's read model of its dashboards, one owner's rows at a time; implemented in the
+/// module's Infrastructure project. A dashboard itself is its event stream (<see cref="IDashboardsAggregateStore"/>).
+/// </summary>
+public interface IDashboardStore
+{
+    /// <summary>One page of the owner's dashboards, by name, for a query.</summary>
+    Task<PagedResult<DashboardRow>> ListAsync(DashboardOwner owner, Page page, PageSize pageSize, CancellationToken cancellationToken);
+
+    /// <summary>Every one of the owner's dashboards, by name, for a query that sums up all of them.</summary>
+    Task<IReadOnlyList<DashboardRow>> AllAsync(DashboardOwner owner, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Writes the dashboard's row as its stored events leave it, or deletes the row of a removed one. Call it right after
+    /// saving the dashboard's events; committing the module's unit of work saves the row.
+    /// </summary>
+    Task RecordAsync(Dashboard dashboard, CancellationToken cancellationToken);
 }
 {{ end ~}}

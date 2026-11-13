@@ -133,7 +133,7 @@ public sealed class SaveDashboardHandler(IDashboardStore dashboards, WidgetCatal
         return null;
     }
 }
-{{ else ~}}
+{{ else if module.values["module.style"] == "ddd" ~}}
 {{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
 {{~ option = project["backend.absence"] == "option" ~}}
 {{~ func ok(type, value)
@@ -241,6 +241,126 @@ public sealed class SaveDashboardHandler(
             if (!fits)
             {
                 return DashboardsFailures.InvalidWidget(placed.Key, widget.Kind == WidgetKind.Chart ? "shows a chart: bar, line or pie." : "shows a table: table.");
+            }
+        }
+
+        return null;
+    }
+}
+{{ else ~}}
+{{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+{{~ value = module.values["module.ddd-depth"] == "strict" ? ".Value" : "" ~}}
+{{~ func ok(type, value)
+  if typed
+    ret "Success(" + value + ")"
+  end
+  ret "Result<" + type + ", ApiError>.Success(" + value + ")"
+end ~}}
+{{~ func fail(type, error)
+  if typed
+    ret "Failure(" + error + ")"
+  end
+  ret "Result<" + type + ", ApiError>.Failure(" + error + ")"
+end ~}}
+using {{ namespace }}.BuildingBlocks.Dashboards;
+using {{ namespace }}.BuildingBlocks.Identity;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Application.Commands.SaveDashboard;
+
+/// <summary>
+/// Saves the caller's dashboard: its events first, then its row in the dashboards table, which pages and the chart
+/// read. Whether a widget is one the modules declare for the caller, and whether its visual suits it, is asked here, of
+/// the widget catalogue; everything else a dashboard must be is the dashboard's own rule.
+/// </summary>
+public sealed class SaveDashboardHandler(
+    IDashboardsAggregateStore aggregates,
+    IDashboardStore dashboards,
+    IDashboardsUnitOfWork unitOfWork,
+    WidgetCatalog catalog,
+    IWidgetAccess access,
+    ICurrentUser user)
+    : ICommandHandler<SaveDashboard, Result<Guid, ApiError>>
+{
+    /// <summary>How many widgets a dashboard holds; the dashboard's rule (<see cref="Dashboard.MaximumWidgets"/>).</summary>
+    public const int MaximumWidgets = Dashboard.MaximumWidgets;
+
+    private static readonly string[] ChartVisuals = ["bar", "line", "pie"];
+
+    public async Task<Result<Guid, ApiError>> HandleAsync(SaveDashboard command, CancellationToken cancellationToken)
+    {
+        {{ not_null "command" }}
+
+        if (user.Subject is not { } subject)
+        {
+            return {{ fail "Guid" "DashboardsFailures.NotSignedIn()" }};
+        }
+
+        var problem = await ProblemAsync(command.Widgets, cancellationToken);
+        if (problem is not null)
+        {
+            return {{ fail "Guid" "problem" }};
+        }
+
+        var owner = DashboardOwner.From(subject);
+{{~ if option ~}}
+        var found = await aggregates.LoadAsync<Dashboard>(command.Id, cancellationToken);
+        Dashboard dashboard;
+        if (found.HasValue)
+        {
+            dashboard = found.Value;
+{{~ else ~}}
+        var dashboard = await aggregates.LoadAsync<Dashboard>(command.Id, cancellationToken);
+        if (dashboard is not null)
+        {
+{{~ end ~}}
+            // The stream keeps its owner, removed or not: no one saves over someone else's dashboard.
+            if (dashboard.Owner != owner)
+            {
+                return {{ fail "Guid" "DashboardsFailures.AlreadyExists(command.Id.Value)" }};
+            }
+
+            var rearranged = dashboard.Rearrange(command.Name, command.Widgets);
+            if (!rearranged.IsSuccess)
+            {
+                return {{ fail "Guid" "DashboardsFailures.From(rearranged.Error)" }};
+            }
+        }
+        else
+        {
+            var created = Dashboard.Create(command.Id, owner, command.Name, command.Widgets);
+            if (!created.IsSuccess)
+            {
+                return {{ fail "Guid" "DashboardsFailures.From(created.Error)" }};
+            }
+
+            dashboard = created.Value;
+        }
+
+        // The events are the dashboard; its row follows them, in a transaction of its own.
+        await aggregates.SaveAsync(dashboard, cancellationToken);
+        await dashboards.RecordAsync(dashboard, cancellationToken);
+        await unitOfWork.CommitAsync(cancellationToken);
+        return {{ ok "Guid" "command.Id.Value" }};
+    }
+
+    /// <summary>The first widget that is not one the modules declare for the caller, or shows what it cannot, or null.</summary>
+    private async Task<ApiError?> ProblemAsync(IReadOnlyList<DashboardWidget> widgets, CancellationToken cancellationToken)
+    {
+        // A missing widget, or one without a key, is the dashboard's to refuse.
+        foreach (var placed in widgets.Where(widget => widget is not null && !string.IsNullOrWhiteSpace(widget.Key{{ value }})))
+        {
+            if (placed.Source{{ value }} is null || !catalog.TryFind(placed.Source{{ value }}, out var widget) || !await access.AllowsAsync(widget, cancellationToken))
+            {
+                return DashboardsFailures.UnknownWidget(placed.Source{{ value }} ?? string.Empty);
+            }
+
+            var fits = widget.Kind == WidgetKind.Chart ? ChartVisuals.Contains(placed.Visual{{ value }}, StringComparer.Ordinal) : placed.Visual{{ value }} == "table";
+            if (!fits)
+            {
+                return DashboardsFailures.InvalidWidget(placed.Key{{ value }}, widget.Kind == WidgetKind.Chart ? "shows a chart: bar, line or pie." : "shows a table: table.");
             }
         }
 
