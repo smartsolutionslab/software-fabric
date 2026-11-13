@@ -10,9 +10,10 @@ The project's embeddings come from OpenAI's embedding models, through the OpenAI
 - **The key is the Aspire secret parameter `openai-api-key`**, handed to the host as `OpenAI__ApiKey`. When the chat model is OpenAI's, it is the same key; otherwise the AppHost declares it for embeddings. Locally it comes from the AppHost's user secrets (`dotnet user-secrets set Parameters:openai-api-key <key> --project src/AppHost`); in a deployment, from its secret store.
 - **The model is a parameter**, `openai-embedding-model`, defaulting to `text-embedding-3-small` (1536 dimensions). `text-embedding-3-large` (3072) is stronger, at a higher price; stored vectors have the size of the model that made them, so a model of another size needs vector tables of that size and every record embedded again.
 - **Key and model are read when the generator is first needed.** The host starts without them, and the first use fails naming the missing parameter; registering the generator sends no request.
+- **The endpoint is OpenAI's API**, unless the setting `OpenAI:EmbeddingEndpoint` names another OpenAI-compatible endpoint. The AppHost never sets it; the integration tests set it to their stand-in, `FakeEmbeddingsServer` on the loopback interface.
 
 ## Consequences
 
 - An architecture rule fails when the host's `Program.cs` does not call `AddOpenAIEmbeddingGenerator`, and resolves the registered generator, without calling it, failing when it is not OpenAI with the configured model, not wrapped with logging and OpenTelemetry, or when a missing key does not name its parameter.
-- The integration tests give `openai-api-key` a value OpenAI does not accept; they never call the model. No test needs a real key.
+- The integration tests give `openai-api-key` a value OpenAI does not accept and embed against their stand-in; they never call the model. No test needs a real key.
 - Every text embedded is a request to OpenAI: it costs money and sends the text there, records and questions alike.

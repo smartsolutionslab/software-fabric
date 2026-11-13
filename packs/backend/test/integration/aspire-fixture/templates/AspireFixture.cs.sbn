@@ -14,7 +14,9 @@ public sealed class AspireFixture : {{ test_lifetime }}
 {
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
 
-    private DistributedApplication? app;
+    private DistributedApplication? app;{{ if slots["integration-tests.members"] != "" }}
+
+{{ slots["integration-tests.members"] }}{{ end }}
 
     public DistributedApplication App => app ?? throw new InvalidOperationException("The application has not started.");
 
@@ -58,7 +60,9 @@ public sealed class AspireFixture : {{ test_lifetime }}
         if (app is not null)
         {
             await app.DisposeAsync();
-        }
+        }{{ if slots["integration-tests.teardown"] != "" }}
+
+{{ slots["integration-tests.teardown"] }}{{ end }}
     }
 {{~ if project["backend.auth"] != "none" ~}}
 
