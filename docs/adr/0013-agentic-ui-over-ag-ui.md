@@ -244,11 +244,19 @@ is a bounded exception rather than a breach:
   request, was the alternative: the stream would still be read by hand.
 - The pack's agent rules and ADR state the exception, and its gate is lint,
   through the `frontend.framework` role slot `web.lint-configs` added for it:
-  outside `baseApi.ts`, `connectAgent.ts` and tests, `fetch`,
-  `globalThis.fetch` or `window.fetch`, `XMLHttpRequest`, `new HttpAgent` or
-  an `Authorization` header set by hand fails, in a Vue template too. Only a
-  project with `frontend.agent-ui: ag-ui` gets the rule; without the panel
-  there is no exception to hold.
+  outside `baseApi.ts`, `connectAgent.ts`, the SSE realtime stream's
+  `connection.ts` and tests, any reference to `fetch`, `XMLHttpRequest`,
+  `Headers`, `HttpAgent` or `EventSource` fails, bare or as a member of
+  `window`, `globalThis` or `self`, in a Vue template too. Only a project
+  with `frontend.agent-ui: ag-ui` gets the rule; without the panel there is
+  no exception to hold.
+- Lint bans names, not call shapes (owner's decision on #607, 2026-11-13,
+  after three review rounds each found a shape the selectors missed or a
+  false positive they made). There is no rule on the `Authorization` header:
+  without those names no request carries it. What lint cannot see, a name
+  reached through a variable or a computed property, a run-time import, an
+  HTTP library not on the list, the generated ADR states; the backend's
+  policy is the protection, not lint.
 
 **Delivered in three steps** (owner's decision on #182): first this
 dimension, this ADR and the `none` pack; then the `ag-ui` pack's backend; then
