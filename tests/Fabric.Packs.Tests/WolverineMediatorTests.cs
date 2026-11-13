@@ -110,6 +110,80 @@ public sealed class WolverineMediatorTests
     }
 
     /// <summary>
+    /// A module's handler takes the module's own services, its unit of work and, in an event-sourced module, its aggregate
+    /// store, which Wolverine's generated handler code cannot build (#644): the unit of work takes the service provider,
+    /// the aggregate store is registered by a factory. A module added with <c>fabric add-module</c> names them nowhere,
+    /// and its command saves through them all the same.
+    /// </summary>
+    [Theory]
+    [InlineData("ddd")]
+    [InlineData("event-sourced")]
+    public async Task A_modules_command_whose_handler_takes_its_unit_of_work_and_aggregate_store_saves_through_them(string style)
+    {
+        using var project = new GeneratedProject(Profile, Mediator, "backend.tenancy=none", $"module.style={style}");
+        project.AddModule("billing");
+        project.Write("src/Contracts/Billing/NoteRecordedV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record NoteRecordedV1(string Text) : IntegrationEvent;
+            """);
+        var aggregateStore = style == "event-sourced" ? ", IBillingAggregateStore aggregates" : string.Empty;
+        var aggregateStoreUsed = style == "event-sourced" ? "        Ensure.That(aggregates).IsNotNull();\n" : string.Empty;
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Commands/RecordNote", $$"""
+            using Shop.BuildingBlocks.Messaging;
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Billing.Application.Commands.RecordNote;
+
+            public sealed record RecordNote(string Text) : ICommand<Result<string, ApiError>>;
+
+            public sealed class RecordNoteHandler(IBillingUnitOfWork unitOfWork{{aggregateStore}}) : ICommandHandler<RecordNote, Result<string, ApiError>>
+            {
+                public async Task<Result<string, ApiError>> HandleAsync(RecordNote command, CancellationToken cancellationToken)
+                {
+                    Ensure.That(command).IsNotNull();
+            {{aggregateStoreUsed}}
+                    await unitOfWork.PublishAsync(new NoteRecordedV1(command.Text));
+                    await unitOfWork.CommitAsync(cancellationToken);
+                    return Result<string, ApiError>.Success(command.Text);
+                }
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Api/Notes.cs", """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.BuildingBlocks.Messaging;
+            using Shop.Modules.Billing.Application.Commands.RecordNote;
+
+            namespace Shop.Modules.Billing.Api;
+
+            public sealed class Notes : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints) =>
+                    endpoints.MapPost("/notes/{text}", async (string text, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+                        (await dispatcher.SendAsync(new RecordNote(text), cancellationToken)).ToHttpResult()).AllowAnonymous();
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        using var rabbitMq = Container.RabbitMq();
+        using var host = project.StartHost(new Dictionary<string, string>
+        {
+            ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}",
+            ["ConnectionStrings__messaging"] = $"amqp://guest:guest@127.0.0.1:{rabbitMq.Port}",
+            ["Authentication__Authority"] = "http://127.0.0.1:1/realms/shop",
+        });
+
+        var recorded = await host.PostAsync("/billing/notes/fabric");
+        var recordedBody = await recorded.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        recorded.StatusCode.ShouldBe(HttpStatusCode.OK, recordedBody);
+        recordedBody.ShouldBe("\"fabric\"");
+    }
+
+    /// <summary>
     /// The test hosts of agents, dashboards, gRPC and the MCP server send requests through <c>IDispatcher</c>, so they
     /// start Wolverine in process (#362); before, they failed with Wolverine's bus missing or not started.
     /// </summary>
