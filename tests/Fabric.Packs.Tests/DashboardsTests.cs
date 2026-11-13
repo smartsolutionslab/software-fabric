@@ -353,23 +353,6 @@ public sealed class DashboardsTests
         files["tests/Modules/Dashboards.Tests/Commands/SaveDashboardTests.cs"].ShouldContain("public async Task Another_users_dashboard_id_is_refused_and_their_dashboard_stays()");
     }
 
-    /// <summary>
-    /// With Wolverine as the mediator, a handler's generated code cannot build the module's unit of work or aggregate
-    /// store (each reaches the request's scope), so Wolverine is told to take them from the message's scope: without it
-    /// every save answered 500 (pairwise-12, #608).
-    /// </summary>
-    [Theory]
-    [InlineData("ddd", "IDashboardsUnitOfWork")]
-    [InlineData("event-sourced", "IDashboardsUnitOfWork")]
-    [InlineData("event-sourced", "IDashboardsAggregateStore")]
-    public void With_the_wolverine_mediator_the_dashboards_handlers_take_the_modules_stores_from_the_messages_scope(string style, string service)
-    {
-        var profile = style == "ddd" ? Profile : "industrial-event-driven-mfe";
-        var files = Files(profile, Dashboards, "backend.mediator=wolverine");
-
-        files["src/Host/Wiring/Messaging.cs"].ShouldContain($"options.CodeGeneration.AlwaysUseServiceLocationFor<Shop.Modules.Dashboards.Application.{service}>();");
-    }
-
     [Fact]
     public void The_frontends_openapi_document_describes_the_dashboards_endpoints()
     {
@@ -679,6 +662,26 @@ public sealed class DashboardsTests
     public void With_the_wolverine_mediator_and_roles_the_integration_tests_save_and_reload_a_dashboard()
     {
         using var project = new GeneratedProject("lean-crud", Dashboards, Roles, "backend.bus.transport=rabbitmq", "backend.mediator=wolverine");
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0", customMessage: output);
+        output.ShouldNotContain("skipped: 1", customMessage: output);
+    }
+
+    /// <summary>
+    /// With Wolverine as the mediator, a handler's generated code cannot build the module's unit of work or aggregate
+    /// store (each reaches the request's scope), so they must come from the message's scope: without that every save
+    /// answered 500 (pairwise-12, #608). The integration tests save a dashboard, through the handlers that take them.
+    /// </summary>
+    [Theory]
+    [InlineData(Profile)]
+    [InlineData("industrial-event-driven-mfe")]
+    public void With_the_wolverine_mediator_under_ddd_and_event_sourced_the_integration_tests_save_and_reload_a_dashboard(string profile)
+    {
+        using var project = new GeneratedProject(profile, Dashboards, "backend.mediator=wolverine");
         project.Build();
 
         var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
