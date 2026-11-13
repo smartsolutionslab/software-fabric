@@ -13,6 +13,7 @@ namespace Fabric.Packs.Tests;
 public sealed partial class PermissionProbeTests
 {
     private const string Roles = "backend.authorization=roles";
+    private const string MicroFrontends = "frontend.architecture=micro-frontends";
 
     public static TheoryData<string, string[]> Projects => new()
     {
@@ -32,6 +33,20 @@ public sealed partial class PermissionProbeTests
         { "saas-standard-vue", [Roles], "web/app/src/modules/billing/BillingPage.vue", "useGetBillingPermissionsManage" },
         { "saas-standard-vue", [Roles, "frontend.state=pinia"], "web/app/src/modules/billing/BillingPage.vue", "getBillingPermissionsManage" },
         { "saas-standard-vue", [Roles, "frontend.state=pinia", "frontend.api-client=openapi-fetch"], "web/app/src/modules/billing/BillingPage.vue", "api.GET('/billing/permissions/manage')" },
+        // A remote has no API client of its own: the shell's page around it asks the probe.
+        { "industrial-event-driven-mfe", [Roles], "web/app/src/modules/billing/BillingPage.tsx", "useGetBillingPermissionsManage" },
+        { "saas-standard-react", [Roles, MicroFrontends, "frontend.design-system=tokens"], "web/app/src/modules/billing/BillingPage.tsx", "useGetBillingPermissionsManageQuery" },
+        { "saas-standard-react", [Roles, MicroFrontends, "frontend.design-system=tokens", "frontend.routing=tanstack-router"], "web/app/src/modules/billing/BillingPage.tsx", "useGetBillingPermissionsManageQuery" },
+        { "saas-standard-vue", [Roles, MicroFrontends, "frontend.design-system=tokens", "frontend.mfe-technique=native-federation"], "web/app/src/modules/billing/BillingPage.vue", "useGetBillingPermissionsManage" },
+        { "saas-standard-vue", [Roles, MicroFrontends, "frontend.design-system=tokens", "frontend.mfe-technique=web-components", "frontend.state=pinia", "frontend.api-client=openapi-fetch"], "web/app/src/modules/billing/BillingPage.vue", "api.GET('/billing/permissions/manage')" },
+    };
+
+    /// <summary>A micro-frontend shell's module page, which mounts the module's remote, and the test add-module writes beside it.</summary>
+    public static TheoryData<string, string[], string, string> RemotePages => new()
+    {
+        { "industrial-event-driven-mfe", [Roles], "web/app/src/modules/billing/BillingPage.tsx", "web/app/src/modules/billing/BillingPage.probe.test.tsx" },
+        { "saas-standard-react", [Roles, MicroFrontends, "frontend.design-system=tokens", "frontend.routing=tanstack-router"], "web/app/src/modules/billing/BillingPage.tsx", "web/app/src/modules/billing/BillingPage.probe.test.tsx" },
+        { "saas-standard-vue", [Roles, MicroFrontends, "frontend.design-system=tokens", "frontend.mfe-technique=native-federation"], "web/app/src/modules/billing/BillingPage.vue", "web/app/src/modules/billing/BillingPage.probe.test.ts" },
     };
 
     [Theory]
@@ -119,6 +134,32 @@ public sealed partial class PermissionProbeTests
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web/app/openapi.json")).ShouldContain("\"/billing/permissions/manage\"");
     }
 
+    [Theory]
+    [MemberData(nameof(RemotePages))]
+    public void A_micro_frontend_shells_page_mounts_the_remote_and_its_test_checks_Manage_shows_only_on_200(string profile, string[] overrides, string page, string test)
+    {
+        using var project = new GeneratedProject(profile, overrides);
+        project.AddModule("billing");
+
+        var content = File.ReadAllText(Path.Combine(project.ProjectDirectory, page));
+        content.ShouldContain("useCanManage");
+        content.ShouldContain("module=\"billing\"");
+        var pageTest = File.ReadAllText(Path.Combine(project.ProjectDirectory, test));
+        pageTest.ShouldContain("vi.mock('./useCanManage'");
+        pageTest.ShouldContain("Manage");
+    }
+
+    [Fact]
+    public void Without_authorization_choices_a_micro_frontend_shells_page_only_mounts_the_remote()
+    {
+        using var project = new GeneratedProject("industrial-event-driven-mfe");
+        project.AddModule("billing");
+
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "web/app/src/modules/billing/BillingPage.tsx")).ShouldNotContain("useCanManage");
+        File.Exists(Path.Combine(project.ProjectDirectory, "web/app/src/modules/billing/useCanManage.ts")).ShouldBeFalse();
+        File.Exists(Path.Combine(project.ProjectDirectory, "web/app/src/modules/billing/BillingPage.probe.test.tsx")).ShouldBeFalse();
+    }
+
     [Fact]
     public void Without_authorization_choices_a_new_modules_page_asks_nothing()
     {
@@ -138,6 +179,8 @@ public sealed partial class PermissionProbeTests
     [InlineData("lean-crud", new[] { Roles, "frontend.api-client=openapi-fetch" })]
     [InlineData("saas-standard-vue", new[] { Roles })]
     [InlineData("saas-standard-vue", new[] { Roles, "frontend.state=pinia" })]
+    [InlineData("industrial-event-driven-mfe", new[] { Roles })]
+    [InlineData("saas-standard-vue", new[] { Roles, MicroFrontends, "frontend.design-system=tokens", "frontend.mfe-technique=native-federation" })]
     public void The_web_app_builds_lints_and_tests_with_a_new_modules_page_calling_its_probe(string profile, string[] overrides)
     {
         using var project = new GeneratedProject(profile, overrides);
