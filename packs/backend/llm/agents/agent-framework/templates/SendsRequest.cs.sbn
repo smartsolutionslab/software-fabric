@@ -1,0 +1,9 @@
+namespace {{ namespace }}.BuildingBlocks.Agents;
+
+/// <summary>
+/// Endpoint metadata naming the command or query an endpoint sends, which <c>.Sends&lt;TRequest&gt;()</c> adds. An agent's
+/// tool for that request requires of its caller what every endpoint that sends it requires; a tool whose request no
+/// endpoint sends is refused.
+/// </summary>
+/// <param name="Request">The command or query the endpoint sends through <c>IDispatcher</c>.</param>
+public sealed record SendsRequest(Type Request);

@@ -4,6 +4,11 @@
 - An agent is defined in a module's Application project, under `Agents/`: a static class whose `Create(IChatClient model, IDispatcher dispatcher)` returns `model.AsAIAgent(instructions: ..., name: ..., tools: [...])`. Never create or run an agent in Domain, Infrastructure, Api or BuildingBlocks; an architecture rule fails the build.
 - A command or query runs the agent: its handler takes `IChatClient` and `IDispatcher`, creates the agent, runs it and returns its answer's text as a successful `Result`. An endpoint sends that request through `IDispatcher`; it never runs an agent.
 - A tool is one of the module's commands or queries: `DispatcherTool.For<FindInvoice>(dispatcher, "what it does, for the model")`. Never `AIFunctionFactory.Create`, an `AITool` of your own or an agent's `AsAIFunction`; an architecture rule fails the build.
+- A tool requires of its caller what the endpoint that sends its request requires. Mark that endpoint with `.Sends<FindInvoice>()` where it is mapped (after `MapGet`/`MapPost`), and declare the policy there as for any endpoint; never check access in the agent or the handler. A tool whose request no endpoint marks is refused at every call, and `EveryAgentToolRequestHasAnEndpoint` fails the build.
+{{~ if project["backend.auth"] != "none" ~}}
+- Run an agent inside the HTTP request that asked for it: outside one (a consumer, a background job) every tool is refused, since there is no signed-in caller to check.
+{{~ end ~}}
+- Test a tool's access with `AgentCaller` (`tests/Fakes`): `using var caller = AgentCaller.SignedIn("visitor", AgentCaller.Sending<FindInvoice>(BillingPolicyNames.Manage));`.
 - Give a tool only to a use case a model may call with arguments of its own choosing. Its handler validates them as it would a request body.
 - A list query with `Page` and `PageSize` can be a tool as it is: the model passes them as whole numbers, as `?page=` and `?pageSize=`. Do not add a second, unpaged query for an agent.
 {{~ if project["backend.absence"] == "option" ~}}

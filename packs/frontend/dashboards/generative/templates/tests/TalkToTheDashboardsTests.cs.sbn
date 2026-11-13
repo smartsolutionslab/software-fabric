@@ -1,5 +1,7 @@
 using System.Text.Json;
 using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.ListWidgets;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.ProposeWidget;
 using {{ namespace }}.Modules.Dashboards.Application.Queries.TalkToTheDashboards;
 using {{ namespace }}.Tests.Fakes;
 using Microsoft.Extensions.AI;
@@ -16,6 +18,7 @@ public class TalkToTheDashboardsTests
     {{ test_attribute }}
     public async Task The_agent_proposes_a_declared_widget_through_the_dispatcher_and_is_offered_only_its_two_tools()
     {
+        using var caller = AgentCaller.SignedIn("developer", AgentCaller.Sending<ListWidgets>(), AgentCaller.Sending<ProposeWidget>());
         using var model = new ToolCallingChatClient("propose_widget", new Dictionary<string, object?> { ["source"] = "dashboards.widget-counts", ["visual"] = "bar", ["replaces"] = null });
 
         var updates = await RunAsync(model, null);
