@@ -1,0 +1,34 @@
+import { render, screen } from '@testing-library/vue';
+import { expect, test, vi } from 'vitest';
+import {{ module.namespace }}Page from './{{ module.namespace }}Page.vue';
+
+// The module's remote is loaded at run time; here it stands in, so this test checks the page around it.
+vi.mock('@/remotes/Remote.vue', async () => {
+  const { defineComponent, h } = await import('vue');
+  return {
+    default: defineComponent({
+      props: { module: { type: String, required: true } },
+      setup: (props) => () => h('h1', `The ${props.module} remote`),
+    }),
+  };
+});
+
+// A remote has no API client of its own, so the shell's page asks the module's permission probe; here the answer is the test's.
+const probe = vi.hoisted(() => ({ canManage: true }));
+vi.mock('./useCanManage', () => ({ useCanManage: () => probe.canManage }));
+
+test('the {{ module.namespace }} page mounts its remote and offers Manage when the probe answers 200', () => {
+  probe.canManage = true;
+  render({{ module.namespace }}Page);
+
+  expect(screen.getByRole('heading', { name: 'The {{ module.name }} remote' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Manage' })).toBeInTheDocument();
+});
+
+test('the {{ module.namespace }} page offers no Manage when the probe refuses', () => {
+  probe.canManage = false;
+  render({{ module.namespace }}Page);
+
+  expect(screen.getByRole('heading', { name: 'The {{ module.name }} remote' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Manage' })).toBeNull();
+});

@@ -1,0 +1,18 @@
+using {{ namespace }}.Modules.{{ module.namespace }}.Application;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.Queries.CanManage;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Tests.Queries;
+
+public class CanManageTests
+{
+    {{ test_attribute }}
+    public async Task The_answer_names_the_permission_the_endpoints_policy_granted()
+    {
+        var handler = new CanManageHandler();
+
+        var result = await handler.HandleAsync(new CanManage(), {{ test_cancellation_token }});
+
+        {{ `result.IsSuccess` | should_be_true }};
+        {{ `result.Value.Name` | should_be (module.namespace + "PolicyNames.Manage") }};
+    }
+}

@@ -1,6 +1,7 @@
 {{~ editor = module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains(project["frontend.dashboards"], "user-editable") && project["frontend.api-client"] == "orval" && (!object.has_key(project, "frontend.state") || project["frontend.state"] != "pinia") ~}}
+{{~ probe = !editor && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
 import { render, screen } from '@testing-library/vue';
-import { expect, test{{ if editor }}, vi{{ end }} } from 'vitest';
+import { expect, test{{ if editor || probe }}, vi{{ end }} } from 'vitest';
 import { axe } from 'vitest-axe';
 import { createMemoryHistory } from 'vue-router';
 import { createAppRouter } from '@/router';
@@ -14,6 +15,12 @@ vi.mock('@/dashboards/DashboardEditor.vue', async () => {
   return { default: { render: () => h('p', 'The dashboard editor') } };
 });
 {{~ end ~}}
+{{~ if probe ~}}
+
+// The page asks the module's permission probe through the generated client; here the answer is the test's.
+const probe = vi.hoisted(() => ({ canManage: true }));
+vi.mock('./useCanManage', () => ({ useCanManage: () => probe.canManage }));
+{{~ end ~}}
 
 test('the {{ module.namespace }} page has no accessibility violations axe can find', async () => {
   const router = createAppRouter(createMemoryHistory());
@@ -25,6 +32,22 @@ test('the {{ module.namespace }} page has no accessibility violations axe can fi
 {{~ else ~}}
   expect(await screen.findByRole('heading', { name: '{{ module.namespace }}' })).toBeInTheDocument();
 {{~ end ~}}
+{{~ if probe ~}}
+  expect(screen.getByRole('heading', { name: 'Manage' })).toBeInTheDocument();
+{{~ end ~}}
 
   expect(await axe(container)).toHaveNoViolations();
 });
+{{~ if probe ~}}
+
+test('the {{ module.namespace }} page offers no Manage when the probe refuses', async () => {
+  probe.canManage = false;
+  const router = createAppRouter(createMemoryHistory());
+  await router.push('/{{ module.name }}');
+
+  render({{ module.namespace }}Page, { global: { plugins: [router] } });
+
+  expect(await screen.findByRole('heading', { name: '{{ module.namespace }}' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Manage' })).toBeNull();
+});
+{{~ end ~}}

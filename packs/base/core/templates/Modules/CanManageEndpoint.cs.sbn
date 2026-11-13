@@ -1,0 +1,24 @@
+{{~ if project["backend.api-style"] != "minimal-apis" ~}}
+#error The sample endpoint of a module's policy is a minimal API only so far (docs/adr/0006 of the generator).
+{{~ end ~}}
+using {{ namespace }}.BuildingBlocks.Api;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.Queries.CanManage;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Api.Endpoints;
+
+/// <summary>
+/// The permission named {{ module.name }}.manage when the caller holds it, 403 when not: the module's page asks it before
+/// it offers to manage anything, and the integration tests prove the policy on it.
+/// </summary>
+public sealed class CanManageEndpoint : IEndpoint
+{
+    public void Map(IEndpointRouteBuilder endpoints) =>
+        endpoints.MapGet("/permissions/manage", async (IDispatcher dispatcher, CancellationToken cancellationToken) =>
+                (await dispatcher.QueryAsync(new CanManage(), cancellationToken)).ToHttpResult())
+            .RequireAuthorization({{ module.namespace }}PolicyNames.Manage);
+}

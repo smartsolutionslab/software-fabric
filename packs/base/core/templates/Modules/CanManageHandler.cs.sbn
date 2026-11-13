@@ -1,0 +1,22 @@
+{{~ if !object.has_key(project, "backend.result-style") ~}}
+#error The permission probe returns a Result; backend.errors without one has no branch here yet (docs/adr/0006 of the generator).
+{{~ end ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.BuildingBlocks.Modules;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.Queries.CanManage;
+
+/// <summary>Names the permission the caller holds; the policy on the endpoint has already refused anyone else.</summary>
+public sealed class CanManageHandler : IQueryHandler<CanManage, Result<PermissionDto, ApiError>>
+{
+    public Task<Result<PermissionDto, ApiError>> HandleAsync(CanManage query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+{{~ if project["backend.result-style"] == "typed-outcomes" ~}}
+        return Task.FromResult<Result<PermissionDto, ApiError>>(Success({{ module.namespace }}PolicyNames.Manage.ToDto()));
+{{~ else ~}}
+        return Task.FromResult(Result<PermissionDto, ApiError>.Success({{ module.namespace }}PolicyNames.Manage.ToDto()));
+{{~ end ~}}
+    }
+}

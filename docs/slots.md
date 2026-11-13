@@ -55,7 +55,9 @@ web/
 ## Modules register by convention, never by list
 
 `fabric add-module` only creates files (ADR-0001), so nothing may need a
-line per module in a shared file. Proposed in ADR-0005:
+line per module in a shared file. The one file it extends is the frontend's
+copy of the OpenAPI document, with the new module's paths and schemas
+(ADR-0005, amended for #609). Proposed in ADR-0005:
 
 - **Build:** `build.proj` (Microsoft.Build.Traversal) and the Host pick up
   module projects with globs — `src/Modules/*/*.Api/*.Api.csproj` — not a
@@ -498,7 +500,7 @@ AppHost's model with it, declares it instead (*#260*).
 | `web.typecheck-excludes` *(added for #126; declared by react)* | `web/app/tsconfig.json` (`exclude`, rendered only with a contribution) | `, ` | rtk-query-codegen (the generated client, without keycloak: its document starts with no paths) |
 | `web.store-imports`, `web.store-reducers`, `web.store-middleware` *(added in M1-07b; declared by redux-toolkit)* | `web/app/src/store.ts` | newline / `,` + newline / none | rtk-query-codegen |
 | `web.api-imports`, `web.api-headers` *(added in M1-07b; declared by every api-client pack)* | `web/app/src/api/baseApi.ts` | newline | oidc-client-ts (the bearer token) |
-| `web.openapi-paths`, `web.openapi-schemas` *(added for #184; role slots of `frontend.api-client`)* | `web/app/openapi.json` (`paths` after the host's own; `components.schemas`, sorted by name with the host's own) | `,` + newline / blank line | frontend.dashboards.user-editable (the dashboards module's endpoints; a module's /permissions/manage is not in the document, #463), tenancy column with `writes_for_tenants` (the host's `GET /tenants`, #629; `optional: true`) |
+| `web.openapi-paths`, `web.openapi-schemas` *(added for #184; role slots of `frontend.api-client`)* | `web/app/openapi.json` (`paths` after the host's own; `components.schemas`, sorted by name with the host's own) | `,` + newline / blank line | base core (every module's `GET /<module>/permissions/manage` and the `PermissionDto` it answers, with authorization choices; `optional: true`; a module added later gets its probe from add-module, ADR-0005, #609), frontend.dashboards.user-editable (the dashboards module's endpoints), tenancy column with `writes_for_tenants` (the host's `GET /tenants`, #629; `optional: true`) |
 | `web.vite-imports` *(added in M1-07)* | `web/app/vite.config.ts` | newline | tailwind, pwa yes |
 | `web.vite-plugins` | `web/app/vite.config.ts` | `,` + newline | tailwind, module-federation (`federation(shellFederation)`), native-federation (`shellFederation()`, the `virtual:federation` module), mfe-technique web-components (`shellRemotes()`, the `virtual:remotes` module), pwa yes (`VitePWA({...})`, the service worker and manifest) |
 | `web.custom-element-prefixes` *(added for #388; declared by vue, not a role slot: React needs no telling)* | `web/app/vite.config.ts` (Vue's `isCustomElement`: a tag starting with one of these quoted prefixes is left to the browser; rendered only with a contribution), and with native-federation or mfe-technique web-components every remote's `web/modules/<module>/vite.config.ts` | `, ` | design-system web-components (`'ds-'`) |

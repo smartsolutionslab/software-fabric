@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Fabric.Core.Catalog;
 using Fabric.Core.Choices;
 using Fabric.Core.Packs;
@@ -88,13 +89,66 @@ public static class Generator
 
         var moduleOnly = after with { Files = [.. after.Files.Where(file => file.Module == name)] };
         var rendered = Renderer.Render(catalog, moduleOnly, choices, project.Name);
-        return rendered.Errors.Count > 0
-            ? AdditionFailure(rendered.Errors)
-            : new ModuleAddition(rendered.Files, FabricFile.Write(catalog, project.Name, project.Profile, choices), [])
-            {
-                Experimental = ExperimentalOptions.Chosen(catalog, choices),
-            };
+        if (rendered.Errors.Count > 0)
+        {
+            return AdditionFailure(rendered.Errors);
+        }
+
+        var documentBefore = Renderer.Render(catalog, OpenApiDocumentOnly(before), project.Choices, project.Name);
+        var documentAfter = Renderer.Render(catalog, OpenApiDocumentOnly(after), choices, project.Name);
+        if (documentBefore.Errors.Count + documentAfter.Errors.Count > 0)
+        {
+            return AdditionFailure([.. documentBefore.Errors.Union(documentAfter.Errors, StringComparer.Ordinal)]);
+        }
+
+        return new ModuleAddition(rendered.Files, FabricFile.Write(catalog, project.Name, project.Profile, choices), [])
+        {
+            Experimental = ExperimentalOptions.Chosen(catalog, choices),
+            OpenApi = OpenApiAdded(documentBefore.Files, documentAfter.Files, name, project.Choices.Modules.Keys),
+        };
     }
+
+    private static Composition OpenApiDocumentOnly(Composition composition) =>
+        composition with { Files = [.. composition.Files.Where(file => file.Module is null && file.Target == OpenApiAdditions.DocumentPath)] };
+
+    /// <summary>
+    /// The paths and schemas the copy of the OpenAPI document has with the new module and not without it (ADR-0005), or
+    /// <c>null</c> when it gains none or the project has no copy.
+    /// </summary>
+    private static OpenApiAdditions? OpenApiAdded(
+        IReadOnlyList<RenderedFile> before,
+        IReadOnlyList<RenderedFile> after,
+        string name,
+        IEnumerable<string> existingModules)
+    {
+        if (before.SingleOrDefault() is not { } withoutModule || after.SingleOrDefault() is not { } withModule)
+        {
+            return null;
+        }
+
+        var (oldDocument, newDocument) = (JsonNode.Parse(withoutModule.Content)!, JsonNode.Parse(withModule.Content)!);
+        var paths = Added(oldDocument["paths"], newDocument["paths"]);
+        var schemas = Added(oldDocument["components"]?["schemas"], newDocument["components"]?["schemas"]);
+        if (paths.Count + schemas.Count == 0)
+        {
+            return null;
+        }
+
+        // The host maps modules in the order of their namespaces (ModuleDiscovery), each under /<module>.
+        var later = existingModules
+            .Where(module => string.CompareOrdinal(Names.ToPascalCase(module), Names.ToPascalCase(name)) > 0)
+            .OrderBy(Names.ToPascalCase, StringComparer.Ordinal)
+            .Select(module => "/" + module)
+            .ToList();
+        return new OpenApiAdditions(paths, schemas, later);
+    }
+
+    private static List<KeyValuePair<string, JsonNode>> Added(JsonNode? before, JsonNode? after) =>
+        after is not JsonObject members
+            ? []
+            : [.. members
+                .Where(member => before?.AsObject().ContainsKey(member.Key) != true)
+                .Select(member => new KeyValuePair<string, JsonNode>(member.Key, member.Value!.DeepClone()))];
 
     private static string? ProjectWideRefusal(PackManifest pack)
     {
@@ -261,6 +315,16 @@ public static class Generator
             foreach (var file in addition.Created)
             {
                 files.Add(file.Path, file);
+            }
+
+            if (addition.OpenApi is { } openApi && files.TryGetValue(OpenApiAdditions.DocumentPath, out var document))
+            {
+                if (openApi.InsertInto(document.Content, out var extended) is { } refusal)
+                {
+                    return Failure([$"add-module {module.Name}: {refusal}"]);
+                }
+
+                files[OpenApiAdditions.DocumentPath] = document with { Content = extended };
             }
 
             files[FabricFile.FileName] = new RenderedFile(FabricFile.FileName, fabricYaml);

@@ -41,9 +41,13 @@ public static class ProjectWriter
         return null;
     }
 
-    /// <summary>Adds new files to an existing project and replaces its <c>fabric.yaml</c>. Never overwrites anything else.</summary>
+    /// <summary>
+    /// Adds new files to an existing project and replaces its <c>fabric.yaml</c>. Never overwrites anything else, except
+    /// that <paramref name="openApi"/>'s paths and schemas are inserted into the frontend's copy of the OpenAPI document,
+    /// leaving the rest of it as it is (ADR-0005).
+    /// </summary>
     /// <returns>An error, or <c>null</c> when everything was written.</returns>
-    public static string? Add(string directory, IReadOnlyList<RenderedFile> files, string fabricYaml)
+    public static string? Add(string directory, IReadOnlyList<RenderedFile> files, string fabricYaml, OpenApiAdditions? openApi = null)
     {
         ArgumentNullException.ThrowIfNull(directory);
         ArgumentNullException.ThrowIfNull(files);
@@ -65,6 +69,22 @@ public static class ProjectWriter
             }
 
             targets.Add((fullPath, file.Content));
+        }
+
+        if (openApi is not null)
+        {
+            var copy = Path.Combine(root, OpenApiAdditions.DocumentPath);
+            if (!File.Exists(copy))
+            {
+                return $"{OpenApiAdditions.DocumentPath} is missing; add-module adds the new module's paths to it, so restore it first.";
+            }
+
+            if (openApi.InsertInto(File.ReadAllText(copy), out var extended) is { } refusal)
+            {
+                return refusal;
+            }
+
+            targets.Add((copy, extended));
         }
 
         targets.Add((Path.Combine(root, FabricFile.FileName), fabricYaml));

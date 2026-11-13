@@ -1,0 +1,59 @@
+{{~ if project["frontend.framework"] == "react" ~}}
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/api/baseApi';
+
+/** Whether the caller may manage {{ module.name }}: the module's permission probe answers 200 only to a holder of {{ module.name }}.manage. */
+export function useCanManage(): boolean {
+  return useQuery({
+    queryKey: ['/{{ module.name }}/permissions/manage'],
+    queryFn: async () => (await api.GET('/{{ module.name }}/permissions/manage')).data,
+  }).isSuccess;
+}
+{{~ else if project["frontend.state"] == "pinia" ~}}
+import { defineStore } from 'pinia';
+import { computed, onMounted, ref, type ComputedRef } from 'vue';
+import { api, ApiError } from '@/api/baseApi';
+
+/**
+ * Whether the caller may manage {{ module.name }}: the module's permission probe answers 200 only to a holder of
+ * {{ module.name }}.manage, and 403 to anyone else. The store lives beside the module's page, which add-module writes with it.
+ */
+export const use{{ module.namespace }}PermissionsStore = defineStore('{{ module.name }}-permissions', () => {
+  const canManage = ref(false);
+
+  async function load() {
+    try {
+      await api.GET('/{{ module.name }}/permissions/manage');
+      canManage.value = true;
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 403) {
+        throw error;
+      }
+
+      canManage.value = false;
+    }
+  }
+
+  return { canManage, load };
+});
+
+/** Asks the probe once the page is mounted. */
+export function useCanManage(): ComputedRef<boolean> {
+  const permissions = use{{ module.namespace }}PermissionsStore();
+  onMounted(() => void permissions.load());
+  return computed(() => permissions.canManage);
+}
+{{~ else ~}}
+import { useQuery } from '@tanstack/vue-query';
+import { computed, type ComputedRef } from 'vue';
+import { api } from '@/api/baseApi';
+
+/** Whether the caller may manage {{ module.name }}: the module's permission probe answers 200 only to a holder of {{ module.name }}.manage. */
+export function useCanManage(): ComputedRef<boolean> {
+  const probe = useQuery({
+    queryKey: ['/{{ module.name }}/permissions/manage'],
+    queryFn: async () => (await api.GET('/{{ module.name }}/permissions/manage')).data,
+  });
+  return computed(() => probe.isSuccess.value);
+}
+{{~ end ~}}
