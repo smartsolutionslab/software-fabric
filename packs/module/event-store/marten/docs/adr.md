@@ -8,6 +8,8 @@ Event-sourced modules keep their events in Marten (MIT) on the project's Postgre
 
 The module's `<Module>AggregateStore` (Infrastructure, `EventStore/`) implements `I<Module>AggregateStore` over that store and checks the expected stream version on every save. Projections in the module's Infrastructure project (`SingleStreamProjection<TReadModel, Guid>` and the other Marten projection types) are registered with the store and run inline: a read model changes in the same transaction as the events that change it.
 
+Two saves that both create one aggregate id race: both can find no aggregate before either saves, and Marten refuses the second stream (`Marten.Exceptions.ExistingStreamIdCollisionException`). The host answers that with `409` problem details and the code `already-exists`, as a unique index's refusal answers with EF Core, instead of `500` (`DuplicateStreamExceptionHandler`, nested in `src/BuildingBlocks/EventStore/Wiring/DuplicateStreamResponses.cs`). Nothing from the exception reaches the caller. Only a stream that had to be new counts: a save that loses to another on a stream that exists (`EventStreamUnexpectedMaxEventIdException`) is a lost update, not a duplicate, and stays a `500`. As with a unique index, this is a backstop for the race; a handler that creates looks for the aggregate first and returns a `Result` failure with its own code, which names the rule.
+
 Only a module's Infrastructure project references Marten; an architecture rule fails the build otherwise.
 
 The MigrationRunner creates and updates every module's event store tables (streams, events and the projections' read models) after the EF Core migrations; the host never changes the schema (`AutoCreate.None`), so a module whose tables are missing fails rather than creating them.
@@ -17,4 +19,5 @@ Built without tenancy only: generating it with a tenancy option fails, because t
 ## Consequences
 
 - A stream is append-only; an event's type name is part of the stored data, so renaming an event type needs a Marten event type alias.
+- The `409` is generic: the handler knows that the stream existed, not which rule of the domain the id stands for. A caller that needs to know gets it from the application-level check.
 - Integration events still go through the module's unit of work, a separate transaction from the event store's. Save the aggregate first, then publish: a crash in between leaves the change without its integration event, never an event without its change.
