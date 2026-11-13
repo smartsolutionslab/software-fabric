@@ -19,6 +19,7 @@ files:
   - { template: templates/Module/CountWordsHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/CountWords/CountWordsHandler.cs", per-module: true, when: 'module.name == "assistant"' }
   - { template: templates/Module/AssistantFailures.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/AssistantFailures.cs", per-module: true, when: 'module.name == "assistant"' }
   - { template: templates/Module/NothingToCount.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/NothingToCount.cs", per-module: true, when: 'module.name == "assistant"' }
+  - { template: templates/Module/WordEndpoints.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/WordEndpoints.cs", per-module: true, when: 'module.name == "assistant"' }
   - { template: templates/tests/TalkToTheAssistantTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Queries/TalkToTheAssistantTests.cs", per-module: true, when: 'module.name == "assistant"' }
   - { template: templates/tests/AgentUiGoesThroughAQuery.cs.sbn, target: tests/Architecture.Tests/Rules/AgentUiGoesThroughAQuery.cs }
   - { template: templates/tests/AgentUiTests.cs.sbn, target: tests/Integration.Tests/AgentUiTests.cs }

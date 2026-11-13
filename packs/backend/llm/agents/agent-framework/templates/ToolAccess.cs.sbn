@@ -1,0 +1,72 @@
+{{~ anonymous = project["backend.auth"] == "none" ~}}
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.BuildingBlocks.Agents;
+
+/// <summary>
+/// Whether the caller may have a tool's request sent: the signed-in user of the HTTP request the agent runs in must meet
+/// what every endpoint that sends the request requires (<see cref="SendsRequest"/>), as if they had called it. The policy
+/// stays where the endpoint declares it; the tool reads it from the host's endpoint table.
+/// </summary>
+internal static class ToolAccess
+{
+    /// <summary>Why the request may not be sent for this caller, or null when it may.</summary>
+    public static async Task<string?> RefusalAsync(Type request)
+    {
+        var context = new HttpContextAccessor().HttpContext;
+        if (context is null)
+        {
+{{~ if anonymous ~}}
+            // The project has no authentication: no endpoint requires anything of a caller, so there is nothing to check.
+            return null;
+{{~ else ~}}
+            return $"{request.Name} is sent only for a signed-in caller, and this agent runs outside an HTTP request (in a consumer or a background job, say), so no one's access can be checked.";
+{{~ end ~}}
+        }
+
+        var services = context.RequestServices;
+        var endpoints = services.GetRequiredService<EndpointDataSource>().Endpoints
+            .Where(endpoint => endpoint.Metadata.GetOrderedMetadata<SendsRequest>().Any(sends => sends.Request == request))
+            .ToList();
+        if (endpoints.Count == 0)
+        {
+            return $"no endpoint sends {request.Name}, so nothing says who may: map the endpoint that sends it with .Sends<{request.Name}>().";
+        }
+
+        var policies = services.GetService<IAuthorizationPolicyProvider>();
+        var authorization = services.GetService<IAuthorizationService>();
+        foreach (var endpoint in endpoints.Where(endpoint => endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null))
+        {
+            var authorizeData = endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>();
+            var endpointPolicies = endpoint.Metadata.GetOrderedMetadata<AuthorizationPolicy>();
+            if (policies is null || authorization is null)
+            {
+                if (authorizeData.Count > 0 || endpointPolicies.Count > 0)
+                {
+                    return $"{endpoint.DisplayName} requires authorization, which the host cannot check.";
+                }
+
+                continue;
+            }
+
+            var policy = await AuthorizationPolicy.CombineAsync(policies, authorizeData, endpointPolicies) ?? await policies.GetFallbackPolicyAsync();
+            if (policy is null)
+            {
+                continue;
+            }
+
+            var result = await authorization.AuthorizeAsync(context.User, context, policy);
+            if (!result.Succeeded)
+            {
+                var named = authorizeData.Select(data => data.Policy).OfType<string>().ToList();
+                var requirement = named.Count == 0 ? "a signed-in user" : $"the policy {string.Join(" and ", named)}";
+                return $"{endpoint.DisplayName}, which sends {request.Name}, requires {requirement}, and the caller does not meet it.";
+            }
+        }
+
+        return null;
+    }
+}
