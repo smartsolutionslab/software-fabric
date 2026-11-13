@@ -129,4 +129,47 @@ public class OpenApiAdditionsTests
         document["paths"]!.AsObject().Select(path => path.Key).ShouldBe(["/billing/permissions/manage"]);
         document["components"]!["schemas"]!.AsObject().Select(schema => schema.Key).ShouldBe(["PermissionDto"]);
     }
+
+    [Fact]
+    public void Adds_only_the_schemas_to_components_that_have_none_keeping_what_components_already_holds()
+    {
+        var copy = """
+            {
+              "openapi": "3.1.2",
+              "paths": {},
+              "components": {
+                "securitySchemes": {
+                  "Bearer": {
+                    "type": "http",
+                    "scheme": "bearer"
+                  }
+                },
+                "responses": {
+                  "Forbidden": {
+                    "description": "The caller lacks the policy."
+                  }
+                }
+              }
+            }
+
+            """;
+
+        Billing.InsertInto(copy, out var extended).ShouldBeNull();
+
+        var components = JsonNode.Parse(extended)!["components"]!.AsObject();
+        components.Select(member => member.Key).ShouldBe(["securitySchemes", "responses", "schemas"]);
+        components["securitySchemes"]!["Bearer"]!["scheme"]!.GetValue<string>().ShouldBe("bearer");
+        components["responses"]!["Forbidden"]!["description"]!.GetValue<string>().ShouldBe("The caller lacks the policy.");
+        components["schemas"]!.AsObject().Select(schema => schema.Key).ShouldBe(["PermissionDto"]);
+    }
+
+    [Theory]
+    [InlineData("""{ "paths": [] }""", "paths")]
+    [InlineData("""{ "paths": {}, "components": [] }""", "components")]
+    [InlineData("""{ "paths": {}, "components": { "schemas": 1 } }""", "components.schemas")]
+    public void Refuses_a_copy_whose_paths_or_schemas_are_not_objects_naming_the_member(string copy, string member)
+    {
+        Billing.InsertInto(copy, out _)
+            .ShouldBe($"web/app/openapi.json has a {member} that is not a JSON object; add-module adds the new module's paths to it.");
+    }
 }

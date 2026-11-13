@@ -47,8 +47,22 @@ public sealed record OpenApiAdditions(
             return $"{DocumentPath} is not valid JSON ({exception.Message}); add-module adds the new module's paths to it.";
         }
 
-        var paths = root["paths"]?.AsObject();
-        var schemas = root["components"]?["schemas"]?.AsObject();
+        if (!TryObject(root, "paths", out var paths))
+        {
+            return NotAnObject("paths");
+        }
+
+        if (!TryObject(root, "components", out var components))
+        {
+            return NotAnObject("components");
+        }
+
+        JsonObject? schemas = null;
+        if (components is not null && !TryObject(components, "schemas", out schemas))
+        {
+            return NotAnObject("components.schemas");
+        }
+
         if (Paths.FirstOrDefault(path => paths?.ContainsKey(path.Key) == true) is { Key: { } existingPath })
         {
             return Refusal("path", existingPath);
@@ -72,7 +86,7 @@ public sealed record OpenApiAdditions(
 
         if (Schemas.Count > 0)
         {
-            schemas ??= Child(Child(root, "components"), "schemas");
+            schemas ??= Child(components ?? Child(root, "components"), "schemas");
             foreach (var (key, value) in Schemas)
             {
                 var at = schemas.Select(schema => schema.Key).ToList().FindIndex(name => string.CompareOrdinal(name, key) > 0);
@@ -86,6 +100,16 @@ public sealed record OpenApiAdditions(
 
     private static string Refusal(string kind, string name) =>
         $"{DocumentPath} already has the {kind} {name}; add-module only adds a new module's paths and schemas.";
+
+    private static string NotAnObject(string member) =>
+        $"{DocumentPath} has a {member} that is not a JSON object; add-module adds the new module's paths to it.";
+
+    // A member that is missing is fine, add-module creates it; one of another kind is a copy it cannot extend.
+    private static bool TryObject(JsonObject parent, string name, out JsonObject? child)
+    {
+        child = parent[name] as JsonObject;
+        return child is not null || parent[name] is null;
+    }
 
     private static JsonObject Child(JsonObject parent, string name)
     {
