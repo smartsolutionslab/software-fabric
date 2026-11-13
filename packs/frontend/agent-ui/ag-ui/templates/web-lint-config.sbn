@@ -36,12 +36,15 @@
         },
         {
           selector:
-            'CallExpression[callee.property.name=/^(set|append)$/] > Literal.arguments:first-child[value=/^authorization$/i], ' +
+            'CallExpression[callee.property.name=/^(set|append)$/]:matches([callee.object.name=/headers$/i], ' +
+            "[callee.object.property.name=/^headers$/i], [callee.object.callee.name='Headers']) > " +
+            'Literal.arguments:first-child[value=/^authorization$/i], ' +
             ':matches(Property[key.name=/^headers$/i], Property[key.value=/^headers$/i], VariableDeclarator[id.name=/headers$/i], ' +
             "NewExpression[callee.name='Headers']) > ObjectExpression > " +
             'Property:matches([key.name=/^authorization$/i], [key.value=/^authorization$/i]), ' +
-            'AssignmentExpression > MemberExpression.left[property.name=/^authorization$/i], ' +
-            'AssignmentExpression > MemberExpression.left[property.value=/^authorization$/i]',
+            'AssignmentExpression > MemberExpression.left:matches([object.name=/headers$/i], [object.property.name=/^headers$/i])' +
+            ':matches([property.name=/^authorization$/i], [property.value=/^authorization$/i]), ' +
+            "AssignmentExpression > MemberExpression.left:matches([property.name='Authorization'], [property.value='Authorization'])",
           message: 'Only src/api/baseApi.ts and src/agents/connectAgent.ts set the Authorization header.',
         },
       ],
@@ -65,12 +68,15 @@
         },
         {
           selector:
-            'CallExpression[callee.property.name=/^(set|append)$/] > Literal.arguments:first-child[value=/^authorization$/i], ' +
+            'CallExpression[callee.property.name=/^(set|append)$/]:matches([callee.object.name=/headers$/i], ' +
+            "[callee.object.property.name=/^headers$/i], [callee.object.callee.name='Headers']) > " +
+            'Literal.arguments:first-child[value=/^authorization$/i], ' +
             ':matches(Property[key.name=/^headers$/i], Property[key.value=/^headers$/i], VariableDeclarator[id.name=/headers$/i], ' +
             "NewExpression[callee.name='Headers']) > ObjectExpression > " +
             'Property:matches([key.name=/^authorization$/i], [key.value=/^authorization$/i]), ' +
-            'AssignmentExpression > MemberExpression.left[property.name=/^authorization$/i], ' +
-            'AssignmentExpression > MemberExpression.left[property.value=/^authorization$/i]',
+            'AssignmentExpression > MemberExpression.left:matches([object.name=/headers$/i], [object.property.name=/^headers$/i])' +
+            ':matches([property.name=/^authorization$/i], [property.value=/^authorization$/i]), ' +
+            "AssignmentExpression > MemberExpression.left:matches([property.name='Authorization'], [property.value='Authorization'])",
           message: 'Only src/api/baseApi.ts and src/agents/connectAgent.ts set the Authorization header.',
         },
       ],
