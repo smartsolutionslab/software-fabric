@@ -1,5 +1,7 @@
 {{ if project["backend.llm"] == "azure-openai" ~}}
-        // Embeddings use the chat model's azure-openai-endpoint and azure-openai-api-key, given their values above.{{ else ~}}
-        // A resource that does not exist and a key-shaped value Azure does not accept: the integration tests never call the embedding model.
-        builder.Configuration["Parameters:azure-openai-endpoint"] = "https://not-a-real-resource.openai.azure.com";
+        // Embeddings use the chat model's azure-openai-api-key, given its value above, and the endpoint the chat model shares:
+        // the fixture's stand-in, which ends in /v1 and is used as is. It answers embeddings only; chat requests get a 404.{{ else ~}}
+        // The fixture's stand-in, which ends in /v1 and is used as is, and a key-shaped value Azure does not accept: the
+        // host embeds against the stand-in, never Azure.
         builder.Configuration["Parameters:azure-openai-api-key"] = "not-a-real-key";{{ end }}
+        builder.Configuration["Parameters:azure-openai-endpoint"] = embeddings.Endpoint;

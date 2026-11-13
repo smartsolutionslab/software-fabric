@@ -1,5 +1,15 @@
+{{~ stand_in = false
+if object.has_key(project, "backend.llm.extras") && (array.contains project["backend.llm.extras"] "rag")
+  stand_in = project["backend.llm.embeddings"] == "ollama"
+end ~}}
+{{~ if stand_in ~}}
+        // Ollama would pull its image and the model, gigabytes, on start, and the integration tests never call the model:
+        // drop both resources, and the host's wait on them. The endpoint is the fixture's embeddings stand-in, given below,
+        // which answers chat requests with a 404.
+{{~ else ~}}
         // Ollama would pull its image and the model, gigabytes, on start, and the integration tests never call the model:
         // drop both resources, and the host's wait on them, and give the host an endpoint nothing listens on instead.
+{{~ end ~}}
         string[] modelServer = ["ollama", "ollama-model"];
         foreach (var resource in builder.Resources.Where(resource => modelServer.Contains(resource.Name)).ToList())
         {
@@ -10,6 +20,6 @@
         foreach (var wait in modelHost.Annotations.OfType<WaitAnnotation>().Where(wait => modelServer.Contains(wait.Resource.Name)).ToList())
         {
             modelHost.Annotations.Remove(wait);
-        }
+        }{{ if !stand_in }}
 
-        builder.CreateResourceBuilder(modelHost).WithEnvironment("Ollama__Endpoint", "http://localhost:9");
+        builder.CreateResourceBuilder(modelHost).WithEnvironment("Ollama__Endpoint", "http://localhost:9");{{ end }}

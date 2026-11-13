@@ -35,7 +35,9 @@ public sealed class ContainerFixture : {{ test_lifetime }}
     private WebApplicationFactory<Program>? host;
 
     /// <summary>The started resources' endpoints, by the AppHost's resource names.</summary>
-    public ContainerResources Resources { get; } = new();
+    public ContainerResources Resources { get; } = new();{{ if slots["integration-tests.members"] != "" }}
+
+{{ slots["integration-tests.members"] }}{{ end }}
 
     {{ test_setup }}
     {
@@ -81,7 +83,9 @@ public sealed class ContainerFixture : {{ test_lifetime }}
         foreach (var container in Enumerable.Reverse(containers))
         {
             await container.DisposeAsync();
-        }
+        }{{ if slots["integration-tests.teardown"] != "" }}
+
+{{ slots["integration-tests.teardown"] }}{{ end }}
     }
 
     /// <summary>The repository's directory: the one holding build.proj, above the tests' output.</summary>

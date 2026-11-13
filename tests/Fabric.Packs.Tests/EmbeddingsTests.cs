@@ -19,9 +19,6 @@ public sealed class EmbeddingsTests
     private const string Rag = "backend.llm.extras=rag";
     private const string Wiring = "src/BuildingBlocks/Llm/Wiring";
 
-    /// <summary>An endpoint nothing listens on (the discard port); nothing is ever sent to it.</summary>
-    private const string DeadEndpoint = "http://localhost:9";
-
     private const string EmbeddingsProbe = """
         using Microsoft.AspNetCore.Builder;
         using Microsoft.AspNetCore.Http;
@@ -42,7 +39,7 @@ public sealed class EmbeddingsTests
         }
         """;
 
-    /// <summary>Runs inside the generated integration tests: no Ollama resource runs, and the host still resolves its embedding generator at the fixture's dead endpoint.</summary>
+    /// <summary>Runs inside the generated integration tests: no Ollama resource runs, and the host resolves its embedding generator at the fixture's stand-in.</summary>
     private const string WithoutTheEmbeddingsServer = """
         using Aspire.Hosting.ApplicationModel;
         using Microsoft.Extensions.DependencyInjection;
@@ -65,13 +62,13 @@ public sealed class EmbeddingsTests
             }
 
             [Fact]
-            public async Task The_host_resolves_the_ollama_embedding_generator_at_an_endpoint_nothing_listens_on()
+            public async Task The_host_resolves_the_ollama_embedding_generator_at_the_fixtures_stand_in()
             {
                 using var client = aspire.CreateHostClient();
 
                 var probe = await client.GetStringAsync(new Uri("/billing/embeddings-probe", UriKind.Relative), TestContext.Current.CancellationToken);
 
-                probe.ShouldBe("\"ollama nomic-embed-text http://localhost:9/\"");
+                probe.ShouldBe($"\"ollama nomic-embed-text {aspire.Embeddings.Endpoint}/\"");
             }
         }
         """;
@@ -161,7 +158,7 @@ public sealed class EmbeddingsTests
         appHost.ShouldContain(".WithEnvironment(\"AzureOpenAI__ApiKey\", azureOpenAIApiKey)");
         files["Directory.Packages.props"].ShouldContain("<PackageVersion Include=\"Microsoft.Extensions.AI.OpenAI\" Version=\"11.0.0\" />");
         var fixture = files["tests/Integration.Tests/AspireFixture.cs"];
-        fixture.ShouldContain("builder.Configuration[\"Parameters:azure-openai-endpoint\"] = \"https://not-a-real-resource.openai.azure.com\";");
+        fixture.ShouldContain("builder.Configuration[\"Parameters:azure-openai-endpoint\"] = embeddings.Endpoint;");
         fixture.ShouldContain("builder.Configuration[\"Parameters:azure-openai-api-key\"] = \"not-a-real-key\";");
         files[$"{Wiring}/AzureOpenAIEmbeddingGenerator.cs"].ShouldContain("/openai/v1/");
     }
@@ -187,7 +184,7 @@ public sealed class EmbeddingsTests
         packages.ShouldContain("<PackageVersion Include=\"CommunityToolkit.Aspire.Hosting.Ollama\" Version=\"13.6.1\" />");
         var fixture = files["tests/Integration.Tests/AspireFixture.cs"];
         fixture.ShouldContain("\"ollama-embedding-model\"");
-        fixture.ShouldContain($".WithEnvironment(\"Ollama__Endpoint\", \"{DeadEndpoint}\")");
+        fixture.ShouldContain(".WithEnvironment(\"Ollama__Endpoint\", embeddings.Endpoint)");
         fixture.LastIndexOf("builder.Resources.Remove(", StringComparison.Ordinal)
             .ShouldBeLessThan(fixture.IndexOf("await builder.BuildAsync(", StringComparison.Ordinal));
         files["README.md"].ShouldContain("nomic-embed-text");

@@ -11,7 +11,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/Host/Host.csproj" />
+    <ProjectReference Include="../../src/Host/Host.csproj" />{{ if slots["integration-tests.references"] != "" }}
+{{ slots["integration-tests.references"] }}{{ end }}
   </ItemGroup>
 
 </Project>
