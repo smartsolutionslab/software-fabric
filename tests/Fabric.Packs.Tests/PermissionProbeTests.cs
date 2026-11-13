@@ -79,6 +79,21 @@ public sealed partial class PermissionProbeTests
         ((string?)schema["properties"]!["name"]!["type"]).ShouldBe("string");
     }
 
+    /// <summary>
+    /// The generated integration test compares the copy with the served document re-serialised indented, byte for byte;
+    /// a contribution that leaves a stray line break between entries fails it only there, after a Docker run.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Projects))]
+    [InlineData("saas-standard-react", new[] { Roles, "frontend.dashboards=user-editable" })]
+    [InlineData("saas-standard-react", new[] { Roles, "frontend.dashboards=user-editable", "backend.mediator=wolverine" })]
+    public void The_frontends_openapi_copy_is_written_as_the_integration_test_writes_it(string profile, string[] overrides)
+    {
+        var copy = Generate(profile, overrides)["web/app/openapi.json"];
+
+        (JsonNode.Parse(copy)!.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }) + "\n").ShouldBe(copy);
+    }
+
     [Fact]
     public void Without_authorization_choices_neither_the_probe_nor_PermissionDto_is_generated()
     {

@@ -29,5 +29,4 @@
     probes = probes | array.add (probe | string.rstrip)
   end
 ~}}
-{{ probes | array.join ",\n" }}
-{{~ end ~}}
+{{ probes | array.join ",\n" }}{{ end }}
