@@ -24,7 +24,7 @@ The project builds agents with Microsoft Agent Framework (`Microsoft.Agents.AI`,
 {{~ if client ~}}
 - **An agent can be given the declared MCP servers' tools**, from `IAgentMcpTools.ToolsAsync(allow, ...)` (BuildingBlocks), next to its own use cases. Every call the model asks for is checked by `allow` before it reaches the server, as with `UseMcpTools`.
 {{~ end ~}}
-- **Tests never call a real model.** `tests/Fakes/ToolCallingChatClient.cs` stands in for it and asks for a tool call; `tests/Agents.Tests` runs a sample agent through a query and the dispatcher with it.
+- **Tests never call a real model.** `tests/Fakes/ToolCallingChatClient.cs` stands in for it and asks for a tool call; `tests/Agents.Tests` runs a sample agent through a query and the dispatcher with it. `tests/Fakes/AgentCaller.cs` is the HTTP request a test runs a tool in, with the endpoints that send its requests; where modules have policies it registers those of every module whose Api project the test project references, as the host does, so a module's test names the module's own policy (#637).
 
 ## Consequences
 

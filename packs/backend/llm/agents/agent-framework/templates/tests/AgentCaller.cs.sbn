@@ -1,5 +1,12 @@
+{{~ policies = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+{{~ if policies ~}}
+using System.Reflection;
+{{~ end ~}}
 using System.Security.Claims;
 using {{ namespace }}.BuildingBlocks.Agents;
+{{~ if policies ~}}
+using {{ namespace }}.BuildingBlocks.Modules;
+{{~ end ~}}
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -12,21 +19,38 @@ namespace {{ namespace }}.Tests.Fakes;
 /// The HTTP request an agent's tools run in, in a test: who calls, and the endpoints that send the tools' requests with
 /// what each requires, as the host would map them. Every tool call the test makes until it is disposed sees it; a tool
 /// called without one runs as an agent does in a consumer or a background job.
+{{~ if policies ~}}
+/// The policies are the host's: every module whose Api project the test project references registers its own, so an
+/// endpoint here names <c>BillingPolicyNames.Manage</c> as the module's does.
+{{~ end ~}}
 /// </summary>
 public sealed class AgentCaller : IDisposable
 {
     /// <summary>A policy for the tests alone: only the user named <c>manager</c> meets it.</summary>
     public const string ManagePolicy = "samples.manage";
+{{~ if policies ~}}
+
+    private const string ModuleApis = "{{ namespace }}.Modules.*.Api.dll";
+{{~ end ~}}
 
     private readonly ServiceProvider services;
 
     private AgentCaller(ClaimsPrincipal user, IReadOnlyList<Endpoint> endpoints)
     {
+{{~ if policies ~}}
+        var collection = new ServiceCollection()
+            .AddLogging()
+            .AddAuthorizationCore(options => options.AddPolicy(ManagePolicy, policy => policy.RequireUserName("manager")))
+            .AddSingleton<EndpointDataSource>(new DefaultEndpointDataSource(endpoints));
+        AddModulePolicies(collection);
+        services = collection.BuildServiceProvider();
+{{~ else ~}}
         services = new ServiceCollection()
             .AddLogging()
             .AddAuthorizationCore(options => options.AddPolicy(ManagePolicy, policy => policy.RequireUserName("manager")))
             .AddSingleton<EndpointDataSource>(new DefaultEndpointDataSource(endpoints))
             .BuildServiceProvider();
+{{~ end ~}}
         new HttpContextAccessor().HttpContext = new DefaultHttpContext { User = user, RequestServices = services };
     }
 
@@ -73,6 +97,28 @@ public sealed class AgentCaller : IDisposable
         services.Dispose();
     }
 
+{{~ if policies ~}}
+    /// <summary>
+    /// Registers the policies of every module Api assembly beside the tests, through the host's own
+    /// <see cref="ModulePolicyOwners"/>, and refuses a name two modules register as the host does.
+    /// </summary>
+    private static void AddModulePolicies(IServiceCollection collection)
+    {
+        var owners = new ModulePolicyOwners();
+        List<string> conflicts = [];
+        foreach (var file in Directory.EnumerateFiles(AppContext.BaseDirectory, ModuleApis).Order(StringComparer.Ordinal))
+        {
+            var api = Assembly.Load(new AssemblyName(Path.GetFileNameWithoutExtension(file)));
+            conflicts.AddRange(owners.Register(api, collection));
+        }
+
+        if (conflicts.Count > 0)
+        {
+            throw new InvalidOperationException(string.Join(Environment.NewLine, conflicts));
+        }
+    }
+
+{{~ end ~}}
     private static RouteEndpointBuilder Endpoint<TRequest>()
     {
         var endpoint = new RouteEndpointBuilder(_ => Task.CompletedTask, RoutePatternFactory.Parse("/" + typeof(TRequest).Name), 0)

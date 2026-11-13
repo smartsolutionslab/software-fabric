@@ -8,7 +8,11 @@
 {{~ if project["backend.auth"] != "none" ~}}
 - Run an agent inside the HTTP request that asked for it: outside one (a consumer, a background job) every tool is refused, since there is no signed-in caller to check.
 {{~ end ~}}
-- Test a tool's access with `AgentCaller` (`tests/Fakes`): `using var caller = AgentCaller.SignedIn("visitor", AgentCaller.Sending<FindInvoice>(BillingPolicyNames.Manage));`.
+{{~ if object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+- Test a tool's access with `AgentCaller` (`tests/Fakes`): `using var caller = AgentCaller.SignedIn("visitor", AgentCaller.Sending<FindInvoice>(BillingPolicyNames.Manage));`. It registers the policies of every module whose Api project the test project references, as the host does; never register them again.
+{{~ else ~}}
+- Test a tool's access with `AgentCaller` (`tests/Fakes`): `using var caller = AgentCaller.SignedIn("visitor", AgentCaller.Sending<FindInvoice>());`.
+{{~ end ~}}
 - Give a tool only to a use case a model may call with arguments of its own choosing. Its handler validates them as it would a request body.
 - A list query with `Page` and `PageSize` can be a tool as it is: the model passes them as whole numbers, as `?page=` and `?pageSize=`. Do not add a second, unpaged query for an agent.
 {{~ if project["backend.absence"] == "option" ~}}
