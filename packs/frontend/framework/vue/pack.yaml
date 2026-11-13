@@ -34,6 +34,7 @@ declares-slots:
   - { slot: web.providers, description: "Providers, outermost first: (app: App, root: Component) => Component, installing into the app and returning the root, wrapped or as it came.", separator: ",\n" }
   - { slot: web.styles, description: "Lines of src/index.css." }
   - { slot: web.restricted-imports, description: "Entries of the no-restricted-imports patterns ({ group: [...], message: '...' }), indented twelve spaces as Prettier prints them.", separator: ",\n" }
+  - { slot: web.lint-configs, description: "Config objects appended to eslint.config.js's array, each naming the files it applies to (a rule for some files only), indented two spaces as Prettier prints them; rendered only with a contribution.", separator: ",\n" }
   # Vue's own, not a role slot (ADR-0008): React renders a tag with a hyphen as a custom element without being told.
   - { slot: web.custom-element-prefixes, description: "Tag prefixes, as quoted strings ('ds-'), that Vue's compiler leaves to the browser as custom elements (isCustomElement in vite.config.ts; rendered only with a contribution).", separator: ", " }
 slots:

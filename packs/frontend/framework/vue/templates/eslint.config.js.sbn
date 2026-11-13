@@ -61,4 +61,6 @@ export default defineConfigWithVueTs(
       ],
     },
   },
+{{- if slots["web.lint-configs"] != "" }}
+{{ slots["web.lint-configs"] }},{{ end }}
 );
