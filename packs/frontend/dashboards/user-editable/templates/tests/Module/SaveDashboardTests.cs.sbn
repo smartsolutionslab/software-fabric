@@ -149,6 +149,21 @@ public class SaveDashboardTests
 
         {{ `result.Error.Code` | should_be `"dashboards.too-many-widgets"` }};
     }
+{{~ if ddd ~}}
+
+    {{ test_attribute }}
+    public async Task A_request_without_a_widget_list_is_refused_and_keeps_the_saved_widgets()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+        await module.SendAsync(Save("Sales", new WidgetPlacement("w-1", "dashboards.widget-counts", "bar", 0, 0, 6, 4)), {{ test_cancellation_token }});
+
+        var result = await module.SendAsync(new SaveDashboardRequest("Sales", null!).ToCommand(Id), {{ test_cancellation_token }});
+
+        {{ `result.Error.Code` | should_be `"dashboards.too-many-widgets"` }};
+        {{ `module.Store.Saves` | should_be `1` }};
+        {{ `module.Store.Stored.Single().Widgets.Select(widget => widget.Key)` | should_be `["w-1"]` }};
+    }
+{{~ end ~}}
 
     {{ test_cases_attribute }}
     {{ test_case_attribute `""` }}

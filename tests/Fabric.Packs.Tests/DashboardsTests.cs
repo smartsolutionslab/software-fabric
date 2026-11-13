@@ -315,6 +315,7 @@ public sealed class DashboardsTests
         var files = Files(profile, Dashboards);
 
         files["tests/Modules/Dashboards.Tests/Commands/SaveDashboardTests.cs"].ShouldContain("public async Task The_owner_saves_a_removed_dashboards_id_again()");
+        files["tests/Modules/Dashboards.Tests/Commands/SaveDashboardTests.cs"].ShouldContain("public async Task A_request_without_a_widget_list_is_refused_and_keeps_the_saved_widgets()");
         files["tests/Integration.Tests/DashboardsTests.cs"].ShouldContain("public async Task The_owner_saves_a_removed_dashboards_id_again_and_lists_it()");
     }
 
