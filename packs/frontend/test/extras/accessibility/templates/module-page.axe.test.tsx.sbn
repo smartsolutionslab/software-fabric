@@ -52,9 +52,28 @@ vi.mock('@/api/generated', async (importOriginal) => {
   });
   const answer = (hook: string) =>
     shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
+  // A mutation nobody has triggered is idle, not saving: the page shows as it first does.
+  const idle = {
+    data: undefined,
+    error: null,
+    isIdle: true,
+    isPending: false,
+    isSuccess: false,
+    isError: false,
+    status: 'idle',
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    reset: vi.fn(),
+  };
   const generated = await importOriginal<Record<string, unknown>>();
+  const isMutation = (hook: string) => `get${hook.slice('use'.length)}MutationOptions` in generated;
   return Object.fromEntries(
-    Object.entries(generated).map(([name, value]) => [name, /^use[A-Z]/.test(name) ? () => answer(name) : value]),
+    Object.entries(generated).map(([name, value]) => {
+      if (!/^use[A-Z]/.test(name)) {
+        return [name, value];
+      }
+      return [name, isMutation(name) ? () => idle : () => answer(name)];
+    }),
   );
 {{~ else ~}}
   const state = (data: unknown, loading: boolean) => ({
@@ -68,11 +87,21 @@ vi.mock('@/api/generated', async (importOriginal) => {
   });
   const answer = (hook: string) =>
     shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
+  // A mutation nobody has triggered is idle, not saving: the page shows as it first does.
+  const idle = {
+    data: undefined,
+    error: undefined,
+    isUninitialized: true,
+    isLoading: false,
+    isSuccess: false,
+    isError: false,
+    reset: vi.fn(),
+  };
   const generated = await importOriginal<Record<string, unknown>>();
   return Object.fromEntries(
     Object.entries(generated).map(([name, value]) => {
       if (/^use\w*Mutation$/.test(name)) {
-        return [name, () => [vi.fn(), state(undefined, true)]];
+        return [name, () => [vi.fn(), idle]];
       }
       if (/^useLazy\w*Query$/.test(name)) {
         return [name, () => [vi.fn(), answer(name)]];

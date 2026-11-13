@@ -44,9 +44,28 @@ vi.mock('@/api/generated', async (importOriginal) => {
   });
   const answer = (hook: string) =>
     shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
+  // A mutation nobody has triggered is idle, not saving: the page shows as it first does.
+  const idle = () => ({
+    data: ref(undefined),
+    error: ref(null),
+    isIdle: ref(true),
+    isPending: ref(false),
+    isSuccess: ref(false),
+    isError: ref(false),
+    status: ref('idle'),
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    reset: vi.fn(),
+  });
   const generated = await importOriginal<Record<string, unknown>>();
+  const isMutation = (hook: string) => `get${hook.slice('use'.length)}MutationOptions` in generated;
   return Object.fromEntries(
-    Object.entries(generated).map(([name, value]) => [name, /^use[A-Z]/.test(name) ? () => answer(name) : value]),
+    Object.entries(generated).map(([name, value]) => {
+      if (!/^use[A-Z]/.test(name)) {
+        return [name, value];
+      }
+      return [name, isMutation(name) ? idle : () => answer(name)];
+    }),
   );
 });
 {{~ end ~}}
