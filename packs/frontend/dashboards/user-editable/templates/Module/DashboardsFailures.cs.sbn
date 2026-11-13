@@ -1,3 +1,4 @@
+{{~ if module.values["module.style"] == "crud" ~}}
 namespace {{ namespace }}.Modules.Dashboards.Application;
 
 /// <summary>Everything a dashboards use case refuses, each with its own code.</summary>
@@ -19,3 +20,32 @@ public static class DashboardsFailures
 
     public static ApiError WidgetNotFound(string id) => new WidgetNotFound(id);
 }
+{{ else ~}}
+using System.Net;
+
+namespace {{ namespace }}.Modules.Dashboards.Application;
+
+/// <summary>Everything a dashboards use case refuses, each with its own code; a dashboard's own rules come from the domain.</summary>
+public static class DashboardsFailures
+{
+    public static ApiError NotSignedIn() => new NotSignedIn();
+
+    public static ApiError InvalidId() => new InvalidDashboardId();
+
+    public static ApiError InvalidWidget(string key, string reason) => new InvalidWidget(key, reason);
+
+    public static ApiError UnknownWidget(string source) => new UnknownWidget(source);
+
+    public static ApiError NotFound(Guid id) => new DashboardNotFound(id);
+{{~ if module.values["module.style"] == "event-sourced" ~}}
+
+    /// <summary>The id is another user's dashboard, removed or not: its stream keeps its owner.</summary>
+    public static ApiError AlreadyExists(Guid id) => new DashboardAlreadyExists(id);
+{{~ end ~}}
+
+    public static ApiError WidgetNotFound(string id) => new WidgetNotFound(id);
+
+    /// <summary>A rule of the dashboard's that the request breaks: the request is what is wrong.</summary>
+    public static ApiError From(DomainError error) => ApiError.From(error, HttpStatusCode.BadRequest);
+}
+{{ end ~}}

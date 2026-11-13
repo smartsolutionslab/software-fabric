@@ -1,4 +1,6 @@
-using {{ namespace }}.Modules.Dashboards.Domain;
+{{~ # Under ddd and event-sourced a dashboard is an aggregate; under event-sourced a page's summaries come from its rows (DashboardRowMappings). ~}}
+{{~ ddd = module.values["module.style"] != "crud" ~}}
+using {{ namespace }}.Modules.Dashboards.Domain{{ if ddd }}.Dashboards{{ end }};
 
 namespace {{ namespace }}.Modules.Dashboards.Application.DTOs;
 
@@ -7,12 +9,14 @@ public static class DashboardMappings
     public static DashboardDto ToDashboardDto(this Dashboard dashboard)
     {
         {{ not_null "dashboard" }}
-        return new DashboardDto(dashboard.Id, dashboard.Name, [.. dashboard.Widgets.Select(widget => widget.ToDto())]);
+        return new DashboardDto(dashboard.Id{{ if ddd }}.Value{{ end }}, dashboard.Name{{ if ddd }}.Value{{ end }}, [.. dashboard.Widgets.Select(widget => widget.ToDto())]);
     }
+{{~ if module.values["module.style"] != "event-sourced" ~}}
 
     public static DashboardSummaryDto ToDashboardSummaryDto(this Dashboard dashboard)
     {
         {{ not_null "dashboard" }}
-        return new DashboardSummaryDto(dashboard.Id, dashboard.Name, dashboard.Widgets.Count);
+        return new DashboardSummaryDto(dashboard.Id{{ if ddd }}.Value{{ end }}, dashboard.Name{{ if ddd }}.Value{{ end }}, dashboard.Widgets.Count);
     }
+{{~ end ~}}
 }

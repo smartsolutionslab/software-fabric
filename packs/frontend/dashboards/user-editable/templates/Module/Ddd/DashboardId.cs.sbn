@@ -1,0 +1,37 @@
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+{{~ event_sourced = module.values["module.style"] == "event-sourced" ~}}
+{{~ if event_sourced ~}}
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+
+{{~ end ~}}
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+/// <summary>A dashboard's identity: a Guid the client chooses (a v7), never the empty one.</summary>
+{{~ if event_sourced ~}}
+/// <remarks>It is the id of the dashboard's event stream.</remarks>
+public sealed record DashboardId : {{ if strict }}IValueObject<Guid>, {{ end }}IAggregateId
+{{~ else ~}}
+public sealed record DashboardId{{ if strict }} : IValueObject<Guid>{{ end }}
+{{~ end ~}}
+{
+    private DashboardId(Guid value) => Value = value;
+
+    public Guid Value { get; }
+
+    public static DashboardId New() => new(Guid.CreateVersion7());
+
+    public static DashboardId From(Guid value)
+    {
+{{~ if project["backend.guards"] == "ensure-that" ~}}
+        Ensure.That(value).IsNotEmpty();
+{{~ else ~}}
+        if (value == Guid.Empty)
+        {
+            throw new ArgumentException("A dashboard's id is never an empty Guid.", nameof(value));
+        }
+{{~ end ~}}
+        return new DashboardId(value);
+    }
+
+    public override string ToString() => Value.ToString();
+}

@@ -1,0 +1,17 @@
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+/// <summary>How a placed widget shows its data: <c>bar</c>, <c>line</c> or <c>pie</c> for a chart, <c>table</c> for a table; which it may be is the dashboard's rule.</summary>
+public sealed record WidgetVisual : IValueObject<string>
+{
+    private WidgetVisual(string value) => Value = value;
+
+    public string Value { get; }
+
+    public static WidgetVisual From(string value)
+    {
+        {{ not_null "value" }}
+        return new WidgetVisual(value);
+    }
+
+    public override string ToString() => Value;
+}

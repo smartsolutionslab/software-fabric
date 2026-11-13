@@ -1,3 +1,4 @@
+{{~ if module.values["module.style"] == "crud" ~}}
 using {{ namespace }}.BuildingBlocks.Api;
 using {{ namespace }}.BuildingBlocks.Messaging;
 using {{ namespace }}.Modules.Dashboards.Application.Commands.RemoveDashboard;
@@ -30,3 +31,59 @@ public sealed class DashboardEndpoints : IEndpoint
             (await dispatcher.SendAsync(new RemoveDashboard(id), cancellationToken)).ToHttpResult());
     }
 }
+{{ else ~}}
+using {{ namespace }}.BuildingBlocks.Api;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.Dashboards.Application;
+using {{ namespace }}.Modules.Dashboards.Application.Commands.RemoveDashboard;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.GetDashboard;
+using {{ namespace }}.Modules.Dashboards.Application.Queries.ListDashboards;
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Routing;
+
+namespace {{ namespace }}.Modules.Dashboards.Api.Endpoints;
+
+/// <summary>
+/// The caller's own dashboards. Saving is a PUT to an id the client chose and removing a DELETE, so every write can be
+/// retried without applying twice.
+/// </summary>
+public sealed class DashboardEndpoints : IEndpoint
+{
+    public void Map(IEndpointRouteBuilder endpoints)
+    {
+        {{ not_null "endpoints" }}
+
+        endpoints.MapGet("/", async (Page page, PageSize pageSize, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+            (await dispatcher.QueryAsync(new ListDashboards(page, pageSize), cancellationToken)).ToHttpResult());
+        endpoints.MapGet("/{id:guid}", async (Guid id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+            (await dispatcher.QueryAsync(new GetDashboard(id), cancellationToken)).ToHttpResult());
+        endpoints.MapPut("/{id:guid}", async (Guid id, SaveDashboardRequest request, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            if (id == Guid.Empty)
+            {
+                return Refused<Guid>(DashboardsFailures.InvalidId());
+            }
+
+            return (await dispatcher.SendAsync(request.ToCommand(id), cancellationToken)).ToHttpResult();
+        });
+        endpoints.MapDelete("/{id:guid}", async (Guid id, IDispatcher dispatcher, CancellationToken cancellationToken) =>
+        {
+            if (id == Guid.Empty)
+            {
+                return Refused<Unit>(DashboardsFailures.NotFound(id));
+            }
+
+            return (await dispatcher.SendAsync(new RemoveDashboard(DashboardId.From(id)), cancellationToken)).ToHttpResult();
+        });
+    }
+
+    // The empty Guid is refused before a dashboard's id is made of it: the id's factory would throw on it, and with the
+    // BCL guards a thrown precondition answers 500, not the 400 or 404 the caller's mistake earns.
+    private static Results<Ok<T>, ProblemHttpResult> Refused<T>(ApiError error)
+        where T : notnull =>
+        Result<T, ApiError>.Failure(error).ToHttpResult();
+}
+{{ end ~}}

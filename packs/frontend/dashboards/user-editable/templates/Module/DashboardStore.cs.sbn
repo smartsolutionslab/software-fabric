@@ -1,3 +1,4 @@
+{{~ if module.values["module.style"] == "crud" ~}}
 {{~ option = project["backend.absence"] == "option" ~}}
 using {{ namespace }}.Modules.Dashboards.Application;
 using {{ namespace }}.Modules.Dashboards.Domain;
@@ -57,3 +58,138 @@ public sealed class DashboardStore(DashboardsDbContext context) : IDashboardStor
         dashboard is null ? Option<Dashboard>.None : Option<Dashboard>.Some(dashboard);
 {{~ end ~}}
 }
+{{ else if module.values["module.style"] == "ddd" ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+using {{ namespace }}.Modules.Dashboards.Application;
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+using {{ namespace }}.Modules.Dashboards.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace {{ namespace }}.Modules.Dashboards.Infrastructure;
+
+/// <summary>Every read filters by owner here{{ if project["backend.tenancy"] == "column" }}, and by tenant in the DbContext's query filter{{ else if project["backend.tenancy"] != "none" }}, and by tenant in the tenant's own schema{{ end }}: a user reads only their own dashboards. The module's unit of work saves what is added, removed or changed.</summary>
+public sealed class DashboardStore(DashboardsDbContext context) : IDashboardStore
+{
+{{~ if option ~}}
+    public async Task<Option<Dashboard>> FindAsync(DashboardId id, DashboardOwner owner, CancellationToken cancellationToken) =>
+        Found(await context.Set<Dashboard>().SingleOrDefaultAsync(dashboard => dashboard.Id == id && dashboard.Owner == owner, cancellationToken));
+
+    public async Task<Option<Dashboard>> ReadAsync(DashboardId id, DashboardOwner owner, CancellationToken cancellationToken) =>
+        Found(await context.Set<Dashboard>().AsNoTracking().SingleOrDefaultAsync(dashboard => dashboard.Id == id && dashboard.Owner == owner, cancellationToken));
+{{~ else ~}}
+    public Task<Dashboard?> FindAsync(DashboardId id, DashboardOwner owner, CancellationToken cancellationToken) =>
+        context.Set<Dashboard>().SingleOrDefaultAsync(dashboard => dashboard.Id == id && dashboard.Owner == owner, cancellationToken);
+
+    public Task<Dashboard?> ReadAsync(DashboardId id, DashboardOwner owner, CancellationToken cancellationToken) =>
+        context.Set<Dashboard>().AsNoTracking().SingleOrDefaultAsync(dashboard => dashboard.Id == id && dashboard.Owner == owner, cancellationToken);
+{{~ end ~}}
+
+    public async Task<PagedResult<Dashboard>> ListAsync(DashboardOwner owner, Page page, PageSize pageSize, CancellationToken cancellationToken)
+    {
+        {{ not_null "page" }}
+        {{ not_null "pageSize" }}
+
+        var owned = context.Set<Dashboard>().AsNoTracking().Where(dashboard => dashboard.Owner == owner);
+        var total = await owned.CountAsync(cancellationToken);
+        var items = await owned
+            .OrderBy(dashboard => dashboard.Name)
+            .ThenBy(dashboard => dashboard.Id)
+            .Skip(page.Skip(pageSize))
+            .Take(pageSize.Value)
+            .ToListAsync(cancellationToken);
+        return new PagedResult<Dashboard>(items, total, page.Value, pageSize.Value);
+    }
+
+    public async Task<IReadOnlyList<Dashboard>> AllAsync(DashboardOwner owner, CancellationToken cancellationToken) =>
+        await context.Set<Dashboard>().AsNoTracking()
+            .Where(dashboard => dashboard.Owner == owner)
+            .OrderBy(dashboard => dashboard.Name)
+            .ThenBy(dashboard => dashboard.Id)
+            .ToListAsync(cancellationToken);
+
+    public void Add(Dashboard dashboard) => context.Add(dashboard);
+
+    public void Remove(Dashboard dashboard) => context.Remove(dashboard);
+{{~ if option ~}}
+
+    private static Option<Dashboard> Found(Dashboard? dashboard) =>
+        dashboard is null ? Option<Dashboard>.None : Option<Dashboard>.Some(dashboard);
+{{~ end ~}}
+}
+{{ else ~}}
+{{~ value = module.values["module.ddd-depth"] == "strict" ? ".Value" : "" ~}}
+using {{ namespace }}.Modules.Dashboards.Application;
+using {{ namespace }}.Modules.Dashboards.Application.ReadModels;
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+using {{ namespace }}.Modules.Dashboards.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace {{ namespace }}.Modules.Dashboards.Infrastructure;
+
+/// <summary>Every read filters by owner here: a user lists only their own dashboards. The module's unit of work saves what is recorded.</summary>
+public sealed class DashboardStore(DashboardsDbContext context) : IDashboardStore
+{
+    public async Task<PagedResult<DashboardRow>> ListAsync(DashboardOwner owner, Page page, PageSize pageSize, CancellationToken cancellationToken)
+    {
+        {{ not_null "owner" }}
+        {{ not_null "page" }}
+        {{ not_null "pageSize" }}
+
+        var owned = context.Set<DashboardRow>().AsNoTracking().Where(row => row.Owner == owner.Value);
+        var total = await owned.CountAsync(cancellationToken);
+        var items = await owned
+            .OrderBy(row => row.Name)
+            .ThenBy(row => row.Id)
+            .Skip(page.Skip(pageSize))
+            .Take(pageSize.Value)
+            .ToListAsync(cancellationToken);
+        return new PagedResult<DashboardRow>(items, total, page.Value, pageSize.Value);
+    }
+
+    public async Task<IReadOnlyList<DashboardRow>> AllAsync(DashboardOwner owner, CancellationToken cancellationToken)
+    {
+        {{ not_null "owner" }}
+
+        return await context.Set<DashboardRow>().AsNoTracking()
+            .Where(row => row.Owner == owner.Value)
+            .OrderBy(row => row.Name)
+            .ThenBy(row => row.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task RecordAsync(Dashboard dashboard, CancellationToken cancellationToken)
+    {
+        {{ not_null "dashboard" }}
+
+        var row = await context.Set<DashboardRow>().SingleOrDefaultAsync(row => row.Id == dashboard.Id.Value, cancellationToken);
+        if (dashboard.IsRemoved())
+        {
+            if (row is not null)
+            {
+                context.Remove(row);
+            }
+
+            return;
+        }
+
+        if (row is null)
+        {
+            row = new DashboardRow { Id = dashboard.Id.Value };
+            context.Add(row);
+        }
+
+        row.Owner = dashboard.Owner.Value;
+        row.Name = dashboard.Name.Value;
+        row.Widgets = [.. dashboard.Widgets.Select(widget => new DashboardRowWidget
+        {
+            Key = widget.Key{{ value }},
+            Source = widget.Source{{ value }},
+            Visual = widget.Visual{{ value }},
+            X = widget.X{{ value }},
+            Y = widget.Y{{ value }},
+            Width = widget.Width{{ value }},
+            Height = widget.Height{{ value }},
+        })];
+    }
+}
+{{ end ~}}

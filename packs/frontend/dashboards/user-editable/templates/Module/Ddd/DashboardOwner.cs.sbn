@@ -1,0 +1,22 @@
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+/// <summary>The user a dashboard belongs to: the identity provider's subject.</summary>
+public sealed record DashboardOwner{{ if strict }} : IValueObject<string>{{ end }}
+{
+    private DashboardOwner(string value) => Value = value;
+
+    public string Value { get; }
+
+    public static DashboardOwner From(string value)
+    {
+{{~ if project["backend.guards"] == "ensure-that" ~}}
+        Ensure.That(value).IsNotNullOrWhiteSpace();
+{{~ else ~}}
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+{{~ end ~}}
+        return new DashboardOwner(value);
+    }
+
+    public override string ToString() => Value;
+}

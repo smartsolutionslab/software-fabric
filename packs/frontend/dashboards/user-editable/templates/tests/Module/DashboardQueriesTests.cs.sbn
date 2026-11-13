@@ -51,6 +51,18 @@ public class DashboardQueriesTests
         {{ `result.Value.Series.Single().Values` | should_be `[1m, 3m]` }};
     }
 
+{{~ if module.values["module.style"] != "crud" ~}}
+    {{ test_attribute }}
+    public async Task The_empty_id_is_no_ones_dashboard()
+    {
+        await using var module = new DashboardsModuleUnderTest();
+
+        var result = await module.QueryAsync(new GetDashboard(Guid.Empty), {{ test_cancellation_token }});
+
+        {{ `result.Error.Code` | should_be `"dashboards.dashboard-not-found"` }};
+    }
+
+{{~ end ~}}
     {{ test_attribute }}
     public async Task Without_a_signed_in_user_nothing_is_read()
     {

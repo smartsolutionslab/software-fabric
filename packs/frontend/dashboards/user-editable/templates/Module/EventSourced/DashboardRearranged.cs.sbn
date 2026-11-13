@@ -1,0 +1,11 @@
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards.Events;
+
+/// <summary>The owner saved the dashboard again: this name and these widgets replace its own.</summary>
+{{~ if strict ~}}
+public sealed record DashboardRearranged(DashboardName Name, IReadOnlyList<DashboardWidget> Widgets) : IDomainEvent;
+{{~ else ~}}
+public sealed record DashboardRearranged(string Name, IReadOnlyList<DashboardWidget> Widgets) : IDomainEvent;
+{{~ end ~}}

@@ -47,6 +47,12 @@ internal sealed class DashboardsModuleUnderTest : IAsyncDisposable
         new DashboardsModule().AddServices(collection, configuration);
         collection
             .AddSingleton<IDashboardStore>(Store)
+{{~ if module.values["module.style"] != "crud" ~}}
+            .AddSingleton<IDashboardsUnitOfWork>(Store)
+{{~ end ~}}
+{{~ if module.values["module.style"] == "event-sourced" ~}}
+            .AddSingleton<IDashboardsAggregateStore>(Store)
+{{~ end ~}}
             .AddSingleton<ICurrentUser>(new SignedInUser(subject))
             .AddSingleton<IWidgetAccess>(new HiddenWidgets(hiddenWidgets));
 {{~ if wolverine ~}}

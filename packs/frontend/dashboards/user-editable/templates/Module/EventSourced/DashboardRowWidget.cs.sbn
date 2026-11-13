@@ -1,0 +1,19 @@
+namespace {{ namespace }}.Modules.Dashboards.Application.ReadModels;
+
+/// <summary>A widget on a dashboard's row, kept in its JSON column.</summary>
+public sealed class DashboardRowWidget
+{
+    public string Key { get; set; } = string.Empty;
+
+    public string Source { get; set; } = string.Empty;
+
+    public string Visual { get; set; } = string.Empty;
+
+    public int X { get; set; }
+
+    public int Y { get; set; }
+
+    public int Width { get; set; }
+
+    public int Height { get; set; }
+}
