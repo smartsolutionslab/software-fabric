@@ -1,0 +1,74 @@
+{{~ pinia = project["frontend.state"] == "pinia" ~}}
+{{~ if pinia ~}}
+import { createPinia } from 'pinia';
+{{~ else ~}}
+import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
+{{~ end ~}}
+import { cleanup, render, screen } from '@testing-library/vue';
+import { afterEach, expect, test, vi } from 'vitest';
+import { defineComponent, h } from 'vue';
+import { useCanManage } from './useCanManage';
+
+// The host, as the probe GET /{{ module.name }}/permissions/manage reaches it through the generated client.
+const host = vi.fn<typeof fetch>();
+vi.stubGlobal('fetch', host);
+afterEach(() => host.mockReset());
+// Without Vitest's globals, Testing Library does not unmount between tests by itself.
+afterEach(cleanup);
+
+// The probe's answer, as a component asking it shows it.
+const Probe = defineComponent({
+  setup() {
+    const permission = useCanManage();
+    return () => h('output', permission.value);
+  },
+});
+
+{{~ if pinia ~}}
+// A store of its own per test, so no answer is kept from the test before.
+function renderProbe() {
+  render(Probe, { global: { plugins: [createPinia()] } });
+}
+{{~ else ~}}
+// A query client of its own per test, so no answer is cached from the test before; it does not retry, so a failure
+// shows at once.
+function renderProbe() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(Probe, { global: { plugins: [[VueQueryPlugin, { queryClient }]] } });
+}
+{{~ end ~}}
+
+test('while the probe has not answered, Manage is still being checked', () => {
+  host.mockReturnValue(new Promise<Response>(() => undefined));
+  renderProbe();
+
+  expect(screen.getByText('checking')).toBeInTheDocument();
+});
+
+test('a 200 from the probe grants Manage', async () => {
+  host.mockImplementation(async () => Response.json({ name: '{{ module.name }}.manage' }));
+  renderProbe();
+
+  expect(await screen.findByText('granted')).toBeInTheDocument();
+});
+
+test('a 403 from the probe refuses Manage, which is no failure', async () => {
+  host.mockImplementation(async () => new Response(null, { status: 403 }));
+  renderProbe();
+
+  expect(await screen.findByText('refused')).toBeInTheDocument();
+});
+
+test('a 500 from the probe is a failure the page shows, not a refusal', async () => {
+  host.mockImplementation(async () => new Response('boom', { status: 500 }));
+  renderProbe();
+
+  expect(await screen.findByText('failed')).toBeInTheDocument();
+});
+
+test('a probe that never reaches the host is a failure the page shows, not a refusal', async () => {
+  host.mockRejectedValue(new TypeError('Failed to fetch'));
+  renderProbe();
+
+  expect(await screen.findByText('failed')).toBeInTheDocument();
+});

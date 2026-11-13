@@ -6,6 +6,8 @@ files:
   - { template: templates/OpenApiDocumentTests.cs.sbn, target: tests/Integration.Tests/OpenApiDocumentTests.cs }
   # With authorization choices: the hook a module's page asks its permission probe with (#609).
   - { template: templates/useCanManage.ts.sbn, target: "web/app/src/modules/{{ module.name }}/useCanManage.ts", per-module: true, when: 'object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/useCanManage.test.tsx.sbn, target: "web/app/src/modules/{{ module.name }}/useCanManage.test.tsx", per-module: true, when: 'project["frontend.framework"] == "react" && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
+  - { template: templates/useCanManage.test.ts.sbn, target: "web/app/src/modules/{{ module.name }}/useCanManage.test.ts", per-module: true, when: 'project["frontend.framework"] == "vue" && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
 declares-slots:
   - { slot: web.api-imports, description: "Import lines of src/api/baseApi.ts. Every api-client pack declares it." }
   - { slot: web.api-headers, description: "Statements in prepareHeaders, a function body run before every call, with the request's Headers headers in scope. Every api-client pack declares it." }

@@ -22,6 +22,9 @@ import { examples } from './{{ module.namespace }}Page.data';
 {{~ if !tanstack ~}}
 import { {{ module.namespace }}Page } from './{{ module.namespace }}Page';
 {{~ end ~}}
+{{~ if probe && !stands_in ~}}
+import type { ManagePermission } from './useCanManage';
+{{~ end ~}}
 
 // The screen's axe check, generated with it. It runs whatever the screen's own component test does, so a check skipped
 // or commented out there never leaves the screen unchecked.
@@ -35,10 +38,11 @@ vi.mock('@/dashboards/DashboardEditor', () => ({ DashboardEditor: () => <p>The d
 
 // The page renders on its own, without {{ if client == "orval" }}a query client{{ else }}the store{{ end }} or the host. Each hook of the generated client answers
 // as if its request were still on its way or, once the page is shown with its data, with its example in the data file.
-const shown = vi.hoisted(() => ({ withExamples: false, refusing: '' }));
+const shown = vi.hoisted(() => ({ withExamples: false, refusing: '', failing: '' }));
 vi.mock('@/api/generated', async (importOriginal) => {
   const { examples } = await import('@/modules/{{ module.name }}/{{ module.namespace }}Page.data');
 {{~ if client == "orval" ~}}
+  const { ApiError } = await import('@/api/baseApi');
   const state = (data: unknown, loading: boolean) => ({
     data,
     error: null,
@@ -52,17 +56,22 @@ vi.mock('@/api/generated', async (importOriginal) => {
     mutate: vi.fn(),
     mutateAsync: vi.fn(),
   });
-  // A request the host refused: what a permission probe answers a caller without the permission.
-  const refused = {
+  // A request that failed, as the generated client reports it.
+  const failure = (status: number) => ({
     ...state(undefined, false),
-    error: { status: 403 },
+    error: new ApiError(status, ''),
     isSuccess: false,
     isError: true,
     status: 'error',
-  };
+  });
   const answer = (hook: string) => {
+    // A request the host refused: what a permission probe answers a caller without the permission.
     if (hook === shown.refusing) {
-      return refused;
+      return failure(403);
+    }
+    // A request that failed for any other reason.
+    if (hook === shown.failing) {
+      return failure(500);
     }
     return shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
   };
@@ -99,11 +108,16 @@ vi.mock('@/api/generated', async (importOriginal) => {
     isSuccess: !loading,
     isError: false,
   });
-  // A request the host refused: what a permission probe answers a caller without the permission.
-  const refused = { ...state(undefined, false), error: { status: 403 }, isSuccess: false, isError: true };
+  // A request that failed, as RTK Query reports it.
+  const failure = (status: number) => ({ ...state(undefined, false), error: { status, data: '' }, isSuccess: false, isError: true });
   const answer = (hook: string) => {
+    // A request the host refused: what a permission probe answers a caller without the permission.
     if (hook === shown.refusing) {
-      return refused;
+      return failure(403);
+    }
+    // A request that failed for any other reason.
+    if (hook === shown.failing) {
+      return failure(500);
     }
     return shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
   };
@@ -135,8 +149,8 @@ vi.mock('@/api/generated', async (importOriginal) => {
 {{~ if probe && !stands_in ~}}
 
 // The page asks the module's permission probe; without a stand-in for the client, the answer is the test's.
-const probe = vi.hoisted(() => ({ canManage: true }));
-vi.mock('./useCanManage', () => ({ useCanManage: () => probe.canManage }));
+const probe = vi.hoisted(() => ({ permission: 'granted' as ManagePermission }));
+vi.mock('./useCanManage', () => ({ useCanManage: () => probe.permission }));
 {{~ end ~}}
 
 // Whatever else asks the host waits for an answer that never comes.
@@ -148,6 +162,12 @@ afterEach(cleanup);
 afterEach(() => {
   shown.withExamples = false;
   shown.refusing = '';
+  shown.failing = '';
+});
+{{~ end ~}}
+{{~ if probe && !stands_in ~}}
+afterEach(() => {
+  probe.permission = 'granted';
 });
 {{~ end ~}}
 
@@ -210,13 +230,34 @@ test('the {{ module.namespace }} page offers no Manage when the probe refuses', 
   await renderPage();
 
   expect(screen.queryByRole('heading', { name: 'Manage' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Permissions for {{ module.name }} could not be loaded.')).not.toBeInTheDocument();
+});
+
+test('the {{ module.namespace }} page shows that its probe failed, not a refusal', async () => {
+  shown.withExamples = true;
+  shown.failing = '{{ permissions }}';
+  const container = await renderPage();
+
+  expect(screen.getByText('Permissions for {{ module.name }} could not be loaded.')).toHaveAttribute('role', 'alert');
+  expect(screen.queryByRole('heading', { name: 'Manage' })).not.toBeInTheDocument();
+  expect(await axe(container)).toHaveNoViolations();
 });
 {{~ else if probe ~}}
 
 test('the {{ module.namespace }} page offers no Manage when the probe refuses', async () => {
-  probe.canManage = false;
+  probe.permission = 'refused';
   await renderPage();
 
   expect(screen.queryByRole('heading', { name: 'Manage' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Permissions for {{ module.name }} could not be loaded.')).not.toBeInTheDocument();
+});
+
+test('the {{ module.namespace }} page shows that its probe failed, not a refusal', async () => {
+  probe.permission = 'failed';
+  const container = await renderPage();
+
+  expect(screen.getByText('Permissions for {{ module.name }} could not be loaded.')).toHaveAttribute('role', 'alert');
+  expect(screen.queryByRole('heading', { name: 'Manage' })).not.toBeInTheDocument();
+  expect(await axe(container)).toHaveNoViolations();
 });
 {{~ end ~}}

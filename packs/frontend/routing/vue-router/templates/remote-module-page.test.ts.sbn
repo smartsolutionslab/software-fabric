@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/vue';
 import { expect, test, vi } from 'vitest';
 import {{ module.namespace }}Page from './{{ module.namespace }}Page.vue';
+import type { ManagePermission } from './useCanManage';
 
 // The module's remote is loaded at run time; here it stands in, so this test checks the page around it.
 vi.mock('@/remotes/Remote.vue', async () => {
@@ -14,11 +15,11 @@ vi.mock('@/remotes/Remote.vue', async () => {
 });
 
 // A remote has no API client of its own, so the shell's page asks the module's permission probe; here the answer is the test's.
-const probe = vi.hoisted(() => ({ canManage: true }));
-vi.mock('./useCanManage', () => ({ useCanManage: () => probe.canManage }));
+const probe = vi.hoisted(() => ({ permission: 'granted' as ManagePermission }));
+vi.mock('./useCanManage', () => ({ useCanManage: () => probe.permission }));
 
 test('the {{ module.namespace }} page mounts its remote and offers Manage when the probe answers 200', () => {
-  probe.canManage = true;
+  probe.permission = 'granted';
   render({{ module.namespace }}Page);
 
   expect(screen.getByRole('heading', { name: 'The {{ module.name }} remote' })).toBeInTheDocument();
@@ -26,9 +27,19 @@ test('the {{ module.namespace }} page mounts its remote and offers Manage when t
 });
 
 test('the {{ module.namespace }} page offers no Manage when the probe refuses', () => {
-  probe.canManage = false;
+  probe.permission = 'refused';
   render({{ module.namespace }}Page);
 
   expect(screen.getByRole('heading', { name: 'The {{ module.name }} remote' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Manage' })).toBeNull();
+  expect(screen.queryByText('Permissions for {{ module.name }} could not be loaded.')).toBeNull();
+});
+
+test('the {{ module.namespace }} page shows that its probe failed, not a refusal', () => {
+  probe.permission = 'failed';
+  render({{ module.namespace }}Page);
+
+  expect(screen.getByRole('heading', { name: 'The {{ module.name }} remote' })).toBeInTheDocument();
+  expect(screen.getByText('Permissions for {{ module.name }} could not be loaded.')).toHaveAttribute('role', 'alert');
   expect(screen.queryByRole('heading', { name: 'Manage' })).toBeNull();
 });
