@@ -10,6 +10,8 @@ Each module has its own category of streams, named after the module (`billing`, 
 
 The module's `<Module>AggregateStore` (Infrastructure, `EventStore/`) implements `I<Module>AggregateStore` over KurrentDB and appends with the stream revision the aggregate was loaded at, so a save from a copy another save has overtaken fails (`WrongExpectedVersionException`). Other adapters over the event store are classes in the module's Infrastructure project whose constructor takes `ModuleEventStore`; each is registered as the module's Application interfaces it implements.
 
+Two saves that both create one aggregate id race: both can find no aggregate before either saves, and KurrentDB refuses the second append, which expected no stream (`WrongExpectedVersionException` expecting `StreamState.NoStream`). The host answers that with `409` problem details and the code `already-exists`, as a unique index's refusal answers with EF Core, instead of `500` (`DuplicateStreamExceptionHandler`, nested in `src/BuildingBlocks/EventStore/Wiring/DuplicateStreamResponses.cs`). Nothing from the exception reaches the caller. Only a stream that had to be new counts: a save that loses to another on a stream that exists (the same exception, expecting a revision) is a lost update, not a duplicate, and stays a `500`. As with a unique index, this is a backstop for the race; a handler that creates looks for the aggregate first and returns a `Result` failure with its own code, which names the rule.
+
 Only a module's Infrastructure project references KurrentDB; an architecture rule fails the build otherwise.
 
 KurrentDB creates a stream on its first append, so the MigrationRunner has nothing to create for it.
@@ -22,5 +24,6 @@ Built without tenancy only: the catalog refuses it with a tenancy option, becaus
 - A stream is append-only, and an event's type name is part of the stored data: renaming an event type, or moving it to another module, orphans the stored events of the old name.
 - Every event-sourced module of a project keeps its events in the same store: the Marten and KurrentDB packs own the same building blocks (`src/BuildingBlocks/EventStore`), so a project mixing them fails to generate.
 - A module's events are not projected into read models here; a query reads the aggregate through `I<Module>AggregateStore` or a model of its own.
+- The `409` is generic: the handler knows that the stream existed, not which rule of the domain the id stands for. A caller that needs to know gets it from the application-level check.
 - Integration events still go through the module's unit of work, a separate transaction from the event store's. Save the aggregate first, then publish: a crash in between leaves the change without its integration event, never an event without its change.
 - The AppHost runs the Aspire integration's default image, which a newer integration package brings along. The Testcontainers fixture, when chosen, names the same tag itself and is updated by hand with it.
