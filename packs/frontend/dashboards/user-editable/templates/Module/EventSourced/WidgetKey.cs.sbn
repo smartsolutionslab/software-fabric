@@ -1,0 +1,17 @@
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+/// <summary>Tells the widgets of one dashboard apart; how long it may be is the dashboard's rule.</summary>
+public sealed record WidgetKey : IValueObject<string>
+{
+    private WidgetKey(string value) => Value = value;
+
+    public string Value { get; }
+
+    public static WidgetKey From(string value)
+    {
+        {{ not_null "value" }}
+        return new WidgetKey(value);
+    }
+
+    public override string ToString() => Value;
+}

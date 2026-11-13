@@ -1,0 +1,17 @@
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+/// <summary>The id of the declared widget a placed widget shows, e.g. <c>billing.monthly-revenue</c>; whether the modules declare it is the save use case's question.</summary>
+public sealed record WidgetSource : IValueObject<string>
+{
+    private WidgetSource(string value) => Value = value;
+
+    public string Value { get; }
+
+    public static WidgetSource From(string value)
+    {
+        {{ not_null "value" }}
+        return new WidgetSource(value);
+    }
+
+    public override string ToString() => Value;
+}

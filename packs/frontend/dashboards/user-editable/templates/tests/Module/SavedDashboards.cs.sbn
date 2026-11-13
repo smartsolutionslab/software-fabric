@@ -1,3 +1,4 @@
+{{~ if module.values["module.style"] == "crud" ~}}
 using {{ namespace }}.Modules.Dashboards.Application.Commands.SaveDashboard;
 
 namespace {{ namespace }}.Modules.Dashboards.Tests;
@@ -13,3 +14,21 @@ internal static class SavedDashboards
         return saved.Value;
     }
 }
+{{ else ~}}
+using {{ namespace }}.Modules.Dashboards.Api.Endpoints;
+using {{ namespace }}.Modules.Dashboards.Application.Commands.SaveDashboard;
+
+namespace {{ namespace }}.Modules.Dashboards.Tests;
+
+/// <summary>Dashboards saved through the module beforehand, by the user it is set up for.</summary>
+internal static class SavedDashboards
+{
+    public static async Task<Guid> SaveAsync(DashboardsModuleUnderTest module, string name, int widgets, CancellationToken cancellationToken)
+    {
+        var id = Guid.CreateVersion7();
+        WidgetPlacement[] placements = [.. Enumerable.Range(0, widgets).Select(index => new WidgetPlacement($"w-{index}", "dashboards.widget-counts", "bar", 0, index, 1, 1))];
+        var saved = await module.SendAsync(new SaveDashboardRequest(name, placements).ToCommand(id), cancellationToken);
+        return saved.Value;
+    }
+}
+{{ end ~}}

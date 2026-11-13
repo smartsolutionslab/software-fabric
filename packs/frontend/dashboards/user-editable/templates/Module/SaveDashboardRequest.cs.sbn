@@ -1,6 +1,30 @@
+{{~ if module.values["module.style"] == "crud" ~}}
 using {{ namespace }}.Modules.Dashboards.Application.Commands.SaveDashboard;
 
 namespace {{ namespace }}.Modules.Dashboards.Api.Endpoints;
 
 /// <summary>The body of <c>PUT /dashboards/{id}</c>: the whole dashboard, which replaces what was saved.</summary>
 public sealed record SaveDashboardRequest(string Name, IReadOnlyList<WidgetPlacement> Widgets);
+{{ else ~}}
+using {{ namespace }}.Modules.Dashboards.Application.Commands.SaveDashboard;
+using {{ namespace }}.Modules.Dashboards.Domain.Dashboards;
+
+namespace {{ namespace }}.Modules.Dashboards.Api.Endpoints;
+
+/// <summary>The body of <c>PUT /dashboards/{id}</c>: the whole dashboard, which replaces what was saved.</summary>
+public sealed record SaveDashboardRequest(string Name, IReadOnlyList<WidgetPlacement> Widgets)
+{
+    /// <summary>
+    /// The command, its values made from the body's. A missing name, widget or widget field is passed on empty, for the
+    /// dashboard or the use case to refuse with its own code; a missing list of widgets is passed on as none, for the use
+    /// case to refuse. The id must not be the empty Guid; the endpoint refuses that before it calls this.
+    /// </summary>
+    public SaveDashboard ToCommand(Guid id) =>
+        new(
+            DashboardId.From(id),
+            DashboardName.From(Name ?? string.Empty),
+            Widgets is null ? null : [.. Widgets.Select(placement => placement is null
+                ? DashboardWidget.From(string.Empty, string.Empty, string.Empty, 0, 0, 0, 0)
+                : DashboardWidget.From(placement.Key ?? string.Empty, placement.Source ?? string.Empty, placement.Visual ?? string.Empty, placement.X, placement.Y, placement.Width, placement.Height))]);
+}
+{{ end ~}}

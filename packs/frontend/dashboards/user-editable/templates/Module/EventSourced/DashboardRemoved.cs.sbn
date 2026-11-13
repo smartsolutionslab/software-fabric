@@ -1,0 +1,6 @@
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+
+namespace {{ namespace }}.Modules.Dashboards.Domain.Dashboards.Events;
+
+/// <summary>The owner removed the dashboard; its stream keeps the owner, who may save the id again.</summary>
+public sealed record DashboardRemoved : IDomainEvent;
