@@ -1,23 +1,7 @@
-{{~ if project["backend.api-style"] != "minimal-apis" ~}}
-#error The sample endpoint of a module's policy is a minimal API only so far (docs/adr/0006 of the generator).
-{{~ end ~}}
-using {{ namespace }}.BuildingBlocks.Api;
-using {{ namespace }}.Modules.{{ module.namespace }}.Application;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.BuildingBlocks.Modules;
 
-namespace {{ namespace }}.Modules.{{ module.namespace }}.Api.Endpoints;
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.Queries.CanManage;
 
-/// <summary>
-/// 200 when the caller holds the policy {{ module.name }}.manage, 403 when not: the sample of an endpoint naming one of
-/// its module's policies, which the integration tests prove the policy on. It stays out of the OpenAPI document, so a
-/// module added after generation leaves the frontend's copy of it current.
-/// </summary>
-public sealed class CanManage : IEndpoint
-{
-    public void Map(IEndpointRouteBuilder endpoints) =>
-        endpoints.MapGet("/permissions/manage", () => TypedResults.Ok())
-            .RequireAuthorization({{ module.namespace }}PolicyNames.Manage)
-            .ExcludeFromDescription();
-}
+/// <summary>Whether the caller may manage {{ module.name }}: the endpoint that sends it requires the policy, so it answers only a holder.</summary>
+public sealed record CanManage : IQuery<Result<PermissionDto, ApiError>>;

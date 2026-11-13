@@ -1,0 +1,6 @@
+import { useGet{{ module.namespace }}PermissionsManageQuery } from '@/api/generated';
+
+/** Whether the caller may manage {{ module.name }}: the module's permission probe answers 200 only to a holder of {{ module.name }}.manage. */
+export function useCanManage(): boolean {
+  return useGet{{ module.namespace }}PermissionsManageQuery().isSuccess;
+}

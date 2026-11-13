@@ -1,4 +1,26 @@
-{{~ if project["frontend.architecture"] == "micro-frontends" ~}}
+{{~ probe = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+{{~ if project["frontend.architecture"] == "micro-frontends" && probe ~}}
+import { Remote } from '@/remotes/Remote';
+import { useCanManage } from './useCanManage';
+
+/**
+ * The module's screens live in its own remote, web/modules/{{ module.name }}; the shell mounts it here (docs/adr). A remote has
+ * no API client of its own, so the shell asks the module's permission probe: "Manage" shows only on a 200.
+ */
+export function {{ module.namespace }}Page() {
+  const canManage = useCanManage();
+  return (
+    <>
+      <Remote module="{{ module.name }}" />
+      {canManage && (
+        <section aria-label="Manage {{ module.name }}">
+          <h2>Manage</h2>
+        </section>
+      )}
+    </>
+  );
+}
+{{~ else if project["frontend.architecture"] == "micro-frontends" ~}}
 import { Remote } from '@/remotes/Remote';
 
 /** The module's screens live in its own remote, web/modules/{{ module.name }}; the shell mounts it here (docs/adr). */
@@ -14,13 +36,35 @@ export function {{ module.namespace }}Page() {
 }
 {{~ else if module.name == "assistant" && object.has_key(project, "frontend.agent-ui") && project["frontend.agent-ui"] == "ag-ui" ~}}
 import { AgentPanel } from '@/agents/AgentPanel';
+{{~ if probe ~}}
+import { useCanManage } from './useCanManage';
+{{~ end ~}}
 
 /** The module the agent panel choice brings; its screen is a conversation with its agent (docs/adr). */
 export function {{ module.namespace }}Page() {
+{{~ if probe ~}}
+  const canManage = useCanManage();
+{{~ end ~}}
   return (
     <main>
       <h1>{{ module.namespace }}</h1>
+{{~ if probe ~}}
+      {canManage && <h2>Manage</h2>}
+{{~ end ~}}
       <AgentPanel agent="assistant" />
+    </main>
+  );
+}
+{{~ else if probe ~}}
+import { useCanManage } from './useCanManage';
+
+/** The module's screens; "Manage" shows only to a caller its permission probe answers with 200. */
+export function {{ module.namespace }}Page() {
+  const canManage = useCanManage();
+  return (
+    <main>
+      <h1>{{ module.namespace }}</h1>
+      {canManage && <h2>Manage</h2>}
     </main>
   );
 }
