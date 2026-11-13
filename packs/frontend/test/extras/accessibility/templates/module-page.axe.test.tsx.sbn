@@ -38,11 +38,17 @@ vi.mock('@/dashboards/DashboardEditor', () => ({ DashboardEditor: () => <p>The d
 
 // The page renders on its own, without {{ if client == "orval" }}a query client{{ else }}the store{{ end }} or the host. Each hook of the generated client answers
 // as if its request were still on its way or, once the page is shown with its data, with its example in the data file.
+{{~ if probe ~}}
 const shown = vi.hoisted(() => ({ withExamples: false, refusing: '', failing: '' }));
+{{~ else ~}}
+const shown = vi.hoisted(() => ({ withExamples: false, refusing: '' }));
+{{~ end ~}}
 vi.mock('@/api/generated', async (importOriginal) => {
   const { examples } = await import('@/modules/{{ module.name }}/{{ module.namespace }}Page.data');
 {{~ if client == "orval" ~}}
+{{~ if probe ~}}
   const { ApiError } = await import('@/api/baseApi');
+{{~ end ~}}
   const state = (data: unknown, loading: boolean) => ({
     data,
     error: null,
@@ -56,6 +62,7 @@ vi.mock('@/api/generated', async (importOriginal) => {
     mutate: vi.fn(),
     mutateAsync: vi.fn(),
   });
+{{~ if probe ~}}
   // A request that failed, as the generated client reports it.
   const failure = (status: number) => ({
     ...state(undefined, false),
@@ -73,6 +80,20 @@ vi.mock('@/api/generated', async (importOriginal) => {
     if (hook === shown.failing) {
       return failure(500);
     }
+{{~ else ~}}
+  // A request the host refused: what a permission probe answers a caller without the permission.
+  const refused = {
+    ...state(undefined, false),
+    error: { status: 403 },
+    isSuccess: false,
+    isError: true,
+    status: 'error',
+  };
+  const answer = (hook: string) => {
+    if (hook === shown.refusing) {
+      return refused;
+    }
+{{~ end ~}}
     return shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
   };
   // A mutation nobody has triggered is idle, not saving: the page shows as it first does.
@@ -108,8 +129,14 @@ vi.mock('@/api/generated', async (importOriginal) => {
     isSuccess: !loading,
     isError: false,
   });
+{{~ if probe ~}}
   // A request that failed, as RTK Query reports it.
-  const failure = (status: number) => ({ ...state(undefined, false), error: { status, data: '' }, isSuccess: false, isError: true });
+  const failure = (status: number) => ({
+    ...state(undefined, false),
+    error: { status, data: '' },
+    isSuccess: false,
+    isError: true,
+  });
   const answer = (hook: string) => {
     // A request the host refused: what a permission probe answers a caller without the permission.
     if (hook === shown.refusing) {
@@ -119,6 +146,14 @@ vi.mock('@/api/generated', async (importOriginal) => {
     if (hook === shown.failing) {
       return failure(500);
     }
+{{~ else ~}}
+  // A request the host refused: what a permission probe answers a caller without the permission.
+  const refused = { ...state(undefined, false), error: { status: 403 }, isSuccess: false, isError: true };
+  const answer = (hook: string) => {
+    if (hook === shown.refusing) {
+      return refused;
+    }
+{{~ end ~}}
     return shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
   };
   // A mutation nobody has triggered is idle, not saving: the page shows as it first does.
@@ -162,7 +197,9 @@ afterEach(cleanup);
 afterEach(() => {
   shown.withExamples = false;
   shown.refusing = '';
+{{~ if probe ~}}
   shown.failing = '';
+{{~ end ~}}
 });
 {{~ end ~}}
 {{~ if probe && !stands_in ~}}

@@ -2,18 +2,20 @@
 {{~ if project["frontend.architecture"] == "micro-frontends" && probe ~}}
 <script setup lang="ts">
 // The module's screens live in its own remote, web/modules/{{ module.name }}; the shell mounts it here (docs/adr). A remote
-// has no API client of its own, so the shell asks the module's permission probe: "Manage" shows only on a 200.
+// has no API client of its own, so the shell asks the module's permission probe: "Manage" shows only on a 200, and any
+// failure but a 403 shows as an alert.
 import Remote from '@/remotes/Remote.vue';
 import { useCanManage } from './useCanManage';
 
-const canManage = useCanManage();
+const permission = useCanManage();
 </script>
 
 <template>
   <Remote module="{{ module.name }}" />
-  <section v-if="canManage" aria-label="Manage {{ module.name }}">
+  <section v-if="permission === 'granted'" aria-label="Manage {{ module.name }}">
     <h2>Manage</h2>
   </section>
+  <p v-if="permission === 'failed'" role="alert">Permissions for {{ module.name }} could not be loaded.</p>
 </template>
 {{~ else if project["frontend.architecture"] == "micro-frontends" ~}}
 <script setup lang="ts">
@@ -40,7 +42,7 @@ import AgentPanel from '@/agents/AgentPanel.vue';
 {{~ if probe ~}}
 import { useCanManage } from './useCanManage';
 
-const canManage = useCanManage();
+const permission = useCanManage();
 {{~ end ~}}
 </script>
 
@@ -48,23 +50,26 @@ const canManage = useCanManage();
   <main>
     <h1>{{ module.namespace }}</h1>
 {{~ if probe ~}}
-    <h2 v-if="canManage">Manage</h2>
+    <h2 v-if="permission === 'granted'">Manage</h2>
+    <p v-if="permission === 'failed'" role="alert">Permissions for {{ module.name }} could not be loaded.</p>
 {{~ end ~}}
     <AgentPanel agent="assistant" />
   </main>
 </template>
 {{~ else if probe ~}}
 <script setup lang="ts">
-// "Manage" shows only to a caller the module's permission probe answers with 200.
+// "Manage" shows only to a caller the module's permission probe answers with 200, and any failure but a 403 shows as
+// an alert.
 import { useCanManage } from './useCanManage';
 
-const canManage = useCanManage();
+const permission = useCanManage();
 </script>
 
 <template>
   <main>
     <h1>{{ module.namespace }}</h1>
-    <h2 v-if="canManage">Manage</h2>
+    <h2 v-if="permission === 'granted'">Manage</h2>
+    <p v-if="permission === 'failed'" role="alert">Permissions for {{ module.name }} could not be loaded.</p>
   </main>
 </template>
 {{~ else ~}}

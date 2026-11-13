@@ -15,7 +15,9 @@ afterEach(cleanup);
 // shows at once.
 function renderProbe() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
   return renderHook(() => useCanManage(), { wrapper }).result;
 }
 
