@@ -1,9 +1,22 @@
 {{~ if project["frontend.framework"] == "react" ~}}
+import { ApiError } from '@/api/baseApi';
 import { useGet{{ module.namespace }}PermissionsManage } from '@/api/generated';
 
+/** What the module's permission probe answered: 200 grants Manage, 403 refuses it, and anything else is a failure to show. */
+export type ManagePermission = 'checking' | 'granted' | 'refused' | 'failed';
+
+/** A 403 is the probe's answer to a caller without the permission; anything else that went wrong is a failure. */
+function settled(error: unknown): ManagePermission {
+  return error instanceof ApiError && error.status === 403 ? 'refused' : 'failed';
+}
+
 /** Whether the caller may manage {{ module.name }}: the module's permission probe answers 200 only to a holder of {{ module.name }}.manage. */
-export function useCanManage(): boolean {
-  return useGet{{ module.namespace }}PermissionsManage().isSuccess;
+export function useCanManage(): ManagePermission {
+  const { isSuccess, error } = useGet{{ module.namespace }}PermissionsManage();
+  if (isSuccess) {
+    return 'granted';
+  }
+  return error === null ? 'checking' : settled(error);
 }
 {{~ else if project["frontend.state"] == "pinia" ~}}
 import { defineStore } from 'pinia';
@@ -11,42 +24,56 @@ import { computed, onMounted, ref, type ComputedRef } from 'vue';
 import { ApiError } from '@/api/baseApi';
 import { get{{ module.namespace }}PermissionsManage } from '@/api/generated';
 
+/** What the module's permission probe answered: 200 grants Manage, 403 refuses it, and anything else is a failure to show. */
+export type ManagePermission = 'checking' | 'granted' | 'refused' | 'failed';
+
 /**
  * Whether the caller may manage {{ module.name }}: the module's permission probe answers 200 only to a holder of
  * {{ module.name }}.manage, and 403 to anyone else. The store lives beside the module's page, which add-module writes with it.
  */
 export const use{{ module.namespace }}PermissionsStore = defineStore('{{ module.name }}-permissions', () => {
-  const canManage = ref(false);
+  const permission = ref<ManagePermission>('checking');
 
   async function load() {
     try {
       await get{{ module.namespace }}PermissionsManage();
-      canManage.value = true;
+      permission.value = 'granted';
     } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 403) {
-        throw error;
-      }
-
-      canManage.value = false;
+      // A 403 is the probe's answer to a caller without the permission; anything else that went wrong is a failure.
+      permission.value = error instanceof ApiError && error.status === 403 ? 'refused' : 'failed';
     }
   }
 
-  return { canManage, load };
+  return { permission, load };
 });
 
 /** Asks the probe once the page is mounted. */
-export function useCanManage(): ComputedRef<boolean> {
+export function useCanManage(): ComputedRef<ManagePermission> {
   const permissions = use{{ module.namespace }}PermissionsStore();
   onMounted(() => void permissions.load());
-  return computed(() => permissions.canManage);
+  return computed(() => permissions.permission);
 }
 {{~ else ~}}
 import { computed, type ComputedRef } from 'vue';
+import { ApiError } from '@/api/baseApi';
 import { useGet{{ module.namespace }}PermissionsManage } from '@/api/generated';
 
+/** What the module's permission probe answered: 200 grants Manage, 403 refuses it, and anything else is a failure to show. */
+export type ManagePermission = 'checking' | 'granted' | 'refused' | 'failed';
+
+/** A 403 is the probe's answer to a caller without the permission; anything else that went wrong is a failure. */
+function settled(error: unknown): ManagePermission {
+  return error instanceof ApiError && error.status === 403 ? 'refused' : 'failed';
+}
+
 /** Whether the caller may manage {{ module.name }}: the module's permission probe answers 200 only to a holder of {{ module.name }}.manage. */
-export function useCanManage(): ComputedRef<boolean> {
+export function useCanManage(): ComputedRef<ManagePermission> {
   const probe = useGet{{ module.namespace }}PermissionsManage();
-  return computed(() => probe.isSuccess.value);
+  return computed(() => {
+    if (probe.isSuccess.value) {
+      return 'granted';
+    }
+    return probe.error.value === null ? 'checking' : settled(probe.error.value);
+  });
 }
 {{~ end ~}}

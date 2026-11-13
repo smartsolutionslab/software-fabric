@@ -5,18 +5,20 @@ import { useCanManage } from './useCanManage';
 
 /**
  * The module's screens live in its own remote, web/modules/{{ module.name }}; the shell mounts it here (docs/adr). A remote has
- * no API client of its own, so the shell asks the module's permission probe: "Manage" shows only on a 200.
+ * no API client of its own, so the shell asks the module's permission probe: "Manage" shows only on a 200, and any failure
+ * but a 403 shows as an alert.
  */
 export function {{ module.namespace }}Page() {
-  const canManage = useCanManage();
+  const permission = useCanManage();
   return (
     <>
       <Remote module="{{ module.name }}" />
-      {canManage && (
+      {permission === 'granted' && (
         <section aria-label="Manage {{ module.name }}">
           <h2>Manage</h2>
         </section>
       )}
+      {permission === 'failed' && <p role="alert">Permissions for {{ module.name }} could not be loaded.</p>}
     </>
   );
 }
@@ -43,13 +45,14 @@ import { useCanManage } from './useCanManage';
 /** The module the agent panel choice brings; its screen is a conversation with its agent (docs/adr). */
 export function {{ module.namespace }}Page() {
 {{~ if probe ~}}
-  const canManage = useCanManage();
+  const permission = useCanManage();
 {{~ end ~}}
   return (
     <main>
       <h1>{{ module.namespace }}</h1>
 {{~ if probe ~}}
-      {canManage && <h2>Manage</h2>}
+      {permission === 'granted' && <h2>Manage</h2>}
+      {permission === 'failed' && <p role="alert">Permissions for {{ module.name }} could not be loaded.</p>}
 {{~ end ~}}
       <AgentPanel agent="assistant" />
     </main>
@@ -58,13 +61,14 @@ export function {{ module.namespace }}Page() {
 {{~ else if probe ~}}
 import { useCanManage } from './useCanManage';
 
-/** The module's screens; "Manage" shows only to a caller its permission probe answers with 200. */
+/** The module's screens; "Manage" shows only to a caller its permission probe answers with 200, and any failure but a 403 shows as an alert. */
 export function {{ module.namespace }}Page() {
-  const canManage = useCanManage();
+  const permission = useCanManage();
   return (
     <main>
       <h1>{{ module.namespace }}</h1>
-      {canManage && <h2>Manage</h2>}
+      {permission === 'granted' && <h2>Manage</h2>}
+      {permission === 'failed' && <p role="alert">Permissions for {{ module.name }} could not be loaded.</p>}
     </main>
   );
 }

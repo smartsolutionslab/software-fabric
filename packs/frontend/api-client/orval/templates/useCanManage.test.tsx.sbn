@@ -1,0 +1,56 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, renderHook, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { afterEach, expect, test, vi } from 'vitest';
+import { useCanManage } from './useCanManage';
+
+// The host, as the probe GET /{{ module.name }}/permissions/manage reaches it through the generated client.
+const host = vi.fn<typeof fetch>();
+vi.stubGlobal('fetch', host);
+afterEach(() => host.mockReset());
+// Without Vitest's globals, Testing Library does not unmount between tests by itself.
+afterEach(cleanup);
+
+// A query client of its own per test, so no answer is cached from the test before; it does not retry, so a failure
+// shows at once.
+function renderProbe() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  return renderHook(() => useCanManage(), { wrapper }).result;
+}
+
+test('while the probe has not answered, Manage is still being checked', () => {
+  host.mockReturnValue(new Promise<Response>(() => undefined));
+
+  expect(renderProbe().current).toBe('checking');
+});
+
+test('a 200 from the probe grants Manage', async () => {
+  host.mockImplementation(async () => Response.json({ name: '{{ module.name }}.manage' }));
+  const probe = renderProbe();
+
+  await waitFor(() => expect(probe.current).toBe('granted'));
+});
+
+test('a 403 from the probe refuses Manage, which is no failure', async () => {
+  host.mockImplementation(async () => new Response(null, { status: 403 }));
+  const probe = renderProbe();
+
+  await waitFor(() => expect(probe.current).toBe('refused'));
+});
+
+test('a 500 from the probe is a failure the page shows, not a refusal', async () => {
+  host.mockImplementation(async () => new Response('boom', { status: 500 }));
+  const probe = renderProbe();
+
+  await waitFor(() => expect(probe.current).toBe('failed'));
+});
+
+test('a probe that never reaches the host is a failure the page shows, not a refusal', async () => {
+  host.mockRejectedValue(new TypeError('Failed to fetch'));
+  const probe = renderProbe();
+
+  await waitFor(() => expect(probe.current).toBe('failed'));
+});

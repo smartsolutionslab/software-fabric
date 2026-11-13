@@ -134,6 +134,27 @@ public sealed partial class PermissionProbeTests
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web/app/openapi.json")).ShouldContain("\"/billing/permissions/manage\"");
     }
 
+    /// <summary>
+    /// 200 shows Manage, 403 hides it, and any other failure is an error the page shows (#639): the hook's own test,
+    /// written beside it, covers a 500 and a host never reached, and the page shows the failure as an alert.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Pages))]
+    public void A_new_modules_probe_tells_a_refusal_from_a_failure_and_its_page_shows_the_failure(string profile, string[] overrides, string page, string call)
+    {
+        using var project = new GeneratedProject(profile, overrides);
+        project.AddModule("billing");
+
+        var hookTest = page.EndsWith(".vue", StringComparison.Ordinal) ? "useCanManage.test.ts" : "useCanManage.test.tsx";
+        var test = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web/app/src/modules/billing", hookTest));
+        test.ShouldContain("a 403 from the probe refuses Manage, which is no failure", customMessage: call);
+        test.ShouldContain("a 500 from the probe is a failure the page shows, not a refusal", customMessage: call);
+        test.ShouldContain("a probe that never reaches the host is a failure the page shows, not a refusal", customMessage: call);
+        var content = File.ReadAllText(Path.Combine(project.ProjectDirectory, page));
+        content.ShouldContain("role=\"alert\"", customMessage: call);
+        content.ShouldContain("Permissions for billing could not be loaded.", customMessage: call);
+    }
+
     [Theory]
     [MemberData(nameof(RemotePages))]
     public void A_micro_frontend_shells_page_mounts_the_remote_and_its_test_checks_Manage_shows_only_on_200(string profile, string[] overrides, string page, string test)
@@ -179,6 +200,8 @@ public sealed partial class PermissionProbeTests
     [InlineData("lean-crud", new[] { Roles, "frontend.api-client=openapi-fetch" })]
     [InlineData("saas-standard-vue", new[] { Roles })]
     [InlineData("saas-standard-vue", new[] { Roles, "frontend.state=pinia" })]
+    [InlineData("saas-standard-vue", new[] { Roles, "frontend.state=pinia", "frontend.api-client=openapi-fetch" })]
+    [InlineData("saas-standard-vue", new[] { Roles, "frontend.api-client=openapi-fetch" })]
     [InlineData("industrial-event-driven-mfe", new[] { Roles })]
     [InlineData("saas-standard-vue", new[] { Roles, MicroFrontends, "frontend.design-system=tokens", "frontend.mfe-technique=native-federation" })]
     public void The_web_app_builds_lints_and_tests_with_a_new_modules_page_calling_its_probe(string profile, string[] overrides)

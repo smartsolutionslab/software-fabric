@@ -1,16 +1,17 @@
 import { render, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 import { {{ module.namespace }}Page } from './{{ module.namespace }}Page';
+import type { ManagePermission } from './useCanManage';
 
 // The module's remote is loaded at run time; here it stands in, so this test checks the page around it.
 vi.mock('@/remotes/Remote', () => ({ Remote: ({ module }: { module: string }) => <h1>The {module} remote</h1> }));
 
 // A remote has no API client of its own, so the shell's page asks the module's permission probe; here the answer is the test's.
-const probe = vi.hoisted(() => ({ canManage: true }));
-vi.mock('./useCanManage', () => ({ useCanManage: () => probe.canManage }));
+const probe = vi.hoisted(() => ({ permission: 'granted' as ManagePermission }));
+vi.mock('./useCanManage', () => ({ useCanManage: () => probe.permission }));
 
 test('the {{ module.namespace }} page mounts its remote and offers Manage when the probe answers 200', () => {
-  probe.canManage = true;
+  probe.permission = 'granted';
   const page = within(render(<{{ module.namespace }}Page />).container);
 
   expect(page.getByRole('heading', { name: 'The {{ module.name }} remote' })).toBeInTheDocument();
@@ -18,9 +19,19 @@ test('the {{ module.namespace }} page mounts its remote and offers Manage when t
 });
 
 test('the {{ module.namespace }} page offers no Manage when the probe refuses', () => {
-  probe.canManage = false;
+  probe.permission = 'refused';
   const page = within(render(<{{ module.namespace }}Page />).container);
 
   expect(page.getByRole('heading', { name: 'The {{ module.name }} remote' })).toBeInTheDocument();
+  expect(page.queryByRole('heading', { name: 'Manage' })).not.toBeInTheDocument();
+  expect(page.queryByText('Permissions for {{ module.name }} could not be loaded.')).not.toBeInTheDocument();
+});
+
+test('the {{ module.namespace }} page shows that its probe failed, not a refusal', () => {
+  probe.permission = 'failed';
+  const page = within(render(<{{ module.namespace }}Page />).container);
+
+  expect(page.getByRole('heading', { name: 'The {{ module.name }} remote' })).toBeInTheDocument();
+  expect(page.getByText('Permissions for {{ module.name }} could not be loaded.')).toHaveAttribute('role', 'alert');
   expect(page.queryByRole('heading', { name: 'Manage' })).not.toBeInTheDocument();
 });
