@@ -48,7 +48,8 @@
             ':not(MemberExpression[computed=false] > .property, Property[shorthand=false] > .key), ' +
             'MemberExpression[object.name=/^(window|globalThis|self)$/]' +
             ':matches([property.name=/^(fetch|XMLHttpRequest|Headers|HttpAgent|EventSource)$/], ' +
-            '[property.value=/^(fetch|XMLHttpRequest|Headers|HttpAgent|EventSource)$/])',
+            '[property.value=/^(fetch|XMLHttpRequest|Headers|HttpAgent|EventSource)$/]), ' +
+            "MemberExpression[property.name='HttpAgent'], MemberExpression[property.value='HttpAgent']",
           message: 'Call the host through src/api; only src/agents/connectAgent.ts calls the host by hand.',
         },
       ],
