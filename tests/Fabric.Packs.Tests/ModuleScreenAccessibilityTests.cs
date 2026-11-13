@@ -215,6 +215,94 @@ public sealed class ModuleScreenAccessibilityTests
         loading.GetValueOrDefault(generated).ShouldBe(["passed", "skipped"]);
     }
 
+    /// <summary>A screen that shows an unlabelled field only once RTK Query's <c>currentData</c> has come.</summary>
+    private const string ReactScreenBehindCurrentData = """
+        import { useGetMeQuery } from '@/api/generated';
+
+        export function BillingPage() {
+          const { currentData } = useGetMeQuery();
+          return (
+            <main>
+              <h1>Billing</h1>
+              {currentData ? <input type="text" /> : <p>Loading</p>}
+            </main>
+          );
+        }
+
+        """;
+
+    /// <summary>A screen that shows an unlabelled field only once its lazy query has answered.</summary>
+    private const string ReactScreenBehindLazyQuery = """
+        import { useEffect } from 'react';
+        import { useLazyGetMeQuery } from '@/api/generated';
+
+        export function BillingPage() {
+          const [getMe, { data }] = useLazyGetMeQuery();
+          useEffect(() => {
+            void getMe();
+          }, [getMe]);
+          return (
+            <main>
+              <h1>Billing</h1>
+              {data ? <input type="text" /> : <p>Loading</p>}
+            </main>
+          );
+        }
+
+        """;
+
+    /// <summary>Each router with RTK Query, and a screen that reads its data through <c>currentData</c> or a lazy query.</summary>
+    public static TheoryData<string, string> RtkQueryScreens => new()
+    {
+        { "frontend.routing=react-router", "currentData" },
+        { "frontend.routing=react-router", "lazy" },
+        { "frontend.routing=tanstack-router", "currentData" },
+        { "frontend.routing=tanstack-router", "lazy" },
+    };
+
+    [Theory]
+    [MemberData(nameof(RtkQueryScreens))]
+    public void With_rtk_query_the_axe_check_shows_the_example_through_current_data_and_lazy_queries_too(string routing, string screenKind)
+    {
+        using var project = new GeneratedProject("saas-standard-react", routing);
+        project.AddModule("billing");
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var screen = Screens(project).ShouldHaveSingleItem();
+        var generated = TestOf(screen);
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, $"pnpm install:\n{installOutput}");
+        var (behindData, hook) = screenKind == "lazy"
+            ? (ReactScreenBehindLazyQuery, "useLazyGetMeQuery")
+            : (ReactScreenBehindCurrentData, "useGetMeQuery");
+        var example = $$"""
+            export const examples: Record<string, unknown> = { {{hook}}: { name: 'Ada' } };
+
+            """;
+
+        // The generated client exports lazy hooks only once the project asks codegen for them.
+        if (screenKind == "lazy")
+        {
+            var config = Path.Combine(project.ProjectDirectory, "web", "app", "openapi-config.json");
+            var withLazyHooks = File.ReadAllText(config).Replace(
+                "\"hooks\": true",
+                "\"hooks\": { \"queries\": true, \"lazyQueries\": true, \"mutations\": true }",
+                StringComparison.Ordinal);
+            withLazyHooks.ShouldContain("lazyQueries");
+            File.WriteAllText(config, withLazyHooks);
+        }
+
+        project.Write(screen, behindData);
+        project.Write(DataOf(screen), example);
+        var (populatedExitCode, populatedOutput, populated) = Statuses(project);
+        populatedExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label shown only with the {hook} example:\n{populatedOutput}");
+        populated.GetValueOrDefault(generated).ShouldBe(["passed", "failed"], populatedOutput);
+
+        project.Write(screen, behindData.Replace(UnlabelledField, """<input type="text" aria-label="Invoice number" />""", StringComparison.Ordinal));
+        var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
+        labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
+        labelled.GetValueOrDefault(generated).ShouldBe(["passed", "passed"]);
+    }
+
     /// <summary>Each router, with the screen's own test skipping its axe check or with it commented out.</summary>
     public static TheoryData<string, string, string> RoutersAndOwnTests => new()
     {
