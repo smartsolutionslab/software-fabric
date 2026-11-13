@@ -113,6 +113,20 @@ public sealed class AgUiTests
     private static readonly string NamesThatCallTheHostInATemplateFindings =
         string.Join(", ", Enumerable.Repeat("vue/no-restricted-syntax", 20));
 
+    /// <summary>A component whose template builds a second agent client through a namespace import.</summary>
+    private const string AgentClientThroughANamespaceInATemplate = """
+        <script setup lang="ts">
+        import * as agui from '@ag-ui/client';
+
+        defineExpose({ agui });
+        </script>
+
+        <template>
+          <button type="button" @click="new agui.HttpAgent({ url: '/api/agents/assistant' }).runAgent()">Ask</button>
+        </template>
+
+        """;
+
     /// <summary>
     /// Data that says authorization without calling the host, keyed, assigned and in a map, and a fetch that belongs
     /// to another object.
@@ -471,6 +485,26 @@ public sealed class AgUiTests
             NamesThatCallTheHostInATemplateFindings + ", " + NamesThatCallTheHostFindings,
             output);
         output.ShouldContain("only src/agents/connectAgent.ts calls the host by hand");
+    }
+
+    /// <summary>
+    /// Review of #638, round 5: in a template, as in a script, <c>HttpAgent</c> fails as a member of anything, such as a
+    /// namespace import's.
+    /// </summary>
+    [Fact]
+    public void With_vue_an_agent_client_reached_through_a_namespace_import_in_a_template_fails_the_web_apps_lint()
+    {
+        using var project = new GeneratedProject("saas-standard-vue", Anthropic, AgentFramework, AgUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+
+        project.Write("web/app/src/pages/AskPage.vue", AgentClientThroughANamespaceInATemplate);
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        LintFindings(output).ShouldBe("vue/no-restricted-syntax", output);
+        output.ShouldContain("9:");
     }
 
     /// <summary>The realtime stream's own EventSource, the third call to the host by hand, keeps passing.</summary>
