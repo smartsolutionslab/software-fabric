@@ -3,7 +3,8 @@ namespace {{ namespace }}.Modules.Dashboards.Application.ReadModels;
 /// <summary>
 /// A dashboard's row in the dashboards table, which pages of dashboards and the widget-count chart read. The save and
 /// remove use cases write it right after they store the dashboard's events, not in one transaction with them: a crash
-/// in between leaves the row stale until the dashboard is saved again. One dashboard is read from its stream.
+/// in between, or two requests whose writes interleave, leaves the row stale until its owner saves the dashboard again.
+/// One dashboard is read from its stream.
 /// </summary>
 public sealed class DashboardRow
 {

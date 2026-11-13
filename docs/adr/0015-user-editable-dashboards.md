@@ -117,9 +117,10 @@ unit of work.
   save and remove use cases write right after they save the aggregate's events
   and commit through `IDashboardsUnitOfWork`, the same on both stores (the
   owner's decision of 2026-11-13); one dashboard is read from its stream. The
-  two writes are not in one transaction: a crash between them leaves the table
-  stale, a dashboard missing from or outdated in the list, until it is next
-  saved. The stream keeps its owner after a removal, so another user's id
+  two writes are not in one transaction: a crash between them, or two requests
+  for one dashboard whose writes interleave (a save's row written after a
+  removal's), leaves the table stale, a dashboard missing from, outdated in or
+  left over in the list, until its owner next saves it. The stream keeps its owner after a removal, so another user's id
   answers 409 `dashboards.already-exists` from the use case itself. With
   `module.ddd-depth: strict`, a placed widget's parts are value objects over one
   value each, since the event store writes a value object as its one value.

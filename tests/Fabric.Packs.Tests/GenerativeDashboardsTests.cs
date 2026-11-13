@@ -157,8 +157,9 @@ public sealed class GenerativeDashboardsTests
         moduleExitCode.ShouldBe(0, moduleOutput);
         moduleOutput.ShouldContain("failed: 0");
 
-        // The module's own test and the sample model test, the agent's 8 and the proposal's 9, then the user-editable pack's 37.
-        moduleOutput.ShouldContain("succeeded: 56");
+        // The module's own test and the sample model test, the agent's 8 and the proposal's 9, then the user-editable pack's 37,
+        // and its 2 that only a ddd or event-sourced module has (a removed id saved again, a missing widget list; #608).
+        moduleOutput.ShouldContain("succeeded: 58");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
         architectureExitCode.ShouldBe(0, architectureOutput);
@@ -192,8 +193,8 @@ public sealed class GenerativeDashboardsTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        // 56, and the module's CanManage handler test that roles bring (#609).
-        output.ShouldContain("succeeded: 57");
+        // 58 under ddd (#608), and the module's CanManage handler test that roles bring (#609).
+        output.ShouldContain("succeeded: 59");
     }
 
     [Fact]

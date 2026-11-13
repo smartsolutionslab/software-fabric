@@ -181,7 +181,13 @@ public sealed class SaveDashboardHandler(
             return {{ fail "Guid" "DashboardsFailures.NotSignedIn()" }};
         }
 
-        var problem = await ProblemAsync(command.Widgets, cancellationToken);
+        // A request without a list of widgets is refused, as one with too many is: an empty list is the way to clear them.
+        if (command.Widgets is not { } widgets)
+        {
+            return {{ fail "Guid" "DashboardsFailures.From(DashboardErrors.TooManyWidgets(Dashboard.MaximumWidgets))" }};
+        }
+
+        var problem = await ProblemAsync(widgets, cancellationToken);
         if (problem is not null)
         {
             return {{ fail "Guid" "problem" }};
@@ -192,7 +198,7 @@ public sealed class SaveDashboardHandler(
         var found = await dashboards.FindAsync(command.Id, owner, cancellationToken);
         if (found.HasValue)
         {
-            var rearranged = found.Value.Rearrange(command.Name, command.Widgets);
+            var rearranged = found.Value.Rearrange(command.Name, widgets);
             if (!rearranged.IsSuccess)
             {
                 return {{ fail "Guid" "DashboardsFailures.From(rearranged.Error)" }};
@@ -202,7 +208,7 @@ public sealed class SaveDashboardHandler(
         var dashboard = await dashboards.FindAsync(command.Id, owner, cancellationToken);
         if (dashboard is not null)
         {
-            var rearranged = dashboard.Rearrange(command.Name, command.Widgets);
+            var rearranged = dashboard.Rearrange(command.Name, widgets);
             if (!rearranged.IsSuccess)
             {
                 return {{ fail "Guid" "DashboardsFailures.From(rearranged.Error)" }};
@@ -211,7 +217,7 @@ public sealed class SaveDashboardHandler(
 {{~ end ~}}
         else
         {
-            var created = Dashboard.Create(command.Id, owner, command.Name, command.Widgets);
+            var created = Dashboard.Create(command.Id, owner, command.Name, widgets);
             if (!created.IsSuccess)
             {
                 return {{ fail "Guid" "DashboardsFailures.From(created.Error)" }};
@@ -298,7 +304,13 @@ public sealed class SaveDashboardHandler(
             return {{ fail "Guid" "DashboardsFailures.NotSignedIn()" }};
         }
 
-        var problem = await ProblemAsync(command.Widgets, cancellationToken);
+        // A request without a list of widgets is refused, as one with too many is: an empty list is the way to clear them.
+        if (command.Widgets is not { } widgets)
+        {
+            return {{ fail "Guid" "DashboardsFailures.From(DashboardErrors.TooManyWidgets(Dashboard.MaximumWidgets))" }};
+        }
+
+        var problem = await ProblemAsync(widgets, cancellationToken);
         if (problem is not null)
         {
             return {{ fail "Guid" "problem" }};
@@ -322,7 +334,7 @@ public sealed class SaveDashboardHandler(
                 return {{ fail "Guid" "DashboardsFailures.AlreadyExists(command.Id.Value)" }};
             }
 
-            var rearranged = dashboard.Rearrange(command.Name, command.Widgets);
+            var rearranged = dashboard.Rearrange(command.Name, widgets);
             if (!rearranged.IsSuccess)
             {
                 return {{ fail "Guid" "DashboardsFailures.From(rearranged.Error)" }};
@@ -330,7 +342,7 @@ public sealed class SaveDashboardHandler(
         }
         else
         {
-            var created = Dashboard.Create(command.Id, owner, command.Name, command.Widgets);
+            var created = Dashboard.Create(command.Id, owner, command.Name, widgets);
             if (!created.IsSuccess)
             {
                 return {{ fail "Guid" "DashboardsFailures.From(created.Error)" }};

@@ -16,13 +16,13 @@ public sealed record SaveDashboardRequest(string Name, IReadOnlyList<WidgetPlace
 {
     /// <summary>
     /// The command, its values made from the body's. A missing name or widget is passed on empty, for the dashboard to
-    /// refuse with its own code.
+    /// refuse with its own code; a missing list of widgets is passed on as none, for the use case to refuse.
     /// </summary>
     public SaveDashboard ToCommand(Guid id) =>
         new(
             DashboardId.From(id),
             DashboardName.From(Name ?? string.Empty),
-            [.. (Widgets ?? []).Select(placement => placement is null
+            Widgets is null ? null : [.. Widgets.Select(placement => placement is null
                 ? DashboardWidget.From(string.Empty, string.Empty, string.Empty, 0, 0, 0, 0)
                 : DashboardWidget.From(placement.Key, placement.Source, placement.Visual, placement.X, placement.Y, placement.Width, placement.Height))]);
 }
