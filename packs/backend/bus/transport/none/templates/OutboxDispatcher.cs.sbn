@@ -68,6 +68,15 @@ public sealed partial class OutboxDispatcher(
                 {
                     LogReadFailed(logger, exception, type.Name{{ if tenants }}, tenant{{ end }});
                 }
+{{~ if project["backend.database"] == "sqlserver" ~}}
+                // The host is stopping and cancelled the read. SQL Server's client reports a cancelled command as a SqlException
+                // or an InvalidOperationException ("Operation cancelled by user."), which the host would take for this service
+                // failing and throw from its own stop; it is the cancellation the host asked for, and ends the loop as one.
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    throw new OperationCanceledException("The host stopped while the outbox was being read.", exception, stoppingToken);
+                }
+{{~ end ~}}
             }
 
             if (delivered == 0)
