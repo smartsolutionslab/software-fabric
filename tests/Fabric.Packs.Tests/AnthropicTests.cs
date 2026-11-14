@@ -7,8 +7,8 @@ namespace Fabric.Packs.Tests;
 /// <c>backend.llm: anthropic</c> (ADR-0010): one <c>IChatClient</c> for Claude, from the official <c>Anthropic</c>
 /// package, registered in infrastructure with logging and OpenTelemetry; the key an Aspire secret parameter, the model
 /// a parameter defaulting to <c>claude-haiku-5-5</c>. The parts every provider shares (the tests' stand-in model, the
-/// rule keeping provider SDKs out of Domain and Application, the API-key gate and the sample query) come from the base,
-/// for projects that call a model only. No test here calls the Anthropic API.
+/// rule keeping provider SDKs out of Domain and Application and the sample query) come from the base, for projects that
+/// call a model only; the settings-secret gate the base gives every project. No test here calls the Anthropic API.
 /// </summary>
 [Collection(FixedPorts.Name)]
 public sealed class AnthropicTests
@@ -24,7 +24,6 @@ public sealed class AnthropicTests
     [
         "tests/Fakes/FakeChatClient.cs",
         "tests/Architecture.Tests/Rules/ProviderSdksStayOutOfDomainAndApplication.cs",
-        "tests/Architecture.Tests/Rules/NoApiKeyInSettings.cs",
         "src/BuildingBlocks/Llm/Wiring/ChatClientRegistration.cs",
     ];
 

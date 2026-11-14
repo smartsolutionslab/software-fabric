@@ -29,7 +29,6 @@ public sealed class AzureOpenAITests
     [
         "tests/Fakes/FakeChatClient.cs",
         "tests/Architecture.Tests/Rules/ProviderSdksStayOutOfDomainAndApplication.cs",
-        "tests/Architecture.Tests/Rules/NoApiKeyInSettings.cs",
         "src/BuildingBlocks/Llm/Wiring/ChatClientRegistration.cs",
     ];
 
