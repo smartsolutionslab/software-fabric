@@ -1,0 +1,57 @@
+{{ sse = project["frontend.realtime"] == "sse" ~}}
+  {
+    // AG-UI's run is a server-sent event stream the generated client cannot make, so connectAgent is the one call to
+    // the host written by hand (docs/adr). Everywhere else a call goes through src/api, which sets the token. Lint bans
+    // the names a call is made with, not the shapes of calls.
+    files: ['src/**/*.{ts,{{ if project["frontend.framework"] == "vue" }}vue{{ else }}tsx{{ end }}}'],
+    ignores: ['src/api/baseApi.ts', 'src/agents/connectAgent.ts', {{ if sse }}'src/realtime/connection.ts', {{ end }}'**/*.test.*'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        ...['fetch', 'XMLHttpRequest', 'Headers', 'EventSource'].map((name) => ({
+          name,
+          message: 'Call the host through src/api; only src/agents/connectAgent.ts calls the host by hand.',
+        })),
+      ],
+      'no-restricted-properties': [
+        'error',
+        ...['window', 'globalThis', 'self'].flatMap((object) =>
+          ['fetch', 'XMLHttpRequest', 'Headers', 'HttpAgent', 'EventSource'].map((property) => ({
+            object,
+            property,
+            message: 'Call the host through src/api; only src/agents/connectAgent.ts calls the host by hand.',
+          })),
+        ),
+        {
+          property: 'HttpAgent',
+          message: 'Talk to an agent through connectAgent; only src/agents/connectAgent.ts calls the host by hand.',
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "ImportSpecifier[imported.name='HttpAgent']",
+          message: 'Talk to an agent through connectAgent; only src/agents/connectAgent.ts calls the host by hand.',
+        },
+      ],
+    },
+  }{{ if project["frontend.framework"] == "vue" }},
+  {
+    // eslint's own rules do not read a template, whose expressions reach what <script setup> exposes.
+    files: ['src/**/*.vue'],
+    rules: {
+      'vue/no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'Identifier[name=/^(fetch|XMLHttpRequest|Headers|HttpAgent|EventSource)$/]' +
+            ':not(MemberExpression[computed=false] > .property, Property[shorthand=false] > .key), ' +
+            'MemberExpression[object.name=/^(window|globalThis|self)$/]' +
+            ':matches([property.name=/^(fetch|XMLHttpRequest|Headers|HttpAgent|EventSource)$/], ' +
+            '[property.value=/^(fetch|XMLHttpRequest|Headers|HttpAgent|EventSource)$/]), ' +
+            "MemberExpression[property.name='HttpAgent'], MemberExpression[property.value='HttpAgent']",
+          message: 'Call the host through src/api; only src/agents/connectAgent.ts calls the host by hand.',
+        },
+      ],
+    },
+  }{{ end }}

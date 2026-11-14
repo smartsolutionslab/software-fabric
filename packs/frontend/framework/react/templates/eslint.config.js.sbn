@@ -63,4 +63,6 @@ export default tseslint.config(
       ],
     },
   },
+{{- if slots["web.lint-configs"] != "" }}
+{{ slots["web.lint-configs"] }},{{ end }}
 );

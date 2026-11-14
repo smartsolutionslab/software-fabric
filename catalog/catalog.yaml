@@ -361,6 +361,7 @@ dimensions:
       web.lint-ignores: { description: "Entries of eslint's ignores (generated files).", separator: ",\n" }
       web.format-ignores: { description: "Lines of the formatter's ignore file: files a tool writes, not people." }
       web.restricted-imports: { description: "Entries of eslint's no-restricted-imports patterns.", separator: ",\n" }
+      web.lint-configs: { description: "Config objects appended to eslint's, each naming the files it applies to: a rule for some files only.", separator: ",\n" }
       web.vite-imports: { description: "Import lines of vite.config.ts." }
       web.vite-plugins: { description: "Entries of vite.config.ts's plugins array.", separator: ",\n" }
       web.imports: { description: "Import lines of the app's entry point." }

@@ -74,6 +74,98 @@ public sealed class AgUiTests
         """;
 
     /// <summary>
+    /// Every name that calls the host: bare (<c>HttpAgent</c> as it is imported), then through <c>window</c>,
+    /// <c>globalThis</c> and <c>self</c>, then through a namespace import.
+    /// </summary>
+    private const string NamesThatCallTheHost = """
+        import { HttpAgent as Agent } from '@ag-ui/client';
+        import * as agui from '@ag-ui/client';
+
+        export const bare = [fetch, XMLHttpRequest, Headers, EventSource, Agent];
+        export const throughWindow = [window.fetch, window.XMLHttpRequest, window.Headers, window.HttpAgent, window.EventSource];
+        export const throughGlobalThis = [globalThis.fetch, globalThis.XMLHttpRequest, globalThis.Headers, globalThis.HttpAgent, globalThis.EventSource];
+        export const throughSelf = [self.fetch, self.XMLHttpRequest, self.Headers, self.HttpAgent, self.EventSource];
+        export const throughTheNamespace = agui.HttpAgent;
+
+        """;
+
+    /// <summary>The rules eslint names for <see cref="NamesThatCallTheHost"/>, in the order of its lines.</summary>
+    private const string NamesThatCallTheHostFindings =
+        "no-restricted-syntax, "
+        + "no-restricted-globals, no-restricted-globals, no-restricted-globals, no-restricted-globals, "
+        + "no-restricted-properties, no-restricted-properties, no-restricted-properties, no-restricted-properties, no-restricted-properties, "
+        + "no-restricted-properties, no-restricted-properties, no-restricted-properties, no-restricted-properties, no-restricted-properties, "
+        + "no-restricted-properties, no-restricted-properties, no-restricted-properties, no-restricted-properties, no-restricted-properties, "
+        + "no-restricted-properties";
+
+    /// <summary>A component whose template reaches every name that calls the host, bare and through each global object.</summary>
+    private const string NamesThatCallTheHostInATemplate = """
+        <template>
+          <button type="button" @click="[fetch, XMLHttpRequest, Headers, HttpAgent, EventSource]">Bare</button>
+          <button type="button" @click="[window.fetch, window.XMLHttpRequest, window.Headers, window.HttpAgent, window.EventSource]">Window</button>
+          <button type="button" @click="[globalThis.fetch, globalThis.XMLHttpRequest, globalThis.Headers, globalThis.HttpAgent, globalThis.EventSource]">GlobalThis</button>
+          <button type="button" @click="[self.fetch, self.XMLHttpRequest, self.Headers, self.HttpAgent, self.EventSource]">Self</button>
+        </template>
+
+        """;
+
+    /// <summary>Twenty findings, one per name in <see cref="NamesThatCallTheHostInATemplate"/>.</summary>
+    private static readonly string NamesThatCallTheHostInATemplateFindings =
+        string.Join(", ", Enumerable.Repeat("vue/no-restricted-syntax", 20));
+
+    /// <summary>A component whose template builds a second agent client through a namespace import.</summary>
+    private const string AgentClientThroughANamespaceInATemplate = """
+        <script setup lang="ts">
+        import * as agui from '@ag-ui/client';
+
+        defineExpose({ agui });
+        </script>
+
+        <template>
+          <button type="button" @click="new agui.HttpAgent({ url: '/api/agents/assistant' }).runAgent()">Ask</button>
+        </template>
+
+        """;
+
+    /// <summary>
+    /// Data that says authorization without calling the host, keyed, assigned and in a map, and a fetch that belongs
+    /// to another object.
+    /// </summary>
+    private const string DataThatSaysAuthorization = """
+        export const roles = new Map<string, string>().set('authorization', 'x');
+
+        export const grant = { authorization: 'manager', Authorization: 'x' };
+
+        export function revoke(record: { authorization?: string; Authorization?: string }) {
+          record.authorization = 'x';
+          record.Authorization = 'x';
+        }
+
+        export const store = { fetch: () => 'cached' };
+
+        export const cached = store.fetch();
+
+        """;
+
+    /// <summary>The same in a component's template.</summary>
+    private const string DataThatSaysAuthorizationInATemplate = """
+        <script setup lang="ts">
+        const roles = new Map<string, string>();
+        const grant: { authorization?: string; Authorization?: string } = {};
+        const store = { fetch: () => 'cached' };
+        defineExpose({ roles, grant, store });
+        </script>
+
+        <template>
+          <button type="button" @click="roles.set('authorization', 'x')">Role</button>
+          <button type="button" @click="grant.authorization = 'x'">Grant</button>
+          <button type="button" @click="grant.Authorization = 'x'">Grant again</button>
+          <button type="button" @click="store.fetch()">Load</button>
+        </template>
+
+        """;
+
+    /// <summary>
     /// Runs the AG-UI SDK's own stream over updates that fail mid-stream, with the tracer <c>AddServiceDefaults()</c>
     /// builds. The browser's RUN_ERROR says only that the run failed; the <c>agui.run</c> span is where the cause is.
     /// The architecture tests reference the host, and through it the SDK, because keycloak's endpoint rule needs it.
@@ -310,6 +402,139 @@ public sealed class AgUiTests
         files["web/app/eslint.config.js"].ShouldNotContain("'@ag-ui/*'");
     }
 
+    /// <summary>
+    /// The owner's decision on #607: AG-UI's run is a server-sent event stream the generated client cannot make, so
+    /// <c>connectAgent</c> alone calls the host by hand, with the token from where <c>src/api/baseApi.ts</c> reads it.
+    /// </summary>
+    [Fact]
+    public void The_agent_panels_client_is_the_one_hand_written_call_to_the_host_and_reads_the_token_where_the_api_client_does()
+    {
+        foreach (var (description, files) in new[]
+        {
+            ("oidc-client-ts", Files(Profile, Anthropic, AgentFramework, AgUi)),
+            ("msal", Files(Profile, Anthropic, AgentFramework, AgUi, "backend.auth=entra-id", "frontend.auth-client=msal")),
+        })
+        {
+            const string TokenImport = "import { accessToken } from '@/auth/accessToken';";
+            files["web/app/src/api/baseApi.ts"].ShouldContain(TokenImport, customMessage: description);
+            files[Client].ShouldContain(TokenImport, customMessage: description);
+            files[Client].ShouldContain("const token = accessToken();", customMessage: description);
+        }
+
+        var react = Files(Profile, Anthropic, AgentFramework, AgUi);
+        react["web/app/eslint.config.js"].ShouldContain("files: ['src/**/*.{ts,tsx}'],");
+        react["web/app/eslint.config.js"].ShouldContain("ignores: ['src/api/baseApi.ts', 'src/agents/connectAgent.ts', '**/*.test.*'],");
+        react["AGENTS.md"].ShouldContain("`src/agents/connectAgent.ts` is the one exception to the API client's rule");
+        AgentUiAdr(react).ShouldContain("`connectAgent` is the one call to the host the generated client does not make");
+
+        Files("saas-standard-vue", Anthropic, AgentFramework, AgUi)["web/app/eslint.config.js"].ShouldContain("files: ['src/**/*.{ts,vue}'],");
+
+        // Without the panel, nothing is excepted, so nothing is added.
+        Files(Profile, Anthropic, AgentFramework)["web/app/eslint.config.js"].ShouldNotContain("no-restricted-globals");
+    }
+
+    /// <summary>
+    /// Owner decision on #607 (2026-11-13): lint bans the names that call the host, not call shapes. Words and data
+    /// that only say authorization, and a fetch of another object's, pass; then every banned name fails, bare and
+    /// through window, globalThis or self.
+    /// </summary>
+    [Fact]
+    public void Every_name_that_calls_the_host_fails_the_web_apps_lint_bare_or_through_the_global_object_and_other_data_passes()
+    {
+        using var project = NewProject(Anthropic, AgentFramework, AgUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+        var (untouchedExitCode, untouchedOutput) = Shell.Run(web, "pnpm", "lint");
+        untouchedExitCode.ShouldBe(0, untouchedOutput);
+
+        project.Write("web/app/src/pages/grants.ts", DataThatSaysAuthorization);
+        var (passingExitCode, passingOutput) = Shell.Run(web, "pnpm", "lint");
+        passingExitCode.ShouldBe(0, passingOutput);
+
+        project.Write("web/app/src/pages/calls.ts", NamesThatCallTheHost);
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        LintFindings(output).ShouldBe(NamesThatCallTheHostFindings, output);
+        output.ShouldContain("only src/agents/connectAgent.ts calls the host by hand");
+    }
+
+    /// <summary>The same in a Vue project, in its scripts and in a component's template.</summary>
+    [Fact]
+    public void With_vue_every_name_that_calls_the_host_fails_the_web_apps_lint_in_a_script_or_a_template_and_other_data_passes()
+    {
+        using var project = new GeneratedProject("saas-standard-vue", Anthropic, AgentFramework, AgUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+        var (untouchedExitCode, untouchedOutput) = Shell.Run(web, "pnpm", "lint");
+        untouchedExitCode.ShouldBe(0, untouchedOutput);
+
+        project.Write("web/app/src/pages/grants.ts", DataThatSaysAuthorization);
+        project.Write("web/app/src/pages/GrantsPage.vue", DataThatSaysAuthorizationInATemplate);
+        var (passingExitCode, passingOutput) = Shell.Run(web, "pnpm", "lint");
+        passingExitCode.ShouldBe(0, passingOutput);
+
+        project.Write("web/app/src/pages/calls.ts", NamesThatCallTheHost);
+        project.Write("web/app/src/pages/CallsPage.vue", NamesThatCallTheHostInATemplate);
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        LintFindings(output).ShouldBe(
+            NamesThatCallTheHostInATemplateFindings + ", " + NamesThatCallTheHostFindings,
+            output);
+        output.ShouldContain("only src/agents/connectAgent.ts calls the host by hand");
+    }
+
+    /// <summary>
+    /// Review of #638, round 5: in a template, as in a script, <c>HttpAgent</c> fails as a member of anything, such as a
+    /// namespace import's.
+    /// </summary>
+    [Fact]
+    public void With_vue_an_agent_client_reached_through_a_namespace_import_in_a_template_fails_the_web_apps_lint()
+    {
+        using var project = new GeneratedProject("saas-standard-vue", Anthropic, AgentFramework, AgUi);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+
+        project.Write("web/app/src/pages/AskPage.vue", AgentClientThroughANamespaceInATemplate);
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldNotBe(0, output);
+        LintFindings(output).ShouldBe("vue/no-restricted-syntax", output);
+        output.ShouldContain(" 8:");
+    }
+
+    /// <summary>The realtime stream's own EventSource, the third call to the host by hand, keeps passing.</summary>
+    [Fact]
+    public void With_the_server_sent_event_stream_the_untouched_web_app_passes_lint()
+    {
+        using var project = NewProject(Anthropic, AgentFramework, AgUi, "frontend.realtime=sse");
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, installOutput);
+
+        var (exitCode, output) = Shell.Run(web, "pnpm", "lint");
+
+        exitCode.ShouldBe(0, output);
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "web/app/src/realtime/connection.ts")).ShouldContain("new EventSource(");
+    }
+
+    [Fact]
+    public void The_agent_panels_adr_says_what_lint_cannot_see_and_that_the_backend_policy_protects_the_host()
+    {
+        var adr = AgentUiAdr(Files(Profile, Anthropic, AgentFramework, AgUi));
+
+        adr.ShouldContain("Lint bans names, not calls:");
+        adr.ShouldContain("What lint cannot see:");
+        adr.ShouldContain("a name reached through a variable");
+        adr.ShouldContain("a property name computed at run time");
+        adr.ShouldContain("an HTTP library not on the list");
+        adr.ShouldContain("The protection is the backend's policy");
+    }
+
     [Fact]
     public void The_end_to_end_script_starts_the_apphost_with_the_stand_in_model()
     {
@@ -513,6 +738,17 @@ public sealed class AgUiTests
         project.Write("src/Host/Agents/StandInChatClient.cs", inOneChunk);
         return project;
     }
+
+    /// <summary>The agent panel's ADR, whatever number the generated project gives it.</summary>
+    private static string AgentUiAdr(Dictionary<string, string> files) =>
+        files[files.Keys.Single(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("-frontend-agent-ui-ag-ui.md", StringComparison.Ordinal))];
+
+    /// <summary>The rule of every error eslint's stylish output lists (<c>  4:26  error  message  rule</c>), in order.</summary>
+    private static string LintFindings(string output) =>
+        string.Join(", ", output.Split('\n')
+            .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Where(words => words.Length > 2 && words[0].Contains(':', StringComparison.Ordinal) && words[0].All(c => char.IsDigit(c) || c == ':') && words[1] == "error")
+            .Select(words => words[^1]));
 
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
     {
