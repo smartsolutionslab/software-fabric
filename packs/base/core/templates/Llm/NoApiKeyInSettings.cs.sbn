@@ -1,20 +1,26 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace {{ namespace }}.Architecture.Tests.Rules;
 
 /// <summary>
 /// A settings file is committed, copied into every build output and read by anyone with the repository, so a model's
-/// key never goes in one: it is an Aspire secret parameter, set with <c>dotnet user-secrets</c> or the deployment's
-/// secret store. A key is found by its name (<c>ApiKey</c>, <c>api-key</c>, ...) or by the prefix provider keys carry
-/// (<c>sk-</c>). A violation names the file and the setting, never the value.
+/// key, or any other secret, never goes in one: it is an Aspire secret parameter, set with <c>dotnet user-secrets</c> or
+/// the deployment's secret store. A key is found by its name (<c>ApiKey</c>, <c>api-key</c>, ...) or by the prefix
+/// provider keys carry (<c>sk-</c>); another secret by the last segment of its name, ignoring case, <c>-</c> and
+/// <c>_</c>: one ending in <c>secret</c>, <c>password</c>, <c>passwd</c> or <c>token</c>, or <c>pwd</c> itself; and a
+/// password inside a connection string by its <c>Password=</c> or <c>Pwd=</c> part, whatever the setting is named.
+/// An empty or blank value is no secret. A violation names the file and the setting, never the value.
 /// </summary>
-public sealed class NoApiKeyInSettings : IArchitectureRule
+public sealed partial class NoApiKeyInSettings : IArchitectureRule
 {
     private static readonly string[] Skipped = ["bin", "obj", "node_modules", ".git"];
 
+    private static readonly string[] SecretNameEndings = ["secret", "password", "passwd", "token"];
+
     private static readonly JsonDocumentOptions Lenient = new() { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
 
-    public string Description => "No appsettings*.json holds an API key; a key is an Aspire secret parameter (AddParameter(..., secret: true)).";
+    public string Description => "No appsettings*.json holds an API key, a secret, a password or a token; each is an Aspire secret parameter (AddParameter(..., secret: true)).";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -29,8 +35,8 @@ public sealed class NoApiKeyInSettings : IArchitectureRule
             {
                 using var settings = JsonDocument.Parse(File.ReadAllText(path), Lenient);
                 violations.AddRange(Settings(settings.RootElement, string.Empty)
-                    .Where(setting => IsApiKey(setting.Key, setting.Value))
-                    .Select(setting => $"{file}: '{setting.Key}' holds an API key; make it an Aspire secret parameter and set it with dotnet user-secrets, never in a settings file."));
+                    .Select(setting => Violation(file, setting.Key, setting.Value))
+                    .OfType<string>());
             }
             catch (JsonException exception)
             {
@@ -58,16 +64,36 @@ public sealed class NoApiKeyInSettings : IArchitectureRule
 
     private static string Child(string key, string name) => key.Length == 0 ? name : $"{key}:{name}";
 
-    private static bool IsApiKey(string key, string value)
+    /// <summary>What is wrong with one setting, naming the file and the setting but never the value; null when nothing is.</summary>
+    private static string? Violation(string file, string key, string value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return false;
+            return null;
         }
 
         var name = key[(key.LastIndexOf(':') + 1)..].Replace("-", string.Empty, StringComparison.Ordinal).Replace("_", string.Empty, StringComparison.Ordinal);
-        return name.Contains("apikey", StringComparison.OrdinalIgnoreCase) || value.StartsWith("sk-", StringComparison.Ordinal);
+        if (name.Contains("apikey", StringComparison.OrdinalIgnoreCase) || value.StartsWith("sk-", StringComparison.Ordinal))
+        {
+            return $"{file}: '{key}' holds an API key; make it an Aspire secret parameter and set it with dotnet user-secrets, never in a settings file.";
+        }
+
+        if (name.Equals("pwd", StringComparison.OrdinalIgnoreCase) || SecretNameEndings.Any(ending => name.EndsWith(ending, StringComparison.OrdinalIgnoreCase)))
+        {
+            return $"{file}: '{key}' holds a secret; make it an Aspire secret parameter and set it with dotnet user-secrets, never in a settings file.";
+        }
+
+        if (PasswordPart().IsMatch(value))
+        {
+            return $"{file}: '{key}' holds a password in a connection string; a connection string comes from Aspire, its password from an Aspire secret parameter, never from a settings file.";
+        }
+
+        return null;
     }
+
+    /// <summary>A connection string's <c>Password=</c> or <c>Pwd=</c> part with a value.</summary>
+    [GeneratedRegex(@"(?:^|;)\s*(?:password|pwd)\s*=\s*[^;\s]", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex PasswordPart();
 
     /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
     private static string RepositoryRoot()

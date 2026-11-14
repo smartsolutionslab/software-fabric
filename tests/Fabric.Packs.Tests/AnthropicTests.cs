@@ -211,6 +211,70 @@ public sealed class AnthropicTests
         output.ShouldNotContain("sk-ant-not-a-real-key");
     }
 
+    [Fact]
+    public void A_secret_password_or_token_in_a_settings_file_fails_the_architecture_tests_naming_the_file_and_the_setting()
+    {
+        using var project = NewProject(Anthropic);
+        project.Write("src/Host/appsettings.Development.json", """
+            {
+              "KeycloakAdmin": {
+                "ClientSecret": "not-a-real-client-secret",
+                "TokenEndpoint": "http://localhost:8080/realms/shop/protocol/openid-connect/token",
+                "SecretName": "keycloak-admin"
+              },
+              "Smtp": {
+                "Password": "not-a-real-password",
+                "UserName": "mailer"
+              },
+              "Webhooks": [
+                { "signing_secret": "not-a-real-signing-secret" }
+              ],
+              "Bot": {
+                "AccessToken": "not-a-real-token",
+                "RefreshToken": "",
+                "MaxTokens": "512"
+              },
+              "Legacy": {
+                "ConnectionString": "Host=db;Username=shop;Password=not-a-real-db-password"
+              },
+              "ConnectionStrings": {
+                "reports": "Server=db;User Id=shop;Pwd=not-a-real-reports-password;",
+                "cache": "localhost:6379",
+                "audit": "Host=db;Username=shop;Password="
+              }
+            }
+            """);
+        project.Write("src/AppHost/appsettings.Development.json", """
+            {
+              "Parameters": {
+                "keycloak-admin-secret": "not-a-real-parameter-secret",
+                "keycloak-admin-password": "   "
+              }
+            }
+            """);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("src/Host/appsettings.Development.json: 'KeycloakAdmin:ClientSecret' holds a secret");
+        output.ShouldContain("src/Host/appsettings.Development.json: 'Smtp:Password' holds a secret");
+        output.ShouldContain("src/Host/appsettings.Development.json: 'Webhooks:0:signing_secret' holds a secret");
+        output.ShouldContain("src/Host/appsettings.Development.json: 'Bot:AccessToken' holds a secret");
+        output.ShouldContain("src/Host/appsettings.Development.json: 'Legacy:ConnectionString' holds a password");
+        output.ShouldContain("src/Host/appsettings.Development.json: 'ConnectionStrings:reports' holds a password");
+        output.ShouldContain("src/AppHost/appsettings.Development.json: 'Parameters:keycloak-admin-secret' holds a secret");
+        output.ShouldNotContain("'KeycloakAdmin:TokenEndpoint'");
+        output.ShouldNotContain("'KeycloakAdmin:SecretName'");
+        output.ShouldNotContain("'Smtp:UserName'");
+        output.ShouldNotContain("'Bot:RefreshToken'");
+        output.ShouldNotContain("'Bot:MaxTokens'");
+        output.ShouldNotContain("'ConnectionStrings:cache'");
+        output.ShouldNotContain("'ConnectionStrings:audit'");
+        output.ShouldNotContain("'Parameters:keycloak-admin-password'");
+        output.ShouldNotContain("not-a-real-");
+    }
+
     private static Dictionary<string, string> Files(string profile, params string[] overrides)
     {
         var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, overrides);
