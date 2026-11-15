@@ -1,9 +1,17 @@
-{{~ ollama = project["backend.llm.embeddings"] == "ollama" ~}}
+{{~ ollama = project["backend.llm.embeddings"] == "ollama"
+# The chat model shares the embeddings' endpoint, so this server is its stand-in too (#662).
+chat = project["backend.llm"] == project["backend.llm.embeddings"] && (ollama || project["backend.llm"] == "azure-openai") ~}}
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
+{{~ if chat ~}}
+using System.Text;
+{{~ end ~}}
 using System.Text.Json;
 using System.Text.Json.Nodes;
+{{~ if chat ~}}
+using Microsoft.Extensions.AI;
+{{~ end ~}}
 using {{ namespace }}.BuildingBlocks.Rag;
 using {{ namespace }}.Tests.Fakes;
 
@@ -13,13 +21,25 @@ namespace {{ namespace }}.Integration.Tests;
 {{~ if ollama ~}}
 /// An Ollama-compatible embeddings endpoint on the loopback interface, answering <c>POST /api/embed</c> with
 /// <see cref="FakeEmbeddingGenerator"/>'s vectors, so the host can index and search while the integration tests run,
-/// and no test calls a real model or pulls one. The fixture gives it to the host as its Ollama endpoint. Anything else,
-/// a chat request included, is a 404: the chat model stays unreachable.
+/// and no test calls a real model or pulls one. The fixture gives it to the host as its Ollama endpoint.
+{{~ if chat ~}}
+/// The chat model shares that endpoint: a chat request, <c>POST /api/chat</c>, is answered by the
+/// <see cref="FakeChatClient"/> a test gave <see cref="Answer"/> for a word its messages contain. A chat request no test
+/// answers, like anything else, is a 404, as a model the host cannot reach.
+{{~ else ~}}
+/// Anything else, a chat request included, is a 404: the chat model stays unreachable.
+{{~ end ~}}
 {{~ else ~}}
 /// An OpenAI-compatible embeddings endpoint on the loopback interface, answering <c>POST /v1/embeddings</c> with
 /// <see cref="FakeEmbeddingGenerator"/>'s vectors, so the host can index and search while the integration tests run,
 /// and no test calls a real model or needs a key. The fixture gives it to the host as its embeddings endpoint, which
+{{~ if chat ~}}
+/// ends in <c>/v1</c>. The chat model shares that endpoint: a chat request, <c>POST /v1/chat/completions</c>, is
+/// answered by the <see cref="FakeChatClient"/> a test gave <see cref="Answer"/> for a word its messages contain, plainly
+/// or streamed. A chat request no test answers, like anything else, is a 404, as a model the host cannot reach.
+{{~ else ~}}
 /// ends in <c>/v1</c>. Anything else, a chat request included, is a 404: the chat model stays unreachable.
+{{~ end ~}}
 {{~ end ~}}
 /// </summary>
 public sealed class FakeEmbeddingsServer : IAsyncDisposable
@@ -28,6 +48,9 @@ public sealed class FakeEmbeddingsServer : IAsyncDisposable
     private readonly FakeEmbeddingGenerator generator = new(VectorTables.Dimensions);
     private readonly CancellationTokenSource stopping = new();
     private readonly ConcurrentDictionary<string, HeldEmbeddings> held = new(StringComparer.OrdinalIgnoreCase);
+{{~ if chat ~}}
+    private readonly ConcurrentDictionary<string, FakeChatClient> chats = new(StringComparer.OrdinalIgnoreCase);
+{{~ end ~}}
     private readonly Task serving;
 
     public FakeEmbeddingsServer()
@@ -53,6 +76,18 @@ public sealed class FakeEmbeddingsServer : IAsyncDisposable
         return holding;
     }
 
+{{~ if chat ~}}
+    /// <summary>
+    /// Answers every chat request whose messages contain the word with the client, which keeps what it was asked, until
+    /// the returned registration is disposed. A word no other test uses keeps tests that run at the same time apart.
+    /// </summary>
+    public IDisposable Answer(string word, FakeChatClient model)
+    {
+        chats[word] = model;
+        return new Registration(() => chats.TryRemove(word, out _));
+    }
+
+{{~ end ~}}
     public async ValueTask DisposeAsync()
     {
         await stopping.CancelAsync();
@@ -92,6 +127,56 @@ public sealed class FakeEmbeddingsServer : IAsyncDisposable
     }
 {{~ end ~}}
 
+{{~ if chat ~}}
+    /// <summary>A message's text: its content as a string, or the text of its content parts.</summary>
+    private static string Text(JsonNode? content) =>
+        content switch
+        {
+            JsonValue text => text.GetValue<string>(),
+            JsonArray parts => string.Concat(parts.Select(part => part?["text"]?.GetValue<string>() ?? string.Empty)),
+            _ => string.Empty,
+        };
+
+    private static ChatRole Role(string? role) =>
+        role switch
+        {
+            "system" or "developer" => ChatRole.System,
+            "assistant" => ChatRole.Assistant,
+            "tool" => ChatRole.Tool,
+            _ => ChatRole.User,
+        };
+{{~ if ollama ~}}
+
+    private static JsonObject Reply(string model, string content, bool done)
+    {
+        var reply = new JsonObject
+        {
+            ["model"] = model,
+            ["created_at"] = "2026-01-01T00:00:00Z",
+            ["message"] = new JsonObject { ["role"] = "assistant", ["content"] = content },
+            ["done"] = done,
+        };
+        if (done)
+        {
+            reply["done_reason"] = "stop";
+        }
+
+        return reply;
+    }
+{{~ else ~}}
+
+    private static JsonObject Completion(string kind, string model, JsonObject choice) =>
+        new()
+        {
+            ["id"] = "chatcmpl-fake",
+            ["object"] = kind,
+            ["created"] = 0,
+            ["model"] = model,
+            ["choices"] = new JsonArray(choice),
+        };
+{{~ end ~}}
+
+{{~ end ~}}
     private static JsonArray Vector(ReadOnlyMemory<float> vector) =>
         [.. vector.ToArray().Select(value => (JsonNode)value)];
 
@@ -117,6 +202,14 @@ public sealed class FakeEmbeddingsServer : IAsyncDisposable
     private async Task AnswerAsync(HttpListenerContext context)
     {
         using var response = context.Response;
+{{~ if chat ~}}
+        if (context.Request.HttpMethod == "POST" && context.Request.Url?.AbsolutePath.TrimEnd('/') == "{{ if ollama }}/api/chat{{ else }}/v1/chat/completions{{ end }}")
+        {
+            await ChatAsync(context.Request, response);
+            return;
+        }
+
+{{~ end ~}}
         if (context.Request.HttpMethod != "POST" || context.Request.Url?.AbsolutePath.TrimEnd('/') != "{{ if ollama }}/api/embed{{ else }}/v1/embeddings{{ end }}")
         {
             response.StatusCode = (int)HttpStatusCode.NotFound;
@@ -162,6 +255,87 @@ public sealed class FakeEmbeddingsServer : IAsyncDisposable
         response.ContentType = "application/json";
         await JsonSerializer.SerializeAsync(response.OutputStream, answer);
     }
+{{~ if chat ~}}
+{{~ if ollama ~}}
+
+    private async Task ChatAsync(HttpListenerRequest request, HttpListenerResponse response)
+    {
+        var body = await JsonNode.ParseAsync(request.InputStream) ?? new JsonObject();
+        List<ChatMessage> messages = [.. (body["messages"] as JsonArray ?? []).Select(message =>
+            new ChatMessage(Role(message?["role"]?.GetValue<string>()), Text(message?["content"])))];
+        var model = chats.FirstOrDefault(chat => messages.Any(message => message.Text.Contains(chat.Key, StringComparison.OrdinalIgnoreCase))).Value;
+        if (model is null)
+        {
+            response.StatusCode = (int)HttpStatusCode.NotFound;
+            return;
+        }
+
+        var answer = (await model.GetResponseAsync(messages)).Text;
+        var name = body["model"]?.GetValue<string>() ?? "fake-model";
+        response.StatusCode = (int)HttpStatusCode.OK;
+        if (body["stream"]?.GetValue<bool>() == false)
+        {
+            response.ContentType = "application/json";
+            await JsonSerializer.SerializeAsync(response.OutputStream, Reply(name, answer, done: true));
+            return;
+        }
+
+        // Ollama streams unless asked not to, as lines of JSON: one with the text, then one that is done.
+        response.ContentType = "application/x-ndjson";
+        var lines = $"{Reply(name, answer, done: false).ToJsonString()}\n{Reply(name, string.Empty, done: true).ToJsonString()}\n";
+        await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(lines));
+    }
+{{~ else ~}}
+
+    private async Task ChatAsync(HttpListenerRequest request, HttpListenerResponse response)
+    {
+        var body = await JsonNode.ParseAsync(request.InputStream) ?? new JsonObject();
+        List<ChatMessage> messages = [.. (body["messages"] as JsonArray ?? []).Select(message =>
+            new ChatMessage(Role(message?["role"]?.GetValue<string>()), Text(message?["content"])))];
+        var model = chats.FirstOrDefault(chat => messages.Any(message => message.Text.Contains(chat.Key, StringComparison.OrdinalIgnoreCase))).Value;
+        if (model is null)
+        {
+            response.StatusCode = (int)HttpStatusCode.NotFound;
+            return;
+        }
+
+        var answer = (await model.GetResponseAsync(messages)).Text;
+        var name = body["model"]?.GetValue<string>() ?? "fake-model";
+        response.StatusCode = (int)HttpStatusCode.OK;
+        if (body["stream"]?.GetValue<bool>() != true)
+        {
+            response.ContentType = "application/json";
+            await JsonSerializer.SerializeAsync(response.OutputStream, Completion("chat.completion", name, new JsonObject
+            {
+                ["index"] = 0,
+                ["message"] = new JsonObject { ["role"] = "assistant", ["content"] = answer },
+                ["finish_reason"] = "stop",
+            }));
+            return;
+        }
+
+        // Streamed, the answer comes as server-sent events: one chunk with the text, one that finishes, then [DONE].
+        response.ContentType = "text/event-stream";
+        JsonObject[] chunks =
+        [
+            Completion("chat.completion.chunk", name, new JsonObject
+            {
+                ["index"] = 0,
+                ["delta"] = new JsonObject { ["role"] = "assistant", ["content"] = answer },
+                ["finish_reason"] = null,
+            }),
+            Completion("chat.completion.chunk", name, new JsonObject
+            {
+                ["index"] = 0,
+                ["delta"] = new JsonObject(),
+                ["finish_reason"] = "stop",
+            }),
+        ];
+        var events = string.Concat(chunks.Select(chunk => $"data: {chunk.ToJsonString()}\n\n")) + "data: [DONE]\n\n";
+        await response.OutputStream.WriteAsync(Encoding.UTF8.GetBytes(events));
+    }
+{{~ end ~}}
+{{~ end ~}}
 
     /// <summary>An answer held back: <see cref="Arrived"/> completes once a request for it came in, and disposing releases it.</summary>
     public sealed class HeldEmbeddings : IDisposable
@@ -185,4 +359,12 @@ public sealed class FakeEmbeddingsServer : IAsyncDisposable
             Interlocked.Decrement(ref waiting);
         }
     }
+{{~ if chat ~}}
+
+    /// <summary>A registration that ends when it is disposed.</summary>
+    private sealed class Registration(Action end) : IDisposable
+    {
+        public void Dispose() => end();
+    }
+{{~ end ~}}
 }

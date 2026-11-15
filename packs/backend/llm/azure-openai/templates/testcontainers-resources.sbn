@@ -4,7 +4,8 @@ if object.has_key(project, "backend.llm.extras") && (array.contains project["bac
 end ~}}
 {{~ if stand_in ~}}
         // A key-shaped value Azure does not accept, and the AppHost's default deployment: the integration tests never call the
-        // model. The endpoint is the fixture's embeddings stand-in, given below, which answers chat requests with a 404.
+        // model. The endpoint is the fixture's embeddings stand-in, given below, which answers a chat request with the
+        // FakeChatClient a test gave it, else a 404.
 {{~ else ~}}
         // A resource that does not exist, a key-shaped value Azure does not accept, and the AppHost's default deployment: the
         // integration tests never call the model.

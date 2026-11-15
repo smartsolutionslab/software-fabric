@@ -1,4 +1,9 @@
         // No Ollama container: it would pull the embedding model. The host's Ollama endpoint is the fixture's stand-in, which
+{{ if project["backend.llm"] == "ollama" ~}}
+        // answers embeddings, and a chat request with the FakeChatClient a test gave it, and its model the AppHost's
+        // embedding model.
+{{~ else ~}}
         // answers embeddings only, and its model the AppHost's embedding model.
+{{~ end ~}}
         settings["Ollama:Endpoint"] = embeddings.Endpoint;
         settings["Ollama:EmbeddingModel"] = "nomic-embed-text";
