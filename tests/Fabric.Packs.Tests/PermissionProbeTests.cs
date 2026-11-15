@@ -170,6 +170,65 @@ public sealed partial class PermissionProbeTests
         pageTest.ShouldContain("Manage");
     }
 
+    /// <summary>A single-page app's module page, per router and client, and the test add-module writes beside it.</summary>
+    public static TheoryData<string, string[], string, string> SinglePageAppPages => new()
+    {
+        { "saas-standard-react", [Roles], "web/app/src/modules/billing/BillingPage.axe.test.tsx", "web/app/src/modules/billing/BillingPage.probe.test.tsx" },
+        { "saas-standard-react", [Roles, "frontend.routing=tanstack-router"], "web/app/src/modules/billing/BillingPage.axe.test.tsx", "web/app/src/modules/billing/BillingPage.probe.test.tsx" },
+        { "lean-crud", [Roles], "web/app/src/modules/billing/BillingPage.axe.test.tsx", "web/app/src/modules/billing/BillingPage.probe.test.tsx" },
+        { "lean-crud", [Roles, "frontend.api-client=openapi-fetch"], "web/app/src/modules/billing/BillingPage.axe.test.tsx", "web/app/src/modules/billing/BillingPage.probe.test.tsx" },
+        { "saas-standard-vue", [Roles], "web/app/src/modules/billing/BillingPage.axe.test.ts", "web/app/src/modules/billing/BillingPage.probe.test.ts" },
+        { "saas-standard-vue", [Roles, "frontend.state=pinia"], "web/app/src/modules/billing/BillingPage.axe.test.ts", "web/app/src/modules/billing/BillingPage.probe.test.ts" },
+    };
+
+    /// <summary>
+    /// The page's own generated test checks that 200 shows Manage, 403 hides it and a failure is an alert (#664, owner's
+    /// decision); the axe check beside it asks nothing of the page but accessibility.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(SinglePageAppPages))]
+    public void A_single_page_apps_module_page_has_its_own_test_of_Manage_and_its_axe_check_asks_nothing_of_it(string profile, string[] overrides, string axeCheck, string test)
+    {
+        using var project = new GeneratedProject(profile, overrides);
+        project.AddModule("billing");
+
+        var pageTest = File.ReadAllText(Path.Combine(project.ProjectDirectory, test));
+        pageTest.ShouldContain("vi.mock('./useCanManage'");
+        pageTest.ShouldContain("offers Manage when the probe answers 200");
+        pageTest.ShouldContain("offers no Manage when the probe refuses");
+        pageTest.ShouldContain("shows that its probe failed, not a refusal");
+        var axe = File.ReadAllText(Path.Combine(project.ProjectDirectory, axeCheck));
+        axe.ShouldNotContain("Manage");
+        axe.ShouldNotContain("useCanManage");
+        axe.ShouldNotContain("heading");
+    }
+
+    [Fact]
+    public void The_assistants_page_has_its_own_test_of_Manage_and_the_dashboard_editors_page_none()
+    {
+        using var project = new GeneratedProject("saas-ai-react", Roles);
+
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "web/app/src/modules/assistant/AssistantPage.probe.test.tsx"))
+            .ShouldContain("offers Manage when the probe answers 200");
+        File.Exists(Path.Combine(project.ProjectDirectory, "web/app/src/modules/dashboards/DashboardsPage.probe.test.tsx")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_assistants_page_has_its_own_test_of_Manage_and_the_dashboard_editors_page_none_with_vue()
+    {
+        using var project = new GeneratedProject(
+            "saas-standard-vue",
+            Roles,
+            "backend.llm=openai",
+            "backend.llm.agents=agent-framework",
+            "frontend.agent-ui=ag-ui",
+            "frontend.dashboards=user-editable");
+
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "web/app/src/modules/assistant/AssistantPage.probe.test.ts"))
+            .ShouldContain("offers Manage when the probe answers 200");
+        File.Exists(Path.Combine(project.ProjectDirectory, "web/app/src/modules/dashboards/DashboardsPage.probe.test.ts")).ShouldBeFalse();
+    }
+
     [Fact]
     public void Without_authorization_choices_a_micro_frontend_shells_page_only_mounts_the_remote()
     {
@@ -189,6 +248,7 @@ public sealed partial class PermissionProbeTests
 
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web/app/src/modules/billing/BillingPage.tsx")).ShouldNotContain("useCanManage");
         File.Exists(Path.Combine(project.ProjectDirectory, "web/app/src/modules/billing/useCanManage.ts")).ShouldBeFalse();
+        File.Exists(Path.Combine(project.ProjectDirectory, "web/app/src/modules/billing/BillingPage.probe.test.tsx")).ShouldBeFalse();
     }
 
     /// <summary>
