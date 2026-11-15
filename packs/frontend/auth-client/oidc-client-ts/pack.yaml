@@ -19,6 +19,9 @@ files:
   - { template: templates/RequirePermission.vue.sbn, target: web/app/src/auth/RequirePermission.vue, when: 'project["frontend.framework"] == "vue" && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/RequirePermission.test.ts.sbn, target: web/app/src/auth/RequirePermission.test.ts, when: 'project["frontend.framework"] == "vue" && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0' }
   - { template: templates/sign-in.spec.ts.sbn, target: web/app/e2e/sign-in.spec.ts }
+  # The screens' axe checks (frontend.test.extras accessibility, #661) render a screen for the local user developer, signed in, through these; the provider's names stay in this pack.
+  - { template: templates/SignedInAsDeveloper.tsx.sbn, target: web/app/src/auth/SignedInAsDeveloper.tsx, when: 'project["frontend.framework"] == "react" && object.has_key(project, "frontend.test.extras") && array.contains(project["frontend.test.extras"], "accessibility") && project["frontend.architecture"] == "spa"' }
+  - { template: templates/signedInAsDeveloper.ts.sbn, target: web/app/src/auth/signedInAsDeveloper.ts, when: 'project["frontend.framework"] == "vue" && object.has_key(project, "frontend.test.extras") && array.contains(project["frontend.test.extras"], "accessibility") && project["frontend.architecture"] == "spa"' }
 slots:
   - { slot: templates.functions, template: templates/functions.sbn }
   - { slot: web.dependencies, template: templates/dependencies.sbn }

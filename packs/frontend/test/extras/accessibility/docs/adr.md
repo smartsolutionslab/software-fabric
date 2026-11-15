@@ -14,4 +14,8 @@ Each module screen's axe check is a file of its own beside it, `<Name>Page.axe.t
 
 The stand-in answers every hook as still loading, so on its own the check sees only the screen as it first renders. Beside it the generator writes `<Name>Page.data.ts`, an empty file the project owns: an example answer per hook there makes the check render the screen a second time, populated with that data. A screen whose data file stays empty is checked in its loading state only, and whatever it shows once data comes is not checked; that is the limit of a check the generator writes without knowing the screen's data. A screen that needs a provider other than the API client (a Pinia store, TanStack Query around openapi-fetch) gets that provider in its axe file by hand.
 {{~ end ~}}
+{{~ if object.has_key(project, "frontend.auth-client") ~}}
+
+With browser sign-in the check stands in for it too: the screen renders for the local user `developer`, signed in with the roles and claims the developer's ID token carries locally, so a screen that reads the signed-in user{{ if object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 }} (`RequirePermission`, `useHasRole`, `useHasClaim`){{ end }} renders without the sign-in provider, and the check sees it as the developer does. What a screen shows only to other users is not checked.
+{{~ end ~}}
 {{~ end ~}}
