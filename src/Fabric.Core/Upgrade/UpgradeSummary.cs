@@ -13,11 +13,17 @@ public static class UpgradeSummary
     /// <summary>The committed copy of the host's OpenAPI document, written by every frontend api-client pack.</summary>
     public const string OpenApiDocument = "web/app/openapi.json";
 
+    /// <summary>The module the client code a frontend api-client pack generates imports, written by every one of them.</summary>
+    public const string BaseApi = "web/app/src/api/baseApi.ts";
+
+    private const string WebSource = "web/app/src/";
+
     /// <summary>
-    /// Writes the summary. <paramref name="hasOpenApiDocument"/> says whether the project's choices write
-    /// <see cref="OpenApiDocument"/>, so the summary names it only for a project that has it.
+    /// Writes the summary. <paramref name="hasOpenApiDocument"/> and <paramref name="hasBaseApi"/> say whether the
+    /// project's choices write <see cref="OpenApiDocument"/> and <see cref="BaseApi"/>, so the summary names each only
+    /// for a project that has it.
     /// </summary>
-    public static string Write(string name, string oldVersion, string newVersion, UpgradeOutcome outcome, bool hasOpenApiDocument)
+    public static string Write(string name, string oldVersion, string newVersion, UpgradeOutcome outcome, bool hasOpenApiDocument, bool hasBaseApi)
     {
         ArgumentNullException.ThrowIfNull(outcome);
 
@@ -33,7 +39,7 @@ public static class UpgradeSummary
             text,
             "conflicts to resolve, then git add and commit",
             outcome.Conflicts.Select(conflict => $"{Describe(conflict.Kind, newVersion)}: {conflict.Path}").ToList());
-        var notes = NotGuaranteed(outcome, hasOpenApiDocument);
+        var notes = NotGuaranteed(outcome, hasOpenApiDocument, hasBaseApi);
         if (notes.Count > 0)
         {
             text.AppendLine("not guaranteed (ADR-0016 D1):");
@@ -67,7 +73,7 @@ public static class UpgradeSummary
     };
 
     /// <summary>D1's list, each only where the upgrade touched what it is about.</summary>
-    private static List<string> NotGuaranteed(UpgradeOutcome outcome, bool hasOpenApiDocument)
+    private static List<string> NotGuaranteed(UpgradeOutcome outcome, bool hasOpenApiDocument, bool hasBaseApi)
     {
         var paths = outcome.Taken.Select(file => file.Path)
             .Concat(outcome.Merged.Select(file => file.Path))
@@ -96,6 +102,15 @@ public static class UpgradeSummary
         {
             notes.Add($"- that {OpenApiDocument} and the client generated from it match what the host serves: C# under src/ changed; " +
                 "run the integration tests, which rewrite the document, commit it, then run pnpm codegen in web/app and adapt the screens.");
+        }
+
+        // Client code a pack generates is written against the stock base API (its exports, and with RTK Query the
+        // FetchBaseQueryError its base query reports); a project's own wrapper may not give them. A change to the base
+        // API alone brings no new code that relies on it, and is listed as taken, merged or a conflict anyway.
+        if (hasBaseApi && paths.Any(path => path.StartsWith(WebSource, StringComparison.Ordinal) && path != BaseApi))
+        {
+            notes.Add($"- that generated client code under {WebSource} works with the project's {BaseApi}: it relies on that file's " +
+                "exports and its base query's error type as fabric writes them (FetchBaseQueryError with RTK Query); keep them, then run pnpm build in web/app.");
         }
 
         if (paths.Any(path => path.StartsWith("docs/adr/", StringComparison.Ordinal)))

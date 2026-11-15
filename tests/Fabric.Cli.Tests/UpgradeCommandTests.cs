@@ -308,6 +308,7 @@ public sealed class UpgradeCommandTests : IDisposable
         run.Output.ShouldNotContain("pnpm-lock.yaml");
         run.Output.ShouldNotContain("migration");
         run.Output.ShouldNotContain("openapi.json");
+        run.Output.ShouldNotContain("baseApi.ts");
     }
 
     [Fact]
@@ -347,6 +348,45 @@ public sealed class UpgradeCommandTests : IDisposable
         run.ExitCode.ShouldBe(0, run.Error);
         run.Output.ShouldContain("migration");
         run.Output.ShouldNotContain("that web/app/openapi.json");
+    }
+
+    [Fact]
+    public void Names_the_base_api_and_its_error_type_when_client_code_under_web_app_src_changed_in_a_project_that_has_it()
+    {
+        AddFile(Path.Combine(newPacks, "base", "core"), "base-api.sbn", "web/app/src/api/baseApi.ts", perModule: false, "export const baseApi = {};\n");
+        AddFile(Path.Combine(newPacks, "module", "style", "ddd"), "use-can-manage.sbn", "web/app/src/modules/{{ module.name }}/useCanManage.ts", perModule: true, "// hook\n");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldContain(
+            "  - that generated client code under web/app/src/ works with the project's web/app/src/api/baseApi.ts: it relies on that file's " +
+            "exports and its base query's error type as fabric writes them (FetchBaseQueryError with RTK Query); keep them, then run pnpm build in web/app.\n");
+    }
+
+    [Fact]
+    public void Does_not_name_the_base_api_for_a_project_without_one()
+    {
+        AddFile(Path.Combine(newPacks, "module", "style", "ddd"), "use-can-manage.sbn", "web/app/src/modules/{{ module.name }}/useCanManage.ts", perModule: true, "// hook\n");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldContain("useCanManage.ts");
+        run.Output.ShouldNotContain("baseApi.ts");
+    }
+
+    [Fact]
+    public void Does_not_name_the_base_api_when_no_client_code_under_web_app_src_but_the_base_api_itself_changed()
+    {
+        AddFile(Path.Combine(newPacks, "base", "core"), "base-api.sbn", "web/app/src/api/baseApi.ts", perModule: false, "export const baseApi = {};\n");
+        AddFile(Path.Combine(newPacks, "base", "core"), "app.sbn", "web/app/package.json", perModule: false, "{}\n");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldContain("pnpm-lock.yaml");
+        run.Output.ShouldNotContain("that generated client code");
     }
 
     [Fact]
