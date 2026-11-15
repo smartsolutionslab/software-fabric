@@ -352,6 +352,80 @@ public sealed class SqlServerTests
         failure.ShouldNotContain("already-exists");
     }
 
+    /// <summary>
+    /// The host stopping cancels the dispatcher's outbox read, and SQL Server's client reports a cancelled command as a
+    /// <c>SqlException</c> or an <c>InvalidOperationException</c> ("Operation cancelled by user."), never as an
+    /// <c>OperationCanceledException</c>. The host took that for the dispatcher failing, and its stop threw it (#658).
+    /// Another transaction holds the outbox table, so the read is in flight whenever the host stops, not only by chance.
+    /// </summary>
+    [Fact]
+    public void The_dispatcher_stops_with_the_host_while_its_outbox_read_waits_on_sql_server()
+    {
+        using var project = new GeneratedProject("lean-crud", SqlServer);
+        project.AddModule("billing");
+        project.Write("tests/Modules/Billing.Tests/OutboxDispatcherTests.cs", """
+            using Microsoft.Data.SqlClient;
+            using Microsoft.EntityFrameworkCore;
+            using Microsoft.Extensions.Configuration;
+            using Microsoft.Extensions.DependencyInjection;
+            using Microsoft.Extensions.Hosting;
+            using Shop.BuildingBlocks.Messaging;
+            using Shop.Modules.Billing.Api;
+            using Shop.Modules.Billing.Infrastructure.Persistence;
+
+            namespace Shop.Modules.Billing.Tests;
+
+            public class OutboxDispatcherTests
+            {
+                [Fact]
+                public async Task The_dispatcher_stops_with_the_host_while_its_outbox_read_waits()
+                {
+                    var cancellationToken = TestContext.Current.CancellationToken;
+                    var builder = Host.CreateApplicationBuilder();
+                    new BillingModule().AddServices(builder.Services, builder.Configuration);
+                    builder.Services
+                        .AddSingleton(new IntegrationEventConsumers([]))
+                        .AddSingleton(new OutboxContexts([typeof(BillingDbContext)]))
+                        .AddSingleton<OutboxSignal>()
+                        .AddHostedService<OutboxDispatcher>();
+                    using var host = builder.Build();
+                    await using (var scope = host.Services.CreateAsyncScope())
+                    {
+                        var context = scope.ServiceProvider.GetRequiredService<BillingDbContext>();
+                        await context.Database.EnsureCreatedAsync(cancellationToken);
+                        await Outbox.CreateTableAsync(context, cancellationToken);
+                    }
+
+                    await using var holder = new SqlConnection(builder.Configuration.GetConnectionString("database"));
+                    await holder.OpenAsync(cancellationToken);
+                    await using var transaction = (SqlTransaction)await holder.BeginTransactionAsync(cancellationToken);
+                    await using (var hold = new SqlCommand("select count(*) from billing.outbox_messages with (tablockx, holdlock)", holder, transaction))
+                    {
+                        await hold.ExecuteScalarAsync(cancellationToken);
+                    }
+
+                    await host.StartAsync(cancellationToken);
+                    await using (var blocked = new SqlCommand("select count(*) from sys.dm_exec_requests where blocking_session_id = @@spid", holder, transaction))
+                    {
+                        while ((int)(await blocked.ExecuteScalarAsync(cancellationToken))! == 0)
+                        {
+                            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
+                        }
+                    }
+
+                    await Should.NotThrowAsync(() => host.StopAsync(cancellationToken));
+                }
+            }
+            """);
+        project.Build();
+
+        using var sqlServer = Container.SqlServer(DatabasePassword);
+        var (exitCode, output) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj", Dependencies(sqlServer));
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+    }
+
     [Fact]
     public void The_generated_integration_tests_pass_against_sql_server_in_the_running_aspire_stack()
     {
