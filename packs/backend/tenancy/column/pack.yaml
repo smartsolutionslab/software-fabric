@@ -31,6 +31,8 @@ files:
 slots:
   - { slot: templates.functions, template: templates/functions.sbn }
   - { slot: host.services, template: templates/host-services.sbn, order: 10 }
+  # With writes for a named tenant only: ForTenant() describes the route's {tenant} in the OpenAPI document (#668).
+  - { slot: buildingblocks.packages, template: templates/buildingblocks-package.sbn }
   - { slot: persistence.context-members, template: templates/context-members.sbn }
   - { slot: persistence.model-conventions, template: templates/model-conventions.sbn }
   - { slot: persistence.save-changes, template: templates/save-changes.sbn }
