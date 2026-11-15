@@ -1,0 +1,40 @@
+{{~ roles = object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") ~}}
+{{~ claims = object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "claims") ~}}
+import type { AccountInfo } from '@azure/msal-browser';
+import { computed, type Plugin } from 'vue';
+import { type Auth, authKey } from './useAuth';
+
+// The local user developer as signed in, with the ID token it has locally.
+const developer: Auth = {
+  account: computed(
+    () =>
+      ({
+        username: 'developer',
+        idTokenClaims: {
+          preferred_username: 'developer',
+{{~ if roles ~}}
+          {{ id_token_roles "'manager'" }},
+{{~ end ~}}
+{{~ if claims ~}}
+          department: 'finance',
+{{~ end ~}}
+        },
+      }) as unknown as AccountInfo,
+  ),
+  isAuthenticated: computed(() => true),
+  isLoading: computed(() => false),
+  error: computed(() => null),
+  activeNavigator: computed(() => null),
+  loginRedirect: () => Promise.resolve(),
+  logoutRedirect: () => Promise.resolve(),
+};
+
+/**
+ * Installs the local user developer, signed in, in place of withAuth: for a test that renders a screen on its own, as
+ * each screen's axe check does.
+ */
+export const signedInAsDeveloper: Plugin = {
+  install(app) {
+    app.provide(authKey, developer);
+  },
+};

@@ -1,0 +1,34 @@
+{{~ roles = object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "roles") ~}}
+{{~ claims = object.has_key(project, "backend.authorization") && array.contains(project["backend.authorization"], "claims") ~}}
+import { type AccountInfo, Logger } from '@azure/msal-browser';
+import { type IMsalContext, MsalContext } from '@azure/msal-react';
+import type { ReactNode } from 'react';
+
+// The local user developer as signed in, with the ID token it has locally.
+const account = {
+  username: 'developer',
+  idTokenClaims: {
+    preferred_username: 'developer',
+{{~ if roles ~}}
+    {{ id_token_roles "'manager'" }},
+{{~ end ~}}
+{{~ if claims ~}}
+    department: 'finance',
+{{~ end ~}}
+  },
+} as unknown as AccountInfo;
+
+const developer = {
+  instance: { getActiveAccount: () => account, getAllAccounts: () => [account], getAccount: () => account },
+  accounts: [account],
+  inProgress: 'none',
+  logger: new Logger({}),
+} as unknown as IMsalContext;
+
+/**
+ * Renders its children for the local user developer, signed in, without the sign-in provider: for a test that renders a
+ * screen on its own, as each screen's axe check does.
+ */
+export function SignedInAsDeveloper({ children }: { children: ReactNode }) {
+  return <MsalContext.Provider value={developer}>{children}</MsalContext.Provider>;
+}
