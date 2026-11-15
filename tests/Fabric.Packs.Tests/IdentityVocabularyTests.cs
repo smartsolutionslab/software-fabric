@@ -217,21 +217,34 @@ public sealed partial class IdentityVocabularyTests
         using var project = new GeneratedProject(profile, [identityProvider.Manifest, authClient.Manifest, integration.Manifest], overrides);
         project.AddModule("billing");
 
-        var keycloakFiles = keycloak.Files.Select(file => file.Target).Concat(SharedFiles).ToHashSet(StringComparer.Ordinal);
-        var authClientFiles = oidcClient.Files.Select(file => file.Target).Concat(AuthClientFiles).ToHashSet(StringComparer.Ordinal);
-        var named = Code(project)
-            .Where(entry => !entry.relative.StartsWith("src/AppHost/", StringComparison.Ordinal) && !keycloakFiles.Contains(entry.relative))
-            .Where(entry => KeycloakSpecific().IsMatch(entry.line))
-            .Concat(Code(project)
-                .Where(entry => !authClientFiles.Contains(entry.relative))
-                .Where(entry => AuthClientSpecific().IsMatch(entry.line)))
-            .Select(entry => $"{entry.relative}:{entry.number}: {entry.line.Trim()}")
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
+        var named = NamedOutsideTheirOwnFiles(project, keycloak, oidcClient);
 
         named.ShouldBeEmpty(string.Join(Environment.NewLine, named));
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "tests/Integration.Tests/AspireFixture.cs"))
             .ShouldContain("test_user_token(App, user)");
+    }
+
+    /// <summary>
+    /// A file outside oidc-client-ts's own that imports from its packages, as the Vue axe template once did (#661), is
+    /// named: the packages are its vocabulary as much as where it keeps the token (#672).
+    /// </summary>
+    [Theory]
+    [InlineData("saas-standard-react", "import { useAuth } from 'react-oidc-context';")]
+    [InlineData("saas-standard-vue", "import type { User } from 'oidc-client-ts';")]
+    public void A_file_outside_oidc_client_ts_that_imports_its_packages_is_named(string profile, string import)
+    {
+        var keycloak = Repository.Packs.Packs["backend.auth.keycloak"];
+        var oidcClient = Repository.Packs.Packs["frontend.auth-client.oidc-client-ts"];
+        using var identityProvider = new VocabularyProbe(keycloak, IdentityProviderVocabulary);
+        using var authClient = new VocabularyProbe(oidcClient, AuthClientVocabulary);
+        using var integration = new VocabularyProbe(Repository.Packs.Packs["backend.test.integration.aspire-fixture"], IntegrationVocabulary);
+        using var project = new GeneratedProject(profile, [identityProvider.Manifest, authClient.Manifest, integration.Manifest]);
+        const string Stray = "web/app/src/modules/stray/signedInUser.ts";
+        project.Write(Stray, $"{import}\n");
+
+        var named = NamedOutsideTheirOwnFiles(project, keycloak, oidcClient);
+
+        named.ShouldBe([$"{Stray}:1: {import}"]);
     }
 
     /// <summary>
@@ -255,6 +268,26 @@ public sealed partial class IdentityVocabularyTests
             .ToList();
 
         named.ShouldBeEmpty(string.Join(Environment.NewLine, named));
+    }
+
+    /// <summary>
+    /// The code lines that name Keycloak outside the keycloak pack's files, the AppHost and the shared files, or the
+    /// oidc-client-ts vocabulary (its packages, too) outside that pack's files, the API client's headers and the
+    /// dependencies it adds.
+    /// </summary>
+    private static List<string> NamedOutsideTheirOwnFiles(GeneratedProject project, Core.Packs.PackManifest keycloak, Core.Packs.PackManifest oidcClient)
+    {
+        var keycloakFiles = keycloak.Files.Select(file => file.Target).Concat(SharedFiles).ToHashSet(StringComparer.Ordinal);
+        var authClientFiles = oidcClient.Files.Select(file => file.Target).Concat(AuthClientFiles).Append("web/app/package.json").ToHashSet(StringComparer.Ordinal);
+        return Code(project)
+            .Where(entry => !entry.relative.StartsWith("src/AppHost/", StringComparison.Ordinal) && !keycloakFiles.Contains(entry.relative))
+            .Where(entry => KeycloakSpecific().IsMatch(entry.line))
+            .Concat(Code(project)
+                .Where(entry => !authClientFiles.Contains(entry.relative))
+                .Where(entry => AuthClientSpecific().IsMatch(entry.line)))
+            .Select(entry => $"{entry.relative}:{entry.number}: {entry.line.Trim()}")
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
     }
 
     /// <summary>
@@ -287,7 +320,7 @@ public sealed partial class IdentityVocabularyTests
     [GeneratedRegex(@"[Kk]eycloak|/realms/|realm_access|resource_access|admin-cli|Username or email|/tenants/")]
     private static partial Regex KeycloakSpecific();
 
-    [GeneratedRegex(@"oidc\.user:|@/auth/accessToken|@/auth/oidcConfig|\baccessToken\(\)")]
+    [GeneratedRegex(@"oidc-client-ts|react-oidc-context|\bUserManager\b|\bhasAuthParams\b|oidc\.user:|@/auth/accessToken|@/auth/oidcConfig|\baccessToken\(\)")]
     private static partial Regex AuthClientSpecific();
 
     [GeneratedRegex(@"@azure/msal|app\.access-token|rememberAccessToken|@/auth/accessToken|@/auth/msal|\baccessToken\(\)")]
