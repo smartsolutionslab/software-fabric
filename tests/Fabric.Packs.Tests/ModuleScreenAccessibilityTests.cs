@@ -530,6 +530,85 @@ public sealed class ModuleScreenAccessibilityTests
         }
     }
 
+    /// <summary>A screen that shows its field only to a manager, through the browser sign-in's <c>RequirePermission</c>.</summary>
+    private const string ReactScreenForManagers = """
+        import { RequirePermission } from '@/auth/RequirePermission';
+
+        export function BillingPage() {
+          return (
+            <main>
+              <h1>Billing</h1>
+              <RequirePermission role="manager">
+                <input type="text" />
+              </RequirePermission>
+            </main>
+          );
+        }
+
+        """;
+
+    private const string VueScreenForManagers = """
+        <script setup lang="ts">
+        import RequirePermission from '@/auth/RequirePermission.vue';
+        </script>
+
+        <template>
+          <main>
+            <h1>Billing</h1>
+            <RequirePermission role="manager">
+              <input type="text" />
+            </RequirePermission>
+          </main>
+        </template>
+
+        """;
+
+    /// <summary>Each router, API client, framework and browser sign-in the axe check has a branch for.</summary>
+    public static TheoryData<string, string[]> SignedInScreens => new()
+    {
+        { "saas-standard-react", [Roles, "frontend.routing=react-router"] },
+        { "saas-standard-react", [Roles, "frontend.routing=tanstack-router"] },
+        { "saas-standard-react", [Roles, "frontend.state=tanstack-query", "frontend.api-client=orval"] },
+        { "lean-crud", [Roles, "frontend.api-client=openapi-fetch"] },
+        { "lean-crud", [Roles, "frontend.api-client=openapi-fetch", "frontend.routing=tanstack-router"] },
+        { "saas-standard-vue", [Roles, "frontend.routing=vue-router"] },
+        { "saas-standard-vue", [Roles, "frontend.state=pinia"] },
+        { "saas-standard-react", [Roles, "backend.auth=entra-id", "frontend.auth-client=msal"] },
+        { "saas-standard-vue", [Roles, "backend.auth=entra-id", "frontend.auth-client=msal"] },
+    };
+
+    /// <summary>
+    /// With browser sign-in, the axe check renders the screen for a local user who holds the realm's roles (#661), as
+    /// <c>src/auth/RequirePermission.test.*</c> signs one in: a screen that shows its field only to a manager renders,
+    /// passes once the field has a label, and fails while it has none, because the developer sees it.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(SignedInScreens))]
+    public void With_browser_sign_in_the_axe_check_renders_the_screen_for_the_signed_in_developer(string profile, string[] overrides)
+    {
+        using var project = new GeneratedProject(profile, overrides);
+        project.AddModule("billing");
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var screen = Screens(project).ShouldHaveSingleItem();
+        var vue = screen.EndsWith(".vue", StringComparison.Ordinal);
+        var generated = TestOf(screen);
+        var forManagers = vue ? VueScreenForManagers : ReactScreenForManagers;
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, $"pnpm install:\n{installOutput}");
+
+        project.Write(screen, forManagers.Replace(UnlabelledField, """<input type="text" aria-label="Invoice number" />""", StringComparison.Ordinal));
+        var (_, labelledOutput, labelled) = Statuses(project);
+        var checks = labelled.GetValueOrDefault(generated).ShouldNotBeNull(labelledOutput);
+        checks.First().ShouldBe("passed", labelledOutput);
+        checks.ShouldNotContain("failed", labelledOutput);
+
+        project.Write(screen, forManagers);
+        var (violationExitCode, violationOutput, violation) = Statuses(project);
+        violationExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label shown to a manager:\n{violationOutput}");
+        violation.GetValueOrDefault(generated).ShouldNotBeNull(violationOutput).First().ShouldBe("failed", violationOutput);
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "vitest-report.json")).ShouldContain("Form elements must have labels", Case.Sensitive, violationOutput);
+    }
+
     /// <summary>
     /// Runs the web app's tests and answers their exit code and output, and the statuses vitest reports for each test
     /// file's tests (<c>passed</c>, <c>failed</c>, <c>skipped</c>, ...), by the file's path relative to the project.
