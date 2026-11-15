@@ -5,11 +5,16 @@ namespace Fabric.Cli.Tests;
 /// <summary>
 /// <c>fabric upgrade</c> (ADR-0016 E4, D1, D2, D3, D8): the project is generated with "fabric 0.0.1" (the fixture packs),
 /// edited, committed, and upgraded to this build with packs that changed: the README's title, a new project file
-/// <c>docs/notes.md</c>, and a new per-module file <c>src/&lt;module&gt;/page.test.md</c>.
+/// <c>docs/notes.md</c>, and a new per-module file <c>src/&lt;module&gt;/page.test.md</c>. Both write a module page,
+/// <c>web/app/src/modules/&lt;module&gt;/&lt;Module&gt;Page.tsx</c>, unchanged between them.
 /// </summary>
 public sealed class UpgradeCommandTests : IDisposable
 {
     private const string OldVersion = "0.0.1";
+
+    private const string ModulePage = "web/app/src/modules/{{ module.name }}/{{ module.namespace }}Page.tsx";
+
+    private const string ProbeTest = "web/app/src/modules/{{ module.name }}/{{ module.namespace }}Page.probe.test.tsx";
 
     private static readonly string Running =
         typeof(FabricCli).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
@@ -23,6 +28,8 @@ public sealed class UpgradeCommandTests : IDisposable
 
     private readonly string project;
 
+    private readonly string oldPacks;
+
     private readonly string newPacks;
 
     private readonly string oldFabric;
@@ -30,13 +37,16 @@ public sealed class UpgradeCommandTests : IDisposable
     public UpgradeCommandTests()
     {
         project = Path.Combine(root, "shop");
+        oldPacks = Path.Combine(root, "old-packs");
+        CopyDirectory(Paths.FixturePacks, oldPacks);
+        AddFile(Path.Combine(oldPacks, "module", "style", "ddd"), "page.sbn", ModulePage, perModule: true, "export function {{ module.namespace }}Page() {}\n");
         newPacks = Path.Combine(root, "packs");
-        CopyDirectory(Paths.FixturePacks, newPacks);
+        CopyDirectory(oldPacks, newPacks);
         Replace(Path.Combine(newPacks, "base", "core", "templates", "readme.md.sbn"), "# Generated project\n", "# Generated project, upgraded\n");
         AddFile(Path.Combine(newPacks, "base", "core"), "notes.md.sbn", "docs/notes.md", perModule: false, "Notes the generator keeps.\n");
         AddFile(Path.Combine(newPacks, "module", "style", "ddd"), "page-test.sbn", "src/{{ module.name }}/page.test.md", perModule: true, "# {{ module.name }} page test\n");
 
-        oldFabric = OldFabric.Create(root, OldVersion, Paths.FixtureCatalog, Paths.FixturePacks);
+        oldFabric = OldFabric.Create(root, OldVersion, Paths.FixtureCatalog, oldPacks);
         Generate(oldFabric, project);
         Git.Run(project, "init", "-q");
         Git.Commit(project, "generate with fabric 0.0.1");
@@ -387,6 +397,41 @@ public sealed class UpgradeCommandTests : IDisposable
         run.ExitCode.ShouldBe(0, run.Error);
         run.Output.ShouldContain("pnpm-lock.yaml");
         run.Output.ShouldNotContain("that generated client code");
+    }
+
+    [Fact]
+    public void A_probe_test_is_not_added_beside_a_module_page_the_project_rewrote_and_the_summary_names_it()
+    {
+        AddFile(Path.Combine(newPacks, "module", "style", "ddd"), "probe.sbn", ProbeTest, perModule: true, "// {{ module.namespace }}Page shows Manage\n");
+        Write("web/app/src/modules/billing/BillingPage.tsx", "export function BillingPage() { return useAppSelector(selectInvoices); }\n");
+        Git.Commit(project, "our billing page");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        Unmerged().ShouldBeEmpty();
+        File.Exists(Path.Combine(project, "web/app/src/modules/billing/BillingPage.probe.test.tsx")).ShouldBeFalse();
+        Read("web/app/src/modules/shipping/ShippingPage.probe.test.tsx").ShouldBe("// ShippingPage shows Manage\n");
+        run.Output.ShouldContain("  A web/app/src/modules/shipping/ShippingPage.probe.test.tsx");
+        run.Output.ShouldNotContain("  A web/app/src/modules/billing/BillingPage.probe.test.tsx");
+        run.Output.ShouldContain(
+            "  - that web/app/src/modules/billing/BillingPage.probe.test.tsx is added: the project's page beside it differs from what " +
+            $"fabric {OldVersion} wrote, and the test asserts the generated page; generate it with fabric and add it by hand if the page keeps a Manage section.\n");
+        run.Output.ShouldNotContain("ShippingPage.probe.test.tsx is added");
+    }
+
+    [Fact]
+    public void A_probe_test_is_added_beside_every_module_page_an_unedited_project_left_as_generated()
+    {
+        AddFile(Path.Combine(newPacks, "module", "style", "ddd"), "probe.sbn", ProbeTest, perModule: true, "// {{ module.namespace }}Page shows Manage\n");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        Tree(project).ShouldBe(Fresh());
+        run.Output.ShouldContain("  A web/app/src/modules/billing/BillingPage.probe.test.tsx");
+        run.Output.ShouldContain("  A web/app/src/modules/shipping/ShippingPage.probe.test.tsx");
+        run.Output.ShouldNotContain("is added: the project's page");
     }
 
     [Fact]

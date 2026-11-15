@@ -69,13 +69,14 @@ public static class Upgrader
                 return Failure(baseError!);
             }
 
+            var baseTree = repository.WriteTree(baseDirectory, Path.Combine(scratch, "base.index"));
+            var skipped = ProbeTests.Skipped(theirs.Files, repository, baseTree);
             var theirsDirectory = Path.Combine(scratch, "theirs", record.Name);
-            if (ProjectWriter.Write(theirsDirectory, theirs.Files) is { } writeError)
+            if (ProjectWriter.Write(theirsDirectory, [.. theirs.Files.Where(file => !skipped.Contains(file.Path))]) is { } writeError)
             {
                 return Failure(writeError);
             }
 
-            var baseTree = repository.WriteTree(baseDirectory, Path.Combine(scratch, "base.index"));
             var theirsTree = repository.WriteTree(theirsDirectory, Path.Combine(scratch, "theirs.index"));
             var outcome = repository.Merge(
                 baseTree,
@@ -84,7 +85,7 @@ public static class Upgrader
                 Path.Combine(scratch, "merge"));
             var servesOpenApiDocument = theirs.Files.Any(file => file.Path == UpgradeSummary.OpenApiDocument);
             var hasBaseApi = theirs.Files.Any(file => file.Path == UpgradeSummary.BaseApi);
-            return new UpgradeResult(UpgradeSummary.Write(record.Name, recorded, GeneratorVersion.Current, outcome, servesOpenApiDocument, hasBaseApi), [])
+            return new UpgradeResult(UpgradeSummary.Write(record.Name, recorded, GeneratorVersion.Current, outcome, servesOpenApiDocument, hasBaseApi, skipped), [])
             {
                 Experimental = theirs.Experimental,
             };

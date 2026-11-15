@@ -143,8 +143,12 @@ that generated client code works with the project's
 `web/app/src/api/baseApi.ts`, when client code under `web/app/src/` other
 than that file changed in a project that has it (the code relies on the
 file's exports and its base query's error type, `FetchBaseQueryError` with
-RTK Query, as the generator writes them); and that the project's own ADRs and
-code agree with a changed pack ADR.
+RTK Query, as the generator writes them); that a module page's new probe test
+(`<Name>Page.probe.test.*`) is added, when the project's `<Name>Page.*`
+differs from what the recorded version wrote (the test asserts the generated
+page, so the upgrade leaves it out and names it; the project generates it with
+fabric and adds it by hand if the page keeps a Manage section); and that the
+project's own ADRs and code agree with a changed pack ADR.
 
 The OpenAPI line is not a further choice: it is the same "may not build" that
 (b) leaves to the project, named because the pilot's first upgrade (0.1.0 to
@@ -154,6 +158,12 @@ The `baseApi.ts` line is the same kind of record: the pilot's upgrade to
 0.4.0 (fabric-pilot#50) brought a generated `useCanManage.ts` (#647) that
 did not build against the pilot's own wrapper, which typed its errors as
 `unknown`, and the summary did not say so (#663).
+The probe-test line records the owner's decision of 2026-11-15 (#676): the
+pilot's upgrade to 0.5.0 (fabric-pilot#58) took a probe test (#664) beside
+five pages it had rewritten, as a plain new file, and 15 of its tests failed
+until the files were deleted by hand. "Differs" is decided by comparing the
+page in the base tree with the project's HEAD, as git compares them; a page
+the project left as generated still gets its probe test.
 
 ### D2. Where the old generator comes from
 

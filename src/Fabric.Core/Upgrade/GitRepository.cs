@@ -59,6 +59,17 @@ internal sealed class GitRepository
         return tree;
     }
 
+    /// <summary>Whether <paramref name="treeish"/> (a tree, or HEAD) holds <paramref name="path"/>.</summary>
+    public bool Has(string treeish, string path) => Git(top, "cat-file", "-e", $"{treeish}:{path}").ExitCode == 0;
+
+    /// <summary>
+    /// The paths under <paramref name="directory"/> whose content differs between <paramref name="tree"/> and HEAD, a
+    /// path on one side only included, compared as git compares them, with the repository's attributes.
+    /// </summary>
+    public IReadOnlyList<string> ChangedSince(string tree, string directory) =>
+        Required(Git(top, "diff", "--name-only", "--no-renames", "-z", tree, "HEAD", "--", $":(literal){directory}"))
+            .Split('\0', StringSplitOptions.RemoveEmptyEntries);
+
     /// <summary>
     /// Merges <paramref name="theirs"/> into HEAD with <paramref name="mergeBase"/> as the merge base. Paths one side
     /// changed are resolved by <c>read-tree --aggressive</c>; paths both changed, or both added, are merged with
