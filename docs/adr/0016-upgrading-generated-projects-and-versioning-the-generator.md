@@ -138,13 +138,22 @@ changed persistence model has its EF Core migration (the project adds it, as
 for any model change); that the committed OpenAPI document
 (`web/app/openapi.json`) and the client generated from it match what the host
 serves, when C# under `src/` changed in a project that has the document (the
-integration tests rewrite it, and `pnpm codegen` regenerates the client); and
-that the project's own ADRs and code agree with a changed pack ADR.
+integration tests rewrite it, and `pnpm codegen` regenerates the client);
+that generated client code works with the project's
+`web/app/src/api/baseApi.ts`, when client code under `web/app/src/` other
+than that file changed in a project that has it (the code relies on the
+file's exports and its base query's error type, `FetchBaseQueryError` with
+RTK Query, as the generator writes them); and that the project's own ADRs and
+code agree with a changed pack ADR.
 
 The OpenAPI line is not a further choice: it is the same "may not build" that
 (b) leaves to the project, named because the pilot's first upgrade (0.1.0 to
 0.3.0, fabric-pilot#33) changed the served document through a Kernel type and
 the summary did not say so (#628).
+The `baseApi.ts` line is the same kind of record: the pilot's upgrade to
+0.4.0 (fabric-pilot#50) brought a generated `useCanManage.ts` (#647) that
+did not build against the pilot's own wrapper, which typed its errors as
+`unknown`, and the summary did not say so (#663).
 
 ### D2. Where the old generator comes from
 
