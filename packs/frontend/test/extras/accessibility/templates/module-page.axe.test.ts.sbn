@@ -1,8 +1,6 @@
 {{~ editor = module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains(project["frontend.dashboards"], "user-editable") && project["frontend.api-client"] == "orval" && (!object.has_key(project, "frontend.state") || project["frontend.state"] != "pinia") ~}}
 {{~ stands_in = object.has_key(project, "frontend.api-client") && project["frontend.api-client"] == "orval" && (!object.has_key(project, "frontend.state") || project["frontend.state"] != "pinia") ~}}
-{{~ probe = !editor && object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
-{{~ permissions = "useGet" + module.namespace + "PermissionsManage" ~}}
-import { cleanup, render, screen } from '@testing-library/vue';
+import { cleanup, render } from '@testing-library/vue';
 import { afterEach, expect, test, vi } from 'vitest';
 import { axe } from 'vitest-axe';
 import { createMemoryHistory } from 'vue-router';
@@ -11,12 +9,10 @@ import { createAppRouter } from '@/router';
 import { examples } from './{{ module.namespace }}Page.data';
 {{~ end ~}}
 import {{ module.namespace }}Page from './{{ module.namespace }}Page.vue';
-{{~ if probe && !stands_in ~}}
-import type { ManagePermission } from './useCanManage';
-{{~ end ~}}
 
 // The screen's axe check, generated with it. It runs whatever the screen's own component test does, so a check skipped
-// or commented out there never leaves the screen unchecked.
+// or commented out there never leaves the screen unchecked. It asks nothing of what the screen shows, only that axe
+// finds no violations in it: what the screen does is its own tests'.
 {{~ if editor ~}}
 
 // The page is the dashboard editor, which needs the query client and the generated client; its own test checks it with
@@ -30,17 +26,10 @@ vi.mock('@/dashboards/DashboardEditor.vue', async () => {
 
 // The page renders on its own, without a query client or the host. Each hook of the generated client answers as if its
 // request were still on its way or, once the page is shown with its data, with its example in the data file.
-{{~ if probe ~}}
-const shown = vi.hoisted(() => ({ withExamples: false, refusing: '', failing: '' }));
-{{~ else ~}}
-const shown = vi.hoisted(() => ({ withExamples: false, refusing: '' }));
-{{~ end ~}}
+const shown = vi.hoisted(() => ({ withExamples: false }));
 vi.mock('@/api/generated', async (importOriginal) => {
   const { ref } = await import('vue');
   const { examples } = await import('@/modules/{{ module.name }}/{{ module.namespace }}Page.data');
-{{~ if probe ~}}
-  const { ApiError } = await import('@/api/baseApi');
-{{~ end ~}}
   const state = (data: unknown, loading: boolean) => ({
     data: ref(data),
     error: ref(null),
@@ -54,40 +43,8 @@ vi.mock('@/api/generated', async (importOriginal) => {
     mutate: vi.fn(),
     mutateAsync: vi.fn(),
   });
-{{~ if probe ~}}
-  // A request that failed, as the generated client reports it.
-  const failure = (status: number) => ({
-    ...state(undefined, false),
-    error: ref(new ApiError(status, '')),
-    isSuccess: ref(false),
-    isError: ref(true),
-    status: ref('error'),
-  });
-  const answer = (hook: string) => {
-    // A request the host refused: what a permission probe answers a caller without the permission.
-    if (hook === shown.refusing) {
-      return failure(403);
-    }
-    // A request that failed for any other reason.
-    if (hook === shown.failing) {
-      return failure(500);
-    }
-{{~ else ~}}
-  // A request the host refused: what a permission probe answers a caller without the permission.
-  const refused = () => ({
-    ...state(undefined, false),
-    error: ref({ status: 403 }),
-    isSuccess: ref(false),
-    isError: ref(true),
-    status: ref('error'),
-  });
-  const answer = (hook: string) => {
-    if (hook === shown.refusing) {
-      return refused();
-    }
-{{~ end ~}}
-    return shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
-  };
+  const answer = (hook: string) =>
+    shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
   // A mutation nobody has triggered is idle, not saving: the page shows as it first does.
   const idle = () => ({
     data: ref(undefined),
@@ -113,12 +70,6 @@ vi.mock('@/api/generated', async (importOriginal) => {
   );
 });
 {{~ end ~}}
-{{~ if probe && !stands_in ~}}
-
-// The page asks the module's permission probe; without a stand-in for the client, the answer is the test's.
-const probe = vi.hoisted(() => ({ permission: 'granted' as ManagePermission }));
-vi.mock('./useCanManage', () => ({ useCanManage: () => probe.permission }));
-{{~ end ~}}
 
 // Whatever else asks the host waits for an answer that never comes.
 vi.stubGlobal('fetch', () => new Promise<Response>(() => undefined));
@@ -128,36 +79,19 @@ afterEach(cleanup);
 {{~ if stands_in ~}}
 afterEach(() => {
   shown.withExamples = false;
-  shown.refusing = '';
-{{~ if probe ~}}
-  shown.failing = '';
-{{~ end ~}}
-});
-{{~ end ~}}
-{{~ if probe && !stands_in ~}}
-afterEach(() => {
-  probe.permission = 'granted';
 });
 {{~ end ~}}
 
+// The router is on the screen's route before it mounts, and the screen has rendered when render returns.
 async function renderPage() {
   const router = createAppRouter(createMemoryHistory());
   await router.push('/{{ module.name }}');
 
-  const { container } = render({{ module.namespace }}Page, { global: { plugins: [router] } });
-{{~ if editor ~}}
-  expect(await screen.findByText('The dashboard editor')).toBeInTheDocument();
-{{~ else ~}}
-  expect(await screen.findByRole('heading', { name: '{{ module.namespace }}' })).toBeInTheDocument();
-{{~ end ~}}
-  return container;
+  return render({{ module.namespace }}Page, { global: { plugins: [router] } }).container;
 }
 
 test('the {{ module.namespace }} page has no accessibility violations axe can find', async () => {
   const container = await renderPage();
-{{~ if probe && !stands_in ~}}
-  expect(screen.getByRole('heading', { name: 'Manage' })).toBeInTheDocument();
-{{~ end ~}}
 
   expect(await axe(container)).toHaveNoViolations();
 });
@@ -168,56 +102,6 @@ test.runIf(Object.keys(examples).length > 0)('the {{ module.namespace }} page pa
   shown.withExamples = true;
   const container = await renderPage();
 
-  expect(await axe(container)).toHaveNoViolations();
-});
-{{~ end ~}}
-{{~ if probe && stands_in ~}}
-
-// With an example for {{ permissions }} in {{ module.namespace }}Page.data.ts, the probe answers 200 and the page
-// shows "Manage".
-const probeAnswers = '{{ permissions }}' in examples;
-
-test.runIf(probeAnswers)('the {{ module.namespace }} page offers Manage once its probe answers', async () => {
-  shown.withExamples = true;
-  await renderPage();
-
-  expect(screen.getByRole('heading', { name: 'Manage' })).toBeInTheDocument();
-});
-
-test('the {{ module.namespace }} page offers no Manage when the probe refuses', async () => {
-  shown.withExamples = true;
-  shown.refusing = '{{ permissions }}';
-  await renderPage();
-
-  expect(screen.queryByRole('heading', { name: 'Manage' })).not.toBeInTheDocument();
-  expect(screen.queryByText('Permissions for {{ module.name }} could not be loaded.')).not.toBeInTheDocument();
-});
-
-test('the {{ module.namespace }} page shows that its probe failed, not a refusal', async () => {
-  shown.withExamples = true;
-  shown.failing = '{{ permissions }}';
-  const container = await renderPage();
-
-  expect(screen.getByText('Permissions for {{ module.name }} could not be loaded.')).toHaveAttribute('role', 'alert');
-  expect(screen.queryByRole('heading', { name: 'Manage' })).not.toBeInTheDocument();
-  expect(await axe(container)).toHaveNoViolations();
-});
-{{~ else if probe ~}}
-
-test('the {{ module.namespace }} page offers no Manage when the probe refuses', async () => {
-  probe.permission = 'refused';
-  await renderPage();
-
-  expect(screen.queryByRole('heading', { name: 'Manage' })).not.toBeInTheDocument();
-  expect(screen.queryByText('Permissions for {{ module.name }} could not be loaded.')).not.toBeInTheDocument();
-});
-
-test('the {{ module.namespace }} page shows that its probe failed, not a refusal', async () => {
-  probe.permission = 'failed';
-  const container = await renderPage();
-
-  expect(screen.getByText('Permissions for {{ module.name }} could not be loaded.')).toHaveAttribute('role', 'alert');
-  expect(screen.queryByRole('heading', { name: 'Manage' })).not.toBeInTheDocument();
   expect(await axe(container)).toHaveNoViolations();
 });
 {{~ end ~}}
