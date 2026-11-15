@@ -109,8 +109,10 @@ public sealed class ForTenantWritesTests
         adr.ShouldContain("`tenant-not-found`");
         adr.ShouldContain("**Amended**");
         adr.ShouldNotContain("narrows the work to that tenant again");
+        adr.ShouldContain("`ForTenant()` also describes the route's `{tenant}` in the OpenAPI document");
         agents.ShouldContain(".RequireAuthorization(<Module>PolicyNames.WriteForTenants).ForTenant()");
         agents.ShouldContain("Never call `TenantScope.Begin` in an Api project or a command or query handler");
+        agents.ShouldContain("`ForTenant()` puts `{tenant}` into the OpenAPI document by itself");
 
         var withoutRoles = Files(Profile);
         Adr(withoutRoles, "Tenancy: a tenant column").ShouldNotContain("ForTenant()");
@@ -231,6 +233,63 @@ public sealed class ForTenantWritesTests
 
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("POST /billing/notes/for-a-tenant is mapped with ForTenant(), but its route has no {tenant} parameter", Case.Sensitive, output);
+    }
+
+    /// <summary>
+    /// The route's <c>{tenant}</c> is read by ForTenant()'s filter, not the handler, so the served OpenAPI document must
+    /// still describe it, once (#668): without it, the generated client has no tenant argument and cannot call the route.
+    /// </summary>
+    [Fact]
+    public async Task The_openapi_document_describes_the_tenant_of_a_for_tenant_route_whether_or_not_the_handler_binds_it()
+    {
+        using var project = new GeneratedProject("lean-crud", "backend.tenancy=column", Roles);
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Api/Endpoints", """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Http.HttpResults;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.Modules.Billing.Application;
+
+            namespace Shop.Modules.Billing.Api.Endpoints;
+
+            public sealed record NewNote(string Text);
+
+            public sealed class Notes : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints)
+                {
+                    endpoints.MapPost("/tenants/{tenant}/notes", Add).RequireAuthorization(BillingPolicyNames.WriteForTenants).ForTenant();
+                    endpoints.MapPost("/tenants/{tenant}/notes/bound", AddBound).RequireAuthorization(BillingPolicyNames.WriteForTenants).ForTenant();
+                }
+
+                internal static NoContent Add(NewNote note) => TypedResults.NoContent();
+
+                internal static NoContent AddBound(string tenant, NewNote note) => TypedResults.NoContent();
+            }
+            """);
+        project.Build();
+
+        using var host = project.StartHost(new Dictionary<string, string>
+        {
+            ["ConnectionStrings__database"] = "Host=127.0.0.1;Port=1;Database=unused",
+            ["Authentication__Authority"] = "http://127.0.0.1:1/realms/unused",
+        });
+        using var response = await host.GetAsync("/openapi/v1.json");
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        response.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK, body);
+        var paths = JsonNode.Parse(body)!["paths"]!;
+
+        foreach (var path in new[] { "/billing/tenants/{tenant}/notes", "/billing/tenants/{tenant}/notes/bound" })
+        {
+            var parameters = paths[path]!["post"]!["parameters"]?.AsArray() ?? [];
+            var tenants = parameters.Where(parameter => (string?)parameter!["name"] == "tenant").ToList();
+            tenants.Count.ShouldBe(1, $"{path}: {body}");
+            ((string?)tenants[0]!["in"]).ShouldBe("path", path);
+            ((bool?)tenants[0]!["required"]).ShouldBe(true, path);
+            ((string?)tenants[0]!["schema"]!["type"]).ShouldBe("string", path);
+        }
     }
 
     private const string NoteEntity = """
