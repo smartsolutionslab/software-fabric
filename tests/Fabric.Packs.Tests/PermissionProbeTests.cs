@@ -198,7 +198,9 @@ public sealed partial class PermissionProbeTests
         pageTest.ShouldContain("offers no Manage when the probe refuses");
         pageTest.ShouldContain("shows that its probe failed, not a refusal");
         var axe = File.ReadAllText(Path.Combine(project.ProjectDirectory, axeCheck));
-        axe.ShouldNotContain("Manage");
+
+        // The section's name, as the page shows it: the signed-in developer's realm role, 'manager', is no part of it (#661).
+        axe.ShouldNotContain("Manage", Case.Sensitive);
         axe.ShouldNotContain("useCanManage");
         axe.ShouldNotContain("heading");
     }
