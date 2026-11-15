@@ -272,12 +272,13 @@ public sealed partial class IdentityVocabularyTests
 
     /// <summary>
     /// The code lines that name Keycloak outside the keycloak pack's files, the AppHost and the shared files, or the
-    /// oidc-client-ts vocabulary outside that pack's files and the API client's headers.
+    /// oidc-client-ts vocabulary (its packages, too) outside that pack's files, the API client's headers and the
+    /// dependencies it adds.
     /// </summary>
     private static List<string> NamedOutsideTheirOwnFiles(GeneratedProject project, Core.Packs.PackManifest keycloak, Core.Packs.PackManifest oidcClient)
     {
         var keycloakFiles = keycloak.Files.Select(file => file.Target).Concat(SharedFiles).ToHashSet(StringComparer.Ordinal);
-        var authClientFiles = oidcClient.Files.Select(file => file.Target).Concat(AuthClientFiles).ToHashSet(StringComparer.Ordinal);
+        var authClientFiles = oidcClient.Files.Select(file => file.Target).Concat(AuthClientFiles).Append("web/app/package.json").ToHashSet(StringComparer.Ordinal);
         return Code(project)
             .Where(entry => !entry.relative.StartsWith("src/AppHost/", StringComparison.Ordinal) && !keycloakFiles.Contains(entry.relative))
             .Where(entry => KeycloakSpecific().IsMatch(entry.line))
@@ -319,7 +320,7 @@ public sealed partial class IdentityVocabularyTests
     [GeneratedRegex(@"[Kk]eycloak|/realms/|realm_access|resource_access|admin-cli|Username or email|/tenants/")]
     private static partial Regex KeycloakSpecific();
 
-    [GeneratedRegex(@"oidc\.user:|@/auth/accessToken|@/auth/oidcConfig|\baccessToken\(\)")]
+    [GeneratedRegex(@"oidc-client-ts|react-oidc-context|\bUserManager\b|\bhasAuthParams\b|oidc\.user:|@/auth/accessToken|@/auth/oidcConfig|\baccessToken\(\)")]
     private static partial Regex AuthClientSpecific();
 
     [GeneratedRegex(@"@azure/msal|app\.access-token|rememberAccessToken|@/auth/accessToken|@/auth/msal|\baccessToken\(\)")]
