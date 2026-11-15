@@ -282,11 +282,14 @@ public sealed partial class PermissionProbeTests
     /// <summary>
     /// After <c>fabric new</c> and <c>add-module</c>, the document the host serves holds the new module's probe and is the
     /// frontend's copy, byte for byte: the generated integration tests pass, the copy's own test included (Docker required).
+    /// Roles and claims together give each module both packs' tests against the same probe.
     /// </summary>
-    [Fact]
-    public void After_add_module_the_served_document_has_the_probe_and_the_frontends_copy_is_current()
+    [Theory]
+    [InlineData(Roles)]
+    [InlineData("backend.authorization=roles,claims")]
+    public void After_add_module_the_served_document_has_the_probe_and_the_frontends_copy_is_current(string authorization)
     {
-        using var project = new GeneratedProject("saas-ai-react", Roles);
+        using var project = new GeneratedProject("saas-ai-react", authorization);
         project.AddModule("billing");
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "web/app/openapi.json")).ShouldContain("\"/billing/permissions/manage\"");
         project.Build();
