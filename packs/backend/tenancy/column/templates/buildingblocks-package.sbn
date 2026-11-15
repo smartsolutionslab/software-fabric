@@ -1,0 +1,3 @@
+{{~ if writes_for_tenants ~}}
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+{{- end ~}}

@@ -1,8 +1,10 @@
 using {{ namespace }}.BuildingBlocks.Tenancy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OpenApi;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.OpenApi;
 
 namespace Microsoft.AspNetCore.Builder;
 
@@ -20,10 +22,12 @@ public static class TenantEndpoints
     /// and what it saves or publishes belongs to that tenant. The command stays free of a tenant. A tenant
     /// <see cref="ITenantDirectory"/> does not list answers <c>404</c> problem details with the code
     /// <see cref="TenantNotFound"/> before the handler runs, and mapping a route without a <c>{tenant}</c> parameter fails
-    /// when the host maps it. The filter runs after authorization, so name a policy that requires
-    /// <see cref="CrossTenantRole"/> as well, as <c>.RequireAuthorization(&lt;Module&gt;PolicyNames.WriteForTenants).ForTenant()</c>
-    /// does; the architecture rule <c>ForTenantRequiresTheCrossTenantRole</c> fails the build otherwise, and for an
-    /// endpoint also mapped with <c>AcrossTenants()</c> or <c>WritesSharedRecords()</c>.
+    /// when the host maps it. The OpenAPI document describes the route's <c>{tenant}</c> as a required string path
+    /// parameter whether or not the handler binds it, so a handler never takes a tenant it does not read. The filter runs
+    /// after authorization, so name a policy that requires <see cref="CrossTenantRole"/> as well, as
+    /// <c>.RequireAuthorization(&lt;Module&gt;PolicyNames.WriteForTenants).ForTenant()</c> does; the architecture rule
+    /// <c>ForTenantRequiresTheCrossTenantRole</c> fails the build otherwise, and for an endpoint also mapped with
+    /// <c>AcrossTenants()</c> or <c>WritesSharedRecords()</c>.
     /// </summary>
     public static RouteHandlerBuilder ForTenant(this RouteHandlerBuilder endpoint)
     {
@@ -39,6 +43,22 @@ public static class TenantEndpoints
 
         return endpoint
             .WithMetadata(new WritesForTenant())
+            .AddOpenApiOperationTransformer((operation, context, cancellationToken) =>
+            {
+                operation.Parameters ??= [];
+                if (!operation.Parameters.Any(parameter => parameter.Name == TenantParameter && parameter.In == ParameterLocation.Path))
+                {
+                    operation.Parameters.Insert(0, new OpenApiParameter
+                    {
+                        Name = TenantParameter,
+                        In = ParameterLocation.Path,
+                        Required = true,
+                        Schema = new OpenApiSchema { Type = JsonSchemaType.String },
+                    });
+                }
+
+                return Task.CompletedTask;
+            })
             .AddEndpointFilter(async (context, next) =>
             {
                 var tenant = context.HttpContext.GetRouteValue(TenantParameter) as string;
