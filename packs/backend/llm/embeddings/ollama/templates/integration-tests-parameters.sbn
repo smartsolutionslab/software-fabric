@@ -1,5 +1,10 @@
         // Ollama would pull its image and the embedding model on start: drop both resources, and the host's wait on them, and
+{{ if project["backend.llm"] == "ollama" ~}}
+        // make the host's Ollama endpoint the fixture's stand-in, which answers embeddings, and a chat request with the
+        // FakeChatClient a test gave it. No test calls a real model.
+{{~ else ~}}
         // make the host's Ollama endpoint the fixture's stand-in, which answers embeddings only. No test calls a real model.
+{{~ end ~}}
         string[] embeddingServer = ["ollama", "ollama-embedding-model"];
         foreach (var resource in builder.Resources.Where(resource => embeddingServer.Contains(resource.Name)).ToList())
         {

@@ -5,7 +5,7 @@ end ~}}
 {{~ if stand_in ~}}
         // Ollama would pull its image and the model, gigabytes, on start, and the integration tests never call the model:
         // drop both resources, and the host's wait on them. The endpoint is the fixture's embeddings stand-in, given below,
-        // which answers chat requests with a 404.
+        // which answers a chat request with the FakeChatClient a test gave it, else a 404.
 {{~ else ~}}
         // Ollama would pull its image and the model, gigabytes, on start, and the integration tests never call the model:
         // drop both resources, and the host's wait on them, and give the host an endpoint nothing listens on instead.

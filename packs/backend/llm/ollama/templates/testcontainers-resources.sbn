@@ -4,7 +4,8 @@ if object.has_key(project, "backend.llm.extras") && (array.contains project["bac
 end ~}}
 {{~ if stand_in ~}}
         // No Ollama container: it would pull the model, gigabytes, and the integration tests never call the model. The host's
-        // endpoint is the fixture's embeddings stand-in, given below, which answers chat requests with a 404.
+        // endpoint is the fixture's embeddings stand-in, given below, which answers a chat request with the FakeChatClient a
+        // test gave it, else a 404.
 {{~ else ~}}
         // No Ollama container: it would pull the model, gigabytes, and the integration tests never call the model. The host
         // gets an endpoint nothing listens on, and the AppHost's model.

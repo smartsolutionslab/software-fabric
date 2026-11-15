@@ -4,4 +4,6 @@
 {{ else ~}}
     <!-- The fake embeddings server answers with FakeEmbeddingGenerator's vectors. -->
 {{ end ~}}
-    <Compile Include="../Fakes/FakeEmbeddingGenerator.cs" Link="Fakes/FakeEmbeddingGenerator.cs" />
+    <Compile Include="../Fakes/FakeEmbeddingGenerator.cs" Link="Fakes/FakeEmbeddingGenerator.cs" />{{ if project["backend.llm"] == project["backend.llm.embeddings"] && (project["backend.llm"] == "azure-openai" || project["backend.llm"] == "ollama") }}
+    <!-- The chat model shares the embeddings' endpoint: the fake server answers chat with the FakeChatClient a test gives it. -->
+    <Compile Include="../Fakes/FakeChatClient.cs" Link="Fakes/FakeChatClient.cs" />{{ end }}
