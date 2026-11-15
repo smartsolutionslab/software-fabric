@@ -16,6 +16,6 @@ The stand-in answers every hook as still loading, so on its own the check sees o
 {{~ end ~}}
 {{~ if object.has_key(project, "frontend.auth-client") ~}}
 
-With browser sign-in the check stands in for it too: the screen renders for the local user `developer`, signed in with the roles and claims the developer's ID token carries locally, so a screen that reads the signed-in user (`RequirePermission`, `useHasRole`, `useHasClaim`) renders without the sign-in provider, and the check sees it as the developer does. What a screen shows only to other users is not checked.
+With browser sign-in the check stands in for it too: the screen renders for the local user `developer`, signed in with the roles and claims the developer's ID token carries locally, so a screen that reads the signed-in user{{ if object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 }} (`RequirePermission`, `useHasRole`, `useHasClaim`){{ end }} renders without the sign-in provider, and the check sees it as the developer does. What a screen shows only to other users is not checked.
 {{~ end ~}}
 {{~ end ~}}
