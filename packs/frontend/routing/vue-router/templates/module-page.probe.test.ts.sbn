@@ -1,0 +1,95 @@
+{{~ remote = project["frontend.architecture"] == "micro-frontends" ~}}
+{{~ assistant = module.name == "assistant" && object.has_key(project, "frontend.agent-ui") && project["frontend.agent-ui"] == "ag-ui" ~}}
+{{~ if remote ~}}
+import { render, screen } from '@testing-library/vue';
+import { expect, test, vi } from 'vitest';
+import {{ module.namespace }}Page from './{{ module.namespace }}Page.vue';
+import type { ManagePermission } from './useCanManage';
+
+// The module's remote is loaded at run time; here it stands in, so this test checks the page around it.
+vi.mock('@/remotes/Remote.vue', async () => {
+  const { defineComponent, h } = await import('vue');
+  return {
+    default: defineComponent({
+      props: { module: { type: String, required: true } },
+      setup: (props) => () => h('h1', `The ${props.module} remote`),
+    }),
+  };
+});
+
+// A remote has no API client of its own, so the shell's page asks the module's permission probe; here the answer is the test's.
+const probe = vi.hoisted(() => ({ permission: 'granted' as ManagePermission }));
+vi.mock('./useCanManage', () => ({ useCanManage: () => probe.permission }));
+
+test('the {{ module.namespace }} page mounts its remote and offers Manage when the probe answers 200', () => {
+  probe.permission = 'granted';
+  render({{ module.namespace }}Page);
+
+  expect(screen.getByRole('heading', { name: 'The {{ module.name }} remote' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Manage' })).toBeInTheDocument();
+});
+
+test('the {{ module.namespace }} page offers no Manage when the probe refuses', () => {
+  probe.permission = 'refused';
+  render({{ module.namespace }}Page);
+
+  expect(screen.getByRole('heading', { name: 'The {{ module.name }} remote' })).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Manage' })).toBeNull();
+  expect(screen.queryByText('Permissions for {{ module.name }} could not be loaded.')).toBeNull();
+});
+
+test('the {{ module.namespace }} page shows that its probe failed, not a refusal', () => {
+  probe.permission = 'failed';
+  render({{ module.namespace }}Page);
+
+  expect(screen.getByRole('heading', { name: 'The {{ module.name }} remote' })).toBeInTheDocument();
+  expect(screen.getByText('Permissions for {{ module.name }} could not be loaded.')).toHaveAttribute('role', 'alert');
+  expect(screen.queryByRole('heading', { name: 'Manage' })).toBeNull();
+});
+{{~ else ~}}
+import { cleanup, render, screen } from '@testing-library/vue';
+import { afterEach, expect, test, vi } from 'vitest';
+import {{ module.namespace }}Page from './{{ module.namespace }}Page.vue';
+import type { ManagePermission } from './useCanManage';
+{{~ if assistant ~}}
+
+// The agent panel has its own test; here it stands in, so this test checks the page around it.
+vi.mock('@/agents/AgentPanel.vue', async () => {
+  const { h } = await import('vue');
+  return { default: { render: () => h('p', 'The agent panel') } };
+});
+{{~ end ~}}
+
+// The page asks the module's permission probe, whose own test, useCanManage.test.ts, reads a 200, a 403 and a failure;
+// here the answer is the test's. The page's axe check asks nothing of this, so a project that rewrites the page owns
+// this test with it.
+const probe = vi.hoisted(() => ({ permission: 'granted' as ManagePermission }));
+vi.mock('./useCanManage', () => ({ useCanManage: () => probe.permission }));
+
+// Without Vitest's globals, Testing Library does not unmount between tests by itself.
+afterEach(cleanup);
+
+test('the {{ module.namespace }} page offers Manage when the probe answers 200', () => {
+  probe.permission = 'granted';
+  render({{ module.namespace }}Page);
+
+  expect(screen.getByRole('heading', { name: 'Manage' })).toBeInTheDocument();
+  expect(screen.queryByText('Permissions for {{ module.name }} could not be loaded.')).toBeNull();
+});
+
+test('the {{ module.namespace }} page offers no Manage when the probe refuses', () => {
+  probe.permission = 'refused';
+  render({{ module.namespace }}Page);
+
+  expect(screen.queryByRole('heading', { name: 'Manage' })).toBeNull();
+  expect(screen.queryByText('Permissions for {{ module.name }} could not be loaded.')).toBeNull();
+});
+
+test('the {{ module.namespace }} page shows that its probe failed, not a refusal', () => {
+  probe.permission = 'failed';
+  render({{ module.namespace }}Page);
+
+  expect(screen.getByText('Permissions for {{ module.name }} could not be loaded.')).toHaveAttribute('role', 'alert');
+  expect(screen.queryByRole('heading', { name: 'Manage' })).toBeNull();
+});
+{{~ end ~}}

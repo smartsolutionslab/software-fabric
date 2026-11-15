@@ -445,6 +445,91 @@ public sealed class ModuleScreenAccessibilityTests
         uncheckedOutput.ShouldContain($"./modules/billing/{Path.GetFileName(screen)}");
     }
 
+    /// <summary>A screen the project wrote itself: its heading is not the module's name, it has no Manage section, and its field has no label.</summary>
+    private const string ReactOwnScreen = """
+        export function BillingPage() {
+          return (
+            <main>
+              <h1>Invoices</h1>
+              <input type="text" />
+            </main>
+          );
+        }
+
+        """;
+
+    private const string VueOwnScreen = """
+        <template>
+          <main>
+            <h1>Invoices</h1>
+            <input type="text" />
+          </main>
+        </template>
+
+        """;
+
+    private const string Roles = "backend.authorization=roles";
+
+    /// <summary>Each router, API client and framework the axe check has a branch for, with and without a permission probe.</summary>
+    public static TheoryData<string, string[]> OwnScreens => new()
+    {
+        { "saas-standard-react", ["frontend.routing=react-router"] },
+        { "saas-standard-react", [Roles, "frontend.routing=react-router"] },
+        { "saas-standard-react", [Roles, "frontend.routing=tanstack-router"] },
+        { "saas-standard-react", [Roles, "frontend.state=tanstack-query", "frontend.api-client=orval"] },
+        { "lean-crud", [Roles, "frontend.api-client=openapi-fetch"] },
+        { "lean-crud", [Roles, "frontend.api-client=openapi-fetch", "frontend.routing=tanstack-router"] },
+        { "saas-standard-vue", ["frontend.routing=vue-router"] },
+        { "saas-standard-vue", [Roles, "frontend.routing=vue-router"] },
+        { "saas-standard-vue", [Roles, "frontend.state=pinia"] },
+    };
+
+    /// <summary>
+    /// The axe check asks nothing of a screen but accessibility (#664, owner's decision): a screen the project wrote,
+    /// whose heading is not the module's name and which has no Manage section, passes it once its field has a label and
+    /// fails it while it has none. Manage, 403 and a failed probe are the page's own generated test's, which a project
+    /// that rewrites the page owns, and that test passes on the page as generated.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(OwnScreens))]
+    public void The_axe_check_asks_nothing_of_a_screen_but_accessibility_and_the_pages_own_test_checks_Manage(string profile, string[] overrides)
+    {
+        using var project = new GeneratedProject(profile, overrides);
+        project.AddModule("billing");
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var screen = Screens(project).ShouldHaveSingleItem();
+        var vue = screen.EndsWith(".vue", StringComparison.Ordinal);
+        var generated = TestOf(screen);
+        var probeTest = ProbeTestOf(screen);
+        var asGenerated = File.ReadAllText(Path.Combine(project.ProjectDirectory, screen));
+        var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, $"pnpm install:\n{installOutput}");
+
+        project.Write(screen, vue ? VueOwnScreen : ReactOwnScreen);
+        var (violationExitCode, violationOutput, violation) = Statuses(project);
+        violationExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label:\n{violationOutput}");
+        violation.GetValueOrDefault(generated).ShouldNotBeNull(violationOutput).First().ShouldBe("failed", violationOutput);
+
+        project.Write(screen, (vue ? VueOwnScreen : ReactOwnScreen).Replace(UnlabelledField, """<input type="text" aria-label="Invoice number" />""", StringComparison.Ordinal));
+        var (_, labelledOutput, labelled) = Statuses(project);
+        var checks = labelled.GetValueOrDefault(generated).ShouldNotBeNull(labelledOutput);
+        checks.First().ShouldBe("passed", labelledOutput);
+        checks.ShouldNotContain("failed", labelledOutput);
+
+        project.Write(screen, asGenerated);
+        var (exitCode, output, statuses) = Statuses(project);
+        exitCode.ShouldBe(0, $"pnpm test:\n{output}");
+        statuses.GetValueOrDefault(generated).ShouldNotBeNull(output).ShouldNotContain("failed", output);
+        if (overrides.Contains(Roles))
+        {
+            statuses.GetValueOrDefault(probeTest).ShouldBe(["passed", "passed", "passed"], output);
+        }
+        else
+        {
+            File.Exists(Path.Combine(project.ProjectDirectory, probeTest)).ShouldBeFalse();
+        }
+    }
+
     /// <summary>
     /// Runs the web app's tests and answers their exit code and output, and the statuses vitest reports for each test
     /// file's tests (<c>passed</c>, <c>failed</c>, <c>skipped</c>, ...), by the file's path relative to the project.
@@ -489,6 +574,10 @@ public sealed class ModuleScreenAccessibilityTests
     /// <summary>The example data the axe check shows a screen with, which the project fills in: <c>BillingPage.data.ts</c>.</summary>
     private static string DataOf(string screen) =>
         screen.EndsWith(".vue", StringComparison.Ordinal) ? screen[..^".vue".Length] + ".data.ts" : screen[..^".tsx".Length] + ".data.ts";
+
+    /// <summary>The page's generated test of its permission probe, which checks Manage: <c>BillingPage.probe.test.tsx</c>.</summary>
+    private static string ProbeTestOf(string screen) =>
+        screen.EndsWith(".vue", StringComparison.Ordinal) ? screen[..^".vue".Length] + ".probe.test.ts" : screen[..^".tsx".Length] + ".probe.test.tsx";
 
     /// <summary>The screen's own component test, which the generator leaves to the project: <c>BillingPage.test.tsx</c>.</summary>
     private static string OwnTestOf(string screen) =>
