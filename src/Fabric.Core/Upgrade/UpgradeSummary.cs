@@ -21,11 +21,20 @@ public static class UpgradeSummary
     /// <summary>
     /// Writes the summary. <paramref name="hasOpenApiDocument"/> and <paramref name="hasBaseApi"/> say whether the
     /// project's choices write <see cref="OpenApiDocument"/> and <see cref="BaseApi"/>, so the summary names each only
-    /// for a project that has it.
+    /// for a project that has it. <paramref name="skippedProbeTests"/> are the probe tests the upgrade left out beside a
+    /// page the project rewrote (#676).
     /// </summary>
-    public static string Write(string name, string oldVersion, string newVersion, UpgradeOutcome outcome, bool hasOpenApiDocument, bool hasBaseApi)
+    public static string Write(
+        string name,
+        string oldVersion,
+        string newVersion,
+        UpgradeOutcome outcome,
+        bool hasOpenApiDocument,
+        bool hasBaseApi,
+        IReadOnlyList<string> skippedProbeTests)
     {
         ArgumentNullException.ThrowIfNull(outcome);
+        ArgumentNullException.ThrowIfNull(skippedProbeTests);
 
         var text = new StringBuilder().AppendLine(CultureInfo.InvariantCulture, $"upgraded {name} from fabric {oldVersion} to fabric {newVersion}; nothing is committed.");
         if (outcome.Taken.Count + outcome.Merged.Count + outcome.Conflicts.Count == 0)
@@ -40,6 +49,9 @@ public static class UpgradeSummary
             "conflicts to resolve, then git add and commit",
             outcome.Conflicts.Select(conflict => $"{Describe(conflict.Kind, newVersion)}: {conflict.Path}").ToList());
         var notes = NotGuaranteed(outcome, hasOpenApiDocument, hasBaseApi);
+        notes.AddRange(skippedProbeTests.Select(path =>
+            $"- that {path} is added: the project's page beside it differs from what fabric {oldVersion} wrote, and the test asserts " +
+            "the generated page; generate it with fabric and add it by hand if the page keeps a Manage section."));
         if (notes.Count > 0)
         {
             text.AppendLine("not guaranteed (ADR-0016 D1):");
