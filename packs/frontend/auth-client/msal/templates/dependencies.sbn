@@ -1,6 +1,6 @@
 {{~ if project["frontend.framework"] == "vue" ~}}
-    "@azure/msal-browser": "5.29.0"
+    "@azure/msal-browser": "5.29.1"
 {{- else ~}}
-    "@azure/msal-browser": "5.29.0",
-    "@azure/msal-react": "5.8.1"
+    "@azure/msal-browser": "5.29.1",
+    "@azure/msal-react": "5.8.2"
 {{- end }}

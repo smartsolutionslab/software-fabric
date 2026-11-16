@@ -14,7 +14,7 @@ concurrency:
 # The Playwright whose Chromium the jobs install and cache, in one place so the cache key cannot drift from what is
 # installed. It matches the @playwright/test the frontend packs generate.
 env:
-  PLAYWRIGHT_VERSION: 1.65.0
+  PLAYWRIGHT_VERSION: 1.65.1
 
 jobs:
   # The solution's tests, in shards that run in parallel (#166). In one job they took 45-60 min, nearly all of it
@@ -36,7 +36,7 @@ jobs:
         with:
           global-json-file: global.json
       # The frontend tests install, build, lint and test generated web apps.
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 10.0.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -154,7 +154,7 @@ jobs:
         with:
           global-json-file: global.json
       - if: env.AFFECTED == 'true'
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           version: 10.0.0
       - if: env.AFFECTED == 'true'
