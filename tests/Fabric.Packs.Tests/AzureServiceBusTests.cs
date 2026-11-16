@@ -136,4 +136,79 @@ public sealed class AzureServiceBusTests
         output.ShouldContain("failed: 0");
         output.ShouldContain("succeeded: 11");
     }
+
+    [Fact]
+    public async Task An_event_from_the_emulator_whose_consumer_always_fails_is_dead_lettered_in_the_table_the_docs_name()
+    {
+        // An event the host's own modules publish and consume may be routed to a local queue; this one is sent to the
+        // emulator's queue by address, so it is received from the broker, as one another service publishes is (#684).
+        using var project = new GeneratedProject(Profile, Transport);
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoicePaidConsumer
+            {
+                public static void Handle(InvoicePaidV1 message) =>
+                    throw new InvalidOperationException($"Every delivery of {message.InvoiceId} fails.");
+            }
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Api/SendThroughTheBroker.cs", """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Http;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.Contracts.Billing;
+            using Wolverine;
+
+            namespace Shop.Modules.Shipping.Api;
+
+            public sealed class SendThroughTheBroker : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints) =>
+                    endpoints.MapPost("/send-through-the-broker", async (IMessageBus bus) =>
+                    {
+                        await bus.EndpointFor(new Uri("asb://queue/shop.contracts.billing.invoicepaidv1")).SendAsync(new InvoicePaidV1(Guid.CreateVersion7()));
+                        return Results.Accepted();
+                    }).AllowAnonymous();
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        using var serviceBus = Container.ServiceBus();
+        using var host = project.StartHost(new Dictionary<string, string>
+        {
+            ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}",
+            ["ConnectionStrings__messaging"] = Container.ServiceBusConnectionString(serviceBus.Port),
+            ["ConnectionStrings__messaging-management"] = Container.ServiceBusConnectionString(serviceBus.ManagementPort!.Value),
+            ["Authentication__Authority"] = "http://127.0.0.1:1/realms/shop",
+        });
+
+        // Wolverine goes on trying to reach the emulator after the host is up; until it has, a send by address fails.
+        var sent = await host.PostAsync("/shipping/send-through-the-broker");
+        for (var attempt = 0; attempt < 60 && sent.StatusCode != HttpStatusCode.Accepted; attempt++)
+        {
+            await Task.Delay(2000, TestContext.Current.CancellationToken);
+            sent = await host.PostAsync("/shipping/send-through-the-broker");
+        }
+
+        sent.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        // Seven attempts over about a minute (the pack's ADR), then the message is dead-lettered somewhere.
+        for (var attempt = 0; attempt < 360 && RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword) == 0; attempt++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+        }
+
+        // The pack's ADR and agent rules name the table as the one place a dead letter is found and replayed from.
+        RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword).ShouldBeGreaterThan(0, $"Queues: {serviceBus.ServiceBusQueues()}");
+    }
 }
