@@ -119,7 +119,7 @@ public sealed partial class FormKitTests
 
         files["web/app/package.json"].ShouldContain("\"@formkit/vue\": \"2.5.0\"");
         files["web/app/package.json"].ShouldContain("\"@formkit/core\": \"2.5.0\"");
-        files["web/app/package.json"].ShouldContain("\"@vue/test-utils\": \"2.5.1\"");
+        files["web/app/package.json"].ShouldContain("\"@vue/test-utils\": \"2.6.0\"");
         files["web/app/package.json"].ShouldNotContain("vee-validate");
         files["web/app/package.json"].ShouldNotContain("@formkit/themes");
         files["web/app/package.json"].ShouldNotContain("@formkit/zod");
