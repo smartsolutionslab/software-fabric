@@ -8,7 +8,7 @@ Wolverine (MIT) carries integration events. Each module's unit of work is Wolver
 
 {{ if project["backend.bus.transport"] == "kafka" }}Over Kafka every integration event has a topic named after its full type name (`{{ namespace }}.Contracts.Billing.InvoicePaidV1`); the host publishes each event to its topic and listens, as one consumer group named after the project, to the topics of the events its modules consume.
 
-{{ end }}{{ if project["backend.bus.transport"] == "azure-service-bus" }}Over Azure Service Bus every integration event has a queue named after its full type name, created at startup through the management API; the host publishes each event to its queue and listens to the queues of the events its modules consume.
+{{ end }}{{ if project["backend.bus.transport"] == "rabbitmq" || project["backend.bus.transport"] == "azure-service-bus" }}An integration event that one module publishes and another module of the same host consumes does not cross the broker: Wolverine routes a message it has a consumer for to a durable local queue in the host (`local://<namespace>.contracts.<module>.<event>/` in the host log, in lower case), and consults the broker's routing only for a message no module of the host consumes. The host's local queues are durable (`UseDurableLocalQueues()` in `src/Host/Wiring/Messaging.cs`): such an event is stored with the publishing module's changes, in the same transaction, and stays in the inbox (`wolverine.wolverine_incoming_envelopes`) until its consumer succeeds, so a host that stops meanwhile delivers it after a restart. It is retried and dead-lettered as below, exactly as one from the broker. The broker carries only what another service sends or receives: the host publishes an event none of its modules consume to {{ if project["backend.bus.transport"] == "rabbitmq" }}an exchange and queue{{ else }}a queue, created at startup through the management API,{{ end }} named after its full type name, and listens to the queue of each event its modules consume, where another service's events arrive. This is intended: modules of one host are not worth a broker hop per event, and the outbox and inbox keep the local queue durable.
 
 {{ end }}{{ if project["backend.mediator"] == "wolverine" }}Wolverine discovers consumers (`*Consumer`) in the modules' Application projects, and their command and query handlers, which the project's mediator invokes on Wolverine's bus (see the mediator's ADR).{{ else }}Wolverine discovers only consumers (`*Consumer`) in the modules' Application projects. Commands and queries stay with the project's own mediator; Wolverine is not used as a second one.{{ end }}
 
@@ -18,6 +18,7 @@ Wolverine generates handler code at startup (`WolverineFx.RuntimeCompilation`). 
 
 ## Consequences
 
-- No event is lost when the broker is down: it waits in the outbox.
+- No event is lost when the broker is down: it waits in the outbox.{{ if project["backend.bus.transport"] == "rabbitmq" || project["backend.bus.transport"] == "azure-service-bus" }} Events between modules of the host do not wait: they never reach the broker.
+- An event a module of the host consumes is not sent to the broker at all, so another service never receives it. Letting a service consume it too, or moving a module to a host of its own, changes the routing in `src/Host/Wiring/Messaging.cs`.{{ end }}
 - Delivery is at least once, and a failed consumer runs again: consumers must be idempotent.
 - A consumer that fails for good is dead-lettered after about a minute, not at once.

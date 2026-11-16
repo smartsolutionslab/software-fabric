@@ -116,7 +116,8 @@ public sealed class AzureServiceBusTests
         // Wolverine retried the failed delivery by itself; nothing was dead-lettered on the way.
         RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword).ShouldBe(0);
 
-        // Without a transport Wolverine would deliver the event in process; it was routed to the queue named after it.
+        // The event itself went through the host's local queue (docs/adr); the host listens to the queue named after it,
+        // where another service's InvoicePaidV1 would arrive.
         serviceBus.ServiceBusQueues().ShouldContain("<title type=\"text\">shop.contracts.billing.invoicepaidv1</title>");
     }
 

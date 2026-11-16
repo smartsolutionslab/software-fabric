@@ -54,6 +54,11 @@ public static class Messaging
             options.UseEntityFrameworkCoreTransactions();
             options.Policies.UseDurableOutboxOnAllSendingEndpoints();
             options.Policies.UseDurableInboxOnAllListeners();
+{{~ if project["backend.bus.transport"] == "rabbitmq" || project["backend.bus.transport"] == "azure-service-bus" ~}}
+            // An event a module of this host consumes goes to a local queue, not the broker (see docs/adr); durable, it is
+            // stored with the publishing module's changes and its retries are scheduled in the inbox, so a restart keeps it.
+            options.Policies.UseDurableLocalQueues();
+{{~ end ~}}
             // A consumer that throws is tried again, the wait doubling from 1 second, before its message is dead-lettered
             // (seven attempts, about a minute; see docs/adr). The retry is scheduled in the durable inbox, so the
             // listener delivers other messages meanwhile.
@@ -69,7 +74,8 @@ public static class Messaging
             // and not in a dead-letter queue of the broker's (see docs/adr).
 {{~ if project["backend.mediator"] == "wolverine" ~}}
             // Commands and queries are Wolverine messages too, invoked in process by the mediator; only integration
-            // events are routed to the broker.
+            // events follow the broker's conventions, and of those only the ones no module of this host consumes are
+            // sent to it.
             options.UseRabbitMq(new Uri(broker)).AutoProvision().DisableDeadLetterQueueing().UseConventionalRouting(convention => convention.IncludeTypes(IsIntegrationEvent));
 {{~ else ~}}
             options.UseRabbitMq(new Uri(broker)).AutoProvision().DisableDeadLetterQueueing().UseConventionalRouting();
@@ -79,7 +85,8 @@ public static class Messaging
             // and not in a dead-letter queue of the broker's (see docs/adr).
 {{~ if project["backend.mediator"] == "wolverine" ~}}
             // Commands and queries are Wolverine messages too, invoked in process by the mediator; only integration
-            // events are routed to the broker.
+            // events follow the broker's conventions, and of those only the ones no module of this host consumes are
+            // sent to it.
             options.UseAzureServiceBus(broker).AutoProvision().ConfigureListeners(listener => listener.DisableDeadLetterQueueing())
                 .UseConventionalRouting(convention => convention.IncludeTypes(IsIntegrationEvent));
 {{~ else ~}}
