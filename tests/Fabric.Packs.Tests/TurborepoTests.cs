@@ -5,7 +5,7 @@ namespace Fabric.Packs.Tests;
 /// <summary>
 /// frontend.workspace.turborepo (#284): the pnpm workspace with Turborepo running build, lint and test in every package,
 /// in dependency order, from a local cache. Owner decisions on #284 mirror Nx's on #283: package-based, local cache
-/// only, the build keyed on every VITE_* and REMOTE_* variable, dist and storybook-static as its outputs, turbo 2.11.10.
+/// only, the build keyed on every VITE_* and REMOTE_* variable, dist and storybook-static as its outputs, turbo 2.11.11.
 /// </summary>
 public sealed class TurborepoTests
 {
@@ -22,7 +22,7 @@ public sealed class TurborepoTests
         package.ShouldContain("\"build\": \"turbo run build\"");
         package.ShouldContain("\"lint\": \"turbo run lint\"");
         package.ShouldContain("\"test\": \"turbo run test\"");
-        package.ShouldContain("\"turbo\": \"2.11.10\"");
+        package.ShouldContain("\"turbo\": \"2.11.11\"");
         package.ShouldContain("\"packageManager\": \"pnpm@10.0.0\"");
         package.ShouldNotContain("--recursive");
     }

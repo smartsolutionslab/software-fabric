@@ -21,6 +21,6 @@ public sealed class ReactHookFormResolversTests
         var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, [validation]);
         generated.Errors.ShouldBeEmpty();
 
-        generated.Files.Single(file => file.Path == "web/app/package.json").Content.ShouldContain("\"@hookform/resolvers\": \"7.0.5\"");
+        generated.Files.Single(file => file.Path == "web/app/package.json").Content.ShouldContain("\"@hookform/resolvers\": \"7.0.6\"");
     }
 }

@@ -10,7 +10,7 @@ cd "$(dirname "$0")/../.."
 web="$PWD/web"
 baselines="$web/app/e2e/__screenshots__"
 # Moves with @playwright/test: the tests run with the project's installed package and the image's browsers.
-image="mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d"
+image="mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579"
 playwright="${image#*:v}"
 playwright="${playwright%%-*}"
 
