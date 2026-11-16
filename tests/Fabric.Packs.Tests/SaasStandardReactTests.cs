@@ -438,6 +438,35 @@ public sealed class SaasStandardReactTests
         HoldsMessages(queues, "wolverine-dead-letter-queue").ShouldBeFalse(queues);
     }
 
+    [Fact]
+    public async Task An_event_between_modules_of_the_host_survives_the_host_stopping_before_its_consumer_succeeds()
+    {
+        // The event does not cross the broker (docs/adr): it is kept in Wolverine's durable local queue, stored with the
+        // billing module's changes, so a host killed mid-delivery delivers it after the restart (#688).
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
+            """);
+        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", PayInvoice);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", SurvivingEvent.Consumer);
+        project.Write("src/Modules/Shipping/Shipping.Api/Deliveries.cs", SurvivingEvent.Endpoint);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        using var rabbitMq = Container.RabbitMq();
+        var invoice = Guid.CreateVersion7();
+        await SurvivingEvent.PayThenKillTheHostMidDeliveryAsync(
+            project.StartHost(new Dictionary<string, string>(Dependencies(postgres, rabbitMq)) { [SurvivingEvent.Hangs] = "true" }),
+            invoice);
+
+        using var restarted = project.StartHost(Dependencies(postgres, rabbitMq));
+        await SurvivingEvent.ShouldBeReceivedAfterTheRestartAsync(restarted, invoice, postgres, DatabasePassword);
+    }
+
     /// <summary>Whether a queue in rabbitmqctl's "name count" listing holds any message.</summary>
     private static bool HoldsMessages(string queues, string queue) =>
         queues.Split('\n').Select(line => line.Split('\t')).Any(columns => columns[0] == queue && columns[^1].Trim() != "0");
