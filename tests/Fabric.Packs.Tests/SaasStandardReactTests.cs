@@ -383,6 +383,66 @@ public sealed class SaasStandardReactTests
     }
 
     [Fact]
+    public async Task An_event_from_the_broker_whose_consumer_always_fails_is_dead_lettered_in_the_table_the_docs_name()
+    {
+        // The host routes an event its own modules publish and consume to a local queue, so the test above never
+        // reaches the broker. Here another service publishes it onto the broker, where Wolverine's RabbitMQ transport
+        // has a dead-letter queue of its own (#684).
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoicePaidConsumer
+            {
+                public static void Handle(InvoicePaidV1 message) =>
+                    throw new InvalidOperationException($"Every delivery of {message.InvoiceId} fails.");
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        using var rabbitMq = Container.RabbitMq();
+        using var host = project.StartHost(Dependencies(postgres, rabbitMq));
+        (await host.GetAsync("/alive")).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // The default exchange drops a message for a queue that does not exist yet: wait for the host to declare it.
+        const string Queue = "Shop.Contracts.Billing.InvoicePaidV1";
+        for (var attempt = 0; attempt < 120 && !rabbitMq.RabbitMqQueues().Split('\n').Any(line => line.StartsWith(Queue + "\t", StringComparison.Ordinal)); attempt++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+        }
+
+        rabbitMq.PublishToRabbitMqQueue(
+            Queue,
+            $$"""{"type":"{{Queue}}","content_type":"application/json","message_id":"{{Guid.CreateVersion7()}}"}""",
+            $$"""{"InvoiceId":"{{Guid.CreateVersion7()}}"}""");
+
+        // Seven attempts over about a minute (the pack's ADR), then the message is dead-lettered somewhere.
+        var queues = rabbitMq.RabbitMqQueues();
+        for (var attempt = 0; attempt < 360 && RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword) == 0 && !HoldsMessages(queues, "wolverine-dead-letter-queue"); attempt++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            queues = rabbitMq.RabbitMqQueues();
+        }
+
+        // The pack's ADR and agent rules name the table as the one place a dead letter is found and replayed from.
+        RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword).ShouldBe(1, $"Queues:\n{queues}");
+        HoldsMessages(queues, "wolverine-dead-letter-queue").ShouldBeFalse(queues);
+    }
+
+    /// <summary>Whether a queue in rabbitmqctl's "name count" listing holds any message.</summary>
+    private static bool HoldsMessages(string queues, string queue) =>
+        queues.Split('\n').Select(line => line.Split('\t')).Any(columns => columns[0] == queue && columns[^1].Trim() != "0");
+
+    [Fact]
     public void A_tenant_cannot_read_another_tenants_rows()
     {
         using var project = new GeneratedProject(Profile);

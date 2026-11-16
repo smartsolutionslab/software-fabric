@@ -180,6 +180,17 @@ internal sealed class Container : IDisposable
         return client.GetStringAsync(new Uri($"http://127.0.0.1:{ManagementPort}/$Resources/queues?api-version=2021-05")).GetAwaiter().GetResult();
     }
 
+    /// <summary>The broker's queues and the messages each holds, one "name count" per line, as rabbitmqctl lists them.</summary>
+    public string RabbitMqQueues() =>
+        Docker("exec", id, "rabbitmqctl", "list_queues", "--quiet", "--no-table-headers", "name", "messages").Trim();
+
+    /// <summary>
+    /// Publishes <paramref name="payload"/> to a queue through the default exchange, as another service would, with the
+    /// AMQP properties given as JSON; through the broker's management API, as the broker's own guest user.
+    /// </summary>
+    public void PublishToRabbitMqQueue(string queue, string properties, string payload) =>
+        Docker("exec", id, "rabbitmqadmin", "--non-interactive", "publish", "message", "--routing-key", queue, "--properties", properties, "--payload", payload);
+
     /// <summary>The first message of a Kafka topic, read with the broker's own console consumer; empty when none arrives in time.</summary>
     public string FirstKafkaMessage(string topic) =>
         Run(["exec", "--user", "appuser", id, "kafka-console-consumer", "--bootstrap-server", "localhost:29092", "--topic", topic,

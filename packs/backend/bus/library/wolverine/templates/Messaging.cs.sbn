@@ -65,20 +65,26 @@ public static class Messaging
                 TimeSpan.FromSeconds(16),
                 TimeSpan.FromSeconds(32));
 {{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
+            // A message given up on is dead-lettered in the wolverine_dead_letters table, where it is replayed from,
+            // and not in a dead-letter queue of the broker's (see docs/adr).
 {{~ if project["backend.mediator"] == "wolverine" ~}}
             // Commands and queries are Wolverine messages too, invoked in process by the mediator; only integration
             // events are routed to the broker.
-            options.UseRabbitMq(new Uri(broker)).AutoProvision().UseConventionalRouting(convention => convention.IncludeTypes(IsIntegrationEvent));
+            options.UseRabbitMq(new Uri(broker)).AutoProvision().DisableDeadLetterQueueing().UseConventionalRouting(convention => convention.IncludeTypes(IsIntegrationEvent));
 {{~ else ~}}
-            options.UseRabbitMq(new Uri(broker)).AutoProvision().UseConventionalRouting();
+            options.UseRabbitMq(new Uri(broker)).AutoProvision().DisableDeadLetterQueueing().UseConventionalRouting();
 {{~ end ~}}
 {{~ else if project["backend.bus.transport"] == "azure-service-bus" ~}}
+            // A message given up on is dead-lettered in the wolverine_dead_letters table, where it is replayed from,
+            // and not in a dead-letter queue of the broker's (see docs/adr).
 {{~ if project["backend.mediator"] == "wolverine" ~}}
             // Commands and queries are Wolverine messages too, invoked in process by the mediator; only integration
             // events are routed to the broker.
-            options.UseAzureServiceBus(broker).AutoProvision().UseConventionalRouting(convention => convention.IncludeTypes(IsIntegrationEvent));
+            options.UseAzureServiceBus(broker).AutoProvision().ConfigureListeners(listener => listener.DisableDeadLetterQueueing())
+                .UseConventionalRouting(convention => convention.IncludeTypes(IsIntegrationEvent));
 {{~ else ~}}
-            options.UseAzureServiceBus(broker).AutoProvision().UseConventionalRouting();
+            options.UseAzureServiceBus(broker).AutoProvision().ConfigureListeners(listener => listener.DisableDeadLetterQueueing())
+                .UseConventionalRouting();
 {{~ end ~}}
             options.Transports.GetOrCreate<AzureServiceBusTransport>().ManagementConnectionString = management;
 {{~ else if project["backend.bus.transport"] == "kafka" ~}}

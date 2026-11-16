@@ -16,6 +16,29 @@ public sealed class EventDrivenBackendTests
 
     private static readonly string[] Frontend = ["frontend.state=redux-toolkit", "frontend.api-client=rtk-query-codegen"];
 
+    /// <summary>An endpoint that publishes InvoicePaidV1 through the billing module's unit of work.</summary>
+    private const string PayInvoice = """
+        using Microsoft.AspNetCore.Builder;
+        using Microsoft.AspNetCore.Http;
+        using Microsoft.AspNetCore.Routing;
+        using Shop.BuildingBlocks.Api;
+        using Shop.Contracts.Billing;
+        using Shop.Modules.Billing.Application;
+
+        namespace Shop.Modules.Billing.Api;
+
+        public sealed class PayInvoice : IEndpoint
+        {
+            public void Map(IEndpointRouteBuilder endpoints) =>
+                endpoints.MapPost("/invoices/{id}/pay", async (Guid id, IBillingUnitOfWork unitOfWork, CancellationToken cancellationToken) =>
+                {
+                    await unitOfWork.PublishAsync(new InvoicePaidV1(id));
+                    await unitOfWork.CommitAsync(cancellationToken);
+                    return Results.Accepted();
+                }).AllowAnonymous();
+        }
+        """;
+
     private const string Invoice = """
         using Shop.BuildingBlocks.EventSourcing;
 
@@ -588,27 +611,7 @@ public sealed class EventDrivenBackendTests
 
             public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
             """);
-        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", """
-            using Microsoft.AspNetCore.Builder;
-            using Microsoft.AspNetCore.Http;
-            using Microsoft.AspNetCore.Routing;
-            using Shop.BuildingBlocks.Api;
-            using Shop.Contracts.Billing;
-            using Shop.Modules.Billing.Application;
-
-            namespace Shop.Modules.Billing.Api;
-
-            public sealed class PayInvoice : IEndpoint
-            {
-                public void Map(IEndpointRouteBuilder endpoints) =>
-                    endpoints.MapPost("/invoices/{id}/pay", async (Guid id, IBillingUnitOfWork unitOfWork, CancellationToken cancellationToken) =>
-                    {
-                        await unitOfWork.PublishAsync(new InvoicePaidV1(id));
-                        await unitOfWork.CommitAsync(cancellationToken);
-                        return Results.Accepted();
-                    }).AllowAnonymous();
-            }
-            """);
+        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", PayInvoice);
         project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", RedeliveredEvent.Consumer(tenancy: false));
         project.Write("src/Modules/Shipping/Shipping.Api/Deliveries.cs", RedeliveredEvent.Endpoint);
         project.Build();
@@ -636,6 +639,57 @@ public sealed class EventDrivenBackendTests
         RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword).ShouldBe(0);
 
         // Without a transport Wolverine would deliver the event in process; it must have crossed on the broker.
+        kafka.FirstKafkaMessage("Shop.Contracts.Billing.InvoicePaidV1").ShouldContain(invoice.ToString());
+    }
+
+    [Fact]
+    public async Task An_event_over_kafka_whose_consumer_always_fails_is_dead_lettered_in_the_table_the_docs_name()
+    {
+        // Wolverine's Kafka transport dead-letters to a topic of its own only when asked to (#684).
+        using var project = new GeneratedProject(Profile, Frontend);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
+            """);
+        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", PayInvoice);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", """
+            using Shop.Contracts.Billing;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoicePaidConsumer
+            {
+                public static void Handle(InvoicePaidV1 message) =>
+                    throw new InvalidOperationException($"Every delivery of {message.InvoiceId} fails.");
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        using var kafka = Container.Kafka();
+        using var host = project.StartHost(new Dictionary<string, string>
+        {
+            ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}",
+            ["ConnectionStrings__messaging"] = $"localhost:{kafka.Port}",
+            ["Authentication__Authority"] = "http://127.0.0.1:1/realms/shop",
+        });
+
+        var invoice = Guid.NewGuid();
+        (await host.PostAsync($"/billing/invoices/{invoice}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        // Seven attempts over about a minute (the pack's ADR), then the message is dead-lettered.
+        for (var attempt = 0; attempt < 360 && RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword) == 0; attempt++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+        }
+
+        // The pack's ADR and agent rules name the table as the one place a dead letter is found and replayed from.
+        RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword).ShouldBe(1);
+
+        // It crossed on the broker, so it was the Kafka listener that gave it up.
         kafka.FirstKafkaMessage("Shop.Contracts.Billing.InvoicePaidV1").ShouldContain(invoice.ToString());
     }
 
