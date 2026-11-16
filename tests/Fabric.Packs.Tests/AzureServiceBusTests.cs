@@ -165,6 +165,7 @@ public sealed class AzureServiceBusTests
             using Microsoft.AspNetCore.Http;
             using Microsoft.AspNetCore.Routing;
             using Shop.BuildingBlocks.Api;
+            using Shop.Contracts;
             using Shop.Contracts.Billing;
             using Wolverine;
 
@@ -175,7 +176,12 @@ public sealed class AzureServiceBusTests
                 public void Map(IEndpointRouteBuilder endpoints) =>
                     endpoints.MapPost("/send-through-the-broker", async (IMessageBus bus) =>
                     {
-                        await bus.EndpointFor(new Uri("asb://queue/shop.contracts.billing.invoicepaidv1")).SendAsync(new InvoicePaidV1(Guid.CreateVersion7()));
+                        // The metadata another service's unit of work would have filled.
+                        var invoicePaid = new InvoicePaidV1(Guid.CreateVersion7()) with
+                        {
+                            Metadata = new EventMetadata(Guid.CreateVersion7(), DateTimeOffset.UnixEpoch, "tenant-a"),
+                        };
+                        await bus.EndpointFor(new Uri("asb://queue/shop.contracts.billing.invoicepaidv1")).SendAsync(invoicePaid);
                         return Results.Accepted();
                     }).AllowAnonymous();
             }
@@ -192,15 +198,8 @@ public sealed class AzureServiceBusTests
             ["Authentication__Authority"] = "http://127.0.0.1:1/realms/shop",
         });
 
-        // Wolverine goes on trying to reach the emulator after the host is up; until it has, a send by address fails.
         var sent = await host.PostAsync("/shipping/send-through-the-broker");
-        for (var attempt = 0; attempt < 60 && sent.StatusCode != HttpStatusCode.Accepted; attempt++)
-        {
-            await Task.Delay(2000, TestContext.Current.CancellationToken);
-            sent = await host.PostAsync("/shipping/send-through-the-broker");
-        }
-
-        sent.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        sent.StatusCode.ShouldBe(HttpStatusCode.Accepted, await sent.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
 
         // Seven attempts over about a minute (the pack's ADR), then the message is dead-lettered somewhere.
         for (var attempt = 0; attempt < 360 && RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword) == 0; attempt++)
@@ -209,6 +208,6 @@ public sealed class AzureServiceBusTests
         }
 
         // The pack's ADR and agent rules name the table as the one place a dead letter is found and replayed from.
-        RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword).ShouldBeGreaterThan(0, $"Queues: {serviceBus.ServiceBusQueues()}");
+        RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword).ShouldBe(1, $"Queues: {serviceBus.ServiceBusQueues()}");
     }
 }
