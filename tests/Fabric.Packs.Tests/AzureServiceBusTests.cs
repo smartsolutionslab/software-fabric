@@ -116,8 +116,45 @@ public sealed class AzureServiceBusTests
         // Wolverine retried the failed delivery by itself; nothing was dead-lettered on the way.
         RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword).ShouldBe(0);
 
-        // Without a transport Wolverine would deliver the event in process; it was routed to the queue named after it.
+        // The event itself went through the host's local queue (docs/adr); the host listens to the queue named after it,
+        // where another service's InvoicePaidV1 would arrive.
         serviceBus.ServiceBusQueues().ShouldContain("<title type=\"text\">shop.contracts.billing.invoicepaidv1</title>");
+    }
+
+    [Fact]
+    public async Task An_event_between_modules_of_the_host_survives_the_host_stopping_before_its_consumer_succeeds()
+    {
+        // The event does not cross the emulator (docs/adr): it is kept in Wolverine's durable local queue, stored with
+        // the billing module's changes, so a host killed mid-delivery delivers it after the restart (#688).
+        using var project = new GeneratedProject(Profile, Transport);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
+            """);
+        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", SaasStandardReactTests.PayInvoice);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", SurvivingEvent.Consumer);
+        project.Write("src/Modules/Shipping/Shipping.Api/Deliveries.cs", SurvivingEvent.Endpoint);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        using var serviceBus = Container.ServiceBus();
+        Dictionary<string, string> dependencies = new()
+        {
+            ["ConnectionStrings__database"] = $"Host=127.0.0.1;Port={postgres.Port};Database=postgres;Username=postgres;Password={DatabasePassword}",
+            ["ConnectionStrings__messaging"] = Container.ServiceBusConnectionString(serviceBus.Port),
+            ["ConnectionStrings__messaging-management"] = Container.ServiceBusConnectionString(serviceBus.ManagementPort!.Value),
+            ["Authentication__Authority"] = "http://127.0.0.1:1/realms/shop",
+        };
+        var invoice = Guid.CreateVersion7();
+        await SurvivingEvent.PayThenKillTheHostMidDeliveryAsync(
+            project.StartHost(new Dictionary<string, string>(dependencies) { [SurvivingEvent.Hangs] = "true" }),
+            invoice);
+
+        using var restarted = project.StartHost(dependencies);
+        await SurvivingEvent.ShouldBeReceivedAfterTheRestartAsync(restarted, invoice, postgres, DatabasePassword);
     }
 
     /// <summary>The generated integration tests, and a publish of the AppHost (<see cref="PublishModeTests"/>), pass.</summary>
