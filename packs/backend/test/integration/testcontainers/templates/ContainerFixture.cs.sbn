@@ -61,8 +61,13 @@ public sealed class ContainerFixture : {{ test_lifetime }}
             {
                 builder.UseSetting(key, value);
             }
+
+            // A port the operating system chooses, not Kestrel's default 5000, which another project's tests may hold.
+            // UseKestrel(0) cannot ask for it: the factory WithWebHostBuilder returns starts its host with the port of
+            // the factory it came from, which has none.
+            builder.UseSetting(WebHostDefaults.ServerUrlsKey, "http://127.0.0.1:0");
         });
-        host.UseKestrel(0);
+        host.UseKestrel();
         host.StartServer();
     }
 
