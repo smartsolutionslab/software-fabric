@@ -3,6 +3,8 @@ files:
   - { template: templates/tokens/package.json.sbn, target: web/packages/tokens/package.json }
   - { template: templates/tokens/build.mjs.sbn, target: web/packages/tokens/build.mjs }
   - { template: templates/tokens/color.tokens.json.sbn, target: web/packages/tokens/src/color.tokens.json }
+  # The dark theme's colours, with a colour scheme: shadcn and shadcn-vue have a dark theme, the other UI libraries none.
+  - { template: templates/tokens/color.dark.tokens.json.sbn, target: web/packages/tokens/dark/color.tokens.json, when: 'object.has_key(project, "frontend.color-scheme")' }
   - { template: templates/tokens/radius.tokens.json.sbn, target: web/packages/tokens/src/radius.tokens.json }
   - { template: templates/ui/package.json.sbn, target: web/packages/ui/package.json }
   - { template: templates/ui/tsconfig.json.sbn, target: web/packages/ui/tsconfig.json }

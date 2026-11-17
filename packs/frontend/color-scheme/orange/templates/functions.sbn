@@ -1,0 +1,31 @@
+func color_scheme_light
+  ret `  --primary: oklch(0.553 0.195 38.402);
+  --primary-foreground: oklch(0.98 0.016 73.684);
+  --ring: oklch(0.646 0.222 41.116);
+  --chart-1: oklch(0.837 0.128 66.29);
+  --chart-2: oklch(0.705 0.213 47.604);
+  --chart-3: oklch(0.646 0.222 41.116);
+  --chart-4: oklch(0.553 0.195 38.402);
+  --chart-5: oklch(0.47 0.157 37.304);
+  --sidebar-primary: oklch(0.553 0.195 38.402);
+  --sidebar-primary-foreground: oklch(0.98 0.016 73.684);
+  --sidebar-ring: oklch(0.646 0.222 41.116);`
+end
+func color_scheme_dark
+  ret `  --primary: oklch(0.47 0.157 37.304);
+  --primary-foreground: oklch(0.98 0.016 73.684);
+  --ring: oklch(0.705 0.213 47.604);
+  --chart-1: oklch(0.837 0.128 66.29);
+  --chart-2: oklch(0.705 0.213 47.604);
+  --chart-3: oklch(0.646 0.222 41.116);
+  --chart-4: oklch(0.553 0.195 38.402);
+  --chart-5: oklch(0.47 0.157 37.304);
+  --sidebar-primary: oklch(0.47 0.157 37.304);
+  --sidebar-primary-foreground: oklch(0.98 0.016 73.684);
+  --sidebar-ring: oklch(0.705 0.213 47.604);`
+end
+func color_scheme_brand
+  ret `      "500": { "$value": "#ff6900" },
+      "700": { "$value": "#ca3500" },
+      "800": { "$value": "#9f2d00" }`
+end

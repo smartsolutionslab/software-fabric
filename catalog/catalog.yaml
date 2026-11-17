@@ -646,6 +646,19 @@ dimensions:
       screenshot-tests: { tier: experimental }
       accessibility:    { tier: supported, note: "axe in component and e2e tests" }
 
+  # ─────────────────────────── Frontend · theme ──────────────────────────────
+  # Next to last in the catalog: active in every profile, it renumbers one ADR of each, the reads' (last, #247).
+
+  frontend.color-scheme:
+    scope: project
+    active-when: "frontend.ui-library in (shadcn, shadcn-vue)"
+    default: blue
+    note: "shadcn/ui's own colour themes on its slate neutrals, in a light and a dark palette: the primary colour, focus rings, the sidebar's active item and the charts, and a design system's brand tokens."
+    options:
+      blue:   { tier: experimental }
+      green:  { tier: experimental }
+      orange: { tier: experimental }
+
   # ─────────────────────────── Backend · data access add-ons ─────────────────
   # Last in the catalog (owner decision on #247): a dimension active in every profile renumbers no profile's ADRs here.
 

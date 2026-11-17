@@ -1,12 +1,10 @@
 @import 'tw-animate-css';
 
-{{~ dark = project["frontend.design-system"] == "none" ~}}
-{{ if dark }}/* shadcn/ui's theme for components.json's baseColor, slate: change colours and radius here, not per component.
-   Two palettes of the same variables, swapped as a whole: :root is the light one, .dark the dark one. The dark palette
-   and dark: utilities apply under a .dark ancestor, which src/theme sets on <html>. */
-{{ else }}/* shadcn/ui's theme for components.json's baseColor, slate: change colours and radius here, not per component.
-   Light only: dark: utilities apply under a .dark ancestor, so dark mode is a .dark block of these variables. */
-{{ end }}@custom-variant dark (&:is(.dark *));
+/* shadcn/ui's slate theme (components.json's baseColor) in fabric.yaml's colour scheme, {{ project["frontend.color-scheme"] }}:
+   change the radius here, never a colour of the palettes by hand, and nothing per component. Two palettes of the same
+   variables, swapped as a whole: :root is the light one, .dark the dark one. The dark palette and dark: utilities
+   apply under a .dark ancestor, which src/theme sets on <html>. */
+@custom-variant dark (&:is(.dark *));
 
 :root {
   --radius: 0.625rem;
@@ -16,8 +14,6 @@
   --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
   --secondary: oklch(0.968 0.007 247.896);
   --secondary-foreground: oklch(0.208 0.042 265.755);
   --muted: oklch(0.968 0.007 247.896);
@@ -27,22 +23,13 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.929 0.013 255.508);
   --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.984 0.003 247.858);
   --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
   --sidebar-accent: oklch(0.968 0.007 247.896);
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+{{ color_scheme_light }}
 }
-{{~ if dark ~}}
 
 .dark {
   --background: oklch(0.129 0.042 264.695);
@@ -51,8 +38,6 @@
   --card-foreground: oklch(0.984 0.003 247.858);
   --popover: oklch(0.208 0.042 265.755);
   --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
   --secondary: oklch(0.279 0.041 260.031);
   --secondary-foreground: oklch(0.984 0.003 247.858);
   --muted: oklch(0.279 0.041 260.031);
@@ -62,22 +47,13 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.208 0.042 265.755);
   --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
   --sidebar-accent: oklch(0.279 0.041 260.031);
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+{{ color_scheme_dark }}
 }
-{{~ end ~}}
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
@@ -124,9 +100,7 @@
   body {
     @apply bg-background text-foreground;
   }
-{{~ if dark ~}}
   .dark {
     color-scheme: dark;
   }
-{{~ end ~}}
 }

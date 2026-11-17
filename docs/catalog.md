@@ -365,6 +365,19 @@ Settings:
 | `echarts` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
 | `recharts` | supported | `frontend.framework == react` | — | — | — |
 
+### `frontend.color-scheme`
+
+- Scope: project
+- Active when: `frontend.ui-library in (shadcn, shadcn-vue)`
+- Default: `blue`
+- Note: shadcn/ui's own colour themes on its slate neutrals, in a light and a dark palette: the primary colour, focus rings, the sidebar's active item and the charts, and a design system's brand tokens.
+
+| Option | Tier | Requires | Conflicts | Profiles | Note |
+|---|---|---|---|---|---|
+| `blue` | experimental | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
+| `green` | experimental | — | — | — | — |
+| `orange` | experimental | — | — | — | — |
+
 ### `frontend.dashboards`
 
 - Scope: project, multi-valued
