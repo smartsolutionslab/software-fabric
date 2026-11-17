@@ -133,6 +133,57 @@ public sealed partial class LocalRunTests
         vstestOutput.ShouldContain("global.json: test.runner is \"VSTest\"", Case.Sensitive, vstestOutput);
     }
 
+    /// <summary>
+    /// Where the rule cannot speak: CI and the command line run the tests through <c>test.sh</c>, whose
+    /// <c>dotnet test --project</c> would stop at <c>MSB1001</c>. The script checks <c>global.json</c> first, naming it.
+    /// </summary>
+    [Theory]
+    [InlineData("xunit")]
+    [InlineData("nunit")]
+    [InlineData("tunit")]
+    public void The_test_script_fails_naming_global_json_before_dotnet_test_when_its_test_runner_is_missing_or_wrong(string framework)
+    {
+        using var project = new GeneratedProject("lean-crud", $"backend.test.framework={framework}");
+        var globalJson = File.ReadAllText(Path.Combine(project.ProjectDirectory, "global.json"));
+        string[] arguments = [".github/scripts/test.sh", ArchitectureTests];
+
+        project.Write("global.json", globalJson[..globalJson.IndexOf(",\n  \"test\"", StringComparison.Ordinal)] + "\n}\n");
+        var (exitCode, output) = Shell.Run(project.ProjectDirectory, "bash", arguments);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("global.json: test.runner is missing; it must be \"Microsoft.Testing.Platform\"", Case.Sensitive, output);
+        output.ShouldNotContain("MSBUILD : error MSB1001", Case.Sensitive, output);
+
+        project.Write("global.json", globalJson.Replace("Microsoft.Testing.Platform", "VSTest", StringComparison.Ordinal));
+        var (vstestExitCode, vstestOutput) = Shell.Run(project.ProjectDirectory, "bash", arguments);
+
+        vstestExitCode.ShouldNotBe(0, vstestOutput);
+        vstestOutput.ShouldContain("global.json: test.runner is \"VSTest\", not \"Microsoft.Testing.Platform\"", Case.Sensitive, vstestOutput);
+        vstestOutput.ShouldNotContain("MSBUILD : error MSB1001", Case.Sensitive, vstestOutput);
+    }
+
+    [Fact]
+    public void The_check_passes_the_global_json_every_project_is_generated_with()
+    {
+        using var project = new GeneratedProject("lean-crud");
+
+        var (exitCode, output) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/check-test-runner.sh");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldBeEmpty();
+    }
+
+    /// <summary>The evals workflow runs <c>dotnet test --project</c> itself, not through <c>test.sh</c>, so it checks first too.</summary>
+    [Fact]
+    public void The_evals_workflow_checks_global_json_s_test_runner_before_it_runs_the_evals()
+    {
+        var evals = Files("saas-ai-react")[".github/workflows/evals.yml"];
+
+        evals.ShouldContain("run: bash .github/scripts/check-test-runner.sh");
+        evals.IndexOf("run: bash .github/scripts/check-test-runner.sh", StringComparison.Ordinal)
+            .ShouldBeLessThan(evals.IndexOf("dotnet test --project", StringComparison.Ordinal));
+    }
+
     private static (int ExitCode, string Output) RunArchitectureTests(GeneratedProject project) =>
         project.DotNetCommand(new Dictionary<string, string>(), "run", "--project", ArchitectureTests, "-c", "Release", "--no-build");
 
