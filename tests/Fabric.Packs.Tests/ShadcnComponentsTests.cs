@@ -99,7 +99,7 @@ public sealed partial class ShadcnComponentsTests
 
         var agents = files["AGENTS.md"];
         agents.ShouldContain("## UI components: shadcn/ui");
-        agents.ShouldContain("change colours and radius in `src/index.css`'s `:root`");
+        agents.ShouldContain("their colours are `fabric.yaml`'s colour scheme (`frontend.color-scheme`) on slate, so never edit a colour of them by hand. Change the radius in `:root`.");
     }
 
     [Fact]
