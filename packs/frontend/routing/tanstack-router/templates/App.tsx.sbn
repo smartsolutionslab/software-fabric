@@ -7,8 +7,9 @@ end ~}}
 {{~ if project["frontend.ui-library"] == "mui" ~}}
 {%{import { Link as MuiLink, Stack } from '@mui/material';
 import { createLink, Outlet } from '@tanstack/react-router';
-import { moduleRoutes } from '@/modules';
-
+import { moduleRoutes } from '@/modules';}%}{{- if slots["web.shell-imports"] != "" }}
+{{ slots["web.shell-imports"] }}{{ end }}
+{%{
 /** A router link drawn as MUI's Link, so it takes its colours from the theme. */
 const Link = createLink(MuiLink);
 
@@ -22,8 +23,9 @@ export function App() {
           <Link key={route.id} to={route.fullPath}>
             {route.options.staticData?.title}
           </Link>
-        ))}
-      </Stack>
+        ))}}%}{{- if slots["web.shell-actions"] != "" }}
+{{ slots["web.shell-actions"] }}{{ end }}
+{%{      </Stack>
       <Outlet />
     </div>
   );
@@ -31,6 +33,8 @@ export function App() {
 }%}{{~ else ~}}
 import { Link, Outlet } from '@tanstack/react-router';
 import { moduleRoutes } from '@/modules';
+{{- if slots["web.shell-imports"] != "" }}
+{{ slots["web.shell-imports"] }}{{ end }}
 {{~ if project["frontend.styling"] == "css-modules" ~}}
 import styles from './App.module.css';
 {{~ end ~}}
@@ -46,6 +50,8 @@ export function App() {
             {route.options.staticData?.title}
           </Link>
         ))}
+{{- if slots["web.shell-actions"] != "" }}
+{{ slots["web.shell-actions"] }}{{ end }}
       </nav>
       <Outlet />
     </div>

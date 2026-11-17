@@ -37,6 +37,8 @@ declares-slots:
   - { slot: web.lint-configs, description: "Config objects appended to eslint.config.js's array, each naming the files it applies to (a rule for some files only), indented two spaces as Prettier prints them; rendered only with a contribution.", separator: ",\n" }
   # Vue's own, not a role slot (ADR-0008): React renders a tag with a hyphen as a custom element without being told.
   - { slot: web.custom-element-prefixes, description: "Tag prefixes, as quoted strings ('ds-'), that Vue's compiler leaves to the browser as custom elements (isCustomElement in vite.config.ts; rendered only with a contribution).", separator: ", " }
+  # Not a role slot (ADR-0008): only the UI library's theme fills it, and each UI library has one framework.
+  - { slot: web.head, description: "Elements of index.html's head after the title, indented four spaces: what must run before the first paint (a theme's class on <html>)." }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-version.sbn }
   - { slot: apphost.packages, template: templates/apphost-package.sbn }
