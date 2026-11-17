@@ -42,6 +42,10 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+      # NuGet packages and the pnpm store from this shard's last run: the tests restore and install generated projects.
+      - uses: ./.github/actions/package-caches
+        with:
+          job: test-${{ matrix.shard }}
       # The sign-in test drives a generated app in Chromium.
       - uses: ./.github/actions/playwright-chromium
         with:
@@ -161,6 +165,11 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+      # NuGet packages and the pnpm store from this profile's last run (see the tests job).
+      - if: env.AFFECTED == 'true'
+        uses: ./.github/actions/package-caches
+        with:
+          job: profile-${{ matrix.profile }}
       # The generated project's e2e tests drive Chromium; its own `playwright install` finds it here on a hit.
       - if: env.AFFECTED == 'true'
         uses: ./.github/actions/playwright-chromium

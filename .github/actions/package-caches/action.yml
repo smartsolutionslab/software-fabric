@@ -1,0 +1,25 @@
+name: Package caches
+description: Restores the NuGet packages and the pnpm store a job used last time, and saves them when the job succeeds (#712).
+inputs:
+  job:
+    description: What the job runs (a test shard, a profile); each keeps its own cache, since each restores other packages.
+    required: true
+runs:
+  using: composite
+  steps:
+    # Generated projects restore into ~/.nuget/packages (none sets NUGET_PACKAGES or a nuget.config folder) and install
+    # with the pnpm set up before this step, whose packageManager is the same pnpm; pnpm keeps its store where `pnpm
+    # store path` says (on the same disk as the temporary directories the projects are generated in) and its metadata
+    # under ~/.cache/pnpm. No generated project has a lockfile, so the key is the files that set package versions; a
+    # change to them starts from the job's last cache through the restore key, and saves the result as a new entry.
+    - id: pnpm
+      shell: bash
+      run: echo "store=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      with:
+        path: |
+          ~/.nuget/packages
+          ${{ steps.pnpm.outputs.store }}
+          ~/.cache/pnpm
+        key: packages-${{ runner.os }}-${{ inputs.job }}-${{ hashFiles('Directory.Packages.props', 'packs/**/Directory.Packages.props.sbn', 'packs/**/*.csproj.sbn', 'packs/**/package-version*.sbn', 'packs/**/package.json.sbn', 'packs/**/*depend*.sbn', 'packs/**/pnpm-override*.sbn') }}
+        restore-keys: packages-${{ runner.os }}-${{ inputs.job }}-
