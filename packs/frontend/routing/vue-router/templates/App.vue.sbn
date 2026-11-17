@@ -17,6 +17,9 @@ import { moduleRoutes } from '@/modules';
 import { RouterLink, RouterView } from 'vue-router';
 import { moduleRoutes } from '@/modules';
 {{~ end ~}}
+{{~ if slots["web.shell-imports"] != "" ~}}
+{{ slots["web.shell-imports"] }}
+{{~ end ~}}
 {{~ if project["frontend.styling"] == "css-modules" && !vuetify ~}}
 import styles from './App.module.css';
 {{~ end ~}}
@@ -35,6 +38,9 @@ import styles from './App.module.css';
       <RouterLink v-for="route in moduleRoutes" :key="route.path" :to="`/${route.path}`">
         {{ "{{" }} route.title {{ "}}" }}
       </RouterLink>
+{{~ end ~}}
+{{~ if slots["web.shell-actions"] != "" ~}}
+{{ slots["web.shell-actions"] }}
 {{~ end ~}}
     </nav>
     <RouterView />

@@ -35,6 +35,8 @@ declares-slots:
   - { slot: web.styles, description: "Lines of src/index.css." }
   - { slot: web.restricted-imports, description: "Entries of the no-restricted-imports patterns ({ group: [...], message: '...' }), indented twelve spaces as Prettier prints them.", separator: ",\n" }
   - { slot: web.lint-configs, description: "Config objects appended to eslint.config.js's array, each naming the files it applies to (a rule for some files only), indented two spaces as Prettier prints them; rendered only with a contribution.", separator: ",\n" }
+  # Not a role slot (ADR-0008): only the UI library's theme fills it, and each UI library has one framework.
+  - { slot: web.head, description: "Elements of index.html's head after the title, indented four spaces: what must run before the first paint (a theme's class on <html>)." }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-version.sbn }
   - { slot: apphost.packages, template: templates/apphost-package.sbn }

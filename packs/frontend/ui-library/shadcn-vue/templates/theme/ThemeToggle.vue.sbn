@@ -1,0 +1,40 @@
+<script setup lang="ts">
+import { ref, watchEffect } from 'vue';
+import { Button } from '@/components/ui/button';
+import { applyTheme, onSystemThemeChange, storedTheme, storeTheme, type Theme, themes } from './theme';
+
+// Switches the app between the light theme, the dark one and the system's, and remembers the choice.
+const labels: Record<Theme, string> = { light: 'Light', dark: 'Dark', system: 'System' };
+const theme = ref<Theme>(storedTheme());
+
+// Synchronously, so a choice shows at once.
+watchEffect(
+  (onCleanup) => {
+    applyTheme(theme.value);
+    if (theme.value === 'system') {
+      onCleanup(onSystemThemeChange(() => applyTheme('system')));
+    }
+  },
+  { flush: 'sync' },
+);
+
+function choose(option: Theme) {
+  storeTheme(option);
+  theme.value = option;
+}
+</script>
+
+<template>
+  <div role="group" aria-label="Theme" class="ml-auto flex gap-1">
+    <Button
+      v-for="option in themes"
+      :key="option"
+      :variant="option === theme ? 'secondary' : 'ghost'"
+      size="sm"
+      :aria-pressed="option === theme"
+      @click="choose(option)"
+    >
+      {{ "{{" }} labels[option] {{ "}}" }}
+    </Button>
+  </div>
+</template>

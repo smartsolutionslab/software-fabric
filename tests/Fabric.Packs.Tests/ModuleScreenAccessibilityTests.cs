@@ -201,19 +201,19 @@ public sealed class ModuleScreenAccessibilityTests
         project.Write(DataOf(screen), example);
         var (populatedExitCode, populatedOutput, populated) = Statuses(project);
         populatedExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label behind the loading branch:\n{populatedOutput}");
-        populated.GetValueOrDefault(generated).ShouldBe(["passed", "failed"], populatedOutput);
+        populated.GetValueOrDefault(generated).ShouldBe(["passed", "passed", "failed", "failed"], populatedOutput);
 
         project.Write(screen, behindLoading.Replace(UnlabelledField, """<input type="text" aria-label="Invoice number" />""", StringComparison.Ordinal)
             .Replace("<input v-else type=\"text\" />", "<input v-else type=\"text\" aria-label=\"Invoice number\" />", StringComparison.Ordinal));
         var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
         labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
-        labelled.GetValueOrDefault(generated).ShouldBe(["passed", "passed"]);
+        labelled.GetValueOrDefault(generated).ShouldBe(["passed", "passed", "passed", "passed"]);
 
         project.Write(screen, behindLoading);
         project.Write(DataOf(screen), "export const examples: Record<string, unknown> = {};\n");
         var (loadingExitCode, loadingOutput, loading) = Statuses(project);
         loadingExitCode.ShouldBe(0, $"pnpm test:\n{loadingOutput}");
-        loading.GetValueOrDefault(generated).ShouldBe(["passed", "skipped"]);
+        loading.GetValueOrDefault(generated).ShouldBe(["passed", "passed", "skipped", "skipped"]);
     }
 
     /// <summary>A screen that shows an unlabelled field only once RTK Query's <c>currentData</c> has come.</summary>
@@ -296,12 +296,12 @@ public sealed class ModuleScreenAccessibilityTests
         project.Write(DataOf(screen), example);
         var (populatedExitCode, populatedOutput, populated) = Statuses(project);
         populatedExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label shown only with the {hook} example:\n{populatedOutput}");
-        populated.GetValueOrDefault(generated).ShouldBe(["passed", "failed"], populatedOutput);
+        populated.GetValueOrDefault(generated).ShouldBe(["passed", "passed", "failed", "failed"], populatedOutput);
 
         project.Write(screen, behindData.Replace(UnlabelledField, """<input type="text" aria-label="Invoice number" />""", StringComparison.Ordinal));
         var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
         labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
-        labelled.GetValueOrDefault(generated).ShouldBe(["passed", "passed"]);
+        labelled.GetValueOrDefault(generated).ShouldBe(["passed", "passed", "passed", "passed"]);
     }
 
     /// <summary>A form whose field shows unless its mutation is saving: on first render, nothing is.</summary>
@@ -392,13 +392,13 @@ public sealed class ModuleScreenAccessibilityTests
         project.Write(screen, form);
         var (violationExitCode, violationOutput, violation) = Statuses(project);
         violationExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label on a form nobody has submitted:\n{violationOutput}");
-        violation.GetValueOrDefault(generated).ShouldBe(["failed", "skipped"], violationOutput);
+        violation.GetValueOrDefault(generated).ShouldBe(["failed", "failed", "skipped", "skipped"], violationOutput);
 
         project.Write(screen, form.Replace("<input type=\"text\"", "<input type=\"text\" aria-label=\"Invoice number\"", StringComparison.Ordinal)
             .Replace("<input v-else type=\"text\"", "<input v-else type=\"text\" aria-label=\"Invoice number\"", StringComparison.Ordinal));
         var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
         labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
-        labelled.GetValueOrDefault(generated).ShouldBe(["passed", "skipped"]);
+        labelled.GetValueOrDefault(generated).ShouldBe(["passed", "passed", "skipped", "skipped"]);
     }
 
     /// <summary>Each router, with the screen's own test skipping its axe check or with it commented out.</summary>
@@ -432,12 +432,12 @@ public sealed class ModuleScreenAccessibilityTests
         project.Write(OwnTestOf(screen), ownTest == "skipped" ? (vue ? VueSkippedOwnTest : ReactSkippedOwnTest) : CommentedOutOwnTest);
         var (violationExitCode, violationOutput, violation) = Statuses(project);
         violationExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label:\n{violationOutput}");
-        violation.GetValueOrDefault(generated).ShouldBe(["failed", "skipped"], violationOutput);
+        violation.GetValueOrDefault(generated).ShouldBe(["failed", "failed", "skipped", "skipped"], violationOutput);
 
         project.Write(screen, (vue ? VueScreen : ReactScreen).Replace(UnlabelledField, """<input type="text" aria-label="Invoice number" />""", StringComparison.Ordinal));
         var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
         labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
-        labelled.GetValueOrDefault(generated).ShouldBe(["passed", "skipped"]);
+        labelled.GetValueOrDefault(generated).ShouldBe(["passed", "passed", "skipped", "skipped"]);
 
         File.Delete(Path.Combine(project.ProjectDirectory, generated));
         var (uncheckedExitCode, uncheckedOutput) = Shell.Run(web, "pnpm", "test");
@@ -611,7 +611,9 @@ public sealed class ModuleScreenAccessibilityTests
 
     /// <summary>
     /// Runs the web app's tests and answers their exit code and output, and the statuses vitest reports for each test
-    /// file's tests (<c>passed</c>, <c>failed</c>, <c>skipped</c>, ...), by the file's path relative to the project.
+    /// file's tests (<c>passed</c>, <c>failed</c>, <c>skipped</c>, ...), by the file's path relative to the project. With
+    /// shadcn's dark theme (#693) a screen's axe check runs each check again in the dark theme, so its statuses come in
+    /// pairs: as it loads, light then dark, and with its example data, light then dark.
     /// </summary>
     private static (int ExitCode, string Output, Dictionary<string, List<string>> Statuses) Statuses(GeneratedProject project)
     {

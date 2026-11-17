@@ -1,0 +1,10 @@
+{{~ if project["frontend.design-system"] == "none" ~}}
+  {
+    name: 'dark',
+    // As the theme toggle does: the choice stored, the class on <html>.
+    switchOn: () => {
+      localStorage.setItem('theme', 'dark');
+      document.documentElement.classList.add('dark');
+    },
+  }
+{{- end }}
