@@ -35,6 +35,6 @@ Or, with the [Aspire CLI](https://aspire.dev), `aspire run`, which finds the App
 dotnet test --project tests/Architecture.Tests/Architecture.Tests.csproj
 ```
 
-`dotnet test --project` exists only on Microsoft.Testing.Platform, which `global.json`'s `"test": { "runner": "Microsoft.Testing.Platform" }` selects. Keep that section when a tool rewrites `global.json`: without it `dotnet test --project` fails with `MSB1001: Unknown switch`. The architecture rule `GlobalJsonSelectsTheTestingPlatform` names the file when the tests run without `dotnet test` (an IDE, or `dotnet run --project <test project>`).
+`dotnet test --project` exists only on Microsoft.Testing.Platform, which `global.json`'s `"test": { "runner": "Microsoft.Testing.Platform" }` selects. Keep that section when a tool rewrites `global.json`: without it `dotnet test --project` fails with `MSB1001: Unknown switch`. `bash .github/scripts/check-test-runner.sh` names the file instead, and `.github/scripts/test.sh` runs it before the tests; the architecture rule `GlobalJsonSelectsTheTestingPlatform` does the same where the tests run without `dotnet test` (an IDE, or `dotnet run --project <test project>`).
 
 {{ slots["readme.sections"] }}
