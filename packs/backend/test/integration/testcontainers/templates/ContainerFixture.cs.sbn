@@ -32,6 +32,13 @@ public sealed class ContainerFixture : {{ test_lifetime }}
 
     private readonly Dictionary<string, string?> settings = [with(StringComparer.Ordinal)];
 
+    /// <summary>
+    /// Held while the factory makes a client. The factory keeps every client it makes in a List, to dispose of them with
+    /// itself, and adds to it without a lock: test classes that ask for clients at once can leave a null in the list,
+    /// and the factory's DisposeAsync then throws a NullReferenceException before it stops the host.
+    /// </summary>
+    private readonly Lock clientsOneAtATime = new();
+
     private WebApplicationFactory<Program>? host;
 
     /// <summary>The started resources' endpoints, by the AppHost's resource names.</summary>
@@ -59,7 +66,14 @@ public sealed class ContainerFixture : {{ test_lifetime }}
         host.StartServer();
     }
 
-    public HttpClient CreateHostClient() => (host ?? throw new InvalidOperationException("The host has not started.")).CreateClient();
+    public HttpClient CreateHostClient()
+    {
+        var started = host ?? throw new InvalidOperationException("The host has not started.");
+        lock (clientsOneAtATime)
+        {
+            return started.CreateClient();
+        }
+    }
 {{~ if project["backend.auth"] != "none" ~}}
 
     /// <summary>A client calling the host as {{ local_user }}; local users' passwords equal their names.</summary>
