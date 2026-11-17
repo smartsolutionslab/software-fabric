@@ -3,7 +3,7 @@ export type Theme = 'light' | 'dark' | 'system';
 
 export const themes: readonly Theme[] = ['light', 'dark', 'system'];
 
-// index.html's script reads the same key and query before the first paint; change them together.
+// index.html's script reads the same key and query before the first paint, and every screen's axe check stores the key.
 const key = 'theme';
 const darkScheme = '(prefers-color-scheme: dark)';
 
