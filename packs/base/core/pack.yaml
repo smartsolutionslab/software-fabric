@@ -13,6 +13,7 @@ files:
   - { template: templates/agents/security-reviewer.md.sbn, target: ".claude/agents/security-reviewer.md" }
   - { template: templates/agents/triage.md.sbn, target: ".claude/agents/triage.md" }
   - { template: templates/global.json.sbn, target: global.json }
+  - { template: templates/aspire.config.json.sbn, target: aspire.config.json }
   - { template: templates/dotnet-tools.json.sbn, target: ".config/dotnet-tools.json" }
   - { template: templates/editorconfig.sbn, target: ".editorconfig" }
   - { template: templates/stylecop.json.sbn, target: stylecop.json }
@@ -65,6 +66,7 @@ files:
   - { template: templates/tests/RetryEveryMethodOptsAClientBackIn.cs.sbn, target: tests/Architecture.Tests/Rules/RetryEveryMethodOptsAClientBackIn.cs }
   - { template: templates/tests/StandardResilienceHandlerOnlyInServiceDefaults.cs.sbn, target: tests/Architecture.Tests/Rules/StandardResilienceHandlerOnlyInServiceDefaults.cs }
   - { template: templates/tests/WorkflowActionsArePinned.cs.sbn, target: tests/Architecture.Tests/Rules/WorkflowActionsArePinned.cs }
+  - { template: templates/tests/GlobalJsonSelectsTheTestingPlatform.cs.sbn, target: tests/Architecture.Tests/Rules/GlobalJsonSelectsTheTestingPlatform.cs }
   - { template: templates/tests/NoSecretInSettings.cs.sbn, target: tests/Architecture.Tests/Rules/NoSecretInSettings.cs }
   - { template: templates/Host/CurrentUser.cs.sbn, target: src/Host/CurrentUser.cs, when: 'project["backend.auth"] != "none"' }
   - { template: templates/tests/EveryEndpointDeclaresItsAuthorization.cs.sbn, target: tests/Architecture.Tests/Rules/EveryEndpointDeclaresItsAuthorization.cs, when: 'project["backend.auth"] != "none"' }
@@ -100,6 +102,7 @@ declares-slots:
   - { slot: agents.brief.security-reviewer, description: "Every pack's brief for the security-reviewer; filled by the generator." }
   - { slot: agents.brief.triage, description: "Every pack's brief for the triage; filled by the generator." }
   - { slot: readme.first-steps, description: "Markdown list items: what to do once, right after generating. README.md lists them under First steps, and fabric new prints them." }
+  - { slot: readme.prerequisites, description: "Markdown list items: what must be installed or running to run the project locally, besides the .NET SDK and Docker, which README.md always lists (a frontend's Node.js and package manager)." }
   - { slot: readme.sections, description: "How to build, run and work on the project, one section per pack that changes it.", separator: "\n\n" }
   - { slot: solution.projects, description: "<Project Path='...' /> lines for projects other packs own." }
   - { slot: dotnet.tools, description: "Entries of the local tool manifest (.config/dotnet-tools.json), restored with dotnet tool restore.", separator: ",\n" }
@@ -154,6 +157,7 @@ gates:
   - { kind: architecture-test, describes: "With authorization choices (backend.authorization not empty): every policy a module endpoint names is registered by that module's IModulePolicies, and by no other module.", file: templates/tests/EveryEndpointPolicyIsRegisteredByItsModule.cs.sbn }
   - { kind: architecture-test, describes: "With authorization choices (backend.authorization not empty): no two modules register a policy under the same name, whether or not an endpoint or MCP tool names it; the host refuses to start on the same names (ModulePolicyOwners), naming both modules.", file: templates/tests/EveryPolicyIsRegisteredByOneModule.cs.sbn }
   - { kind: architecture-test, describes: "Every workflow step uses an action pinned to a full commit SHA, a local action or a docker image by digest.", file: templates/tests/WorkflowActionsArePinned.cs.sbn }
+  - { kind: architecture-test, describes: "global.json's test.runner is Microsoft.Testing.Platform, without which dotnet test --project fails with MSB1001: Unknown switch; the violation names global.json.", file: templates/tests/GlobalJsonSelectsTheTestingPlatform.cs.sbn }
   - { kind: analyzer, describes: "DateTime.Now, DateTime.UtcNow, DateTimeOffset.Now and DateTimeOffset.UtcNow are banned (RS0030) in every project but the AppHost; the time comes from TimeProvider.", file: templates/TimeBannedSymbols.txt.sbn }
   - { kind: analyzer, describes: "Guid.NewGuid is banned (RS0030) in every project but the AppHost, tests included; every Guid is a time-ordered Guid.CreateVersion7().", file: templates/IdentifierBannedSymbols.txt.sbn }
   - { kind: analyzer, describes: "One top-level type per file, named after the type (StyleCop SA1402, SA1649); nested types and generated migrations excepted.", file: templates/stylecop.json.sbn }
