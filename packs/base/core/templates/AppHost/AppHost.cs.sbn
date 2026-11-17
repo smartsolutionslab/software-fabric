@@ -2,7 +2,19 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 {{ slots["apphost.resources"] }}
 
+{{~ if project["backend.topology"] == "services" ~}}
+foreach (var (module, project) in builder.ServiceHosts())
+{
+    // Every service's launch profile names the same port; under the AppHost each gets one of its own.
+    builder.AddProject(module, project)
+        .WithEndpoint("http", endpoint => endpoint.Port = null)
+        .WithHttpHealthCheck("/health"){{ slots["apphost.host-wiring"] | string.replace "\n" "\n    " }};
+}
+
+var host = {{ slots["apphost.host"] }};
+{{~ else ~}}
 var host = {{ slots["apphost.host"] }}{{ slots["apphost.host-wiring"] }};
+{{~ end ~}}
 {{ if slots["apphost.web"] != "" }}
 {{ slots["apphost.web"] }}{{ slots["apphost.web-wiring"] }};
 {{ end }}

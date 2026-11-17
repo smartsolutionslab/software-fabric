@@ -1,0 +1,93 @@
+using System.Xml.Linq;
+
+namespace {{ namespace }}.Architecture.Tests;
+
+/// <summary>
+/// The module projects each service host's project file references (src/Services/&lt;Service&gt;/Host/Host.csproj), read
+/// from the file with wildcards expanded as MSBuild expands them: a service's Program discovers its module at startup,
+/// so its assembly does not reference the module and only the project file says which modules it runs.
+/// </summary>
+public static class ServiceHostReferences
+{
+    /// <summary>Every service, by its directory name, with the projects under src/Modules its host references, as paths relative to the repository.</summary>
+    public static IReadOnlyDictionary<string, IReadOnlyList<string>> Read()
+    {
+        var root = RepositoryRoot();
+        var services = Path.Combine(root, "src", "Services");
+        if (!Directory.Exists(services))
+        {
+            return new Dictionary<string, IReadOnlyList<string>>();
+        }
+
+        var modules = Path.Combine(root, "src", "Modules") + Path.DirectorySeparatorChar;
+        return Directory.EnumerateDirectories(services)
+            .Where(service => File.Exists(HostProject(service)))
+            .Order(StringComparer.Ordinal)
+            .ToDictionary(
+                service => Path.GetFileName(service),
+                service => (IReadOnlyList<string>)[.. References(HostProject(service))
+                    .Where(reference => reference.StartsWith(modules, StringComparison.Ordinal))
+                    .Select(reference => Path.GetRelativePath(root, reference).Replace('\\', '/'))
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal)],
+                StringComparer.Ordinal);
+    }
+
+    /// <summary>The module a project under src/Modules belongs to: Billing for src/Modules/Billing/Billing.Api/Billing.Api.csproj.</summary>
+    public static string ModuleOf(string reference) => reference.Split('/')[2];
+
+    private static string HostProject(string service) => Path.Combine(service, "Host", "Host.csproj");
+
+    private static IEnumerable<string> References(string project)
+    {
+        var directory = Path.GetDirectoryName(project)!;
+        return XDocument.Load(project).Descendants("ProjectReference")
+            .Select(reference => reference.Attribute("Include")?.Value ?? string.Empty)
+            .SelectMany(include => include.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .SelectMany(include => Expand(directory, include.Replace('\\', '/').Split('/')));
+    }
+
+    /// <summary>A path whose segments may hold <c>*</c> or be <c>**</c>, expanded against the file system.</summary>
+    private static IEnumerable<string> Expand(string directory, ReadOnlySpan<string> segments)
+    {
+        if (segments.IsEmpty)
+        {
+            return [];
+        }
+
+        var (segment, rest) = (segments[0], segments[1..].ToArray());
+        if (segment == "**")
+        {
+            return Directory.Exists(directory)
+                ? [.. Expand(directory, rest), .. Directory.EnumerateDirectories(directory, "*", SearchOption.AllDirectories).SelectMany(nested => Expand(nested, rest))]
+                : [];
+        }
+
+        if (rest.Length == 0)
+        {
+            return segment.Contains('*', StringComparison.Ordinal)
+                ? Directory.Exists(directory) ? Directory.EnumerateFiles(directory, segment).Select(Path.GetFullPath) : []
+                : [Path.GetFullPath(Path.Combine(directory, segment))];
+        }
+
+        if (!segment.Contains('*', StringComparison.Ordinal))
+        {
+            return Expand(Path.Combine(directory, segment), rest);
+        }
+
+        return Directory.Exists(directory)
+            ? Directory.EnumerateDirectories(directory, segment).SelectMany(match => Expand(match, rest))
+            : [];
+    }
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+}

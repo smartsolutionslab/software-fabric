@@ -1,0 +1,3 @@
+{{~ for module in modules ~}}
+  <Project Path="src/Services/{{ module.namespace }}/Host/Host.csproj" />
+{{~ end ~}}
