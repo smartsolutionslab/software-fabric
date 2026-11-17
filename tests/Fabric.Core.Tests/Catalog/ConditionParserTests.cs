@@ -65,7 +65,7 @@ public class ConditionParserTests
                 .Concat(dimension.ActiveWhen is { } activeWhen ? [activeWhen] : []))
             .ToList();
 
-        conditions.Count.ShouldBe(77);
+        conditions.Count.ShouldBe(78);
     }
 
     [Fact]
