@@ -144,6 +144,37 @@ public class ValidateCommandTests
         run.ExitCode.ShouldBe(0);
     }
 
+    /// <summary>Services require tenancy none in V1 (ADR-0017 D3).</summary>
+    [Fact]
+    public void Services_with_tenancy_exit_one_and_print_the_sentence()
+    {
+        var run = CliRun.Of(
+            "validate",
+            "--profile", "saas-standard-react",
+            "--set", "backend.bus.transport=rabbitmq",
+            "--set", "backend.topology=services",
+            "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: backend.topology=services requires backend.tenancy == none, but backend.tenancy is column.");
+    }
+
+    /// <summary>Services speak REST only in V1: they conflict with gRPC (ADR-0017 D5).</summary>
+    [Fact]
+    public void Services_with_grpc_exit_one_and_print_the_sentence()
+    {
+        var run = CliRun.Of(
+            "validate",
+            "--profile", "lean-crud",
+            "--set", "backend.bus.transport=kafka",
+            "--set", "backend.topology=services",
+            "--set", "backend.api-protocols=rest,grpc",
+            "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: backend.topology=services conflicts with backend.api-protocols has grpc.");
+    }
+
     [Fact]
     public void An_unknown_dimension_exits_one()
     {
