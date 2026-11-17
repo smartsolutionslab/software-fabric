@@ -56,6 +56,8 @@ jobs:
           curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused http://localhost:11434/api/pull -d "{\"model\": \"$Ollama__Model\", \"stream\": false}"
 {{~ end ~}}
       - run: dotnet build tests/Evals/Evals.csproj -c Release
+      - name: Check global.json's test runner
+        run: bash .github/scripts/check-test-runner.sh
       - name: Evaluate
         run: dotnet test --project tests/Evals/Evals.csproj -c Release --no-build
       # The report shows every score, passing or not.
