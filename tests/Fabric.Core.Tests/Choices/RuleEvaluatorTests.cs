@@ -265,7 +265,7 @@ public class RuleEvaluatorTests
     [Fact]
     public void A_module_option_conflicting_with_a_project_option_is_reported()
     {
-        Violations("saas-standard-react", "backend.topology=services", "module.communication=integration-events,contract-interface")
+        Violations("saas-standard-react", "backend.topology=services", "backend.tenancy=none", "module.communication=integration-events,contract-interface")
             .ShouldBe(["module defaults: module.communication=contract-interface conflicts with backend.topology == services."]);
     }
 

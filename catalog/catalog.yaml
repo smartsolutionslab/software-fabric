@@ -80,7 +80,9 @@ dimensions:
       modular-monolith: { tier: supported }
       services:
         tier: experimental
-        requires: ["backend.bus.transport != none"]
+        # V1 of services (ADR-0017): tenancy none (D3), REST only (D5).
+        requires: ["backend.bus.transport != none", "backend.tenancy == none"]
+        conflicts: ["backend.api-protocols has grpc"]
 
   backend.bus.transport:
     scope: project

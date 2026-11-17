@@ -306,7 +306,7 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `modular-monolith` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
-| `services` | experimental | `backend.bus.transport != none` | — | — | — |
+| `services` | experimental | `backend.bus.transport != none`, `backend.tenancy == none` | `backend.api-protocols has grpc` | — | — |
 
 ### `frontend.agent-ui`
 
