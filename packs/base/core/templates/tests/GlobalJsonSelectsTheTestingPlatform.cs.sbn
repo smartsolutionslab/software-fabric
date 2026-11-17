@@ -1,0 +1,67 @@
+using System.Text.Json;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// <c>dotnet test --project</c> exists only on Microsoft.Testing.Platform, which <c>global.json</c>'s
+/// <c>"test": { "runner": "Microsoft.Testing.Platform" }</c> selects. A tool that rewrites <c>global.json</c> without it
+/// leaves the SDK on VSTest, where <c>--project</c> is <c>MSB1001: Unknown switch</c> and nothing says why. That error
+/// comes before any test runs, so <c>.github/scripts/check-test-runner.sh</c> checks first wherever a script runs
+/// <c>dotnet test --project</c>, and this rule fails where the test platform runs the tests itself (an IDE,
+/// <c>dotnet run --project</c>); both name the file.
+/// </summary>
+public sealed class GlobalJsonSelectsTheTestingPlatform : IArchitectureRule
+{
+    private const string Runner = "Microsoft.Testing.Platform";
+
+    public string Description => "global.json's test.runner is Microsoft.Testing.Platform, which dotnet test --project needs.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var path = Path.Combine(RepositoryRoot(), "global.json");
+        if (!File.Exists(path))
+        {
+            return [$"global.json is missing; it pins the SDK and sets test.runner to {Runner}."];
+        }
+
+        JsonElement root;
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path), new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+            root = document.RootElement.Clone();
+        }
+        catch (JsonException exception)
+        {
+            return [$"global.json is not valid JSON: {exception.Message}"];
+        }
+
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("test", out var test)
+            || test.ValueKind != JsonValueKind.Object
+            || !test.TryGetProperty("runner", out var runner))
+        {
+            return [$"global.json: test.runner is missing; it must be \"{Runner}\", or dotnet test --project fails with MSB1001: Unknown switch."];
+        }
+
+        if (runner.ValueKind != JsonValueKind.String || runner.GetString() != Runner)
+        {
+            return [$"global.json: test.runner is {runner.GetRawText()}, not \"{Runner}\"; dotnet test --project fails with MSB1001: Unknown switch."];
+        }
+
+        return [];
+    }
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+}

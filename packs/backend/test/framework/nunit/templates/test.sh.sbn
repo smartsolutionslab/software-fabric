@@ -6,6 +6,8 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
+# Without global.json's test runner, dotnet test --project fails with MSB1001 and does not say why; this names it.
+bash .github/scripts/check-test-runner.sh
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
