@@ -1,6 +1,6 @@
 # ADR-0017: The services topology
 
-**Status:** Proposed (draft for the owner; decisions D1 to D7 open)
+**Status:** Accepted (owner, 2026-11-17: D1 to D7 decided, see the end)
 **Date:** 2026-11-17
 
 ## Context
@@ -48,8 +48,8 @@ out of scope (see Alternatives).
 
 `src/Edge` is a single host that the frontend talks to. It does two things:
 
-1. **Routes** `/{module-name}/**` to the module's service with YARP, using
-   Aspire service discovery. The route table is built at startup from the
+1. **Routes** `/{module-name}/**` to the module's service with YARP in a host
+   project of its own (D1), using Aspire service discovery. The route table is built at startup from the
    same convention that names the services, so it has no line per module.
 2. **Hosts what exists once per application**: `/me`, the SignalR or SSE
    hub, the MCP server and the AG-UI endpoint.
@@ -72,10 +72,10 @@ New slots take what must exist once:
 | `edge.packages`, `edge.services`, `edge.middleware`, `edge.endpoints` | `src/Edge` only |
 
 Packs that contribute a singleton branch on the topology (ADR-0006) and
-contribute to `edge.*` instead of `host.*` when it is `services`. Today that
-is: `base/core` (`/me`), `frontend/realtime/signalr`, `frontend/realtime/sse`,
-`frontend/agent-ui/ag-ui`, `backend/mcp/server`, and the endpoints of
-`backend/tenancy/*`. Every other pack is unchanged.
+contribute to `edge.*` instead of `host.*` when it is `services`: `base/core`
+(`/me`), `frontend/realtime/signalr`, `frontend/realtime/sse`,
+`frontend/agent-ui/ag-ui` and `backend/mcp/server`. The tenancy packs need no
+branch, since `services` requires `backend.tenancy == none` (D3).
 
 ### The AppHost discovers services by convention
 
@@ -86,11 +86,18 @@ service hosts are added by a loop over `src/Services/*/Host/*.csproj`
 service hosts by glob for the build, as the monolith host references the
 modules.
 
+`apphost.host-wiring` keeps its meaning too: its chained calls (references
+to the bus, Keycloak, the LLM, `.WaitFor(...)`) apply to every service host
+inside the loop. A new slot `apphost.edge-wiring` takes the calls the edge
+needs (Keycloak, the hub's backplane, the web app's reference).
+
 ### Data and messaging per service
 
-- **Database per service** on one PostgreSQL (or SQL Server) server: the
-  AppHost loop adds `AddDatabase(<module>)` and references it from the
-  service. EF Core migrations, the Wolverine outbox and inbox, and Marten's
+- **Database per service** on one PostgreSQL (or SQL Server) server (D2):
+  with `services`, the database packs declare only the server in
+  `apphost.resources` and branch (ADR-0006) to leave out the single
+  `database`; the loop adds `AddDatabase(<module>)` per service and
+  references it under the connection name the service already reads. EF Core migrations, the Wolverine outbox and inbox, and Marten's
   event store live in the service's own database.
 - **Integration events only.** `module.communication: contract-interface`
   already conflicts with `services`; the bus is required. Each service
@@ -102,7 +109,7 @@ modules.
 
 The edge forwards the caller's bearer token unchanged; every service host
 validates it itself through the auth pack's `host.*` contributions. One
-audience for the whole API in V1 (see D4).
+audience for the whole API (D4).
 
 ### Gates
 
@@ -114,17 +121,20 @@ audience for the whole API in V1 (see D4).
 - `SingletonsLiveOnTheEdge`: no service host maps `/me`, a hub, MCP or
   AG-UI.
 - The pairwise matrix includes `services`; the nightly run promotes it to
-  supported (ADR-0003). A profile `saas-services-vue` (or `-react`) keeps
-  the combination generated and tested end to end, with at least two
-  services exchanging one integration event.
+  supported (ADR-0003). The profile `saas-services-vue` (D6) keeps the
+  combination generated and tested end to end, with at least two services
+  exchanging one integration event.
+- Catalog rules for `services`: `requires: ["backend.bus.transport != none",
+  "backend.tenancy == none"]` (D3) and `conflicts: ["backend.api-protocols
+  has grpc"]` (D5).
 
 ## Consequences
 
 - A generated services project runs one process per module plus the edge.
   `aspire run` starts them all; the developer experience stays one command.
 - Most packs need no change. The work is the topology pack, the edge, the
-  AppHost loop, six packs that move their singleton to `edge.*`, and the
-  gates.
+  AppHost loop, five packs that move their singleton to `edge.*`, the two
+  database packs, the catalog rules, the profile and the gates.
 - Per-service databases make cross-module queries impossible by
   construction; read models that span modules are built from events.
 - Local resource use grows with the module count (one .NET process each).
@@ -144,24 +154,17 @@ audience for the whole API in V1 (see D4).
 - **A repository per service.** Breaks the board protocol (ADR-0004), which
   coordinates agents through one repository, and the shared Contracts.
 
-## Open questions for the owner
+## Owner decisions (2026-11-17)
 
-- **D1 — Edge:** a YARP host project of our own, or Aspire's YARP
-  integration if it covers service-discovery routing? (Recommendation: our
-  own host project; it also carries the singletons.)
-- **D2 — Database per service or schema per service on one database?**
-  (Recommendation: database per service; Marten and the outbox already
-  separate cleanly.)
-- **D3 — Tenancy:** allow `services` with `column` and `schema-per-tenant`
-  in V1, or require `backend.tenancy == none` until a pilot needs both?
-  (Recommendation: require `none` in V1, as Marten already does.)
-- **D4 — Audience:** one audience for the API, or one per service?
-  (Recommendation: one in V1.)
-- **D5 — gRPC:** `backend.api-protocols: grpc` adds Kestrel endpoints per
-  host; route it through the edge too, or require `rest` only in V1?
-  (Recommendation: `rest` only in V1.)
-- **D6 — Profile:** `saas-services-vue` or `saas-services-react` as the
-  tested profile? (PharmaTraining uses Vue.)
-- **D7 — Pilot:** PharmaTraining as the services pilot, generated as a
-  monolith first and migrated once the pack is supported, or generated
-  with `services` as soon as the pack is experimental?
+Decided by the owner in the PharmaTraining planning session, each as
+recommended in the proposal unless stated otherwise.
+
+| | Question | Decision |
+|---|---|---|
+| D1 | Edge | A YARP host project of our own, which also carries the singletons |
+| D2 | Data | A database per service on one server |
+| D3 | Tenancy | `services` requires `backend.tenancy == none` in V1 |
+| D4 | Audience | One audience for the whole API |
+| D5 | Protocols | `rest` only: `services` conflicts with `grpc` in V1 |
+| D6 | Tested profile | `saas-services-vue` |
+| D7 | Pilot | PharmaTraining waits for the pack and is generated with `services` as soon as the option builds (experimental), not as a monolith first. That makes "the pack generates a running seven-service project" the pilot's entry gate. |
