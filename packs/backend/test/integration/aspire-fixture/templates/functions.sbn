@@ -29,6 +29,7 @@ func database_fixture_project_references
   ret `<ProjectReference Include="../../src/AppHost/AppHost.csproj" />`
 end
 func database_fixture_file(space)
+  $rag = object.has_key(project, "backend.llm.extras") && (array.contains project["backend.llm.extras"] "rag")
   if project["backend.topology"] == "services"
     if project["backend.database"] == "sqlserver"
       $resources = `var sqlServer = builder.Resources.OfType<SqlServerServerResource>().Single();
@@ -39,6 +40,24 @@ func database_fixture_file(space)
             sqlServer.PasswordParameter,
             .. builder.Resources.OfType<SqlServerDatabaseResource>().Where(resource => resource.Name == "database"),
         ];`
+    else if $rag
+      $resources = `var postgres = builder.Resources.OfType<PostgresServerResource>().Single();
+        builder.CreateResourceBuilder(postgres).AddDatabase("database");
+        var migrationRuns = builder.Resources.OfType<ProjectResource>()
+            .Where(resource => resource.Name.EndsWith(MigrationRun, StringComparison.Ordinal))
+            .Select(resource => resource.Name)
+            .ToList();
+        HashSet<IResource> database =
+        [
+            postgres,
+            postgres.PasswordParameter,
+            .. builder.Resources.OfType<PostgresDatabaseResource>(),
+            .. builder.Resources.Where(resource => migrationRuns.Contains(resource.Name)),
+        ];
+        if (postgres.UserNameParameter is { } user)
+        {
+            database.Add(user);
+        }`
     else
       $resources = `var postgres = builder.Resources.OfType<PostgresServerResource>().Single();
         builder.CreateResourceBuilder(postgres).AddDatabase("database");
@@ -53,6 +72,46 @@ func database_fixture_file(space)
             database.Add(user);
         }`
     end
+    if $rag
+      $summary = `The AppHost's database server alone, on an empty container, started once per test run, with a database of the tests'
+/// own on it and every service's database, migrated by the service's own MigrationRunner run as before the service starts,
+/// so every module's vector table exists in its service's database. Nothing else runs: no service, no model.`
+      $members = `
+    private const string MigrationRun = "-migrations";
+`
+      $service_databases = `
+    private readonly Dictionary<string, string> serviceDatabases = [];
+`
+      $service_databases_property = `
+
+    /// <summary>Each service's own database by its module's name, as the AppHost names it.</summary>
+    public IReadOnlyDictionary<string, string> ServiceDatabases => serviceDatabases;`
+      $wait = `
+        foreach (var migrationRun in migrationRuns)
+        {
+            var finished = await app.ResourceNotifications.WaitForResourceAsync(
+                migrationRun,
+                resourceEvent => KnownResourceStates.TerminalStates.Contains(resourceEvent.Snapshot.State?.Text),
+                timeout.Token);
+            if (finished.Snapshot.ExitCode != 0)
+            {
+                throw new InvalidOperationException($"The MigrationRunner run {migrationRun} ended {finished.Snapshot.State?.Text} with exit code {finished.Snapshot.ExitCode}.");
+            }
+
+            var module = migrationRun[..^MigrationRun.Length];
+            serviceDatabases[module] = await app.GetConnectionStringAsync($"{module}-database", timeout.Token)
+                ?? throw new InvalidOperationException($"The database of the service {module} has no connection string.");
+        }
+`
+    else
+      $summary = `The AppHost's database server alone, on an empty container, started once per test run, with a database of the tests'
+/// own on it: every service has a database of its own, which only its module's migration run changes, so none is the
+/// application's. Nothing else runs: no service, no migrations.`
+      $members = ""
+      $service_databases = ""
+      $service_databases_property = ""
+      $wait = ""
+    end
     ret `using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
@@ -62,19 +121,17 @@ using Aspire.Hosting.Testing;
 namespace ` + space + `;
 
 /// <summary>
-/// The AppHost's database server alone, on an empty container, started once per test run, with a database of the tests'
-/// own on it: every service has a database of its own, which only its module's migration run changes, so none is the
-/// application's. Nothing else runs: no service, no migrations.
+/// ` + $summary + `
 /// </summary>
 public sealed class ApplicationDatabase : ` + test_lifetime + `
-{
+{` + $members + `
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
-
+` + $service_databases + `
     private DistributedApplication? app;
 
     private string? connectionString;
 
-    public string ConnectionString => connectionString ?? throw new InvalidOperationException("The database has not started.");
+    public string ConnectionString => connectionString ?? throw new InvalidOperationException("The database has not started.");` + $service_databases_property + `
 
     ` + (test_setup | string.replace "\n" "\n    ") + `
     {
@@ -99,7 +156,7 @@ public sealed class ApplicationDatabase : ` + test_lifetime + `
 
         app = await builder.BuildAsync(timeout.Token);
         await app.StartAsync(timeout.Token);
-        await app.ResourceNotifications.WaitForResourceHealthyAsync("database", timeout.Token);
+        await app.ResourceNotifications.WaitForResourceHealthyAsync("database", timeout.Token);` + $wait + `
         connectionString = await app.GetConnectionStringAsync("database", timeout.Token)
             ?? throw new InvalidOperationException("The tests' database has no connection string.");
     }
