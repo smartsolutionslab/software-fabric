@@ -1,0 +1,162 @@
+{{~ user_menu = object.has_key(project, "frontend.auth-client") && project["frontend.auth-client"] == "oidc-client-ts" ~}}
+import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from '@tanstack/react-router';
+import { afterEach, expect, test{{ if user_menu }}, vi{{ end }} } from 'vitest';
+import { App } from '@/App';
+import { moduleRoutes } from '@/modules';
+import { createAppRouter } from '@/router';
+import { Breadcrumbs } from './Breadcrumbs';
+import { CommandPalette } from './CommandPalette';
+{{~ if user_menu ~}}
+
+// The user menu has its own test; here it stands in, so this test checks the shell around it.
+vi.mock('@/auth/UserMenu', () => ({ UserMenu: () => <p>The user menu</p> }));
+{{~ end ~}}
+
+// Without Vitest's globals, Testing Library does not unmount between tests by itself.
+afterEach(cleanup);
+
+async function renderAt(path: string) {
+  render(<RouterProvider router={createAppRouter(createMemoryHistory({ initialEntries: [path] }), <App />)} />);
+  await screen.findByRole('navigation', { name: 'Modules' });
+}
+
+// A route tree of the tests' own, for what the shell does on a module's page and below it: a real module's page may
+// need the app's store, query client or host, which these tests do not render. The report's route has no title, so its
+// breadcrumb is its step of the address.
+const root = createRootRoute({
+  component: () => (
+    <>
+      <Breadcrumbs />
+      <CommandPalette routes={[reports]} />
+      <Outlet />
+    </>
+  ),
+});
+const start = createRoute({ getParentRoute: () => root, path: '/', component: () => <h1>Start</h1> });
+const reports = createRoute({
+  getParentRoute: () => root,
+  path: 'reports',
+  staticData: { title: 'Reports' },
+  component: () => (
+    <>
+      <h1>Reports</h1>
+      <Outlet />
+    </>
+  ),
+});
+const report = createRoute({ getParentRoute: () => reports, path: '$reportId', component: () => <h2>A report</h2> });
+const routeTree = root.addChildren([start, reports.addChildren([report])]);
+
+async function renderOwnAt(path: string) {
+  render(<RouterProvider router={createRouter({ routeTree, history: createMemoryHistory({ initialEntries: [path] }) })} />);
+  await screen.findByRole('navigation', { name: 'breadcrumb' });
+}
+
+// The file's first test also pays for warming up jsdom, React and the shell's components.
+test('the sidebar lists the start page and every module from the route tree', { timeout: 20_000 }, async () => {
+  await renderAt('/');
+
+  const navigation = within(screen.getByRole('navigation', { name: 'Modules' }));
+  expect(navigation.getAllByRole('link').map((link) => link.textContent)).toEqual([
+    'Home',
+    ...moduleRoutes.map((module) => module.options.staticData?.title),
+  ]);
+  expect(navigation.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+});
+
+test('the sidebar collapses from its trigger and opens again', async () => {
+  const user = userEvent.setup();
+  await renderAt('/');
+  const sidebar = () => document.querySelector('[data-slot="sidebar"]');
+  expect(sidebar()).toHaveAttribute('data-state', 'expanded');
+
+  await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Toggle Sidebar' }));
+  expect(sidebar()).toHaveAttribute('data-state', 'collapsed');
+
+  await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Toggle Sidebar' }));
+  expect(sidebar()).toHaveAttribute('data-state', 'expanded');
+});
+
+test('on the start page the breadcrumbs name only it', async () => {
+  await renderAt('/');
+
+  const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
+  expect(breadcrumbs.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Home']);
+  expect(breadcrumbs.getByText('Home')).toHaveAttribute('aria-current', 'page');
+  expect(breadcrumbs.getByText('Home')).not.toHaveAttribute('href');
+});
+
+// The current page is text, not a disabled link: the sidebar's link to it stays the only link of that name.
+test('the page the user is on is text in the breadcrumbs, not a second link to it', async () => {
+  await renderOwnAt('/reports');
+
+  const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
+  expect(breadcrumbs.queryByRole('link', { name: 'Reports' })).not.toBeInTheDocument();
+  expect(breadcrumbs.getByText('Reports')).toHaveAttribute('aria-current', 'page');
+});
+
+test("the breadcrumbs follow the route matches from the start page to a module's page and below it", async () => {
+  await renderOwnAt('/reports/42');
+
+  const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
+  expect(breadcrumbs.getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Home', 'Reports', '42']);
+  expect(breadcrumbs.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
+  expect(breadcrumbs.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/reports');
+  expect(breadcrumbs.getByText('42')).toHaveAttribute('aria-current', 'page');
+});
+
+test.each([
+  ['Ctrl+K', '{Control>}k{/Control}'],
+  ['Cmd+K', '{Meta>}k{/Meta}'],
+])('%s opens the command palette and Escape closes it', async (_, keys) => {
+  const user = userEvent.setup();
+  await renderAt('/');
+
+  await user.keyboard(keys);
+  const palette = await screen.findByRole('dialog', { name: 'Go to' });
+  expect(within(palette).getByRole('combobox', { name: 'Go to' })).toHaveFocus();
+  expect(
+    within(palette)
+      .getAllByRole('option')
+      .map((option) => option.textContent),
+  ).toEqual(['Home', ...moduleRoutes.map((module) => module.options.staticData?.title)]);
+
+  await user.keyboard('{Escape}');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('the keyboard alone goes to a page from the command palette', async () => {
+  const user = userEvent.setup();
+  await renderOwnAt('/');
+  expect(screen.getByRole('heading', { name: 'Start' })).toBeInTheDocument();
+
+  await user.keyboard('{Control>}k{/Control}');
+  await screen.findByRole('dialog', { name: 'Go to' });
+  await user.keyboard('{ArrowDown}');
+  expect(screen.getByRole('option', { name: 'Reports' })).toHaveAttribute('aria-selected', 'true');
+  await user.keyboard('{Enter}');
+
+  expect(await screen.findByRole('heading', { name: 'Reports' })).toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('typing narrows the command palette to the pages that match', async () => {
+  const user = userEvent.setup();
+  await renderAt('/');
+
+  await user.keyboard('{Control>}k{/Control}');
+  await screen.findByRole('dialog', { name: 'Go to' });
+  await user.keyboard('no such page');
+
+  expect(screen.queryAllByRole('option')).toHaveLength(0);
+  expect(screen.getByText('No page matches.')).toBeInTheDocument();
+});

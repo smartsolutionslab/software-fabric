@@ -8,8 +8,8 @@ namespace Fabric.Packs.Tests;
 /// collapsible sidebar holding every module's page from the routes the module registers, the theme toggle and the user
 /// menu (the name /me answers, and Sign out); breadcrumbs from the route; a command palette on Ctrl+K or Cmd+K that the
 /// keyboard alone drives; and toasts (sonner, vue-sonner) through which a mutation's result is a status message or an
-/// alert. The shell has its own axe check. TanStack Router, the micro-frontend shell, the other UI libraries and MSAL's
-/// user menu are out of scope: their output is unchanged.
+/// alert. The shell has its own axe check. The micro-frontend shell, the other UI libraries and MSAL's user menu are
+/// out of scope: their output is unchanged. TanStack Router's shell is <see cref="TanStackAppShellTests"/> (#736).
 /// </summary>
 public sealed partial class AppShellTests
 {
@@ -108,11 +108,10 @@ public sealed partial class AppShellTests
 
     /// <summary>Out of scope (the PR says why): these keep the navigation bar they had, and get none of the shell's files.</summary>
     [Theory]
-    [InlineData(React, "frontend.routing=tanstack-router")]
     [InlineData("industrial-event-driven-mfe")]
     [InlineData(React, "frontend.ui-library=radix-headless")]
     [InlineData(Vue, "frontend.ui-library=reka-ui")]
-    public void Other_routers_ui_libraries_and_the_micro_frontend_shell_keep_their_navigation_bar(string profile, params string[] overrides)
+    public void Other_ui_libraries_and_the_micro_frontend_shell_keep_their_navigation_bar(string profile, params string[] overrides)
     {
         var files = Files(profile, overrides);
 
