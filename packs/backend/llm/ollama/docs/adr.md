@@ -14,6 +14,6 @@ The project calls a local model, served by Ollama.
 
 ## Consequences
 
-- An architecture rule fails when the host's `Program.cs` (with `backend.topology: services`, any service host's, `src/Services/<Module>/Host/Program.cs`) does not call `AddOllamaChatClient` (module tests register a stand-in model, so they would not notice), and resolves the registered client, without calling it, failing when it is not Ollama with the configured endpoint and model, not wrapped with logging and OpenTelemetry, or when a missing endpoint does not name its AppHost resource.
+- An architecture rule fails when the host's `Program.cs`{{ if project["backend.topology"] == "services" }} (with `backend.topology: services`, any service host's, `src/Services/<Module>/Host/Program.cs`){{ end }} does not call `AddOllamaChatClient` (module tests register a stand-in model, so they would not notice), and resolves the registered client, without calling it, failing when it is not Ollama with the configured endpoint and model, not wrapped with logging and OpenTelemetry, or when a missing endpoint does not name its AppHost resource.
 - The integration tests remove the `ollama` and `ollama-model` resources before the application starts and give the host an endpoint nothing listens on; they start the application but never pull the image or a model, and never call one.
 - The first start of the AppHost downloads the image and the model, gigabytes in all, and a model answers as fast as the machine allows. Nothing leaves the machine: a prompt goes to the local server only.

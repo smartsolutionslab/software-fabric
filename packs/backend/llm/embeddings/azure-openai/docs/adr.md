@@ -14,6 +14,6 @@ The project's embeddings come from an embedding model deployed in its own Azure 
 
 ## Consequences
 
-- An architecture rule fails when the host's `Program.cs` (with `backend.topology: services`, any service host's, `src/Services/<Module>/Host/Program.cs`) does not call `AddAzureOpenAIEmbeddingGenerator`, and resolves the registered generator, without calling it, failing when it is not the configured deployment at `<endpoint>/openai/v1/`, or at an endpoint ending in `/v1` as given, not wrapped with logging and OpenTelemetry, or when a missing endpoint or key does not name its parameter.
+- An architecture rule fails when the host's `Program.cs`{{ if project["backend.topology"] == "services" }} (with `backend.topology: services`, any service host's, `src/Services/<Module>/Host/Program.cs`){{ end }} does not call `AddAzureOpenAIEmbeddingGenerator`, and resolves the registered generator, without calling it, failing when it is not the configured deployment at `<endpoint>/openai/v1/`, or at an endpoint ending in `/v1` as given, not wrapped with logging and OpenTelemetry, or when a missing endpoint or key does not name its parameter.
 - The integration tests give the endpoint their stand-in, `FakeEmbeddingsServer` on the loopback interface, whose address ends in `/v1`, and the key a value Azure does not accept; they never call the model. No test needs an Azure subscription or a real key.
 - Every text embedded is a request to your Azure resource: it costs money and sends the text there, records and questions alike.
