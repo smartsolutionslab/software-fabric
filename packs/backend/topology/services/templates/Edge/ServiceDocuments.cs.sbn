@@ -63,10 +63,27 @@ public static class ServiceDocuments
 
     private static void Add(JsonObject service, JsonObject document)
     {
+        // A host tags its operations, and names its document, after itself; the edge's document is the one API's.
+        var (serviceName, edgeName) = (Name(service), Name(document));
         var paths = Member(document, "paths", after: "info");
         foreach (var (path, item) in service["paths"] as JsonObject ?? [])
         {
-            paths.TryAdd(path, item?.DeepClone());
+            var added = item?.DeepClone();
+            foreach (var operation in (added as JsonObject ?? []).Select(member => member.Value).OfType<JsonObject>())
+            {
+                if (operation["tags"] is JsonArray operationTags)
+                {
+                    for (var index = 0; index < operationTags.Count; index++)
+                    {
+                        if (operationTags[index]?.GetValue<string>() == serviceName)
+                        {
+                            operationTags[index] = edgeName;
+                        }
+                    }
+                }
+            }
+
+            paths.TryAdd(path, added);
         }
 
         var schemas = Member(Member(document, "components", after: "paths"), "schemas", after: null);
@@ -89,12 +106,15 @@ public static class ServiceDocuments
         if (service["tags"] is JsonArray tags)
         {
             var known = Member(document, "tags", "components", () => new JsonArray());
-            foreach (var tag in tags.Where(tag => !known.Any(existing => JsonNode.DeepEquals(existing, tag))))
+            foreach (var tag in tags.Where(tag => tag?["name"]?.GetValue<string>() != serviceName && !known.Any(existing => JsonNode.DeepEquals(existing, tag))))
             {
                 known.Add(tag?.DeepClone());
             }
         }
     }
+
+    /// <summary>The name a host gives its document and its operations' tag: its application's, the title before " | v1".</summary>
+    private static string? Name(JsonObject document) => document["info"]?["title"]?.GetValue<string>().Split(" | ")[0];
 
     private static JsonObject Member(JsonObject parent, string name, string? after) => Member(parent, name, after, () => new JsonObject());
 

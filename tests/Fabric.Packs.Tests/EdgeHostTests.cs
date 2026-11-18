@@ -24,6 +24,7 @@ public sealed class EdgeHostTests
         project.ShouldContain("""<PackageReference Include="Yarp.ReverseProxy" />""");
         project.ShouldContain("""<PackageReference Include="Microsoft.Extensions.ServiceDiscovery.Yarp" />""");
         project.ShouldNotContain("Modules/", customMessage: "the edge runs no module code.");
+        project.ShouldContain("<AssemblyName>Host</AssemblyName>", customMessage: "the OpenAPI document is named, and tags its operations, after the host, as the monolith's copy does.");
         files["Directory.Packages.props"].ShouldContain("""<PackageVersion Include="Yarp.ReverseProxy" """);
         files["Directory.Packages.props"].ShouldContain("""<PackageVersion Include="Microsoft.Extensions.ServiceDiscovery.Yarp" """);
         files["Solution.slnx"].ShouldContain("""<Project Path="src/Edge/Edge.csproj" />""");

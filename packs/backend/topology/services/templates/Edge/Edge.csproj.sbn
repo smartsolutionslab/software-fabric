@@ -2,7 +2,8 @@
 
   <PropertyGroup>
     <RootNamespace>{{ namespace }}.Edge</RootNamespace>
-    <AssemblyName>{{ namespace }}.Edge</AssemblyName>
+    <!-- The host the frontend sees: its OpenAPI document is named, and tags its operations, after it, as the modular monolith's host does. -->
+    <AssemblyName>Host</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
