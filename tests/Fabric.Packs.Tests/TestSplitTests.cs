@@ -41,6 +41,8 @@ public sealed class TestSplitTests : IDisposable
         var lines = File.ReadAllLines(times);
         lines.ShouldContain($"{Packs}\t{Packs}.{nameof(TestSplitTests)}\tparallel\t{Seconds(listed.Length * 1.5)}");
         lines.ShouldContain($"{Packs}\t{alone}\tserial\t{Seconds(aloneMethods.Length * 0.5)}");
+        lines.ShouldContain($"{Packs}\t{Part(listed[0])}\tparallel\t1.5");
+        lines.ShouldContain($"{Packs}\t{Part(aloneMethods[0])}\tserial\t0.5");
         lines.ShouldBe([.. lines.Order(StringComparer.Ordinal)]);
     }
 
@@ -76,6 +78,108 @@ public sealed class TestSplitTests : IDisposable
 
         exitCode.ShouldBe(0, output);
         output.ShouldBe($"{Packs}\t{Packs}.AgGridTests\tparallel\t5.0\n");
+    }
+
+    [Fact]
+    public void Method_times_are_kept_only_for_a_class_whose_median_is_over_the_target_of_15_minutes()
+    {
+        var history = Write(
+            "history.tsv",
+            $"{Packs}\t{Packs}.AgGridTests\tparallel\t950.0 800.0",
+            $"{Packs}\t{Packs}.AgGridTests#A\tparallel\t500.0 400.0",
+            $"{Packs}\t{Packs}.AgGridTests#Gone\tparallel\t100.0",
+            $"{Packs}\t{Packs}.AgUiTests\tparallel\t100.0 100.0");
+        var times = Write(
+            "times.tsv",
+            $"{Packs}\t{Packs}.AgGridTests\tparallel\t1000.0",
+            $"{Packs}\t{Packs}.AgGridTests#A\tparallel\t600.0",
+            $"{Packs}\t{Packs}.AgGridTests#B\tparallel\t400.0",
+            $"{Packs}\t{Packs}.AgUiTests\tparallel\t1000.0",
+            $"{Packs}\t{Packs}.AgUiTests#X\tparallel\t1000.0");
+
+        var (exitCode, output) = Shell.Run(Repository.Root, "bash", "build/test-history.sh", history, times);
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldBe(
+            $"{Packs}\t{Packs}.AgGridTests\tparallel\t1000.0 950.0 800.0\n"
+            + $"{Packs}\t{Packs}.AgGridTests#A\tparallel\t600.0 500.0 400.0\n"
+            + $"{Packs}\t{Packs}.AgGridTests#B\tparallel\t400.0\n"
+            + $"{Packs}\t{Packs}.AgUiTests\tparallel\t1000.0 100.0 100.0\n");
+    }
+
+    [Fact]
+    public void A_class_with_method_times_runs_in_parts_named_by_method_and_balanced_like_classes()
+    {
+        var methods = ClassMethods("ModuleScreenAccessibilityTests");
+        var history = Write(
+            "history.tsv",
+            $"{Packs}\t{Packs}.ModuleScreenAccessibilityTests\tparallel\t1800.0",
+            $"{Packs}\t{methods[0]}\tparallel\t600.0",
+            $"{Packs}\t{methods[1]}\tparallel\t600.0",
+            $"{Packs}\t{methods[2]}\tparallel\t600.0");
+
+        var (exitCode, output, estimates) = Split(history, Write("shards.txt", "x", "y"));
+
+        exitCode.ShouldBe(0, estimates);
+        Shards(output).ShouldBe([methods[0], methods[1]]);
+        estimates.ShouldContain("shard  1: est  10.0 min  (parallel  10.0, serial   0.0, classes 1)\n", Case.Sensitive, estimates);
+        estimates.ShouldContain("shard  2: est  10.0 min  (parallel  10.0, serial   0.0, classes 1)\n", Case.Sensitive, estimates);
+        estimates.ShouldContain("shard  3: est  10.0 min  (parallel  10.0, serial   0.0, classes 1, the rest)\n", Case.Sensitive, estimates);
+    }
+
+    [Fact]
+    public void Parts_of_one_class_in_one_shard_run_one_after_another_so_they_are_spread()
+    {
+        var methods = ClassMethods("ModuleScreenAccessibilityTests");
+        var history = Write(
+            "history.tsv",
+            $"{Packs}\t{Packs}.ModuleScreenAccessibilityTests\tparallel\t1600.0",
+            $"{Packs}\t{methods[0]}\tparallel\t400.0",
+            $"{Packs}\t{methods[1]}\tparallel\t400.0",
+            $"{Packs}\t{methods[2]}\tparallel\t400.0",
+            $"{Packs}\t{methods[3]}\tparallel\t400.0");
+
+        var (exitCode, output, estimates) = Split(history, Write("shards.txt", "x"));
+
+        exitCode.ShouldBe(0, estimates);
+        Shards(output).ShouldBe([$"{methods[0]} {methods[2]}"]);
+        estimates.ShouldContain("shard  1: est  13.3 min  (parallel  13.3, serial   0.0, classes 1)\n", Case.Sensitive, estimates);
+        estimates.ShouldContain("shard  2: est  13.3 min  (parallel  13.3, serial   0.0, classes 1, the rest)\n", Case.Sensitive, estimates);
+    }
+
+    [Fact]
+    public void A_method_whose_source_is_gone_is_not_named()
+    {
+        var methods = ClassMethods("ModuleScreenAccessibilityTests");
+        var history = Write(
+            "history.tsv",
+            $"{Packs}\t{Packs}.ModuleScreenAccessibilityTests\tparallel\t1000.0",
+            $"{Packs}\t{Packs}.ModuleScreenAccessibilityTests#No_such_method_anywhere\tparallel\t600.0",
+            $"{Packs}\t{methods[0]}\tparallel\t400.0");
+
+        var (exitCode, output, estimates) = Split(history, Write("shards.txt", "x"));
+
+        exitCode.ShouldBe(0, estimates);
+        Shards(output).ShouldBe([methods[0]]);
+        output.ShouldNotContain("No_such_method_anywhere");
+    }
+
+    [Fact]
+    public void A_shard_runs_whole_classes_and_single_methods_together()
+    {
+        var method = $"{Packs}.{nameof(TestSplitTests)}#{nameof(The_first_history_is_this_run_s_times)}";
+        var shards = Write("shards.txt", $"{method} {Packs}.KestrelEndpointsTests");
+        var results = Path.Combine(work, "results");
+
+        var (exitCode, output) = Shell.Run(Repository.Root, "bash", "build/test-shard.sh", "1", results, shards);
+
+        exitCode.ShouldBe(0, output);
+        var ran = Directory.GetFiles(results, "*.xml", SearchOption.AllDirectories)
+            .SelectMany(report => System.Xml.Linq.XDocument.Load(report).Descendants("test"))
+            .Select(test => $"{test.Attribute("type")!.Value}.{test.Attribute("method")!.Value}")
+            .Order(StringComparer.Ordinal);
+        string[] expected = [.. Methods().Where(name => name.StartsWith($"{Packs}.KestrelEndpointsTests.", StringComparison.Ordinal)).Append(method.Replace('#', '.')).Order(StringComparer.Ordinal)];
+        ran.ToArray().ShouldBe(expected, output);
     }
 
     [Fact]
@@ -214,6 +318,13 @@ public sealed class TestSplitTests : IDisposable
         exitCode.ShouldBe(0, output);
         return [.. output.Split('\n').Select(line => line.Trim()).Where(line => line.StartsWith("Fabric.", StringComparison.Ordinal))];
     }
+
+    /// <summary>A class's test methods, as the split names a part: <c>Namespace.Class#Method</c>, in order.</summary>
+    private static string[] ClassMethods(string type) =>
+        [.. Methods().Where(method => method.StartsWith($"{Packs}.{type}.", StringComparison.Ordinal)).Select(Part).Distinct().Order(StringComparer.Ordinal)];
+
+    /// <summary><c>Namespace.Class.Method</c> as the times and the split name it: <c>Namespace.Class#Method</c>.</summary>
+    private static string Part(string method) => $"{method[..method.LastIndexOf('.')]}#{method[(method.LastIndexOf('.') + 1)..]}";
 
     private static string Seconds(double seconds) => seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
 
