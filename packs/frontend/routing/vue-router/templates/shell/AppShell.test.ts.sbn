@@ -49,10 +49,10 @@ test('the sidebar collapses from its trigger and opens again', async () => {
   expect(sidebar()).toHaveAttribute('data-state', 'expanded');
 
   await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Toggle Sidebar' }));
-  expect(sidebar()).toHaveAttribute('data-state', 'collapsed');
+  await vi.waitFor(() => expect(sidebar()).toHaveAttribute('data-state', 'collapsed'));
 
   await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Toggle Sidebar' }));
-  expect(sidebar()).toHaveAttribute('data-state', 'expanded');
+  await vi.waitFor(() => expect(sidebar()).toHaveAttribute('data-state', 'expanded'));
 });
 
 test('on the start page the breadcrumbs name only it', async () => {
