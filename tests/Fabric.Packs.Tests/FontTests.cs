@@ -141,10 +141,13 @@ public sealed partial class FontTests
         agents.ShouldContain("never from a font host");
         agents.ShouldContain("`text-display`, `text-title`, `text-body`, `text-caption`");
         agents.ShouldContain("`tabular-nums`");
+        agents.ShouldContain("`fabric change --set frontend.font=<font>`");
+        agents.ShouldNotContain("decision record of its own");
         var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith($"frontend-font-{font}.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("SIL Open Font License");
         adr.ShouldContain("@fontsource-variable/");
         adr.ShouldContain("src/theme/font.test.ts");
+        adr.ShouldContain("`fabric change --set frontend.font=<font>`");
         files.Single(file => file.Key.EndsWith("ui-library-" + library, StringComparison.Ordinal)).Value.ShouldContain("`frontend.font`");
     }
 
