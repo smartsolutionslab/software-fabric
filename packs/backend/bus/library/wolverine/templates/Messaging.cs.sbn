@@ -41,6 +41,21 @@ public static class Messaging
         // takes messages on; the emulator answers them on a port of its own, which the AppHost passes as this.
         var management = configuration.GetConnectionString("messaging-management") ?? broker;
 {{~ end ~}}
+{{~ if project["backend.bus.transport"] == "rabbitmq" && project["backend.topology"] == "services" ~}}
+
+        // Every service listens on a queue of its own, which the AppHost names after its module and binds to the exchange of
+        // each event the service consumes: services that shared the queue named after the event would compete for it, and
+        // an event would reach only one of them (see docs/adr).
+        var queue = configuration["Messaging:Queue"]
+            ?? throw new InvalidOperationException("Messaging:Queue is missing; the AppHost names the service's queue after its module.");
+{{~ else if project["backend.bus.transport"] == "azure-service-bus" && project["backend.topology"] == "services" ~}}
+
+        // Every service subscribes to the topic of each event it consumes, under a subscription the AppHost names after its
+        // module: services that shared the queue named after the event would compete for it, and an event would reach only
+        // one of them (see docs/adr).
+        var subscription = configuration["Messaging:Subscription"]
+            ?? throw new InvalidOperationException("Messaging:Subscription is missing; the AppHost names the service's subscription after its module.");
+{{~ end ~}}
 {{~ if project["backend.bus.transport"] == "kafka" && project["backend.topology"] == "services" ~}}
 
         // Every service consumes in a consumer group of its own, which the AppHost names after its module: services that
@@ -83,7 +98,13 @@ public static class Messaging
             // Commands and queries are Wolverine messages too, invoked in process by the mediator; only integration
             // events follow the broker's conventions, and of those only the ones no module of this host consumes are
             // sent to it.
+{{~ if project["backend.topology"] == "services" ~}}
+            options.UseRabbitMq(new Uri(broker)).AutoProvision().DisableDeadLetterQueueing().UseConventionalRouting(convention => convention.IncludeTypes(IsIntegrationEvent).QueueNameForListener(_ => queue));
+{{~ else ~}}
             options.UseRabbitMq(new Uri(broker)).AutoProvision().DisableDeadLetterQueueing().UseConventionalRouting(convention => convention.IncludeTypes(IsIntegrationEvent));
+{{~ end ~}}
+{{~ else if project["backend.topology"] == "services" ~}}
+            options.UseRabbitMq(new Uri(broker)).AutoProvision().DisableDeadLetterQueueing().UseConventionalRouting(convention => convention.QueueNameForListener(_ => queue));
 {{~ else ~}}
             options.UseRabbitMq(new Uri(broker)).AutoProvision().DisableDeadLetterQueueing().UseConventionalRouting();
 {{~ end ~}}
@@ -94,8 +115,16 @@ public static class Messaging
             // Commands and queries are Wolverine messages too, invoked in process by the mediator; only integration
             // events follow the broker's conventions, and of those only the ones no module of this host consumes are
             // sent to it.
+{{~ if project["backend.topology"] == "services" ~}}
+            options.UseAzureServiceBus(broker).AutoProvision().ConfigureListeners(listener => listener.DisableDeadLetterQueueing())
+                .UseTopicAndSubscriptionConventionalRouting(convention => convention.IncludeTypes(IsIntegrationEvent).SubscriptionNameForListener(_ => subscription));
+{{~ else ~}}
             options.UseAzureServiceBus(broker).AutoProvision().ConfigureListeners(listener => listener.DisableDeadLetterQueueing())
                 .UseConventionalRouting(convention => convention.IncludeTypes(IsIntegrationEvent));
+{{~ end ~}}
+{{~ else if project["backend.topology"] == "services" ~}}
+            options.UseAzureServiceBus(broker).AutoProvision().ConfigureListeners(listener => listener.DisableDeadLetterQueueing())
+                .UseTopicAndSubscriptionConventionalRouting(convention => convention.SubscriptionNameForListener(_ => subscription));
 {{~ else ~}}
             options.UseAzureServiceBus(broker).AutoProvision().ConfigureListeners(listener => listener.DisableDeadLetterQueueing())
                 .UseConventionalRouting();

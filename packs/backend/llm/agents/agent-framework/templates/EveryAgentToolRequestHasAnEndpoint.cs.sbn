@@ -118,6 +118,11 @@ public sealed class EveryAgentToolRequestHasAnEndpoint : IArchitectureRule
 {{~ else if project["backend.bus.transport"] != "none" ~}}
             builder.UseSetting("ConnectionStrings:messaging", "amqp://localhost");
 {{~ end ~}}
+{{~ if project["backend.topology"] == "services" && project["backend.bus.transport"] == "rabbitmq" ~}}
+            builder.UseSetting("Messaging:Queue", "unused");
+{{~ else if project["backend.topology"] == "services" && project["backend.bus.transport"] == "azure-service-bus" ~}}
+            builder.UseSetting("Messaging:Subscription", "unused");
+{{~ end ~}}
 {{~ if project["backend.auth"] != "none" ~}}
             {{ unstarted_host_settings }}
 {{~ end ~}}

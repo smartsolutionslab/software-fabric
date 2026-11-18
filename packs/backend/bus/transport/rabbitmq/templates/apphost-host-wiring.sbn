@@ -1,3 +1,4 @@
 
     .WithReference(messaging)
-    .WaitFor(messaging)
+    .WaitFor(messaging){{ if project["backend.topology"] == "services" }}
+    .WithEnvironment("Messaging__Queue", module){{ end }}
