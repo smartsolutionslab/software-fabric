@@ -18,4 +18,6 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
+  - { kind: unit-test, describes: "With shadcn or shadcn-vue, the table is busy and named Loading… with skeleton rows in its own columns while its query is pending, and shows its empty state across its columns when it has no rows (src/components/ui/data-table.test.tsx, DataTable.test.ts).", file: templates/data-table.test.tsx.sbn }
+  - { kind: unit-test, describes: "With shadcn or shadcn-vue and the accessibility tests, axe finds no violations in the table while it loads, empty and with rows, in the light and the dark theme (src/components/ui/data-table.axe.test.tsx, DataTable.axe.test.ts).", file: templates/data-table.axe.test.tsx.sbn }
   - { kind: lint-rule, describes: "Importing AG Grid fails lint.", file: templates/restricted.sbn }
