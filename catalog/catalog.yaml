@@ -238,7 +238,11 @@ dimensions:
     default: []
     note: "Empty: the project neither exposes nor uses MCP services. Official C# MCP SDK. ADR-0010."
     options:
-      server: { tier: experimental, note: "the project exposes MCP tools, opted in per command or query" }
+      # With services the MCP endpoint belongs on the edge, which #707 builds (ADR-0017).
+      server:
+        tier: experimental
+        note: "the project exposes MCP tools, opted in per command or query"
+        conflicts: ["backend.topology == services"]
       client: { tier: experimental, note: "the project uses external MCP servers" }
 
   # ─────────────────────────── Backend · per module ──────────────────────────
@@ -331,7 +335,12 @@ dimensions:
     default: aspire-fixture
     options:
       aspire-fixture: { tier: supported }
-      testcontainers: { tier: supported }  # nightly run 42800894655
+      # A services project is integration-tested through its AppHost, which wires every service host, the edge and a
+      # database per service; testcontainers would have to rebuild that by hand (ADR-0017, owner on #723).
+      testcontainers:
+        tier: supported  # nightly run 42800894655
+        note: "monolith only: with services the integration tests run through the AppHost (aspire-fixture), ADR-0017"
+        conflicts: ["backend.topology == services"]
 
   backend.test.extras:
     scope: project
@@ -601,8 +610,9 @@ dimensions:
     default: none
     options:
       none:    { tier: supported }
-      signalr: { tier: experimental }
-      sse:     { tier: experimental }
+      # With services the hub and the event stream belong on the edge, which #707 builds (ADR-0017).
+      signalr: { tier: experimental, conflicts: ["backend.topology == services"] }
+      sse:     { tier: experimental, conflicts: ["backend.topology == services"] }
 
   frontend.agent-ui:
     scope: project
@@ -616,6 +626,8 @@ dimensions:
         tier: supported  # nightly run 42998190693
         note: "an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host"
         requires: ["frontend.architecture == spa"]
+        # With services the AG-UI endpoint belongs on the edge, which #707 builds (ADR-0017).
+        conflicts: ["backend.topology == services"]
 
   frontend.auth-client:
     scope: project

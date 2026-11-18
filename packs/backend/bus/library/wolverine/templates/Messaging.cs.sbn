@@ -41,6 +41,13 @@ public static class Messaging
         // takes messages on; the emulator answers them on a port of its own, which the AppHost passes as this.
         var management = configuration.GetConnectionString("messaging-management") ?? broker;
 {{~ end ~}}
+{{~ if project["backend.bus.transport"] == "kafka" && project["backend.topology"] == "services" ~}}
+
+        // Every service consumes in a consumer group of its own, which the AppHost names after its module: services that
+        // shared one group would split each topic between them, and an event would reach only one of them (see docs/adr).
+        var consumerGroup = configuration["Messaging:ConsumerGroup"]
+            ?? throw new InvalidOperationException("Messaging:ConsumerGroup is missing; the AppHost names the service's consumer group after its module.");
+{{~ end ~}}
 
         services.AddWolverine(options =>
         {
@@ -99,7 +106,11 @@ public static class Messaging
             // host listens to the topics of the events its modules consume.
             options.UseKafka(broker).AutoProvision().ConfigureConsumers(consumer =>
             {
+{{~ if project["backend.topology"] == "services" ~}}
+                consumer.GroupId = consumerGroup;
+{{~ else ~}}
                 consumer.GroupId = "{{ name }}";
+{{~ end ~}}
                 consumer.AutoOffsetReset = AutoOffsetReset.Earliest;
             });
             foreach (var integrationEvent in typeof(IIntegrationEvent).Assembly.GetTypes().Where(IsIntegrationEvent))

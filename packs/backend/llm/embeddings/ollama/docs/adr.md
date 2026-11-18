@@ -14,6 +14,6 @@ The project's embeddings come from a local embedding model, served by Ollama (AD
 
 ## Consequences
 
-- An architecture rule fails when the host's `Program.cs` does not call `AddOllamaEmbeddingGenerator`, and resolves the registered generator, without calling it, failing when it is not Ollama with the configured endpoint and model, not wrapped with logging and OpenTelemetry, or when a missing endpoint does not name its AppHost resource.
+- An architecture rule fails when the host's `Program.cs`{{ if project["backend.topology"] == "services" }} (with `backend.topology: services`, any service host's, `src/Services/<Module>/Host/Program.cs`){{ end }} does not call `AddOllamaEmbeddingGenerator`, and resolves the registered generator, without calling it, failing when it is not Ollama with the configured endpoint and model, not wrapped with logging and OpenTelemetry, or when a missing endpoint does not name its AppHost resource.
 - The integration tests remove the `ollama` and `ollama-embedding-model` resources before the application starts and give the host their stand-in as its endpoint, `FakeEmbeddingsServer` on the loopback interface, which answers `/api/embed`; they never pull the image or a model, and never call one.
 - The first start of the AppHost downloads the image and the model. Nothing leaves the machine: text is embedded by the local server only.

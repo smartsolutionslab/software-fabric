@@ -178,6 +178,22 @@ public class ValidateCommandTests
         run.Error.ShouldContain("error: backend.topology=services conflicts with backend.api-protocols has grpc.");
     }
 
+    /// <summary>Services are integration-tested through the AppHost: they refuse testcontainers (ADR-0017, #723).</summary>
+    [Fact]
+    public void Services_with_testcontainers_exit_one_and_print_the_sentence()
+    {
+        var run = CliRun.Of(
+            "validate",
+            "--profile", "lean-crud",
+            "--set", "backend.bus.transport=kafka",
+            "--set", "backend.topology=services",
+            "--set", "backend.test.integration=testcontainers",
+            "--catalog", Paths.RepositoryCatalog);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("error: backend.test.integration=testcontainers conflicts with backend.topology == services.");
+    }
+
     [Fact]
     public void An_unknown_dimension_exits_one()
     {
