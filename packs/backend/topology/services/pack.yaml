@@ -1,0 +1,33 @@
+option: backend.topology.services
+files:
+  - { template: templates/Host.csproj.sbn, target: "src/Services/{{ module.namespace }}/Host/Host.csproj", per-module: true }
+  - { template: templates/Program.cs.sbn, target: "src/Services/{{ module.namespace }}/Host/Program.cs", per-module: true }
+  - { template: templates/appsettings.json.sbn, target: "src/Services/{{ module.namespace }}/Host/appsettings.json", per-module: true }
+  - { template: templates/launchSettings.json.sbn, target: "src/Services/{{ module.namespace }}/Host/Properties/launchSettings.json", per-module: true }
+  - { template: templates/ServiceHostProjects.cs.sbn, target: src/AppHost/Wiring/ServiceHostProjects.cs }
+  - { template: templates/ServiceHostReferences.cs.sbn, target: tests/Architecture.Tests/ServiceHostReferences.cs }
+  - { template: templates/ServiceHostEntryPoints.cs.sbn, target: tests/Architecture.Tests/ServiceHostEntryPoints.cs }
+  - { template: templates/ModulesDoNotReferenceEachOther.cs.sbn, target: tests/Architecture.Tests/Rules/ModulesDoNotReferenceEachOther.cs }
+  - { template: templates/ServicesDoNotReferenceEachOther.cs.sbn, target: tests/Architecture.Tests/Rules/ServicesDoNotReferenceEachOther.cs }
+  - { template: templates/EveryServiceHostRunsExactlyOneModule.cs.sbn, target: tests/Architecture.Tests/Rules/EveryServiceHostRunsExactlyOneModule.cs }
+# The host.* slots mean what they mean in the modular monolith, "every host that runs module code" (ADR-0017): each
+# renders into every service host.
+declares-slots:
+  - { slot: host.packages, description: "<PackageReference> lines for every service host." }
+  - { slot: host.services, description: "Statements registering services on every service host's builder; IReadOnlyList<IModule> modules (the host's one module) is in scope." }
+  - { slot: host.middleware, description: "Statements adding middleware to every service host's built app, before endpoints are mapped." }
+  - { slot: host.endpoints, description: "Host-wide endpoints mapped on WebApplication app in every service host, beside its module's (e.g. /me)." }
+  - { slot: host.kestrel-endpoints, description: "JSON entries \"<name>\": { \"Url\": \"http://localhost:<port>\", \"Protocols\": \"...\" } under Kestrel:Endpoints of every service host's appsettings.json, each indented six spaces, beside the host's own http endpoint (launchSettings' http://localhost:5080). Rendered only with a contribution; Aspire turns every Kestrel endpoint into an endpoint of the service's resource, by its name.", separator: ",\n" }
+  - { slot: host.log-levels, description: "JSON entries \"<category>\": \"<level>\" under Logging:LogLevel of every service host's appsettings.json, after Default and Microsoft.AspNetCore, each indented six spaces.", separator: ",\n" }
+slots:
+  - { slot: apphost.host, template: templates/apphost-host.sbn }
+  - { slot: apphost.project-references, template: templates/apphost-project-reference.sbn }
+  - { slot: solution.projects, template: templates/solution-project.sbn }
+  - { slot: tests.architecture.references, template: templates/architecture-tests-references.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No module references another module's assemblies.", file: templates/ModulesDoNotReferenceEachOther.cs.sbn }
+  - { kind: architecture-test, describes: "No service host's project references another module's projects.", file: templates/ServicesDoNotReferenceEachOther.cs.sbn }
+  - { kind: architecture-test, describes: "Every service host runs exactly one module: the module Api projects it references hold one IModule between them.", file: templates/EveryServiceHostRunsExactlyOneModule.cs.sbn }

@@ -1,0 +1,1 @@
+    <ProjectReference Include="../Services/*/Host/Host.csproj" IsAspireProjectResource="false" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" ExcludeAssets="all" Private="false" />
