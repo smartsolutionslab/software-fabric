@@ -5,6 +5,9 @@ files:
   - { template: templates/data-table.test.tsx.sbn, target: web/app/src/components/ui/data-table.test.tsx, when: 'project["frontend.framework"] == "react"' }
   - { template: templates/DataTable.vue.sbn, target: web/app/src/components/ui/DataTable.vue, when: 'project["frontend.framework"] == "vue"' }
   - { template: templates/DataTable.test.ts.sbn, target: web/app/src/components/ui/DataTable.test.ts, when: 'project["frontend.framework"] == "vue"' }
+  # With shadcn or shadcn-vue and the accessibility tests, axe checks the table while it loads, empty and with rows (#696).
+  - { template: templates/data-table.axe.test.tsx.sbn, target: web/app/src/components/ui/data-table.axe.test.tsx, when: 'project["frontend.ui-library"] == "shadcn" && object.has_key(project, "frontend.test.extras") && array.contains(project["frontend.test.extras"], "accessibility")' }
+  - { template: templates/DataTable.axe.test.ts.sbn, target: web/app/src/components/ui/DataTable.axe.test.ts, when: 'project["frontend.ui-library"] == "shadcn-vue" && object.has_key(project, "frontend.test.extras") && array.contains(project["frontend.test.extras"], "accessibility")' }
   # CSS Modules (ADR-0006): the table's classes come from a module beside it; one stylesheet, named after each framework's component.
   - { template: templates/data-table.module.css.sbn, target: web/app/src/components/ui/data-table.module.css, when: 'project["frontend.framework"] == "react" && project["frontend.styling"] == "css-modules" && project["frontend.ui-library"] != "mui"' }
   - { template: templates/data-table.module.css.sbn, target: web/app/src/components/ui/DataTable.module.css, when: 'project["frontend.framework"] == "vue" && project["frontend.styling"] == "css-modules" && project["frontend.ui-library"] != "vuetify"' }

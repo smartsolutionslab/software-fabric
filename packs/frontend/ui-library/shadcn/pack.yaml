@@ -9,6 +9,7 @@ files:
   - { template: templates/theme/contrast.test.ts.sbn, target: web/app/src/theme/contrast.test.ts }
   - { template: templates/theme/ThemeToggle.tsx.sbn, target: web/app/src/theme/ThemeToggle.tsx }
   - { template: templates/theme/ThemeToggle.test.tsx.sbn, target: web/app/src/theme/ThemeToggle.test.tsx }
+  - { template: templates/empty-state/empty-state.test.tsx.sbn, target: web/app/src/components/ui/empty-state.test.tsx }
   # The app shell (#695), in a single-page app with react-router: the registry's sidebar and what it uses, breadcrumbs,
   # the command palette (cmdk) and toasts (sonner), which src/lib/notify.tsx reports a mutation's result in.
   - { template: templates/shell/sidebar.tsx.sbn, target: web/app/src/components/ui/sidebar.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }

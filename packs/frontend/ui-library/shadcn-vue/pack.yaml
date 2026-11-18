@@ -10,6 +10,7 @@ files:
   - { template: templates/theme/contrast.test.ts.sbn, target: web/app/src/theme/contrast.test.ts }
   - { template: templates/theme/ThemeToggle.vue.sbn, target: web/app/src/theme/ThemeToggle.vue }
   - { template: templates/theme/ThemeToggle.test.ts.sbn, target: web/app/src/theme/ThemeToggle.test.ts }
+  - { template: templates/empty-state/EmptyState.test.ts.sbn, target: web/app/src/components/ui/empty-state/EmptyState.test.ts }
   # The app shell (#695), in a single-page app with vue-router: the registry's sidebar and what it uses, breadcrumbs,
   # the command palette and toasts (vue-sonner), which src/lib/notify.ts reports a mutation's result in.
   - { template: templates/shell/sidebar/Sidebar.vue.sbn, target: web/app/src/components/ui/sidebar/Sidebar.vue, when: 'project["frontend.ui-library"] == "shadcn-vue" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "vue-router"' }
