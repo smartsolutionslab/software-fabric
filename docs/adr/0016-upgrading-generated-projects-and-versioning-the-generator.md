@@ -416,8 +416,9 @@ marked dimension that
   could then activate, forbid or re-default another dimension, so the change
   would reach past its own files.
 
-Marked today: `frontend.color-scheme`. The font (`frontend.font`, #699) is
-marked by the change that adds it.
+Marked today: `frontend.color-scheme` and `frontend.font` (#699). A font
+change also changes the font's package in `web/app/package.json`, so the
+project installs its dependencies again before its lockfile is current.
 
 ### C3. What `fabric change` requires, does and guarantees
 

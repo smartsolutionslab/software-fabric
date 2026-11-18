@@ -665,6 +665,8 @@ dimensions:
     scope: project
     active-when: "frontend.ui-library in (shadcn, shadcn-vue)"
     default: inter
+    # Presentation only: another font changes the imported package and the theme's font names, nothing else (ADR-0016 C2, #720).
+    changeable: true
     note: "The app's typeface: a variable font (SIL Open Font License) installed from npm and bundled with the app, never loaded from a font host, under the theme's type scale (display, title, body, caption)."
     options:
       inter: { tier: experimental }
