@@ -17,12 +17,12 @@
 # Fabric.Packs.Tests, and every class with no time yet, stays in the last shard. The classes are assigned slowest first
 # to the shard they lengthen least, then classes are moved or swapped off the slowest shard while that shortens it.
 #
-# A class whose work alone is over the target, 15 minutes, runs in parts (#738): where the history keeps its methods'
-# times (build/test-history.sh does for a class whose median is over the target), each method is assigned like a class
-# and named <Namespace.Class>#<Method>, and a method with no time yet runs in the last shard. A method's share of the
-# class's work is its share of the methods' times, and each part pays the setup once more. A class's methods run one
-# after another, so the parts of one class in one shard take as long as their sum, with one setup; the model counts
-# them so.
+# A class whose work alone was over the target, 15 minutes, in any recorded run runs in parts (#738): a runner that slow
+# again would leave its shard over the target. Where the history keeps its methods' times (build/test-history.sh does
+# for a class that took longer than the target in any run), each method is assigned like a class and named
+# <Namespace.Class>#<Method>, and a method with no time yet runs in the last shard. A method's share of the class's work
+# is its share of the methods' times, and each part pays the setup once more. A class's methods run one after another,
+# so the parts of one class in one shard take as long as their sum, with one setup; the model counts them so.
 #
 # Without a history, or when the times would leave a shard empty, the split is build/test-shards.txt as it stands. A
 # class whose source file is gone is not named, nor a method its class's source no longer declares: a shard naming
@@ -68,10 +68,14 @@ awk -F '\t' -v named="$named" -v estimates="$work/estimates" -v shards="$work/sp
     }
     return count % 2 ? values[(count + 1) / 2] : (values[count / 2] + values[count / 2 + 1]) / 2
   }
-  # Each class line'"'"'s work, with slowdown s and setup u: the median of what its runs give.
+  # Each class line'"'"'s work, with slowdown s and setup u: the median of what its runs give, and the most one gave.
   function works(s, u,    l, r, given) {
     for (l = 1; l <= lines; l++) {
-      for (r = 1; r <= runs[l]; r++) { given[r] = took[l, r] / (1 + s * load[l, r]) - u * (parts[l, r] - 1) }
+      peak[l] = 0
+      for (r = 1; r <= runs[l]; r++) {
+        given[r] = took[l, r] / (1 + s * load[l, r]) - u * (parts[l, r] - 1)
+        if (given[r] > peak[l]) { peak[l] = given[r] }
+      }
       work[l] = median(given, runs[l])
       if (work[l] < 0) { work[l] = 0 }
     }
@@ -173,7 +177,7 @@ awk -F '\t' -v named="$named" -v estimates="$work/estimates" -v shards="$work/sp
     count = 0
     for (l = 1; l <= lines; l++) {
       class = lineName[l]
-      if (packs[l] && methods[class] != "" && work[l] > limit) {
+      if (packs[l] && methods[class] != "" && peak[l] > limit) {
         divided[class] = 1
         parted = split(substr(methods[class], 2), list, " ")
         for (p = 1; p <= parted; p++) {
