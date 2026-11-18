@@ -165,6 +165,7 @@ public sealed partial class AppShellTests
             $"src/shell/AppShell.test.{test} > the sidebar collapses from its trigger and opens again",
             $"src/shell/AppShell.test.{test} > on the start page the breadcrumbs name only it",
             $"src/shell/AppShell.test.{test} > the breadcrumbs lead from the start page to a module's page and below it",
+            $"src/shell/AppShell.test.{test} > on a module's page the only link named after it is the sidebar's",
             $"src/shell/AppShell.test.{test} > Ctrl+K opens the command palette and Escape closes it",
             $"src/shell/AppShell.test.{test} > Cmd+K opens the command palette and Escape closes it",
             $"src/shell/AppShell.test.{test} > the keyboard alone goes to a page from the command palette",

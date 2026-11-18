@@ -69,6 +69,18 @@ test('on the start page the breadcrumbs name only it', () => {
   expect(breadcrumbs.getByText('Home')).not.toHaveAttribute('href');
 });
 
+// The current page is text, not a disabled link: the sidebar's link to it stays the only link of that name.
+test.runIf(modules.length > 0)("on a module's page the only link named after it is the sidebar's", () => {
+  const module = firstModule();
+  renderAt(`/${module.path}`);
+
+  expect(screen.getAllByRole('link', { name: module.title })).toHaveLength(1);
+  expect(within(screen.getByRole('navigation', { name: 'breadcrumb' })).getByText(module.title)).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+});
+
 test.runIf(modules.length > 0)("the breadcrumbs lead from the start page to a module's page and below it", () => {
   const module = firstModule();
   renderAt(`/${module.path}/details`);
