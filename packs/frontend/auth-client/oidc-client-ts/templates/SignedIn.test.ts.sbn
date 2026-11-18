@@ -1,5 +1,9 @@
+{{~ user_menu = project["frontend.ui-library"] == "shadcn-vue" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "vue-router" ~}}
+{{~ signed_in = user_menu ? "screen.findByRole('heading', { name: '" + name + "' })" : "screen.findByText('Signed in as developer')" ~}}
 import { render, screen } from '@testing-library/vue';
+{{~ if !user_menu ~}}
 import userEvent from '@testing-library/user-event';
+{{~ end ~}}
 import { User } from 'oidc-client-ts';
 import { afterEach, expect, test, vi } from 'vitest';
 import SignedIn from './SignedIn.vue';
@@ -57,15 +61,28 @@ test('an anonymous visitor is sent to the identity provider', async () => {
   expect(screen.queryByRole('heading', { name: '{{ name }}' })).not.toBeInTheDocument();
 });
 
+{{~ if user_menu ~}}
+// Who is signed in, and Sign out, are in the app shell's user menu (UserMenu.vue), not above the application.
+test('a signed-in user sees the application', async () => {
+  const fake = client({ getUser: vi.fn<AuthClient['getUser']>(() => Promise.resolve(developer)) });
+
+  renderSignedIn(fake);
+
+  expect(await screen.findByRole('heading', { name: '{{ name }}' })).toBeInTheDocument();
+  expect(screen.queryByText(/Signed in as/)).not.toBeInTheDocument();
+  expect(fake.signinRedirect).not.toHaveBeenCalled();
+});
+{{~ else ~}}
 test('a signed-in user sees who they are and the application', async () => {
   const fake = client({ getUser: vi.fn<AuthClient['getUser']>(() => Promise.resolve(developer)) });
 
   renderSignedIn(fake);
 
-  expect(await screen.findByText('Signed in as developer')).toBeInTheDocument();
+  expect(await {{ signed_in }}).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '{{ name }}' })).toBeInTheDocument();
   expect(fake.signinRedirect).not.toHaveBeenCalled();
 });
+{{~ end ~}}
 
 test('coming back from the identity provider completes the sign-in and drops its parameters from the address', async () => {
   window.history.replaceState({}, '', '/?code=the-code&state=the-state');
@@ -73,7 +90,7 @@ test('coming back from the identity provider completes the sign-in and drops its
 
   renderSignedIn(fake);
 
-  expect(await screen.findByText('Signed in as developer')).toBeInTheDocument();
+  expect(await {{ signed_in }}).toBeInTheDocument();
   expect(fake.signinCallback).toHaveBeenCalledOnce();
   expect(window.location.search).toBe('');
   expect(fake.signinRedirect).not.toHaveBeenCalled();
@@ -94,7 +111,7 @@ test('a failed sign-in is shown, not retried', async () => {
 test('a session whose access token expires sends the user back to the identity provider', async () => {
   const fake = client({ getUser: vi.fn<AuthClient['getUser']>(() => Promise.resolve(developer)) });
   renderSignedIn(fake);
-  expect(await screen.findByText('Signed in as developer')).toBeInTheDocument();
+  expect(await {{ signed_in }}).toBeInTheDocument();
 
   const [expired] = vi.mocked(fake.events.addAccessTokenExpired).mock.calls[0] ?? [];
   expired?.();
@@ -106,7 +123,7 @@ test('a session whose access token expires sends the user back to the identity p
 test('a failed silent renewal is shown', async () => {
   const fake = client({ getUser: vi.fn<AuthClient['getUser']>(() => Promise.resolve(developer)) });
   renderSignedIn(fake);
-  expect(await screen.findByText('Signed in as developer')).toBeInTheDocument();
+  expect(await {{ signed_in }}).toBeInTheDocument();
 
   const [renewalFailed] = vi.mocked(fake.events.addSilentRenewError).mock.calls[0] ?? [];
   renewalFailed?.(new Error('the identity provider is unreachable'));
@@ -132,9 +149,18 @@ test('signing out does not start a sign-in while the identity provider signs the
     unloaded?.();
     return Promise.resolve();
   });
+{{~ if user_menu ~}}
+  const auth = createAuth(fake);
+  render(SignedIn, { global: { provide: { [authKey]: auth } }, slots: { default: '<h1>{{ name }}</h1>' } });
+  await screen.findByRole('heading', { name: '{{ name }}' });
+
+  // As the user menu's Sign out does.
+  await auth.signoutRedirect();
+{{~ else ~}}
   renderSignedIn(fake);
 
   await userEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
+{{~ end ~}}
 
   await vi.waitFor(() => expect(fake.signoutRedirect).toHaveBeenCalledOnce());
   expect(fake.signinRedirect).not.toHaveBeenCalled();

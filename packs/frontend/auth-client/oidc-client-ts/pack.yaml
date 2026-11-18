@@ -22,6 +22,8 @@ files:
   # The screens' axe checks (frontend.test.extras accessibility, #661) render a screen for the local user developer, signed in, through these; the provider's names stay in this pack.
   - { template: templates/SignedInAsDeveloper.tsx.sbn, target: web/app/src/auth/SignedInAsDeveloper.tsx, when: 'project["frontend.framework"] == "react" && object.has_key(project, "frontend.test.extras") && array.contains(project["frontend.test.extras"], "accessibility") && project["frontend.architecture"] == "spa"' }
   - { template: templates/signedInAsDeveloper.ts.sbn, target: web/app/src/auth/signedInAsDeveloper.ts, when: 'project["frontend.framework"] == "vue" && object.has_key(project, "frontend.test.extras") && array.contains(project["frontend.test.extras"], "accessibility") && project["frontend.architecture"] == "spa"' }
+  - { template: templates/shell/UserMenu.test.tsx.sbn, target: web/app/src/auth/UserMenu.test.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/UserMenu.test.ts.sbn, target: web/app/src/auth/UserMenu.test.ts, when: 'project["frontend.ui-library"] == "shadcn-vue" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "vue-router"' }
 slots:
   - { slot: templates.functions, template: templates/functions.sbn }
   - { slot: web.dependencies, template: templates/dependencies.sbn }
@@ -38,3 +40,4 @@ gates:
   - { kind: unit-test, describes: "With Vue and backend.authorization roles or claims, RequirePermission.vue and the useHasRole / useHasClaim composables show an element to a user the ID token says holds the role or claim and hide it from one who does not (src/auth/RequirePermission.test.ts).", file: templates/RequirePermission.test.ts.sbn }
   - { kind: unit-test, describes: "With Vue, SignedIn sends an anonymous visitor (or one whose access token expired) to the identity provider, completes the sign-in on the way back, shows a failed sign-in, renewal or redirect, and shows a signed-in user and the application (src/auth/SignedIn.test.ts).", file: templates/SignedIn.test.ts.sbn }
   - { kind: end-to-end-test, describes: "A realm user signs in through the identity provider and sees the application (e2e/sign-in.spec.ts, run against the running AppHost).", file: templates/sign-in.spec.ts.sbn }
+  - { kind: unit-test, describes: "In the shell of shadcn or shadcn-vue, the user menu names the user as /me answers and signs out through the identity provider (src/auth/UserMenu.test.tsx, src/auth/UserMenu.test.ts).", file: templates/shell/UserMenu.test.tsx.sbn }

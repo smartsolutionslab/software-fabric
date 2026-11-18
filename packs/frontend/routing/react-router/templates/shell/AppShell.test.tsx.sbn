@@ -1,0 +1,129 @@
+{{~ user_menu = object.has_key(project, "frontend.auth-client") && project["frontend.auth-client"] == "oidc-client-ts" ~}}
+import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
+import { afterEach, expect, test{{ if user_menu }}, vi{{ end }} } from 'vitest';
+import { App } from '@/App';
+import type { ModuleRoute } from '@/modules';
+
+{{~ if user_menu ~}}
+// The user menu has its own test; here it stands in, so this test checks the shell around it.
+vi.mock('@/auth/UserMenu', () => ({ UserMenu: () => <p>The user menu</p> }));
+{{~ end ~}}
+
+// The modules the app finds, as the shell finds them: every src/modules/<module>/routes.tsx.
+const modules = Object.values(
+  import.meta.glob<ModuleRoute>('../modules/*/routes.tsx', { eager: true, import: 'route' }),
+);
+
+/** The first module, for the tests that need one; they run only when the app has a module. */
+function firstModule(): ModuleRoute {
+  const [module] = modules;
+  if (module === undefined) {
+    throw new Error('The app has no module.');
+  }
+  return module;
+}
+
+// Without Vitest's globals, Testing Library does not unmount between tests by itself.
+afterEach(cleanup);
+
+function renderAt(path: string) {
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <App />
+    </MemoryRouter>,
+  );
+}
+
+// The file's first test also pays for warming up jsdom, React and the shell's components.
+test('the sidebar lists the start page and every module from its routes', { timeout: 20_000 }, () => {
+  renderAt('/');
+
+  const navigation = within(screen.getByRole('navigation', { name: 'Modules' }));
+  expect(navigation.getAllByRole('link').map((link) => link.textContent)).toEqual([
+    'Home',
+    ...modules.map((module) => module.title),
+  ]);
+  expect(navigation.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+});
+
+test('the sidebar collapses from its trigger and opens again', async () => {
+  const user = userEvent.setup();
+  renderAt('/');
+  const sidebar = () => document.querySelector('[data-slot="sidebar"]');
+  expect(sidebar()).toHaveAttribute('data-state', 'expanded');
+
+  await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Toggle Sidebar' }));
+  expect(sidebar()).toHaveAttribute('data-state', 'collapsed');
+
+  await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Toggle Sidebar' }));
+  expect(sidebar()).toHaveAttribute('data-state', 'expanded');
+});
+
+test('on the start page the breadcrumbs name only it', () => {
+  renderAt('/');
+
+  const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
+  expect(breadcrumbs.getByText('Home')).toHaveAttribute('aria-current', 'page');
+  expect(breadcrumbs.getByText('Home')).not.toHaveAttribute('href');
+});
+
+test.runIf(modules.length > 0)("the breadcrumbs lead from the start page to a module's page and below it", () => {
+  const module = firstModule();
+  renderAt(`/${module.path}/details`);
+
+  const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
+  expect(breadcrumbs.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
+  expect(breadcrumbs.getByRole('link', { name: module.title })).toHaveAttribute('href', `/${module.path}`);
+  expect(breadcrumbs.getByText('details')).toHaveAttribute('aria-current', 'page');
+});
+
+test.each([
+  ['Ctrl+K', '{Control>}k{/Control}'],
+  ['Cmd+K', '{Meta>}k{/Meta}'],
+])('%s opens the command palette and Escape closes it', async (_, keys) => {
+  const user = userEvent.setup();
+  renderAt('/');
+
+  await user.keyboard(keys);
+  const palette = await screen.findByRole('dialog', { name: 'Go to' });
+  expect(within(palette).getByRole('combobox', { name: 'Go to' })).toHaveFocus();
+  expect(
+    within(palette)
+      .getAllByRole('option')
+      .map((option) => option.textContent),
+  ).toEqual(['Home', ...modules.map((module) => module.title)]);
+
+  await user.keyboard('{Escape}');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test.runIf(modules.length > 0)('the keyboard alone goes to a page from the command palette', async () => {
+  const module = firstModule();
+  const user = userEvent.setup();
+  renderAt('/');
+
+  await user.keyboard('{Control>}k{/Control}');
+  await screen.findByRole('dialog', { name: 'Go to' });
+  await user.keyboard('{ArrowDown}');
+  expect(screen.getByRole('option', { name: module.title })).toHaveAttribute('aria-selected', 'true');
+  await user.keyboard('{Enter}');
+
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(
+    within(screen.getByRole('navigation', { name: 'Modules' })).getByRole('link', { name: module.title }),
+  ).toHaveAttribute('aria-current', 'page');
+});
+
+test('typing narrows the command palette to the pages that match', async () => {
+  const user = userEvent.setup();
+  renderAt('/');
+
+  await user.keyboard('{Control>}k{/Control}');
+  await screen.findByRole('dialog', { name: 'Go to' });
+  await user.keyboard('no such page');
+
+  expect(screen.queryAllByRole('option')).toHaveLength(0);
+  expect(screen.getByText('No page matches.')).toBeInTheDocument();
+});

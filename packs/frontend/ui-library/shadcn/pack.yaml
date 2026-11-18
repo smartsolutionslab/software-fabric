@@ -9,9 +9,11 @@ files:
   - { template: templates/theme/contrast.test.ts.sbn, target: web/app/src/theme/contrast.test.ts }
   - { template: templates/theme/ThemeToggle.tsx.sbn, target: web/app/src/theme/ThemeToggle.tsx }
   - { template: templates/theme/ThemeToggle.test.tsx.sbn, target: web/app/src/theme/ThemeToggle.test.tsx }
+  - { template: templates/shell/notify.test.tsx.sbn, target: web/app/src/lib/notify.test.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
 slots:
   - { slot: web.dependencies, template: templates/dependencies.sbn }
   - { slot: web.dev-dependencies, template: templates/dev-dependencies.sbn }
+  - { slot: web.test-setup, template: templates/test-setup.sbn }
   - { slot: web.styles, template: templates/styles.sbn, order: 15 }
   - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 20 }
   - { slot: web.head, template: templates/head.sbn }
@@ -28,3 +30,4 @@ gates:
   - { kind: unit-test, describes: "Button renders a button in the theme's colours, has the registry's variants and sizes, and with asChild gives its child the button's look instead (src/components/ui/button.test.tsx).", file: templates/button.test.tsx.sbn }
   - { kind: unit-test, describes: "src/theme/contrast.test.ts reads both palettes of src/index.css, with a design system's tokens over them as built (light and dark), and fails when a text colour the components put on a background (foreground, card, popover, primary, secondary, accent, muted-foreground, destructive, sidebar) has less than WCAG AA's 4.5:1 in the light or the dark theme; jsdom computes no colours, so axe cannot.", file: templates/theme/contrast.test.ts.sbn }
   - { kind: unit-test, describes: "The theme toggle follows the system until a choice is made, remembers it, still works with storage blocked, and index.html sets the stored or system theme before the first paint (src/theme/ThemeToggle.test.tsx, src/theme/theme.test.ts).", file: templates/theme/ThemeToggle.test.tsx.sbn }
+  - { kind: unit-test, describes: "With react-router in a single-page app, notify reports a mutation's success in a toast as a status message and its failure as an alert (src/lib/notify.test.tsx).", file: templates/shell/notify.test.tsx.sbn }
