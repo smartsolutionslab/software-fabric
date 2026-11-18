@@ -26,7 +26,7 @@ import { SignedInAsDeveloper } from '@/auth/SignedInAsDeveloper';
 import { createAppRouter } from '@/router';
 {{~ end ~}}
 {{~ if stands_in ~}}
-import { emptyExamples, examples } from './{{ module.namespace }}Page.data';
+import * as data from './{{ module.namespace }}Page.data';
 {{~ end ~}}
 {{~ if !tanstack ~}}
 import { {{ module.namespace }}Page } from './{{ module.namespace }}Page';
@@ -129,6 +129,12 @@ vi.mock('@/api/generated', async (importOriginal) => {
 });
 {{~ end ~}}
 
+{{~ if stands_in ~}}
+const { examples } = data;
+// A data file written before it had an empty example (#734) has none: the page is then not checked with nothing to show.
+const emptyExamples = (data as { emptyExamples?: Record<string, unknown> }).emptyExamples ?? {};
+
+{{~ end ~}}
 // Whatever else asks the host waits for an answer that never comes.
 vi.stubGlobal('fetch', () => new Promise<Response>(() => undefined));
 
