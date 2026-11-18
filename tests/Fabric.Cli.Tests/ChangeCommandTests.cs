@@ -57,6 +57,36 @@ public sealed class ChangeCommandTests : IDisposable
     }
 
     [Fact]
+    public void A_project_changed_from_inter_to_geist_imports_and_names_geist_and_keeps_an_edit_elsewhere()
+    {
+        Read(Styles).ShouldContain("@import '@fontsource-variable/inter';");
+        Write("README.md", Read("README.md") + OwnNotes);
+        Git.Commit(project, "our notes");
+
+        var run = Change("--set", "frontend.font=geist");
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldStartWith("changed shop's frontend.font from inter to geist; nothing is committed.");
+        run.Output.ShouldContain($"  M {Styles}");
+        run.Output.ShouldContain("  M web/app/package.json");
+        run.Output.ShouldNotContain("conflict");
+        Git.Run(project, "ls-files", "-u").ShouldBeEmpty();
+
+        var styles = Read(Styles);
+        styles.ShouldContain("@import '@fontsource-variable/geist';");
+        styles.ShouldContain("--font-sans: 'Geist Variable',");
+        styles.ShouldNotContain("@fontsource-variable/inter");
+        styles.ShouldNotContain("'Inter Variable'");
+        Read("web/app/package.json").ShouldContain("\"@fontsource-variable/geist\":");
+        Read("fabric.yaml").ShouldContain("\n  frontend.font: geist\n", Case.Sensitive);
+        Read("README.md").ShouldEndWith(OwnNotes);
+
+        var fresh = Fresh("--set", "frontend.font=geist");
+        fresh["README.md"] += OwnNotes;
+        Tree(project).ShouldBe(fresh);
+    }
+
+    [Fact]
     public void A_dimension_the_catalog_does_not_mark_changeable_is_refused_by_name_and_the_project_left_untouched()
     {
         var head = Git.Run(project, "rev-parse", "HEAD");
