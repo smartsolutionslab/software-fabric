@@ -22,7 +22,10 @@ files:
   # The screens' axe checks (frontend.test.extras accessibility, #661) render a screen for the local user developer, signed in, through these; the provider's names stay in this pack.
   - { template: templates/SignedInAsDeveloper.tsx.sbn, target: web/app/src/auth/SignedInAsDeveloper.tsx, when: 'project["frontend.framework"] == "react" && object.has_key(project, "frontend.test.extras") && array.contains(project["frontend.test.extras"], "accessibility") && project["frontend.architecture"] == "spa"' }
   - { template: templates/signedInAsDeveloper.ts.sbn, target: web/app/src/auth/signedInAsDeveloper.ts, when: 'project["frontend.framework"] == "vue" && object.has_key(project, "frontend.test.extras") && array.contains(project["frontend.test.extras"], "accessibility") && project["frontend.architecture"] == "spa"' }
+  # The app shell's user menu (#695): the name the host's /me answers and Sign out, in the sidebar of shadcn's or shadcn-vue's shell.
+  - { template: templates/shell/UserMenu.tsx.sbn, target: web/app/src/auth/UserMenu.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
   - { template: templates/shell/UserMenu.test.tsx.sbn, target: web/app/src/auth/UserMenu.test.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/UserMenu.vue.sbn, target: web/app/src/auth/UserMenu.vue, when: 'project["frontend.ui-library"] == "shadcn-vue" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "vue-router"' }
   - { template: templates/shell/UserMenu.test.ts.sbn, target: web/app/src/auth/UserMenu.test.ts, when: 'project["frontend.ui-library"] == "shadcn-vue" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "vue-router"' }
 slots:
   - { slot: templates.functions, template: templates/functions.sbn }
@@ -32,6 +35,9 @@ slots:
   - { slot: web.env, template: templates/env.sbn }
   - { slot: web.api-imports, template: templates/api-import.sbn }
   - { slot: web.api-headers, template: templates/api-headers.sbn }
+  # After the UI library's controls (the theme toggle): the user menu is the shell's last.
+  - { slot: web.shell-imports, template: templates/shell-import.sbn, order: 10 }
+  - { slot: web.shell-actions, template: templates/shell-action.sbn, order: 10 }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

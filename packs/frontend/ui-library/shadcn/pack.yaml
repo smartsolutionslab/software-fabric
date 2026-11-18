@@ -9,6 +9,20 @@ files:
   - { template: templates/theme/contrast.test.ts.sbn, target: web/app/src/theme/contrast.test.ts }
   - { template: templates/theme/ThemeToggle.tsx.sbn, target: web/app/src/theme/ThemeToggle.tsx }
   - { template: templates/theme/ThemeToggle.test.tsx.sbn, target: web/app/src/theme/ThemeToggle.test.tsx }
+  # The app shell (#695), in a single-page app with react-router: the registry's sidebar and what it uses, breadcrumbs,
+  # the command palette (cmdk) and toasts (sonner), which src/lib/notify.tsx reports a mutation's result in.
+  - { template: templates/shell/sidebar.tsx.sbn, target: web/app/src/components/ui/sidebar.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/sheet.tsx.sbn, target: web/app/src/components/ui/sheet.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/tooltip.tsx.sbn, target: web/app/src/components/ui/tooltip.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/separator.tsx.sbn, target: web/app/src/components/ui/separator.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/input.tsx.sbn, target: web/app/src/components/ui/input.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/skeleton.tsx.sbn, target: web/app/src/components/ui/skeleton.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/breadcrumb.tsx.sbn, target: web/app/src/components/ui/breadcrumb.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/command.tsx.sbn, target: web/app/src/components/ui/command.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/dialog.tsx.sbn, target: web/app/src/components/ui/dialog.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/sonner.tsx.sbn, target: web/app/src/components/ui/sonner.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/use-mobile.ts.sbn, target: web/app/src/hooks/use-mobile.ts, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
+  - { template: templates/shell/notify.tsx.sbn, target: web/app/src/lib/notify.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
   - { template: templates/shell/notify.test.tsx.sbn, target: web/app/src/lib/notify.test.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
 slots:
   - { slot: web.dependencies, template: templates/dependencies.sbn }

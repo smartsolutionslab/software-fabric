@@ -1,0 +1,49 @@
+{{~ if project["frontend.framework"] == "react" ~}}
+import { useGetMe } from '@/api/generated';
+
+/** The signed-in user's name as the host's /me answers it; undefined until it has answered, or when it names nobody. */
+export function useCurrentUser(): string | undefined {
+  const { data } = useGetMe();
+  return data?.name ?? undefined;
+}
+{{~ else if project["frontend.state"] == "pinia" ~}}
+import { defineStore } from 'pinia';
+import { computed, onMounted, ref, type ComputedRef } from 'vue';
+import { getMe } from '@/api/generated';
+
+/** Who is signed in, as the host's /me answers it: asked once, by the first component that needs it. */
+export const useCurrentUserStore = defineStore('current-user', () => {
+  const name = ref<string | undefined>();
+  let asked = false;
+
+  async function load() {
+    if (asked) {
+      return;
+    }
+    asked = true;
+    try {
+      name.value = (await getMe()).name ?? undefined;
+    } catch {
+      // Without an answer the menu names nobody; it still signs the user out.
+    }
+  }
+
+  return { name, load };
+});
+
+/** The signed-in user's name as the host's /me answers it; undefined until it has answered, or when it names nobody. */
+export function useCurrentUser(): ComputedRef<string | undefined> {
+  const currentUser = useCurrentUserStore();
+  onMounted(() => void currentUser.load());
+  return computed(() => currentUser.name);
+}
+{{~ else ~}}
+import { computed, type ComputedRef } from 'vue';
+import { useGetMe } from '@/api/generated';
+
+/** The signed-in user's name as the host's /me answers it; undefined until it has answered, or when it names nobody. */
+export function useCurrentUser(): ComputedRef<string | undefined> {
+  const me = useGetMe();
+  return computed(() => me.data.value?.name ?? undefined);
+}
+{{~ end ~}}

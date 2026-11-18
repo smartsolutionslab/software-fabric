@@ -1,0 +1,20 @@
+<script setup lang="ts">
+import { LogOutIcon } from '@lucide/vue';
+import { useCurrentUser } from '@/api/useCurrentUser';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/auth/useAuth';
+
+// The app shell's user menu: who is signed in, as the host's /me names them, and Sign out.
+const { signoutRedirect } = useAuth();
+const name = useCurrentUser();
+</script>
+
+<template>
+  <div class="flex items-center justify-between gap-2 px-2 text-sm">
+    <span class="truncate">{{ "{{" }} name === undefined ? 'Signed in' : `Signed in as ${name}` {{ "}}" }}</span>
+    <Button variant="ghost" size="sm" @click="signoutRedirect()">
+      <LogOutIcon />
+      Sign out
+    </Button>
+  </div>
+</template>
