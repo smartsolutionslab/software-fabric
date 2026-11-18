@@ -1,0 +1,2 @@
+// The service's own database on the one server, named after its module.
+var database = sqlServer.AddDatabase($"{module}-database", module);

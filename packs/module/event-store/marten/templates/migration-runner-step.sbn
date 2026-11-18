@@ -1,1 +1,1 @@
-await host.Services.ApplyEventStoreSchemasAsync();
+await host.Services.ApplyEventStoreSchemasAsync({{ if project["backend.topology"] == "services" }}infrastructure{{ end }});

@@ -3,9 +3,19 @@ var postgres = builder.AddPostgres("postgres")
     .WithImage("pgvector/pgvector", "0.8.7-pg18");
 // Aspire places the data volume by the major version in the image tag, which pgvector's tag does not carry; PostgreSQL 18
 // keeps its data under /var/lib/postgresql and refuses to start over a mount at the older /var/lib/postgresql/data.
+{{- if project["backend.topology"] == "services" }}
+// The server alone: every service gets a database of its own on it, in the AppHost's loop over the services.
+postgres
+    .WithVolume(VolumeNameGenerator.Generate(postgres, "data"), "/var/lib/postgresql");
+{{- else }}
 var database = postgres
     .WithVolume(VolumeNameGenerator.Generate(postgres, "data"), "/var/lib/postgresql")
     .AddDatabase("database");
+{{- end -}}
+{{- else if project["backend.topology"] == "services" -}}
+// The server alone: every service gets a database of its own on it, in the AppHost's loop over the services.
+var postgres = builder.AddPostgres("postgres")
+    .WithDataVolume();
 {{- else -}}
 var database = builder.AddPostgres("postgres")
     .WithDataVolume()

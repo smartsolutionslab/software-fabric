@@ -2,6 +2,19 @@ using System.Reflection;
 using {{ namespace }}.BuildingBlocks.Persistence;
 using Microsoft.EntityFrameworkCore;
 
+{{~ if project["backend.topology"] == "services" ~}}
+// Applies one module's migrations to its service's own database, then exits; the AppHost runs this once per service,
+// naming the module in Migrations:Module, and starts the service only after its run completes.
+var builder = Host.CreateApplicationBuilder(args);
+builder.AddServiceDefaults();
+
+var module = builder.Configuration["Migrations:Module"]
+    ?? throw new InvalidOperationException("Migrations:Module is missing; the AppHost names the module whose database this run migrates.");
+var infrastructure = Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, $"{{ namespace }}.Modules.{Namespace(module)}.Infrastructure.dll"));
+var contexts = infrastructure.GetTypes()
+    .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(ModuleDbContext).IsAssignableFrom(type))
+    .ToList();
+{{~ else ~}}
 // Applies every module's migrations, then exits; the AppHost starts the host only after this completes.
 var builder = Host.CreateApplicationBuilder(args);
 builder.AddServiceDefaults();
@@ -12,6 +25,7 @@ var contexts = Directory.EnumerateFiles(AppContext.BaseDirectory, "{{ namespace 
     .SelectMany(assembly => assembly.GetTypes())
     .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(ModuleDbContext).IsAssignableFrom(type))
     .ToList();
+{{~ end ~}}
 
 foreach (var context in contexts)
 {
@@ -29,4 +43,8 @@ foreach (var context in contexts)
     await ((ModuleDbContext)scope.ServiceProvider.GetRequiredService(context)).MigrateModuleAsync();
 }{{ if slots["migration-runner.steps"] != "" }}
 
-{{ slots["migration-runner.steps"] }}{{ end }}
+{{ slots["migration-runner.steps"] }}{{ end }}{{ if project["backend.topology"] == "services" }}
+
+// The module's namespace, as fabric writes it from the module's name: order-handling is OrderHandling.
+static string Namespace(string module) =>
+    string.Concat(module.Split('-', StringSplitOptions.RemoveEmptyEntries).Select(part => char.ToUpperInvariant(part[0]) + part[1..]));{{ end }}

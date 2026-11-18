@@ -7,6 +7,10 @@ var host = {{ slots["apphost.host"] }}{{ slots["apphost.edge-wiring"] }};
 
 foreach (var (module, project) in builder.ServiceHosts())
 {
+{{~ if slots["apphost.service-resources"] != "" ~}}
+    {{ slots["apphost.service-resources"] }}
+
+{{~ end ~}}
     // Every service's launch profile names the same port; under the AppHost each gets one of its own.
     var service = builder.AddProject(module, project)
         .WithEndpoint("http", endpoint => endpoint.Port = null)

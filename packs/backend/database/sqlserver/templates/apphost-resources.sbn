@@ -1,3 +1,9 @@
+{{- if project["backend.topology"] == "services" -}}
+// The server alone: every service gets a database of its own on it, in the AppHost's loop over the services.
+var sqlServer = builder.AddSqlServer("sqlserver")
+    .WithDataVolume();
+{{- else -}}
 var database = builder.AddSqlServer("sqlserver")
     .WithDataVolume()
     .AddDatabase("database");
+{{- end }}
