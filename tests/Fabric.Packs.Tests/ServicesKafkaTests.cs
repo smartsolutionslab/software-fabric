@@ -106,6 +106,34 @@ public sealed class ServicesKafkaTests
     }
 
     [Fact]
+    public void With_services_every_architecture_rule_that_builds_a_service_host_gives_it_a_consumer_group()
+    {
+        var files = WithModules(Services, "billing", "shipping");
+
+        var rules = files.Where(file => file.Key.StartsWith("tests/Architecture.Tests/Rules/", StringComparison.Ordinal)
+            && file.Value.Contains("UseSetting(\"ConnectionStrings:messaging\"", StringComparison.Ordinal)).ToList();
+        rules.ShouldNotBeEmpty();
+        foreach (var (path, content) in rules)
+        {
+            content.ShouldContain("builder.UseSetting(\"Messaging:ConsumerGroup\", \"unused\");", customMessage: $"{path} builds a service host, which fails without Messaging:ConsumerGroup.");
+        }
+    }
+
+    [Fact]
+    public void A_services_project_with_kafka_passes_its_architecture_tests()
+    {
+        using var project = new GeneratedProject(Profile, Services);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+    }
+
+    [Fact]
     public void One_event_published_over_kafka_reaches_every_service_that_consumes_it_under_the_AppHost()
     {
         using var project = new GeneratedProject(Profile, Services);
