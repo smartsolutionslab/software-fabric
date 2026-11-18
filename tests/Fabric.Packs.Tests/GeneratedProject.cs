@@ -49,6 +49,36 @@ internal sealed partial class GeneratedProject : IDisposable
         ProjectWriter.Add(ProjectDirectory, addition.Created, addition.FabricYaml!, addition.OpenApi).ShouldBeNull();
     }
 
+    /// <summary>
+    /// Drops the module's sample (#734) as AGENTS.md says: every file and folder with Sample in its name in the module and
+    /// its tests, its integration test and its Migrations folder. For a test that needs the module without it.
+    /// </summary>
+    public void DeleteSample(string module)
+    {
+        var name = Core.Generation.Names.ToPascalCase(module);
+        string[] roots = [Path.Combine(ProjectDirectory, "src", "Modules", name), Path.Combine(ProjectDirectory, "tests", "Modules", name + ".Tests")];
+        foreach (var root in roots.Where(Directory.Exists))
+        {
+            foreach (var directory in Directory.EnumerateDirectories(root, "*Sample*", SearchOption.AllDirectories).ToList().Where(Directory.Exists))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+
+            foreach (var file in Directory.EnumerateFiles(root, "*Sample*", SearchOption.AllDirectories).ToList())
+            {
+                File.Delete(file);
+            }
+        }
+
+        var migrations = Path.Combine(ProjectDirectory, "src", "Modules", name, name + ".Infrastructure", "Migrations");
+        if (Directory.Exists(migrations))
+        {
+            Directory.Delete(migrations, recursive: true);
+        }
+
+        File.Delete(Path.Combine(ProjectDirectory, "tests", "Integration.Tests", name + "SamplesTests.cs"));
+    }
+
     public void Write(string relativePath, string content)
     {
         var path = Path.Combine(ProjectDirectory, relativePath);

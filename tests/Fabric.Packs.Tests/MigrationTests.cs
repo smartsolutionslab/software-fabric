@@ -33,7 +33,7 @@ public sealed class MigrationTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
-        DeleteTheSamplesTable(project);
+        project.DeleteSample("billing");
         project.Build();
 
         using var postgres = Container.Postgres(DatabasePassword);
@@ -256,13 +256,6 @@ public sealed class MigrationTests
             }
 
             """);
-    }
-
-    /// <summary>The sample's migrations and its table's mapping deleted, as AGENTS.md says to drop the sample: the module's model is empty again.</summary>
-    internal static void DeleteTheSamplesTable(GeneratedProject project)
-    {
-        Directory.Delete(Path.Combine(project.ProjectDirectory, "src/Modules/Billing/Billing.Infrastructure/Migrations"), recursive: true);
-        File.Delete(Path.Combine(project.ProjectDirectory, "src/Modules/Billing/Billing.Infrastructure/Persistence/Configurations/SampleConfiguration.cs"));
     }
 
     /// <summary>A Note entity in billing, a migration creating its table made with the EF tool, and a build.</summary>

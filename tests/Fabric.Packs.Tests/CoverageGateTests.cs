@@ -41,6 +41,8 @@ public sealed class CoverageGateTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
+        // Without the module's well-tested sample (#734), which would carry the untested method over the line.
+        project.DeleteSample("billing");
         project.Write($"{directory}/Discount.cs", Discount(layer));
         project.Build();
 

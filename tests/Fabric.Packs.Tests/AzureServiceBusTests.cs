@@ -171,7 +171,8 @@ public sealed class AzureServiceBusTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("succeeded: 11");
+        // The project's own integration tests and the billing sample's five (#734).
+        output.ShouldContain("succeeded: 16");
     }
 
     [Fact]

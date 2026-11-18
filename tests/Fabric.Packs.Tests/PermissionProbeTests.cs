@@ -344,7 +344,7 @@ public sealed partial class PermissionProbeTests
             .Select(path => path.Key)
             .ToList();
 
-        paths.IndexOf("/billing/permissions/manage").ShouldBe(paths.IndexOf("/assistant/samples/{id}") + 1);
+        paths.IndexOf("/billing/permissions/manage").ShouldBe(paths.IndexOf("/assistant/permissions/manage") + 1);
         paths.IndexOf("/billing/samples").ShouldBe(paths.IndexOf("/billing/permissions/manage") + 1);
         paths.IndexOf("/dashboards/permissions/manage").ShouldBe(paths.IndexOf("/billing/samples/{id}") + 1);
         paths[^3].ShouldBe("/zeta/permissions/manage");
