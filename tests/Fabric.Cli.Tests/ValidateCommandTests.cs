@@ -9,8 +9,10 @@ public class ValidateCommandTests
 
         run.ExitCode.ShouldBe(0);
         run.Output.ShouldStartWith("valid: profile saas-standard-react");
-        // Its one experimental option is the default colour scheme (#694), until a nightly matrix run promotes it.
-        run.Error.ShouldBe($"warning: frontend.color-scheme=blue is experimental (ADR-0003): it is generated, but not yet passing the test matrix.{Environment.NewLine}");
+        // Its experimental options are the default colour scheme (#694) and font (#699), until a nightly matrix run promotes them.
+        run.Error.ShouldBe(
+            $"warning: frontend.color-scheme=blue is experimental (ADR-0003): it is generated, but not yet passing the test matrix.{Environment.NewLine}" +
+            $"warning: frontend.font=inter is experimental (ADR-0003): it is generated, but not yet passing the test matrix.{Environment.NewLine}");
     }
 
     [Fact]
