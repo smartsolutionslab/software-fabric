@@ -211,10 +211,14 @@ public sealed partial class ColorSchemeTests
         agents.ShouldContain("`frontend.color-scheme`");
         agents.ShouldContain("never edit a colour of them by hand");
         agents.ShouldContain("`fabric upgrade`");
+        agents.ShouldContain("`fabric change --set frontend.color-scheme=<scheme>`");
+        agents.ShouldNotContain("decision record of its own");
         var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith($"color-scheme-{scheme}.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("apps/v4/registry/themes.ts");
         adr.ShouldContain("4.5:1");
-        files.Single(file => file.Key.EndsWith("ui-library-" + library, StringComparison.Ordinal)).Value.ShouldContain("`frontend.color-scheme`");
+        adr.ShouldContain("`fabric change --set frontend.color-scheme=<scheme>`");
+        var libraryAdr = files.Single(file => file.Key.EndsWith("ui-library-" + library, StringComparison.Ordinal)).Value;
+        libraryAdr.ShouldContain("`frontend.color-scheme`");
     }
 
     /// <summary>
