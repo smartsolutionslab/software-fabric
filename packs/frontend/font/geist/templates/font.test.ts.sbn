@@ -1,0 +1,59 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
+import { expect, test } from 'vitest';
+
+// Read from disk, relative to web/app where Vitest runs: Vitest hands a test a stylesheet empty, even with ?raw.
+const styles = readFileSync('src/index.css', 'utf8');
+const page = readFileSync('index.html', 'utf8');
+const packages = createRequire(import.meta.url);
+
+// fabric.yaml's font (frontend.font): the packages index.css imports, with the family their faces declare.
+const fonts = [
+  { name: '@fontsource-variable/geist', family: 'Geist Variable' },
+  { name: '@fontsource-variable/geist-mono', family: 'Geist Mono Variable' },
+];
+// The theme variables that name the font first.
+const theme = [
+  { variable: 'font-sans', family: 'Geist Variable' },
+  { variable: 'font-mono', family: 'Geist Mono Variable' },
+];
+
+/** A URL the browser would fetch from another host: https://…, //… or any other scheme with a host. */
+const remote = /^(?:[a-z][a-z\d+.-]*:)?\/\//i;
+
+/** Every URL a stylesheet loads: its imports, quoted or in url(), and its other url()s. */
+function urls(stylesheet: string): string[] {
+  return [
+    ...[...stylesheet.matchAll(/@import\s+['"]([^'"]+)['"]/g)].map(([, url = '']) => url),
+    ...[...stylesheet.matchAll(/url\(\s*['"]?([^'")\s]+)/g)].map(([, url = '']) => url),
+  ];
+}
+
+// The font ships with the app: a font host (Google Fonts, a CDN) would learn every visitor's address, and the page
+// would depend on a host the project does not run.
+test('index.css and index.html load nothing from another host', () => {
+  const links = [...page.matchAll(/\b(?:href|src)="([^"]+)"/g)].map(([, url = '']) => url);
+
+  expect([...urls(styles), ...links].filter((url) => remote.test(url))).toEqual([]);
+});
+
+test.each(fonts)('index.css imports $name, and every face of $family is a file of the package', ({ name, family }) => {
+  expect(urls(styles)).toContain(name);
+
+  const stylesheet = packages.resolve(name);
+  const css = readFileSync(stylesheet, 'utf8');
+  const faces = [...css.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(([, face = '']) => face);
+  expect(faces).not.toEqual([]);
+  for (const face of faces) {
+    expect(face).toContain(`font-family: '${family}';`);
+    for (const url of urls(face)) {
+      expect(url).not.toMatch(remote);
+      expect(existsSync(resolve(dirname(stylesheet), url))).toBe(true);
+    }
+  }
+});
+
+test.each(theme)('the theme names $family first in --$variable', ({ family, variable }) => {
+  expect(styles).toContain(`--${variable}: '${family}', `);
+});

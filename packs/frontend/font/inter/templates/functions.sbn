@@ -1,0 +1,9 @@
+func font_imports
+  ret "@import '@fontsource-variable/inter';"
+end
+func font_sans
+  ret "'Inter Variable', ui-sans-serif, system-ui, sans-serif"
+end
+func font_mono
+  ret "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+end

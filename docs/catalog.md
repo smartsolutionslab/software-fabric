@@ -412,6 +412,18 @@ Settings:
 | `tokens-and-components` | supported | `frontend.framework == react`, `frontend.styling == tailwind` | — | `industrial-event-driven-mfe` | tokens plus an own component package with Storybook |
 | `web-components` | experimental | — | — | — | tokens plus Lit web components with Storybook, framework-neutral |
 
+### `frontend.font`
+
+- Scope: project
+- Active when: `frontend.ui-library in (shadcn, shadcn-vue)`
+- Default: `inter`
+- Note: The app's typeface: a variable font (SIL Open Font License) installed from npm and bundled with the app, never loaded from a font host, under the theme's type scale (display, title, body, caption).
+
+| Option | Tier | Requires | Conflicts | Profiles | Note |
+|---|---|---|---|---|---|
+| `geist` | experimental | — | — | — | with Geist Mono for monospace text (identifiers, codes) |
+| `inter` | experimental | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
+
 ### `frontend.forms`
 
 - Scope: project

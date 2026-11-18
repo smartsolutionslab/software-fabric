@@ -1,0 +1,13 @@
+option: frontend.font.geist
+files:
+  # The font's gate: nothing from another host, every face a file of the package.
+  - { template: templates/font.test.ts.sbn, target: web/app/src/theme/font.test.ts }
+slots:
+  - { slot: web.dependencies, template: templates/dependencies.sbn }
+  # The font vocabulary: the UI library's theme calls it.
+  - { slot: templates.functions, template: templates/functions.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "src/theme/font.test.ts fails when index.html or src/index.css loads anything from another host (a font CDN such as Google Fonts), when index.css does not import the font's package, when one of the package's faces is not a file of the package, or when the theme's --font-sans and --font-mono do not name Geist and Geist Mono first.", file: templates/font.test.ts.sbn }
