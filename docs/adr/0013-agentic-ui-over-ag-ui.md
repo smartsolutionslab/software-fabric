@@ -1,6 +1,8 @@
 # ADR-0013: Agentic UI over AG-UI
 
-**Status:** Accepted
+**Status:** Accepted. Amended (owner, 2026-11-18, #707): with the services
+topology, the owning service speaks AG-UI and the edge forwards, see the
+amendment at the end.
 **Date:** 2026-11-05
 
 ## Context
@@ -66,7 +68,9 @@ owner on 2026-11-05. Each recommendation was accepted
       itself, against ADR-0011's rule that a command or query runs an agent.
     - It brings `OpenTelemetry.Api` 1.18.0, while the base pins 1.17.0.
   - **One endpoint, `POST /agents/{name}`, in the host**, added through
-    `host.services` and `host.endpoints` as the SignalR hub is (#155). It
+    `host.services` and `host.endpoints` as the SignalR hub is (#155).
+    (Amended 2026-11-18 for the services topology; see the amendment at the
+    end.) It
     requires sign-in unless `backend.auth: none`. It reads the AG-UI
     `RunAgentInput` and sends the named agent's `IAgentConversation` query
     through `IDispatcher`. The handler runs the agent and returns its updates
@@ -294,3 +298,23 @@ Read on 2026-11-05:
 - What `none`'s gates cannot see: the host, which the architecture tests do
   not load, and a client written by hand against the AG-UI wire format
   without either library.
+
+## Amendment (owner, 2026-11-18): AG-UI with the services topology (#707)
+
+ADR-0017 runs each module in a service host of its own behind an edge,
+`src/Edge`, which runs no module code. This ADR's one endpoint "in the host"
+assumes the single host of a modular monolith, where the endpoint sends the
+agent's query through `IDispatcher` in process. The owner decided on #707
+(comments of 2026-11-18, and its **Decisions** section); ADR-0017's
+amendment of the same date records it for the topology. The text above
+stands for a modular monolith; with services, where this section differs, it
+takes precedence.
+
+- **The owning service speaks AG-UI**, at `POST /{module}/agents/{name}`,
+  in its own service host.
+- **The edge forwards `POST /agents/{name}`** to the owning service. It
+  learns a route table, agent name to owning service, from the services at
+  startup, and reads it with a **client-credentials client of its own**, not
+  through an anonymous internal endpoint.
+- The conflict between `frontend.agent-ui == ag-ui` and `services` is lifted
+  by #769, the issue that builds this.

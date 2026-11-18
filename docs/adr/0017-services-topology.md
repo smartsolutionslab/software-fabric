@@ -1,6 +1,8 @@
 # ADR-0017: The services topology
 
-**Status:** Accepted (owner, 2026-11-17: D1 to D7 decided, see the end)
+**Status:** Accepted (owner, 2026-11-17: D1 to D7 decided, see the end).
+Amended (owner, 2026-11-18, #707): the singletons with services, see the
+amendment at the end.
 **Date:** 2026-11-17
 
 ## Context
@@ -52,7 +54,9 @@ out of scope (see Alternatives).
    project of its own (D1), using Aspire service discovery. The route table is built at startup from the
    same convention that names the services, so it has no line per module.
 2. **Hosts what exists once per application**: `/me`, the SignalR or SSE
-   hub, the MCP server and the AG-UI endpoint.
+   hub, the MCP server and the AG-UI endpoint. (Amended 2026-11-18: the edge
+   hosts no MCP server, and AG-UI is spoken by the owning service and
+   forwarded by the edge; see the amendment at the end.)
 
 The frontend, the OpenAPI copy and the end-to-end tests see one origin, as
 they do in the monolith. Module paths already start with the module's name,
@@ -75,7 +79,8 @@ Packs that contribute a singleton branch on the topology (ADR-0006) and
 contribute to `edge.*` instead of `host.*` when it is `services`: `base/core`
 (`/me`), `frontend/realtime/signalr`, `frontend/realtime/sse`,
 `frontend/agent-ui/ag-ui` and `backend/mcp/server`. The tenancy packs need no
-branch, since `services` requires `backend.tenancy == none` (D3).
+branch, since `services` requires `backend.tenancy == none` (D3). (Amended
+2026-11-18 for the MCP server and AG-UI; see the amendment at the end.)
 
 ### The AppHost discovers services by convention
 
@@ -89,7 +94,9 @@ modules.
 `apphost.host-wiring` keeps its meaning too: its chained calls (references
 to the bus, Keycloak, the LLM, `.WaitFor(...)`) apply to every service host
 inside the loop. A new slot `apphost.edge-wiring` takes the calls the edge
-needs (Keycloak, the hub's backplane, the web app's reference).
+needs (Keycloak, the hub's backplane, the web app's reference). (Amended
+2026-11-18: realtime events reach the edge over the project's bus, with no
+backplane; see the amendment at the end.)
 
 ### Data and messaging per service
 
@@ -119,7 +126,8 @@ audience for the whole API (D4).
 - `EveryServiceHostRunsExactlyOneModule`: the scan in each host finds one
   `IModule`.
 - `SingletonsLiveOnTheEdge`: no service host maps `/me`, a hub, MCP or
-  AG-UI.
+  AG-UI. (Amended 2026-11-18: a service maps its own MCP server and AG-UI
+  endpoint under its module's path; see the amendment at the end.)
 - The pairwise matrix includes `services`; the nightly run promotes it to
   supported (ADR-0003). The profile `saas-services-vue` (D6) keeps the
   combination generated and tested end to end, with at least two services
@@ -148,7 +156,9 @@ never picks it:
   `frontend.agent-ui == ag-ui` conflict with `services` for now: each of them
   would map its endpoint in every service host, which `SingletonsLiveOnTheEdge`
   forbids. #707 moves them to `edge.*` and lifts these conflicts in the same
-  change.
+  change. (Amended 2026-11-18: each conflict is lifted in its own sub-issue of
+  #707, and the MCP server and AG-UI do not move to the edge as such; see the
+  amendment at the end.)
 
 What does work with services: the model and embeddings rules check every
 service host's `Program.cs`; agent-framework's endpoint rule starts every
@@ -195,3 +205,61 @@ recommended in the proposal unless stated otherwise.
 | D5 | Protocols | `rest` only: `services` conflicts with `grpc` in V1 |
 | D6 | Tested profile | `saas-services-vue` |
 | D7 | Pilot | PharmaTraining waits for the pack and is generated with `services` as soon as the option builds (experimental), not as a monolith first. That makes "the pack generates a running seven-service project" the pilot's entry gate. |
+
+## Amendment (owner, 2026-11-18): the singletons with services (#707)
+
+The Decision above puts `/me`, the SignalR hub or SSE stream, the MCP server
+and the AG-UI endpoint on the edge. `/me` moved there with #705. The other
+three each reach module code in process in a monolith host: a module's
+consumers send browser events through `IBrowserEvents`, the AG-UI endpoint
+sends the agent's query through `IDispatcher`, and the MCP server dispatches
+the `[McpTool]` requests. The edge runs no module code, and the Decision
+did not say how the hub's events reach it, beyond naming a backplane.
+
+The owner decided on #707 (comments of 2026-11-18, and its **Decisions**
+section). The text above stands; where this section differs, it takes
+precedence.
+
+- **MCP server: the edge hosts none.** With services, each service is its
+  own MCP server, at `/{module}/mcp`. `backend/mcp/server` contributes
+  nothing to `edge.*`. The MCP server tests are generated once per service,
+  each project starting its own service host and testing that service's
+  `/{module}/mcp`; with the modular monolith, `tests/Mcp.Server.Tests` stays
+  as it is, one project against `src/Host`.
+- **AG-UI: spoken by the owning service, forwarded by the edge.** With
+  services, the service that owns an agent speaks AG-UI, at
+  `POST /{module}/agents/{name}`. The edge learns a route table, agent name
+  to owning service, from the services at startup, and forwards
+  `POST /agents/{name}` with it. The edge reads that table with a
+  **client-credentials client of its own**, not through an anonymous
+  internal endpoint.
+- **Realtime: over the bus.** With services, a service's `IBrowserEvents`
+  publishes a browser-event message on the project's bus, and the edge
+  consumes it and pushes it to the browsers connected to its hub or stream.
+  The message is `BrowserEventV1`, in the BuildingBlocks: non-durable, and
+  not an integration event. No new AppHost resource is added; there is no
+  backplane. The edge is on the broker only when a realtime option is
+  chosen.
+- **One edge replica in V1**, decided with the realtime message: V1
+  supports one edge replica.
+- **The endpoints a service maps under its own module's path**,
+  `/{module}/mcp` and `/{module}/agents/{name}`, are that service's, not
+  singletons the edge hosts.
+- **The conflicts are lifted one by one.** The "Options services refuse
+  (#723)" section says #707 lifts all four in one change. Instead, each
+  conflict is lifted in the sub-issue of #707 that makes its option work:
+
+  | Issue | Does |
+  |---|---|
+  | #764 | These amendments, to this ADR, ADR-0013 and ADR-0010 |
+  | #765 | A service host knows its module's route name |
+  | #766 | The MCP server per service; lifts `backend.mcp has server` |
+  | #767 | The edge on the bus |
+  | #768 | SignalR and SSE on the edge; lift `frontend.realtime == signalr` and `== sse` |
+  | #769 | The AG-UI forward; lifts `frontend.agent-ui == ag-ui` |
+
+  The MCP client's `DeclaredServers` under services is #759. #707 closes when
+  its sub-issues have merged.
+
+ADR-0013 (AG-UI) and ADR-0010 (the MCP server) state the same for services,
+in amendments of their own.
