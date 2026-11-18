@@ -21,7 +21,7 @@
     schemas = schemas | array.add (permission | string.rstrip)
   end
   for chosen in modules
-    if chosen.name != "dashboards"
+    if chosen.name != "dashboards" && chosen.name != "assistant"
       capture sample
 ~}}
       "{{ chosen.namespace }}SampleDto": {

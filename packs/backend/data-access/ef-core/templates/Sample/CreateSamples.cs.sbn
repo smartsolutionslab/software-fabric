@@ -5,6 +5,8 @@
 {{~ sqlserver = project["backend.database"] == "sqlserver" ~}}
 {{~ # The tenant column pack adds a TenantId to every table; a schema per tenant keeps tenants apart without one. ~}}
 {{~ tenant_column = project["backend.tenancy"] == "column" ~}}
+{{~ # The module's schema, as its DbContext names it. ~}}
+{{~ schema = module.name | string.replace "-" "_" ~}}
 using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
@@ -19,11 +21,11 @@ public partial class _20261118000000_CreateSamples : Migration
     protected override void Up(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.EnsureSchema(
-            name: "{{ module.name }}");
+            name: "{{ schema }}");
 
         migrationBuilder.CreateTable(
             name: "{{ table }}",
-            schema: "{{ module.name }}",
+            schema: "{{ schema }}",
             columns: table => new
             {
                 id = table.Column<Guid>(type: "{{ sqlserver ? "uniqueidentifier" : "uuid" }}", nullable: false),
@@ -38,7 +40,7 @@ public partial class _20261118000000_CreateSamples : Migration
 
         migrationBuilder.CreateIndex(
             name: "IX_{{ table }}_TenantId",
-            schema: "{{ module.name }}",
+            schema: "{{ schema }}",
             table: "{{ table }}",
             column: "TenantId");
 {{~ end ~}}
@@ -49,6 +51,6 @@ public partial class _20261118000000_CreateSamples : Migration
     {
         migrationBuilder.DropTable(
             name: "{{ table }}",
-            schema: "{{ module.name }}");
+            schema: "{{ schema }}");
     }
 }
