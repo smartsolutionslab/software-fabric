@@ -19,8 +19,9 @@ env:
 jobs:
   # Which classes each test shard runs (#711), worked out once so every shard reads the same split: build/test-split.sh
   # balances them by the median of the times the build job of recent runs kept in the Actions cache (a few KB, this
-  # branch's latest entry, else main's). Without one the split is build/test-shards.txt, which also sets how many
-  # shards there are.
+  # branch's latest entry, else main's), and runs a class longer than the 15-minute target in parts, by method (#738).
+  # Without one the split is build/test-shards.txt, which also sets how many shards there are: 20, so that no shard's
+  # estimate is over the target.
   split:
     runs-on: ubuntu-latest
     outputs:
@@ -49,7 +50,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -109,7 +110,7 @@ jobs:
           path: ${{ runner.temp }}/test-times
           key: test-times-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: test-times-
-      # Every test project's every method ran in some shard; prints the counts per project and each class's time.
+      # Every test project's every method ran in exactly one shard; prints the counts per project and each class's time.
       - run: |
           assemblies=()
           for project in tests/*/*.Tests.csproj; do

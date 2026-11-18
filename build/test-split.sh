@@ -10,8 +10,14 @@
 # Fabric.Packs.Tests, and every class with no time yet, stays in the last shard. The classes are assigned slowest first
 # to the shard they lengthen least, then classes are moved or swapped off the slowest shard while that shortens it.
 #
+# A class too long for one shard runs in parts (#738): where the history keeps its methods' times (build/test-history.sh
+# does for a class whose median is over the target), each method is assigned like a class and named
+# <Namespace.Class>#<Method>, and a method with no time yet runs in the last shard. A class's methods run one after
+# another, so the parts of one class in one shard take as long as their sum; the model counts them so.
+#
 # Without a history, or when the times would leave a shard empty, the split is build/test-shards.txt as it stands. A
-# class whose source file is gone is not named: a shard naming only such classes would run no test and fail.
+# class whose source file is gone is not named, nor a method its class's source no longer declares: a shard naming
+# only such classes would run no test and fail.
 # Prints each shard's estimate to stderr.
 # Usage: build/test-split.sh <history> <build/test-shards.txt>
 set -euo pipefail
@@ -31,6 +37,15 @@ fi
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 find "$repository/tests/Fabric.Packs.Tests" -name '*.cs' -not -path '*/bin/*' -not -path '*/obj/*' -printf '%f\n' | sed 's/\.cs$//' > "$work/sources"
+# The methods of Fabric.Packs.Tests the history has times for that their class's source still declares.
+: > "$work/methods"
+awk -F '\t' '$1 == "Fabric.Packs.Tests" && index($2, "#") { print $2 }' "$history" | while IFS= read -r part; do
+  class="${part%%#*}"
+  source="$(find "$repository/tests/Fabric.Packs.Tests" -name "${class##*.}.cs" -not -path '*/bin/*' -not -path '*/obj/*' | head -n 1)"
+  if [ -n "$source" ] && grep -qE "[^A-Za-z0-9_]${part#*#}[[:space:]]*\(" "$source"; then
+    echo "$part" >> "$work/methods"
+  fi
+done
 
 status=0
 awk -F '\t' -v named="$named" -v estimates="$work/estimates" -v shards="$work/split" '
@@ -43,14 +58,18 @@ awk -F '\t' -v named="$named" -v estimates="$work/estimates" -v shards="$work/sp
     }
     return count % 2 ? values[(count + 1) / 2] + 0 : (values[count / 2] + values[count / 2 + 1]) / 2
   }
-  # The seconds bin b takes with item add (0 for none) in it and item drop (0 for none) out of it.
-  function cost(b, add, drop,    k, item, parallel, longest, serial) {
+  # The seconds bin b takes with item add (0 for none) in it and item drop (0 for none) out of it. Items of one class
+  # (the parts of a class split by method) run one after another, so the longest parallel item is the longest class.
+  function cost(b, add, drop,    k, item, parallel, longest, serial, sums) {
     parallel = 0; longest = 0; serial = 0
-    for (k = 1; k <= members[b]; k++) {
-      item = member[b, k]
-      if (item != drop) { if (alone[item]) { serial += seconds[item] } else { parallel += seconds[item]; if (seconds[item] > longest) { longest = seconds[item] } } }
+    for (k = 1; k <= members[b] + 1; k++) {
+      item = k <= members[b] ? member[b, k] : add
+      if (!item || item == drop) { continue }
+      if (alone[item]) { serial += seconds[item]; continue }
+      parallel += seconds[item]
+      sums[group[item]] += seconds[item]
+      if (sums[group[item]] > longest) { longest = sums[group[item]] }
     }
-    if (add) { if (alone[add]) { serial += seconds[add] } else { parallel += seconds[add]; if (seconds[add] > longest) { longest = seconds[add] } } }
     parallelTime = parallel / 4 > longest ? parallel / 4 : longest
     serialTime = serial
     return parallelTime + serialTime
@@ -63,11 +82,14 @@ awk -F '\t' -v named="$named" -v estimates="$work/estimates" -v shards="$work/sp
   }
   function larger(a, b) { return a > b ? a : b }
   FILENAME == ARGV[1] { source[$1] = 1; next }
+  FILENAME == ARGV[2] { part[$1] = 1; class = $1; sub(/#.*/, "", class); divided[class] = 1; next }
   {
-    class = $2; sub(/.*\./, "", class)
-    if ($1 == "Fabric.Packs.Tests" && !(class in source)) { next }
+    class = $2; sub(/#.*/, "", class)
+    type = class; sub(/.*\./, "", type)
+    if ($1 == "Fabric.Packs.Tests" && !(type in source)) { next }
+    if (index($2, "#") ? !($2 in part) : (class in divided)) { next }
     count++
-    name[count] = $2; alone[count] = $3 == "serial"; seconds[count] = median($4); movable[count] = $1 == "Fabric.Packs.Tests"
+    name[count] = $2; group[count] = class; alone[count] = $3 == "serial"; seconds[count] = median($4); movable[count] = $1 == "Fabric.Packs.Tests"
   }
   END {
     bins = named + 1
@@ -78,8 +100,8 @@ awk -F '\t' -v named="$named" -v estimates="$work/estimates" -v shards="$work/sp
       for (j = i - 1; j >= 1 && (seconds[order[j]] < seconds[item] || (seconds[order[j]] == seconds[item] && name[order[j]] > name[item])); j--) { order[j + 1] = order[j] }
       order[j + 1] = item
     }
-    for (i = 1; i <= count; i++) { item = order[i]; n[i] = name[item]; a[i] = alone[item]; s[i] = seconds[item]; m[i] = movable[item] }
-    for (i = 1; i <= count; i++) { name[i] = n[i]; alone[i] = a[i]; seconds[i] = s[i]; movable[i] = m[i] }
+    for (i = 1; i <= count; i++) { item = order[i]; n[i] = name[item]; g[i] = group[item]; a[i] = alone[item]; s[i] = seconds[item]; m[i] = movable[item] }
+    for (i = 1; i <= count; i++) { name[i] = n[i]; group[i] = g[i]; alone[i] = a[i]; seconds[i] = s[i]; movable[i] = m[i] }
 
     for (i = 1; i <= count; i++) { if (!movable[i]) { put(bins, i) } }
     for (i = 1; i <= count; i++) {
@@ -115,7 +137,9 @@ awk -F '\t' -v named="$named" -v estimates="$work/estimates" -v shards="$work/sp
 
     for (b = 1; b <= bins; b++) {
       total = cost(b, 0, 0)
-      printf "shard %2d: est %5.1f min  (parallel %5.1f, serial %5.1f, classes %d%s)\n", b, total / 60, parallelTime / 60, serialTime / 60, members[b], b == bins ? ", the rest" : "" > estimates
+      classes = 0
+      for (k = 1; k <= members[b]; k++) { if (!((b, group[member[b, k]]) in counted)) { counted[b, group[member[b, k]]] = 1; classes++ } }
+      printf "shard %2d: est %5.1f min  (parallel %5.1f, serial %5.1f, classes %d%s)\n", b, total / 60, parallelTime / 60, serialTime / 60, classes, b == bins ? ", the rest" : "" > estimates
       if (b < bins && members[b] == 0) { empty = 1 }
     }
     if (empty) { exit 3 }
@@ -126,7 +150,7 @@ awk -F '\t' -v named="$named" -v estimates="$work/estimates" -v shards="$work/sp
       print line > shards
     }
   }
-' "$work/sources" "$history" || status=$?
+' "$work/sources" "$work/methods" "$history" || status=$?
 if [ "$status" -eq 3 ]; then
   echo "The times would leave a shard empty; the split is $fallback." >&2
   cat "$fallback"
