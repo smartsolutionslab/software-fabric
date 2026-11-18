@@ -41,6 +41,8 @@ end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
 {{~ formkit = project["frontend.forms"] == "formkit" ~}}
+{{~ # With the app shell (#695) Save reports through notify, in the shell's toasts; without it, in a notice of its own. ~}}
+{{~ shell = ui == "shadcn-vue" && project["frontend.routing"] == "vue-router" ~}}
 {{~ if !((ui == "shadcn-vue" || ui == "reka-ui" || ui == "vuetify") && (project["frontend.forms"] == "vee-validate" || project["frontend.forms"] == "tanstack-form" || project["frontend.forms"] == "formkit")) || (project["frontend.validation"] != "zod" && project["frontend.validation"] != "valibot") ~}}
 <script lang="ts">
 throw new Error('The dashboards pack builds the Vue dashboard page from shadcn-vue, reka-ui or vuetify with vee-validate, TanStack Form or FormKit, and zod or valibot only so far; frontend.ui-library is {{ project["frontend.ui-library"] }}, frontend.forms is {{ project["frontend.forms"] }}, frontend.validation is {{ project["frontend.validation"] }} (docs/adr/0006 of the generator).');
@@ -85,6 +87,9 @@ import { z } from 'zod';
 import { schemaSubmit } from '@/forms/schemaSubmit';
 {{~ else if !tanstack ~}}
 import { toTypedSchema } from '@/forms/toTypedSchema';
+{{~ end ~}}
+{{~ if shell ~}}
+import { notify } from '@/lib/notify';
 {{~ end ~}}
 {%{import Failure from './Failure.vue';
 import {
@@ -169,12 +174,18 @@ const proposed = computed(() => pendingOnGrid(placements.value, pending.value));
 const drawn = () => [...toLayout(placements.value), ...proposed.value.map(({ item }) => item)];
 watch([placements, pending], () => (layout.value = drawn()), { flush: 'sync' });
 {{~ end ~}}
+{{~ if shell ~}}
+// Counts the draft's changes; Save reports a save only while the draft is still the one it saved, so a save that ends
+// after a later edit does not call that edit saved.
+const revision = ref(0);
+{{~ else ~}}
 {%{// Counts the draft's changes; the notice says Saved only while the saved revision is still the current one, so a
 // save that ends after a later edit does not call that edit saved.
 const revision = ref(0);
 const savedRevision = ref<number>();
 const failed = ref(false);
-const saves = ref(0);
+}%}{{~ end ~}}
+{%{const saves = ref(0);
 const tooLow = ref(false);
 const catalogPage = ref(1);
 // Only the page asked for: while the next page loads there is no data, so nothing from the page before is offered.
@@ -190,20 +201,41 @@ const listed = computed(() => new Map(catalog.value.map((widget) => [widget.id, 
 const full = computed(() => placements.value.length >= maximumWidgets);
 const roomLeft = computed(() => hasRoom(placements.value));
 
+}%}{{~ if shell ~}}
 const edited = () => {
+  revision.value += 1;
+};
+
+/** Every change to the draft: a save already under way no longer saves what is on screen. */
+{{~ else ~}}
+{%{const edited = () => {
   revision.value += 1;
   failed.value = false;
 };
 
 /** Every change to the draft: a notice that it was saved no longer holds. */
-const change = (next: (current: Placement[]) => Placement[]) => {
+}%}{{~ end ~}}
+{%{const change = (next: (current: Placement[]) => Placement[]) => {
   placements.value = next(placements.value);
   edited();
 };
 
 }%}{{~ if formkit ~}}
 {%{const submit = schemaSubmit(nameSchema, async ({ name }) => {
+}%}{{~ if shell ~}}
   const submitted = revision.value;
+  try {
+    await save({ id: dashboard.id, data: { name, widgets: placements.value } });
+    if (revision.value === submitted) {
+      notify.success('The dashboard was saved.');
+    }
+    saves.value += 1;
+    emit('saved');
+  } catch {
+    notify.failure('The dashboard could not be saved.');
+  }
+{{~ else ~}}
+{%{  const submitted = revision.value;
   try {
     await save({ id: dashboard.id, data: { name, widgets: placements.value } });
     savedRevision.value = submitted;
@@ -213,7 +245,8 @@ const change = (next: (current: Placement[]) => Placement[]) => {
   } catch {
     failed.value = true;
   }
-});
+}%}{{~ end ~}}
+{%{});
 
 // The widget form, which another page of the picker resets.
 let adding: FormKitNode | undefined;
@@ -253,7 +286,20 @@ const add = schemaSubmit(widgetSchema, ({ source: chosenSource, visual: chosenVi
   validators: { onDynamic: nameSchema },
   onSubmit: async ({ value }) => {
     const { name } = }%}{{ if valibot }}v.parse(nameSchema, value){{ else }}nameSchema.parse(value){{ end }}{%{;
+}%}{{~ if shell ~}}
     const submitted = revision.value;
+    try {
+      await save({ id: dashboard.id, data: { name, widgets: placements.value } });
+      if (revision.value === submitted) {
+        notify.success('The dashboard was saved.');
+      }
+      saves.value += 1;
+      emit('saved');
+    } catch {
+      notify.failure('The dashboard could not be saved.');
+    }
+{{~ else ~}}
+{%{    const submitted = revision.value;
     try {
       await save({ id: dashboard.id, data: { name, widgets: placements.value } });
       savedRevision.value = submitted;
@@ -263,7 +309,8 @@ const add = schemaSubmit(widgetSchema, ({ source: chosenSource, visual: chosenVi
     } catch {
       failed.value = true;
     }
-  },
+}%}{{~ end ~}}
+{%{  },
 });
 const nameErrors = naming.useStore((state) => ({ name: state.fieldMeta.name?.errors[0]?.message }));
 
@@ -356,7 +403,20 @@ const add = handleAdd(({ source: chosenSource, visual: chosenVisual }) => {
 });
 
 const submit = handleSave(async (values) => {
+}%}{{~ if shell ~}}
   const submitted = revision.value;
+  try {
+    await save({ id: dashboard.id, data: { name: values.name, widgets: placements.value } });
+    if (revision.value === submitted) {
+      notify.success('The dashboard was saved.');
+    }
+    saves.value += 1;
+    emit('saved');
+  } catch {
+    notify.failure('The dashboard could not be saved.');
+  }
+{{~ else ~}}
+{%{  const submitted = revision.value;
   try {
     await save({ id: dashboard.id, data: { name: values.name, widgets: placements.value } });
     savedRevision.value = submitted;
@@ -366,7 +426,8 @@ const submit = handleSave(async (values) => {
   } catch {
     failed.value = true;
   }
-});
+}%}{{~ end ~}}
+{%{});
 }%}{{~ end ~}}
 {%{
 /** The grid reports its layout after every change, its own compaction included; only real moves change the draft. */
@@ -466,9 +527,11 @@ const tiles = computed(() =>
 }%}{{~ end ~}}
 {%{      <FormKit type="text" name="name" label="Dashboard name" @input="edited" />
       <}%}{{ button }}{{ primary }}{%{ type="submit" :disabled="saving">Save dashboard</}%}{{ button }}{%{>
-      <p v-if="savedRevision === revision" role="status">Saved.</p>
+}%}{{~ if !shell ~}}
+{%{      <p v-if="savedRevision === revision" role="status">Saved.</p>
       <p v-if="failed" role="alert">The dashboard could not be saved.</p>
-    </FormKit>
+}%}{{~ end ~}}
+{%{    </FormKit>
 
     <FormKit type="form" :actions="false" }%}{{ form_class "flex flex-wrap items-end gap-2" "d-flex flex-wrap align-end ga-2" }}{%{ @node="addingNode" @submit="add">
       <FormKit type="select" name="source" label="Widget" v-model="source" :options="sources" :disabled="loading" />
@@ -506,9 +569,11 @@ const tiles = computed(() =>
 {%{      </label>
       <}%}{{ button }}{{ primary }}{%{ type="submit" :disabled="saving">Save dashboard</}%}{{ button }}{%{>
       <p v-if="nameErrors.name" role="alert">{{ nameErrors.name }}</p>
-      <p v-if="savedRevision === revision" role="status">Saved.</p>
+}%}{{~ if !shell ~}}
+{%{      <p v-if="savedRevision === revision" role="status">Saved.</p>
       <p v-if="failed" role="alert">The dashboard could not be saved.</p>
-    </form>
+}%}{{~ end ~}}
+{%{    </form>
 
     <form novalidate }%}{{ class_of "flex flex-wrap items-end gap-2" "form" "d-flex flex-wrap align-end ga-2" }}{%{ @submit="add">
       <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" "d-flex flex-column ga-1 text-body-medium" }}{%{>
