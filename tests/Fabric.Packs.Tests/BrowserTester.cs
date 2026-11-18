@@ -6,9 +6,17 @@ namespace Fabric.Packs.Tests;
 /// </summary>
 internal static class BrowserTester
 {
-    public static bool NeverStarted(string output) => false;
+    /// <summary>What vitest's orchestrator says when a test file's iframe did not report ready in time.</summary>
+    private const string NotReady = "did not become ready within";
 
+    public static bool NeverStarted(string output) => output.Contains(NotReady, StringComparison.Ordinal);
+
+    /// <summary>Fails, with the whole output, when the browser tester never started; a run that did is left to the caller.</summary>
     public static void ShouldHaveStarted(string output)
     {
+        if (NeverStarted(output))
+        {
+            throw new ShouldAssertException($"the browser tester never started (timeout), not the gate's verdict:\n{output}");
+        }
     }
 }
