@@ -29,4 +29,25 @@ public class SampleNameTests
     {{ test_attribute }}
     public void A_name_longer_than_the_maximum_is_refused() =>
         {{ should_throw (guard_exception "ArgumentOutOfRangeException") `() => SampleName.From(new string('a', SampleName.MaxLength + 1))` }};
+
+    {{ test_attribute }}
+    public void A_callers_name_of_one_to_the_maximum_characters_becomes_a_name()
+    {
+        {{ `SampleName.TryFrom("Ada", out var name)` | should_be_true }};
+        {{ `name` | should_be `SampleName.From("Ada")` }};
+    }
+
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `null` }}
+    {{ test_case_attribute `""` }}
+    {{ test_case_attribute `"   "` }}
+    public void A_callers_blank_name_is_no_name_and_no_exception(string? value)
+    {
+        {{ `SampleName.TryFrom(value, out var name)` | should_be_false }};
+        {{ `name` | should_be_null }};
+    }
+
+    {{ test_attribute }}
+    public void A_callers_name_longer_than_the_maximum_is_no_name() =>
+        {{ `SampleName.TryFrom(new string('a', SampleName.MaxLength + 1), out _)` | should_be_false }};
 }

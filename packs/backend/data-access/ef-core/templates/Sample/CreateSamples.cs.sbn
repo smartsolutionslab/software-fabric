@@ -1,0 +1,54 @@
+{{~ # The sample's one table: the crud entity or the ddd aggregate, or an event-sourced module's read model of its samples. ~}}
+{{~ summaries = module.values["module.style"] == "event-sourced" ~}}
+{{~ entity = summaries ? "Application.ReadModels.SampleSummary" : "Domain.Samples.Sample" ~}}
+{{~ table = summaries ? "sample_summaries" : "samples" ~}}
+{{~ sqlserver = project["backend.database"] == "sqlserver" ~}}
+{{~ # The tenant column pack adds a TenantId to every table; a schema per tenant keeps tenants apart without one. ~}}
+{{~ tenant_column = project["backend.tenancy"] == "column" ~}}
+using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.Migrations;
+
+/// <inheritdoc />
+public partial class _20261118000000_CreateSamples : Migration
+{
+    /// <inheritdoc />
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.EnsureSchema(
+            name: "{{ module.name }}");
+
+        migrationBuilder.CreateTable(
+            name: "{{ table }}",
+            schema: "{{ module.name }}",
+            columns: table => new
+            {
+                id = table.Column<Guid>(type: "{{ sqlserver ? "uniqueidentifier" : "uuid" }}", nullable: false),
+                name = table.Column<string>(type: "{{ sqlserver ? "nvarchar(100)" : "character varying(100)" }}", maxLength: 100, nullable: false){{ if tenant_column }},
+                TenantId = table.Column<string>(type: "{{ sqlserver ? "nvarchar(64)" : "character varying(64)" }}", maxLength: 64, nullable: false){{ end }}
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_{{ table }}", x => x.id);
+            });
+{{~ if tenant_column ~}}
+
+        migrationBuilder.CreateIndex(
+            name: "IX_{{ table }}_TenantId",
+            schema: "{{ module.name }}",
+            table: "{{ table }}",
+            column: "TenantId");
+{{~ end ~}}
+    }
+
+    /// <inheritdoc />
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.DropTable(
+            name: "{{ table }}",
+            schema: "{{ module.name }}");
+    }
+}

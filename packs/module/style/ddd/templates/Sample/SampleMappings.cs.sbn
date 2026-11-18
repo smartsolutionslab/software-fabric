@@ -1,0 +1,13 @@
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.DTOs;
+
+public static class SampleMappings
+{
+    public static {{ module.namespace }}SampleDto ToDto(this Sample sample)
+    {
+        {{ not_null "sample" }}
+
+        return new {{ module.namespace }}SampleDto(sample.Id.Value, sample.Name.Value);
+    }
+}

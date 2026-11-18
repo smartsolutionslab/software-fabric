@@ -1,0 +1,7 @@
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples.Events;
+
+/// <summary>A sample was created with this name. A stored event is never edited: a change is a new event.</summary>
+public sealed record SampleCreated({{ if strict }}SampleId Id, SampleName Name{{ else }}Guid Id, string Name{{ end }}) : IDomainEvent;

@@ -1,0 +1,39 @@
+{{~ option = project["backend.absence"] == "option" ~}}
+using {{ namespace }}.Modules.{{ module.namespace }}.Application;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+using {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure;
+
+/// <summary>The samples table{{ if project["backend.tenancy"] == "column" }}, the current tenant's rows only (the DbContext's query filter){{ else if project["backend.tenancy"] != "none" }}, in the current tenant's own schema{{ end }}. The module's unit of work saves what is added.</summary>
+public sealed class SampleStore({{ module.namespace }}DbContext context) : ISampleStore
+{
+    public void Add(Sample sample) => context.Add(sample);
+
+{{~ if option ~}}
+    public async Task<Option<Sample>> FindAsync(Guid id, CancellationToken cancellationToken) =>
+        await context.Set<Sample>().AsNoTracking().SingleOrDefaultAsync(sample => sample.Id == id, cancellationToken) is { } sample
+            ? Option<Sample>.Some(sample)
+            : Option<Sample>.None;
+{{~ else ~}}
+    public Task<Sample?> FindAsync(Guid id, CancellationToken cancellationToken) =>
+        context.Set<Sample>().AsNoTracking().SingleOrDefaultAsync(sample => sample.Id == id, cancellationToken);
+{{~ end ~}}
+
+    public async Task<PagedResult<Sample>> ListAsync(Page page, PageSize pageSize, CancellationToken cancellationToken)
+    {
+        {{ not_null "page" }}
+        {{ not_null "pageSize" }}
+
+        var samples = context.Set<Sample>().AsNoTracking();
+        var total = await samples.CountAsync(cancellationToken);
+        var items = await samples
+            .OrderBy(sample => sample.Name)
+            .ThenBy(sample => sample.Id)
+            .Skip(page.Skip(pageSize))
+            .Take(pageSize.Value)
+            .ToListAsync(cancellationToken);
+        return new PagedResult<Sample>(items, total, page.Value, pageSize.Value);
+    }
+}

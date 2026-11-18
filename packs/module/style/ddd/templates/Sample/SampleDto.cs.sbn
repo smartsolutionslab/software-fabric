@@ -1,0 +1,4 @@
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.DTOs;
+
+/// <summary>A sample as the module's endpoints answer it.</summary>
+public sealed record {{ module.namespace }}SampleDto(Guid Id, string Name);

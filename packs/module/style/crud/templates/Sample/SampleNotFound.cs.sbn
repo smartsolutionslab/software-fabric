@@ -1,0 +1,6 @@
+using System.Net;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application;
+
+public sealed record SampleNotFound(Guid Id)
+    : ApiError("{{ module.name }}.sample-not-found", $"There is no sample {Id}.", HttpStatusCode.NotFound);

@@ -1,0 +1,20 @@
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.Commands.CreateSample;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Tests.Samples;
+
+public class CreateSampleTests
+{
+    {{ test_attribute }}
+    public async Task A_created_sample_is_stored_with_its_name_once_the_unit_of_work_commits_and_its_id_answered()
+    {
+        var store = new InMemorySampleStore();
+
+        var created = await new CreateSampleHandler(store, store).HandleAsync(new CreateSample(SampleName.From("Ada")), {{ test_cancellation_token }});
+
+        var sample = {{ `store.Stored` | should_have_single_item }};
+        {{ `created.Value` | should_be `sample.Id.Value` }};
+        {{ `sample.Name.Value` | should_be `"Ada"` }};
+        {{ `created.Value.Version` | should_be `7` }};
+    }
+}

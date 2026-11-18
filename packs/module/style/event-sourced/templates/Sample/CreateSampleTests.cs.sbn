@@ -1,0 +1,22 @@
+{{~ handler = module.values["module.cqrs"] == "physical" ? "new CreateSampleHandler(samples)" : "new CreateSampleHandler(samples, samples, samples)" ~}}
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.Commands.CreateSample;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Tests.Samples;
+
+public class CreateSampleTests
+{
+    {{ test_attribute }}
+    public async Task A_created_samples_event_is_stored_in_its_stream_its_read_model_written_and_its_id_answered()
+    {
+        var samples = new InMemorySamples();
+
+        var created = await {{ handler }}.HandleAsync(new CreateSample(SampleName.From("Ada")), {{ test_cancellation_token }});
+
+        {{ `samples.Streams[created.Value]` | should_have_single_item }};
+        var summary = {{ `samples.Summaries` | should_have_single_item }};
+        {{ `summary.Id` | should_be `created.Value` }};
+        {{ `summary.Name` | should_be `"Ada"` }};
+        {{ `created.Value.Version` | should_be `7` }};
+    }
+}

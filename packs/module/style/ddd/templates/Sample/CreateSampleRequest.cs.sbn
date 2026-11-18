@@ -1,0 +1,4 @@
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Api.Endpoints;
+
+/// <summary>The body of <c>POST /{{ module.name }}/samples</c>.</summary>
+public sealed record Create{{ module.namespace }}SampleRequest(string Name);

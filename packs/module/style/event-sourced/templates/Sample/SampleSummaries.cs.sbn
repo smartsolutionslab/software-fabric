@@ -1,0 +1,52 @@
+{{~ option = project["backend.absence"] == "option" ~}}
+using {{ namespace }}.Modules.{{ module.namespace }}.Application;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.ReadModels;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+using {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure;
+
+/// <summary>The samples' table, written after each sample's events; the module's unit of work saves what is recorded.</summary>
+public sealed class SampleSummaries({{ module.namespace }}DbContext context) : ISampleSummaries
+{
+    public async Task RecordAsync(Sample sample, CancellationToken cancellationToken)
+    {
+        {{ not_null "sample" }}
+
+        var row = await context.Set<SampleSummary>().SingleOrDefaultAsync(row => row.Id == sample.Id.Value, cancellationToken);
+        if (row is null)
+        {
+            row = new SampleSummary { Id = sample.Id.Value };
+            context.Add(row);
+        }
+
+        row.Name = sample.Name.Value;
+    }
+
+{{~ if option ~}}
+    public async Task<Option<SampleSummary>> FindAsync(Guid id, CancellationToken cancellationToken) =>
+        await context.Set<SampleSummary>().AsNoTracking().SingleOrDefaultAsync(row => row.Id == id, cancellationToken) is { } row
+            ? Option<SampleSummary>.Some(row)
+            : Option<SampleSummary>.None;
+{{~ else ~}}
+    public Task<SampleSummary?> FindAsync(Guid id, CancellationToken cancellationToken) =>
+        context.Set<SampleSummary>().AsNoTracking().SingleOrDefaultAsync(row => row.Id == id, cancellationToken);
+{{~ end ~}}
+
+    public async Task<PagedResult<SampleSummary>> ListAsync(Page page, PageSize pageSize, CancellationToken cancellationToken)
+    {
+        {{ not_null "page" }}
+        {{ not_null "pageSize" }}
+
+        var rows = context.Set<SampleSummary>().AsNoTracking();
+        var total = await rows.CountAsync(cancellationToken);
+        var items = await rows
+            .OrderBy(row => row.Name)
+            .ThenBy(row => row.Id)
+            .Skip(page.Skip(pageSize))
+            .Take(pageSize.Value)
+            .ToListAsync(cancellationToken);
+        return new PagedResult<SampleSummary>(items, total, page.Value, pageSize.Value);
+    }
+}

@@ -1,0 +1,26 @@
+{{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
+{{~ physical = module.values["module.cqrs"] == "physical" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.DTOs;
+{{~ if physical ~}}
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.ReadModels;
+{{~ end ~}}
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.Queries.ListSamples;
+
+public sealed class ListSamplesHandler({{ if physical }}I{{ module.namespace }}ReadModels samples{{ else }}ISampleSummaries samples{{ end }})
+    : IQueryHandler<ListSamples, Result<PagedResult<{{ module.namespace }}SampleDto>, ApiError>>
+{
+    public async Task<Result<PagedResult<{{ module.namespace }}SampleDto>, ApiError>> HandleAsync(ListSamples query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+{{~ if physical ~}}
+        var page = await samples.ListAsync<SampleSummary, string>(query.Page, query.PageSize, sample => sample.Name, cancellationToken);
+{{~ else ~}}
+        var page = await samples.ListAsync(query.Page, query.PageSize, cancellationToken);
+{{~ end ~}}
+        var dtos = new PagedResult<{{ module.namespace }}SampleDto>([.. page.Items.Select(sample => sample.ToDto())], page.TotalCount, page.Page, page.PageSize);
+        return {{ if typed }}Success(dtos){{ else }}Result<PagedResult<{{ module.namespace }}SampleDto>, ApiError>.Success(dtos){{ end }};
+    }
+}

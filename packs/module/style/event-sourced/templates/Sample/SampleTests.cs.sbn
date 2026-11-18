@@ -1,0 +1,34 @@
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples.Events;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Tests.Samples;
+
+public class SampleTests
+{
+    {{ test_attribute }}
+    public void A_new_sample_raises_that_it_was_created_and_has_its_id_and_name()
+    {
+        var id = SampleId.New();
+
+        var sample = Sample.Create(id, SampleName.From("Ada"));
+
+        {{ `sample.Id` | should_be `id` }};
+        {{ `sample.Name` | should_be `SampleName.From("Ada")` }};
+        {{ should_be (should_have_single_item `((IEventSourced)sample).PendingEvents`) (strict ? `new SampleCreated(id, SampleName.From("Ada"))` : `new SampleCreated(id.Value, "Ada")`) }};
+    }
+
+    {{ test_attribute }}
+    public void A_sample_loaded_from_its_events_is_the_sample_that_raised_them()
+    {
+        var created = Sample.Create(SampleId.New(), SampleName.From("Ada"));
+        var loaded = (IEventSourced)Activator.CreateInstance(typeof(Sample), nonPublic: true)!;
+
+        loaded.Replay(((IEventSourced)created).PendingEvents);
+
+        {{ `((Sample)loaded).Id` | should_be `created.Id` }};
+        {{ `((Sample)loaded).Name` | should_be `created.Name` }};
+        {{ `loaded.Version` | should_be `1` }};
+    }
+}

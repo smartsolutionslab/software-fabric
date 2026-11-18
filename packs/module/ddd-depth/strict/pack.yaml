@@ -14,10 +14,6 @@ files:
   - { template: templates/TypeParametersExcludeNull.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}TypeParametersExcludeNull.cs", per-module: true }
   - { template: templates/ValueObjectsHaveOneValue.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}ValueObjectsHaveOneValue.cs", per-module: true, when: 'module.values["module.style"] == "event-sourced"' }
   - { template: templates/EventsTakeValueObjectsByConstructor.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}EventsTakeValueObjectsByConstructor.cs", per-module: true, when: 'module.values["module.style"] == "event-sourced"' }
-  - { template: templates/SampleId.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/SampleId.cs", per-module: true }
-  - { template: templates/SampleName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/SampleName.cs", per-module: true }
-  - { template: templates/SampleIdTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleIdTests.cs", per-module: true }
-  - { template: templates/SampleNameTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleNameTests.cs", per-module: true }
 slots:
   - { slot: persistence.context-members, template: templates/context-members.sbn }
   # An event store is chosen only with event-sourced modules; a project of ddd modules has no event store to register with.

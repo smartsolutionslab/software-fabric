@@ -18,7 +18,6 @@ files:
   - { template: templates/BuildingBlocks/ICurrentUser.cs.sbn, target: src/BuildingBlocks/Identity/ICurrentUser.cs }
   - { template: templates/BuildingBlocks/HttpCurrentUser.cs.sbn, target: src/BuildingBlocks/Identity/HttpCurrentUser.cs }
   - { template: templates/BuildingBlocks/DashboardWidgetsRegistration.cs.sbn, target: src/BuildingBlocks/Dashboards/Wiring/DashboardWidgetsRegistration.cs }
-  - { template: templates/BuildingBlocks/ModuleAdapterRegistration.cs.sbn, target: src/BuildingBlocks/Persistence/Wiring/ModuleAdapterRegistration.cs }
   - { template: templates/Module/Dashboard.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboard.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "crud"' }
   - { template: templates/Module/DashboardWidget.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/DashboardWidget.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] == "crud"' }
   - { template: templates/Module/Ddd/Dashboard.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Dashboards/Dashboard.cs", per-module: true, when: 'module.name == "dashboards" && module.values["module.style"] != "crud"' }
@@ -133,7 +132,6 @@ files:
   - { template: templates/web/Pager.test.ts.sbn, target: web/app/src/dashboards/Pager.test.ts, when: 'project["frontend.framework"] == "vue" && project["frontend.api-client"] == "orval" && (!object.has_key(project, "frontend.state") || project["frontend.state"] != "pinia") && project["frontend.architecture"] == "spa"' }
 slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 30 }
-  - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 50 }
   - { slot: tests.module-host-services, template: templates/module-host-services.sbn }
   - { slot: messaging.wolverine-options, template: templates/wolverine-options.sbn, optional: true }
   - { slot: web.dependencies, template: templates/web-dependency.sbn }

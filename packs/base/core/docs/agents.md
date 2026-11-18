@@ -35,3 +35,10 @@
 - Tests never call a real model: give the code under test a `FakeChatClient` (`tests/Fakes`) with the answer the test needs, and read what it was asked from `Requests`. A test that would reach a provider is a bug, whatever the network allows.
 - A model's answer is untrusted input: parse it into a typed shape and check it like a request body; never execute it, interpolate it into SQL or markup, or pass it on as a tool's argument unchecked.
 {{~ end ~}}
+
+## Module sample (base)
+
+- `fabric add-module <name>` gives the module a sample to copy from: a `Sample` with a name, created by `POST /<module>/samples` (`CreateSample`), listed a page at a time by `GET /<module>/samples` (`ListSamples`) and read back by `GET /<module>/samples/{id}` (`GetSample`), built the way the module's style builds anything, with its tests, its endpoints in the OpenAPI document and its table's migration `20261118000000_CreateSamples` where it has a table. It is there to be renamed or deleted; never build a feature on it as it is.
+- The types the OpenAPI document names carry the module's name (`<Module>SampleDto`, `Create<Module>SampleRequest`), so two modules' samples never share a schema; a module's own DTOs need names no other module uses for the same reason.
+- To start from it, rename `Sample` and everything named after it to the module's first record (`Invoice`, `InvoiceDto`, `CreateInvoice`, `/invoices`), delete the module's `Migrations` folder and add the first migration of your own with `dotnet ef migrations add`. To drop it, delete every file and folder with `Sample` in its name under `src/Modules/<Module>/` and `tests/Modules/<Module>.Tests/`, `tests/Integration.Tests/<Module>SamplesTests.cs` and the module's `Migrations` folder. Either way, run the integration tests once so they rewrite `web/app/openapi.json`, and commit it.
+- Once a database outside your machine has the sample's table, do neither: add a migration that drops or renames the table instead.

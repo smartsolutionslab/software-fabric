@@ -14,6 +14,34 @@ files:
   - { template: templates/DomainIsPure.cs.sbn, target: tests/Architecture.Tests/Rules/DomainIsPure.cs }
   - { template: templates/DomainErrorsCarryNoHttp.cs.sbn, target: tests/Architecture.Tests/Rules/DomainErrorsCarryNoHttp.cs }
   - { template: templates/EveryDomainEventHasAReaction.cs.sbn, target: tests/Architecture.Tests/Rules/EveryDomainEventHasAReaction.cs }
+  # The module's sample (#734): a record to rename or delete, in every module but dashboards, whose model and migrations are its pack's.
+  - { template: templates/Sample/SampleId.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/SampleId.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/SampleName.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/Sample.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/Sample.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleCreated.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/Events/SampleCreated.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/ISampleStore.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/ISampleStore.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleFailures.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/SampleFailures.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/InvalidSampleName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidSampleName.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleNotFound.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/SampleNotFound.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/CreateSample.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Commands/CreateSample/CreateSample.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/CreateSampleHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Commands/CreateSample/CreateSampleHandler.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/ListSamples.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/ListSamples/ListSamples.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/ListSamplesHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/ListSamples/ListSamplesHandler.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/GetSample.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/GetSample/GetSample.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/GetSampleHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/GetSample/GetSampleHandler.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleDto.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/{{ module.namespace }}SampleDto.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleMappings.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/SampleMappings.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleStore.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/SampleStore.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleConfiguration.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/Configurations/SampleConfiguration.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/CreateSampleRequest.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/Create{{ module.namespace }}SampleRequest.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleEndpoints.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/SampleEndpoints.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleIdTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleIdTests.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleNameTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleNameTests.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleTests.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/InMemorySampleStore.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/InMemorySampleStore.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/CreateSampleTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/CreateSampleTests.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/ListSamplesTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/ListSamplesTests.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/GetSampleTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/GetSampleTests.cs", per-module: true, when: 'module.name != "dashboards"' }
 slots:
   - { slot: solution.projects, template: templates/solution-project.sbn }
   - { slot: modules.packages.domain, template: templates/domain-reference.sbn }

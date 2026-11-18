@@ -1,0 +1,27 @@
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.Persistence.Configurations;
+
+public sealed class SampleConfiguration : IEntityTypeConfiguration<Sample>
+{
+    public void Configure(EntityTypeBuilder<Sample> builder)
+    {
+        {{ not_null "builder" }}
+
+        builder.ToTable("samples");
+        builder.HasKey(sample => sample.Id);
+{{~ if strict ~}}
+        // The identifier and the value object map to their backing values by convention (module.ddd-depth: strict).
+        builder.Property(sample => sample.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(sample => sample.Name).HasColumnName("name").HasMaxLength(SampleName.MaxLength).IsRequired();
+{{~ else ~}}
+        builder.Property(sample => sample.Id).HasColumnName("id").ValueGeneratedNever()
+            .HasConversion(id => id.Value, value => SampleId.From(value));
+        builder.Property(sample => sample.Name).HasColumnName("name").HasMaxLength(SampleName.MaxLength).IsRequired()
+            .HasConversion(name => name.Value, value => SampleName.From(value));
+{{~ end ~}}
+    }
+}

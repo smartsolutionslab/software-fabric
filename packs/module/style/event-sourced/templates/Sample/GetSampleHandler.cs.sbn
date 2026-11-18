@@ -1,0 +1,37 @@
+{{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+{{~ physical = module.values["module.cqrs"] == "physical" ~}}
+{{~ find = physical ? "samples.FindAsync<SampleSummary>(query.Id, cancellationToken)" : "samples.FindAsync(query.Id, cancellationToken)" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.DTOs;
+{{~ if physical ~}}
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.ReadModels;
+{{~ end ~}}
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.Queries.GetSample;
+
+public sealed class GetSampleHandler({{ if physical }}I{{ module.namespace }}ReadModels samples{{ else }}ISampleSummaries samples{{ end }})
+    : IQueryHandler<GetSample, Result<{{ module.namespace }}SampleDto, ApiError>>
+{
+    public async Task<Result<{{ module.namespace }}SampleDto, ApiError>> HandleAsync(GetSample query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+{{~ if option ~}}
+        var sample = await {{ find }};
+        if (!sample.HasValue)
+        {
+            return {{ if typed }}Failure(SampleFailures.NotFound(query.Id)){{ else }}Result<{{ module.namespace }}SampleDto, ApiError>.Failure(SampleFailures.NotFound(query.Id)){{ end }};
+        }
+
+        return {{ if typed }}Success(sample.Value.ToDto()){{ else }}Result<{{ module.namespace }}SampleDto, ApiError>.Success(sample.Value.ToDto()){{ end }};
+{{~ else ~}}
+        if (await {{ find }} is not { } sample)
+        {
+            return {{ if typed }}Failure(SampleFailures.NotFound(query.Id)){{ else }}Result<{{ module.namespace }}SampleDto, ApiError>.Failure(SampleFailures.NotFound(query.Id)){{ end }};
+        }
+
+        return {{ if typed }}Success(sample.ToDto()){{ else }}Result<{{ module.namespace }}SampleDto, ApiError>.Success(sample.ToDto()){{ end }};
+{{~ end ~}}
+    }
+}

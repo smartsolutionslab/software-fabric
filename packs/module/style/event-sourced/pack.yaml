@@ -9,6 +9,38 @@ files:
   - { template: templates/ModuleAggregateStore.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/I{{ module.namespace }}AggregateStore.cs", per-module: true }
   - { template: templates/EventsAreAppliedByAnAggregate.cs.sbn, target: tests/Architecture.Tests/Rules/EventsAreAppliedByAnAggregate.cs }
   - { template: templates/EventSourcedDomainIsPure.cs.sbn, target: tests/Architecture.Tests/Rules/EventSourcedDomainIsPure.cs }
+  # The module's sample (#734): a record to rename or delete, in every module but dashboards, whose model and migrations are its pack's.
+  - { template: templates/Sample/SampleId.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/SampleId.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/SampleName.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/Sample.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/Sample.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleCreated.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/Events/SampleCreated.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleSummary.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/ReadModels/SampleSummary.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleFailures.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/SampleFailures.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/InvalidSampleName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidSampleName.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleNotFound.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/SampleNotFound.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/CreateSample.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Commands/CreateSample/CreateSample.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/CreateSampleHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Commands/CreateSample/CreateSampleHandler.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/ListSamples.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/ListSamples/ListSamples.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/ListSamplesHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/ListSamples/ListSamplesHandler.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/GetSample.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/GetSample/GetSample.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/GetSampleHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/GetSample/GetSampleHandler.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleDto.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/{{ module.namespace }}SampleDto.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleMappings.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/SampleMappings.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/CreateSampleRequest.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/Create{{ module.namespace }}SampleRequest.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleEndpoints.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/SampleEndpoints.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleIdTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleIdTests.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleNameTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleNameTests.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/SampleTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/SampleTests.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/InMemorySamples.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/InMemorySamples.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/CreateSampleTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/CreateSampleTests.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/ListSamplesTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/ListSamplesTests.cs", per-module: true, when: 'module.name != "dashboards"' }
+  - { template: templates/Sample/GetSampleTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/GetSampleTests.cs", per-module: true, when: 'module.name != "dashboards"' }
+  # Logical CQRS: the command writes the samples' table right after the sample's events, as the dashboards module does (#608).
+  - { template: templates/Sample/ISampleSummaries.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/ISampleSummaries.cs", per-module: true, when: 'module.name != "dashboards" && module.values["module.cqrs"] != "physical"' }
+  - { template: templates/Sample/SampleSummaries.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/SampleSummaries.cs", per-module: true, when: 'module.name != "dashboards" && module.values["module.cqrs"] != "physical"' }
+  - { template: templates/Sample/SampleSummaryConfiguration.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/Configurations/SampleSummaryConfiguration.cs", per-module: true, when: 'module.name != "dashboards" && module.values["module.cqrs"] != "physical"' }
+  # Physical CQRS: a Marten projection writes the read model the queries read.
+  - { template: templates/Sample/SampleSummaryProjection.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Projections/SampleSummaryProjection.cs", per-module: true, when: 'module.name != "dashboards" && module.values["module.cqrs"] == "physical"' }
 slots:
   - { slot: solution.projects, template: templates/solution-project.sbn }
   - { slot: modules.packages.domain, template: templates/domain-reference.sbn }

@@ -1,0 +1,38 @@
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+using System.Diagnostics.CodeAnalysis;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+
+/// <summary>
+/// A sample's name, 1 to <see cref="MaxLength"/> characters and not blank: a value object with rules of its own,
+/// emitted by fabric add-module with the rest of the sample. Rename it after a value of yours (<c>InvoiceNumber</c>) or
+/// delete it (AGENTS.md). <see cref="From"/> guards a value the code already trusts; <see cref="TryFrom"/> checks a
+/// caller's, so a bad one is the caller's mistake rather than an exception.
+/// </summary>
+public sealed record SampleName{{ if strict }} : IValueObject<string>{{ end }}
+{
+    public const int MaxLength = 100;
+
+    private SampleName(string value) => Value = value;
+
+    public string Value { get; }
+
+    public static SampleName From(string value)
+    {
+{{~ if project["backend.guards"] == "ensure-that" ~}}
+        Ensure.That(value).IsNotNullOrWhiteSpace().HasMaxLength(MaxLength);
+{{~ else ~}}
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(value.Length, MaxLength, nameof(value));
+{{~ end ~}}
+        return new SampleName(value);
+    }
+
+    public static bool TryFrom(string? value, [NotNullWhen(true)] out SampleName? name)
+    {
+        name = string.IsNullOrWhiteSpace(value) || value.Length > MaxLength ? null : new SampleName(value);
+        return name is not null;
+    }
+
+    public override string ToString() => Value;
+}

@@ -1,10 +1,15 @@
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+using System.Diagnostics.CodeAnalysis;
+
 namespace {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
 
 /// <summary>
-/// The shape of a value object in a strict module, emitted by fabric add-module: rename it after a value with rules of
-/// its own (<c>InvoiceNumber</c>) or delete it. It is created only through <see cref="From"/>, which guards the value.
+/// A sample's name, 1 to <see cref="MaxLength"/> characters and not blank: a value object with rules of its own,
+/// emitted by fabric add-module with the rest of the sample. Rename it after a value of yours (<c>InvoiceNumber</c>) or
+/// delete it (AGENTS.md). <see cref="From"/> guards a value the code already trusts; <see cref="TryFrom"/> checks a
+/// caller's, so a bad one is the caller's mistake rather than an exception.
 /// </summary>
-public sealed record SampleName : IValueObject<string>
+public sealed record SampleName{{ if strict }} : IValueObject<string>{{ end }}
 {
     public const int MaxLength = 100;
 
@@ -21,6 +26,12 @@ public sealed record SampleName : IValueObject<string>
         ArgumentOutOfRangeException.ThrowIfGreaterThan(value.Length, MaxLength, nameof(value));
 {{~ end ~}}
         return new SampleName(value);
+    }
+
+    public static bool TryFrom(string? value, [NotNullWhen(true)] out SampleName? name)
+    {
+        name = string.IsNullOrWhiteSpace(value) || value.Length > MaxLength ? null : new SampleName(value);
+        return name is not null;
     }
 
     public override string ToString() => Value;

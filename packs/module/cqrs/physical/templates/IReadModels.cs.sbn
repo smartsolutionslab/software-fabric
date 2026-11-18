@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+
 namespace {{ namespace }}.BuildingBlocks.ReadModels;
 
 /// <summary>The read side of a module: read models fed by projections, never the aggregates. Each module has its own (I&lt;Module&gt;ReadModels).</summary>
@@ -12,5 +14,9 @@ public interface IReadModels
 {{~ end ~}}
 
     Task<IReadOnlyList<TReadModel>> ListAsync<TReadModel>(CancellationToken cancellationToken)
+        where TReadModel : class;
+
+    /// <summary>One page of the read models in the order <paramref name="orderBy"/> gives, and how many there are: a list query's page.</summary>
+    Task<PagedResult<TReadModel>> ListAsync<TReadModel, TKey>(Page page, PageSize pageSize, Expression<Func<TReadModel, TKey>> orderBy, CancellationToken cancellationToken)
         where TReadModel : class;
 }

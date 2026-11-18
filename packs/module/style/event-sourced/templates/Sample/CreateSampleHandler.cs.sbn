@@ -1,0 +1,29 @@
+{{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
+{{~ physical = module.values["module.cqrs"] == "physical" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.Commands.CreateSample;
+
+{{~ if physical ~}}
+/// <summary>Stores the new sample's events; its projection writes the read model the queries read, in the same save.</summary>
+public sealed class CreateSampleHandler(I{{ module.namespace }}AggregateStore samples)
+{{~ else ~}}
+/// <summary>Stores the new sample's events, then writes its row of the samples' table, which the queries read.</summary>
+public sealed class CreateSampleHandler(I{{ module.namespace }}AggregateStore samples, ISampleSummaries summaries, I{{ module.namespace }}UnitOfWork unitOfWork)
+{{~ end ~}}
+    : ICommandHandler<CreateSample, Result<Guid, ApiError>>
+{
+    public async Task<Result<Guid, ApiError>> HandleAsync(CreateSample command, CancellationToken cancellationToken)
+    {
+        {{ not_null "command" }}
+
+        var sample = Sample.Create(SampleId.New(), command.Name);
+        await samples.SaveAsync(sample, cancellationToken);
+{{~ if !physical ~}}
+        await summaries.RecordAsync(sample, cancellationToken);
+        await unitOfWork.CommitAsync(cancellationToken);
+{{~ end ~}}
+        return {{ if typed }}Success(sample.Id.Value){{ else }}Result<Guid, ApiError>.Success(sample.Id.Value){{ end }};
+    }
+}

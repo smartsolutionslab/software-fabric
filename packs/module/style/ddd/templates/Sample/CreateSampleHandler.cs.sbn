@@ -1,0 +1,19 @@
+{{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.Commands.CreateSample;
+
+public sealed class CreateSampleHandler(ISampleStore samples, I{{ module.namespace }}UnitOfWork unitOfWork)
+    : ICommandHandler<CreateSample, Result<Guid, ApiError>>
+{
+    public async Task<Result<Guid, ApiError>> HandleAsync(CreateSample command, CancellationToken cancellationToken)
+    {
+        {{ not_null "command" }}
+
+        var sample = Sample.Create(SampleId.New(), command.Name);
+        samples.Add(sample);
+        await unitOfWork.CommitAsync(cancellationToken);
+        return {{ if typed }}Success(sample.Id.Value){{ else }}Result<Guid, ApiError>.Success(sample.Id.Value){{ end }};
+    }
+}
