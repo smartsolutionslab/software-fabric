@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Prints the test-time history with this run's times added: one line per class that ran this time,
-# <assembly><tab><Namespace.Class><tab><parallel|serial><tab><seconds>..., this run's seconds first and at most five
-# runs' in all, so build/test-split.sh can balance the shards by a median rather than one run's times. A class that did
-# not run this time is dropped with its history. The build job keeps the history in the Actions cache for the next run.
+# <assembly><tab><Namespace.Class><tab><parallel|serial><tab><seconds>...<tab><load>...<tab><parts>..., this run's
+# first and at most five runs' in all, so build/test-split.sh can balance the shards by a median rather than one run's
+# times. Each run's load and parts (build/tests-all-ran.sh) stay beside its seconds, in the same order: they are what
+# build/test-split.sh learns a class's slowdown beside others and its setup per part from (#757). A class that did not
+# run this time is dropped with its history. The build job keeps the history in the Actions cache for the next run.
 #
 # A class whose median is over the target, 15 minutes, cannot fit in a shard of that length, so build/test-split.sh
 # runs it in parts, by test method (#738): for such a class, the history also keeps each of its methods' times, in
@@ -26,14 +28,19 @@ awk -F '\t' '
     }
     return count % 2 ? values[(count + 1) / 2] + 0 : (values[count / 2] + values[count / 2 + 1]) / 2
   }
-  FILENAME == ARGV[1] { previous[$1 "\t" $2] = $4; next }
+  FILENAME == ARGV[1] { previous[$1 "\t" $2] = $4 "\t" $5 "\t" $6; next }
   {
     key = $1 "\t" $2
-    count = split(previous[key], seconds, " ")
-    line = $4
-    for (i = 1; i <= count && i < runs; i++) { line = line " " seconds[i] }
-    kept[key] = $3 "\t" line
-    if (index($2, "#") == 0) { over[key] = median(line) > target }
+    split(previous[key], before, "\t")
+    line = $3
+    for (column = 1; column <= 3; column++) {
+      count = split(before[column], values, " ")
+      entries[column] = $(column + 3)
+      for (i = 1; i <= count && i < runs; i++) { entries[column] = entries[column] " " values[i] }
+      line = line "\t" entries[column]
+    }
+    kept[key] = line
+    if (index($2, "#") == 0) { over[key] = median(entries[1]) > target }
   }
   END {
     for (key in kept) {

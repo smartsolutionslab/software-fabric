@@ -20,6 +20,8 @@ jobs:
   # Which classes each test shard runs (#711), worked out once so every shard reads the same split: build/test-split.sh
   # balances them by the median of the times the build job of recent runs kept in the Actions cache (a few KB, this
   # branch's latest entry, else main's), and runs a class longer than the 15-minute target in parts, by method (#738).
+  # The times carry each run's load and parts, from which the split learns how classes slow each other and what a part
+  # costs (#757); the cache key's v2 keeps it from reading a history without them.
   # Without one the split is build/test-shards.txt, which also sets how many shards there are: 20, so that no shard's
   # estimate is over the target.
   split:
@@ -31,8 +33,8 @@ jobs:
       - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ${{ runner.temp }}/test-times
-          key: test-times-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: test-times-
+          key: test-times-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: test-times-v2-
       - id: split
         run: |
           build/test-split.sh "$RUNNER_TEMP/test-times/history.tsv" build/test-shards.txt > "$RUNNER_TEMP/test-shards.txt"
@@ -108,8 +110,8 @@ jobs:
       - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ${{ runner.temp }}/test-times
-          key: test-times-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: test-times-
+          key: test-times-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: test-times-v2-
       # Every test project's every method ran in exactly one shard; prints the counts per project and each class's time.
       - run: |
           assemblies=()
@@ -128,7 +130,7 @@ jobs:
       - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: ${{ runner.temp }}/test-times
-          key: test-times-${{ github.run_id }}-${{ github.run_attempt }}
+          key: test-times-v2-${{ github.run_id }}-${{ github.run_attempt }}
       - run: build/profiles.sh
 
   # The pairwise matrix's per-pull-request layer (ADR-0003 amendment, roadmap M3-03): every combination of
