@@ -128,6 +128,33 @@ audience for the whole API (D4).
   "backend.tenancy == none"]` (D3) and `conflicts: ["backend.api-protocols
   has grpc"]` (D5).
 
+### Options services refuse (#723)
+
+The catalog states what a services project cannot build yet as `conflicts`
+on the option, so `fabric new` refuses it with one sentence and the matrix
+never picks it:
+
+- **Integration tests run through the AppHost** (owner, 2026-11-18, #723).
+  `backend.test.integration == testcontainers` conflicts with `services`, and
+  `aspire-fixture`, the dimension's default, is what a services project gets.
+  The AppHost already wires every service host, the edge and a database per
+  service with its own migration run (D2), so the Aspire fixture tests that
+  setup as it runs; a testcontainers fixture would have to rebuild it by hand,
+  one host, database and migration run per module, and would test that copy
+  instead. A modular monolith keeps both options. A testcontainers fixture for
+  services and a silent fallback to `aspire-fixture` were both rejected.
+- **The singletons wait for the edge.** `backend.mcp has server`,
+  `frontend.realtime == signalr`, `frontend.realtime == sse` and
+  `frontend.agent-ui == ag-ui` conflict with `services` for now: each of them
+  would map its endpoint in every service host, which `SingletonsLiveOnTheEdge`
+  forbids. #707 moves them to `edge.*` and lifts these conflicts in the same
+  change.
+
+What does work with services: the model and embeddings rules check every
+service host's `Program.cs`; agent-framework's endpoint rule starts every
+service host; and with `rag`, the vector tables each service's migration run
+makes in its own database are what the generated `VectorTablesTests` check.
+
 ## Consequences
 
 - A generated services project runs one process per module plus the edge.

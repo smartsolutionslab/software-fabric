@@ -213,7 +213,7 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `client` | experimental | — | — | — | the project uses external MCP servers |
-| `server` | experimental | — | — | — | the project exposes MCP tools, opted in per command or query |
+| `server` | experimental | — | `backend.topology == services` | — | the project exposes MCP tools, opted in per command or query |
 
 ### `backend.mediator`
 
@@ -286,7 +286,7 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `aspire-fixture` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
-| `testcontainers` | supported | — | — | — | — |
+| `testcontainers` | supported | — | `backend.topology == services` | — | monolith only: with services the integration tests run through the AppHost (aspire-fixture), ADR-0017 |
 
 ### `backend.test.mocks`
 
@@ -317,7 +317,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `ag-ui` | supported | `frontend.architecture == spa` | — | `saas-ai-react` | an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host |
+| `ag-ui` | supported | `frontend.architecture == spa` | `backend.topology == services` | `saas-ai-react` | an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host |
 | `none` | supported | — | — | — | no agent panel; agents are reached through the project's own endpoints |
 
 ### `frontend.api-client`
@@ -489,8 +489,8 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `none` | supported | — | — | `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
-| `signalr` | experimental | — | — | `industrial-event-driven-mfe` | — |
-| `sse` | experimental | — | — | — | — |
+| `signalr` | experimental | — | `backend.topology == services` | `industrial-event-driven-mfe` | — |
+| `sse` | experimental | — | `backend.topology == services` | — | — |
 
 ### `frontend.routing`
 
