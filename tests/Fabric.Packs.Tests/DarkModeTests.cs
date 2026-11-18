@@ -35,13 +35,14 @@ public sealed partial class DarkModeTests
         dark.Keys.ShouldBe(light.Keys.Where(name => name != "--radius"), ignoreOrder: true);
         dark["--background"].ShouldBe("oklch(0.129 0.042 264.695)");
         dark["--foreground"].ShouldBe("oklch(0.984 0.003 247.858)");
-        dark["--primary"].ShouldBe("oklch(0.424 0.199 265.638)");
+        dark["--primary"].ShouldBe("oklch(0.707 0.165 254.624)");
+        dark["--primary-foreground"].ShouldBe("oklch(0.282 0.091 267.935)");
         dark["--muted-foreground"].ShouldBe("oklch(0.704 0.04 256.788)");
         dark["--destructive"].ShouldBe("oklch(0.704 0.191 22.216)");
         dark["--border"].ShouldBe("oklch(1 0 0 / 10%)");
         dark["--input"].ShouldBe("oklch(1 0 0 / 15%)");
         dark["--chart-1"].ShouldBe("oklch(0.809 0.105 251.813)");
-        dark["--sidebar-primary"].ShouldBe("oklch(0.424 0.199 265.638)");
+        dark["--sidebar-primary"].ShouldBe("oklch(0.707 0.165 254.624)");
         dark["--sidebar-border"].ShouldBe("oklch(1 0 0 / 10%)");
         styles.ShouldNotContain("Light only");
     }
@@ -56,6 +57,7 @@ public sealed partial class DarkModeTests
         files.Keys.ShouldContain("web/app/src/theme/theme.ts");
         files.Keys.ShouldContain("web/app/src/theme/theme.test.ts");
         files.Keys.ShouldContain("web/app/src/theme/contrast.test.ts");
+        files["web/app/src/theme/contrast.test.ts"].ShouldContain("['primary', 'background'],");
         var head = files["web/app/index.html"].Split("</head>")[0];
         head.ShouldContain("<script>");
         head.ShouldContain("localStorage.getItem('theme')");
@@ -144,6 +146,7 @@ public sealed partial class DarkModeTests
         plain.ShouldContain("✓ src/theme/theme.test.ts > before the first paint index.html follows the system with storage blocked", customMessage: testOutput);
         plain.ShouldContain("✓ src/theme/contrast.test.ts > in the dark theme muted-foreground on background has a contrast of at least 4.5:1", customMessage: testOutput);
         plain.ShouldContain("✓ src/theme/contrast.test.ts > in the light theme primary-foreground on primary has a contrast of at least 4.5:1", customMessage: testOutput);
+        plain.ShouldContain("✓ src/theme/contrast.test.ts > in the dark theme primary on background has a contrast of at least 4.5:1", customMessage: testOutput);
         plain.ShouldContain($"✓ {axeCheck} > the Billing page has no accessibility violations axe can find in the dark theme", customMessage: testOutput);
 
         var styles = Path.Combine(app, "src", "index.css");

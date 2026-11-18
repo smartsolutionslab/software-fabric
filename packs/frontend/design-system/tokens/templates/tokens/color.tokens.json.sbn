@@ -16,7 +16,7 @@
       "700": { "$value": "#3730a3" }{{ end }}
     },
     "signal": {
-      "500": { "$value": "#d97706" }
+{{ if scheme }}{{ color_scheme_signal }}{{ else }}      "500": { "$value": "#d97706" }{{ end }}
     },
     "danger": {
 {{~ if scheme ~}}
