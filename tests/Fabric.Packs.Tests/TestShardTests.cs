@@ -63,6 +63,19 @@ public sealed class TestShardTests : IDisposable
     }
 
     [Fact]
+    public void A_test_method_that_ran_in_two_shards_fails_the_check_and_is_named()
+    {
+        var twice = $"{TestType}.{nameof(A_test_method_that_ran_in_two_shards_fails_the_check_and_is_named)}";
+        WriteReport("shard-1", Methods.Value);
+        WriteReport("shard-2", [twice]);
+
+        var (exitCode, output) = Check();
+
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain($"Fabric.Packs.Tests: these test methods ran in more than one shard:\n  {twice}\n", Case.Sensitive, output);
+    }
+
+    [Fact]
     public void An_assembly_without_any_report_fails_the_check()
     {
         WriteReport("shard-1", ["Fabric.Other.Tests.SomeTests.Something"], "Fabric.Other.Tests");
