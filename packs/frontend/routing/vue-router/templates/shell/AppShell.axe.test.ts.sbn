@@ -1,0 +1,80 @@
+{{~ user_menu = object.has_key(project, "frontend.auth-client") && project["frontend.auth-client"] == "oidc-client-ts" ~}}
+import { render, screen, within } from '@testing-library/vue';
+import userEvent from '@testing-library/user-event';
+import { afterEach, expect, test{{ if user_menu }}, vi{{ end }} } from 'vitest';
+import { axe } from 'vitest-axe';
+{{~ if user_menu ~}}
+import { computed } from 'vue';
+{{~ end ~}}
+import { createMemoryHistory } from 'vue-router';
+import App from '@/App.vue';
+{{~ if user_menu ~}}
+import { signedInAsDeveloper } from '@/auth/signedInAsDeveloper';
+{{~ end ~}}
+import { createAppRouter } from '@/router';
+{{~ if user_menu ~}}
+
+// The user menu asks the host's /me for the name; here it answers at once.
+vi.mock('@/api/useCurrentUser', () => ({ useCurrentUser: () => computed(() => 'developer') }));
+{{~ end ~}}
+
+afterEach(() => {
+  document.documentElement.removeAttribute('class');
+  localStorage.clear();
+});
+
+{{~ if user_menu ~}}
+// The shell renders for the local user developer, signed in, as the app shows it.
+{{~ end ~}}
+async function renderShell() {
+  const router = createAppRouter(createMemoryHistory());
+  await router.push('/');
+  return render(App, { global: { plugins: [router{{ if user_menu }}, signedInAsDeveloper{{ end }}] } }).container;
+}
+
+const themes = [
+  { name: 'light', switchOn: () => undefined },
+  {
+    name: 'dark',
+    // As the theme toggle does: the choice stored, the class on <html>.
+    switchOn: () => {
+      localStorage.setItem('theme', 'dark');
+      document.documentElement.classList.add('dark');
+    },
+  },
+];
+
+// Whichever test renders first in a file also pays for warming up jsdom, Vue and axe.
+test.each(themes)(
+  'the app shell has no accessibility violations axe can find in the $name theme',
+  { timeout: 20_000 },
+  async ({ switchOn }) => {
+    switchOn();
+    const container = await renderShell();
+
+    expect(await axe(container)).toHaveNoViolations();
+  },
+);
+
+test.each(themes)(
+  'the open command palette has no accessibility violations axe can find in the $name theme',
+  async ({ switchOn }) => {
+    switchOn();
+    const user = userEvent.setup();
+    await renderShell();
+
+    await user.keyboard('{Control>}k{/Control}');
+    await screen.findByRole('dialog', { name: 'Go to' });
+
+    expect(await axe(document.body)).toHaveNoViolations();
+  },
+);
+
+test('the collapsed sidebar leaves no accessibility violations axe can find', async () => {
+  const user = userEvent.setup();
+  const container = await renderShell();
+
+  await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Toggle Sidebar' }));
+
+  expect(await axe(container)).toHaveNoViolations();
+});

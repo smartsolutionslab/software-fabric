@@ -1,0 +1,59 @@
+import { Fragment } from 'react';
+import { Link, useLocation } from 'react-router';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+import type { ModuleRoute } from '@/modules';
+
+interface Crumb {
+  label: string;
+  to: string;
+}
+
+/** Home, the module the address is in (by the title its routes.tsx gives it), and each step of the address below it. */
+function crumbsOf(pathname: string, routes: readonly ModuleRoute[]): Crumb[] {
+  const [first, ...rest] = pathname.split('/').filter((segment) => segment !== '');
+  const crumbs: Crumb[] = [{ label: 'Home', to: '/' }];
+  if (first === undefined) {
+    return crumbs;
+  }
+
+  const module = routes.find((route) => route.path === first);
+  crumbs.push({ label: module?.title ?? decodeURIComponent(first), to: `/${first}` });
+  let to = `/${first}`;
+  for (const segment of rest) {
+    to = `${to}/${segment}`;
+    crumbs.push({ label: decodeURIComponent(segment), to });
+  }
+  return crumbs;
+}
+
+/** Where the user is, from the route hierarchy: every step a link but the current one. */
+export function Breadcrumbs({ routes }: { routes: readonly ModuleRoute[] }) {
+  const crumbs = crumbsOf(useLocation().pathname, routes);
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        {crumbs.map((crumb, index) => (
+          <Fragment key={crumb.to}>
+            {index > 0 && <BreadcrumbSeparator />}
+            <BreadcrumbItem>
+              {index === crumbs.length - 1 ? (
+                <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+              ) : (
+                <BreadcrumbLink asChild>
+                  <Link to={crumb.to}>{crumb.label}</Link>
+                </BreadcrumbLink>
+              )}
+            </BreadcrumbItem>
+          </Fragment>
+        ))}
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}

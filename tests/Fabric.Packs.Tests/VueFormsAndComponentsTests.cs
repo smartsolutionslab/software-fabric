@@ -94,7 +94,7 @@ public sealed partial class VueFormsAndComponentsTests
         import { PanelLeft } from '@lucide/vue';
         import { Button } from '@/components/ui/button';
 
-        defineOptions({ name: 'UiSidebarTrigger' });
+        defineOptions({ name: 'UiPanelToggle' });
 
         const emit = defineEmits<{ toggle: [] }>();
         </script>
@@ -227,7 +227,8 @@ public sealed partial class VueFormsAndComponentsTests
         project.Write("web/app/src/pages/SignUpForm.test.ts", SignUpFormTest);
         project.Write("web/app/src/components/ui/card/Card.vue", CliCard);
         project.Write("web/app/src/components/ui/dialog/DialogOverlay.vue", CliDialogOverlay);
-        project.Write("web/app/src/components/ui/sidebar/SidebarTrigger.vue", CliSidebarTrigger);
+        // Beside the shipped sidebar (#695), whose own trigger toggles it: this one only has the registry's shape.
+        project.Write("web/app/src/components/ui/panel-toggle/PanelToggle.vue", CliSidebarTrigger);
         var web = Path.Combine(project.ProjectDirectory, "web");
         var app = Path.Combine(web, "app");
         foreach (var step in new[] { "install", "build", "lint" })

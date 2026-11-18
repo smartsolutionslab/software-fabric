@@ -45,10 +45,16 @@ public sealed class VueFrontendTests
     private const string ModuleRouteTest = """
         import { render, screen } from '@testing-library/vue';
         import userEvent from '@testing-library/user-event';
-        import { expect, test } from 'vitest';
+        import { expect, test, vi } from 'vitest';
         import { createMemoryHistory } from 'vue-router';
         import App from '@/App.vue';
         import { createAppRouter } from '@/router';
+
+        // The shell's user menu asks /me as the signed-in user; it has its own test, so here it stands in.
+        vi.mock('@/auth/UserMenu.vue', async () => {
+          const { h } = await import('vue');
+          return { default: { render: () => h('p', 'The user menu') } };
+        });
 
         test('the billing link leads to the billing page', async () => {
           const router = createAppRouter(createMemoryHistory());

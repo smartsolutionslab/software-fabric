@@ -48,7 +48,35 @@ export function SignedIn({ children }: { children: ReactNode }) {
     </>
   );
 }
-}%}{{~ else ~}}
+}%}{{~ else if project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router" ~}}
+import { type ReactNode, useEffect } from 'react';
+import { hasAuthParams, useAuth } from 'react-oidc-context';
+
+/**
+ * Renders its children for a signed-in user and sends everyone else to the identity provider. Who is signed in, and
+ * Sign out, are in the app shell's user menu (UserMenu.tsx).
+ */
+export function SignedIn({ children }: { children: ReactNode }) {
+  const auth = useAuth();
+  const mustSignIn =
+    !auth.isAuthenticated && !auth.isLoading && !auth.activeNavigator && !auth.error && !hasAuthParams();
+
+  useEffect(() => {
+    if (mustSignIn) {
+      void auth.signinRedirect();
+    }
+  }, [mustSignIn, auth]);
+
+  if (auth.error) {
+    return <p role="alert">Sign-in failed: {auth.error.message}</p>;
+  }
+  if (!auth.isAuthenticated) {
+    return <p>Signing in…</p>;
+  }
+
+  return children;
+}
+{{~ else ~}}
 import { type ReactNode, useEffect } from 'react';
 import { hasAuthParams, useAuth } from 'react-oidc-context';
 {{~ if project["frontend.styling"] == "css-modules" ~}}

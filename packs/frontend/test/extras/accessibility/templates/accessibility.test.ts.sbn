@@ -1,12 +1,21 @@
 {{~ if project["frontend.routing"] != "vue-router" ~}}
 throw new Error('The accessibility pack renders the Vue start page through vue-router only so far (docs/adr/0006 of the generator).');
 {{~ end ~}}
+{{~ user_menu = project["frontend.ui-library"] == "shadcn-vue" && project["frontend.architecture"] == "spa" && object.has_key(project, "frontend.auth-client") && project["frontend.auth-client"] == "oidc-client-ts" ~}}
 import { render } from '@testing-library/vue';
-import { expect, test } from 'vitest';
+import { expect, test{{ if user_menu }}, vi{{ end }} } from 'vitest';
 import { axe } from 'vitest-axe';
 import { createMemoryHistory } from 'vue-router';
 import App from './App.vue';
 import { createAppRouter } from './router';
+{{~ if user_menu ~}}
+
+// The user menu has its own test; here it stands in, so this test checks the start page.
+vi.mock('@/auth/UserMenu.vue', async () => {
+  const { h } = await import('vue');
+  return { default: { render: () => h('p', 'The user menu') } };
+});
+{{~ end ~}}
 
 test('the start page has no accessibility violations axe can find', async () => {
   const router = createAppRouter(createMemoryHistory());
