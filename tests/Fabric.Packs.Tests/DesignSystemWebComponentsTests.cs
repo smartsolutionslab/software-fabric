@@ -213,8 +213,9 @@ public sealed class DesignSystemWebComponentsTests
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "--filter", "@shop/ui", "test");
 
+        BrowserTester.ShouldHaveStarted(output);
         exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("a badge is styled only through the design tokens");
+        output.ShouldContain("a badge is styled only through the design tokens", Case.Insensitive, output);
     }
 
     // A token may resolve to any colour, the gate's own included: the colours it starts unset properties from and those
@@ -235,6 +236,7 @@ public sealed class DesignSystemWebComponentsTests
 
         var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "--filter", "@shop/ui", "test");
 
+        BrowserTester.ShouldHaveStarted(output);
         exitCode.ShouldBe(0, output);
     }
 
@@ -334,6 +336,7 @@ public sealed class DesignSystemWebComponentsTests
         foreach (var step in steps)
         {
             var (exitCode, output) = Shell.Run(web, "pnpm", step);
+            BrowserTester.ShouldHaveStarted(output);
             exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
         }
     }
