@@ -112,6 +112,36 @@ public class OpenApiAdditionsTests
             .ShouldBe("web/app/openapi.json already has the schema PermissionDto; add-module only adds a new module's paths and schemas.");
     }
 
+    /// <summary>
+    /// A project without an identity provider starts with a copy that has no paths, and so no tags (#734): the first
+    /// module's endpoints bring the tag the host gives them, after the components, as the host serves it.
+    /// </summary>
+    [Fact]
+    public void Adds_the_tags_a_copy_lacks_after_the_components_and_none_it_already_has()
+    {
+        var copy = """
+            {
+              "openapi": "3.1.2",
+              "paths": {}
+            }
+
+            """;
+        var samples = new OpenApiAdditions(
+            [new("/billing/samples", JsonNode.Parse("""{ "get": { "tags": [ "Host" ] } }""")!)],
+            [new("BillingSampleDto", JsonNode.Parse("""{ "type": "object" }""")!)],
+            [],
+            ["Host"]);
+
+        samples.InsertInto(copy, out var extended).ShouldBeNull();
+        samples.InsertInto(extended, out _).ShouldNotBeNull();
+        new OpenApiAdditions([new("/shipping/samples", JsonNode.Parse("{}")!)], [], [], ["Host"]).InsertInto(extended, out var second).ShouldBeNull();
+
+        var document = JsonNode.Parse(extended)!.AsObject();
+        document.Select(member => member.Key).ShouldBe(["openapi", "paths", "components", "tags"]);
+        document["tags"]!.ToJsonString().ShouldBe("""[{"name":"Host"}]""");
+        JsonNode.Parse(second)!["tags"]!.ToJsonString().ShouldBe("""[{"name":"Host"}]""");
+    }
+
     [Fact]
     public void Adds_the_components_a_copy_without_schemas_lacks()
     {
