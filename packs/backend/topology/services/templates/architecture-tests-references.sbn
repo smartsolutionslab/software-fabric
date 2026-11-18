@@ -1,0 +1,1 @@
+    <ProjectReference Include="../../src/Services/*/Host/Host.csproj" />

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Services.{{ module.namespace }}.Host</RootNamespace>
+    <AssemblyName>{{ namespace }}.Services.{{ module.namespace }}.Host</AssemblyName>
+    <!-- The AppHost names this service's resource after its module. -->
+    <ModuleName>{{ module.name }}</ModuleName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../../ServiceDefaults/ServiceDefaults.csproj" />
+    <ProjectReference Include="../../../BuildingBlocks/BuildingBlocks.csproj" />
+    <ProjectReference Include="../../../Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- src/Host holds the code packs write once for every host (wiring, host-wide types); each service host compiles it. -->
+    <Compile Include="../../../Host/**/*.cs" Exclude="../../../Host/bin/**;../../../Host/obj/**" Link="Host/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+{{ slots["host.packages"] }}
+  </ItemGroup>
+
+</Project>

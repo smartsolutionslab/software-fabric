@@ -8,6 +8,9 @@ slots:
   - { slot: host.packages, template: templates/host-package.sbn }
   - { slot: host.services, template: templates/host-services.sbn }
   - { slot: host.middleware, template: templates/host-middleware.sbn }
+  # With services, the edge describes what it maps itself and adds every service's paths to it (ADR-0017).
+  - { slot: edge.services, template: templates/host-services.sbn, optional: true }
+  - { slot: edge.middleware, template: templates/host-middleware.sbn, optional: true }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

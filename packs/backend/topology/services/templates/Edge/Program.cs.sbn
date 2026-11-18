@@ -1,0 +1,16 @@
+var builder = WebApplication.CreateBuilder(args);
+builder.AddServiceDefaults();
+builder.Services.AddModuleRoutes(builder.Configuration);
+
+{{ slots["edge.services"] }}
+
+var app = builder.Build();
+
+{{ slots["edge.middleware"] }}
+app.UseServiceDocuments();
+
+app.MapDefaultEndpoints();
+{{ slots["edge.endpoints"] }}
+app.MapReverseProxy();
+
+app.Run();

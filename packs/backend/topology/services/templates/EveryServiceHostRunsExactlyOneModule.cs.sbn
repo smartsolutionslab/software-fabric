@@ -1,0 +1,38 @@
+using {{ namespace }}.BuildingBlocks.Modules;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A service host discovers every <see cref="IModule"/> in the module Api assemblies it references, so it runs exactly
+/// one module when it references exactly one Api project and that assembly has exactly one IModule.
+/// </summary>
+public sealed class EveryServiceHostRunsExactlyOneModule : IArchitectureRule
+{
+    private const string ModulePrefix = "{{ namespace }}.Modules.";
+
+    public string Description => "Every service host runs exactly one module: its scan finds one IModule.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var assemblies = model.ModuleAssemblies.ToDictionary(assembly => assembly.GetName().Name!, StringComparer.Ordinal);
+        foreach (var (service, references) in ServiceHostReferences.Read())
+        {
+            var apis = references
+                .Select(ServiceHostReferences.ModuleOf)
+                .Where(module => references.Contains($"src/Modules/{module}/{module}.Api/{module}.Api.csproj"))
+                .Select(module => ModulePrefix + module + ".Api")
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            var modules = apis
+                .SelectMany(api => assemblies.TryGetValue(api, out var assembly) ? assembly.GetTypes() : [])
+                .Count(type => type is { IsClass: true, IsAbstract: false } && typeof(IModule).IsAssignableFrom(type));
+            if (modules != 1)
+            {
+                var found = apis.Count == 0 ? "no module Api project" : string.Join(", ", apis);
+                yield return $"src/Services/{service}/Host finds {modules} IModule implementations, in {found}; a service host runs exactly one module.";
+            }
+        }
+    }
+}

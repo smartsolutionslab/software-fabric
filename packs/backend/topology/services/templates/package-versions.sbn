@@ -1,0 +1,2 @@
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery.Yarp" Version="11.0.0" />
+    <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />

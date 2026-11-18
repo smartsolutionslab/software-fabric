@@ -1,0 +1,12 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests;
+
+/// <summary>The entry point (<c>Program</c>) of every service host beside the tests, for the rules that start a host.</summary>
+public static class ServiceHostEntryPoints
+{
+    public static IReadOnlyList<Type> All { get; } =
+        [.. Directory.EnumerateFiles(AppContext.BaseDirectory, "{{ namespace }}.Services.*.Host.dll")
+            .Order(StringComparer.Ordinal)
+            .Select(path => Assembly.LoadFrom(path).GetType("Program", throwOnError: true)!)];
+}

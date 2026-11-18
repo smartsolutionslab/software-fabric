@@ -1,0 +1,135 @@
+using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Microsoft.AspNetCore.Builder;
+
+/// <summary>
+/// The frontend sees one API (ADR-0017): the edge's OpenAPI document is its own, describing what the edge maps itself,
+/// with every module service's paths and schemas added, the paths in the order of the modules. Where the edge serves no
+/// document of its own (outside Development), it serves none.
+/// </summary>
+public static class ServiceDocuments
+{
+    private const string DocumentPath = "/openapi/v1.json";
+
+    public static WebApplication UseServiceDocuments(this WebApplication app)
+    {
+        {{ not_null "app" }}
+
+        app.Use(async (context, next) =>
+        {
+            if (!HttpMethods.IsGet(context.Request.Method) || context.Request.Path != DocumentPath)
+            {
+                await next(context);
+                return;
+            }
+
+            var response = context.Response.Body;
+            using var own = new MemoryStream();
+            context.Response.Body = own;
+            try
+            {
+                await next(context);
+            }
+            finally
+            {
+                context.Response.Body = response;
+            }
+
+            if (context.Response.StatusCode != StatusCodes.Status200OK || JsonNode.Parse(own.ToArray()) is not JsonObject document)
+            {
+                own.Position = 0;
+                await own.CopyToAsync(response, context.RequestAborted);
+                return;
+            }
+
+            using var client = context.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
+            foreach (var module in ModuleRoutes.Modules(app.Configuration))
+            {
+                var served = await client.GetStringAsync(new Uri("http://" + module + DocumentPath), context.RequestAborted);
+                if (JsonNode.Parse(served) is JsonObject service)
+                {
+                    Add(service, document);
+                }
+            }
+
+            context.Response.ContentLength = null;
+            await context.Response.WriteAsync(document.ToJsonString(), context.RequestAborted);
+        });
+
+        return app;
+    }
+
+    private static void Add(JsonObject service, JsonObject document)
+    {
+        // A host tags its operations, and names its document, after itself; the edge's document is the one API's.
+        var (serviceName, edgeName) = (Name(service), Name(document));
+        var paths = Member(document, "paths", after: "info");
+        foreach (var (path, item) in service["paths"] as JsonObject ?? [])
+        {
+            var added = item?.DeepClone();
+            foreach (var operation in (added as JsonObject ?? []).Select(member => member.Value).OfType<JsonObject>())
+            {
+                if (operation["tags"] is JsonArray operationTags)
+                {
+                    for (var index = 0; index < operationTags.Count; index++)
+                    {
+                        if (operationTags[index]?.GetValue<string>() == serviceName)
+                        {
+                            operationTags[index] = edgeName;
+                        }
+                    }
+                }
+            }
+
+            paths.TryAdd(path, added);
+        }
+
+        var schemas = Member(Member(document, "components", after: "paths"), "schemas", after: null);
+        List<KeyValuePair<string, JsonNode?>> merged = [.. schemas.Select(schema => KeyValuePair.Create(schema.Key, schema.Value?.DeepClone()))];
+        foreach (var (name, schema) in service["components"]?["schemas"] as JsonObject ?? [])
+        {
+            if (!schemas.ContainsKey(name))
+            {
+                merged.Add(KeyValuePair.Create(name, schema?.DeepClone()));
+            }
+        }
+
+        // The document lists schemas by name, as a host serving every module would.
+        schemas.Clear();
+        foreach (var (name, schema) in merged.OrderBy(schema => schema.Key, StringComparer.Ordinal))
+        {
+            schemas.Add(name, schema);
+        }
+
+        if (service["tags"] is JsonArray tags)
+        {
+            var known = Member(document, "tags", "components", () => new JsonArray());
+            foreach (var tag in tags.Where(tag => tag?["name"]?.GetValue<string>() != serviceName && !known.Any(existing => JsonNode.DeepEquals(existing, tag))))
+            {
+                known.Add(tag?.DeepClone());
+            }
+        }
+    }
+
+    /// <summary>The name a host gives its document and its operations' tag: its application's, the title before " | v1".</summary>
+    private static string? Name(JsonObject document) => document["info"]?["title"]?.GetValue<string>().Split(" | ")[0];
+
+    private static JsonObject Member(JsonObject parent, string name, string? after) => Member(parent, name, after, () => new JsonObject());
+
+    /// <summary>The member, created after the member <paramref name="after"/> where it is missing, as the host would order them.</summary>
+    private static T Member<T>(JsonObject parent, string name, string? after, Func<T> create)
+        where T : JsonNode
+    {
+        if (parent[name] is T member)
+        {
+            return member;
+        }
+
+        var created = create();
+        var at = after is null ? -1 : parent.IndexOf(after);
+        parent.Insert(at < 0 ? parent.Count : at + 1, name, created);
+        return created;
+    }
+}
