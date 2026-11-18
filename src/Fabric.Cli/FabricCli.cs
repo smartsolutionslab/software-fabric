@@ -26,6 +26,7 @@ public static class FabricCli
             NewCommand(output, error),
             AddModuleCommand(output, error),
             UpgradeCommand(output, error),
+            ChangeCommand(output, error),
             ProfilesCommand(output, error),
             MatrixCommand(output, error),
             ReferenceCommand(output, error),
@@ -255,6 +256,49 @@ public static class FabricCli
 
             output.Write(summary);
             WarnExperimental(error, upgrade.Experimental);
+            return 0;
+        }));
+
+        return command;
+    }
+
+    private static Command ChangeCommand(TextWriter output, TextWriter error)
+    {
+        var (set, catalog, packs) = (SetOption(), CatalogOption(), PacksOption());
+        var project = new Option<string>("--project")
+        {
+            Description = "The generated project to change: the top of a git repository with a clean working tree. Defaults to the current directory.",
+            DefaultValueFactory = _ => ".",
+        };
+        var command = new Command(
+            "change",
+            "Change a choice the catalog marks changeable in a project this fabric wrote: merge what it writes for the changed " +
+            "choices into the project, three-way against what it writes for the recorded ones (ADR-0016). Conflicts are left " +
+            "as git conflicts; nothing is committed.")
+        {
+            set,
+            project,
+            catalog,
+            packs,
+        };
+
+        command.SetAction(result => Guarded(error, () =>
+        {
+            var catalogModel = CatalogReader.ReadFile(result.GetValue(catalog)!);
+            var loaded = PackLoader.Load(result.GetValue(packs)!, catalogModel);
+            if (loaded.Errors.Count > 0)
+            {
+                return Fail(error, loaded.Errors);
+            }
+
+            var change = ChoiceChanger.Change(result.GetValue(project)!, result.GetValue(set) ?? [], catalogModel, loaded.Packs);
+            if (change.Summary is not { } summary)
+            {
+                return Fail(error, change.Errors);
+            }
+
+            output.Write(summary);
+            WarnExperimental(error, change.Experimental);
             return 0;
         }));
 

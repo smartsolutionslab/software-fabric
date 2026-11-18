@@ -36,22 +36,64 @@ public static class UpgradeSummary
         ArgumentNullException.ThrowIfNull(outcome);
         ArgumentNullException.ThrowIfNull(skippedProbeTests);
 
-        var text = new StringBuilder().AppendLine(CultureInfo.InvariantCulture, $"upgraded {name} from fabric {oldVersion} to fabric {newVersion}; nothing is committed.");
+        return Write(
+            $"upgraded {name} from fabric {oldVersion} to fabric {newVersion}; nothing is committed.",
+            $"fabric {newVersion}",
+            outcome,
+            hasOpenApiDocument,
+            hasBaseApi,
+            [.. skippedProbeTests.Select(path =>
+                $"- that {path} is added: the project's page beside it differs from what fabric {oldVersion} wrote, and the test asserts " +
+                "the generated page; generate it with fabric and add it by hand if the page keeps a Manage section.")]);
+    }
+
+    /// <summary>
+    /// Writes the summary of <c>fabric change</c> (ADR-0016 C1): the same sections as an upgrade's, with the changed
+    /// choices, <c>dimension=option</c>, standing where an upgrade names the new generator.
+    /// </summary>
+    public static string WriteChange(
+        string name,
+        IReadOnlyList<ChoiceChange> changes,
+        UpgradeOutcome outcome,
+        bool hasOpenApiDocument,
+        bool hasBaseApi)
+    {
+        ArgumentNullException.ThrowIfNull(changes);
+        ArgumentNullException.ThrowIfNull(outcome);
+
+        var described = string.Join(", ", changes.Select(change => $"{change.Dimension} from {change.From} to {change.To}"));
+        return Write(
+            $"changed {name}'s {described}; nothing is committed.",
+            string.Join(' ', changes.Select(change => $"{change.Dimension}={change.To}")),
+            outcome,
+            hasOpenApiDocument,
+            hasBaseApi,
+            []);
+    }
+
+    /// <param name="theirs">What wrote the merged-in tree, as the sections name it.</param>
+    private static string Write(
+        string headline,
+        string theirs,
+        UpgradeOutcome outcome,
+        bool hasOpenApiDocument,
+        bool hasBaseApi,
+        IReadOnlyList<string> extraNotes)
+    {
+        var text = new StringBuilder().AppendLine(headline);
         if (outcome.Taken.Count + outcome.Merged.Count + outcome.Conflicts.Count == 0)
         {
-            text.AppendLine(CultureInfo.InvariantCulture, $"nothing changed: the project already has what fabric {newVersion} writes.");
+            text.AppendLine(CultureInfo.InvariantCulture, $"nothing changed: the project already has what {theirs} writes.");
         }
 
-        Section(text, $"taken from fabric {newVersion}", outcome.Taken.Select(file => $"{file.Status} {file.Path}").ToList());
+        Section(text, $"taken from {theirs}", outcome.Taken.Select(file => $"{file.Status} {file.Path}").ToList());
         Section(text, "merged with the project's edits", outcome.Merged.Select(file => $"{file.Status} {file.Path}").ToList());
         Section(
             text,
             "conflicts to resolve, then git add and commit",
-            outcome.Conflicts.Select(conflict => $"{Describe(conflict.Kind, newVersion)}: {conflict.Path}").ToList());
+            outcome.Conflicts.Select(conflict => $"{Describe(conflict.Kind, theirs)}: {conflict.Path}").ToList());
         var notes = NotGuaranteed(outcome, hasOpenApiDocument, hasBaseApi);
-        notes.AddRange(skippedProbeTests.Select(path =>
-            $"- that {path} is added: the project's page beside it differs from what fabric {oldVersion} wrote, and the test asserts " +
-            "the generated page; generate it with fabric and add it by hand if the page keeps a Manage section."));
+        notes.AddRange(extraNotes);
         if (notes.Count > 0)
         {
             text.AppendLine("not guaranteed (ADR-0016 D1):");
@@ -75,12 +117,12 @@ public static class UpgradeSummary
         }
     }
 
-    private static string Describe(ConflictKind kind, string newVersion) => kind switch
+    private static string Describe(ConflictKind kind, string theirs) => kind switch
     {
         ConflictKind.BothChanged => "both changed",
         ConflictKind.BothAdded => "both added",
-        ConflictKind.DeletedByProject => $"deleted by the project, changed by fabric {newVersion}",
-        ConflictKind.DeletedByGenerator => $"changed by the project, deleted by fabric {newVersion}",
+        ConflictKind.DeletedByProject => $"deleted by the project, changed by {theirs}",
+        ConflictKind.DeletedByGenerator => $"changed by the project, deleted by {theirs}",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 
