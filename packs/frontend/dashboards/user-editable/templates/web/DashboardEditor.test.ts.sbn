@@ -1,9 +1,14 @@
 {{~ cell = project["frontend.data-grid"] == "ag-grid" ? "gridcell" : "cell" ~}}
 {{~ axe = array.contains(project["frontend.test.extras"], "accessibility") ~}}
+{{~ shell = project["frontend.ui-library"] == "shadcn-vue" && project["frontend.routing"] == "vue-router" ~}}
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
 import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, within } from '@testing-library/vue';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+{{~ if shell ~}}
+import { defineComponent, h } from 'vue';
+import { toast } from 'vue-sonner';
+{{~ end ~}}
 {{~ if axe ~}}
 import { axe } from 'vitest-axe';
 {{~ end ~}}
@@ -15,6 +20,9 @@ import type {
   WidgetData,
   WidgetDescriptionDto,
 } from '@/api/generated';
+{{~ if shell ~}}
+import { Toaster } from '@/components/ui/sonner';
+{{~ end ~}}
 import DashboardEditor from './DashboardEditor.vue';
 
 // {{ if project["frontend.charts"] == "chartjs" }}Chart.js{{ else }}ECharts{{ end }} draws on a canvas jsdom does not have; the chart's accessible name is what the editor decides.
@@ -148,15 +156,28 @@ const saves = () =>
       request: JSON.parse(String(init?.body)) as SaveDashboardRequest,
     }));
 
+{{~ if shell ~}}
+/** The editor beside the app shell's toaster, which shows what Save reports. */
+const WithToasts = defineComponent({ setup: () => () => [h(DashboardEditor), h(Toaster)] });
+
+/** The toaster's live region, where Save's report is. */
+const toasts = () => within(screen.getByRole('region', { name: /notifications/i }));
+
+{{~ end ~}}
 function renderEditor() {
   // A failed read fails at once: the query client's retries would only slow the test down.
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(DashboardEditor, { global: { plugins: [[VueQueryPlugin, { queryClient }]] } });
+  return render({{ if shell }}WithToasts{{ else }}DashboardEditor{{ end }}, { global: { plugins: [[VueQueryPlugin, { queryClient }]] } });
 }
 
 beforeEach(() => {
   Object.assign(answers, defaults);
   vi.stubGlobal('fetch', fetchMock);
+{{~ if shell ~}}
+  // vue-sonner keeps its toasts between renders and shows a new toaster those still open: one test's toast is not the
+  // next's.
+  toast.dismiss();
+{{~ end ~}}
 });
 
 afterEach(() => {
@@ -197,7 +218,7 @@ test('a user opens a dashboard, adds a widget, removes one, renames it and saves
       ],
     },
   });
-  expect(await screen.findByRole('status')).toHaveTextContent('Saved.');
+  expect(await screen.findByRole('status')).toHaveTextContent('{{ if shell }}The dashboard was saved.{{ else }}Saved.{{ end }}');
   await waitFor(() => expect(reads().filter((path) => path === '/dashboards').length).toBeGreaterThan(listed));
 });
 
@@ -337,6 +358,32 @@ test('a table widget whose rows shrink to fewer pages goes back to its last page
   expect(await within(widget).findByRole('{{ cell }}', { name: 'Row 1' })).toBeInTheDocument();
 });
 
+{{~ if shell ~}}
+test('saving reports in a toast that the dashboard was saved', async () => {
+  const user = userEvent.setup();
+  renderEditor();
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+
+  await user.click(await screen.findByRole('button', { name: 'Save dashboard' }));
+
+  expect(await toasts().findByRole('status')).toHaveTextContent('The dashboard was saved.');
+  expect(screen.getAllByRole('status')).toHaveLength(1);
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('a failed save reports in a toast that the dashboard could not be saved', async () => {
+  const user = userEvent.setup();
+  answers.save = () => 'failure';
+  renderEditor();
+  await user.click(await screen.findByRole('button', { name: 'Sales' }));
+
+  await user.click(await screen.findByRole('button', { name: 'Save dashboard' }));
+
+  expect(await toasts().findByRole('alert')).toHaveTextContent('The dashboard could not be saved.');
+  expect(screen.getAllByRole('alert')).toHaveLength(1);
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+{{~ else ~}}
 test('any change after saving takes the saved notice away', async () => {
   const user = userEvent.setup();
   renderEditor();
@@ -352,6 +399,7 @@ test('any change after saving takes the saved notice away', async () => {
   await user.type(screen.getByLabelText('Dashboard name'), ' 2');
   await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
 });
+{{~ end ~}}
 
 test('a failed refresh of a dashboard opened before does not open the copy it had', async () => {
   const user = userEvent.setup();
@@ -381,7 +429,14 @@ test('edits made while a save is under way are not reported as saved', async () 
   pending.settle(sales.id);
 
   await waitFor(() => expect(reads().filter((path) => path === '/dashboards').length).toBeGreaterThan(listed));
+{{~ if shell ~}}
+  // A toast shows a moment after it is asked for: the next save's toast is the first one there.
+  answers.save = (id) => id;
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+  expect(await toasts().findAllByRole('status')).toHaveLength(1);
+{{~ else ~}}
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
+{{~ end ~}}
 });
 
 test('saving refreshes the widgets on the dashboard, whose data may be what was just saved', async () => {

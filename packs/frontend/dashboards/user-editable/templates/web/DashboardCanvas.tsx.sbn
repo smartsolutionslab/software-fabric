@@ -14,12 +14,15 @@ end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
 {{~ mui = project["frontend.ui-library"] == "mui" ~}}
+{{~ # With the app shell (#695) Save reports through notify, in the shell's toasts; without it, in a notice of its own. ~}}
+{{~ shell = ui == "shadcn" && project["frontend.routing"] == "react-router" ~}}
+{{~ hooks = shell ? "useEffect, useMemo, useState" : "useMemo, useState" ~}}
 {{~ if mui ~}}
 import { Box, Button, Stack, Typography } from '@mui/material';
 {{~ end ~}}
 {{~ if tanstack ~}}
 import { revalidateLogic, useForm, useStore } from '@tanstack/react-form';
-import { useMemo, useState } from 'react';
+import { {{ hooks }} } from 'react';
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
 {{~ if valibot ~}}
 import * as v from 'valibot';
@@ -28,13 +31,13 @@ import { z } from 'zod';
 {{~ end ~}}
 {{~ else if valibot ~}}
 import { valibotResolver } from '@hookform/resolvers/valibot';
-import { useMemo, useState } from 'react';
+import { {{ hooks }} } from 'react';
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
 import { useForm, useWatch } from 'react-hook-form';
 import * as v from 'valibot';
 {{~ else ~}}
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMemo, useState } from 'react';
+import { {{ hooks }} } from 'react';
 import ReactGridLayout, { useContainerWidth } from 'react-grid-layout';
 import { useForm, useWatch } from 'react-hook-form';
 import { z } from 'zod';
@@ -42,6 +45,9 @@ import { z } from 'zod';
 {%{import { useGetDashboardsWidgetsQuery, usePutDashboardsByIdMutation, type WidgetDescriptionDto } from '@/api/generated';
 }%}{{~ if !mui ~}}
 import { Button } from '@/components/ui/button';
+{{~ end ~}}
+{{~ if shell ~}}
+import { notify } from '@/lib/notify';
 {{~ end ~}}
 {%{import { Failure } from './Failure';
 import { applyLayout, columns, hasRoom, lowest, nextPlacement, type Placement, toLayout, withinReach } from './layout';
@@ -103,19 +109,34 @@ interface DashboardCanvasProps {
   dashboard: DraftDashboard;
   onSaved: () => void;
 }
+}%}{{~ if shell ~}}
 
+/** What a Save came to, and the draft's revision it sent. */
+interface SaveOutcome {
+  saved: boolean;
+  revision: number;
+}
+{{~ end ~}}
+{%{
 /**
  * One dashboard being edited: its name, the declared widgets on a 12-column grid that the user moves and resizes, and
  * Save, which PUTs the whole dashboard to its id, so saving twice saves it once.
  */
 export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   const [placements, setPlacements] = useState<Placement[]>(dashboard.widgets);
-  // Counts the draft's changes; the notice says Saved only while the saved revision is still the current one, so a
+}%}{{~ if shell ~}}
+  // Counts the draft's changes; Save reports a save only while the draft is still the one it saved, so a save that
+  // ends after a later edit does not call that edit saved.
+  const [revision, setRevision] = useState(0);
+  const [outcome, setOutcome] = useState<SaveOutcome | undefined>();
+{{~ else ~}}
+{%{  // Counts the draft's changes; the notice says Saved only while the saved revision is still the current one, so a
   // save that ends after a later edit does not call that edit saved.
   const [revision, setRevision] = useState(0);
   const [savedRevision, setSavedRevision] = useState<number | undefined>();
   const [failed, setFailed] = useState(false);
-  const [catalogPage, setCatalogPage] = useState(1);
+}%}{{~ end ~}}
+{%{  const [catalogPage, setCatalogPage] = useState(1);
   const widgets = useGetDashboardsWidgetsQuery({ page: catalogPage, pageSize: catalogPageSize });
   const [save, { isLoading: saving }] = usePutDashboardsByIdMutation();
   const { width, containerRef } = useContainerWidth();
@@ -135,13 +156,31 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   const proposed = pendingOnGrid(placements, pending);
 {{~ end ~}}
 {%{
+}%}{{~ if shell ~}}
+  // Each Save is a new outcome, told once in the shell's toasts; a failure always, a save only while it is current.
+  const report = outcome && (!outcome.saved || outcome.revision === revision) ? outcome : undefined;
+  useEffect(() => {
+    if (report?.saved) {
+      notify.success('The dashboard was saved.');
+    } else if (report) {
+      notify.failure('The dashboard could not be saved.');
+    }
+  }, [report]);
+
   const edited = () => {
+    setRevision((current) => current + 1);
+  };
+
+  /** Every change to the draft: a save already under way no longer saves what is on screen. */
+{{~ else ~}}
+{%{  const edited = () => {
     setRevision((current) => current + 1);
     setFailed(false);
   };
 
   /** Every change to the draft: a notice that it was saved no longer holds. */
-  const change = (next: (current: Placement[]) => Placement[]) => {
+}%}{{~ end ~}}
+{%{  const change = (next: (current: Placement[]) => Placement[]) => {
     setPlacements(next);
     edited();
   };
@@ -165,6 +204,17 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
     validators: { onDynamic: nameSchema },
     onSubmit: async ({ value }) => {
       const { name } = {{ if valibot }}v.parse(nameSchema, value){{ else }}nameSchema.parse(value){{ end }};
+{{~ if shell ~}}
+      const submitted = revision;
+      try {
+        await save({ id: dashboard.id, saveDashboardRequest: { name, widgets: placements } }).unwrap();
+        setOutcome({ saved: true, revision: submitted });
+        setSaves((count) => count + 1);
+        onSaved();
+      } catch {
+        setOutcome({ saved: false, revision: submitted });
+      }
+{{~ else ~}}
       const submitted = revision;
       try {
         await save({ id: dashboard.id, saveDashboardRequest: { name, widgets: placements } }).unwrap();
@@ -175,6 +225,7 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
       } catch {
         setFailed(true);
       }
+{{~ end ~}}
     },
   });
   const adding = useForm({
@@ -226,7 +277,18 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
   });
 
   const submit = naming.handleSubmit(async ({ name }) => {
+}%}{{~ if shell ~}}
     const submitted = revision;
+    try {
+      await save({ id: dashboard.id, saveDashboardRequest: { name, widgets: placements } }).unwrap();
+      setOutcome({ saved: true, revision: submitted });
+      setSaves((count) => count + 1);
+      onSaved();
+    } catch {
+      setOutcome({ saved: false, revision: submitted });
+    }
+{{~ else ~}}
+{%{    const submitted = revision;
     try {
       await save({ id: dashboard.id, saveDashboardRequest: { name, widgets: placements } }).unwrap();
       setSavedRevision(submitted);
@@ -236,7 +298,8 @@ export function DashboardCanvas({ dashboard, onSaved }: DashboardCanvasProps) {
     } catch {
       setFailed(true);
     }
-  });
+}%}{{~ end ~}}
+{%{  });
 
 }%}{{~ end ~}}
 {{~ if mui ~}}
@@ -599,9 +662,11 @@ const nativeControl = { px: 1, py: 0.5, border: 1, borderColor: 'divider', borde
         <naming.Subscribe selector={(state) => state.fieldMeta.name?.errors[0]?.message}>
           {(message) => message && <p role="alert">{message}</p>}
         </naming.Subscribe>
-        {savedRevision === revision && <p role="status">Saved.</p>}
+}%}{{~ if !shell ~}}
+{%{        {savedRevision === revision && <p role="status">Saved.</p>}
         {failed && <p role="alert">The dashboard could not be saved.</p>}
-      </form>
+}%}{{~ end ~}}
+{%{      </form>
 
       <form
         onSubmit={(event) => {
@@ -688,9 +753,11 @@ const nativeControl = { px: 1, py: 0.5, border: 1, borderColor: 'divider', borde
           Save dashboard
         </Button>
         {naming.formState.errors.name && <p role="alert">{naming.formState.errors.name.message}</p>}
-        {savedRevision === revision && <p role="status">Saved.</p>}
+}%}{{~ if !shell ~}}
+{%{        {savedRevision === revision && <p role="status">Saved.</p>}
         {failed && <p role="alert">The dashboard could not be saved.</p>}
-      </form>
+}%}{{~ end ~}}
+{%{      </form>
 
       <form onSubmit={add} }%}{{ class_of "flex flex-wrap items-end gap-2" "form" }}{%{>
         <label }%}{{ class_of "flex flex-col gap-1 text-sm" "field" }}{%{>
