@@ -8,6 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The same name at runtime, ServiceModule.Name: the module's route name, which the edge routes /<module>/... by. -->
+    <AssemblyMetadata Include="ModuleName" Value="$(ModuleName)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../../../ServiceDefaults/ServiceDefaults.csproj" />
     <ProjectReference Include="../../../BuildingBlocks/BuildingBlocks.csproj" />
     <ProjectReference Include="../../../Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}.Api.csproj" />
