@@ -1,0 +1,9 @@
+      "@formkit/core": "2.5.0",
+      "@formkit/dev": "2.5.0",
+      "@formkit/i18n": "2.5.0",
+      "@formkit/inputs": "2.5.0",
+      "@formkit/observer": "2.5.0",
+      "@formkit/rules": "2.5.0",
+      "@formkit/themes": "2.5.0",
+      "@formkit/utils": "2.5.0",
+      "@formkit/validation": "2.5.0"
