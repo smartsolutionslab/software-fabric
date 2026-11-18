@@ -19,19 +19,28 @@ public sealed class AnthropicIsTheProjectsModel : IArchitectureRule
 
     private const string Registration = "AddAnthropicChatClient";
 
+{{~ if project["backend.topology"] == "services" ~}}
+    private const string ServiceHosts = "src/Services/";
+{{~ else ~}}
     private const string HostProgram = "src/Host/Program.cs";
+{{~ end ~}}
 
-    public string Description => "The host calls AddAnthropicChatClient, which registers Claude behind logging and OpenTelemetry, with the AppHost's key and model; a missing key fails naming its parameter.";
+    public string Description => "{{ if project["backend.topology"] == "services" }}Every service host calls{{ else }}The host calls{{ end }} AddAnthropicChatClient, which registers Claude behind logging and OpenTelemetry, with the AppHost's key and model; a missing key fails naming its parameter.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
         {{ not_null "model" }}
 
+{{~ if project["backend.topology"] == "services" ~}}
+        List<string> violations = [.. ServiceHostsWithoutTheClient()
+            .Select(program => $"{program} never calls {Registration}: the service host has no IChatClient, and a use case that takes one fails to resolve.")];
+{{~ else ~}}
         List<string> violations = [];
         if (!HostRegistersTheClient())
         {
             violations.Add($"{HostProgram} never calls {Registration}: the host has no IChatClient, and a use case that takes one fails to resolve.");
         }
+{{~ end ~}}
 
         using (var services = Services(new() { ["Anthropic:ApiKey"] = "not-a-real-key", ["Anthropic:Model"] = Model }))
         {
@@ -63,6 +72,30 @@ public sealed class AnthropicIsTheProjectsModel : IArchitectureRule
         return violations;
     }
 
+{{~ if project["backend.topology"] == "services" ~}}
+    /// <summary>The Program.cs of every service host, src/Services/&lt;Module&gt;/Host, that never calls the registration.</summary>
+    private static List<string> ServiceHostsWithoutTheClient()
+    {
+        var root = RepositoryRoot();
+        var services = Path.Combine(root, ServiceHosts);
+        if (!Directory.Exists(services))
+        {
+            return [];
+        }
+
+        return [.. Directory.EnumerateDirectories(services)
+            .Where(service => File.Exists(Path.Combine(service, "Host", "Host.csproj")))
+            .Select(service => $"{ServiceHosts}{Path.GetFileName(service)}/Host/Program.cs")
+            .Where(program => !Registers(Path.Combine(root, program)))
+            .Order(StringComparer.Ordinal)];
+    }
+
+    private static bool Registers(string program) =>
+        File.Exists(program)
+        && CSharpSyntaxTree.ParseText(File.ReadAllText(program)).GetRoot().DescendantNodes()
+            .OfType<InvocationExpressionSyntax>()
+            .Any(call => call.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: Registration });
+{{~ else ~}}
     private static bool HostRegistersTheClient()
     {
         var program = Path.Combine(RepositoryRoot(), HostProgram);
@@ -71,6 +104,7 @@ public sealed class AnthropicIsTheProjectsModel : IArchitectureRule
                 .OfType<InvocationExpressionSyntax>()
                 .Any(call => call.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: Registration });
     }
+{{~ end ~}}
 
     /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
     private static string RepositoryRoot()

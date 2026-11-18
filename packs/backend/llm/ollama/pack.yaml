@@ -17,4 +17,4 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: architecture-test, describes: "The host's Program.cs calls AddOllamaChatClient, which registers the Ollama server's model as the project's IChatClient behind logging and OpenTelemetry, with the endpoint and model the AppHost supplies; a missing endpoint fails naming the AppHost resource. No request is sent.", file: templates/OllamaIsTheProjectsModel.cs.sbn }
+  - { kind: architecture-test, describes: "The host's Program.cs, and with backend.topology services every service host's (src/Services/<Module>/Host/Program.cs, found by convention), calls AddOllamaChatClient, which registers the Ollama server's model as the project's IChatClient behind logging and OpenTelemetry, with the endpoint and model the AppHost supplies; a missing endpoint fails naming the AppHost resource. No request is sent.", file: templates/OllamaIsTheProjectsModel.cs.sbn }

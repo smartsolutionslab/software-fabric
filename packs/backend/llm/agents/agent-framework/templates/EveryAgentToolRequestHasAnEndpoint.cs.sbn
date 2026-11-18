@@ -1,5 +1,5 @@
-{{~ if project["backend.topology"] != "modular-monolith" ~}}
-#error The agent tools' endpoint rule starts the modular-monolith host only so far (docs/adr/0006 of the generator).
+{{~ if project["backend.topology"] != "modular-monolith" && project["backend.topology"] != "services" ~}}
+#error The agent tools' endpoint rule starts the modular-monolith host or the service hosts only so far (docs/adr/0006 of the generator).
 {{~ end ~}}
 {{~ if project["backend.api-style"] != "minimal-apis" ~}}
 #error An endpoint names the request it sends with .Sends<TRequest>() on a minimal API only so far (docs/adr/0006 of the generator).
@@ -18,11 +18,21 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 /// <summary>
 /// An agent's tool requires of its caller what the endpoints that send its request require, so every request a module
 /// makes a tool of with <see cref="DispatcherTool"/><c>.For&lt;TRequest&gt;</c> needs an endpoint marked
+{{~ if project["backend.topology"] == "services" ~}}
+/// <c>.Sends&lt;TRequest&gt;()</c> in the service host of the request's own module, src/Services/&lt;Module&gt;/Host, which
+/// runs that module's agents: without one the tool is refused at every call. It starts every service host and reads its
+/// own endpoint table once in Development and once in Production, and counts an endpoint mapped in either.
+{{~ else ~}}
 /// <c>.Sends&lt;TRequest&gt;()</c>: without one the tool is refused at every call. It reads the host's own endpoint table
 /// once in Development and once in Production, and counts an endpoint mapped in either.
+{{~ end ~}}
 /// </summary>
 public sealed class EveryAgentToolRequestHasAnEndpoint : IArchitectureRule
 {
+{{~ if project["backend.topology"] == "services" ~}}
+    private const string ModulePrefix = "{{ namespace }}.Modules.";
+
+{{~ end ~}}
     public string Description => "Every command or query a module makes an agent's tool of is sent by an endpoint marked .Sends<TRequest>(), whose authorization the tool then requires.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
@@ -39,6 +49,39 @@ public sealed class EveryAgentToolRequestHasAnEndpoint : IArchitectureRule
             return [];
         }
 
+{{~ if project["backend.topology"] == "services" ~}}
+        var sent = ServiceHostEntryPoints.All
+            .SelectMany(entryPoint => Sent(entryPoint, Environments.Development).Concat(Sent(entryPoint, Environments.Production)))
+            .ToHashSet();
+        return [.. requests
+            .Where(request => !sent.Contains((ServiceHost(request), request)))
+            .Select(request => $"{request.FullName} is an agent's tool, but no endpoint of {ServiceHost(request)}, the service host of its module, sends it: mark the endpoint that sends it with .Sends<{request.Name}>(), whose authorization the tool then requires of its caller.")
+            .Order(StringComparer.Ordinal)];
+    }
+
+    private static List<(string ServiceHost, Type Request)> Sent(Type entryPoint, string environment)
+    {
+        using var host = (IMappedHost)Activator.CreateInstance(typeof(MappedHost<>).MakeGenericType(entryPoint), environment)!;
+        var service = "src/Services/" + entryPoint.Assembly.GetName().Name!.Split('.')[^2] + "/Host";
+        return [.. host.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .SelectMany(endpoint => endpoint.Metadata.GetOrderedMetadata<SendsRequest>())
+            .Select(sends => (service, sends.Request))];
+    }
+
+    /// <summary>src/Services/Billing/Host for a request declared in <c>{{ namespace }}.Modules.Billing.Application</c>.</summary>
+    private static string ServiceHost(Type request)
+    {
+        var assembly = request.Assembly.GetName().Name!;
+        var module = assembly.StartsWith(ModulePrefix, StringComparison.Ordinal) ? assembly[ModulePrefix.Length..].Split('.')[0] : assembly;
+        return $"src/Services/{module}/Host";
+    }
+
+    private interface IMappedHost : IDisposable
+    {
+        IServiceProvider Services { get; }
+    }
+
+{{~ else ~}}
         var sent = Sent(Environments.Development).Concat(Sent(Environments.Production)).ToHashSet();
         return [.. requests
             .Where(request => !sent.Contains(request))
@@ -54,11 +97,17 @@ public sealed class EveryAgentToolRequestHasAnEndpoint : IArchitectureRule
             .Select(sends => sends.Request)];
     }
 
+{{~ end ~}}
     /// <summary>
     /// The host with every endpoint mapped but nothing started: no hosted service runs, so the configuration Aspire
     /// would provide only has to be present, never reachable.
     /// </summary>
+{{~ if project["backend.topology"] == "services" ~}}
+    private sealed class MappedHost<TEntryPoint>(string environment) : WebApplicationFactory<TEntryPoint>, IMappedHost
+        where TEntryPoint : class
+{{~ else ~}}
     private sealed class MappedHost(string environment) : WebApplicationFactory<Program>
+{{~ end ~}}
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {

@@ -1,5 +1,6 @@
 {{~ column = project["backend.tenancy"] == "column"
-schemas = project["backend.tenancy"] == "schema-per-tenant" ~}}
+schemas = project["backend.tenancy"] == "schema-per-tenant"
+services = project["backend.topology"] == "services" ~}}
 using System.Reflection;
 using {{ namespace }}.BuildingBlocks.Persistence;
 using {{ namespace }}.BuildingBlocks.Rag;
@@ -14,6 +15,8 @@ namespace {{ namespace }}.Rag.Tests;
 /// <summary>The vector tables the MigrationRunner made: one per module schema, of the embeddings model's size, with an HNSW cosine index and a tenant column its key includes.</summary>
 {{~ else if schemas ~}}
 /// <summary>The vector tables the MigrationRunner made: one in each listed tenant's schema of every module, of the embeddings model's size, with an HNSW cosine index.</summary>
+{{~ else if services ~}}
+/// <summary>The vector tables each service's MigrationRunner run made in the service's own database: one per module schema, of the embeddings model's size, with an HNSW cosine index.</summary>
 {{~ else ~}}
 /// <summary>The vector tables the MigrationRunner made: one per module schema, of the embeddings model's size, with an HNSW cosine index.</summary>
 {{~ end ~}}
@@ -27,6 +30,31 @@ public sealed class VectorTablesTests({{ database_fixture }})
     public async Task Every_modules_schema_has_an_embeddings_table_of_the_models_size_with_an_hnsw_cosine_index()
 {{~ end ~}}
     {
+{{~ if services ~}}
+        var modules = Directory.EnumerateFiles(AppContext.BaseDirectory, "{{ namespace }}.Modules.*.Infrastructure.dll")
+            .Select(Path.GetFileName)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        List<string> missing = [.. modules
+            .Where(module => !database.ServiceDatabases.Keys.Any(service => Infrastructure(service) == module))
+            .Select(module => $"{module} has no service database.")];
+        foreach (var (service, connectionString) in database.ServiceDatabases)
+        {
+            var schemas = Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, Infrastructure(service)))
+                .GetTypes()
+                .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(ModuleDbContext).IsAssignableFrom(type))
+                .Select(VectorTables.SchemaOf)
+                .ToList();
+            foreach (var schema in schemas)
+            {
+                missing.AddRange(await ProblemsAsync(schema, connectionString));
+            }
+        }
+
+        {{ `missing` | should_be_empty }};
+    }
+{{~ else ~}}
         var schemas = Directory.EnumerateFiles(AppContext.BaseDirectory, "{{ namespace }}.Modules.*.Infrastructure.dll")
             .Order(StringComparer.Ordinal)
             .Select(Assembly.LoadFrom)
@@ -47,6 +75,7 @@ public sealed class VectorTablesTests({{ database_fixture }})
 
         {{ `missing` | should_be_empty }};
     }
+{{~ end ~}}
 
     {{ test_attribute }}
     public async Task Creating_the_tables_again_keeps_the_table_and_its_records()
@@ -58,20 +87,33 @@ public sealed class VectorTablesTests({{ database_fixture }})
 
         await VectorTables.CreateAsync({{ database_connection_string }}, [Schema], cancellationToken);
 
+{{~ if services ~}}
+        {{ `(await ProblemsAsync(Schema, database.ConnectionString))` | should_be_empty }};
+        {{ `(await ScalarAsync($"SELECT count(*)::text FROM {VectorTables.Table(Schema)}", database.ConnectionString))` | should_be `"1"` }};
+    }
+
+    /// <summary>The project's name of a service's module's Infrastructure assembly: order-handling is OrderHandling's.</summary>
+    private static string Infrastructure(string module) =>
+        $"{{ namespace }}.Modules.{string.Concat(module.Split('-', StringSplitOptions.RemoveEmptyEntries).Select(part => char.ToUpperInvariant(part[0]) + part[1..]))}.Infrastructure.dll";
+
+    private static async Task<List<string>> ProblemsAsync(string schema, string connectionString)
+    {
+{{~ else ~}}
         {{ `(await ProblemsAsync(Schema))` | should_be_empty }};
         {{ `(await ScalarAsync($"SELECT count(*)::text FROM {VectorTables.Table(Schema)}"))` | should_be `"1"` }};
     }
 
     private async Task<List<string>> ProblemsAsync(string schema)
     {
+{{~ end ~}}
         List<string> problems = [];
-        var column = await ScalarAsync($"SELECT format_type(atttypid, atttypmod) FROM pg_attribute WHERE attrelid = to_regclass('{VectorTables.Table(schema).Replace("'", "''", StringComparison.Ordinal)}') AND attname = 'embedding'");
+        var column = await ScalarAsync($"SELECT format_type(atttypid, atttypmod) FROM pg_attribute WHERE attrelid = to_regclass('{VectorTables.Table(schema).Replace("'", "''", StringComparison.Ordinal)}') AND attname = 'embedding'"{{ if services }}, connectionString{{ end }});
         if (column != $"vector({VectorTables.Dimensions})")
         {
             problems.Add($"{schema}.embeddings has no embedding column of vector({VectorTables.Dimensions}) but '{column}'.");
         }
 
-        var index = await ScalarAsync($"SELECT string_agg(indexdef, '; ') FROM pg_indexes WHERE schemaname = '{schema.Replace("'", "''", StringComparison.Ordinal)}' AND tablename = 'embeddings'");
+        var index = await ScalarAsync($"SELECT string_agg(indexdef, '; ') FROM pg_indexes WHERE schemaname = '{schema.Replace("'", "''", StringComparison.Ordinal)}' AND tablename = 'embeddings'"{{ if services }}, connectionString{{ end }});
         if (index?.Contains("USING hnsw (embedding vector_cosine_ops)", StringComparison.Ordinal) != true)
         {
             problems.Add($"{schema}.embeddings has no HNSW cosine index: '{index}'.");
@@ -93,9 +135,15 @@ public sealed class VectorTablesTests({{ database_fixture }})
         return problems;
     }
 
+{{~ if services ~}}
+    private static async Task<string?> ScalarAsync(string sql, string connectionString)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+{{~ else ~}}
     private async Task<string?> ScalarAsync(string sql)
     {
         await using var connection = new NpgsqlConnection({{ database_connection_string }});
+{{~ end ~}}
         await connection.OpenAsync({{ test_cancellation_token }});
         await using var command = new NpgsqlCommand(sql, connection);
         return await command.ExecuteScalarAsync({{ test_cancellation_token }}) as string;
