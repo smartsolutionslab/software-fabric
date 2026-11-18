@@ -46,7 +46,7 @@ public sealed class ChangeCommandTests : IDisposable
 
         var styles = Read(Styles);
         Block(styles, ":root").ShouldContain("--primary: oklch(0.553 0.195 38.402);");
-        Block(styles, ".dark").ShouldContain("--primary: oklch(0.47 0.157 37.304);");
+        Block(styles, ".dark").ShouldContain("--primary: oklch(0.75 0.183 55.934);");
         styles.ShouldNotContain("264.376");
         Read("fabric.yaml").ShouldContain("\n  frontend.color-scheme: orange\n", Case.Sensitive);
         Read("README.md").ShouldEndWith(OwnNotes);
