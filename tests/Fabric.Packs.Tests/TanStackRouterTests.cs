@@ -19,13 +19,20 @@ public sealed class TanStackRouterTests
         import { render, screen } from '@testing-library/react';
         import userEvent from '@testing-library/user-event';
         import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
+        import { Provider } from 'react-redux';
         import { expect, test } from 'vitest';
         import { App } from '@/App';
         import { createAppRouter } from '@/router';
+        import { store } from '@/store';
 
+        // The page lists the module's samples through the store, as the app's providers give it (#734).
         test('the billing link leads to the billing page', async () => {
           const router = createAppRouter(createMemoryHistory(), <App />);
-          render(<RouterProvider router={router} />);
+          render(
+            <Provider store={store}>
+              <RouterProvider router={router} />
+            </Provider>,
+          );
 
           await userEvent.click(await screen.findByRole('link', { name: 'Billing' }));
 

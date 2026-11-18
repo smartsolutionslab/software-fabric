@@ -79,11 +79,11 @@ internal sealed partial class GeneratedProject : IDisposable
 
         File.Delete(Path.Combine(ProjectDirectory, "tests", "Integration.Tests", name + "SamplesTests.cs"));
 
-        // The module page's sample (#734, PR 2): its hook, form and their tests, the page's test and the end-to-end test.
+        // The module page's sample (#734, PR 2): its hook, form and their tests, and the end-to-end test.
         var page = Path.Combine(ProjectDirectory, "web", "app", "src", "modules", module);
         if (Directory.Exists(page))
         {
-            foreach (var file in Directory.EnumerateFiles(page, "*Sample*").Append(Path.Combine(page, name + "Page.test.tsx")).ToList())
+            foreach (var file in Directory.EnumerateFiles(page, "*Sample*").ToList())
             {
                 File.Delete(file);
             }

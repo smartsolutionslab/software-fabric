@@ -37,7 +37,7 @@ public sealed partial class ModulePageTests
         files[Page].ShouldContain("<EmptyState");
         files[Page].ShouldContain("<CreateBillingSampleForm");
         files.Keys.ShouldContain(Form);
-        files.Keys.ShouldContain(Module + "BillingPage.test.tsx");
+        files.Keys.ShouldContain(Module + "BillingPageSamples.test.tsx");
         files.Keys.ShouldContain(Module + "useBillingSamples.test.tsx");
         files.Keys.ShouldContain("web/app/e2e/billing-samples.spec.ts");
     }
@@ -165,12 +165,12 @@ public sealed partial class ModulePageTests
         var plain = Escapes().Replace(testOutput, string.Empty);
         string[] passed =
         [
-            "BillingPage.test.tsx > the page lists the samples by name",
-            "BillingPage.test.tsx > while the samples load the page shows skeleton rows",
-            "BillingPage.test.tsx > without samples the page says so and its action leads to the form",
-            "BillingPage.test.tsx > a created sample is reported",
-            "BillingPage.test.tsx > a sample the server refuses is reported as a failure",
-            "BillingPage.test.tsx > a blank name is refused before anything is sent",
+            "BillingPageSamples.test.tsx > the page lists the samples by name",
+            "BillingPageSamples.test.tsx > while the samples load the page shows skeleton rows",
+            "BillingPageSamples.test.tsx > without samples the page says so and its action leads to the form",
+            "BillingPageSamples.test.tsx > a created sample is reported",
+            "BillingPageSamples.test.tsx > a sample the server refuses is reported as a failure",
+            "BillingPageSamples.test.tsx > a blank name is refused before anything is sent",
             "useBillingSamples.test.tsx > a created sample is in the list before the server answers and stays once it is created",
             "useBillingSamples.test.tsx > a sample the server refuses is taken out of the list again",
             "BillingPage.axe.test.tsx > the Billing page has no accessibility violations axe can find",
