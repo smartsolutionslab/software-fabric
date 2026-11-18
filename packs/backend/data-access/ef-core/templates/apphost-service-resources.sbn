@@ -1,0 +1,5 @@
+// The module's migrations, in its database alone, before the service starts.
+var migrations = builder.AddProject<Projects.MigrationRunner>($"{module}-migrations")
+    .WithReference(database, "database")
+    .WithEnvironment("Migrations__Module", module)
+    .WaitFor(database);

@@ -23,7 +23,7 @@ declares-slots:
   - { slot: persistence.interceptors, description: "Expressions creating an EF Core interceptor (IInterceptor) for one ModuleDbContext instance, each indented twelve spaces; this is the ModuleDbContext, so Services is available. Added in OnConfiguring, so every instance gets its own.", separator: ",\n" }
   - { slot: persistence.save-changes, description: "Statements run before every SaveChanges of a module's DbContext; this is the ModuleDbContext." }
   - { slot: migration-runner.preflight, description: "Top-level statements of src/MigrationRunner/Program.cs, run before any module's EF Core migrations; IHost host and List<Type> contexts (every module's DbContext type) are in scope, and await is allowed. For checks that must fail before any module migrates, in any schema." }
-  - { slot: migration-runner.steps, description: "Top-level statements of src/MigrationRunner/Program.cs, run after every module's EF Core migrations and before the runner exits; IHost host (its Services and configuration, with the connection string 'database') and List<Type> contexts (every module's DbContext type) are in scope, and await is allowed. For schema that is not an EF Core migration (an event store's tables), so the host never migrates." }
+  - { slot: migration-runner.steps, description: "Top-level statements of src/MigrationRunner/Program.cs, run after every module's EF Core migrations and before the runner exits; IHost host (its Services and configuration, with the connection string 'database') and List<Type> contexts (every module's DbContext type) are in scope, and await is allowed. For schema that is not an EF Core migration (an event store's tables), so the host never migrates. With backend.topology services a run is one module's, the one the AppHost names in Migrations:Module, against that service's own database: contexts holds the module's DbContext alone, and Assembly infrastructure is its Infrastructure assembly." }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
   - { slot: dependabot.nuget-ignore, template: templates/dependabot-nuget-ignore.sbn }
@@ -34,6 +34,8 @@ slots:
   - { slot: apphost.project-references, template: templates/apphost-project-reference.sbn }
   - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 15 }
   - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 5 }
+  # With backend.topology services only, the only topology that renders the slot: one run per service (ADR-0017 D2).
+  - { slot: apphost.service-resources, template: templates/apphost-service-resources.sbn, order: 15 }
   - { slot: host.services, template: templates/host-services.sbn }
   - { slot: host.log-levels, template: templates/host-log-levels.sbn }
   # With backend.test.integration testcontainers only (ADR-0002: dropped where no pack declares the slot).

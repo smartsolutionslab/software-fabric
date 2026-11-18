@@ -2,6 +2,9 @@
 {{~ # Marten's streams are not separated by tenant yet; rendering them would leak (ADR-0006: fail loudly). ~}}
 {{ marten_event_store_needs_backend_tenancy_none }}
 {{~ end ~}}
+{{~ if project["backend.topology"] == "services" ~}}
+using System.Reflection;
+{{~ end ~}}
 using {{ namespace }}.BuildingBlocks.EventStore;
 using {{ namespace }}.BuildingBlocks.Modules;
 using JasperFx;
@@ -45,6 +48,26 @@ public static class EventStoreRegistration
         return services;
     }
 
+{{~ if project["backend.topology"] == "services" ~}}
+    /// <summary>
+    /// Creates or updates the tables of one module's event store, in its service's own database: streams, events and the
+    /// projections' read models. Nothing when the module has no event store.
+    /// </summary>
+    public static async Task ApplyEventStoreSchemasAsync(this IServiceProvider services, Assembly infrastructure)
+    {
+        {{ not_null "services" }}
+        {{ not_null "infrastructure" }}
+
+        if (ModuleEventStore.Of(infrastructure) is not { } module)
+        {
+            return;
+        }
+
+        var connectionString = ModuleEventStore.ConnectionString(services.GetRequiredService<IConfiguration>());
+        using var store = DocumentStore.For(options => module.Configure(options, connectionString, AutoCreate.CreateOrUpdate));
+        await store.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
+    }
+{{~ else ~}}
     /// <summary>Creates or updates the tables of every module's event store: streams, events and the projections' read models.</summary>
     public static async Task ApplyEventStoreSchemasAsync(this IServiceProvider services)
     {
@@ -62,4 +85,5 @@ public static class EventStoreRegistration
             await store.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
         }
     }
+{{~ end ~}}
 }
