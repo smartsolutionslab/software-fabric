@@ -17,12 +17,34 @@ env:
   PLAYWRIGHT_VERSION: 1.65.1
 
 jobs:
+  # Which classes each test shard runs (#711), worked out once so every shard reads the same split: build/test-split.sh
+  # balances them by the median of the times the build job of recent runs kept in the Actions cache (a few KB, this
+  # branch's latest entry, else main's). Without one the split is build/test-shards.txt, which also sets how many
+  # shards there are.
+  split:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.split.outputs.shards }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ runner.temp }}/test-times
+          key: test-times-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: test-times-
+      - id: split
+        run: |
+          build/test-split.sh "$RUNNER_TEMP/test-times/history.tsv" build/test-shards.txt > "$RUNNER_TEMP/test-shards.txt"
+          cat "$RUNNER_TEMP/test-shards.txt"
+          { echo 'shards<<END_OF_SHARDS'; cat "$RUNNER_TEMP/test-shards.txt"; echo END_OF_SHARDS; } >> "$GITHUB_OUTPUT"
+
   # The solution's tests, in shards that run in parallel (#166). In one job they took 45-60 min, nearly all of it
   # Fabric.Packs.Tests, whose Docker-backed classes share fixed ports and so run one after another on a runner; on
-  # separate runners they do not wait for each other. build/test-shards.txt says which classes each shard runs, from
-  # their measured times; the last shard runs everything the file does not name. The build job below fails unless
-  # every shard passed and every test method ran in one of them.
+  # separate runners they do not wait for each other. The split job says which classes each shard runs; the last shard
+  # runs everything the split does not name. The build job below fails unless every shard passed and every test method
+  # ran in one of them.
   tests:
+    needs: split
     name: test-${{ matrix.shard }}
     strategy:
       fail-fast: false
@@ -50,7 +72,10 @@ jobs:
       - run: dnx --yes aspire.cli@13.6.5 -- setup --install-path "$HOME/.aspire"
       - run: dotnet build Fabric.slnx -c Release
       # Each test assembly writes an xUnit XML report: what ran, and per-class and per-test times.
-      - run: build/test-shard.sh "${{ matrix.shard }}" "$RUNNER_TEMP/test-results"
+      - env:
+          SHARDS: ${{ needs.split.outputs.shards }}
+        run: printf '%s\n' "$SHARDS" > "$RUNNER_TEMP/test-shards.txt"
+      - run: build/test-shard.sh "${{ matrix.shard }}" "$RUNNER_TEMP/test-results" "$RUNNER_TEMP/test-shards.txt"
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -79,14 +104,30 @@ jobs:
         with:
           pattern: test-results-*
           path: ${{ runner.temp }}/test-results
-      # Every test project's every method ran in some shard; prints the counts per project.
+      - uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ runner.temp }}/test-times
+          key: test-times-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: test-times-
+      # Every test project's every method ran in some shard; prints the counts per project and each class's time.
       - run: |
           assemblies=()
           for project in tests/*/*.Tests.csproj; do
             name="$(basename "$project" .csproj)"
             assemblies+=("$(dirname "$project")/bin/Release/net11.0/$name.dll")
           done
-          build/tests-all-ran.sh "$RUNNER_TEMP/test-results" "${assemblies[@]}"
+          build/tests-all-ran.sh --times "$RUNNER_TEMP/test-times.tsv" "$RUNNER_TEMP/test-results" "${assemblies[@]}"
+      # This run's times join the history the next run's split job balances by; only a run whose every test ran adds
+      # them, so no class's time is short for tests that did not run.
+      - run: |
+          mkdir -p "$RUNNER_TEMP/test-times"
+          build/test-history.sh "$RUNNER_TEMP/test-times/history.tsv" "$RUNNER_TEMP/test-times.tsv" > "$RUNNER_TEMP/history.tsv"
+          mv "$RUNNER_TEMP/history.tsv" "$RUNNER_TEMP/test-times/history.tsv"
+          wc -c "$RUNNER_TEMP/test-times/history.tsv"
+      - uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ runner.temp }}/test-times
+          key: test-times-${{ github.run_id }}-${{ github.run_attempt }}
       - run: build/profiles.sh
 
   # The pairwise matrix's per-pull-request layer (ADR-0003 amendment, roadmap M3-03): every combination of
