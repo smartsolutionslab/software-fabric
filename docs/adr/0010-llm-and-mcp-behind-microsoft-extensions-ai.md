@@ -1,6 +1,7 @@
 # ADR-0010: LLM and MCP behind Microsoft.Extensions.AI
 
-**Status:** Accepted
+**Status:** Accepted. Amended (owner, 2026-11-18, #707): with the services
+topology, each service is its own MCP server, see the amendment at the end.
 **Date:** 2026-11-01
 
 ## Context
@@ -216,3 +217,24 @@ assemblies; the repository owner accepted all of it.
   `backend.llm: none` describe the catalog before it.
 - `backend.llm.agents` (ADR-0011, 2026-11-05), retrieval-augmented generation (ADR-0012,
   2026-11-05) and evaluations (ADR-0014, 2026-11-05) are later decisions, each with its own ADR.
+
+## Amendment (owner, 2026-11-18): the MCP server with the services topology (#707)
+
+ADR-0017 runs each module in a service host of its own behind an edge,
+`src/Edge`, which runs no module code. The Consequences above put the MCP
+SDK and the server "in the host", the single host of a modular monolith,
+which dispatches the `[McpTool]` requests in process. The owner decided on
+#707 (comments of 2026-11-18, and its **Decisions** section); ADR-0017's
+amendment of the same date records it for the topology. The text above
+stands for a modular monolith; with services, where this section differs, it
+takes precedence.
+
+- **Each service is its own MCP server**, at `/{module}/mcp`, in its own
+  service host. The edge hosts no MCP server.
+- **The MCP server tests are generated once per service**, each project
+  starting its own service host and testing that service's `/{module}/mcp`.
+  With the modular monolith, `tests/Mcp.Server.Tests` stays as it is, one
+  project against `src/Host`.
+- The conflict between `backend.mcp has server` and `services` is lifted by
+  #766, the issue that builds this. The MCP client's `DeclaredServers` under
+  services is #759.
