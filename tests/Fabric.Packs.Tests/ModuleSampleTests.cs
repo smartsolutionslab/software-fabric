@@ -126,6 +126,21 @@ public sealed class ModuleSampleTests
         files[Snapshot].ShouldContain("partial class BillingModelSnapshot : ModelSnapshot");
     }
 
+    /// <summary>A module's schema is its name with underscores for hyphens, as its DbContext names it; the route keeps the hyphen.</summary>
+    [Fact]
+    public void A_hyphenated_modules_sample_table_is_in_the_schema_its_context_uses()
+    {
+        var addition = Generator.AddModule(Repository.Catalog, Repository.Packs.Packs, Record("saas-standard-react", []), "order-handling", []);
+        addition.Errors.ShouldBeEmpty();
+        var files = addition.Created.ToDictionary(file => file.Path, file => file.Content);
+        const string Migrations = "src/Modules/OrderHandling/OrderHandling.Infrastructure/Migrations/";
+
+        files[Migrations + "20261118000000_CreateSamples.cs"].ShouldContain("schema: \"order_handling\"");
+        files[Migrations + "20261118000000_CreateSamples.cs"].ShouldNotContain("\"order-handling\"");
+        files[Migrations + "OrderHandlingModelSnapshot.cs"].ShouldContain(".HasDefaultSchema(\"order_handling\")");
+        addition.OpenApi!.Paths.Select(path => path.Key).ShouldContain("/order-handling/samples");
+    }
+
     [Fact]
     public void On_sql_server_the_migration_uses_sql_servers_column_types()
     {
@@ -146,13 +161,18 @@ public sealed class ModuleSampleTests
         WithBilling("saas-standard-react")[Endpoints].ShouldNotContain("RequireAuthorization");
     }
 
-    [Fact]
-    public void The_dashboards_module_has_its_own_use_cases_and_no_sample()
+    /// <summary>The modules a pack brings come with use cases of their own; the sample is for the modules a project adds.</summary>
+    [Theory]
+    [InlineData("dashboards")]
+    [InlineData("assistant")]
+    public void A_module_a_pack_brings_has_its_own_use_cases_and_no_sample(string module)
     {
         var files = Generate("saas-ai-react");
+        var name = char.ToUpperInvariant(module[0]) + module[1..];
 
-        files.Keys.Where(path => path.StartsWith("src/Modules/Dashboards/", StringComparison.Ordinal) && path.Contains("Sample", StringComparison.Ordinal)).ShouldBeEmpty();
-        Paths(files).ShouldNotContain("/dashboards/samples");
+        files.Keys.ShouldContain($"src/Modules/{name}/{name}.Api/{name}Module.cs");
+        files.Keys.Where(path => path.Contains($"/{name}", StringComparison.Ordinal) && path.Contains("Sample", StringComparison.Ordinal)).ShouldBeEmpty();
+        Paths(files).ShouldNotContain($"/{module}/samples");
     }
 
     /// <summary>The frontend's copy of the OpenAPI document, and so its generated client, describes every module's sample.</summary>
