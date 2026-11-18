@@ -124,30 +124,35 @@ public sealed class TestSplitTests : IDisposable
     }
 
     [Fact]
-    public void Method_times_are_kept_only_for_a_class_whose_median_is_over_the_target_of_15_minutes()
+    public void Method_times_are_kept_only_for_a_class_whose_time_was_over_the_target_of_15_minutes_in_any_run()
     {
         var history = Write(
             "history.tsv",
             $"{Packs}\t{Packs}.AgGridTests\tparallel\t950.0 800.0\t0.00 0.00\t1 1",
             $"{Packs}\t{Packs}.AgGridTests#A\tparallel\t500.0 400.0\t0.00 0.00\t1 1",
             $"{Packs}\t{Packs}.AgGridTests#Gone\tparallel\t100.0\t0.00\t1",
-            $"{Packs}\t{Packs}.AgUiTests\tparallel\t100.0 100.0\t0.00 0.00\t1 1");
+            $"{Packs}\t{Packs}.AgUiTests\tparallel\t100.0 100.0\t0.00 0.00\t1 1",
+            $"{Packs}\t{Packs}.AnthropicTests\tparallel\t100.0 100.0\t0.00 0.00\t1 1");
         var times = Write(
             "times.tsv",
-            $"{Packs}\t{Packs}.AgGridTests\tparallel\t1000.0\t0.00\t1",
-            $"{Packs}\t{Packs}.AgGridTests#A\tparallel\t600.0\t0.00\t1",
-            $"{Packs}\t{Packs}.AgGridTests#B\tparallel\t400.0\t0.00\t1",
+            $"{Packs}\t{Packs}.AgGridTests\tparallel\t100.0\t0.00\t1",
+            $"{Packs}\t{Packs}.AgGridTests#A\tparallel\t60.0\t0.00\t1",
+            $"{Packs}\t{Packs}.AgGridTests#B\tparallel\t40.0\t0.00\t1",
             $"{Packs}\t{Packs}.AgUiTests\tparallel\t1000.0\t0.00\t1",
-            $"{Packs}\t{Packs}.AgUiTests#X\tparallel\t1000.0\t0.00\t1");
+            $"{Packs}\t{Packs}.AgUiTests#X\tparallel\t1000.0\t0.00\t1",
+            $"{Packs}\t{Packs}.AnthropicTests\tparallel\t899.0\t0.00\t1",
+            $"{Packs}\t{Packs}.AnthropicTests#Y\tparallel\t899.0\t0.00\t1");
 
         var (exitCode, output) = Shell.Run(Repository.Root, "bash", "build/test-history.sh", history, times);
 
         exitCode.ShouldBe(0, output);
         output.ShouldBe(
-            $"{Packs}\t{Packs}.AgGridTests\tparallel\t1000.0 950.0 800.0\t0.00 0.00 0.00\t1 1 1\n"
-            + $"{Packs}\t{Packs}.AgGridTests#A\tparallel\t600.0 500.0 400.0\t0.00 0.00 0.00\t1 1 1\n"
-            + $"{Packs}\t{Packs}.AgGridTests#B\tparallel\t400.0\t0.00\t1\n"
-            + $"{Packs}\t{Packs}.AgUiTests\tparallel\t1000.0 100.0 100.0\t0.00 0.00 0.00\t1 1 1\n");
+            $"{Packs}\t{Packs}.AgGridTests\tparallel\t100.0 950.0 800.0\t0.00 0.00 0.00\t1 1 1\n"
+            + $"{Packs}\t{Packs}.AgGridTests#A\tparallel\t60.0 500.0 400.0\t0.00 0.00 0.00\t1 1 1\n"
+            + $"{Packs}\t{Packs}.AgGridTests#B\tparallel\t40.0\t0.00\t1\n"
+            + $"{Packs}\t{Packs}.AgUiTests\tparallel\t1000.0 100.0 100.0\t0.00 0.00 0.00\t1 1 1\n"
+            + $"{Packs}\t{Packs}.AgUiTests#X\tparallel\t1000.0\t0.00\t1\n"
+            + $"{Packs}\t{Packs}.AnthropicTests\tparallel\t899.0 100.0 100.0\t0.00 0.00 0.00\t1 1 1\n");
     }
 
     [Fact]
@@ -339,6 +344,26 @@ public sealed class TestSplitTests : IDisposable
         exitCode.ShouldBe(0, estimates);
         Shards(output).ShouldBe([$"{Packs}.ModuleScreenAccessibilityTests"]);
         estimates.ShouldContain("shard  1: est  10.0 min  (parallel  10.0, serial   0.0, classes 1)\n", Case.Sensitive, estimates);
+    }
+
+    [Fact]
+    public void A_class_whose_work_alone_was_over_the_target_in_any_run_runs_in_parts()
+    {
+        // Its median, 850 s, fits the 15 minutes, but one run took 1000 s with nothing beside it: a runner that slow
+        // again would leave its shard over the target, so it runs in parts.
+        var methods = ClassMethods("ModuleScreenAccessibilityTests");
+        var history = Write(
+            "history.tsv",
+            $"{Packs}\t{Packs}.ModuleScreenAccessibilityTests\tparallel\t1000.0 700.0\t0.00 0.00\t1 1",
+            $"{Packs}\t{methods[0]}\tparallel\t500.0 350.0\t0.00 0.00\t1 1",
+            $"{Packs}\t{methods[1]}\tparallel\t500.0 350.0\t0.00 0.00\t1 1");
+
+        var (exitCode, output, estimates) = Split(history, Write("shards.txt", "x"));
+
+        exitCode.ShouldBe(0, estimates);
+        Shards(output).ShouldBe([methods[0]]);
+        estimates.ShouldContain("shard  1: est   7.1 min  (parallel   7.1, serial   0.0, classes 1)\n", Case.Sensitive, estimates);
+        estimates.ShouldContain("shard  2: est   7.1 min  (parallel   7.1, serial   0.0, classes 1, the rest)\n", Case.Sensitive, estimates);
     }
 
     [Fact]
