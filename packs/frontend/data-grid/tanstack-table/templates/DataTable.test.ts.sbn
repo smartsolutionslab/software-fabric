@@ -1,15 +1,32 @@
-import { render, screen } from '@testing-library/vue';
+{{~ shadcn = project["frontend.ui-library"] == "shadcn-vue" ~}}
+import { render, screen{{ if shadcn }}, within{{ end }} } from '@testing-library/vue';
 import { expect, test } from 'vitest';
 import DataTable from './DataTable.vue';
 import { columnsOf } from './data-table-columns';
 
 interface Person {
   name: string;
+{{~ if shadcn ~}}
+  team: string;
+{{~ end ~}}
 }
 
 const people = columnsOf<Person>();
+{{~ if shadcn ~}}
+const columns = people.columns([
+  people.accessor('name', { header: 'Name' }),
+  people.accessor('team', { header: 'Team' }),
+]);
+const data: Person[] = [
+  { name: 'first', team: 'blue' },
+  { name: 'second', team: 'green' },
+];
+const none: Person[] = [];
+const empty = '<p>No people yet.</p>';
+{{~ else ~}}
 const columns = people.columns([people.accessor('name', { header: 'Name' })]);
 const data: Person[] = [{ name: 'first' }, { name: 'second' }];
+{{~ end ~}}
 
 test('the table shows a header and one row per item', () => {
   // A generic component is rendered for one row type, as a template does it from its props.
@@ -18,3 +35,37 @@ test('the table shows a header and one row per item', () => {
   expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
   expect(screen.getAllByRole('row')).toHaveLength(3);
 });
+{{~ if shadcn ~}}
+
+test('while its query is pending the table is busy, says it is loading and shows skeleton rows in its shape', () => {
+  const { container } = render(DataTable<Person>, {
+    props: { columns, data: none, loading: true },
+    slots: { empty },
+  });
+
+  const table = screen.getByRole('table', { name: 'Loading…', busy: true });
+  expect(within(table).getByRole('columnheader', { name: 'Team' })).toBeInTheDocument();
+  const skeletonRows = container.querySelectorAll('tbody tr');
+  expect(skeletonRows.length).toBeGreaterThan(0);
+  for (const row of skeletonRows) {
+    expect(row.querySelectorAll('td [data-slot="skeleton"]')).toHaveLength(2);
+  }
+  expect(screen.queryByText('No people yet.')).not.toBeInTheDocument();
+});
+
+test('a table without rows shows its empty state in place of them', () => {
+  render(DataTable<Person>, { props: { columns, data: none }, slots: { empty } });
+
+  const table = screen.getByRole('table');
+  expect(table).not.toHaveAttribute('aria-busy');
+  const cell = within(table).getByRole('cell', { name: 'No people yet.' });
+  expect(cell).toHaveAttribute('colspan', '2');
+});
+
+test('a table with rows shows no empty state', () => {
+  render(DataTable<Person>, { props: { columns, data }, slots: { empty } });
+
+  expect(screen.getByRole('cell', { name: 'second' })).toBeInTheDocument();
+  expect(screen.queryByText('No people yet.')).not.toBeInTheDocument();
+});
+{{~ end ~}}
