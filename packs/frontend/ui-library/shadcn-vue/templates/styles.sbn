@@ -1,4 +1,5 @@
 @import 'tw-animate-css';
+{{ font_imports }}
 
 /* shadcn-vue's slate theme (components.json's baseColor) in fabric.yaml's colour scheme, {{ project["frontend.color-scheme"] }}:
    change the radius here, never a colour of the palettes by hand, and nothing per component. Two palettes of the same
@@ -55,6 +56,25 @@
 {{ color_scheme_dark }}
 }
 
+/* fabric.yaml's font, {{ project["frontend.font"] }}, from its npm package (imported above, bundled with the app), and the type scale:
+   text-display, text-title, text-body and text-caption, each with its line height. */
+@theme {
+  --font-sans: {{ font_sans }};
+  --font-mono: {{ font_mono }};
+  --text-display: 2.25rem;
+  --text-display--line-height: 2.5rem;
+  --text-display--letter-spacing: -0.025em;
+  --text-display--font-weight: 700;
+  --text-title: 1.5rem;
+  --text-title--line-height: 2rem;
+  --text-title--letter-spacing: -0.0125em;
+  --text-title--font-weight: 600;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -99,6 +119,15 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  h1 {
+    @apply text-title;
+  }
+  /* Tabular figures, so the digits of amounts and counts line up in a column. */
+  table,
+  [role='grid'],
+  [role='treegrid'] {
+    font-variant-numeric: tabular-nums;
   }
   .dark {
     color-scheme: dark;

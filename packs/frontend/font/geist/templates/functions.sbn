@@ -1,0 +1,10 @@
+func font_imports
+  ret "@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';"
+end
+func font_sans
+  ret "'Geist Variable', ui-sans-serif, system-ui, sans-serif"
+end
+func font_mono
+  ret "'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+end

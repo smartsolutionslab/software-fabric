@@ -647,7 +647,7 @@ dimensions:
       accessibility:    { tier: supported, note: "axe in component and e2e tests" }
 
   # ─────────────────────────── Frontend · theme ──────────────────────────────
-  # Next to last in the catalog: active in every profile, it renumbers one ADR of each, the reads' (last, #247).
+  # Next to last in the catalog: active in every profile, they renumber one ADR of each, the reads' (last, #247).
 
   frontend.color-scheme:
     scope: project
@@ -658,6 +658,15 @@ dimensions:
       blue:   { tier: experimental }
       green:  { tier: experimental }
       orange: { tier: experimental }
+
+  frontend.font:
+    scope: project
+    active-when: "frontend.ui-library in (shadcn, shadcn-vue)"
+    default: inter
+    note: "The app's typeface: a variable font (SIL Open Font License) installed from npm and bundled with the app, never loaded from a font host, under the theme's type scale (display, title, body, caption)."
+    options:
+      inter: { tier: experimental }
+      geist: { tier: experimental, note: "with Geist Mono for monospace text (identifiers, codes)" }
 
   # ─────────────────────────── Backend · data access add-ons ─────────────────
   # Last in the catalog (owner decision on #247): a dimension active in every profile renumbers no profile's ADRs here.

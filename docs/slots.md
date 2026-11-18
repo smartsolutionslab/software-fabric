@@ -138,7 +138,7 @@ pack fill a slot of a choice it can be combined with but does not need
 
 | Slot | File | Filled by |
 |---|---|---|
-| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11); the integration pack (the integration-fixture vocabulary below, M3-12); the identity-provider and auth-client packs (the identity-provider vocabulary below, M3-13); the tenant-column pack (`cross_tenant_reads` and `cross_tenant_role`: staff read across tenants, #610; `shared_records`: staff write records shared by all tenants, #623; `writes_for_tenants`: staff write into one named tenant, #629; others call them only with `backend.tenancy=column`); the colour-scheme packs (the colour-scheme vocabulary below, #694) |
+| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11); the integration pack (the integration-fixture vocabulary below, M3-12); the identity-provider and auth-client packs (the identity-provider vocabulary below, M3-13); the tenant-column pack (`cross_tenant_reads` and `cross_tenant_role`: staff read across tenants, #610; `shared_records`: staff write records shared by all tenants, #623; `writes_for_tenants`: staff write into one named tenant, #629; others call them only with `backend.tenancy=column`); the colour-scheme packs (the colour-scheme vocabulary below, #694); the font packs (the font vocabulary below, #699) |
 | `dotnet.build-items` *(added with the kernel options)* | `Directory.Build.props` | ensure-that (ban list), typed-outcomes (`using static Outcome`) |
 | `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
@@ -489,7 +489,7 @@ AppHost's model with it, declares it instead (*#260*).
 |---|---|---|---|
 | `web.workspace-packages` *(added in M1-07; a role slot of `frontend.workspace` since #283, declared by pnpm-workspaces, nx and turborepo)* | `web/pnpm-workspace.yaml` | newline | spa (`  - app`), micro-frontends (`app`, `modules/*`), design-system tokens-and-components (`packages/tokens`, `packages/ui`), design-system tokens (`packages/tokens`), design-system web-components (`packages/tokens`, `packages/ui`) |
 | `web.pnpm-overrides` *(added for #569; a role slot of `frontend.workspace`, declared by pnpm-workspaces, nx and turborepo)* | `web/package.json` (`pnpm.overrides`: pnpm reads overrides only from the workspace root; rendered only with a contribution). An entry is a package name and the version every dependency in the workspace gets, indented six spaces: `      "swagger-parser": "12.1.0"` | `,` + newline | rtk-query-codegen (`@apidevtools/swagger-parser`) |
-| `web.dependencies` | `web/app/package.json` | `,` + newline | react, redux, rtk, router, rhf, zod, tailwind, shadcn, tanstack-table, echarts, oidc, agent-ui ag-ui (`@ag-ui/client`), openapi-fetch |
+| `web.dependencies` | `web/app/package.json` | `,` + newline | react, redux, rtk, router, rhf, zod, tailwind, shadcn, tanstack-table, echarts, oidc, agent-ui ag-ui (`@ag-ui/client`), openapi-fetch, font inter and geist (their Fontsource packages) |
 | `web.dev-dependencies` | 〃 | `,` + newline | vitest, testing-library, playwright, axe, rtk codegen, pwa yes (`vite-plugin-pwa`), openapi-fetch (`openapi-typescript`) |
 | `web.scripts` | 〃 | `,` + newline | rtk-query-codegen, orval, openapi-fetch (`codegen`) |
 | `web.prepare` *(added in M1-07b)* | 〃 (`dev`, `build`, `test`) | ` && ` | rtk-query-codegen, orval, openapi-fetch (`pnpm codegen`), design-system tokens-and-components, tokens and web-components (build the tokens) |
@@ -535,6 +535,26 @@ with each design system's tokens over them too.
 | `color_scheme_light` | the light palette's (`:root`) scheme variables, one per line, indented two spaces: `--primary`, `--primary-foreground`, `--ring`, `--chart-1` to `--chart-5`, `--sidebar-primary`, `--sidebar-primary-foreground`, `--sidebar-ring` (`--primary: oklch(0.488 0.243 264.376);`, …) |
 | `color_scheme_dark` | the same variables of the dark palette (`.dark`) |
 | `color_scheme_brand` | the entries of the tokens' `brand` group in `web/packages/tokens/src/color.tokens.json`, indented six spaces: `500`, `700` (the light primary) and `800` (the dark primary) as `#rrggbb` (`"700": { "$value": "#1447e6" }`) |
+
+#### The font vocabulary *(#699)*
+
+The typeface of shadcn's and shadcn-vue's theme comes from the chosen
+`frontend.font` pack (inter or geist): a variable font from npm (Fontsource),
+which the pack adds to `web.dependencies` and the theme imports, so the build
+bundles its files and the page loads no font from another host. Functions,
+not a slot, for the colour scheme's reason: the theme is itself a
+contribution to `web.styles`. The UI library's `src/index.css` calls them for
+its imports and for `--font-sans` and `--font-mono` in its `@theme` block,
+beside the type scale (`--text-display`, `--text-title`, `--text-body`,
+`--text-caption`). A font pack that lacks a function fails generation naming
+it. Each font pack's `src/theme/font.test.ts` fails when `index.html` or
+`src/index.css` loads anything from another host.
+
+| Function | Returns (inter) |
+|---|---|
+| `font_imports` | the `@import` lines of the font's packages (`@import '@fontsource-variable/inter';`; geist: `geist` and `geist-mono`) |
+| `font_sans` | the value of `--font-sans`: the font's family first, then the system's (`'Inter Variable', ui-sans-serif, system-ui, sans-serif`) |
+| `font_mono` | the value of `--font-mono`: the system's monospace fonts (geist: `'Geist Mono Variable'` first) |
 
 #### The design-token contract *(#373)*
 
