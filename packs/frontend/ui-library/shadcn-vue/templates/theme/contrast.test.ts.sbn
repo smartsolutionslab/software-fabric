@@ -3,6 +3,13 @@ import { expect, test } from 'vitest';
 
 // Read from disk, relative to web/app where Vitest runs: Vitest hands a test a stylesheet empty, even with ?raw.
 const styles = readFileSync('src/index.css', 'utf8');
+{{~ if project["frontend.design-system"] != "none" ~}}
+// The design system's tokens win over the palettes for each colour they set (their Tailwind theme maps --color-primary to
+// --ds-color-primary), so they are read as built, which pnpm test does first: tokens.css holds the light values,
+// dark.css the dark values of the tokens the dark theme changes.
+const tokens = readFileSync('../packages/tokens/dist/tokens.css', 'utf8');
+const darkTokens = readFileSync('../packages/tokens/dist/dark.css', 'utf8');
+{{~ end ~}}
 
 // jsdom computes no colours, so axe cannot judge contrast in a component test: this test reads both palettes of
 // src/index.css instead and checks each text colour the components put on a background against WCAG AA (4.5:1).
@@ -21,23 +28,56 @@ const pairs = [
   ['sidebar-accent-foreground', 'sidebar-accent'],
 ] as const;
 
-/** The variables of a top-level rule of the stylesheet: :root holds the light palette, .dark the dark one. */
-function palette(selector: string): Map<string, string> {
-  const block = new RegExp(`^${selector.replace('.', '\\.')} \\{([^}]*)\\}`, 'm').exec(styles)?.[1];
+/** The variables of a top-level rule of a stylesheet: :root holds the light palette, .dark the dark one. */
+function variables(stylesheet: string, file: string, selector: string): Map<string, string> {
+  const block = new RegExp(`^${selector.replace('.', '\\.')} \\{([^}]*)\\}`, 'm').exec(stylesheet)?.[1];
   if (block === undefined) {
-    throw new Error(`src/index.css has no top-level ${selector} block.`);
+    throw new Error(`${file} has no top-level ${selector} block.`);
   }
 
   return new Map(
     [...block.matchAll(/--([\w-]+):\s*([^;]+);/g)].map(([, name = '', value = '']) => [name, value.trim()]),
   );
 }
+{{~ if project["frontend.design-system"] != "none" ~}}
 
+const tokenColours = {
+  light: variables(tokens, 'tokens.css', ':root'),
+  dark: new Map([...variables(tokens, 'tokens.css', ':root'), ...variables(darkTokens, 'dark.css', '.dark')]),
+};
+
+/** The colour the token of a palette variable gives it in a theme (primary is --ds-color-primary), or none. */
+function token(theme: 'light' | 'dark', name: string): string | undefined {
+  let value = tokenColours[theme].get(`ds-color-${name}`);
+  while (value?.startsWith('var(--')) {
+    value = tokenColours[theme].get(value.slice('var(--'.length, -1));
+  }
+
+  return value;
+}
+{{~ end ~}}
+
+{{~ if project["frontend.design-system"] != "none" ~}}
+/** The relative luminance (WCAG) of a #rrggbb or an oklch() colour, oklch() through OKLab, clipped to the sRGB gamut. */
+{{~ else ~}}
 /** The relative luminance (WCAG) of an oklch() colour, through OKLab and linear sRGB, clipped to the sRGB gamut. */
+{{~ end ~}}
 function luminance(colour: string): number {
+{{~ if project["frontend.design-system"] != "none" ~}}
+  const hex = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(colour);
+  if (hex) {
+    const linear = (channel: string) => {
+      const value = parseInt(channel, 16) / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    };
+    const [red, green, blue] = hex.slice(1).map(linear) as [number, number, number];
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  }
+
+{{~ end ~}}
   const match = /^oklch\(([\d.]+) ([\d.]+) ([\d.]+)\)$/.exec(colour);
   if (!match) {
-    throw new Error(`The contrast test reads opaque oklch() colours only, not ${colour}.`);
+    throw new Error(`The contrast test reads opaque {{ if project["frontend.design-system"] != "none" }}#rrggbb and {{ end }}oklch() colours only, not ${colour}.`);
   }
 
   const [lightness, chroma, hue] = match.slice(1).map(Number) as [number, number, number];
@@ -65,9 +105,9 @@ const cases = (['light', 'dark'] as const).flatMap((theme) =>
 test.each(cases)(
   'in the $theme theme $text on $background has a contrast of at least 4.5:1',
   ({ theme, text, background }) => {
-    const colours = palette(theme === 'light' ? ':root' : '.dark');
+    const colours = variables(styles, 'src/index.css', theme === 'light' ? ':root' : '.dark');
     const colour = (name: string) => {
-      const value = colours.get(name);
+      const value = {{ if project["frontend.design-system"] != "none" }}token(theme, name) ?? {{ end }}colours.get(name);
       if (value === undefined) {
         throw new Error(`The ${theme} palette in src/index.css has no --${name}.`);
       }

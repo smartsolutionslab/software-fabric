@@ -138,7 +138,7 @@ pack fill a slot of a choice it can be combined with but does not need
 
 | Slot | File | Filled by |
 |---|---|---|
-| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11); the integration pack (the integration-fixture vocabulary below, M3-12); the identity-provider and auth-client packs (the identity-provider vocabulary below, M3-13); the tenant-column pack (`cross_tenant_reads` and `cross_tenant_role`: staff read across tenants, #610; `shared_records`: staff write records shared by all tenants, #623; `writes_for_tenants`: staff write into one named tenant, #629; others call them only with `backend.tenancy=column`) |
+| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11); the integration pack (the integration-fixture vocabulary below, M3-12); the identity-provider and auth-client packs (the identity-provider vocabulary below, M3-13); the tenant-column pack (`cross_tenant_reads` and `cross_tenant_role`: staff read across tenants, #610; `shared_records`: staff write records shared by all tenants, #623; `writes_for_tenants`: staff write into one named tenant, #629; others call them only with `backend.tenancy=column`); the colour-scheme packs (the colour-scheme vocabulary below, #694) |
 | `dotnet.build-items` *(added with the kernel options)* | `Directory.Build.props` | ensure-that (ban list), typed-outcomes (`using static Outcome`) |
 | `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
@@ -507,13 +507,34 @@ AppHost's model with it, declares it instead (*#260*).
 | `web.imports` | `web/app/src/main.tsx` | newline | redux, router, oidc, design-system web-components (defines its elements) |
 | `web.providers` | `web/app/src/main.tsx` | `,` + newline | redux, oidc, router — wrappers composed in order |
 | `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn, design-system tokens-and-components (the tokens' Tailwind theme, `@source` for the ui package), design-system tokens and web-components (the tokens' Tailwind theme, or their CSS custom properties with css-modules), micro-frontends (`@source` for the remotes) |
-| `web.head` *(added for #693; declared by react and vue, not a role slot)* | `web/app/index.html`, after the title (rendered only with a contribution) | newline | shadcn, shadcn-vue (without a design system: the script that sets the stored or system theme's `.dark` class before the first paint) |
-| `web.shell-imports`, `web.shell-actions` *(added for #693; declared by react-router, tanstack-router and vue-router)* | `web/app/src/App.tsx` or `App.vue` (imports; elements at the end of the navigation bar; rendered only with a contribution) | newline | shadcn, shadcn-vue (without a design system: `ThemeToggle`) |
-| `web.axe-themes` *(added for #693; declared by test extras accessibility)* | every module screen's `<Name>Page.axe.test.*` (`themes`, each `{ name, switchOn }`; rendered only with a contribution) | `,` + newline | shadcn, shadcn-vue (without a design system: `dark`; `optional: true`) |
+| `web.head` *(added for #693; declared by react and vue, not a role slot)* | `web/app/index.html`, after the title (rendered only with a contribution) | newline | shadcn, shadcn-vue (the script that sets the stored or system theme's `.dark` class before the first paint; with a design system too since #694) |
+| `web.shell-imports`, `web.shell-actions` *(added for #693; declared by react-router, tanstack-router and vue-router)* | `web/app/src/App.tsx` or `App.vue` (imports; elements at the end of the navigation bar; rendered only with a contribution) | newline | shadcn, shadcn-vue (`ThemeToggle`; with a design system too since #694) |
+| `web.axe-themes` *(added for #693; declared by test extras accessibility)* | every module screen's `<Name>Page.axe.test.*` (`themes`, each `{ name, switchOn }`; rendered only with a contribution) | `,` + newline | shadcn, shadcn-vue (`dark`, with a design system too since #694; `optional: true`) |
 | `web.restricted-imports` *(added in M1-07)* | `web/app/eslint.config.js` | `,` + newline | router, shadcn, react-hook-form, zod — each bans its alternatives; micro-frontends (the shell imports no remote); agent-ui none (no AG-UI or CopilotKit client), agent-ui ag-ui (no CopilotKit) |
 | `web.lint-configs` *(added for #607; a role slot of `frontend.framework`)* | `web/app/eslint.config.js` (config objects after the framework's own, each with the `files` it applies to; rendered only with a contribution) | `,` + newline | agent-ui ag-ui (outside `src/api/baseApi.ts`, `src/agents/connectAgent.ts` and, with `frontend.realtime: sse`, `src/realtime/connection.ts`, any reference to `fetch`, `XMLHttpRequest`, `Headers`, `HttpAgent` or `EventSource`, bare or through `window`, `globalThis` or `self` (`HttpAgent` through anything), in a Vue template too) |
 | `web.remote-restricted-imports` *(added for #156; declared by module-federation, native-federation and mfe-technique web-components)* | `web/modules/<module>/eslint.config.js` | `,` + newline | mfe-mixed-frameworks no (bans every UI framework but the shell's) |
 | `web.ui-package-fields` *(added for #285; declared by tokens-and-components and web-components)* | `web/packages/ui/package.json`, after `"private"` | `,` + newline | native-federation (`"version": "0.0.0"`: native federation shares a package only when its package.json names a version) |
+
+#### The colour-scheme vocabulary *(#694)*
+
+The colours of shadcn's and shadcn-vue's theme come from the chosen
+`frontend.color-scheme` pack (blue, green or orange): shadcn/ui's own themes
+on its slate neutrals. A function, not a slot, because the theme is itself a
+contribution (to `web.styles`), and a contribution cannot read a slot. The
+UI library's `src/index.css` keeps slate's neutrals and calls the functions
+for the scheme's variables; a design system's tokens call
+`color_scheme_brand` for their brand shades, and only with a scheme, so the
+tokens of the other UI libraries keep their indigo brand and one light value
+per colour. A scheme pack that lacks a function fails generation naming it.
+`ColorSchemeTests` fails when a scheme's palettes are not shadcn/ui's values
+or a text colour has less than 4.5:1 on its background in either theme,
+with each design system's tokens over them too.
+
+| Function | Returns (blue) |
+|---|---|
+| `color_scheme_light` | the light palette's (`:root`) scheme variables, one per line, indented two spaces: `--primary`, `--primary-foreground`, `--ring`, `--chart-1` to `--chart-5`, `--sidebar-primary`, `--sidebar-primary-foreground`, `--sidebar-ring` (`--primary: oklch(0.488 0.243 264.376);`, …) |
+| `color_scheme_dark` | the same variables of the dark palette (`.dark`) |
+| `color_scheme_brand` | the entries of the tokens' `brand` group in `web/packages/tokens/src/color.tokens.json`, indented six spaces: `500`, `700` (the light primary) and `800` (the dark primary) as `#rrggbb` (`"700": { "$value": "#1447e6" }`) |
 
 #### The design-token contract *(#373)*
 
@@ -537,6 +558,11 @@ screens read them only under `tokens` today.
 | `border` | `var(--ds-color-border)` | `border-border` | the borders of inputs, tool calls, the assistant, widgets and table rows |
 | `muted-foreground` | `var(--ds-color-muted-foreground)` | `text-muted-foreground` | status lines, speaker labels, notes, help text, placeholders |
 | `destructive` | `var(--ds-color-destructive)` | `text-destructive`, `border-destructive`, `ring-destructive` | alerts and invalid inputs |
+
+With a colour scheme (shadcn and shadcn-vue, #694) each colour above also has
+a dark value, in `web/packages/tokens/dark/color.tokens.json`, compiled to
+`dist/dark.css` under `.dark`, which the tokens' Tailwind theme imports after
+the light values.
 
 The tokens also define radius `sm`, `md`, `lg` and spacing `1`, `2`, `3`,
 `4`, `6`, `8` (`var(--ds-radius-md)`, `var(--ds-spacing-4)`; with Tailwind

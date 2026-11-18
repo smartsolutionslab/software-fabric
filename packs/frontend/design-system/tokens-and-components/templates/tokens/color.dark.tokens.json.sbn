@@ -1,0 +1,13 @@
+{
+  "color": {
+    "$type": "color",
+    "primary": { "$value": "{color.brand.800}" },
+    "primary-foreground": { "$value": "{color.ink.50}" },
+    "accent": { "$value": "{color.signal.500}" },
+    "accent-foreground": { "$value": "{color.ink.900}" },
+    "surface": { "$value": "{color.ink.900}" },
+    "border": { "$value": "#ffffff1a" },
+    "muted-foreground": { "$value": "{color.ink.400}" },
+    "destructive": { "$value": "{color.danger.400}" }
+  }
+}

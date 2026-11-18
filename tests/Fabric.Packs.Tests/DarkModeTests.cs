@@ -7,8 +7,8 @@ namespace Fabric.Packs.Tests;
 /// #693: with frontend.ui-library shadcn or shadcn-vue, the theme has a dark block of every variable (shadcn's slate dark
 /// values) beside the light one, the app shell a theme toggle (light, dark, system) whose choice is remembered and set
 /// before the first paint, and every screen's axe check runs in both themes, while a contrast test reads both palettes.
-/// With a design system the tokens own the brand colours and have no dark values, so such a project stays light only;
-/// other UI libraries are unchanged.
+/// Since #694 the palettes carry the colour scheme (blue by default) and a design system's tokens have dark values too,
+/// so such a project has the dark theme as well (ColorSchemeTests); other UI libraries are unchanged.
 /// </summary>
 public sealed partial class DarkModeTests
 {
@@ -25,7 +25,7 @@ public sealed partial class DarkModeTests
     [Theory]
     [InlineData(React)]
     [InlineData(Vue)]
-    public void The_theme_has_a_dark_block_of_every_variable_of_the_light_one_in_shadcns_slate_dark_values(string profile)
+    public void The_theme_has_a_dark_block_of_every_variable_of_the_light_one_in_shadcns_slate_dark_values_with_the_blue_scheme(string profile)
     {
         var styles = Files(profile)["web/app/src/index.css"];
 
@@ -35,13 +35,13 @@ public sealed partial class DarkModeTests
         dark.Keys.ShouldBe(light.Keys.Where(name => name != "--radius"), ignoreOrder: true);
         dark["--background"].ShouldBe("oklch(0.129 0.042 264.695)");
         dark["--foreground"].ShouldBe("oklch(0.984 0.003 247.858)");
-        dark["--primary"].ShouldBe("oklch(0.929 0.013 255.508)");
+        dark["--primary"].ShouldBe("oklch(0.424 0.199 265.638)");
         dark["--muted-foreground"].ShouldBe("oklch(0.704 0.04 256.788)");
         dark["--destructive"].ShouldBe("oklch(0.704 0.191 22.216)");
         dark["--border"].ShouldBe("oklch(1 0 0 / 10%)");
         dark["--input"].ShouldBe("oklch(1 0 0 / 15%)");
-        dark["--chart-1"].ShouldBe("oklch(0.488 0.243 264.376)");
-        dark["--sidebar-primary"].ShouldBe("oklch(0.488 0.243 264.376)");
+        dark["--chart-1"].ShouldBe("oklch(0.809 0.105 251.813)");
+        dark["--sidebar-primary"].ShouldBe("oklch(0.424 0.199 265.638)");
         dark["--sidebar-border"].ShouldBe("oklch(1 0 0 / 10%)");
         styles.ShouldNotContain("Light only");
     }
@@ -93,21 +93,6 @@ public sealed partial class DarkModeTests
         var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("ui-library-" + (profile == React ? "shadcn.md" : "shadcn-vue.md"), StringComparison.Ordinal)).Value;
         adr.ShouldContain("`.dark`");
         adr.ShouldContain("prefers-color-scheme");
-    }
-
-    [Theory]
-    [InlineData(React, "frontend.design-system=tokens")]
-    [InlineData(React, "frontend.design-system=tokens-and-components")]
-    [InlineData(Vue, "frontend.design-system=tokens")]
-    public void With_a_design_systems_tokens_the_theme_stays_light_and_says_why(string profile, string designSystem)
-    {
-        var files = Files(profile, designSystem);
-
-        files["web/app/src/index.css"].ShouldNotContain(".dark {");
-        files["web/app/index.html"].ShouldNotContain("<script>");
-        files.Keys.ShouldNotContain(path => path.StartsWith("web/app/src/theme/", StringComparison.Ordinal));
-        files.Where(file => file.Key.StartsWith("web/app/src/App.", StringComparison.Ordinal)).ShouldAllBe(file => !file.Value.Contains("ThemeToggle"));
-        files["AGENTS.md"].ShouldContain("The theme is light only: the design system's tokens set");
     }
 
     [Theory]

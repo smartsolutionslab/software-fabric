@@ -1,3 +1,1 @@
-{{~ if project["frontend.design-system"] == "none" ~}}
 import ThemeToggle from '@/theme/ThemeToggle.vue';
-{{- end }}

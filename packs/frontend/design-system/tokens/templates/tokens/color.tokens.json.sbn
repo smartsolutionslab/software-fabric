@@ -1,20 +1,27 @@
+{{~ scheme = object.has_key project "frontend.color-scheme" ~}}
 {
   "color": {
     "$type": "color",
     "ink": {
       "50": { "$value": "#f8fafc" },
       "200": { "$value": "#e2e8f0" },
+{{~ if scheme ~}}
+      "400": { "$value": "#94a3b8" },
+{{~ end ~}}
       "500": { "$value": "#64748b" },
       "900": { "$value": "#0f172a" }
     },
     "brand": {
-      "500": { "$value": "#4f46e5" },
-      "700": { "$value": "#3730a3" }
+{{ if scheme }}{{ color_scheme_brand }}{{ else }}      "500": { "$value": "#4f46e5" },
+      "700": { "$value": "#3730a3" }{{ end }}
     },
     "signal": {
       "500": { "$value": "#d97706" }
     },
     "danger": {
+{{~ if scheme ~}}
+      "400": { "$value": "#f87171" },
+{{~ end ~}}
       "600": { "$value": "#dc2626" }
     },
     "primary": { "$value": "{color.brand.700}" },

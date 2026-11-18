@@ -19,6 +19,9 @@ StyleDictionary.registerFormat({
   format: ({ dictionary }) =>
     [
       "@import './tokens.css';",
+{{~ if object.has_key project "frontend.color-scheme" ~}}
+      "@import './dark.css';",
+{{~ end ~}}
       '',
       '@theme inline {',
       ...dictionary.allTokens.map((token) => `  --${token.path.join('-')}: var(--${token.name});`),
@@ -67,3 +70,30 @@ const dictionary = new StyleDictionary({
 });
 
 await dictionary.buildAllPlatforms();
+{{~ if object.has_key project "frontend.color-scheme" ~}}
+
+// dist/dark.css: the dark theme's value of each colour token dark/*.tokens.json sets again (--ds-color-primary), under
+// .dark, which the app's theme sets on <html>. It reads the tokens above for its references and writes them resolved.
+const dark = new StyleDictionary({
+  include: ['src/**/*.tokens.json'],
+  source: ['dark/**/*.tokens.json'],
+  log: { errors: { brokenReferences: 'throw' } },
+  platforms: {
+    css: {
+      transformGroup: 'css',
+      prefix,
+      buildPath: 'dist/',
+      files: [
+        {
+          destination: 'dark.css',
+          format: 'css/variables',
+          filter: (token) => token.isSource,
+          options: { selector: '.dark' },
+        },
+      ],
+    },
+  },
+});
+
+await dark.buildAllPlatforms();
+{{~ end ~}}

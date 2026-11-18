@@ -1,0 +1,10 @@
+option: frontend.color-scheme.green
+files: []
+slots:
+  # The colour-scheme vocabulary: the UI library's palettes and a design system's brand tokens call it.
+  - { slot: templates.functions, template: templates/functions.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: unit-test, describes: "The UI library's src/theme/contrast.test.ts reads these palettes (and a design system's tokens over them, light and dark, which take the brand colours) and fails when a text colour has less than WCAG AA's 4.5:1 on its background in the light or the dark theme.", file: templates/functions.sbn }

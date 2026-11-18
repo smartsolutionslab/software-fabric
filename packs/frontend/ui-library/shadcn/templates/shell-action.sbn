@@ -1,3 +1,1 @@
-{{~ if project["frontend.design-system"] == "none" ~}}
         <ThemeToggle />
-{{- end }}
