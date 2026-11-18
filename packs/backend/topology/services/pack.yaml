@@ -28,7 +28,8 @@ declares-slots:
   - { slot: host.endpoints, description: "Host-wide endpoints mapped on WebApplication app in every service host, beside its module's; what the application has once goes to edge.endpoints." }
   - { slot: host.kestrel-endpoints, description: "JSON entries \"<name>\": { \"Url\": \"http://localhost:<port>\", \"Protocols\": \"...\" } under Kestrel:Endpoints of every service host's appsettings.json, each indented six spaces, beside the host's own http endpoint (launchSettings' http://localhost:5080). Rendered only with a contribution; Aspire turns every Kestrel endpoint into an endpoint of the service's resource, by its name.", separator: ",\n" }
   - { slot: host.log-levels, description: "JSON entries \"<category>\": \"<level>\" under Logging:LogLevel of every service host's appsettings.json, after Default and Microsoft.AspNetCore, each indented six spaces.", separator: ",\n" }
-  # What exists once per application goes to the edge, src/Edge, instead (ADR-0017): /me, a hub, MCP, AG-UI.
+  # What exists once per application goes to the edge, src/Edge, instead (ADR-0017): /me, a hub, AG-UI. Each service is
+  # its own MCP server, at /<module>/mcp (ADR-0017, amended 2026-11-18).
   - { slot: edge.packages, description: "<PackageReference> lines for the edge (src/Edge/Edge.csproj) alone, beside host.packages, which it renders too: the edge compiles src/Host as every service host does." }
   - { slot: edge.services, description: "Statements registering services on the edge's builder, for what the edge maps itself (authentication, the OpenAPI document)." }
   - { slot: edge.middleware, description: "Statements adding middleware to the edge's built app, before the edge's own endpoints and the module routes are mapped." }
@@ -47,4 +48,4 @@ gates:
   - { kind: architecture-test, describes: "No service host's project references another module's projects.", file: templates/ServicesDoNotReferenceEachOther.cs.sbn }
   - { kind: architecture-test, describes: "Every service host runs exactly one module: the module Api projects it references hold one IModule between them.", file: templates/EveryServiceHostRunsExactlyOneModule.cs.sbn }
   - { kind: architecture-test, describes: "Every service host knows its module's route name: its assembly carries the ModuleName metadata ServiceModule.Name reads. The violation names the service.", file: templates/EveryServiceHostKnowsItsModule.cs.sbn }
-  - { kind: architecture-test, describes: "No service host maps what the application has once (/me, a SignalR hub or event stream, MCP, AG-UI); it lives on the edge, src/Edge. The violation names the service and the route.", file: templates/SingletonsLiveOnTheEdge.cs.sbn }
+  - { kind: architecture-test, describes: "No service host maps what the application has once (/me, a SignalR hub or event stream, AG-UI); it lives on the edge, src/Edge. Nor does one map an MCP server at its root, /mcp: its own is at /<module>/mcp. The violation names the service and the route.", file: templates/SingletonsLiveOnTheEdge.cs.sbn }
