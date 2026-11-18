@@ -140,7 +140,13 @@ public static class Generator
             .OrderBy(Names.ToPascalCase, StringComparer.Ordinal)
             .Select(module => "/" + module)
             .ToList();
-        return new OpenApiAdditions(paths, schemas, later);
+        // The tags the new paths carry, which a copy without paths lacks.
+        var tags = (newDocument["tags"] as JsonArray ?? [])
+            .Select(tag => tag?["name"]?.GetValue<string>())
+            .OfType<string>()
+            .Where(tag => !(oldDocument["tags"] as JsonArray ?? []).Any(existing => existing?["name"]?.GetValue<string>() == tag))
+            .ToList();
+        return new OpenApiAdditions(paths, schemas, later, tags);
     }
 
     private static List<KeyValuePair<string, JsonNode>> Added(JsonNode? before, JsonNode? after) =>

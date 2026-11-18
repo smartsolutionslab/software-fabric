@@ -384,40 +384,7 @@ public sealed class KurrentDbTests
     {
         using var project = new GeneratedProject(Profile, [.. KurrentDb, "module.ddd-depth=strict"]);
         project.AddModule("billing");
-        project.Write("src/Modules/Billing/Billing.Domain/Samples/Sample.cs", """
-            using Shop.BuildingBlocks.EventSourcing;
-
-            namespace Shop.Modules.Billing.Domain.Samples;
-
-            public sealed class Sample : EventSourcedAggregate<SampleId>
-            {
-                private Sample()
-                {
-                }
-
-                public SampleName Name { get; private set; } = default!;
-
-                public static Sample Create(SampleId id, SampleName name)
-                {
-                    var sample = new Sample();
-                    sample.Raise(new SampleNamed(id, name));
-                    return sample;
-                }
-
-                private void Apply(SampleNamed named)
-                {
-                    Id = named.Sample;
-                    Name = named.Name;
-                }
-            }
-            """);
-        project.Write("src/Modules/Billing/Billing.Domain/Samples/SampleNamed.cs", """
-            using Shop.BuildingBlocks.EventSourcing;
-
-            namespace Shop.Modules.Billing.Domain.Samples;
-
-            public sealed record SampleNamed(SampleId Sample, SampleName Name) : IDomainEvent;
-            """);
+        // The module's own sample (#734): a strict event-sourced aggregate whose event carries its two value objects.
         project.Write("tests/Modules/Billing.Tests/EventStoreTests.cs", """"
             using System.Text;
             using KurrentDB.Client;
@@ -444,7 +411,7 @@ public sealed class KurrentDbTests
                     (await store.LoadAsync<Sample>(id, cancellationToken)).Value.Name.ShouldBe(SampleName.From("Ada"));
                     await foreach (var stored in provider.GetRequiredService<KurrentDBClient>().ReadStreamAsync(Direction.Forwards, $"billing-{id.Value}", StreamPosition.Start, cancellationToken: cancellationToken))
                     {
-                        Encoding.UTF8.GetString(stored.Event.Data.Span).ShouldBe($$$"""{"Sample":"{{{id.Value}}}","Name":"Ada"}""");
+                        Encoding.UTF8.GetString(stored.Event.Data.Span).ShouldBe($$$"""{"Id":"{{{id.Value}}}","Name":"Ada"}""");
                     }
                 }
 
@@ -454,7 +421,7 @@ public sealed class KurrentDbTests
                     var cancellationToken = TestContext.Current.CancellationToken;
                     await using var provider = Provider();
                     var id = SampleId.New();
-                    var stored = new EventData(Uuid.NewUuid(), "SampleNamed", Encoding.UTF8.GetBytes($$$"""{"Sample":"{{{id.Value}}}","Name":"  "}"""), contentType: "application/json");
+                    var stored = new EventData(Uuid.NewUuid(), "SampleCreated", Encoding.UTF8.GetBytes($$$"""{"Id":"{{{id.Value}}}","Name":"  "}"""), contentType: "application/json");
                     await provider.GetRequiredService<KurrentDBClient>().AppendToStreamAsync($"billing-{id.Value}", StreamState.NoStream, [stored], cancellationToken: cancellationToken);
 
                     await Should.ThrowAsync<GuardException>(() => provider.GetRequiredService<IBillingAggregateStore>().LoadAsync<Sample>(id, cancellationToken));

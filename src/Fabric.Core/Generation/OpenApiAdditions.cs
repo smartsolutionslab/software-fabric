@@ -14,10 +14,15 @@ namespace Fabric.Core.Generation;
 /// The route prefixes (<c>/orders</c>) of the project's modules the host maps after the new one: it maps modules in the
 /// order of their namespaces, so the new paths go before the first path of any of these.
 /// </param>
+/// <param name="Tags">
+/// The names of the tags the new paths carry. A copy without paths has none (a project without an identity provider
+/// starts so), and the host lists each tag once, after the components.
+/// </param>
 public sealed record OpenApiAdditions(
     IReadOnlyList<KeyValuePair<string, JsonNode>> Paths,
     IReadOnlyList<KeyValuePair<string, JsonNode>> Schemas,
-    IReadOnlyList<string> LaterModules)
+    IReadOnlyList<string> LaterModules,
+    IReadOnlyList<string>? Tags = null)
 {
     /// <summary>The committed copy every frontend api-client pack writes.</summary>
     public const string DocumentPath = "web/app/openapi.json";
@@ -94,6 +99,21 @@ public sealed record OpenApiAdditions(
             }
         }
 
+        var tags = root["tags"] as JsonArray;
+        if (root["tags"] is not null && tags is null)
+        {
+            return NotAnObject("tags");
+        }
+
+        foreach (var tag in Tags ?? [])
+        {
+            if (tags?.Any(existing => existing?["name"]?.GetValue<string>() == tag) != true)
+            {
+                tags ??= ChildArray(root, "tags");
+                tags.Add(new JsonObject { ["name"] = tag });
+            }
+        }
+
         extended = root.ToJsonString(Indented) + "\n";
         return null;
     }
@@ -102,7 +122,7 @@ public sealed record OpenApiAdditions(
         $"{DocumentPath} already has the {kind} {name}; add-module only adds a new module's paths and schemas.";
 
     private static string NotAnObject(string member) =>
-        $"{DocumentPath} has a {member} that is not a JSON object; add-module adds the new module's paths to it.";
+        $"{DocumentPath} has a {member} that is not a JSON {(member == "tags" ? "array" : "object")}; add-module adds the new module's paths to it.";
 
     // A member that is missing is fine, add-module creates it; one of another kind is a copy it cannot extend.
     private static bool TryObject(JsonObject parent, string name, out JsonObject? child)
@@ -114,6 +134,13 @@ public sealed record OpenApiAdditions(
     private static JsonObject Child(JsonObject parent, string name)
     {
         var child = new JsonObject();
+        parent[name] = child;
+        return child;
+    }
+
+    private static JsonArray ChildArray(JsonObject parent, string name)
+    {
+        var child = new JsonArray();
         parent[name] = child;
         return child;
     }
