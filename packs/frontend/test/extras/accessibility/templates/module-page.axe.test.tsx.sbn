@@ -131,7 +131,7 @@ vi.mock('@/api/generated', async (importOriginal) => {
 
 {{~ if stands_in ~}}
 const { examples } = data;
-// A data file written before it had an empty example (#734) has none: the page is then not checked with nothing to show.
+// A data file written before it had an empty example has none: the page is then not checked with nothing to show.
 const emptyExamples = (data as { emptyExamples?: Record<string, unknown> }).emptyExamples ?? {};
 
 {{~ end ~}}
