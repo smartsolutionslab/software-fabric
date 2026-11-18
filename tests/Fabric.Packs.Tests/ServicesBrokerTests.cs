@@ -87,6 +87,22 @@ public sealed class ServicesBrokerTests
         appHost.ShouldNotContain("shipping", Case.Insensitive);
     }
 
+    [Theory]
+    [InlineData("rabbitmq", "Messaging:Queue")]
+    [InlineData("azure-service-bus", "Messaging:Subscription")]
+    public void With_services_every_architecture_rule_that_builds_a_service_host_gives_it_the_name_the_AppHost_would(string transport, string setting)
+    {
+        var files = WithModules(Services(transport), "billing", "shipping");
+
+        var rules = files.Where(file => file.Key.StartsWith("tests/Architecture.Tests/Rules/", StringComparison.Ordinal)
+            && file.Value.Contains("UseSetting(\"ConnectionStrings:messaging\"", StringComparison.Ordinal)).ToList();
+        rules.ShouldNotBeEmpty();
+        foreach (var (path, content) in rules)
+        {
+            content.ShouldContain($"builder.UseSetting(\"{setting}\", \"unused\");", customMessage: $"{path} builds a service host, which fails without {setting}.");
+        }
+    }
+
     [Fact]
     public void With_services_and_rabbitmq_a_service_listens_on_the_queue_the_AppHost_names_and_fails_without_it()
     {
