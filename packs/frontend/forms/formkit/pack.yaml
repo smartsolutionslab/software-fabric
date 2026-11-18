@@ -10,6 +10,7 @@ files:
 slots:
   - { slot: web.dependencies, template: templates/dependencies.sbn }
   - { slot: web.dev-dependencies, template: templates/dev-dependencies.sbn }
+  - { slot: web.pnpm-overrides, template: templates/pnpm-override.sbn }
   - { slot: web.imports, template: templates/import.sbn, order: 30 }
   - { slot: web.providers, template: templates/provider.sbn, order: 30 }
   - { slot: web.test-setup, template: templates/test-setup.sbn, order: 30 }

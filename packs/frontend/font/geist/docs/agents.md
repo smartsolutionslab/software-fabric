@@ -1,0 +1,4 @@
+## Font: Geist
+
+- The app's typeface is Geist, with Geist Mono for monospace text, `fabric.yaml`'s font (`frontend.font`): the npm packages `@fontsource-variable/geist` and `@fontsource-variable/geist-mono`, imported in `src/index.css` and bundled with the app, never from a font host. Never add a `<link>` or an `@import` of Google Fonts or another CDN: `src/theme/font.test.ts` fails on anything `index.html` or `src/index.css` loads from another host.
+- The theme's `--font-sans` names Geist and `--font-mono` Geist Mono; text takes them through `font-sans` (the page's default) and `font-mono` (identifiers, codes), never a `font-family` of a component's own. Another font is a change of the project's choices (Inter and Geist are offered), decided with a decision record of its own, not a hand edit.

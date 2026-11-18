@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 using System.Text.RegularExpressions;
 
 namespace Fabric.Packs.Tests;
@@ -162,6 +164,32 @@ public sealed partial class TestcontainersTests
             output.ShouldContain("failed: 0", customMessage: tests);
             output.ShouldNotContain("succeeded: 0", customMessage: tests);
         }
+    }
+
+    /// <summary>
+    /// The host in the tests listens on a port the operating system chooses, not on Kestrel's default port 5000 (#717):
+    /// with something else listening there, the integration tests still pass, so two projects' tests can run at once
+    /// on one machine.
+    /// </summary>
+    [Fact]
+    public void The_integration_tests_pass_while_something_else_listens_on_port_5000()
+    {
+        using var project = NewProject("lean-crud", "frontend.realtime=signalr", "backend.auth=none", "backend.tenancy=none");
+        if (!Directory.EnumerateDirectories(Path.Combine(project.ProjectDirectory, "src", "Modules")).Any())
+        {
+            project.AddModule("billing");
+        }
+
+        project.Build();
+        DockerPorts.EnsureRunsAlone();
+        using var occupant = new TcpListener(IPAddress.Loopback, 5000);
+        occupant.Start();
+
+        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0");
+        output.ShouldNotContain("succeeded: 0");
     }
 
     /// <summary>

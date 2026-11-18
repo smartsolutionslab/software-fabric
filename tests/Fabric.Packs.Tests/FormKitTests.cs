@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Fabric.Core.Choices;
 using Fabric.Core.Generation;
@@ -376,6 +377,45 @@ public sealed partial class FormKitTests
         FormatCheck(project);
     }
 
+    // A generated project has no lockfile, so @formkit/vue's own ^2.5.0 ranges took FormKit 2.7.0 in beside the pinned
+    // 2.5.0 core the day it was published, and two FormKitNode types failed the type check (#730).
+    [Theory]
+    [InlineData("pnpm-workspaces")]
+    [InlineData("nx")]
+    [InlineData("turborepo")]
+    public void The_workspace_root_overrides_every_formkit_package_to_the_version_the_app_pins(string workspace)
+    {
+        var files = Files(Vue, FormKit, $"frontend.workspace={workspace}");
+        var pinned = (string?)JsonNode.Parse(files["web/app/package.json"])!["dependencies"]!["@formkit/core"];
+        var overrides = JsonNode.Parse(files["web/package.json"])!["pnpm"]?["overrides"]?.AsObject();
+
+        overrides.ShouldNotBeNull();
+        foreach (var formKitPackage in new[] { "core", "dev", "i18n", "inputs", "observer", "rules", "themes", "utils", "validation" })
+        {
+            ((string?)overrides[$"@formkit/{formKitPackage}"]).ShouldBe(pinned, $"@formkit/{formKitPackage}");
+        }
+    }
+
+    [Fact]
+    public void A_formkit_project_installs_every_formkit_package_at_the_one_version_the_app_pins()
+    {
+        using var project = new GeneratedProject(Vue, FormKit);
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var pinned = (string?)JsonNode.Parse(File.ReadAllText(Path.Combine(web, "app", "package.json")))!["dependencies"]!["@formkit/core"];
+        var (exitCode, output) = Shell.Run(web, "pnpm", "install");
+        exitCode.ShouldBe(0, $"pnpm install:\n{output}");
+
+        var installed = Directory.GetDirectories(Path.Combine(web, "node_modules", ".pnpm"), "@formkit+*")
+            .Select(Path.GetFileName)
+            .Select(name => FormKitPackage().Match(name!))
+            .Select(match => $"@formkit/{match.Groups["name"].Value}@{match.Groups["version"].Value}")
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        installed.ShouldNotBeEmpty();
+        installed.Where(package => !package.EndsWith($"@{pinned}", StringComparison.Ordinal)).ShouldBeEmpty($"pinned {pinned}, installed: {string.Join(", ", installed)}");
+    }
+
     /// <summary>The sign-up form with the same rules written in Valibot.</summary>
     private static string ToValibot(string form) => form
         .Replace("import { z } from 'zod';", "import * as v from 'valibot';", StringComparison.Ordinal)
@@ -491,6 +531,10 @@ public sealed partial class FormKitTests
 
     [GeneratedRegex(@"(?<![:\w-])class=""(?<classes>[^""]*)""")]
     private static partial Regex ClassAttribute();
+
+    /// <summary>An entry of node_modules/.pnpm: <c>@formkit+vue@2.5.0_vue@3.5.45_typescript@6.0.3</c>.</summary>
+    [GeneratedRegex(@"^@formkit\+(?<name>[a-z0-9-]+)@(?<version>[^_]+)")]
+    private static partial Regex FormKitPackage();
 
     [GeneratedRegex(@"import (?<name>\w+) from '(?<module>\.{1,2}/[^']+\.module\.css)';")]
     private static partial Regex ModuleImport();

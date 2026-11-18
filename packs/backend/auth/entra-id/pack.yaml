@@ -34,6 +34,11 @@ slots:
   - { slot: host.packages, template: templates/host-package.sbn }
   - { slot: host.services, template: templates/host-services.sbn }
   - { slot: host.middleware, template: templates/host-middleware.sbn, order: -10 }
+  # With services, the edge validates the token for what it maps itself (/me) as every service does (ADR-0017);
+  # edge.* is declared only by the services topology, and apphost.edge-wiring renders only with it.
+  - { slot: apphost.edge-wiring, template: templates/apphost-host-wiring.sbn, order: 20 }
+  - { slot: edge.services, template: templates/host-services.sbn, optional: true }
+  - { slot: edge.middleware, template: templates/host-middleware.sbn, order: -10, optional: true }
   - { slot: modules.endpoints, template: templates/module-endpoints.sbn, order: -10 }
   - { slot: tests.architecture.references, template: templates/architecture-tests-references.sbn }
   # With backend.test.integration testcontainers only (ADR-0002: dropped where no pack declares the slot).

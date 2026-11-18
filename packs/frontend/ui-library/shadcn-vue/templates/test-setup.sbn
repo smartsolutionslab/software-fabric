@@ -1,0 +1,4 @@
+{{~ if project["frontend.architecture"] == "spa" && project["frontend.routing"] == "vue-router" ~}}
+
+// jsdom measures nothing: the command palette scrolls the item it highlights into view.
+Element.prototype.scrollIntoView ??= () => undefined;{{ end }}

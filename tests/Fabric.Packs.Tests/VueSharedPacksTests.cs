@@ -135,7 +135,7 @@ public sealed partial class VueSharedPacksTests
         // CI forces colour, which puts escape codes between the parts of a reported test's name.
         var plain = Escapes().Replace(testOutput, string.Empty);
         plain.ShouldContain("✓ src/auth/SignedIn.test.ts > an anonymous visitor is sent to the identity provider", customMessage: testOutput);
-        plain.ShouldContain("✓ src/auth/SignedIn.test.ts > a signed-in user sees who they are and the application", customMessage: testOutput);
+        plain.ShouldContain("✓ src/auth/SignedIn.test.ts > a signed-in user sees the application", customMessage: testOutput);
         plain.ShouldContain("✓ src/auth/SignedIn.test.ts > coming back from the identity provider completes the sign-in and drops its parameters from the address", customMessage: testOutput);
         plain.ShouldContain("✓ src/auth/SignedIn.test.ts > a failed sign-in is shown, not retried", customMessage: testOutput);
         plain.ShouldContain("✓ src/auth/SignedIn.test.ts > a session whose access token expires sends the user back to the identity provider", customMessage: testOutput);

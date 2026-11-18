@@ -1,0 +1,4 @@
+{{~ if project["backend.auth"] != "none" ~}}
+app.MapGet("/me", (System.Security.Claims.ClaimsPrincipal user) => TypedResults.Ok(new {{ namespace }}.Host.CurrentUser(user.FindFirst("{{ user_name_claim }}")?.Value)))
+    .RequireAuthorization();
+{{- end }}

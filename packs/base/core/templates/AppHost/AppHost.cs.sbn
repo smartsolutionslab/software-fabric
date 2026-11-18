@@ -2,7 +2,28 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 {{ slots["apphost.resources"] }}
 
+{{~ if project["backend.topology"] == "services" ~}}
+var host = {{ slots["apphost.host"] }}{{ slots["apphost.edge-wiring"] }};
+
+foreach (var (module, project) in builder.ServiceHosts())
+{
+{{~ if slots["apphost.service-resources"] != "" ~}}
+    {{ slots["apphost.service-resources"] }}
+
+{{~ end ~}}
+    // Every service's launch profile names the same port; under the AppHost each gets one of its own.
+    var service = builder.AddProject(module, project)
+        .WithEndpoint("http", endpoint => endpoint.Port = null)
+        .WithHttpHealthCheck("/health"){{ slots["apphost.host-wiring"] | string.replace "\n" "\n    " }};
+
+    // The edge routes /<module>/... to the service it finds under the module's name, listed under Edge:Modules.
+    host.WithReference(service)
+        .WithEnvironment($"Edge__Modules__{module}", module)
+        .WaitFor(service);
+}
+{{~ else ~}}
 var host = {{ slots["apphost.host"] }}{{ slots["apphost.host-wiring"] }};
+{{~ end ~}}
 {{ if slots["apphost.web"] != "" }}
 {{ slots["apphost.web"] }}{{ slots["apphost.web-wiring"] }};
 {{ end }}

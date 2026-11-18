@@ -1,8 +1,17 @@
+{{~ user_menu = project["frontend.ui-library"] == "shadcn-vue" && project["frontend.architecture"] == "spa" && object.has_key(project, "frontend.auth-client") && project["frontend.auth-client"] == "oidc-client-ts" ~}}
 import { render, screen } from '@testing-library/vue';
-import { expect, test } from 'vitest';
+import { expect, test{{ if user_menu }}, vi{{ end }} } from 'vitest';
 import { createMemoryHistory } from 'vue-router';
 import App from './App.vue';
 import { createAppRouter } from './router';
+{{~ if user_menu ~}}
+
+// The user menu has its own test; here it stands in, so this test checks the start page.
+vi.mock('@/auth/UserMenu.vue', async () => {
+  const { h } = await import('vue');
+  return { default: { render: () => h('p', 'The user menu') } };
+});
+{{~ end ~}}
 
 test('the start page names the application', async () => {
   const router = createAppRouter(createMemoryHistory());

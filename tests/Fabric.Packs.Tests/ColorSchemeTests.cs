@@ -24,6 +24,7 @@ public sealed partial class ColorSchemeTests
         ("card-foreground", "card"),
         ("popover-foreground", "popover"),
         ("primary-foreground", "primary"),
+        ("primary", "background"),
         ("secondary-foreground", "secondary"),
         ("accent-foreground", "accent"),
         ("muted-foreground", "background"),
@@ -78,10 +79,12 @@ public sealed partial class ColorSchemeTests
     }
 
     /// <summary>
-    /// The values are shadcn/ui's (apps/v4/registry/themes.ts at 968d8cb9): each theme's primary, its foreground and its
-    /// charts. Its sidebar-primary (the 600 tone light, the 500 tone dark) has less than 4.5:1 under the light foreground,
-    /// so the sidebar's active item takes the theme's primary, and that tone colours the focus rings, which the theme
-    /// leaves to the base colour.
+    /// The values are shadcn/ui's (apps/v4/registry/themes.ts at 968d8cb9): each theme's light primary, its foreground and
+    /// its charts. Its sidebar-primary (the 600 tone light, the 500 tone dark) has less than 4.5:1 under the light
+    /// foreground, so the sidebar's active item takes the theme's primary, and that tone colours the focus rings, which the
+    /// theme leaves to the base colour. Its dark primary (the 800 tone) has less than 4.5:1 as text on the dark background
+    /// (#721), the button's link variant, and no tone has 4.5:1 both on that background and under a light foreground, so
+    /// the dark primary is the 400 tone under the 950 tone.
     /// </summary>
     [Theory]
     [MemberData(nameof(SchemesAndProfiles))]
@@ -90,17 +93,17 @@ public sealed partial class ColorSchemeTests
         var styles = Files(profile, $"frontend.color-scheme={scheme}")["web/app/src/index.css"];
         var light = Variables(Block(styles, ":root"));
         var dark = Variables(Block(styles, ".dark"));
-        var (lightPrimary, darkPrimary, foreground, lightRing, darkRing, charts) = scheme switch
+        var (lightPrimary, lightForeground, darkPrimary, darkForeground, lightRing, darkRing, charts) = scheme switch
         {
-            "blue" => ("oklch(0.488 0.243 264.376)", "oklch(0.424 0.199 265.638)", "oklch(0.97 0.014 254.604)", "oklch(0.546 0.245 262.881)", "oklch(0.623 0.214 259.815)",
+            "blue" => ("oklch(0.488 0.243 264.376)", "oklch(0.97 0.014 254.604)", "oklch(0.707 0.165 254.624)", "oklch(0.282 0.091 267.935)", "oklch(0.546 0.245 262.881)", "oklch(0.623 0.214 259.815)",
                 new[] { "oklch(0.809 0.105 251.813)", "oklch(0.623 0.214 259.815)", "oklch(0.546 0.245 262.881)", "oklch(0.488 0.243 264.376)", "oklch(0.424 0.199 265.638)" }),
-            "green" => ("oklch(0.527 0.154 150.069)", "oklch(0.448 0.119 151.328)", "oklch(0.982 0.018 155.826)", "oklch(0.627 0.194 149.214)", "oklch(0.723 0.219 149.579)",
+            "green" => ("oklch(0.527 0.154 150.069)", "oklch(0.982 0.018 155.826)", "oklch(0.792 0.209 151.711)", "oklch(0.266 0.065 152.934)", "oklch(0.627 0.194 149.214)", "oklch(0.723 0.219 149.579)",
                 new[] { "oklch(0.871 0.15 154.449)", "oklch(0.723 0.219 149.579)", "oklch(0.627 0.194 149.214)", "oklch(0.527 0.154 150.069)", "oklch(0.448 0.119 151.328)" }),
-            _ => ("oklch(0.553 0.195 38.402)", "oklch(0.47 0.157 37.304)", "oklch(0.98 0.016 73.684)", "oklch(0.646 0.222 41.116)", "oklch(0.705 0.213 47.604)",
+            _ => ("oklch(0.553 0.195 38.402)", "oklch(0.98 0.016 73.684)", "oklch(0.75 0.183 55.934)", "oklch(0.266 0.079 36.259)", "oklch(0.646 0.222 41.116)", "oklch(0.705 0.213 47.604)",
                 new[] { "oklch(0.837 0.128 66.29)", "oklch(0.705 0.213 47.604)", "oklch(0.646 0.222 41.116)", "oklch(0.553 0.195 38.402)", "oklch(0.47 0.157 37.304)" }),
         };
 
-        foreach (var (palette, primary, ring) in new[] { (light, lightPrimary, lightRing), (dark, darkPrimary, darkRing) })
+        foreach (var (palette, primary, foreground, ring) in new[] { (light, lightPrimary, lightForeground, lightRing), (dark, darkPrimary, darkForeground, darkRing) })
         {
             palette["--primary"].ShouldBe(primary);
             palette["--primary-foreground"].ShouldBe(foreground);
@@ -151,6 +154,32 @@ public sealed partial class ColorSchemeTests
         }
     }
 
+    /// <summary>
+    /// The tokens' accent (color.signal.500) is the scheme's (#721): at least 60° of OKLCH hue from the primary in both
+    /// themes, so an accent badge does not read as a primary one. Amber sat beside the orange scheme's primary.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(SchemesAndDesignSystems))]
+    public void A_design_systems_accent_is_at_least_60_degrees_of_hue_from_the_schemes_primary_in_both_themes(string profile, string scheme, string designSystem)
+    {
+        if (designSystem == "none")
+        {
+            return;
+        }
+
+        var tokens = Tokens(Files(profile, $"frontend.color-scheme={scheme}", $"frontend.design-system={designSystem}"));
+        var expected = scheme == "orange" ? "#00a6f4" : "#d97706";
+
+        foreach (var theme in new[] { "light", "dark" })
+        {
+            var accent = tokens.Resolve("accent", theme)!;
+            var primary = tokens.Resolve("primary", theme)!;
+            var distance = Math.Abs(Hue(accent) - Hue(primary)) % 360;
+            Math.Min(distance, 360 - distance).ShouldBeGreaterThanOrEqualTo(60, $"{scheme}, {designSystem}: in the {theme} theme the accent ({accent}) and the primary ({primary})");
+            accent.ShouldBe(expected, $"{scheme}, {designSystem}: the {theme} accent");
+        }
+    }
+
     [Theory]
     [InlineData(React, "tokens", "green")]
     [InlineData(React, "tokens-and-components", "blue")]
@@ -166,12 +195,13 @@ public sealed partial class ColorSchemeTests
         files.Keys.ShouldContain("web/app/src/theme/contrast.test.ts");
         files.Where(file => file.Key.StartsWith("web/app/src/App.", StringComparison.Ordinal)).ShouldContain(file => file.Value.Contains("ThemeToggle"));
         files["web/app/src/theme/contrast.test.ts"].ShouldContain("../packages/tokens/dist/dark.css");
+        files["web/app/src/theme/contrast.test.ts"].ShouldContain("['primary', 'background'],");
         files["AGENTS.md"].ShouldNotContain("light only");
         var brand = scheme switch
         {
-            "blue" => new[] { "#2b7fff", "#1447e6", "#193cb8" },
-            "green" => ["#00c950", "#008236", "#016630"],
-            _ => ["#ff6900", "#ca3500", "#9f2d00"],
+            "blue" => new[] { "#51a2ff", "#2b7fff", "#1447e6", "#193cb8" },
+            "green" => ["#05df72", "#00c950", "#008236", "#016630"],
+            _ => ["#ff8904", "#ff6900", "#ca3500", "#9f2d00"],
         };
         var colours = files["web/packages/tokens/src/color.tokens.json"];
         brand.ShouldAllBe(hex => colours.Contains(hex));
@@ -249,6 +279,7 @@ public sealed partial class ColorSchemeTests
         var plain = Escapes().Replace(testOutput, string.Empty);
         plain.ShouldContain("✓ src/theme/contrast.test.ts > in the dark theme muted-foreground on background has a contrast of at least 4.5:1", customMessage: testOutput);
         plain.ShouldContain("✓ src/theme/contrast.test.ts > in the light theme primary-foreground on primary has a contrast of at least 4.5:1", customMessage: testOutput);
+        plain.ShouldContain("✓ src/theme/contrast.test.ts > in the dark theme primary on background has a contrast of at least 4.5:1", customMessage: testOutput);
         plain.ShouldContain($"✓ {axeCheck} > the Billing page has no accessibility violations axe can find in the dark theme", customMessage: testOutput);
         File.ReadAllText(Path.Combine(web, "packages", "tokens", "dist", "dark.css")).ShouldContain(".dark {");
 
@@ -316,6 +347,26 @@ public sealed partial class ColorSchemeTests
     {
         var (lighter, darker) = (Math.Max(Luminance(first), Luminance(second)), Math.Min(Luminance(first), Luminance(second)));
         return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    /// <summary>The OKLCH hue, in degrees, of an opaque #rrggbb colour.</summary>
+    private static double Hue(string colour)
+    {
+        var hex = Hex().Match(colour);
+        hex.Success.ShouldBeTrue($"an opaque #rrggbb colour, not {colour}");
+        double Channel(int index)
+        {
+            var value = int.Parse(hex.Groups[1].Value.AsSpan(index * 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture) / 255.0;
+            return value <= 0.04045 ? value / 12.92 : Math.Pow((value + 0.055) / 1.055, 2.4);
+        }
+
+        var (red, green, blue) = (Channel(0), Channel(1), Channel(2));
+        var l = Math.Cbrt((0.4122214708 * red) + (0.5363325363 * green) + (0.0514459929 * blue));
+        var m = Math.Cbrt((0.2119034982 * red) + (0.6806995451 * green) + (0.1073969566 * blue));
+        var s = Math.Cbrt((0.0883024619 * red) + (0.2817188376 * green) + (0.6299787005 * blue));
+        var a = (1.9779984951 * l) - (2.4285922050 * m) + (0.4505937099 * s);
+        var b = (0.0259040371 * l) + (0.7827717662 * m) - (0.8086757660 * s);
+        return ((Math.Atan2(b, a) * 180 / Math.PI) + 360) % 360;
     }
 
     /// <summary>The relative luminance (WCAG) of an opaque #rrggbb or oklch() colour, oklch() clipped to the sRGB gamut.</summary>

@@ -1,5 +1,19 @@
+{{~ shell = project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router" ~}}
+{{~ if shell ~}}
+    "@radix-ui/react-dialog": "1.3.1",
+    "@radix-ui/react-separator": "1.2.0",
+{{~ end ~}}
     "@radix-ui/react-slot": "1.5.0",
+{{~ if shell ~}}
+    "@radix-ui/react-tooltip": "1.4.1",
+{{~ end ~}}
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
+{{~ if shell ~}}
+    "cmdk": "1.1.1",
+{{~ end ~}}
     "lucide-react": "1.73.0",
+{{~ if shell ~}}
+    "sonner": "2.0.8",
+{{~ end ~}}
     "tailwind-merge": "3.7.0"

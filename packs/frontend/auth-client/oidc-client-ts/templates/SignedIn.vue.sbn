@@ -1,4 +1,5 @@
 {{~ vuetify = project["frontend.ui-library"] == "vuetify" ~}}
+{{~ user_menu = project["frontend.ui-library"] == "shadcn-vue" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "vue-router" ~}}
 {{~ func class_of(tailwind, module, material)
   if vuetify
     ret 'class="' + material + '"'
@@ -18,8 +19,16 @@ import { useAuth } from '@/auth/useAuth';
 import styles from './SignedIn.module.css';
 {{~ end ~}}
 
+{{~ if user_menu ~}}
+/**
+ * Renders its default slot for a signed-in user and sends everyone else to the identity provider. Who is signed in, and
+ * Sign out, are in the app shell's user menu (UserMenu.vue).
+ */
+const { isAuthenticated, isLoading, error, activeNavigator, signinRedirect } = useAuth();
+{{~ else ~}}
 /** Renders its default slot for a signed-in user and sends everyone else to the identity provider. */
 const { user, isAuthenticated, isLoading, error, activeNavigator, signinRedirect, signoutRedirect } = useAuth();
+{{~ end ~}}
 
 watchEffect(() => {
   if (!isAuthenticated.value && !isLoading.value && !error.value && !activeNavigator.value) {
@@ -32,6 +41,9 @@ watchEffect(() => {
   <p v-if="error" role="alert">Sign-in failed: {{ "{{" }} error.message {{ "}}" }}</p>
   <p v-else-if="activeNavigator === 'signoutRedirect'">Signing out…</p>
   <p v-else-if="!isAuthenticated">Signing in…</p>
+{{~ if user_menu ~}}
+  <slot v-else />
+{{~ else ~}}
   <template v-else>
     <div {{ class_of "flex items-center justify-end gap-3 p-2 text-sm" "signedIn" "d-flex align-center justify-end ga-3 pa-2 text-body-medium" }}>
       <span>Signed in as {{ "{{" }} user?.profile.preferred_username {{ "}}" }}</span>
@@ -43,4 +55,5 @@ watchEffect(() => {
     </div>
     <slot />
   </template>
+{{~ end ~}}
 </template>

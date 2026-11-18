@@ -5,6 +5,8 @@ slots:
   - { slot: apphost.packages, template: templates/apphost-package.sbn }
   - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 10 }
   - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 10 }
+  # With backend.topology services only, the only topology that renders the slot: the service's own database (ADR-0017 D2).
+  - { slot: apphost.service-resources, template: templates/apphost-service-resources.sbn, order: 10 }
   - { slot: buildingblocks.packages, template: templates/buildingblocks-package.sbn }
   - { slot: persistence.options, template: templates/persistence-options.sbn }
   # With backend.test.integration testcontainers only (ADR-0002: dropped where no pack declares the slot).

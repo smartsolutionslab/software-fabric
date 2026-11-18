@@ -118,6 +118,8 @@ declares-slots:
   - { slot: apphost.web, description: "The expression adding the web app, without a semicolon.", cardinality: at-most-one }
   - { slot: apphost.web-wiring, description: "Chained calls on the web app, each starting on a new line.", separator: "" }
   - { slot: apphost.host-wiring, description: "Chained calls on the host, each starting on a new line (.WithReference(...), .WaitFor(...)).", separator: "" }
+  - { slot: apphost.service-resources, description: "With backend.topology services: statements at the top of the AppHost's loop over the service hosts, run once per service before it is added (string module, its resource name, and string project are in scope), each starting on a new line; what they declare is in scope for apphost.host-wiring. A database per service and its migration run (ADR-0017 D2); rendered nowhere in a modular monolith." }
+  - { slot: apphost.edge-wiring, description: "With backend.topology services: chained calls on the edge (src/Edge), each starting on a new line, for what the edge itself needs (the identity provider for /me); rendered nowhere in a modular monolith.", separator: "" }
   - { slot: service-defaults.activity-sources, description: "C# string expressions naming more ActivitySources the tracer listens to, besides the application's own: a library's spans that only exist with a listener.", separator: ", " }
   - { slot: buildingblocks.packages, description: "<PackageReference> lines for BuildingBlocks." }
   - { slot: modules.infrastructure, description: "Statements registering infrastructure for one module, generic over TModule." }
@@ -139,6 +141,8 @@ declares-slots:
 slots:
   # With an identity provider: GET /me, reading the claim the provider names (user_name_claim).
   - { slot: host.endpoints, template: templates/Host/host-endpoints.sbn, order: 10 }
+  # With services, /me exists once, on the edge (ADR-0017); edge.* is declared only by the services topology.
+  - { slot: edge.endpoints, template: templates/Host/edge-endpoints.sbn, order: 10, optional: true }
   - { slot: tests.module-host-services, template: templates/Llm/module-host-services.sbn }
   - { slot: dependabot.nuget-ignore, template: templates/dependabot-nuget-ignore.sbn }
   # With authorization choices: every module's GET /<module>/permissions/manage and the PermissionDto it answers (#609).

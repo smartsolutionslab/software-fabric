@@ -1,8 +1,8 @@
 {
   "color": {
     "$type": "color",
-    "primary": { "$value": "{color.brand.800}" },
-    "primary-foreground": { "$value": "{color.ink.50}" },
+    "primary": { "$value": "{color.brand.400}" },
+    "primary-foreground": { "$value": "{color.ink.900}" },
     "accent": { "$value": "{color.signal.500}" },
     "accent-foreground": { "$value": "{color.ink.900}" },
     "surface": { "$value": "{color.ink.900}" },

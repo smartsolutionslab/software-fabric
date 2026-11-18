@@ -16,6 +16,7 @@ slots:
   - { slot: apphost.host, template: templates/apphost-host.sbn }
   - { slot: apphost.project-references, template: templates/apphost-project-reference.sbn }
   - { slot: solution.projects, template: templates/solution-project.sbn }
+  - { slot: tests.architecture.references, template: templates/architecture-tests-references.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

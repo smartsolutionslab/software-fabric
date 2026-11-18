@@ -1,0 +1,47 @@
+option: backend.topology.services
+files:
+  - { template: templates/Host.csproj.sbn, target: "src/Services/{{ module.namespace }}/Host/Host.csproj", per-module: true }
+  - { template: templates/Program.cs.sbn, target: "src/Services/{{ module.namespace }}/Host/Program.cs", per-module: true }
+  - { template: templates/appsettings.json.sbn, target: "src/Services/{{ module.namespace }}/Host/appsettings.json", per-module: true }
+  - { template: templates/launchSettings.json.sbn, target: "src/Services/{{ module.namespace }}/Host/Properties/launchSettings.json", per-module: true }
+  - { template: templates/Edge/Edge.csproj.sbn, target: src/Edge/Edge.csproj }
+  - { template: templates/Edge/Program.cs.sbn, target: src/Edge/Program.cs }
+  - { template: templates/Edge/appsettings.json.sbn, target: src/Edge/appsettings.json }
+  - { template: templates/Edge/launchSettings.json.sbn, target: src/Edge/Properties/launchSettings.json }
+  - { template: templates/Edge/ModuleRoutes.cs.sbn, target: src/Edge/Wiring/ModuleRoutes.cs }
+  - { template: templates/Edge/ServiceDocuments.cs.sbn, target: src/Edge/Wiring/ServiceDocuments.cs }
+  - { template: templates/ServiceHostProjects.cs.sbn, target: src/AppHost/Wiring/ServiceHostProjects.cs }
+  - { template: templates/ServiceHostReferences.cs.sbn, target: tests/Architecture.Tests/ServiceHostReferences.cs }
+  - { template: templates/ServiceHostEntryPoints.cs.sbn, target: tests/Architecture.Tests/ServiceHostEntryPoints.cs }
+  - { template: templates/ModulesDoNotReferenceEachOther.cs.sbn, target: tests/Architecture.Tests/Rules/ModulesDoNotReferenceEachOther.cs }
+  - { template: templates/ServicesDoNotReferenceEachOther.cs.sbn, target: tests/Architecture.Tests/Rules/ServicesDoNotReferenceEachOther.cs }
+  - { template: templates/EveryServiceHostRunsExactlyOneModule.cs.sbn, target: tests/Architecture.Tests/Rules/EveryServiceHostRunsExactlyOneModule.cs }
+  - { template: templates/SingletonsLiveOnTheEdge.cs.sbn, target: tests/Architecture.Tests/Rules/SingletonsLiveOnTheEdge.cs }
+# The host.* slots mean what they mean in the modular monolith, "every host that runs module code" (ADR-0017): each
+# renders into every service host.
+declares-slots:
+  - { slot: host.packages, description: "<PackageReference> lines for every service host." }
+  - { slot: host.services, description: "Statements registering services on every service host's builder; IReadOnlyList<IModule> modules (the host's one module) is in scope." }
+  - { slot: host.middleware, description: "Statements adding middleware to every service host's built app, before endpoints are mapped." }
+  - { slot: host.endpoints, description: "Host-wide endpoints mapped on WebApplication app in every service host, beside its module's; what the application has once goes to edge.endpoints." }
+  - { slot: host.kestrel-endpoints, description: "JSON entries \"<name>\": { \"Url\": \"http://localhost:<port>\", \"Protocols\": \"...\" } under Kestrel:Endpoints of every service host's appsettings.json, each indented six spaces, beside the host's own http endpoint (launchSettings' http://localhost:5080). Rendered only with a contribution; Aspire turns every Kestrel endpoint into an endpoint of the service's resource, by its name.", separator: ",\n" }
+  - { slot: host.log-levels, description: "JSON entries \"<category>\": \"<level>\" under Logging:LogLevel of every service host's appsettings.json, after Default and Microsoft.AspNetCore, each indented six spaces.", separator: ",\n" }
+  # What exists once per application goes to the edge, src/Edge, instead (ADR-0017): /me, a hub, MCP, AG-UI.
+  - { slot: edge.packages, description: "<PackageReference> lines for the edge (src/Edge/Edge.csproj) alone, beside host.packages, which it renders too: the edge compiles src/Host as every service host does." }
+  - { slot: edge.services, description: "Statements registering services on the edge's builder, for what the edge maps itself (authentication, the OpenAPI document)." }
+  - { slot: edge.middleware, description: "Statements adding middleware to the edge's built app, before the edge's own endpoints and the module routes are mapped." }
+  - { slot: edge.endpoints, description: "Endpoints the application has once, mapped on WebApplication app in the edge alone (/me); never in a service host (SingletonsLiveOnTheEdge)." }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: apphost.host, template: templates/apphost-host.sbn }
+  - { slot: apphost.project-references, template: templates/apphost-project-reference.sbn }
+  - { slot: solution.projects, template: templates/solution-project.sbn }
+  - { slot: tests.architecture.references, template: templates/architecture-tests-references.sbn }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No module references another module's assemblies.", file: templates/ModulesDoNotReferenceEachOther.cs.sbn }
+  - { kind: architecture-test, describes: "No service host's project references another module's projects.", file: templates/ServicesDoNotReferenceEachOther.cs.sbn }
+  - { kind: architecture-test, describes: "Every service host runs exactly one module: the module Api projects it references hold one IModule between them.", file: templates/EveryServiceHostRunsExactlyOneModule.cs.sbn }
+  - { kind: architecture-test, describes: "No service host maps what the application has once (/me, a SignalR hub or event stream, MCP, AG-UI); it lives on the edge, src/Edge. The violation names the service and the route.", file: templates/SingletonsLiveOnTheEdge.cs.sbn }

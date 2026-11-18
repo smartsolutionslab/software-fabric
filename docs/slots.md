@@ -30,7 +30,9 @@ src/
   BuildingBlocks/               base; packs add their own files under it
   Contracts/                    base
   Kernel/                       base (project; Page, PageSize, PagedResult, Sorting); guards, result and absence packs add Ensure, Result, ApiError, Option
-  Host/                         backend.topology.modular-monolith
+  Host/                         backend.topology.modular-monolith; with services, no project: the code every service host compiles
+  Services/<Module>/Host/       backend.topology.services (per module; ADR-0017)
+  Edge/                         backend.topology.services (the YARP edge in front of the services; ADR-0017)
   MigrationRunner/              backend.data-access.ef-core (applies every module's migrations, then exits)
   Modules/
     Directory.Build.props       base; per-layer package references by slot
@@ -138,7 +140,7 @@ pack fill a slot of a choice it can be combined with but does not need
 
 | Slot | File | Filled by |
 |---|---|---|
-| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11); the integration pack (the integration-fixture vocabulary below, M3-12); the identity-provider and auth-client packs (the identity-provider vocabulary below, M3-13); the tenant-column pack (`cross_tenant_reads` and `cross_tenant_role`: staff read across tenants, #610; `shared_records`: staff write records shared by all tenants, #623; `writes_for_tenants`: staff write into one named tenant, #629; others call them only with `backend.tenancy=column`); the colour-scheme packs (the colour-scheme vocabulary below, #694) |
+| `templates.functions` *(added with the kernel options)* | — (Scriban code, prefixed to every template) | backend.guards.* (`not_null`, `not_blank`); the test-framework and assertion packs (the test vocabulary below, M3-11); the integration pack (the integration-fixture vocabulary below, M3-12); the identity-provider and auth-client packs (the identity-provider vocabulary below, M3-13); the tenant-column pack (`cross_tenant_reads` and `cross_tenant_role`: staff read across tenants, #610; `shared_records`: staff write records shared by all tenants, #623; `writes_for_tenants`: staff write into one named tenant, #629; others call them only with `backend.tenancy=column`); the colour-scheme packs (the colour-scheme vocabulary below, #694); the font packs (the font vocabulary below, #699) |
 | `dotnet.build-items` *(added with the kernel options)* | `Directory.Build.props` | ensure-that (ban list), typed-outcomes (`using static Outcome`) |
 | `dotnet.tools` *(added with migrations)* | `.config/dotnet-tools.json` | ef-core (`dotnet-ef`) |
 | `dotnet.package-versions` | `Directory.Packages.props` | every pack that brings a NuGet package |
@@ -152,7 +154,7 @@ pack fill a slot of a choice it can be combined with but does not need
 | `tests.build-properties` *(added in M1-02)* | `tests/Directory.Build.props` | xunit (`OutputType Exe` for xUnit v3); nunit (`OutputType Exe` and `EnableNUnitRunner`); tunit (`OutputType Exe`, and `TUnitImplicitUsings` false) |
 | `tests.packages` | `tests/Directory.Build.props` | xunit, nunit or tunit, shouldly or awesome-assertions, nsubstitute or moq, aspire-fixture; nunit and tunit also compile `tests/TestRun/*.cs` into every test project; tunit references `TUnit.Engine` from test projects only; awesome-assertions compiles `tests/Assertions/*.cs` into every project under `tests/`; mediator wolverine (`WolverineFx.RuntimeCompilation`: a test that starts Wolverine compiles its handlers' code, #362) |
 | `tests.usings` | `tests/Directory.Build.props` | xunit, nunit or tunit (test projects only: a program under `tests/` keeps `System.ComponentModel`'s `[Description]`), shouldly or awesome-assertions, nsubstitute or moq |
-| `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak, generic-oidc, entra-id (the host and `Microsoft.AspNetCore.Mvc.Testing`, for the base's endpoint rule `EveryEndpointDeclaresItsAuthorization`, rendered whenever `backend.auth` is not `none`) |
+| `tests.architecture.references` *(added with #50)* | `tests/Architecture.Tests/Architecture.Tests.csproj` | keycloak, generic-oidc, entra-id, none (`Microsoft.AspNetCore.Mvc.Testing`, for the endpoint rules `EveryEndpointDeclaresItsAuthorization` and `NoAuthentication`); backend.topology (the hosts those rules start: `src/Host`, or with services every `src/Services/*/Host`, #704) |
 | `tests.module-host-services` *(added for #77, declared by the test-framework pack)* | `tests/Modules/<Module>.Tests/<Module>ModuleTests.cs`, before the module's services; `services` in scope | the base, with a model provider (the tests' stand-in `IChatClient`, which the host otherwise provides); agent-framework (`IDispatcher`, which a handler running an agent takes, and `IAgentMcpTools` with the MCP client); contract-interface (`IDispatcher`, which a module's API takes, and a throwing stand-in for every other module's API) |
 | `integration-tests.parameters` *(added for #77, declared by aspire-fixture; contributed with `optional: true` since #260)* | `tests/Integration.Tests/AspireFixture.cs`, before the application is built; `builder` in scope | a model provider with a key (a key-shaped value no provider accepts, for its secret parameter); agent-ui ag-ui (`model-stand-in` true: the host's stand-in model answers the agents) |
 | `integration-tests.database` *(added for #260, declared by testcontainers; contributions `optional: true`)* | `tests/Integration.Tests/ContainerFixture.cs` and the database fixture alone (rag's `ApplicationDatabase.cs`), first in the setup; `settings`, `cancellationToken`, `StartAsync(container, …)` and `RunProjectAsync("src/<Project>", …)` in scope | postgres (its container, the pgvector image with rag, with the core `ContainerBuilder`, and `ConnectionStrings:database`), ef-core (runs the MigrationRunner, order 20), tenancy column with `writes_for_tenants` (`Tenancy:Tenants`, order 15) |
@@ -456,17 +458,20 @@ AppHost's model with it, declares it instead (*#260*).
 | Slot | File | Cardinality | Filled by |
 |---|---|---|---|
 | `apphost.packages` | `src/AppHost/AppHost.csproj` | 0+ | postgres, rabbitmq, azure-service-bus, react |
-| `apphost.project-references` *(added in M1-02)* | `src/AppHost/AppHost.csproj` | 0+ | backend.topology (the host project) |
+| `apphost.project-references` *(added in M1-02)* | `src/AppHost/AppHost.csproj` | 0+ | backend.topology (the host project; with services, every service host by glob, for the build only) |
 | `apphost.resources` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, azure-service-bus (the emulator, and its management address as `messagingManagement`, null outside run mode), keycloak, react (Vite app), micro-frontends (a Vite app per directory of `web/modules`, `builder.AddRemotes()`), agent-ui ag-ui (the `model-stand-in` parameter, false unless a test sets it), tenancy column with `writes_for_tenants` (`string[] tenants`, #629) |
-| `apphost.host` | `src/AppHost/Program.cs` | **exactly-one** | backend.topology (adds the host project) |
-| `apphost.host-wiring` | `src/AppHost/Program.cs` | 0+ | postgres, rabbitmq, keycloak (`.WithReference(...).WaitFor(...)`), azure-service-bus (also `ConnectionStrings__messaging-management`, in run mode only), agent-ui ag-ui (`model-stand-in` as `Agents__ModelStandIn`), tenancy column with `writes_for_tenants` (`.WithTenants(tenants)`, #629) |
+| `apphost.host` | `src/AppHost/Program.cs` | **exactly-one** | backend.topology (adds the host project; with services, the edge `src/Edge`, #705) |
+| `apphost.host-wiring` | `src/AppHost/Program.cs`; with services, on every service host in the AppHost's loop over `src/Services/*/Host/Host.csproj` (#704) | 0+ | postgres, rabbitmq, keycloak (`.WithReference(...).WaitFor(...)`), azure-service-bus (also `ConnectionStrings__messaging-management`, in run mode only), agent-ui ag-ui (`model-stand-in` as `Agents__ModelStandIn`), tenancy column with `writes_for_tenants` (`.WithTenants(tenants)`, #629) |
+| `apphost.service-resources` *(added for #706)* | `src/AppHost/Program.cs`, at the top of the AppHost's loop over the service hosts, once per service before it is added; `string module` and `string project` in scope, and what it declares is in scope for `apphost.host-wiring` (with services; rendered nowhere in a modular monolith) | 0+ | postgres, sqlserver (`var database = <server>.AddDatabase($"{module}-database", module)`: the service's own database, ADR-0017 D2), ef-core (`var migrations`: the service's own `MigrationRunner` run, `<module>-migrations`, with `Migrations__Module`) |
+| `apphost.edge-wiring` *(added for #705)* | `src/AppHost/Program.cs`, on the edge only (with services; rendered nowhere in a modular monolith) | 0+ | keycloak, generic-oidc, entra-id (the identity provider's address and `Authentication__Authority`: the edge validates the token for `/me`) |
 | `apphost.web` *(added in M1-07)* | `src/AppHost/Program.cs` | at-most-one | react (`AddViteApp("web", "../../web/app").WithPnpm()`) |
 | `apphost.web-wiring` *(added in M1-07)* | `src/AppHost/Program.cs` | 0+ | keycloak, the host (`.WithReference(...)`), micro-frontends (`.WithRemotes(remotes)`: each remote's address) |
 | `service-defaults.activity-sources` *(added for #205; separator `, `)* | `src/ServiceDefaults/Wiring/Extensions.cs`, one more `.AddSource(...)` on the tracer, rendered only with a contribution | 0+ | C# string expressions naming a library's `ActivitySource`, whose spans exist only while something listens: agent-ui ag-ui (`"Experimental.AGUI.Server"`, the AG-UI run spans that carry a mid-stream failure) |
-| `host.packages` | `src/Host/Host.csproj` | 0+ | keycloak, wolverine, ef-core, agent-ui ag-ui (`AGUI.Server`, `AGUI.Formatting`: only the host speaks AG-UI) |
+| `host.packages` | `src/Host/Host.csproj`; with services, every service host's `src/Services/<Module>/Host/Host.csproj`, as every `host.*` slot renders into every service host (ADR-0017) | 0+ | keycloak, wolverine, ef-core, agent-ui ag-ui (`AGUI.Server`, `AGUI.Formatting`: only the host speaks AG-UI) |
 | `host.services` | `src/Host/Program.cs` | 0+ | keycloak, wolverine (with `modules` in scope), result (problem details, the guard exception handler), tenancy, ef-core (the unique-constraint exception handler), agent-ui ag-ui (the agents by name, and in Development the stand-in model; after the provider's client, order 40) |
 | `host.middleware` | `src/Host/Program.cs` | 0+ | result (`UseExceptionHandler`, first), keycloak, tenancy |
-| `host.endpoints` *(added in M1-06)* | `src/Host/Program.cs` | 0+ | the base with an identity provider (`/me`), tenancy (`/me/tenant`), agent-ui ag-ui (`POST /agents/{name}`) |
+| `host.endpoints` *(added in M1-06)* | `src/Host/Program.cs` | 0+ | the base with an identity provider (`/me`; with services on the edge instead), tenancy (`/me/tenant`), agent-ui ag-ui (`POST /agents/{name}`) |
+| `edge.packages`, `edge.services`, `edge.middleware`, `edge.endpoints` *(added for #705, declared by backend.topology services; contributions `optional: true`)* | `src/Edge/Edge.csproj` and `src/Edge/Program.cs`, the edge alone (ADR-0017); the edge also renders `host.packages`, since it compiles `src/Host`, and `host.log-levels` | 0+ | keycloak, generic-oidc, entra-id (`edge.services`, `edge.middleware`: the token check for the edge's own endpoints), rest (`AddOpenApi`, `MapOpenApi`: the edge's document, to which it adds every service's paths), the base with an identity provider (`edge.endpoints`: `/me`) |
 | `host.log-levels` | `src/Host/appsettings.json`, under `Logging:LogLevel` | 0+ | ef-core (SQL commands at `Warning`) |
 | `host.kestrel-endpoints` *(added for #250; separator `,` + newline)* | `src/Host/appsettings.json`, under `Kestrel:Endpoints` beside the host's own `http` (`http://localhost:5080`, launchSettings' URL); rendered only with a contribution | 0+ | api-protocols grpc (`grpc`, HTTP/2 only on `http://localhost:5081`: Kestrel speaks HTTP/2 without TLS only on an endpoint that speaks nothing else). Aspire turns every Kestrel endpoint into an endpoint of the host resource, by its name |
 | `messaging.wolverine-options` *(added for #249; declared by bus.library wolverine)* | `src/Host/Wiring/Messaging.cs`, inside `AddWolverine` after the consumers' discovery; `WolverineOptions options` and `modules` in scope; rendered only with a contribution | 0+ | mediator wolverine (`options.DiscoverRequestHandlers()`: command and query handlers become Wolverine handlers, and a handler's `IDispatcher` comes from the message's scope; in `src/BuildingBlocks` since #362, so tests starting Wolverine use it too; `.ResolveModuleServicesFromScope(modules)` since #644: every module's own services, its unit of work and aggregate store among them, come from the message's scope too) |
@@ -480,7 +485,7 @@ AppHost's model with it, declares it instead (*#260*).
 | `persistence.schema` *(added in #253)* | `src/BuildingBlocks/Persistence/ModuleDbContext.cs` (`CurrentSchema`, evaluated at the instance's first use, not at its construction; with a contribution, a model per schema and, outside the module's schema, its migrations and their history moved there); `schema` and `services` in scope | **at-most-one** | tenancy schema-per-tenant (`<module>_<tenant>` for a listed tenant) |
 | `migration-runner.preflight` *(added in #253; declared by ef-core)* | `src/MigrationRunner/Program.cs`, before any module's EF Core migrations; `IHost host` and `List<Type> contexts` in scope, `await` allowed | 0+ | tenancy schema-per-tenant (checks every module before any migrates); empty, the runner is unchanged |
 | `read-connection.data-source` *(added for #247, declared by backend.data-access.reads dapper; contributions `optional: true`)* | `src/BuildingBlocks/Persistence/Wiring/ReadConnectionRegistration.cs`: one C# expression creating the `System.Data.Common.DbDataSource` that `IReadConnection` opens query handlers' connections from; `string connectionString` (Aspire's `database`) in scope | **exactly-one** | postgres (`Npgsql.NpgsqlDataSource.Create(connectionString)`), sqlserver (`Microsoft.Data.SqlClient.SqlClientFactory.Instance.CreateDataSource(connectionString)`): the drivers their EF Core providers already bring |
-| `migration-runner.steps` *(added in #29; declared by ef-core)* | `src/MigrationRunner/Program.cs`, after every module's EF Core migrations; `IHost host` in scope, `await` allowed | 0+ | an event store's schema (Marten, #28); empty, the runner is unchanged |
+| `migration-runner.steps` *(added in #29; declared by ef-core)* | `src/MigrationRunner/Program.cs`, after every module's EF Core migrations; `IHost host` in scope, `await` allowed | 0+ | an event store's schema (Marten, #28); empty, the runner is unchanged. With services a run is one module's (`Migrations:Module`, #706): `contexts` holds its DbContext alone and `Assembly infrastructure` is its Infrastructure assembly |
 | `event-store.json-converters` *(added for #121; a role slot of `module.event-store` since #254, declared by marten and kurrentdb)* | `src/BuildingBlocks/EventStore/ModuleEventStore.cs` (the System.Text.Json options of every module's Marten store, or of the events KurrentDB keeps; `JsonSerializerOptions json` in scope; rendered only with a contribution) | 0+ | module.ddd-depth.strict, `optional: true` (writes value objects as their backing values) |
 
 ### Frontend
@@ -489,7 +494,7 @@ AppHost's model with it, declares it instead (*#260*).
 |---|---|---|---|
 | `web.workspace-packages` *(added in M1-07; a role slot of `frontend.workspace` since #283, declared by pnpm-workspaces, nx and turborepo)* | `web/pnpm-workspace.yaml` | newline | spa (`  - app`), micro-frontends (`app`, `modules/*`), design-system tokens-and-components (`packages/tokens`, `packages/ui`), design-system tokens (`packages/tokens`), design-system web-components (`packages/tokens`, `packages/ui`) |
 | `web.pnpm-overrides` *(added for #569; a role slot of `frontend.workspace`, declared by pnpm-workspaces, nx and turborepo)* | `web/package.json` (`pnpm.overrides`: pnpm reads overrides only from the workspace root; rendered only with a contribution). An entry is a package name and the version every dependency in the workspace gets, indented six spaces: `      "swagger-parser": "12.1.0"` | `,` + newline | rtk-query-codegen (`@apidevtools/swagger-parser`) |
-| `web.dependencies` | `web/app/package.json` | `,` + newline | react, redux, rtk, router, rhf, zod, tailwind, shadcn, tanstack-table, echarts, oidc, agent-ui ag-ui (`@ag-ui/client`), openapi-fetch |
+| `web.dependencies` | `web/app/package.json` | `,` + newline | react, redux, rtk, router, rhf, zod, tailwind, shadcn, tanstack-table, echarts, oidc, agent-ui ag-ui (`@ag-ui/client`), openapi-fetch, font inter and geist (their Fontsource packages) |
 | `web.dev-dependencies` | 〃 | `,` + newline | vitest, testing-library, playwright, axe, rtk codegen, pwa yes (`vite-plugin-pwa`), openapi-fetch (`openapi-typescript`) |
 | `web.scripts` | 〃 | `,` + newline | rtk-query-codegen, orval, openapi-fetch (`codegen`) |
 | `web.prepare` *(added in M1-07b)* | 〃 (`dev`, `build`, `test`) | ` && ` | rtk-query-codegen, orval, openapi-fetch (`pnpm codegen`), design-system tokens-and-components, tokens and web-components (build the tokens) |
@@ -508,7 +513,7 @@ AppHost's model with it, declares it instead (*#260*).
 | `web.providers` | `web/app/src/main.tsx` | `,` + newline | redux, oidc, router — wrappers composed in order |
 | `web.styles` | `web/app/src/index.css` | newline | tailwind, shadcn, design-system tokens-and-components (the tokens' Tailwind theme, `@source` for the ui package), design-system tokens and web-components (the tokens' Tailwind theme, or their CSS custom properties with css-modules), micro-frontends (`@source` for the remotes) |
 | `web.head` *(added for #693; declared by react and vue, not a role slot)* | `web/app/index.html`, after the title (rendered only with a contribution) | newline | shadcn, shadcn-vue (the script that sets the stored or system theme's `.dark` class before the first paint; with a design system too since #694) |
-| `web.shell-imports`, `web.shell-actions` *(added for #693; declared by react-router, tanstack-router and vue-router)* | `web/app/src/App.tsx` or `App.vue` (imports; elements at the end of the navigation bar; rendered only with a contribution) | newline | shadcn, shadcn-vue (`ThemeToggle`; with a design system too since #694) |
+| `web.shell-imports`, `web.shell-actions` *(added for #693; declared by react-router, tanstack-router and vue-router)* | `web/app/src/App.tsx` or `App.vue` (imports; elements at the end of the navigation bar, or of the sidebar's footer in the shadcn and shadcn-vue shell since #695; rendered only with a contribution) | newline | shadcn, shadcn-vue (`ThemeToggle`; with a design system too since #694); oidc-client-ts (`UserMenu`, in the shadcn and shadcn-vue shell, #695) |
 | `web.axe-themes` *(added for #693; declared by test extras accessibility)* | every module screen's `<Name>Page.axe.test.*` (`themes`, each `{ name, switchOn }`; rendered only with a contribution) | `,` + newline | shadcn, shadcn-vue (`dark`, with a design system too since #694; `optional: true`) |
 | `web.restricted-imports` *(added in M1-07)* | `web/app/eslint.config.js` | `,` + newline | router, shadcn, react-hook-form, zod — each bans its alternatives; micro-frontends (the shell imports no remote); agent-ui none (no AG-UI or CopilotKit client), agent-ui ag-ui (no CopilotKit) |
 | `web.lint-configs` *(added for #607; a role slot of `frontend.framework`)* | `web/app/eslint.config.js` (config objects after the framework's own, each with the `files` it applies to; rendered only with a contribution) | `,` + newline | agent-ui ag-ui (outside `src/api/baseApi.ts`, `src/agents/connectAgent.ts` and, with `frontend.realtime: sse`, `src/realtime/connection.ts`, any reference to `fetch`, `XMLHttpRequest`, `Headers`, `HttpAgent` or `EventSource`, bare or through `window`, `globalThis` or `self` (`HttpAgent` through anything), in a Vue template too) |
@@ -523,18 +528,41 @@ on its slate neutrals. A function, not a slot, because the theme is itself a
 contribution (to `web.styles`), and a contribution cannot read a slot. The
 UI library's `src/index.css` keeps slate's neutrals and calls the functions
 for the scheme's variables; a design system's tokens call
-`color_scheme_brand` for their brand shades, and only with a scheme, so the
-tokens of the other UI libraries keep their indigo brand and one light value
-per colour. A scheme pack that lacks a function fails generation naming it.
+`color_scheme_brand` for their brand shades and `color_scheme_signal` for
+their accent, and only with a scheme, so the tokens of the other UI libraries
+keep their indigo brand, their amber accent and one light value per colour. A scheme pack that lacks a function fails generation naming it.
 `ColorSchemeTests` fails when a scheme's palettes are not shadcn/ui's values
-or a text colour has less than 4.5:1 on its background in either theme,
-with each design system's tokens over them too.
+or a text colour (the primary as text on the background included) has less
+than 4.5:1 on its background in either theme, with each design system's
+tokens over them too, and when the tokens' accent is less than 60° of hue
+from their primary.
 
 | Function | Returns (blue) |
 |---|---|
 | `color_scheme_light` | the light palette's (`:root`) scheme variables, one per line, indented two spaces: `--primary`, `--primary-foreground`, `--ring`, `--chart-1` to `--chart-5`, `--sidebar-primary`, `--sidebar-primary-foreground`, `--sidebar-ring` (`--primary: oklch(0.488 0.243 264.376);`, …) |
 | `color_scheme_dark` | the same variables of the dark palette (`.dark`) |
-| `color_scheme_brand` | the entries of the tokens' `brand` group in `web/packages/tokens/src/color.tokens.json`, indented six spaces: `500`, `700` (the light primary) and `800` (the dark primary) as `#rrggbb` (`"700": { "$value": "#1447e6" }`) |
+| `color_scheme_brand` | the entries of the tokens' `brand` group in `web/packages/tokens/src/color.tokens.json`, indented six spaces: `400` (the dark primary), `500`, `700` (the light primary) and `800` as `#rrggbb` (`"700": { "$value": "#1447e6" }`) |
+| `color_scheme_signal` *(#721)* | the entries of the tokens' `signal` group, the accent, in the same file and indentation: `500`, at least 60° of OKLCH hue from the primary in both themes (`"500": { "$value": "#d97706" }`; sky `#00a6f4` for orange) |
+
+#### The font vocabulary *(#699)*
+
+The typeface of shadcn's and shadcn-vue's theme comes from the chosen
+`frontend.font` pack (inter or geist): a variable font from npm (Fontsource),
+which the pack adds to `web.dependencies` and the theme imports, so the build
+bundles its files and the page loads no font from another host. Functions,
+not a slot, for the colour scheme's reason: the theme is itself a
+contribution to `web.styles`. The UI library's `src/index.css` calls them for
+its imports and for `--font-sans` and `--font-mono` in its `@theme` block,
+beside the type scale (`--text-display`, `--text-title`, `--text-body`,
+`--text-caption`). A font pack that lacks a function fails generation naming
+it. Each font pack's `src/theme/font.test.ts` fails when `index.html` or
+`src/index.css` loads anything from another host.
+
+| Function | Returns (inter) |
+|---|---|
+| `font_imports` | the `@import` lines of the font's packages (`@import '@fontsource-variable/inter';`; geist: `geist` and `geist-mono`) |
+| `font_sans` | the value of `--font-sans`: the font's family first, then the system's (`'Inter Variable', ui-sans-serif, system-ui, sans-serif`) |
+| `font_mono` | the value of `--font-mono`: the system's monospace fonts (geist: `'Geist Mono Variable'` first) |
 
 #### The design-token contract *(#373)*
 

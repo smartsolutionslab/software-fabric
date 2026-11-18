@@ -29,6 +29,90 @@ func database_fixture_project_references
   ret `<ProjectReference Include="../../src/AppHost/AppHost.csproj" />`
 end
 func database_fixture_file(space)
+  if project["backend.topology"] == "services"
+    if project["backend.database"] == "sqlserver"
+      $resources = `var sqlServer = builder.Resources.OfType<SqlServerServerResource>().Single();
+        builder.CreateResourceBuilder(sqlServer).AddDatabase("database");
+        HashSet<IResource> database =
+        [
+            sqlServer,
+            sqlServer.PasswordParameter,
+            .. builder.Resources.OfType<SqlServerDatabaseResource>().Where(resource => resource.Name == "database"),
+        ];`
+    else
+      $resources = `var postgres = builder.Resources.OfType<PostgresServerResource>().Single();
+        builder.CreateResourceBuilder(postgres).AddDatabase("database");
+        HashSet<IResource> database =
+        [
+            postgres,
+            postgres.PasswordParameter,
+            .. builder.Resources.OfType<PostgresDatabaseResource>().Where(resource => resource.Name == "database"),
+        ];
+        if (postgres.UserNameParameter is { } user)
+        {
+            database.Add(user);
+        }`
+    end
+    ret `using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Testing;
+
+` + (test_run_fixture (space + ".ApplicationDatabase")) + `
+
+namespace ` + space + `;
+
+/// <summary>
+/// The AppHost's database server alone, on an empty container, started once per test run, with a database of the tests'
+/// own on it: every service has a database of its own, which only its module's migration run changes, so none is the
+/// application's. Nothing else runs: no service, no migrations.
+/// </summary>
+public sealed class ApplicationDatabase : ` + test_lifetime + `
+{
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+
+    private DistributedApplication? app;
+
+    private string? connectionString;
+
+    public string ConnectionString => connectionString ?? throw new InvalidOperationException("The database has not started.");
+
+    ` + (test_setup | string.replace "\n" "\n    ") + `
+    {
+        using var timeout = new CancellationTokenSource(StartupTimeout);
+        var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AppHost>(timeout.Token);
+
+        ` + $resources + `
+
+        foreach (var resource in builder.Resources.Where(resource => !database.Contains(resource)).ToList())
+        {
+            builder.Resources.Remove(resource);
+        }
+
+        // Tests start from an empty container: never a developer's data, never a password a volume remembers.
+        foreach (var resource in builder.Resources)
+        {
+            foreach (var volume in resource.Annotations.OfType<ContainerMountAnnotation>().Where(mount => mount.Type == ContainerMountType.Volume).ToList())
+            {
+                resource.Annotations.Remove(volume);
+            }
+        }
+
+        app = await builder.BuildAsync(timeout.Token);
+        await app.StartAsync(timeout.Token);
+        await app.ResourceNotifications.WaitForResourceHealthyAsync("database", timeout.Token);
+        connectionString = await app.GetConnectionStringAsync("database", timeout.Token)
+            ?? throw new InvalidOperationException("The tests' database has no connection string.");
+    }
+
+    ` + (test_teardown | string.replace "\n" "\n    ") + `
+    {
+        if (app is not null)
+        {
+            await app.DisposeAsync();
+        }
+    }
+}`
+  end
   if project["backend.database"] == "sqlserver"
     $summary = `The AppHost's database alone, on an empty container, started once per test run: SQL Server, migrated by the
 /// MigrationRunner as before the host starts, so every module's schema exists. Nothing else runs: no host, no model.`

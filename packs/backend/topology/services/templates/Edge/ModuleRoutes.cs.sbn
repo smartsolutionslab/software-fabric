@@ -1,0 +1,42 @@
+using Yarp.ReverseProxy.Configuration;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+/// <summary>
+/// The edge's route table (ADR-0017): a module's paths, /&lt;module&gt;/..., go to the module's service, which service
+/// discovery finds under the module's name. The AppHost names every service it starts under Edge:Modules, by the same
+/// convention that names the services, so neither it nor the edge has a line per module.
+/// </summary>
+public static class ModuleRoutes
+{
+    private const string Section = "Edge:Modules";
+
+    public static IServiceCollection AddModuleRoutes(this IServiceCollection services, IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        var modules = Modules(configuration);
+        services.AddReverseProxy()
+            .LoadFromMemory(
+                [.. modules.Select(module => new RouteConfig { RouteId = module, ClusterId = module, Match = new RouteMatch { Path = "/" + module + "/{**path}" } })],
+                [.. modules.Select(module => new ClusterConfig
+                {
+                    ClusterId = module,
+                    Destinations = new Dictionary<string, DestinationConfig>(StringComparer.Ordinal) { [module] = new DestinationConfig { Address = "http://" + module } },
+                })])
+            .AddServiceDiscoveryDestinationResolver();
+
+        return services;
+    }
+
+    /// <summary>The modules the AppHost started a service for, in the order the services map them in one document.</summary>
+    public static IReadOnlyList<string> Modules(IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        return [.. configuration.GetSection(Section).GetChildren()
+            .Select(module => module.Value)
+            .OfType<string>()
+            .Order(StringComparer.Ordinal)];
+    }
+}

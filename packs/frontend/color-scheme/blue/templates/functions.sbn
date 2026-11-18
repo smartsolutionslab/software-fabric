@@ -12,20 +12,24 @@ func color_scheme_light
   --sidebar-ring: oklch(0.546 0.245 262.881);`
 end
 func color_scheme_dark
-  ret `  --primary: oklch(0.424 0.199 265.638);
-  --primary-foreground: oklch(0.97 0.014 254.604);
+  ret `  --primary: oklch(0.707 0.165 254.624);
+  --primary-foreground: oklch(0.282 0.091 267.935);
   --ring: oklch(0.623 0.214 259.815);
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar-primary: oklch(0.424 0.199 265.638);
-  --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
+  --sidebar-primary: oklch(0.707 0.165 254.624);
+  --sidebar-primary-foreground: oklch(0.282 0.091 267.935);
   --sidebar-ring: oklch(0.623 0.214 259.815);`
 end
 func color_scheme_brand
-  ret `      "500": { "$value": "#2b7fff" },
+  ret `      "400": { "$value": "#51a2ff" },
+      "500": { "$value": "#2b7fff" },
       "700": { "$value": "#1447e6" },
       "800": { "$value": "#193cb8" }`
+end
+func color_scheme_signal
+  ret `      "500": { "$value": "#d97706" }`
 end
