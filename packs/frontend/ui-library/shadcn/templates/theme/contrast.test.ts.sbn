@@ -18,6 +18,8 @@ const pairs = [
   ['card-foreground', 'card'],
   ['popover-foreground', 'popover'],
   ['primary-foreground', 'primary'],
+  // The button's link variant: the primary colour as text on the page.
+  ['primary', 'background'],
   ['secondary-foreground', 'secondary'],
   ['accent-foreground', 'accent'],
   ['muted-foreground', 'background'],

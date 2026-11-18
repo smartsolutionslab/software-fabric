@@ -523,18 +523,21 @@ on its slate neutrals. A function, not a slot, because the theme is itself a
 contribution (to `web.styles`), and a contribution cannot read a slot. The
 UI library's `src/index.css` keeps slate's neutrals and calls the functions
 for the scheme's variables; a design system's tokens call
-`color_scheme_brand` for their brand shades, and only with a scheme, so the
-tokens of the other UI libraries keep their indigo brand and one light value
-per colour. A scheme pack that lacks a function fails generation naming it.
+`color_scheme_brand` for their brand shades and `color_scheme_signal` for
+their accent, and only with a scheme, so the tokens of the other UI libraries
+keep their indigo brand, their amber accent and one light value per colour. A scheme pack that lacks a function fails generation naming it.
 `ColorSchemeTests` fails when a scheme's palettes are not shadcn/ui's values
-or a text colour has less than 4.5:1 on its background in either theme,
-with each design system's tokens over them too.
+or a text colour (the primary as text on the background included) has less
+than 4.5:1 on its background in either theme, with each design system's
+tokens over them too, and when the tokens' accent is less than 60° of hue
+from their primary.
 
 | Function | Returns (blue) |
 |---|---|
 | `color_scheme_light` | the light palette's (`:root`) scheme variables, one per line, indented two spaces: `--primary`, `--primary-foreground`, `--ring`, `--chart-1` to `--chart-5`, `--sidebar-primary`, `--sidebar-primary-foreground`, `--sidebar-ring` (`--primary: oklch(0.488 0.243 264.376);`, …) |
 | `color_scheme_dark` | the same variables of the dark palette (`.dark`) |
-| `color_scheme_brand` | the entries of the tokens' `brand` group in `web/packages/tokens/src/color.tokens.json`, indented six spaces: `500`, `700` (the light primary) and `800` (the dark primary) as `#rrggbb` (`"700": { "$value": "#1447e6" }`) |
+| `color_scheme_brand` | the entries of the tokens' `brand` group in `web/packages/tokens/src/color.tokens.json`, indented six spaces: `400` (the dark primary), `500`, `700` (the light primary) and `800` as `#rrggbb` (`"700": { "$value": "#1447e6" }`) |
+| `color_scheme_signal` *(#721)* | the entries of the tokens' `signal` group, the accent, in the same file and indentation: `500`, at least 60° of OKLCH hue from the primary in both themes (`"500": { "$value": "#d97706" }`; sky `#00a6f4` for orange) |
 
 #### The font vocabulary *(#699)*
 
