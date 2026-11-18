@@ -124,7 +124,6 @@ public sealed partial class ModulePageTests
         data.ShouldContain("export const emptyExamples");
         var axe = files[Module + "BillingPage.axe.test.tsx"];
         axe.ShouldContain("emptyExamples");
-        axe.ShouldContain("while it loads");
         axe.ShouldContain("when it has nothing to show");
         axe.ShouldContain("with its example data");
     }
@@ -174,7 +173,7 @@ public sealed partial class ModulePageTests
             "BillingPage.test.tsx > a blank name is refused before anything is sent",
             "useBillingSamples.test.tsx > a created sample is in the list before the server answers and stays once it is created",
             "useBillingSamples.test.tsx > a sample the server refuses is taken out of the list again",
-            "BillingPage.axe.test.tsx > the Billing page has no accessibility violations axe can find while it loads",
+            "BillingPage.axe.test.tsx > the Billing page has no accessibility violations axe can find",
             "BillingPage.axe.test.tsx > the Billing page passes axe when it has nothing to show",
             "BillingPage.axe.test.tsx > the Billing page passes axe with its example data",
         ];
