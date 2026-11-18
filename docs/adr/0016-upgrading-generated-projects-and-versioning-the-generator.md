@@ -1,7 +1,8 @@
 # ADR-0016: Upgrading generated projects and versioning the generator
 
 **Status:** Accepted (owner, 2026-11-11, review of PR #572: every
-recommendation, D1 to D8, accepted).
+recommendation, D1 to D8, accepted). Amended (owner, 2026-11-18, #720):
+a changed choice is applied by `fabric change`, C1 to C3 below.
 **Date:** 2026-11-11
 
 ## Context
@@ -48,8 +49,10 @@ The three trees are:
 What follows from the decision as stated, and is not a further choice:
 
 - **Choices do not change.** Both generations read the project's own
-  `fabric.yaml`. Changing a project-scoped choice stays what ADR-0001 says it
-  is: a migration with an ADR in that project, not an upgrade.
+  `fabric.yaml`. Changing a project-scoped choice is not an upgrade: for a
+  dimension the catalog marks changeable it is `fabric change` (amendment of
+  2026-11-18, C1 to C3); for any other it stays what ADR-0001 says it is, a
+  migration with an ADR in that project.
 - **The generated project contains no upgrade machinery.** Nothing in it
   branches on a generator version; it receives ordinary file changes, which
   go through its own CI and review like any other change.
@@ -343,6 +346,104 @@ agent, and a clean tree means nothing unrelated is mixed into the upgrade.
 The exact plumbing is M4-12's to settle by test; the decision is an explicit
 base and no synthetic history in the project.
 
+## Amendment (owner, 2026-11-18): applying a changed choice (#720)
+
+E4 regenerates base and theirs from the same `fabric.yaml`, so a choice
+changed in it changes both trees alike and the merge sees no difference:
+setting another colour scheme (#694) and running `fabric upgrade` repaints
+nothing. #694 therefore documented the scheme as fixed at generation.
+
+**Owner's decision (#720, option (a) of two):** a command applies a changed
+choice to an existing project. It regenerates the base from the choices
+recorded in `fabric.yaml` and the new tree from the changed ones, so the
+three-way merge applies the difference, and it records the new choice in
+`fabric.yaml`. It is limited at first to dimensions the catalog marks safe
+to change: presentation-only ones, `frontend.color-scheme` and, after #699,
+the font. The alternative set aside was (b): choices stay fixed after
+generation, and another scheme means generating the project again.
+
+The owner's decision covers the behaviour. C1 to C3 are how it is built;
+C1's spelling and C2's marker were proposed with the change that builds it
+(PR for #720), for the owner to accept in its review.
+
+### C1. The command: `fabric change --set <dimension>=<option>`
+
+**Options weighed:**
+
+- **(a) A command of its own, `fabric change --set <dimension>=<option>`**
+  (repeatable; `--project`, `--catalog` and `--packs` as for `upgrade`).
+- **(b) `fabric upgrade --set <dimension>=<option>`.**
+
+**Proposed: (a).** The two commands move different axes, and keeping them
+apart keeps each merge's difference attributable to one cause:
+
+- `upgrade` changes the generator with the choices fixed (E4: "choices do
+  not change"); `change` changes choices with the generator fixed. One
+  merge per axis means a conflict marker names exactly what produced the
+  other side: `fabric 0.4.0` in an upgrade, `frontend.color-scheme=orange`
+  in a change.
+- They need different things. `upgrade` installs the recorded old version
+  from the feed (D2) and refuses a `-dev` version (D3); `change` regenerates
+  both trees with the running fabric, needs no feed, and works on a project
+  a development build wrote, as `add-module` does.
+- A `--set` on `upgrade` would make E4's guarantee optional per call, and
+  the combined merge (old generator and old choices against new generator
+  and new choices) would mix two differences that D1's summary describes
+  separately. Doing both is two commands in order: `upgrade`, then `change`.
+- `--set dimension=option` is how `new`, `validate` and `add-module` already
+  spell a choice.
+
+### C2. What "safe to change" means, and how the catalog marks it
+
+A dimension is safe to change when its options differ only in what the
+generated files show, not in what the project's own code builds on:
+presentation (palettes, tokens, fonts), not a database, a protocol or a
+library the project's code calls. Changing it then rewrites generated files
+the project rarely edits, and the merge keeps whatever else it did.
+
+The catalog marks it with `changeable: true` on the dimension
+(`docs/catalog-rules.md`); `fabric change` refuses any other dimension, a
+setting, or an unknown name, naming each, before anything is touched.
+`docs/catalog.md` lists the command on each marked dimension. Whether a
+dimension is presentation-only is a judgement made when it is marked, in
+review; what can be checked is checked by the catalog lint, which fails a
+marked dimension that
+
+- is module-scoped (`change` sets project choices; a module's choices are
+  fixed, as `Regenerate` already says), or
+- is named by another dimension's `active-when`, `requires` or
+  `default-from`, or by any option's `requires` or `conflicts`: changing it
+  could then activate, forbid or re-default another dimension, so the change
+  would reach past its own files.
+
+Marked today: `frontend.color-scheme` and `frontend.font` (#699). A font
+change also changes the font's package in `web/app/package.json`, so the
+project installs its dependencies again before its lockfile is current.
+
+### C3. What `fabric change` requires, does and guarantees
+
+- **A project this fabric and catalog wrote.** Base is what the running
+  fabric writes for the recorded choices, so `fabric.yaml` must record the
+  running version and catalog hash; otherwise every difference between the
+  two generators would be taken as the project's own edit and kept. The
+  refusal says to run `fabric upgrade` first. This is D5 (a)'s rule for
+  `add-module`: one version describes the whole tree.
+- **D8's merge, unchanged:** a git repository at its top with a clean
+  working tree; base and theirs as tree objects no commit refers to; one
+  side's changes taken, both sides' merged, overlaps left as git conflicts;
+  nothing committed. The conflict labels are the recorded and the changed
+  choice (`frontend.color-scheme=blue`, `frontend.color-scheme=orange`).
+- **A changed choice the catalog rejects** for this project (an inactive
+  dimension, an unknown option) fails with the catalog's own errors, as
+  `fabric new` would; one already recorded is refused as nothing to change.
+- **D1 (b) holds with "fresh generation" read as fresh generation with the
+  changed choice:** an unedited project comes out byte-identical to what
+  `fabric new` writes with it, and an edited one keeps its edits outside the
+  files the choice rewrites. The summary has the same sections and the same
+  "not guaranteed" list as an upgrade's; D1's probe-test rule is not applied:
+  it is for a test a newer generator adds beside a page, and a change of
+  choice brings no newer generator.
+
 ## Consequences
 
 - ADR-0001's "out of scope for V1" no longer holds: an upgrade reaches an
@@ -359,3 +460,6 @@ base and no synthetic history in the project.
   this in the generator repository before it reaches the pilot.
 - The summary an upgrade prints is the agent's brief for resolving it: which
   files were merged, which conflict, and what D1 says is not guaranteed.
+- A presentation choice (the colour scheme) is no longer fixed at
+  generation: `fabric change` applies it as a reviewed merge (amendment of
+  2026-11-18). Every other choice still is, until the catalog marks it.

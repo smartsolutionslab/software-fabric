@@ -45,6 +45,27 @@ public class CatalogReaderTests
     }
 
     [Fact]
+    public void Reads_whether_a_dimension_may_be_changed_after_generation_and_takes_unsaid_as_no()
+    {
+        var catalog = Read("""
+            version: 1
+            dimensions:
+              frontend.color-scheme: { scope: project, changeable: true, default: blue, options: { blue: { tier: supported } } }
+              frontend.framework: { scope: project, options: { react: { tier: supported } } }
+            """);
+
+        catalog.Dimensions["frontend.color-scheme"].Changeable.ShouldBeTrue();
+        catalog.Dimensions["frontend.framework"].Changeable.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_repository_catalog_marks_the_colour_scheme_and_the_font_changeable_after_generation_and_nothing_else()
+    {
+        ReadRepositoryCatalog().Dimensions.Values.Where(dimension => dimension.Changeable).Select(dimension => dimension.Id)
+            .ShouldBe(["frontend.color-scheme", "frontend.font"]);
+    }
+
+    [Fact]
     public void Keeps_dimensions_in_file_order()
     {
         var catalog = ReadRepositoryCatalog();

@@ -8,5 +8,6 @@ The app's typeface is Inter, a variable font under the SIL Open Font License 1.1
 
 ## Consequences
 
-- The font is a choice recorded in `fabric.yaml` (`frontend.font`), made when the project is generated; Inter and Geist are offered. `fabric upgrade` keeps the choice, so it brings this font's changes in a newer generator, not another font.
+- The font is a choice recorded in `fabric.yaml` (`frontend.font`); Inter and Geist are offered, and neither is edited in by hand.
+- Another font is a change of that choice: `fabric change --set frontend.font=<font>` merges the other font's package and theme names into the project and records it, keeping the project's other edits. `fabric upgrade` keeps the recorded font and brings its changes in a newer generator.
 - The package's version is pinned in `web/app/package.json` like every other dependency. Every script it covers (Latin, Latin Extended, Cyrillic, Greek, Vietnamese) is bundled; a browser downloads only the files whose `unicode-range` a page's text uses.

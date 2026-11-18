@@ -21,6 +21,27 @@ public class CatalogLinterTests
     }
 
     [Fact]
+    public void A_changeable_module_scoped_dimension_is_reported()
+    {
+        Lint("""
+              x.y: { scope: module, changeable: true, default: o, options: { o: { tier: supported } } }
+            """).ShouldBe(["x.y: is changeable but module-scoped; fabric change sets project choices only (ADR-0016 C2)."]);
+    }
+
+    [Theory]
+    [InlineData("x.z: { scope: project, active-when: \"x.y == p\", options: { q: { tier: supported } } }", "x.z active-when")]
+    [InlineData("x.z: { scope: project, requires: [\"x.y != p\"], options: { q: { tier: supported } } }", "x.z requires")]
+    [InlineData("x.z: { scope: project, options: { q: { tier: supported, conflicts: [\"x.y == p\"] } } }", "x.z=q")]
+    [InlineData("x.z: { scope: project, default-from: x.y, options: { o: { tier: supported } } }", "x.z default-from")]
+    public void A_changeable_dimension_another_dimension_depends_on_is_reported(string dependent, string subject)
+    {
+        Lint($$"""
+              x.y: { scope: project, changeable: true, default: o, options: { o: { tier: supported }, p: { tier: supported } } }
+              {{dependent}}
+            """).ShouldBe([$"x.y: is changeable, but {subject} names it; changing it could change what else is chosen, so it cannot be changeable (ADR-0016 C2)."]);
+    }
+
+    [Fact]
     public void A_setting_default_outside_its_range_is_reported()
     {
         Lint("""

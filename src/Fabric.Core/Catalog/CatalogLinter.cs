@@ -19,6 +19,11 @@ public static class CatalogLinter
             CheckDimension(catalog, dimension, problems);
         }
 
+        foreach (var dimension in catalog.Dimensions.Values.Where(dimension => dimension.Changeable))
+        {
+            CheckChangeable(catalog, dimension, problems);
+        }
+
         problems.AddRange(ActiveWhenCycles.Find(catalog));
 
         foreach (var profile in catalog.Profiles.Keys)
@@ -80,6 +85,43 @@ public static class CatalogLinter
             {
                 CheckSetting(dimension, option, setting, problems);
             }
+        }
+    }
+
+    /// <summary>
+    /// What ADR-0016 C2 can check of "safe to change": <c>fabric change</c> sets project choices, and a changed value must
+    /// not decide whether another dimension is active, allowed or defaulted, or the change would reach past its own files.
+    /// </summary>
+    private static void CheckChangeable(CatalogModel catalog, Dimension dimension, List<string> problems)
+    {
+        if (dimension.Scope != DimensionScope.Project)
+        {
+            problems.Add($"{dimension.Id}: is changeable but module-scoped; fabric change sets project choices only (ADR-0016 C2).");
+        }
+
+        foreach (var other in catalog.Dimensions.Values.Where(other => other.Id != dimension.Id))
+        {
+            List<string> subjects = [];
+            if (other.ActiveWhen?.Dimension == dimension.Id)
+            {
+                subjects.Add($"{other.Id} active-when");
+            }
+
+            if (other.Requires.Any(condition => condition.Dimension == dimension.Id))
+            {
+                subjects.Add($"{other.Id} requires");
+            }
+
+            subjects.AddRange(other.Options.Values
+                .Where(option => option.Requires.Concat(option.Conflicts).Any(condition => condition.Dimension == dimension.Id))
+                .Select(option => $"{other.Id}={option.Id}"));
+            if (other.DefaultFrom == dimension.Id)
+            {
+                subjects.Add($"{other.Id} default-from");
+            }
+
+            problems.AddRange(subjects.Select(subject =>
+                $"{dimension.Id}: is changeable, but {subject} names it; changing it could change what else is chosen, so it cannot be changeable (ADR-0016 C2)."));
         }
     }
 

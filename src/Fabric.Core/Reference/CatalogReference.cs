@@ -89,6 +89,11 @@ public static class CatalogReference
             { Default: { } chosen } => $"- Default: {Codes(chosen)}\n",
         });
 
+        if (dimension.Changeable)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"- Changeable after generation: {Code($"fabric change --set {dimension.Id}=<option>")} (ADR-0016 C1)\n");
+        }
+
         if (dimension.Requires.Count > 0)
         {
             text.Append(CultureInfo.InvariantCulture, $"- Requires: {Conditions(dimension.Requires)}\n");

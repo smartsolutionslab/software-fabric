@@ -73,6 +73,14 @@ generator version, with a `-dev` version, or with a catalog hash the
 recorded version does not write is refused, because the tree that generated
 it cannot be reproduced.
 
+`fabric change --set frontend.color-scheme=orange` changes a choice the
+catalog marks `changeable` (ADR-0016 C1 to C3) in a project this fabric and
+catalog wrote, in the same kind of merge: the project written from its
+recorded choices is the merge base, the project written with the changed
+choice is merged in, and `fabric.yaml` ends up recording it. A dimension
+the catalog does not mark is refused, by name, before anything is touched;
+a project another fabric wrote is upgraded first.
+
 `fabric matrix` writes the pairwise matrix (ADR-0003): full choice sets
 without a profile, each one's `choices` ready for `fabric new --choices`,
 that together contain every pair of options with a pack that some valid
