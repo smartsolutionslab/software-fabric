@@ -12,6 +12,7 @@ interface SkeletonProps {
 const props = defineProps<SkeletonProps>();
 </script>
 
+<!-- The accent, as shadcn/ui's skeleton: the registry's primary at 10% would take the design system's primary token too. -->
 <template>
-  <div data-slot="skeleton" :class="cn('animate-pulse rounded-md bg-primary/10', props.class)" />
+  <div data-slot="skeleton" :class="cn('animate-pulse rounded-md bg-accent', props.class)" />
 </template>

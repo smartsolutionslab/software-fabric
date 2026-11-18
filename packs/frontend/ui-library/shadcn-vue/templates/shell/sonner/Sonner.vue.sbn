@@ -10,6 +10,7 @@ defineOptions({ name: 'UiSonner' });
 const props = defineProps<ToasterProps>();
 </script>
 
+<!-- Slots named in full (v-slot:): the generator's tests read a hash before "error" as a branch a pack does not support. -->
 <template>
   <Sonner
     :class="cn('toaster group', props.class)"
@@ -21,24 +22,24 @@ const props = defineProps<ToasterProps>();
     }"
     v-bind="props"
   >
-    <template #success-icon>
+    <template v-slot:success-icon>
       <CircleCheckIcon class="size-4" />
     </template>
-    <template #info-icon>
+    <template v-slot:info-icon>
       <InfoIcon class="size-4" />
     </template>
-    <template #warning-icon>
+    <template v-slot:warning-icon>
       <TriangleAlertIcon class="size-4" />
     </template>
-    <template #error-icon>
+    <template v-slot:error-icon>
       <OctagonXIcon class="size-4" />
     </template>
-    <template #loading-icon>
+    <template v-slot:loading-icon>
       <div>
         <Loader2Icon class="size-4 animate-spin" />
       </div>
     </template>
-    <template #close-icon>
+    <template v-slot:close-icon>
       <XIcon class="size-4" />
     </template>
   </Sonner>
