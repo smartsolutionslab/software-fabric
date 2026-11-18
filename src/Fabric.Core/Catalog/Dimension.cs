@@ -16,4 +16,7 @@ public sealed record Dimension(
 {
     /// <summary>Conditions that must all hold whenever the dimension is set, whichever options are chosen; checked per module for a module dimension.</summary>
     public IReadOnlyList<Condition> Requires { get; init; } = [];
+
+    /// <summary>Whether <c>fabric change</c> may set the dimension in a generated project (ADR-0016 C2); <c>false</c> unless the catalog says <c>changeable: true</c>.</summary>
+    public bool Changeable { get; init; }
 }

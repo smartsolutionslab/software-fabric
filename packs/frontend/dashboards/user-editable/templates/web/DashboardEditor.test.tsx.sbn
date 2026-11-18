@@ -1,6 +1,10 @@
 {{~ cell = project["frontend.data-grid"] == "ag-grid" ? "gridcell" : "cell" ~}}
+{{~ shell = project["frontend.ui-library"] == "shadcn" && project["frontend.routing"] == "react-router" ~}}
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+{{~ if shell ~}}
+import { toast } from 'sonner';
+{{~ end ~}}
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 {{~ if array.contains project["frontend.test.extras"] "accessibility" ~}}
 import { axe } from 'vitest-axe';
@@ -12,6 +16,9 @@ import type {
   WidgetData,
   WidgetDescriptionDto,
 } from '@/api/generated';
+{{~ if shell ~}}
+import { Toaster } from '@/components/ui/sonner';
+{{~ end ~}}
 import { DashboardEditor } from './DashboardEditor';
 
 const save = vi.fn();
@@ -117,13 +124,33 @@ beforeEach(() => {
   save.mockReturnValue({ unwrap: () => Promise.resolve(sales.id) });
   refetch.mockReset();
   refetchWidget.mockReset();
+{{~ if shell ~}}
+  // Sonner keeps its toasts between renders and shows a new toaster those still open: one test's toast is not the
+  // next's.
+  toast.dismiss();
+{{~ end ~}}
 });
+{{~ if shell ~}}
+
+/** The editor beside the app shell's toaster, which shows what Save reports. */
+function renderWithToasts() {
+  return render(
+    <>
+      <DashboardEditor />
+      <Toaster />
+    </>,
+  );
+}
+
+/** The toaster's live region, where Save's report is. */
+const toasts = () => within(screen.getByRole('region', { name: /notifications/i }));
+{{~ end ~}}
 
 // The longest journey here, and the file's first test: it also pays for warming up jsdom, React and the grid,
 // about two thirds of its time when run alone. Under parallel load that passes the default 5 s.
 test('a user opens a dashboard, adds a widget, removes one, renames it and saves', { timeout: 20_000 }, async () => {
   const user = userEvent.setup();
-  render(<DashboardEditor />);
+  {{ if shell }}renderWithToasts(){{ else }}render(<DashboardEditor />){{ end }};
 
   await user.click(screen.getByRole('button', { name: 'Sales' }));
   expect(await screen.findByRole('img', { name: 'Widgets per dashboard' })).toBeInTheDocument();
@@ -151,7 +178,7 @@ test('a user opens a dashboard, adds a widget, removes one, renames it and saves
       ],
     },
   });
-  expect(await screen.findByRole('status')).toHaveTextContent('Saved.');
+  expect(await screen.findByRole('status')).toHaveTextContent('{{ if shell }}The dashboard was saved.{{ else }}Saved.{{ end }}');
   expect(refetch).toHaveBeenCalled();
 });
 
@@ -295,6 +322,32 @@ test('a table widget whose rows shrink to fewer pages goes back to its last page
   expect(await within(widget).findByRole('{{ cell }}', { name: 'Row 1' })).toBeInTheDocument();
 });
 
+{{~ if shell ~}}
+test('saving reports in a toast that the dashboard was saved', async () => {
+  const user = userEvent.setup();
+  renderWithToasts();
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  await user.click(await screen.findByRole('button', { name: 'Save dashboard' }));
+
+  expect(await toasts().findByRole('status')).toHaveTextContent('The dashboard was saved.');
+  expect(screen.getAllByRole('status')).toHaveLength(1);
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('a failed save reports in a toast that the dashboard could not be saved', async () => {
+  const user = userEvent.setup();
+  save.mockReturnValue({ unwrap: () => Promise.reject(new Error('refused')) });
+  renderWithToasts();
+  await user.click(screen.getByRole('button', { name: 'Sales' }));
+
+  await user.click(await screen.findByRole('button', { name: 'Save dashboard' }));
+
+  expect(await toasts().findByRole('alert')).toHaveTextContent('The dashboard could not be saved.');
+  expect(screen.getAllByRole('alert')).toHaveLength(1);
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+{{~ else ~}}
 test('any change after saving takes the saved notice away', async () => {
   const user = userEvent.setup();
   render(<DashboardEditor />);
@@ -310,6 +363,7 @@ test('any change after saving takes the saved notice away', async () => {
   await user.type(screen.getByLabelText('Dashboard name'), ' 2');
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
 });
+{{~ end ~}}
 
 test('a failed refresh of a dashboard opened before does not open the copy it had', async () => {
   const user = userEvent.setup();
@@ -326,7 +380,7 @@ test('edits made while a save is under way are not reported as saved', async () 
   const user = userEvent.setup();
   let finish: (id: string) => void = () => undefined;
   save.mockReturnValue({ unwrap: () => new Promise<string>((resolve) => (finish = resolve)) });
-  render(<DashboardEditor />);
+  {{ if shell }}renderWithToasts(){{ else }}render(<DashboardEditor />){{ end }};
   await user.click(screen.getByRole('button', { name: 'Sales' }));
   await user.click(await screen.findByRole('button', { name: 'Save dashboard' }));
 
@@ -334,7 +388,14 @@ test('edits made while a save is under way are not reported as saved', async () 
   finish(sales.id);
 
   await waitFor(() => expect(refetch).toHaveBeenCalled());
+{{~ if shell ~}}
+  // A toast shows a moment after it is asked for: the next save's toast is the first one there.
+  save.mockReturnValue({ unwrap: () => Promise.resolve(sales.id) });
+  await user.click(screen.getByRole('button', { name: 'Save dashboard' }));
+  expect(await toasts().findAllByRole('status')).toHaveLength(1);
+{{~ else ~}}
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
+{{~ end ~}}
 });
 
 test('saving refreshes the widgets on the dashboard, whose data may be what was just saved', async () => {

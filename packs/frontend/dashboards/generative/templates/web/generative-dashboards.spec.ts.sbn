@@ -1,5 +1,7 @@
 {{~ # The grid's class names are react-grid-layout's, or grid-layout-plus's for Vue; everything else is the same page. ~}}
 {{~ vue = project["frontend.framework"] == "vue" ~}}
+{{~ # With the app shell (#695) Save reports in a toast through notify; without it, in a notice beside the button. ~}}
+{{~ shell = (project["frontend.ui-library"] == "shadcn" && project["frontend.routing"] == "react-router") || (project["frontend.ui-library"] == "shadcn-vue" && project["frontend.routing"] == "vue-router") ~}}
 import { expect, type Page, test } from '@playwright/test';
 
 async function openDashboards(page: Page) {
@@ -39,7 +41,7 @@ test('a user asks the assistant for a chart, accepts it, saves the dashboard and
   await expect(widget.getByRole('img', { name: 'Widgets per dashboard' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Save dashboard' }).click();
-  await expect(page.getByRole('status')).toHaveText('Saved.');
+  await expect(page.getByRole('status')).toHaveText('{{ if shell }}The dashboard was saved.{{ else }}Saved.{{ end }}');
 
   await page.reload();
   await expect(page.getByText('Signed in as developer')).toBeVisible();

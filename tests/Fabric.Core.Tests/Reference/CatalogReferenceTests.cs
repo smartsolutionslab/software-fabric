@@ -166,6 +166,22 @@ public class CatalogReferenceTests
     }
 
     [Fact]
+    public void A_dimension_changeable_after_generation_says_so_with_the_command_that_changes_it()
+    {
+        var catalog = CatalogReader.Read(
+            new StringReader("""
+                version: 1
+                dimensions:
+                  frontend.color-scheme: { scope: project, changeable: true, default: blue, options: { blue: { tier: supported } } }
+                """),
+            "catalog.yaml");
+
+        CatalogReference.Write(catalog).ShouldContain(
+            "- Default: `blue`\n- Changeable after generation: `fabric change --set frontend.color-scheme=<option>` (ADR-0016 C1)\n",
+            Case.Sensitive);
+    }
+
+    [Fact]
     public void A_profile_the_catalog_cannot_resolve_is_reported_by_name_instead_of_listed_as_using_nothing()
     {
         var broken = CatalogReader.Read(

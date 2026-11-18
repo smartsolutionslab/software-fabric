@@ -370,6 +370,7 @@ Settings:
 - Scope: project
 - Active when: `frontend.ui-library in (shadcn, shadcn-vue)`
 - Default: `blue`
+- Changeable after generation: `fabric change --set frontend.color-scheme=<option>` (ADR-0016 C1)
 - Note: shadcn/ui's own colour themes on its slate neutrals, in a light and a dark palette: the primary colour, focus rings, the sidebar's active item and the charts, and a design system's brand tokens.
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
@@ -417,6 +418,7 @@ Settings:
 - Scope: project
 - Active when: `frontend.ui-library in (shadcn, shadcn-vue)`
 - Default: `inter`
+- Changeable after generation: `fabric change --set frontend.font=<option>` (ADR-0016 C1)
 - Note: The app's typeface: a variable font (SIL Open Font License) installed from npm and bundled with the app, never loaded from a font host, under the theme's type scale (display, title, body, caption).
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |

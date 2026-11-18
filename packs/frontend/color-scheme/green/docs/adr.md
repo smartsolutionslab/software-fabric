@@ -12,5 +12,5 @@ The design system's brand tokens (`color.brand.400`, `500`, `700` and `800` in `
 
 ## Consequences
 
-- The scheme is a choice recorded in `fabric.yaml` (`frontend.color-scheme`), made when the project is generated; its colours are not edited by hand.
-- `fabric upgrade` keeps `fabric.yaml`'s choices, so it brings this scheme's changes in a newer generator, not another scheme.
+- The scheme is a choice recorded in `fabric.yaml` (`frontend.color-scheme`); its colours are not edited by hand.
+- Another scheme is a change of that choice: `fabric change --set frontend.color-scheme=<scheme>` merges the other scheme's palettes into the project and records it, keeping the project's other edits. `fabric upgrade` keeps the recorded scheme and brings its changes in a newer generator.
