@@ -99,6 +99,8 @@ public sealed class NoAuthentication : IArchitectureRule
             builder.UseSetting("Messaging:Queue", "unused");
 {{~ else if project["backend.topology"] == "services" && project["backend.bus.transport"] == "azure-service-bus" ~}}
             builder.UseSetting("Messaging:Subscription", "unused");
+{{~ else if project["backend.topology"] == "services" && project["backend.bus.transport"] == "kafka" ~}}
+            builder.UseSetting("Messaging:ConsumerGroup", "unused");
 {{~ end ~}}
             builder.ConfigureServices(services => services.RemoveAll<IHostedService>());
         }

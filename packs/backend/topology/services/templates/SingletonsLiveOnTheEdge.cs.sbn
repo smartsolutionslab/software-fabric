@@ -82,6 +82,8 @@ public sealed class SingletonsLiveOnTheEdge : IArchitectureRule
             builder.UseSetting("Messaging:Queue", "unused");
 {{~ else if project["backend.topology"] == "services" && project["backend.bus.transport"] == "azure-service-bus" ~}}
             builder.UseSetting("Messaging:Subscription", "unused");
+{{~ else if project["backend.topology"] == "services" && project["backend.bus.transport"] == "kafka" ~}}
+            builder.UseSetting("Messaging:ConsumerGroup", "unused");
 {{~ end ~}}
 {{~ if project["backend.auth"] != "none" ~}}
             {{ unstarted_host_settings }}
