@@ -79,6 +79,7 @@ public static class CatalogReader
             "default-from",
             "requires",
             "note",
+            "changeable",
             "role-slots",
             "options");
 
@@ -116,6 +117,7 @@ public static class CatalogReader
             roleSlots)
         {
             Requires = fields.Optional("requires") is { } requires ? source.Conditions(requires, owner) : [],
+            Changeable = fields.Optional("changeable") is { } changeable && source.Boolean(changeable, "changeable", owner),
         };
     }
 

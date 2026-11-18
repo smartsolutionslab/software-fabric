@@ -653,6 +653,8 @@ dimensions:
     scope: project
     active-when: "frontend.ui-library in (shadcn, shadcn-vue)"
     default: blue
+    # Presentation only: another scheme repaints the palettes and tokens and changes nothing else (ADR-0016 C2, #720).
+    changeable: true
     note: "shadcn/ui's own colour themes on its slate neutrals, in a light and a dark palette: the primary colour, focus rings, the sidebar's active item and the charts, and a design system's brand tokens."
     options:
       blue:   { tier: experimental }
