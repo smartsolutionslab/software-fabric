@@ -23,7 +23,7 @@ public sealed partial class PwaEndToEndTests
         // The generated CI's own end-to-end step: start the AppHost, wait for the app, run Playwright, stop.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, e2eOutput);
-        e2eOutput.ShouldContain("2 passed");
+        e2eOutput.ShouldContain("5 passed"); // and the billing page's three sample tests (#734)
 
         // The gate: a worker that keeps every same-origin answer, /api included, fails the offline test.
         var config = Path.Combine(web, "app", "vite.config.ts");
@@ -49,7 +49,7 @@ public sealed partial class PwaEndToEndTests
 
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, e2eOutput);
-        e2eOutput.ShouldContain("2 passed");
+        e2eOutput.ShouldContain("5 passed"); // and the billing page's three sample tests (#734)
     }
 
     [GeneratedRegex(@"urlPattern: [\s\S]*?,\n(?<indent>\s*)handler:")]

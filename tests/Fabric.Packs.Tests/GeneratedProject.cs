@@ -51,7 +51,8 @@ internal sealed partial class GeneratedProject : IDisposable
 
     /// <summary>
     /// Drops the module's sample (#734) as AGENTS.md says: every file and folder with Sample in its name in the module and
-    /// its tests, its integration test and its Migrations folder. For a test that needs the module without it.
+    /// its tests, its integration test and its Migrations folder, and in the web app its page's hook, form and tests. For a test that needs
+    /// the module without it; a test that writes the page itself writes its data file too.
     /// </summary>
     public void DeleteSample(string module)
     {
@@ -77,6 +78,24 @@ internal sealed partial class GeneratedProject : IDisposable
         }
 
         File.Delete(Path.Combine(ProjectDirectory, "tests", "Integration.Tests", name + "SamplesTests.cs"));
+
+        // The module page's sample (#734, PR 2): its hook, form and their tests, the page's test and the end-to-end test.
+        var page = Path.Combine(ProjectDirectory, "web", "app", "src", "modules", module);
+        if (Directory.Exists(page))
+        {
+            foreach (var file in Directory.EnumerateFiles(page, "*Sample*").Append(Path.Combine(page, name + "Page.test.tsx")).ToList())
+            {
+                File.Delete(file);
+            }
+        }
+
+        File.Delete(Path.Combine(ProjectDirectory, "web", "app", "e2e", module + "-samples.spec.ts"));
+        if (File.Exists(Path.Combine(page, name + "Page.data.ts")))
+        {
+            File.WriteAllText(
+                Path.Combine(page, name + "Page.data.ts"),
+                "export const examples: Record<string, unknown> = {};\n\nexport const emptyExamples: Record<string, unknown> = {};\n");
+        }
     }
 
     public void Write(string relativePath, string content)

@@ -195,6 +195,8 @@ public sealed class TanStackRouterTests
     {
         using var project = new GeneratedProject(Profile, TanStackRouter);
         project.AddModule("billing");
+        // The page is the test's, so the module page's sample goes (#734).
+        project.DeleteSample("billing");
         project.Write("web/app/src/modules/billing/routes.tsx", NestedRoutes);
         project.Write("web/app/src/modules/billing/BillingPage.tsx", NestingPage);
         project.Write("web/app/src/modules/billing/InvoicePage.tsx", NestedPage);
