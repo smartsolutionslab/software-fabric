@@ -1,10 +1,8 @@
 # The test shards of ci.yml's tests job, one per line: the Fabric.Packs.Tests classes the shard runs, by full name.
-# build/test-shard.sh runs them, and the shard after the last line runs everything this file does not name. The
-# classes in the fixed-ports and Docker-ports collections run one after another on a runner, and a class's own tests
-# run one after another too, so both are spread over the shards by the times the build job prints for each class:
-# rebalance by those. A new line needs a new shard in ci.yml's matrix (TestShardTests checks it).
-# Every class that takes 40 s or more is named, so the last shard runs only light ones and has room for a new class
-# until the next rebalance.
+# build/test-shard.sh runs them, and the shard after the last line runs everything the split does not name. In CI the
+# split job replaces these lines with build/test-split.sh's, balanced by the median of recent runs' times per class
+# (#711); this file is the split only while no times are cached, and its line count sets the number of shards. A new
+# line needs a new shard in ci.yml's matrix (TestShardTests checks it). Balanced by hand on one run's times (#710).
 Fabric.Packs.Tests.SchemaPerTenantTests Fabric.Packs.Tests.NUnitTests Fabric.Packs.Tests.OpenApiFetchDocumentTests Fabric.Packs.Tests.RadixHeadlessTests Fabric.Packs.Tests.OpenApiFetchTests Fabric.Packs.Tests.RadixHeadlessDashboardsTests Fabric.Packs.Tests.PolicyOwnershipTests Fabric.Packs.Tests.EventDrivenBackendTests
 Fabric.Packs.Tests.TestcontainersTests Fabric.Packs.Tests.FormKitTests Fabric.Packs.Tests.VueFrontendTests Fabric.Packs.Tests.VueFormsAndComponentsTests Fabric.Packs.Tests.PrimitiveBoundaryTests Fabric.Packs.Tests.GrpcTests Fabric.Packs.Tests.RekaUiDashboardsTests Fabric.Packs.Tests.SseVueTests Fabric.Packs.Tests.CrossTenantReadsTests Fabric.Packs.Tests.LeanCrudSignInTests
 Fabric.Packs.Tests.GenerativeDashboardsTests Fabric.Packs.Tests.MoqTests Fabric.Packs.Tests.NxTests Fabric.Packs.Tests.MsalTests Fabric.Packs.Tests.StorybookTestsTests Fabric.Packs.Tests.SignInTests Fabric.Packs.Tests.GuidVersion7Tests Fabric.Packs.Tests.SettingsSecretsTests Fabric.Packs.Tests.PnpmOverridesSlotTests Fabric.Packs.Tests.MatrixGenerationTests Fabric.Packs.Tests.SharedIdentityTests Fabric.Packs.Tests.ServerEventsTests Fabric.Packs.Tests.WolverineMediatorTests Fabric.Packs.Tests.OpenAITests
