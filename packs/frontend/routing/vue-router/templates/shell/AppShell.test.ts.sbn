@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 import { createMemoryHistory } from 'vue-router';
 import App from '@/App.vue';
-import { type ModuleRoute, moduleRoutes } from '@/modules';
+import { moduleRoutes } from '@/modules';
 import { createAppRouter } from '@/router';
 
 {{~ if user_menu ~}}
@@ -15,14 +15,14 @@ vi.mock('@/auth/UserMenu.vue', async () => {
 });
 {{~ end ~}}
 
-/** The first module, for the tests that need one; they run only when the app has a module. */
-function firstModule(): ModuleRoute {
-  const [module] = moduleRoutes;
-  if (module === undefined) {
-    throw new Error('The app has no module.');
-  }
-  return module;
-}
+// Beside the app's modules, one of the tests' own, for what the shell does on a module's page: a real module's page
+// may need the app's query client, stores or host, which these tests do not install.
+vi.mock('@/modules', async (importOriginal) => {
+  const { h } = await import('vue');
+  const modules = await importOriginal<typeof import('@/modules')>();
+  const reports = { path: 'reports', title: 'Reports', component: { render: () => h('h1', 'Reports') } };
+  return { ...modules, moduleRoutes: [...modules.moduleRoutes, reports] };
+});
 
 async function renderAt(path: string) {
   const router = createAppRouter(createMemoryHistory());
@@ -64,29 +64,23 @@ test('on the start page the breadcrumbs name only it', async () => {
 });
 
 // The current page is text, not a disabled link: the sidebar's link to it stays the only link of that name.
-test.runIf(moduleRoutes.length > 0)("on a module's page the only link named after it is the sidebar's", async () => {
-  const module = firstModule();
-  await renderAt(`/${module.path}`);
+test('the page the user is on is text in the breadcrumbs, not a second link to it', async () => {
+  await renderAt('/reports');
 
-  expect(screen.getAllByRole('link', { name: module.title })).toHaveLength(1);
-  expect(within(screen.getByRole('navigation', { name: 'breadcrumb' })).getByText(module.title)).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
+  expect(breadcrumbs.queryByRole('link', { name: 'Reports' })).not.toBeInTheDocument();
+  expect(breadcrumbs.getByText('Reports')).toHaveAttribute('aria-current', 'page');
+  expect(screen.getAllByRole('link', { name: 'Reports' })).toHaveLength(1);
 });
 
-test.runIf(moduleRoutes.length > 0)(
-  "the breadcrumbs lead from the start page to a module's page and below it",
-  async () => {
-    const module = firstModule();
-    await renderAt(`/${module.path}/details`);
+test("the breadcrumbs lead from the start page to a module's page and below it", async () => {
+  await renderAt('/reports/details');
 
-    const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
-    expect(breadcrumbs.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
-    expect(breadcrumbs.getByRole('link', { name: module.title })).toHaveAttribute('href', `/${module.path}`);
-    expect(breadcrumbs.getByText('details')).toHaveAttribute('aria-current', 'page');
-  },
-);
+  const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
+  expect(breadcrumbs.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
+  expect(breadcrumbs.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/reports');
+  expect(breadcrumbs.getByText('details')).toHaveAttribute('aria-current', 'page');
+});
 
 test.each([
   ['Ctrl+K', '{Control>}k{/Control}'],
@@ -108,21 +102,19 @@ test.each([
   await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });
 
-test.runIf(moduleRoutes.length > 0)('the keyboard alone goes to a page from the command palette', async () => {
-  const module = firstModule();
+test('the keyboard alone goes to a page from the command palette', async () => {
   const user = userEvent.setup();
   const router = await renderAt('/');
 
   await user.keyboard('{Control>}k{/Control}');
   await screen.findByRole('dialog', { name: 'Go to' });
-  await user.keyboard('{ArrowDown}');
-  await vi.waitFor(() =>
-    expect(screen.getByRole('option', { name: module.title })).toHaveAttribute('data-highlighted'),
-  );
+  await user.keyboard('{ArrowDown}'.repeat(moduleRoutes.length));
+  await vi.waitFor(() => expect(screen.getByRole('option', { name: 'Reports' })).toHaveAttribute('data-highlighted'));
   await user.keyboard('{Enter}');
 
-  await vi.waitFor(() => expect(router.currentRoute.value.path).toBe(`/${module.path}`));
+  await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/reports'));
   await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(await screen.findByRole('heading', { name: 'Reports' })).toBeInTheDocument();
 });
 
 test('typing narrows the command palette to the pages that match', async () => {

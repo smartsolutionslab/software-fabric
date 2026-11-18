@@ -1,10 +1,12 @@
 {{~ user_menu = object.has_key(project, "frontend.auth-client") && project["frontend.auth-client"] == "oidc-client-ts" ~}}
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, expect, test{{ if user_menu }}, vi{{ end }} } from 'vitest';
 import { App } from '@/App';
 import type { ModuleRoute } from '@/modules';
+import { Breadcrumbs } from './Breadcrumbs';
+import { CommandPalette } from './CommandPalette';
 
 {{~ if user_menu ~}}
 // The user menu has its own test; here it stands in, so this test checks the shell around it.
@@ -16,14 +18,9 @@ const modules = Object.values(
   import.meta.glob<ModuleRoute>('../modules/*/routes.tsx', { eager: true, import: 'route' }),
 );
 
-/** The first module, for the tests that need one; they run only when the app has a module. */
-function firstModule(): ModuleRoute {
-  const [module] = modules;
-  if (module === undefined) {
-    throw new Error('The app has no module.');
-  }
-  return module;
-}
+// A module of the tests' own, for what the shell does on a module's page: a real module's page may need the app's
+// store, query client or host, which these tests do not render.
+const reports: ModuleRoute = { path: 'reports', title: 'Reports', element: <h1>Reports</h1> };
 
 // Without Vitest's globals, Testing Library does not unmount between tests by itself.
 afterEach(cleanup);
@@ -70,24 +67,28 @@ test('on the start page the breadcrumbs name only it', () => {
 });
 
 // The current page is text, not a disabled link: the sidebar's link to it stays the only link of that name.
-test.runIf(modules.length > 0)("on a module's page the only link named after it is the sidebar's", () => {
-  const module = firstModule();
-  renderAt(`/${module.path}`);
-
-  expect(screen.getAllByRole('link', { name: module.title })).toHaveLength(1);
-  expect(within(screen.getByRole('navigation', { name: 'breadcrumb' })).getByText(module.title)).toHaveAttribute(
-    'aria-current',
-    'page',
+test('the page the user is on is text in the breadcrumbs, not a second link to it', () => {
+  render(
+    <MemoryRouter initialEntries={['/reports']}>
+      <Breadcrumbs routes={[reports]} />
+    </MemoryRouter>,
   );
+
+  const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
+  expect(breadcrumbs.queryByRole('link', { name: 'Reports' })).not.toBeInTheDocument();
+  expect(breadcrumbs.getByText('Reports')).toHaveAttribute('aria-current', 'page');
 });
 
-test.runIf(modules.length > 0)("the breadcrumbs lead from the start page to a module's page and below it", () => {
-  const module = firstModule();
-  renderAt(`/${module.path}/details`);
+test("the breadcrumbs lead from the start page to a module's page and below it", () => {
+  render(
+    <MemoryRouter initialEntries={['/reports/details']}>
+      <Breadcrumbs routes={[reports]} />
+    </MemoryRouter>,
+  );
 
   const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
   expect(breadcrumbs.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
-  expect(breadcrumbs.getByRole('link', { name: module.title })).toHaveAttribute('href', `/${module.path}`);
+  expect(breadcrumbs.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/reports');
   expect(breadcrumbs.getByText('details')).toHaveAttribute('aria-current', 'page');
 });
 
@@ -111,21 +112,26 @@ test.each([
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
-test.runIf(modules.length > 0)('the keyboard alone goes to a page from the command palette', async () => {
-  const module = firstModule();
+test('the keyboard alone goes to a page from the command palette', async () => {
   const user = userEvent.setup();
-  renderAt('/');
+  render(
+    <MemoryRouter>
+      <CommandPalette routes={[reports]} />
+      <Routes>
+        <Route path="/" element={<h1>Start</h1>} />
+        <Route path="/reports" element={reports.element} />
+      </Routes>
+    </MemoryRouter>,
+  );
 
   await user.keyboard('{Control>}k{/Control}');
   await screen.findByRole('dialog', { name: 'Go to' });
   await user.keyboard('{ArrowDown}');
-  expect(screen.getByRole('option', { name: module.title })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByRole('option', { name: 'Reports' })).toHaveAttribute('aria-selected', 'true');
   await user.keyboard('{Enter}');
 
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  expect(
-    within(screen.getByRole('navigation', { name: 'Modules' })).getByRole('link', { name: module.title }),
-  ).toHaveAttribute('aria-current', 'page');
+  expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument();
 });
 
 test('typing narrows the command palette to the pages that match', async () => {
