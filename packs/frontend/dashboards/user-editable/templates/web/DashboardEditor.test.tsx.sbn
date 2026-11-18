@@ -2,6 +2,9 @@
 {{~ shell = project["frontend.ui-library"] == "shadcn" && project["frontend.routing"] == "react-router" ~}}
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+{{~ if shell ~}}
+import { toast } from 'sonner';
+{{~ end ~}}
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 {{~ if array.contains project["frontend.test.extras"] "accessibility" ~}}
 import { axe } from 'vitest-axe';
@@ -121,6 +124,11 @@ beforeEach(() => {
   save.mockReturnValue({ unwrap: () => Promise.resolve(sales.id) });
   refetch.mockReset();
   refetchWidget.mockReset();
+{{~ if shell ~}}
+  // Sonner keeps its toasts between renders and shows a new toaster those still open: one test's toast is not the
+  // next's.
+  toast.dismiss();
+{{~ end ~}}
 });
 {{~ if shell ~}}
 

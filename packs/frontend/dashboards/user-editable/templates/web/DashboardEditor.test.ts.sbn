@@ -7,6 +7,7 @@ import { render, screen, waitFor, within } from '@testing-library/vue';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 {{~ if shell ~}}
 import { defineComponent, h } from 'vue';
+import { toast } from 'vue-sonner';
 {{~ end ~}}
 {{~ if axe ~}}
 import { axe } from 'vitest-axe';
@@ -172,6 +173,11 @@ function renderEditor() {
 beforeEach(() => {
   Object.assign(answers, defaults);
   vi.stubGlobal('fetch', fetchMock);
+{{~ if shell ~}}
+  // vue-sonner keeps its toasts between renders and shows a new toaster those still open: one test's toast is not the
+  // next's.
+  toast.dismiss();
+{{~ end ~}}
 });
 
 afterEach(() => {
