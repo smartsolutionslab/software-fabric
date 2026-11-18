@@ -14,6 +14,6 @@ The project's embeddings come from OpenAI's embedding models, through the OpenAI
 
 ## Consequences
 
-- An architecture rule fails when the host's `Program.cs` does not call `AddOpenAIEmbeddingGenerator`, and resolves the registered generator, without calling it, failing when it is not OpenAI with the configured model, not wrapped with logging and OpenTelemetry, or when a missing key does not name its parameter.
+- An architecture rule fails when the host's `Program.cs` (with `backend.topology: services`, any service host's, `src/Services/<Module>/Host/Program.cs`) does not call `AddOpenAIEmbeddingGenerator`, and resolves the registered generator, without calling it, failing when it is not OpenAI with the configured model, not wrapped with logging and OpenTelemetry, or when a missing key does not name its parameter.
 - The integration tests give `openai-api-key` a value OpenAI does not accept and embed against their stand-in; they never call the model. No test needs a real key.
 - Every text embedded is a request to OpenAI: it costs money and sends the text there, records and questions alike.
