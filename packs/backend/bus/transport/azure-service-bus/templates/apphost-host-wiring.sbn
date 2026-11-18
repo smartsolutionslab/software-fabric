@@ -7,4 +7,5 @@
         {
             context.EnvironmentVariables["ConnectionStrings__messaging-management"] = messagingManagement;
         }
-    })
+    }){{ if project["backend.topology"] == "services" }}
+    .WithEnvironment("Messaging__Subscription", module){{ end }}
