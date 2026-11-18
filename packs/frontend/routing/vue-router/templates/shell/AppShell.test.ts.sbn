@@ -1,0 +1,130 @@
+{{~ user_menu = object.has_key(project, "frontend.auth-client") && project["frontend.auth-client"] == "oidc-client-ts" ~}}
+import { render, screen, within } from '@testing-library/vue';
+import userEvent from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
+import { createMemoryHistory } from 'vue-router';
+import App from '@/App.vue';
+import { moduleRoutes } from '@/modules';
+import { createAppRouter } from '@/router';
+
+{{~ if user_menu ~}}
+// The user menu has its own test; here it stands in, so this test checks the shell around it.
+vi.mock('@/auth/UserMenu.vue', async () => {
+  const { h } = await import('vue');
+  return { default: { render: () => h('p', 'The user menu') } };
+});
+{{~ end ~}}
+
+// Beside the app's modules, one of the tests' own, for what the shell does on a module's page: a real module's page
+// may need the app's query client, stores or host, which these tests do not install.
+vi.mock('@/modules', async (importOriginal) => {
+  const { h } = await import('vue');
+  const modules = await importOriginal<typeof import('@/modules')>();
+  const reports = { path: 'reports', title: 'Reports', component: { render: () => h('h1', 'Reports') } };
+  return { ...modules, moduleRoutes: [...modules.moduleRoutes, reports] };
+});
+
+async function renderAt(path: string) {
+  const router = createAppRouter(createMemoryHistory());
+  await router.push(path);
+  render(App, { global: { plugins: [router] } });
+  return router;
+}
+
+test('the sidebar lists the start page and every module from its routes', async () => {
+  await renderAt('/');
+
+  const navigation = within(screen.getByRole('navigation', { name: 'Modules' }));
+  expect(navigation.getAllByRole('link').map((link) => link.textContent.trim())).toEqual([
+    'Home',
+    ...moduleRoutes.map((module) => module.title),
+  ]);
+  expect(navigation.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+});
+
+test('the sidebar collapses from its trigger and opens again', async () => {
+  const user = userEvent.setup();
+  await renderAt('/');
+  const sidebar = () => document.querySelector('[data-slot="sidebar"]');
+  expect(sidebar()).toHaveAttribute('data-state', 'expanded');
+
+  await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Toggle Sidebar' }));
+  await vi.waitFor(() => expect(sidebar()).toHaveAttribute('data-state', 'collapsed'));
+
+  await user.click(within(screen.getByRole('banner')).getByRole('button', { name: 'Toggle Sidebar' }));
+  await vi.waitFor(() => expect(sidebar()).toHaveAttribute('data-state', 'expanded'));
+});
+
+test('on the start page the breadcrumbs name only it', async () => {
+  await renderAt('/');
+
+  const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
+  expect(breadcrumbs.getByText('Home')).toHaveAttribute('aria-current', 'page');
+  expect(breadcrumbs.getByText('Home')).not.toHaveAttribute('href');
+});
+
+// The current page is text, not a disabled link: the sidebar's link to it stays the only link of that name.
+test('the page the user is on is text in the breadcrumbs, not a second link to it', async () => {
+  await renderAt('/reports');
+
+  const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
+  expect(breadcrumbs.queryByRole('link', { name: 'Reports' })).not.toBeInTheDocument();
+  expect(breadcrumbs.getByText('Reports')).toHaveAttribute('aria-current', 'page');
+  expect(screen.getAllByRole('link', { name: 'Reports' })).toHaveLength(1);
+});
+
+test("the breadcrumbs lead from the start page to a module's page and below it", async () => {
+  await renderAt('/reports/details');
+
+  const breadcrumbs = within(screen.getByRole('navigation', { name: 'breadcrumb' }));
+  expect(breadcrumbs.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/');
+  expect(breadcrumbs.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/reports');
+  expect(breadcrumbs.getByText('details')).toHaveAttribute('aria-current', 'page');
+});
+
+test.each([
+  ['Ctrl+K', '{Control>}k{/Control}'],
+  ['Cmd+K', '{Meta>}k{/Meta}'],
+])('%s opens the command palette and Escape closes it', async (_, keys) => {
+  const user = userEvent.setup();
+  await renderAt('/');
+
+  await user.keyboard(keys);
+  const palette = await screen.findByRole('dialog', { name: 'Go to' });
+  await vi.waitFor(() => expect(within(palette).getByRole('textbox', { name: 'Go to' })).toHaveFocus());
+  expect(
+    within(palette)
+      .getAllByRole('option')
+      .map((option) => option.textContent.trim()),
+  ).toEqual(['Home', ...moduleRoutes.map((module) => module.title)]);
+
+  await user.keyboard('{Escape}');
+  await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+});
+
+test('the keyboard alone goes to a page from the command palette', async () => {
+  const user = userEvent.setup();
+  const router = await renderAt('/');
+
+  await user.keyboard('{Control>}k{/Control}');
+  await screen.findByRole('dialog', { name: 'Go to' });
+  await user.keyboard('{ArrowDown}'.repeat(moduleRoutes.length));
+  await vi.waitFor(() => expect(screen.getByRole('option', { name: 'Reports' })).toHaveAttribute('data-highlighted'));
+  await user.keyboard('{Enter}');
+
+  await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/reports'));
+  await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(await screen.findByRole('heading', { name: 'Reports' })).toBeInTheDocument();
+});
+
+test('typing narrows the command palette to the pages that match', async () => {
+  const user = userEvent.setup();
+  await renderAt('/');
+
+  await user.keyboard('{Control>}k{/Control}');
+  await screen.findByRole('dialog', { name: 'Go to' });
+  await user.keyboard('no such page');
+
+  await vi.waitFor(() => expect(screen.queryAllByRole('option')).toHaveLength(0));
+  expect(screen.getByText('No page matches.')).toBeInTheDocument();
+});

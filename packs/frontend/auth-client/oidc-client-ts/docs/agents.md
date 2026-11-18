@@ -7,6 +7,9 @@
 - Read the signed-in user with `useAuth()` from `@/auth/useAuth`; never parse tokens yourself. It is a small composable over oidc-client-ts's `UserManager`; do not add a Vue OIDC library.
 - Do not add the `Authorization` header by hand; `src/api/baseApi.ts` does it for every generated endpoint.
 - Test a component that reads the user by providing `createAuth(fake)` under `authKey`, as `src/auth/SignedIn.test.ts` does; never mock oidc-client-ts itself.
+{{~ if project["frontend.ui-library"] == "shadcn-vue" && project["frontend.architecture"] == "spa" ~}}
+- Who is signed in, and Sign out, are the shell's user menu (`src/auth/UserMenu.vue`): the name is the host's `/me` answer (`useCurrentUser()` from `@/api/useCurrentUser`), not the token's.
+{{~ end ~}}
 - Local users: `developer` / `developer` (and `developer-b` with tenancy), defined in {{ local_users_source }}.
 {{~ if roles || claims ~}}
 - Hiding an element is a convenience, never protection: the backend policy decides. Every action you hide still needs its endpoint's policy (`.RequireAuthorization(...)`).
@@ -19,6 +22,9 @@
 ## Browser sign-in: oidc-client-ts
 
 - Read the signed-in user with `useAuth()` from `react-oidc-context`; never parse tokens yourself.
+{{~ if project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router" ~}}
+- Who is signed in, and Sign out, are the shell's user menu (`src/auth/UserMenu.tsx`): the name is the host's `/me` answer (`useCurrentUser()` from `@/api/useCurrentUser`), not the token's.
+{{~ end ~}}
 - Do not add the `Authorization` header by hand; `src/api/baseApi.ts` does it for every generated endpoint.
 - Local users: `developer` / `developer` (and `developer-b` with tenancy), defined in {{ local_users_source }}.
 {{~ if roles || claims ~}}
