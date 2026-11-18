@@ -112,7 +112,9 @@ public sealed class ServicesAgentFrameworkTests
         exitCode.ShouldNotBe(0, output);
         output.Split('\n')
             .ShouldContain(line => line.Contains(Request, StringComparison.Ordinal) && line.Contains("src/Services/Billing/Host", StringComparison.Ordinal), output);
-        output.ShouldNotContain("src/Services/Shipping/Host");
+        // The started hosts log their content root, so only a violation naming Shipping's service host counts.
+        output.Split('\n')
+            .ShouldNotContain(line => line.Contains("is an agent's tool", StringComparison.Ordinal) && line.Contains("src/Services/Shipping/Host", StringComparison.Ordinal), output);
         output.ShouldNotContain("#error");
     }
 
