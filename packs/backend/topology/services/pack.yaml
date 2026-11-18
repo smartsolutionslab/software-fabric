@@ -10,12 +10,14 @@ files:
   - { template: templates/Edge/launchSettings.json.sbn, target: src/Edge/Properties/launchSettings.json }
   - { template: templates/Edge/ModuleRoutes.cs.sbn, target: src/Edge/Wiring/ModuleRoutes.cs }
   - { template: templates/Edge/ServiceDocuments.cs.sbn, target: src/Edge/Wiring/ServiceDocuments.cs }
+  - { template: templates/ServiceModule.cs.sbn, target: src/Host/Wiring/ServiceModule.cs }
   - { template: templates/ServiceHostProjects.cs.sbn, target: src/AppHost/Wiring/ServiceHostProjects.cs }
   - { template: templates/ServiceHostReferences.cs.sbn, target: tests/Architecture.Tests/ServiceHostReferences.cs }
   - { template: templates/ServiceHostEntryPoints.cs.sbn, target: tests/Architecture.Tests/ServiceHostEntryPoints.cs }
   - { template: templates/ModulesDoNotReferenceEachOther.cs.sbn, target: tests/Architecture.Tests/Rules/ModulesDoNotReferenceEachOther.cs }
   - { template: templates/ServicesDoNotReferenceEachOther.cs.sbn, target: tests/Architecture.Tests/Rules/ServicesDoNotReferenceEachOther.cs }
   - { template: templates/EveryServiceHostRunsExactlyOneModule.cs.sbn, target: tests/Architecture.Tests/Rules/EveryServiceHostRunsExactlyOneModule.cs }
+  - { template: templates/EveryServiceHostKnowsItsModule.cs.sbn, target: tests/Architecture.Tests/Rules/EveryServiceHostKnowsItsModule.cs }
   - { template: templates/SingletonsLiveOnTheEdge.cs.sbn, target: tests/Architecture.Tests/Rules/SingletonsLiveOnTheEdge.cs }
 # The host.* slots mean what they mean in the modular monolith, "every host that runs module code" (ADR-0017): each
 # renders into every service host.
@@ -44,4 +46,5 @@ gates:
   - { kind: architecture-test, describes: "No module references another module's assemblies.", file: templates/ModulesDoNotReferenceEachOther.cs.sbn }
   - { kind: architecture-test, describes: "No service host's project references another module's projects.", file: templates/ServicesDoNotReferenceEachOther.cs.sbn }
   - { kind: architecture-test, describes: "Every service host runs exactly one module: the module Api projects it references hold one IModule between them.", file: templates/EveryServiceHostRunsExactlyOneModule.cs.sbn }
+  - { kind: architecture-test, describes: "Every service host knows its module's route name: its assembly carries the ModuleName metadata ServiceModule.Name reads. The violation names the service.", file: templates/EveryServiceHostKnowsItsModule.cs.sbn }
   - { kind: architecture-test, describes: "No service host maps what the application has once (/me, a SignalR hub or event stream, MCP, AG-UI); it lives on the edge, src/Edge. The violation names the service and the route.", file: templates/SingletonsLiveOnTheEdge.cs.sbn }

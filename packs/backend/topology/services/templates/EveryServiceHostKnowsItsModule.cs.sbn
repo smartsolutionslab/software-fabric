@@ -1,0 +1,22 @@
+using System.Reflection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A service host maps what is its own under its module's route name, ServiceModule.Name, which reads the ModuleName
+/// metadata its project writes into its assembly. A host whose project lost that line would fail only when it asks.
+/// </summary>
+public sealed class EveryServiceHostKnowsItsModule : IArchitectureRule
+{
+    public string Description => "Every service host knows its module's route name: its assembly carries ModuleName metadata.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        return [.. ServiceHostEntryPoints.All
+            .Where(entryPoint => !entryPoint.Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                .Any(metadata => metadata.Key == "ModuleName" && !string.IsNullOrWhiteSpace(metadata.Value)))
+            .Select(entryPoint => "src/Services/" + entryPoint.Assembly.GetName().Name!.Split('.')[^2] + "/Host does not know its module's route name: its assembly carries no ModuleName metadata.")];
+    }
+}
