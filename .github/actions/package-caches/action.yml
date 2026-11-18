@@ -1,8 +1,8 @@
 name: Package caches
-description: Restores the NuGet packages and the pnpm store a job used last time, and saves them when the job succeeds (#712).
+description: Restores the NuGet packages and the pnpm store from one cache that every job shares; the job that says so saves it (#712).
 inputs:
-  job:
-    description: What the job runs (a test shard, a profile); each keeps its own cache, since each restores other packages.
+  save:
+    description: Whether this job saves the cache at its end when it was not restored under the exact key ('true' or 'false').
     required: true
 runs:
   using: composite
@@ -11,15 +11,33 @@ runs:
     # with the pnpm set up before this step, whose packageManager is the same pnpm; pnpm keeps its store where `pnpm
     # store path` says (on the same disk as the temporary directories the projects are generated in) and its metadata
     # under ~/.cache/pnpm. No generated project has a lockfile, so the key is the files that set package versions; a
-    # change to them starts from the job's last cache through the restore key, and saves the result as a new entry.
+    # change to them starts from the last cache through the restore key, and the saving job stores the result anew.
+    #
+    # One entry for every job, not one per job: each job's packages came to 0.7-1.6 GB, about 27 GB for the shards and
+    # profiles together against the repository's 10 GB, and the entries evicted each other within the hour. Most of
+    # each job's packages are the same, so one job's cache serves the others nearly as well; what it lacks is downloaded.
     - id: pnpm
       shell: bash
       run: echo "store=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
-    - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+    - id: key
+      shell: bash
+      run: echo "key=packages-$RUNNER_OS-${{ hashFiles('Directory.Packages.props', 'packs/**/Directory.Packages.props.sbn', 'packs/**/*.csproj.sbn', 'packs/**/package-version*.sbn', 'packs/**/package.json.sbn', 'packs/**/*depend*.sbn', 'packs/**/pnpm-override*.sbn') }}" >> "$GITHUB_OUTPUT"
+    # Restores now and saves when the job succeeds, unless the exact key was restored.
+    - if: inputs.save == 'true'
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
       with:
         path: |
           ~/.nuget/packages
           ${{ steps.pnpm.outputs.store }}
           ~/.cache/pnpm
-        key: packages-${{ runner.os }}-${{ inputs.job }}-${{ hashFiles('Directory.Packages.props', 'packs/**/Directory.Packages.props.sbn', 'packs/**/*.csproj.sbn', 'packs/**/package-version*.sbn', 'packs/**/package.json.sbn', 'packs/**/*depend*.sbn', 'packs/**/pnpm-override*.sbn') }}
-        restore-keys: packages-${{ runner.os }}-${{ inputs.job }}-
+        key: ${{ steps.key.outputs.key }}
+        restore-keys: packages-${{ runner.os }}-
+    - if: inputs.save != 'true'
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      with:
+        path: |
+          ~/.nuget/packages
+          ${{ steps.pnpm.outputs.store }}
+          ~/.cache/pnpm
+        key: ${{ steps.key.outputs.key }}
+        restore-keys: packages-${{ runner.os }}-
