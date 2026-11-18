@@ -38,12 +38,11 @@ function BreadcrumbLink({
   );
 }
 
+// Text, not the registry's disabled role="link": the page's own link (the sidebar's) stays the only one of its name.
 function BreadcrumbPage({ className, ...props }: React.ComponentProps<'span'>) {
   return (
     <span
       data-slot="breadcrumb-page"
-      role="link"
-      aria-disabled="true"
       aria-current="page"
       className={cn('font-normal text-foreground', className)}
       {...props}

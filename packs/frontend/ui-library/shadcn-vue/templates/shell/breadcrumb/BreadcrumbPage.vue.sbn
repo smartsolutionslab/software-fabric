@@ -7,14 +7,9 @@ const props = defineProps<{
 }>();
 </script>
 
+<!-- Text, not the registry's disabled role="link": the page's own link (the sidebar's) stays the only one of its name. -->
 <template>
-  <span
-    data-slot="breadcrumb-page"
-    role="link"
-    aria-disabled="true"
-    aria-current="page"
-    :class="cn('text-foreground font-normal', props.class)"
-  >
+  <span data-slot="breadcrumb-page" aria-current="page" :class="cn('text-foreground font-normal', props.class)">
     <slot />
   </span>
 </template>
