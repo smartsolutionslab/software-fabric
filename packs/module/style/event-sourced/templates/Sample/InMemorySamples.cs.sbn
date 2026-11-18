@@ -1,0 +1,142 @@
+{{~ option = project["backend.absence"] == "option" ~}}
+{{~ physical = module.values["module.cqrs"] == "physical" ~}}
+{{~ func none(type)
+  if option
+    ret "Task.FromResult(Option<" + type + ">.None)"
+  end
+  ret "Task.FromResult<" + type + "?>(null)"
+end ~}}
+{{~ func some(type, value)
+  if option
+    ret "Task.FromResult(Option<" + type + ">.Some(" + value + "))"
+  end
+  ret "Task.FromResult<" + type + "?>(" + value + ")"
+end ~}}
+{{~ if physical ~}}
+using System.Linq.Expressions;
+{{~ end ~}}
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+{{~ if !physical ~}}
+using {{ namespace }}.Contracts;
+{{~ end ~}}
+using {{ namespace }}.Modules.{{ module.namespace }}.Application;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.ReadModels;
+{{~ if physical ~}}
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples.Events;
+using {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.Projections;
+{{~ else ~}}
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+{{~ end ~}}
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Tests.Samples;
+
+{{~ if physical ~}}
+/// <summary>
+/// The module's event streams and its read models in memory: a saved sample's events count at once, and the sample's
+/// own projection writes its read model from them, as Marten runs it inline.
+/// </summary>
+internal sealed class InMemorySamples : I{{ module.namespace }}AggregateStore, I{{ module.namespace }}ReadModels
+{{~ else ~}}
+/// <summary>
+/// The module's event streams and its samples' table in memory, with its unit of work over the table: events count once
+/// they are saved, a row once it is committed.
+/// </summary>
+internal sealed class InMemorySamples : I{{ module.namespace }}AggregateStore, ISampleSummaries, I{{ module.namespace }}UnitOfWork
+{{~ end ~}}
+{
+    private readonly Dictionary<Guid, List<IDomainEvent>> streams = [];
+{{~ if !physical ~}}
+    private readonly Dictionary<Guid, SampleSummary> recorded = [];
+{{~ end ~}}
+
+    public IReadOnlyDictionary<Guid, List<IDomainEvent>> Streams => streams;
+
+    public List<SampleSummary> Summaries { get; } = [];
+
+{{~ if option ~}}
+    public Task<Option<TAggregate>> LoadAsync<TAggregate>(IAggregateId id, CancellationToken cancellationToken)
+{{~ else ~}}
+    public Task<TAggregate?> LoadAsync<TAggregate>(IAggregateId id, CancellationToken cancellationToken)
+{{~ end ~}}
+        where TAggregate : class, IEventSourced
+    {
+        if (!streams.TryGetValue(id.Value, out var history))
+        {
+            return {{ none "TAggregate" }};
+        }
+
+        var aggregate = (TAggregate)Activator.CreateInstance(typeof(TAggregate), nonPublic: true)!;
+        aggregate.Replay(history);
+        return {{ some "TAggregate" "aggregate" }};
+    }
+
+    public Task SaveAsync(IEventSourced aggregate, CancellationToken cancellationToken)
+    {
+        var history = streams.GetValueOrDefault(aggregate.Id.Value) ?? [];
+        if (history.Count != aggregate.Version)
+        {
+            throw new InvalidOperationException($"The stream {aggregate.Id.Value} moved on since it was loaded.");
+        }
+
+{{~ if physical ~}}
+        Summaries.AddRange(aggregate.PendingEvents.OfType<SampleCreated>().Select(SampleSummaryProjection.Create));
+{{~ end ~}}
+        streams[aggregate.Id.Value] = [.. history, .. aggregate.PendingEvents];
+        aggregate.MarkStored();
+        return Task.CompletedTask;
+    }
+{{~ if physical ~}}
+
+{{~ if option ~}}
+    public Task<Option<TReadModel>> FindAsync<TReadModel>(Guid id, CancellationToken cancellationToken)
+{{~ else ~}}
+    public Task<TReadModel?> FindAsync<TReadModel>(Guid id, CancellationToken cancellationToken)
+{{~ end ~}}
+        where TReadModel : class =>
+        Summaries.SingleOrDefault(summary => summary.Id == id) is TReadModel found ? {{ some "TReadModel" "found" }} : {{ none "TReadModel" }};
+
+    public Task<IReadOnlyList<TReadModel>> ListAsync<TReadModel>(CancellationToken cancellationToken)
+        where TReadModel : class =>
+        Task.FromResult<IReadOnlyList<TReadModel>>([.. Summaries.OfType<TReadModel>()]);
+
+    public Task<PagedResult<TReadModel>> ListAsync<TReadModel, TKey>(Page page, PageSize pageSize, Expression<Func<TReadModel, TKey>> orderBy, CancellationToken cancellationToken)
+        where TReadModel : class
+    {
+        List<TReadModel> items = [.. Summaries.OfType<TReadModel>().AsQueryable().OrderBy(orderBy).Skip(page.Skip(pageSize)).Take(pageSize.Value)];
+        return Task.FromResult(new PagedResult<TReadModel>(items, Summaries.Count, page.Value, pageSize.Value));
+    }
+{{~ else ~}}
+
+    public Task RecordAsync(Sample sample, CancellationToken cancellationToken)
+    {
+        recorded[sample.Id.Value] = new SampleSummary { Id = sample.Id.Value, Name = sample.Name.Value };
+        return Task.CompletedTask;
+    }
+
+{{~ if option ~}}
+    public Task<Option<SampleSummary>> FindAsync(Guid id, CancellationToken cancellationToken) =>
+{{~ else ~}}
+    public Task<SampleSummary?> FindAsync(Guid id, CancellationToken cancellationToken) =>
+{{~ end ~}}
+        Summaries.SingleOrDefault(summary => summary.Id == id) is { } found ? {{ some "SampleSummary" "found" }} : {{ none "SampleSummary" }};
+
+    public Task<PagedResult<SampleSummary>> ListAsync(Page page, PageSize pageSize, CancellationToken cancellationToken)
+    {
+        List<SampleSummary> items = [.. Summaries
+            .OrderBy(summary => summary.Name, StringComparer.Ordinal)
+            .ThenBy(summary => summary.Id)
+            .Skip(page.Skip(pageSize))
+            .Take(pageSize.Value)];
+        return Task.FromResult(new PagedResult<SampleSummary>(items, Summaries.Count, page.Value, pageSize.Value));
+    }
+
+    public Task PublishAsync(IntegrationEvent integrationEvent) => Task.CompletedTask;
+
+    public Task CommitAsync(CancellationToken cancellationToken)
+    {
+        Summaries.AddRange(recorded.Values);
+        recorded.Clear();
+        return Task.CompletedTask;
+    }
+{{~ end ~}}
+}

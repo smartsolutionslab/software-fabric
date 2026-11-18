@@ -1,0 +1,123 @@
+{{~ signed_in = project["backend.auth"] != "none" ~}}
+{{~ authorization = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+{{~ tenancy = project["backend.tenancy"] != "none" ~}}
+{{~ func status(response, code)
+  ret (should_be (response + ".StatusCode") ("HttpStatusCode." + code)) + ";"
+end ~}}
+{{~ func client(user)
+  if signed_in
+    ret "await " + (signed_in_host_client ("\"" + user + "\""))
+  end
+  ret host_client
+end ~}}
+using System.Net;
+using System.Net.Http.Json;
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>
+/// The {{ module.name }} module's sample through the running application: a sample is created, read back and listed a
+/// page at a time{{ if tenancy }}, inside the tenant of the user who created it{{ end }}. It goes with the sample (AGENTS.md).
+/// </summary>
+{{~ integration_fixture_attributes ~}}
+public class {{ module.namespace }}SamplesTests({{ integration_fixture }})
+{
+    private static readonly Uri Samples = new("/{{ module.name }}/samples", UriKind.Relative);
+
+    {{ test_attribute }}
+    public async Task A_created_sample_is_read_back_and_listed()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        using var client = {{ client "developer" }};
+        var name = $"Sample {Guid.CreateVersion7()}";
+
+        using var created = await client.PostAsJsonAsync(Samples, new { name }, cancellationToken);
+
+        {{ status "created" "Created" }}
+        var id = await created.Content.ReadFromJsonAsync<Guid>(cancellationToken);
+        {{ should_be `created.Headers.Location` (`new Uri($"/` + module.name + `/samples/{id}", UriKind.Relative)`) }};
+        var sample = await client.GetFromJsonAsync<Sample>(created.Headers.Location, cancellationToken);
+        {{ `sample` | should_be `new Sample(id, name)` }};
+        var page = await client.GetFromJsonAsync<SamplePage>(new Uri("/{{ module.name }}/samples?page=1&pageSize=100", UriKind.Relative), cancellationToken);
+        {{ `page!.Items` | should_contain `new Sample(id, name)` }};
+        {{ `page.TotalCount` | should_be_greater_than `0` }};
+        {{ `page.PageSize` | should_be `100` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_blank_name_is_refused_as_the_callers_mistake()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        using var client = {{ client "developer" }};
+
+        using var refused = await client.PostAsJsonAsync(Samples, new { name = "  " }, cancellationToken);
+
+        {{ status "refused" "BadRequest" }}
+        {{ `(await refused.Content.ReadFromJsonAsync<Problem>(cancellationToken))!.Code` | should_be ('"' + module.name + '.invalid-sample-name"') }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_page_size_above_the_maximum_is_refused()
+    {
+        using var client = {{ client "developer" }};
+
+        using var response = await client.GetAsync(new Uri("/{{ module.name }}/samples?pageSize=101", UriKind.Relative), {{ test_cancellation_token }});
+
+        {{ status "response" "BadRequest" }}
+    }
+{{~ if authorization ~}}
+
+    {{ test_attribute }}
+    public async Task A_user_without_the_manage_permission_lists_samples_but_creates_none()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        using var client = {{ client "visitor" }};
+
+        using var listed = await client.GetAsync(Samples, cancellationToken);
+        using var created = await client.PostAsJsonAsync(Samples, new { name = "Not mine to create" }, cancellationToken);
+
+        {{ status "listed" "OK" }}
+        {{ status "created" "Forbidden" }}
+    }
+{{~ end ~}}
+{{~ if signed_in ~}}
+
+    {{ test_attribute }}
+    public async Task An_anonymous_caller_neither_lists_nor_creates_samples()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        using var client = {{ host_client }};
+
+        using var listed = await client.GetAsync(Samples, cancellationToken);
+        using var created = await client.PostAsJsonAsync(Samples, new { name = "Anonymous" }, cancellationToken);
+
+        {{ status "listed" "Unauthorized" }}
+        {{ status "created" "Unauthorized" }}
+    }
+{{~ end ~}}
+{{~ if tenancy ~}}
+
+    {{ test_attribute }}
+    public async Task A_user_of_another_tenant_neither_reads_nor_lists_the_sample()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        using var developer = {{ client "developer" }};
+        using var otherTenant = {{ client "developer-b" }};
+        var name = $"Tenant A {Guid.CreateVersion7()}";
+        using var created = await developer.PostAsJsonAsync(Samples, new { name }, cancellationToken);
+        var id = await created.Content.ReadFromJsonAsync<Guid>(cancellationToken);
+
+        using var read = await otherTenant.GetAsync(created.Headers.Location, cancellationToken);
+        var page = await otherTenant.GetFromJsonAsync<SamplePage>(new Uri("/{{ module.name }}/samples?pageSize=100", UriKind.Relative), cancellationToken);
+
+        {{ status "read" "NotFound" }}
+        {{ `page!.Items` | should_not_contain `new Sample(id, name)` }};
+    }
+{{~ end ~}}
+
+    private sealed record Sample(Guid Id, string Name);
+
+    private sealed record SamplePage(IReadOnlyList<Sample> Items, int TotalCount, int Page, int PageSize);
+
+    private sealed record Problem(string Code);
+}

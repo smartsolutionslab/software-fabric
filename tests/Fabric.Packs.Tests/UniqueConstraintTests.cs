@@ -72,6 +72,8 @@ public sealed class UniqueConstraintTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
+        // The Note is mapped without a migration, so the module's sample goes (AGENTS.md, #734): the module has none.
+        project.DeleteSample("billing");
         project.Write("src/Modules/Billing/Billing.Domain/Note.cs", Note);
         project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/Configurations/NoteConfiguration.cs", NoteConfiguration);
         project.Write("src/Modules/Billing/Billing.Api/Notes.cs", NotesEndpoint);

@@ -1,0 +1,15 @@
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+
+/// <summary>
+/// The module's sample entity, emitted by fabric add-module: a record with a name that the sample's endpoints create,
+/// list and read back. Rename it after the module's first entity (<c>Invoice</c>) or delete it with everything named
+/// Sample (AGENTS.md).
+/// </summary>
+public sealed class Sample
+{
+    public const int MaxNameLength = 100;
+
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+}

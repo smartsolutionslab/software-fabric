@@ -1,5 +1,5 @@
 {{~ # The document the host serves for the generated endpoints; OpenApiDocumentTests keeps it current from then on. ~}}
-{{~ if project["backend.auth"] == "none" ~}}
+{{~ if project["backend.auth"] == "none" && slots["web.openapi-paths"] == "" ~}}
 {
   "openapi": "3.1.2",
   "info": {
@@ -7,6 +7,34 @@
     "version": "1.0.0"
   },
   "paths": {}
+}
+{{~ else if project["backend.auth"] == "none" ~}}
+{{~ # Without an identity provider the host has no paths of its own: only the modules' (their samples, #734). ~}}
+{
+  "openapi": "3.1.2",
+  "info": {
+    "title": "Host | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+{{ slots["web.openapi-paths"] }}
+  },
+  "components": {
+    "schemas": {
+{{~
+  schemas = []
+  for contributed in slots["web.openapi-schemas"] | string.split "\n\n"
+    schemas = schemas | array.add (contributed | string.rstrip)
+  end
+~}}
+{{ schemas | array.sort | array.join ",\n" }}
+    }
+  },
+  "tags": [
+    {
+      "name": "Host"
+    }
+  ]
 }
 {{~ else ~}}
 {

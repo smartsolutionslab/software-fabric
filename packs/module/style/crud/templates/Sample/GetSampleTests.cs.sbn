@@ -1,0 +1,43 @@
+using System.Net;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.Commands.CreateSample;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.Queries.GetSample;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Tests.Samples;
+
+public class GetSampleTests
+{
+    {{ test_attribute }}
+    public async Task A_created_sample_is_read_back_by_its_id()
+    {
+        var store = new InMemorySampleStore();
+        var created = await new CreateSampleHandler(store, store).HandleAsync(new CreateSample("Ada"), {{ test_cancellation_token }});
+
+        var sample = await new GetSampleHandler(store).HandleAsync(new GetSample(created.Value), {{ test_cancellation_token }});
+
+        {{ `sample.Value.Id` | should_be `created.Value` }};
+        {{ `sample.Value.Name` | should_be `"Ada"` }};
+    }
+
+    {{ test_attribute }}
+    public async Task An_unknown_id_and_the_empty_guid_are_not_found()
+    {
+        var handler = new GetSampleHandler(new InMemorySampleStore());
+
+        var unknown = await handler.HandleAsync(new GetSample(Guid.CreateVersion7()), {{ test_cancellation_token }});
+        var empty = await handler.HandleAsync(new GetSample(Guid.Empty), {{ test_cancellation_token }});
+
+        {{ `unknown.Error.Code` | should_be ('"' + module.name + '.sample-not-found"') }};
+        {{ `unknown.Error.Status` | should_be `HttpStatusCode.NotFound` }};
+        {{ `empty.Error.Code` | should_be ('"' + module.name + '.sample-not-found"') }};
+    }
+
+    {{ test_attribute }}
+    public void A_name_the_caller_got_wrong_is_a_bad_request_with_its_own_code()
+    {
+        var error = SampleFailures.InvalidName();
+
+        {{ `error.Code` | should_be ('"' + module.name + '.invalid-sample-name"') }};
+        {{ `error.Status` | should_be `HttpStatusCode.BadRequest` }};
+    }
+}

@@ -1,9 +1,12 @@
-{{~ if object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
 {{~
-  # The host maps modules in the order of their namespaces (ModuleDiscovery).
-  probes = []
+  authorization = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0
+  # The host maps modules in the order of their namespaces (ModuleDiscovery), and a module's endpoints in the order of
+  # their types' names (EndpointDiscovery): the permission probe's CanManageEndpoint before the sample's SampleEndpoints.
+  # Every module but those a pack brings (dashboards, assistant), which come with use cases of their own, has the sample (#734).
+  entries = []
   for chosen in modules | array.sort "namespace"
-    capture probe
+    if authorization
+      capture probe
 ~}}
     "/{{ chosen.name }}/permissions/manage": {
       "get": {
@@ -25,8 +28,115 @@
       }
     }
 {{~
+      end
+      entries = entries | array.add (probe | string.rstrip)
     end
-    probes = probes | array.add (probe | string.rstrip)
+    if chosen.name != "dashboards" && chosen.name != "assistant"
+      capture sample
+~}}
+    "/{{ chosen.name }}/samples": {
+      "post": {
+        "tags": [
+          "Host"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Create{{ chosen.namespace }}SampleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Host"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "maximum": 21474837,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOf{{ chosen.namespace }}SampleDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{{ chosen.name }}/samples/{id}": {
+      "get": {
+        "tags": [
+          "Host"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/{{ chosen.namespace }}SampleDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+{{~
+      end
+      entries = entries | array.add (sample | string.rstrip)
+    end
   end
 ~}}
-{{ probes | array.join ",\n" }}{{ end }}
+{{ entries | array.join ",\n" }}

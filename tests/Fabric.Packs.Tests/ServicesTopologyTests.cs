@@ -83,7 +83,9 @@ public sealed class ServicesTopologyTests
         project.AddModule("returns");
 
         var after = Snapshot(project.ProjectDirectory);
-        var changed = before.Where(file => file.Key != FabricFile.FileName && after[file.Key] != file.Value).Select(file => file.Key).ToList();
+        // add-module records the module in fabric.yaml and inserts its sample's endpoints into the frontend's copy of the
+        // OpenAPI document (#734); every other existing file stays as it was.
+        var changed = before.Where(file => file.Key != FabricFile.FileName && file.Key != "web/app/openapi.json" && after[file.Key] != file.Value).Select(file => file.Key).ToList();
         changed.ShouldBeEmpty();
         after.Keys.ShouldContain("src/Services/Returns/Host/Host.csproj");
 

@@ -1,0 +1,18 @@
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.Persistence.Configurations;
+
+public sealed class SampleConfiguration : IEntityTypeConfiguration<Sample>
+{
+    public void Configure(EntityTypeBuilder<Sample> builder)
+    {
+        {{ not_null "builder" }}
+
+        builder.ToTable("samples");
+        builder.HasKey(sample => sample.Id);
+        builder.Property(sample => sample.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(sample => sample.Name).HasColumnName("name").HasMaxLength(Sample.MaxNameLength).IsRequired();
+    }
+}

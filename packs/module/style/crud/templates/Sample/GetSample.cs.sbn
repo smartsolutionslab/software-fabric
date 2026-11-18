@@ -1,0 +1,7 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.DTOs;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.Queries.GetSample;
+
+/// <summary>One sample by its id; the empty Guid is no sample's.</summary>
+public sealed record GetSample(Guid Id) : IQuery<Result<{{ module.namespace }}SampleDto, ApiError>>;

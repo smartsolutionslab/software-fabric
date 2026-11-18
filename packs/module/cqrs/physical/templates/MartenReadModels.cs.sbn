@@ -13,6 +13,7 @@ end ~}}
 {{~ # Physical CQRS is built for event-sourced modules on Marten only (ADR-0006: fail loudly, never render nothing). ~}}
 {{ physical_cqrs_needs_an_event_sourced_module_on_marten }}
 {{~ end ~}}
+using System.Linq.Expressions;
 using Marten;
 
 namespace {{ namespace }}.BuildingBlocks.ReadModels;
@@ -41,5 +42,21 @@ public abstract class MartenReadModels(IDocumentStore store) : IReadModels
     {
         await using var session = store.QuerySession();
         return await session.Query<TReadModel>().ToListAsync(cancellationToken);
+    }
+
+    public async Task<PagedResult<TReadModel>> ListAsync<TReadModel, TKey>(Page page, PageSize pageSize, Expression<Func<TReadModel, TKey>> orderBy, CancellationToken cancellationToken)
+        where TReadModel : class
+    {
+        {{ not_null "page" }}
+        {{ not_null "pageSize" }}
+
+        await using var session = store.QuerySession();
+        var total = await session.Query<TReadModel>().CountAsync(cancellationToken);
+        var items = await session.Query<TReadModel>()
+            .OrderBy(orderBy)
+            .Skip(page.Skip(pageSize))
+            .Take(pageSize.Value)
+            .ToListAsync(cancellationToken);
+        return new PagedResult<TReadModel>(items, total, page.Value, pageSize.Value);
     }
 }

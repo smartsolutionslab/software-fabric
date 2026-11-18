@@ -1,0 +1,11 @@
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.ReadModels;
+
+/// <summary>
+/// A sample as its list and its page read it{{ if module.values["module.cqrs"] == "physical" }}: a Marten document its projection writes from the sample's events{{ else }}: a row of the samples' table, written right after the sample's events are stored{{ end }}.
+/// </summary>
+public sealed class SampleSummary
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+}

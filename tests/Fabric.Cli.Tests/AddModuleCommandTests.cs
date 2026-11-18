@@ -109,7 +109,7 @@ public sealed class AddModuleCommandTests : IDisposable
         var run = CliRun.Of("add-module", "billing", "--project", shop, "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
 
         run.ExitCode.ShouldBe(0, run.Error);
-        run.Output.ShouldContain("web/app/openapi.json: added /billing/permissions/manage and the schema PermissionDto.");
+        run.Output.ShouldContain("web/app/openapi.json: added /billing/permissions/manage, /billing/samples, /billing/samples/{id} and the schemas BillingSampleDto, CreateBillingSampleRequest, PagedResultOfBillingSampleDto, PermissionDto.");
         File.ReadAllText(Path.Combine(shop, "web", "app", "openapi.json")).ShouldContain("\"/billing/permissions/manage\"");
     }
 }

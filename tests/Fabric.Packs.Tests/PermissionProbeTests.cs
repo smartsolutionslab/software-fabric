@@ -306,9 +306,10 @@ public sealed partial class PermissionProbeTests
     {
         var addition = Add(Record("lean-crud", [Roles]), "billing");
 
+        // The probe before the module's sample (#734), as the host maps them.
         var openApi = addition.OpenApi.ShouldNotBeNull();
-        openApi.Paths.Select(path => path.Key).ShouldBe(["/billing/permissions/manage"]);
-        openApi.Schemas.Select(schema => schema.Key).ShouldBe(["PermissionDto"]);
+        openApi.Paths.Select(path => path.Key).ShouldBe(["/billing/permissions/manage", "/billing/samples", "/billing/samples/{id}"]);
+        openApi.Schemas.Select(schema => schema.Key).ShouldContain("PermissionDto");
         openApi.LaterModules.ShouldBeEmpty();
     }
 
@@ -318,15 +319,18 @@ public sealed partial class PermissionProbeTests
         var addition = Add(Record("saas-ai-react", [Roles]), "billing");
 
         var openApi = addition.OpenApi.ShouldNotBeNull();
-        openApi.Paths.Select(path => path.Key).ShouldBe(["/billing/permissions/manage"]);
-        openApi.Schemas.ShouldBeEmpty();
+        openApi.Paths.Select(path => path.Key).ShouldBe(["/billing/permissions/manage", "/billing/samples", "/billing/samples/{id}"]);
+        openApi.Schemas.Select(schema => schema.Key).ShouldNotContain("PermissionDto");
         openApi.LaterModules.ShouldBe(["/dashboards"]);
     }
 
     [Fact]
-    public void Add_module_adds_nothing_to_the_copy_without_authorization_choices()
+    public void Add_module_adds_no_probe_to_the_copy_without_authorization_choices_only_the_sample()
     {
-        Add(Record("saas-ai-react", []), "billing").OpenApi.ShouldBeNull();
+        var openApi = Add(Record("saas-ai-react", []), "billing").OpenApi.ShouldNotBeNull();
+
+        openApi.Paths.Select(path => path.Key).ShouldBe(["/billing/samples", "/billing/samples/{id}"]);
+        openApi.Schemas.Select(schema => schema.Key).ShouldNotContain("PermissionDto");
     }
 
     [Fact]
@@ -341,8 +345,10 @@ public sealed partial class PermissionProbeTests
             .ToList();
 
         paths.IndexOf("/billing/permissions/manage").ShouldBe(paths.IndexOf("/assistant/permissions/manage") + 1);
-        paths.IndexOf("/dashboards/permissions/manage").ShouldBe(paths.IndexOf("/billing/permissions/manage") + 1);
-        paths.Last().ShouldBe("/zeta/permissions/manage");
+        paths.IndexOf("/billing/samples").ShouldBe(paths.IndexOf("/billing/permissions/manage") + 1);
+        paths.IndexOf("/dashboards/permissions/manage").ShouldBe(paths.IndexOf("/billing/samples/{id}") + 1);
+        paths[^3].ShouldBe("/zeta/permissions/manage");
+        paths.Last().ShouldBe("/zeta/samples/{id}");
     }
 
     [Fact]

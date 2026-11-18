@@ -1,0 +1,17 @@
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.ReadModels;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples.Events;
+using Marten.Events.Aggregation;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.Projections;
+
+/// <summary>Writes a sample's read model from its events, inline: in the same save as the events.</summary>
+public sealed class SampleSummaryProjection : SingleStreamProjection<SampleSummary, Guid>
+{
+    public static SampleSummary Create(SampleCreated created)
+    {
+        {{ not_null "created" }}
+
+        return new SampleSummary { Id = created.Id{{ if strict }}.Value{{ end }}, Name = created.Name{{ if strict }}.Value{{ end }} };
+    }
+}

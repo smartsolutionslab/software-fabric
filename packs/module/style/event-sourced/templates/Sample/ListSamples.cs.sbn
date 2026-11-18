@@ -1,0 +1,7 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.DTOs;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.Queries.ListSamples;
+
+/// <summary>One page of the module's samples, by name.</summary>
+public sealed record ListSamples(Page Page, PageSize PageSize) : IQuery<Result<PagedResult<{{ module.namespace }}SampleDto>, ApiError>>;

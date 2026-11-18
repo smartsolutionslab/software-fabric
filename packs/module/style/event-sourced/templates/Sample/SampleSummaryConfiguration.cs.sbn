@@ -1,0 +1,20 @@
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.ReadModels;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Infrastructure.Persistence.Configurations;
+
+/// <summary>One row per sample, written after its events. The samples themselves are their event streams.</summary>
+public sealed class SampleSummaryConfiguration : IEntityTypeConfiguration<SampleSummary>
+{
+    public void Configure(EntityTypeBuilder<SampleSummary> builder)
+    {
+        {{ not_null "builder" }}
+
+        builder.ToTable("sample_summaries");
+        builder.HasKey(row => row.Id);
+        builder.Property(row => row.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(row => row.Name).HasColumnName("name").HasMaxLength(SampleName.MaxLength).IsRequired();
+    }
+}

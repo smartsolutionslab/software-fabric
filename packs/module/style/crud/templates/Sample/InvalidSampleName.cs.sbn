@@ -1,0 +1,7 @@
+using System.Net;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application;
+
+public sealed record InvalidSampleName()
+    : ApiError("{{ module.name }}.invalid-sample-name", $"A sample's name is 1 to {Sample.MaxNameLength} characters and not blank.", HttpStatusCode.BadRequest);

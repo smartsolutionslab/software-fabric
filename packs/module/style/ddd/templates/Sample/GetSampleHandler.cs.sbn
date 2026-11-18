@@ -1,0 +1,38 @@
+{{~ typed = project["backend.result-style"] == "typed-outcomes" ~}}
+{{~ option = project["backend.absence"] == "option" ~}}
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.DTOs;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Application.Queries.GetSample;
+
+public sealed class GetSampleHandler(ISampleStore samples)
+    : IQueryHandler<GetSample, Result<{{ module.namespace }}SampleDto, ApiError>>
+{
+    public async Task<Result<{{ module.namespace }}SampleDto, ApiError>> HandleAsync(GetSample query, CancellationToken cancellationToken)
+    {
+        {{ not_null "query" }}
+
+        if (query.Id == Guid.Empty)
+        {
+            return {{ if typed }}Failure(SampleFailures.NotFound(query.Id)){{ else }}Result<{{ module.namespace }}SampleDto, ApiError>.Failure(SampleFailures.NotFound(query.Id)){{ end }};
+        }
+
+{{~ if option ~}}
+        var sample = await samples.FindAsync(SampleId.From(query.Id), cancellationToken);
+        if (!sample.HasValue)
+        {
+            return {{ if typed }}Failure(SampleFailures.NotFound(query.Id)){{ else }}Result<{{ module.namespace }}SampleDto, ApiError>.Failure(SampleFailures.NotFound(query.Id)){{ end }};
+        }
+
+        return {{ if typed }}Success(sample.Value.ToDto()){{ else }}Result<{{ module.namespace }}SampleDto, ApiError>.Success(sample.Value.ToDto()){{ end }};
+{{~ else ~}}
+        if (await samples.FindAsync(SampleId.From(query.Id), cancellationToken) is not { } sample)
+        {
+            return {{ if typed }}Failure(SampleFailures.NotFound(query.Id)){{ else }}Result<{{ module.namespace }}SampleDto, ApiError>.Failure(SampleFailures.NotFound(query.Id)){{ end }};
+        }
+
+        return {{ if typed }}Success(sample.ToDto()){{ else }}Result<{{ module.namespace }}SampleDto, ApiError>.Success(sample.ToDto()){{ end }};
+{{~ end ~}}
+    }
+}

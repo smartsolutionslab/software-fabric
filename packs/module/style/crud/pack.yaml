@@ -2,6 +2,28 @@ option: module.style.crud
 files:
   # Per module: the rule checks only the modules that chose CRUD, so another module may choose another style.
   - { template: templates/EntitiesKnowNoPersistence.cs.sbn, target: "tests/Architecture.Tests/Rules/{{ module.namespace }}EntitiesKnowNoPersistence.cs", per-module: true }
+  # The module's sample (#734): a record to rename or delete, in every module but those a pack brings (dashboards, assistant), which come with use cases of their own.
+  - { template: templates/Sample/Sample.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Domain/Samples/Sample.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/ISampleStore.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/ISampleStore.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/SampleFailures.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/SampleFailures.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/InvalidSampleName.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/InvalidSampleName.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/SampleNotFound.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/SampleNotFound.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/CreateSample.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Commands/CreateSample/CreateSample.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/CreateSampleHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Commands/CreateSample/CreateSampleHandler.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/ListSamples.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/ListSamples/ListSamples.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/ListSamplesHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/ListSamples/ListSamplesHandler.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/GetSample.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/GetSample/GetSample.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/GetSampleHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/GetSample/GetSampleHandler.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/SampleDto.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/{{ module.namespace }}SampleDto.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/SampleMappings.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/DTOs/SampleMappings.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/SampleStore.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/SampleStore.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/SampleConfiguration.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/Configurations/SampleConfiguration.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/CreateSampleRequest.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/Create{{ module.namespace }}SampleRequest.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/SampleEndpoints.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/Endpoints/SampleEndpoints.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/InMemorySampleStore.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/InMemorySampleStore.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/CreateSampleTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/CreateSampleTests.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/ListSamplesTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/ListSamplesTests.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/GetSampleTests.cs.sbn, target: "tests/Modules/{{ module.namespace }}.Tests/Samples/GetSampleTests.cs", per-module: true, when: 'module.name != "dashboards" && module.name != "assistant"' }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

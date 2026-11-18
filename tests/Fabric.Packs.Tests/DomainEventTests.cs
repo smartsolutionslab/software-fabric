@@ -412,6 +412,8 @@ public sealed class DomainEventTests
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
+        // Only this test's own tests count below, without the module's sample's (#734).
+        project.DeleteSample("billing");
         project.WriteTypes("src/Modules/Billing/Billing.Domain/Invoices", Invoice);
         project.Write("src/Modules/Billing/Billing.Infrastructure/Persistence/Configurations/InvoiceConfiguration.cs", InvoiceConfiguration);
         project.WriteTypes("src/Modules/Billing/Billing.Application/Invoices", Reactions);

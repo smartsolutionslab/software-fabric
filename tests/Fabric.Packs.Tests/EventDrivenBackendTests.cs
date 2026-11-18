@@ -505,6 +505,8 @@ public sealed class EventDrivenBackendTests
         // beside physical ones is made by hand: ledger loses the read side only the physical pack renders per module.
         File.Delete(Path.Combine(project.ProjectDirectory, "src", "Modules", "Ledger", "Ledger.Application", "ILedgerReadModels.cs"));
         File.Delete(Path.Combine(project.ProjectDirectory, "src", "Modules", "Ledger", "Ledger.Infrastructure", "ReadModels", "LedgerReadModels.cs"));
+        // Its sample reads that read side, so it goes too, as AGENTS.md says to drop a module's sample (#734).
+        project.DeleteSample("ledger");
 
         project.Write("src/Modules/Ledger/Ledger.Application/Queries/GetEntry/EntryQuery.cs", """
             namespace Shop.Modules.Ledger.Application.Queries.GetEntry;

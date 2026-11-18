@@ -1,14 +1,14 @@
-{{~ if module.values["module.style"] == "event-sourced" ~}}
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
 using {{ namespace }}.BuildingBlocks.EventSourcing;
 
-{{~ end ~}}
 namespace {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
 
 /// <summary>
-/// The shape of an identifier in a strict module, emitted by fabric add-module: rename it after your aggregate
-/// (<c>InvoiceId</c>) or delete it. A new one is a time-ordered Guid v7; an empty Guid is never one.
+/// A sample's identity and the id of its event stream, emitted by fabric add-module with the rest of the sample: rename
+/// it after your aggregate (<c>InvoiceId</c>) or delete it (AGENTS.md). A new one is a time-ordered Guid v7; an empty
+/// Guid is never one.
 /// </summary>
-public sealed record SampleId : IValueObject<Guid>{{ if module.values["module.style"] == "event-sourced" }}, IAggregateId{{ end }}
+public sealed record SampleId : {{ if strict }}IValueObject<Guid>, {{ end }}IAggregateId
 {
     private SampleId(Guid value) => Value = value;
 

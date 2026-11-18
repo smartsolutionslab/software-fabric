@@ -24,15 +24,16 @@ public sealed class MigrationTests
     }
 
     /// <summary>
-    /// A module starts without migrations (fabric add-module makes none). EF Core 11 refuses to migrate a context
-    /// with no migrations by default (MigrationsNotFound); the runner still takes such a module as EF Core 10 did,
-    /// creating its history table and nothing else.
+    /// A module whose sample was deleted (AGENTS.md, #734) has no migrations until its first own one. EF Core 11 refuses
+    /// to migrate a context with no migrations by default (MigrationsNotFound); the runner still takes such a module as
+    /// EF Core 10 did, creating its history table and nothing else.
     /// </summary>
     [Fact]
     public void The_migration_runner_takes_a_module_with_no_migrations_yet_and_gives_it_its_history_table()
     {
         using var project = new GeneratedProject(Profile);
         project.AddModule("billing");
+        project.DeleteSample("billing");
         project.Build();
 
         using var postgres = Container.Postgres(DatabasePassword);

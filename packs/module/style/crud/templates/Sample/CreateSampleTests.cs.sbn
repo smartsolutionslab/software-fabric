@@ -1,0 +1,33 @@
+using {{ namespace }}.Modules.{{ module.namespace }}.Application.Commands.CreateSample;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Tests.Samples;
+
+public class CreateSampleTests
+{
+    {{ test_attribute }}
+    public async Task A_created_sample_is_stored_with_its_name_once_the_unit_of_work_commits_and_its_id_answered()
+    {
+        var store = new InMemorySampleStore();
+
+        var created = await new CreateSampleHandler(store, store).HandleAsync(new CreateSample("Ada"), {{ test_cancellation_token }});
+
+        var sample = {{ `store.Stored` | should_have_single_item }};
+        {{ `created.Value` | should_be `sample.Id` }};
+        {{ `sample.Name` | should_be `"Ada"` }};
+        {{ `created.Value.Version` | should_be `7` }};
+    }
+
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `""` }}
+    {{ test_case_attribute `"   "` }}
+    {{ test_case_attribute `"0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789x"` }}
+    public async Task A_blank_name_or_one_longer_than_the_maximum_is_refused_and_nothing_stored(string name)
+    {
+        var store = new InMemorySampleStore();
+
+        var created = await new CreateSampleHandler(store, store).HandleAsync(new CreateSample(name), {{ test_cancellation_token }});
+
+        {{ `created.Error.Code` | should_be ('"' + module.name + '.invalid-sample-name"') }};
+        {{ `store.Stored` | should_be_empty }};
+    }
+}

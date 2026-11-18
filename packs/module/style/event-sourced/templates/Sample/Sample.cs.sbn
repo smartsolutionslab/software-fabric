@@ -1,0 +1,42 @@
+{{~ strict = module.values["module.ddd-depth"] == "strict" ~}}
+using {{ namespace }}.BuildingBlocks.EventSourcing;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples.Events;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+
+/// <summary>
+/// The module's sample aggregate, emitted by fabric add-module: a record with a name, the sum of its events, that the
+/// sample's endpoints create, list and read back. Rename it after the module's first aggregate (<c>Invoice</c>) or
+/// delete it with everything named Sample (AGENTS.md).
+/// </summary>
+public sealed class Sample : EventSourcedAggregate<SampleId>
+{
+    // Only loading creates an empty sample, which its first event fills.
+    private Sample()
+    {
+    }
+
+    public SampleName Name { get; private set; } = null!;
+
+    /// <summary>A new sample: what happened is raised as <see cref="SampleCreated"/> and applied by <see cref="Apply"/>.</summary>
+    public static Sample Create(SampleId id, SampleName name)
+    {
+        {{ not_null "id" }}
+        {{ not_null "name" }}
+
+        var sample = new Sample();
+        sample.Raise(new SampleCreated({{ if strict }}id, name{{ else }}id.Value, name.Value{{ end }}));
+        return sample;
+    }
+
+    private void Apply(SampleCreated created)
+    {
+{{~ if strict ~}}
+        Id = created.Id;
+        Name = created.Name;
+{{~ else ~}}
+        Id = SampleId.From(created.Id);
+        Name = SampleName.From(created.Name);
+{{~ end ~}}
+    }
+}

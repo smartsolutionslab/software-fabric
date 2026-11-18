@@ -1,19 +1,24 @@
 namespace {{ namespace }}.Architecture.Tests.Rules;
 
-public sealed class DomainIsPure : IArchitectureRule
+/// <summary>Per module: the rule checks only the modules that chose ddd, so another module may choose another style.</summary>
+public sealed class {{ module.namespace }}DomainIsPure : IArchitectureRule
 {
-    public string Description => "A module's Domain project references nothing but the BCL, Kernel and BuildingBlocks.Domain.";
+    private const string Domain = "{{ namespace }}.Modules.{{ module.namespace }}.Domain";
+
+    public string Description => "The {{ module.namespace }} module is domain-driven: its Domain project references nothing but the BCL, Kernel and BuildingBlocks.Domain.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
         {{ not_null "model" }}
 
-        foreach (var assembly in model.ModuleAssemblies.Where(assembly => assembly.GetName().Name!.EndsWith(".Domain", StringComparison.Ordinal)))
+        foreach (var reference in model.ModuleAssemblies
+            .Where(assembly => assembly.GetName().Name == Domain)
+            .SelectMany(assembly => assembly.GetReferencedAssemblies())
+            .Select(reference => reference.Name!)
+            .Where(name => !IsAllowed(name))
+            .Order(StringComparer.Ordinal))
         {
-            foreach (var reference in assembly.GetReferencedAssemblies().Select(reference => reference.Name!).Where(name => !IsAllowed(name)))
-            {
-                yield return $"{assembly.GetName().Name} references {reference}.";
-            }
+            yield return $"{Domain} references {reference}.";
         }
     }
 

@@ -1,0 +1,19 @@
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples;
+using {{ namespace }}.Modules.{{ module.namespace }}.Domain.Samples.Events;
+
+namespace {{ namespace }}.Modules.{{ module.namespace }}.Tests.Samples;
+
+public class SampleTests
+{
+    {{ test_attribute }}
+    public void A_new_sample_has_its_id_and_name_and_raises_that_it_was_created()
+    {
+        var id = SampleId.New();
+
+        var sample = Sample.Create(id, SampleName.From("Ada"));
+
+        {{ `sample.Id` | should_be `id` }};
+        {{ `sample.Name` | should_be `SampleName.From("Ada")` }};
+        {{ `sample.DomainEvents` | should_have_single_item | should_be `new SampleCreated(id, SampleName.From("Ada"))` }};
+    }
+}
