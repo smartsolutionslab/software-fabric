@@ -1,24 +1,20 @@
-using Shop.BuildingBlocks.Messaging;
+using System.Collections.Concurrent;
 using Shop.Contracts.Billing;
-using Shop.Modules.Shipping.Application.Commands.CreateSample;
-using Shop.Modules.Shipping.Domain.Samples;
 
 namespace Shop.Modules.Shipping.Application;
 
 /// <summary>
-/// Consumes the billing service's <see cref="InvoicePaidV1"/> on the shipping service's own queue and records it as a
-/// sample in the shipping service's database. A redelivered message is dropped by the durable inbox, by its envelope id.
+/// Consumes the billing service's <see cref="InvoicePaidV1"/> on the shipping service's own queue and keeps the invoices
+/// it received, which the services' end-to-end test reads back.
 /// </summary>
-public sealed class InvoicePaidConsumer(IDispatcher dispatcher)
+public static class InvoicePaidConsumer
 {
-    public async Task HandleAsync(InvoicePaidV1 message, CancellationToken cancellationToken)
+    public static ConcurrentQueue<Guid> Received { get; } = new();
+
+    public static void Handle(InvoicePaidV1 message)
     {
         Ensure.That(message).IsNotNull();
 
-        var recorded = await dispatcher.SendAsync(new CreateSample(SampleName.From($"Invoice {message.InvoiceId} paid")), cancellationToken);
-        if (recorded.IsFailure)
-        {
-            throw new InvalidOperationException($"Invoice {message.InvoiceId} was not recorded: {recorded.Error.Message}");
-        }
+        Received.Enqueue(message.InvoiceId);
     }
 }
