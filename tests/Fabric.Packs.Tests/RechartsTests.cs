@@ -82,7 +82,7 @@ public sealed partial class RechartsTests
         files["web/app/eslint.config.js"].ShouldContain("message: 'Use Chart from src/components/chart (docs/adr).',");
         files["web/app/eslint.config.js"].ShouldNotContain("'recharts'");
         files["web/app/src/components/chart.tsx"].ShouldContain("import { ResponsiveContainer } from 'recharts';");
-        files["web/app/src/components/chart.tsx"].ShouldContain("<div role=\"img\" aria-label={label}>");
+        files["web/app/src/components/chart.tsx"].ShouldContain("<div role=\"img\" aria-label={label} className={themed}>");
         files["web/app/src/components/chart.tsx"].ShouldContain("<ResponsiveContainer width=\"100%\" height={height}>");
         files["web/app/src/components/chart-colors.ts"].ShouldContain("export function chartColor(position: number): string {");
         files["AGENTS.md"].ShouldContain("## Charts: Recharts");
