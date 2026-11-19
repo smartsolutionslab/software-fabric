@@ -1,4 +1,5 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Inbox } from 'lucide-react';
 import { afterEach, expect, test } from 'vitest';
 import { axe } from 'vitest-axe';
@@ -46,19 +47,41 @@ const themes = [
   },
 ];
 
+const firstOfMany = { page: 1, pageSize: 25, totalCount: 312 };
+
 const states = [
   { state: 'while it loads', table: () => <DataTable columns={columns} data={none} loading empty={empty} /> },
   { state: 'when it is empty', table: () => <DataTable columns={columns} data={none} empty={empty} /> },
   { state: 'with rows', table: () => <DataTable columns={columns} data={data} empty={empty} /> },
+  {
+    state: 'with row actions, its page and the columns control open',
+    table: () => (
+      <DataTable
+        columns={columns}
+        data={data}
+        empty={empty}
+        actions={(person) => <button type="button">Edit {person.name}</button>}
+        paging={firstOfMany}
+      />
+    ),
+    open: true,
+  },
 ];
 
 // Whichever test renders first in a file also pays for warming up jsdom, React and axe.
-test.each(states.flatMap(({ state, table }) => themes.map(({ name, switchOn }) => ({ state, table, name, switchOn }))))(
+test.each(
+  states.flatMap(({ state, table, open = false }) =>
+    themes.map(({ name, switchOn }) => ({ state, table, open, name, switchOn })),
+  ),
+)(
   'the table has no accessibility violations axe can find $state in the $name theme',
   { timeout: 20_000 },
-  async ({ table, switchOn }) => {
+  async ({ table, open, switchOn }) => {
     switchOn();
     const { container } = render(table());
+    if (open) {
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    }
 
     expect(await axe(container)).toHaveNoViolations();
   },
