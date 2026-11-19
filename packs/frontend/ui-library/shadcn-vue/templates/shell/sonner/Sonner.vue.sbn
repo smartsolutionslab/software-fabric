@@ -36,7 +36,7 @@ const props = defineProps<ToasterProps>();
     </template>
     <template v-slot:loading-icon>
       <div>
-        <Loader2Icon class="size-4 animate-spin" />
+        <Loader2Icon class="size-4 motion-safe:animate-spin" />
       </div>
     </template>
     <template v-slot:close-icon>

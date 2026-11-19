@@ -1,4 +1,4 @@
 import type { ReactNode } from 'react';
-import { BrowserRouter } from 'react-router';
+import { AppRouter } from './AppRouter';
 
-export const withRouter = (children: ReactNode) => <BrowserRouter>{children}</BrowserRouter>;
+export const withRouter = (children: ReactNode) => <AppRouter app={children} />;

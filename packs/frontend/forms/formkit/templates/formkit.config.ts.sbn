@@ -58,10 +58,10 @@ const sections: Record<string, string> = {
  */
 {{~ if project["frontend.design-system"] == "tokens" ~}}
 const field =
-  'w-full rounded-md border border-border bg-surface px-3 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm group-data-[errors=true]:border-destructive group-data-[errors=true]:ring-destructive/20';
+  'w-full rounded-md border border-border bg-surface px-3 text-base shadow-xs motion-safe:transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm group-data-[errors=true]:border-destructive group-data-[errors=true]:ring-destructive/20';
 {{~ else ~}}
 const field =
-  'w-full rounded-md border border-slate-300 bg-white px-3 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-slate-500 focus-visible:border-slate-400 focus-visible:ring-[3px] focus-visible:ring-slate-400/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm group-data-[errors=true]:border-red-600 group-data-[errors=true]:ring-red-600/20';
+  'w-full rounded-md border border-slate-300 bg-white px-3 text-base shadow-xs motion-safe:transition-[color,box-shadow] outline-none placeholder:text-slate-500 focus-visible:border-slate-400 focus-visible:ring-[3px] focus-visible:ring-slate-400/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm group-data-[errors=true]:border-red-600 group-data-[errors=true]:ring-red-600/20';
 {{~ end ~}}
 
 /** The classes of each FormKit section; FormKit's own formkit-* classes and themes are not used. */
@@ -80,7 +80,7 @@ const sections: Record<string, string> = {
  * FormKit marks the outer section of an input with errors data-errors, which the outer section's group passes on.
  */
 const field =
-  'w-full rounded-md border border-input bg-transparent px-3 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 group-data-[errors=true]:border-destructive group-data-[errors=true]:ring-destructive/20 dark:group-data-[errors=true]:ring-destructive/40';
+  'w-full rounded-md border border-input bg-transparent px-3 text-base shadow-xs motion-safe:transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30 group-data-[errors=true]:border-destructive group-data-[errors=true]:ring-destructive/20 dark:group-data-[errors=true]:ring-destructive/40';
 
 /** The classes of each FormKit section, as shadcn-vue has them; FormKit's own formkit-* classes and themes are not used. */
 const sections: Record<string, string> = {
