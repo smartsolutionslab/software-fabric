@@ -1,6 +1,14 @@
 import { expect, test } from '@playwright/test';
 
-test('a server event{{ if project["backend.topology"] == "services" }} from the {{ module.name }} service{{ end }} reaches the {{ if project["backend.auth"] == "none" }}browser{{ else }}signed-in browser{{ end }} over its own connection', async ({ page }) => {
+{{~ if project["backend.topology"] == "services" ~}}
+// Template literals, because Prettier never wraps one: however long the module's name, these lines stay as they are.
+const title = `a server event from the {{ module.name }} service reaches the {{ if project["backend.auth"] == "none" }}browser{{ else }}signed-in browser{{ end }} over its own connection`;
+const testEndpoint = `/api/{{ module.name }}/server-events/test`;
+
+test(title, async ({ page }) => {
+{{~ else ~}}
+test('a server event reaches the {{ if project["backend.auth"] == "none" }}browser{{ else }}signed-in browser{{ end }} over its own connection', async ({ page }) => {
+{{~ end ~}}
   const frames: string[] = [];
   page.on('websocket', (socket) => {
     if (socket.url().includes('/api/hubs/events')) {
@@ -25,7 +33,7 @@ test('a server event{{ if project["backend.topology"] == "services" }} from the 
   // The browser joins its group just after it connects, so the event is sent until it arrives.
   const text = `hello from the host ${Date.now()}`;
   await expect(async () => {
-    const sent = await page.request.post('/api/{{ if project["backend.topology"] == "services" }}{{ module.name }}/server-events{{ else }}hubs/events{{ end }}/test', { headers, data: { text } });
+    const sent = await page.request.post({{ if project["backend.topology"] == "services" }}testEndpoint{{ else }}'/api/hubs/events/test'{{ end }}, { headers, data: { text } });
     expect(sent.status()).toBe(204);
     expect(frames.some((frame) => frame.includes(text))).toBe(true);
   }).toPass({ timeout: 30_000 });

@@ -109,8 +109,46 @@ public sealed partial class ServicesServerEventsTests
         integration.ShouldNotContain("new Uri(\"/server-events/test\"");
 
         files.Keys.ShouldNotContain("web/app/e2e/server-events.spec.ts");
-        files["web/app/e2e/billing-server-events.spec.ts"].ShouldContain("'/api/billing/server-events/test'");
-        files["web/app/e2e/order-items-server-events.spec.ts"].ShouldContain("'/api/order-items/server-events/test'");
+        files["web/app/e2e/billing-server-events.spec.ts"].ShouldContain("`/api/billing/server-events/test`");
+        files["web/app/e2e/order-items-server-events.spec.ts"].ShouldContain("`/api/order-items/server-events/test`");
+    }
+
+    /// <summary>
+    /// With services the spec's title names the module, so a long name took the <c>test(...)</c> line past the
+    /// printWidth of 120 and <c>pnpm format:check</c> failed (#814). Both auth branches: they word the title differently.
+    /// The longest name also takes the test endpoint's URL past 120.
+    /// </summary>
+    [Theory]
+    [InlineData("signalr", "keycloak")]
+    [InlineData("signalr", "none")]
+    [InlineData("sse", "keycloak")]
+    [InlineData("sse", "none")]
+    public void With_services_every_services_end_to_end_spec_passes_the_format_check(string realtime, string auth)
+    {
+        using var project = new GeneratedProject(Profile, [.. Services(realtime), $"backend.auth={auth}"]);
+        foreach (var module in new[] { "billing", "dashboards", "assistant", "warehouse-notifications" })
+        {
+            project.AddModule(module);
+        }
+
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, install) = Shell.Run(web, "pnpm", "install");
+        installExitCode.ShouldBe(0, install);
+
+        var specs = Directory.GetFiles(Path.Combine(web, "app", "e2e"), "*-server-events.spec.ts")
+            .Select(path => "e2e/" + Path.GetFileName(path))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        specs.ShouldBe(
+        [
+            "e2e/assistant-server-events.spec.ts",
+            "e2e/billing-server-events.spec.ts",
+            "e2e/dashboards-server-events.spec.ts",
+            "e2e/warehouse-notifications-server-events.spec.ts",
+        ]);
+
+        var (exitCode, output) = Shell.Run(Path.Combine(web, "app"), "pnpm", ["exec", "prettier", "--check", .. specs]);
+        exitCode.ShouldBe(0, output);
     }
 
     [Theory]
