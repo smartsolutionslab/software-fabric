@@ -1,3 +1,4 @@
+{{~ edge = project["backend.topology"] == "services" && object.has_key(project, "frontend.agent-ui") && project["frontend.agent-ui"] == "ag-ui" ~}}
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.IdentityModel.Tokens;
 
@@ -19,7 +20,7 @@ public static class StandInEndpoints
     {
         ["response_types_supported"] = ["code"],
         ["response_modes_supported"] = ["query"],
-        ["grant_types_supported"] = ["authorization_code", "password"],
+        ["grant_types_supported"] = ["authorization_code", "password"{{ if edge }}, "client_credentials"{{ end }}],
         ["subject_types_supported"] = ["pairwise"],
         ["id_token_signing_alg_values_supported"] = [SecurityAlgorithms.RsaSha256],
         ["code_challenge_methods_supported"] = ["S256"],
@@ -95,11 +96,19 @@ public static class StandInEndpoints
         return Results.Redirect(QueryHelpers.AddQueryString(redirectUri, answer));
     }
 
+{{~ if edge ~}}
+    private static async Task<IResult> TokenAsync(string directory, HttpRequest request, StandInSettings settings, AuthorizationCodes codes, TokenIssuer issuer, CancellationToken cancellationToken)
+    {
+        var form = await request.ReadFormAsync(cancellationToken);
+        if (form["client_id"] != settings.Client && form["grant_type"] != "client_credentials")
+        {
+{{~ else ~}}
     private static async Task<IResult> TokenAsync(HttpRequest request, StandInSettings settings, AuthorizationCodes codes, TokenIssuer issuer, CancellationToken cancellationToken)
     {
         var form = await request.ReadFormAsync(cancellationToken);
         if (form["client_id"] != settings.Client)
         {
+{{~ end ~}}
             return Error("invalid_client");
         }
 
@@ -126,6 +135,27 @@ public static class StandInEndpoints
                 }
 
                 return Results.Json(issuer.Issue(authority, sign.User, TokenLifetime, sign.Nonce));
+{{~ if edge ~}}
+            case "client_credentials":
+                // An application signing in as itself, as the edge does to read the services' agents, from one directory.
+                var application = form["client_id"].ToString();
+                if (!settings.Applications.TryGetValue(application, out var secret) || !string.Equals(secret, form["client_secret"], StringComparison.Ordinal))
+                {
+                    return Error("invalid_client");
+                }
+
+                if (!settings.Directories.Values.Contains(directory, StringComparer.OrdinalIgnoreCase))
+                {
+                    return Error("invalid_request");
+                }
+
+                return Results.Json(new Dictionary<string, object>(StringComparer.Ordinal)
+                {
+                    ["access_token"] = issuer.IssueForApplication(authority, directory, application, TokenLifetime),
+                    ["token_type"] = "Bearer",
+                    ["expires_in"] = (int)TokenLifetime.TotalSeconds,
+                });
+{{~ end ~}}
             default:
                 return Error("unsupported_grant_type");
         }

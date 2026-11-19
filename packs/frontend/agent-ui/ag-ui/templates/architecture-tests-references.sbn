@@ -1,0 +1,1 @@
+{{ if project["backend.topology"] == "services" }}    <ProjectReference Include="../../src/Edge/Edge.csproj" Aliases="Edge" />{{ end }}

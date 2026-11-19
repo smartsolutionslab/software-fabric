@@ -1,0 +1,50 @@
+using System.Net.Http.Headers;
+using System.Text.Json.Serialization;
+
+namespace {{ namespace }}.Edge.Agents;
+
+/// <summary>
+/// The edge's own access token, set on every request of the client it is added to: minted with the client-credentials
+/// grant at EdgeClient:TokenEndpoint, as the client EdgeClient:ClientId with its secret EdgeClient:ClientSecret, for the
+/// scope EdgeClient:Scope where the identity provider needs one. The AppHost provides them in development; a deployment
+/// sets them for the client it registers for the edge (docs/adr).
+/// </summary>
+public sealed class EdgeClientToken(IHttpClientFactory clients, IConfiguration configuration) : DelegatingHandler
+{
+    /// <summary>The HttpClient the token is minted with.</summary>
+    public const string TokenClient = "edge-client-token";
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        {{ not_null "request" }}
+
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await MintAsync(cancellationToken));
+        return await base.SendAsync(request, cancellationToken);
+    }
+
+    private async Task<string> MintAsync(CancellationToken cancellationToken)
+    {
+        Dictionary<string, string> form = new(StringComparer.Ordinal)
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = Setting("EdgeClient:ClientId"),
+            ["client_secret"] = Setting("EdgeClient:ClientSecret"),
+        };
+        if (configuration["EdgeClient:Scope"] is { Length: > 0 } scope)
+        {
+            form["scope"] = scope;
+        }
+
+        using var client = clients.CreateClient(TokenClient);
+        using var content = new FormUrlEncodedContent(form);
+        using var response = await client.PostAsync(new Uri(Setting("EdgeClient:TokenEndpoint")), content, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var token = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken);
+        return token?.AccessToken ?? throw new InvalidOperationException("The identity provider answered the edge's client-credentials grant without a token.");
+    }
+
+    private string Setting(string key) =>
+        configuration[key] ?? throw new InvalidOperationException($"{key} is missing; the AppHost provides it in development.");
+
+    private sealed record TokenResponse([property: JsonPropertyName("access_token")] string AccessToken);
+}

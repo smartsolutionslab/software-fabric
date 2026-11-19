@@ -12,6 +12,14 @@ files:
   - { template: templates/Host/AgentRuns.cs.sbn, target: src/Host/Agents/AgentRuns.cs }
   - { template: templates/Host/AgentEvents.cs.sbn, target: src/Host/Agents/AgentEvents.cs }
   - { template: templates/Host/StandInChatClient.cs.sbn, target: src/Host/Agents/StandInChatClient.cs }
+  # With services the owning service speaks AG-UI under its module, and the edge forwards POST /agents/{name} to it by a
+  # table it reads from the services at startup; every service host compiles src/Host, so none of this goes there, and
+  # the edge never speaks AG-UI (ADR-0013 and ADR-0017, amended).
+  - { template: templates/Edge/AgentRouteTable.cs.sbn, target: src/Edge/Agents/AgentRouteTable.cs, when: 'project["backend.topology"] == "services"' }
+  - { template: templates/Edge/AgentRoutes.cs.sbn, target: src/Edge/Agents/AgentRoutes.cs, when: 'project["backend.topology"] == "services"' }
+  - { template: templates/Edge/EdgeClientToken.cs.sbn, target: src/Edge/Agents/EdgeClientToken.cs, when: 'project["backend.topology"] == "services" && project["backend.auth"] != "none"' }
+  - { template: templates/Edge/AgentRoutesRegistration.cs.sbn, target: src/Edge/Wiring/AgentRoutesRegistration.cs, when: 'project["backend.topology"] == "services"' }
+  - { template: templates/Edge/AgentRouteEndpoints.cs.sbn, target: src/Edge/Wiring/AgentRouteEndpoints.cs, when: 'project["backend.topology"] == "services"' }
   - { template: templates/Module/AssistantAgent.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Agents/AssistantAgent.cs", per-module: true, when: 'module.name == "assistant"' }
   - { template: templates/Module/TalkToTheAssistant.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/TalkToTheAssistant/TalkToTheAssistant.cs", per-module: true, when: 'module.name == "assistant"' }
   - { template: templates/Module/TalkToTheAssistantHandler.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Application/Queries/TalkToTheAssistant/TalkToTheAssistantHandler.cs", per-module: true, when: 'module.name == "assistant"' }
@@ -44,6 +52,13 @@ slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 40 }
   - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 40 }
   - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 60 }
+  # edge.* is declared only by the services topology, and apphost.edge-wiring renders only with it: the edge's table of
+  # agents and its client-credentials client, whose token mint and settings each identity provider's pack supplies
+  # (edge_client_resources, edge_client_wiring).
+  - { slot: edge.services, template: templates/edge-services.sbn, order: 40, optional: true }
+  - { slot: edge.endpoints, template: templates/edge-endpoints.sbn, order: 40, optional: true }
+  - { slot: apphost.edge-wiring, template: templates/apphost-edge-wiring.sbn, order: 40 }
+  - { slot: tests.architecture.references, template: templates/architecture-tests-references.sbn }
   - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 40 }
   - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 40 }
   - { slot: integration-tests.parameters, template: templates/integration-tests-parameters.sbn, optional: true }
@@ -61,8 +76,8 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: architecture-test, describes: "Only the host speaks AG-UI, and it runs no agent: a module or the BuildingBlocks referencing the AG-UI SDK (AGUI.*), the host referencing Agent Framework (Microsoft.Agents.AI*), or anything referencing Agent Framework's AG-UI hosting fails the build naming the assembly.", file: templates/tests/AgentUiGoesThroughAQuery.cs.sbn }
-  - { kind: end-to-end-test, describes: "Through Aspire, POST /agents/assistant streams the assistant's answer in more than one TEXT_MESSAGE_CONTENT event after a count_words tool call whose query ran through the dispatcher, and a second turn calls the tool again for its own message and streams its answer in more than one chunk too; an anonymous caller is refused unless backend.auth is none; an unknown agent is not found.", file: templates/tests/AgentUiTests.cs.sbn }
+  - { kind: architecture-test, describes: "Only the host speaks AG-UI, and it runs no agent: a module or the BuildingBlocks referencing the AG-UI SDK (AGUI.*), the host (with services, any service host, or the edge) referencing Agent Framework (Microsoft.Agents.AI*), anything referencing Agent Framework's AG-UI hosting, or with services an edge that registers the modules' agents fails the build naming the assembly.", file: templates/tests/AgentUiGoesThroughAQuery.cs.sbn }
+  - { kind: end-to-end-test, describes: "Through Aspire (with services, through the edge to the assistant's service), POST /agents/assistant streams the assistant's answer in more than one TEXT_MESSAGE_CONTENT event after a count_words tool call whose query ran through the dispatcher, and a second turn calls the tool again for its own message and streams its answer in more than one chunk too; an anonymous caller is refused unless backend.auth is none; an unknown agent is not found.", file: templates/tests/AgentUiTests.cs.sbn }
   - { kind: unit-test, describes: "The assistant's query, run through the dispatcher with a stand-in model that asks for a tool call, streams the call, its result and the answer built from it (tests/Modules/Assistant.Tests).", file: templates/tests/TalkToTheAssistantTests.cs.sbn }
   - { kind: lint-rule, describes: "Importing CopilotKit (@copilotkit/*) in the web app fails lint: the panel talks to the agents on @ag-ui/client.", file: templates/web-restricted.sbn }
   - { kind: lint-rule, describes: "Outside src/api/baseApi.ts, src/agents/connectAgent.ts, with frontend.realtime sse the realtime stream's src/realtime/connection.ts, and tests, the web app's lint bans the names a call to the host is made with: fetch, XMLHttpRequest, Headers or EventSource, bare or as a member of window, globalThis or self, and HttpAgent, imported or as a member of anything; with Vue, in a component's template too. It bans names, not call shapes, and no rule looks at the Authorization header.", file: templates/web-lint-config.sbn }
