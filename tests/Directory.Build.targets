@@ -1,0 +1,8 @@
+<Project>
+  <!-- build/test-shard.sh runs a shard's test assemblies in one dotnet test with TestShard set. Each names its xUnit
+       report after itself and the shard: the runner's own name is the instant it writes the report, which two
+       assemblies finishing together can share, and then one report overwrites the other (#795). -->
+  <PropertyGroup Condition=" '$(TestShard)' != '' ">
+    <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --report-xunit-xml-filename $(AssemblyName)-shard-$(TestShard).xunit.xml</TestingPlatformCommandLineArguments>
+  </PropertyGroup>
+</Project>
