@@ -1,5 +1,6 @@
 import { Inbox } from '@lucide/vue';
-import { render } from '@testing-library/vue';
+import { render, screen } from '@testing-library/vue';
+import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test } from 'vitest';
 import { axe } from 'vitest-axe';
 import { h } from 'vue';
@@ -50,16 +51,29 @@ const states = [
   { state: 'while it loads', props: { columns, data: none, loading: true } },
   { state: 'when it is empty', props: { columns, data: none } },
   { state: 'with rows', props: { columns, data } },
+  {
+    state: 'with actions, a page and columns open',
+    props: { columns, data, paging: { page: 1, pageSize: 25, totalCount: 312 } },
+    open: true,
+  },
 ];
+const actions = ({ row }: { row: Person }) => h('button', { type: 'button' }, `Edit ${row.name}`);
 
 // Whichever test renders first in a file also pays for warming up jsdom, Vue and axe.
-test.each(states.flatMap(({ state, props }) => themes.map(({ name, switchOn }) => ({ state, props, name, switchOn }))))(
+test.each(
+  states.flatMap(({ state, props, open = false }) =>
+    themes.map(({ name, switchOn }) => ({ state, props, open, name, switchOn })),
+  ),
+)(
   'the table has no accessibility violations axe can find $state in the $name theme',
   { timeout: 20_000 },
-  async ({ props, switchOn }) => {
+  async ({ props, open, switchOn }) => {
     switchOn();
     // A generic component is rendered for one row type, as a template does it from its props.
-    const { container } = render(DataTable<Person>, { props, slots: { empty } });
+    const { container } = render(DataTable<Person>, { props, slots: open ? { empty, actions } : { empty } });
+    if (open) {
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    }
 
     expect(await axe(container)).toHaveNoViolations();
   },

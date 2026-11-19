@@ -39,10 +39,10 @@ api.enhanceEndpoints({
   },
 });
 
-/** The module's samples, a page at a time: undefined until the host answers. */
+/** The module's samples, a page at a time, and the page they are of: undefined until the host answers. */
 export function use{{ ns }}Samples() {
   const { data, isLoading, isError } = useGet{{ ns }}SamplesQuery(samplesPage);
-  return { samples: data?.items, isLoading, isError };
+  return { samples: data?.items, page: data, isLoading, isError };
 }
 
 /** Creates a sample; resolves to whether the host created it. */

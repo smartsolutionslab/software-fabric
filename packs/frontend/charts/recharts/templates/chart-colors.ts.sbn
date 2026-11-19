@@ -1,3 +1,10 @@
+{{~ if object.has_key(project, "frontend.ui-library") && project["frontend.ui-library"] == "shadcn" ~}}
+/**
+ * One palette for every chart in the project: the theme's --chart-1…5 (src/index.css), which SVG fills take as they
+ * are, so a chart follows dark mode with the rest of the page (docs/adr).
+ */
+const palette = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)'] as const;
+{{~ else ~}}
 /** One palette for every chart in the project: Recharts brings none of its own (docs/adr). */
 const palette = [
   '#5470c6',
@@ -10,6 +17,7 @@ const palette = [
   '#9a60b4',
   '#ea7ccc',
 ] as const;
+{{~ end ~}}
 
 /** The colour of a chart's series, or of a pie's slice, at a position; after the last colour the palette starts again. */
 export function chartColor(position: number): string {

@@ -99,7 +99,11 @@ const none: {{ ns }}SampleDto[] = [];
 const skeletonRows = ['first', 'second', 'third'];
 {{~ end ~}}
 
+{{~ if table ~}}
+const { samples: rows, page, isLoading, isError } = use{{ ns }}Samples();
+{{~ else ~}}
 const { samples: rows, isLoading, isError } = use{{ ns }}Samples();
+{{~ end ~}}
 const { create, isSaving } = useCreate{{ ns }}Sample();
 {{~ if probe ~}}
 const permission = useCanManage();
@@ -129,7 +133,7 @@ async function onCreate(name: string) {
       <Create{{ ns }}SampleForm ref="form" :on-create="onCreate" :saving="isSaving" />
       <p v-if="isError" role="alert">The samples could not be loaded.</p>
 {{~ if table ~}}
-      <DataTable v-else :columns="columns" :data="rows ?? none" :loading="isLoading">
+      <DataTable v-else :columns="columns" :data="rows ?? none" :loading="isLoading" :paging="page">
         <template #empty>
           <EmptyState>
             <template #icon><Inbox /></template>

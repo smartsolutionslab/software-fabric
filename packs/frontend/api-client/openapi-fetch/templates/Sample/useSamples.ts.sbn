@@ -25,13 +25,13 @@ function withPending(page: SamplesPage, name: string): SamplesPage {
   return { ...page, items, totalCount: Number(page.totalCount) + 1 };
 }
 
-/** The module's samples, a page at a time: undefined until the host answers. */
+/** The module's samples, a page at a time, and the page they are of: undefined until the host answers. */
 export function use{{ ns }}Samples() {
   const { data, isLoading, isError } = useQuery({
     queryKey: samplesKey,
     queryFn: async () => (await api.GET('/{{ module.name }}/samples', { params: { query: samplesPage } })).data,
   });
-  return { samples: data?.items, isLoading, isError };
+  return { samples: data?.items, page: data, isLoading, isError };
 }
 
 /**
@@ -138,6 +138,7 @@ export function use{{ ns }}Samples() {
   onMounted(() => void store.load());
   return {
     samples: computed(() => store.page?.items),
+    page: computed(() => store.page),
     isLoading: computed(() => store.page === undefined && !store.failed),
     isError: computed(() => store.failed),
   };
@@ -175,13 +176,13 @@ function withPending(page: SamplesPage, name: string): SamplesPage {
   return { ...page, items, totalCount: Number(page.totalCount) + 1 };
 }
 
-/** The module's samples, a page at a time: undefined until the host answers. */
+/** The module's samples, a page at a time, and the page they are of: undefined until the host answers. */
 export function use{{ ns }}Samples() {
   const { data, isLoading, isError } = useQuery({
     queryKey: samplesKey,
     queryFn: async () => (await api.GET('/{{ module.name }}/samples', { params: { query: samplesPage } })).data,
   });
-  return { samples: computed(() => data.value?.items), isLoading, isError };
+  return { samples: computed(() => data.value?.items), page: data, isLoading, isError };
 }
 
 /**

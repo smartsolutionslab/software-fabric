@@ -1,0 +1,97 @@
+import { render, screen } from '@testing-library/vue';
+import type { ChartConfiguration } from 'chart.js';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { defineComponent, h } from 'vue';
+import DataChart from './DataChart.vue';
+
+// The test reads the data and options the chart is drawn with, as Chart.js is given them.
+const drawn = vi.hoisted(() => ({ props: undefined as { data?: unknown; options?: unknown } | undefined }));
+vi.mock('vue-chartjs', () => ({
+  Chart: defineComponent({
+    props: { type: String, data: Object, options: Object },
+    setup(props, { attrs }) {
+      drawn.props = props;
+      return () => h('canvas', attrs);
+    },
+  }),
+}));
+
+const palettes = `
+:root {
+  --chart-1: rgb(1, 1, 1);
+  --chart-2: rgb(2, 2, 2);
+  --chart-3: rgb(3, 3, 3);
+  --chart-4: rgb(4, 4, 4);
+  --chart-5: rgb(5, 5, 5);
+  --foreground: rgb(10, 10, 10);
+  --muted-foreground: rgb(100, 100, 100);
+  --border: rgb(200, 200, 200);
+}
+.dark {
+  --chart-1: rgb(201, 201, 201);
+  --foreground: rgb(250, 250, 250);
+  --border: rgb(50, 50, 50);
+}`;
+
+const sales: ChartConfiguration = {
+  type: 'bar',
+  data: {
+    labels: ['January', 'February'],
+    datasets: [
+      { label: 'Revenue', data: [3, 4] },
+      { label: 'Costs', data: [1, 2], backgroundColor: 'rgb(9, 9, 9)' },
+    ],
+  },
+};
+const shares: ChartConfiguration = { type: 'pie', data: { labels: ['A', 'B', 'C'], datasets: [{ data: [1, 2, 3] }] } };
+
+let style: HTMLStyleElement;
+
+beforeEach(() => {
+  style = document.createElement('style');
+  style.textContent = palettes;
+  document.head.append(style);
+});
+
+afterEach(() => {
+  style.remove();
+  document.documentElement.removeAttribute('class');
+});
+
+test("a chart colours each series without colours of its own from the theme's --chart-1…5, and its text and lines too", () => {
+  render(DataChart, { props: { config: sales, label: 'Revenue per month' } });
+
+  expect(screen.getByRole('img', { name: 'Revenue per month' })).toBeInTheDocument();
+  expect(drawn.props?.data).toMatchObject({
+    datasets: [
+      { label: 'Revenue', backgroundColor: 'rgb(1, 1, 1)', borderColor: 'rgb(1, 1, 1)' },
+      { label: 'Costs', backgroundColor: 'rgb(9, 9, 9)' },
+    ],
+  });
+  expect(drawn.props?.data).not.toMatchObject({ datasets: [{}, { borderColor: expect.anything() }] });
+  expect(drawn.props?.options).toMatchObject({ color: 'rgb(10, 10, 10)', borderColor: 'rgb(200, 200, 200)' });
+  expect(sales.data.datasets[0]).not.toHaveProperty('backgroundColor');
+});
+
+test("a pie's slices each take the next colour of the theme", () => {
+  render(DataChart, { props: { config: shares, label: 'Shares' } });
+
+  expect(drawn.props?.data).toMatchObject({
+    datasets: [{ backgroundColor: ['rgb(1, 1, 1)', 'rgb(2, 2, 2)', 'rgb(3, 3, 3)'] }],
+  });
+});
+
+test('a chart follows the theme into dark mode and back', async () => {
+  render(DataChart, { props: { config: sales, label: 'Revenue per month' } });
+
+  document.documentElement.classList.add('dark');
+  await vi.waitFor(() => {
+    expect(drawn.props?.data).toMatchObject({ datasets: [{ backgroundColor: 'rgb(201, 201, 201)' }, {}] });
+    expect(drawn.props?.options).toMatchObject({ color: 'rgb(250, 250, 250)', borderColor: 'rgb(50, 50, 50)' });
+  });
+
+  document.documentElement.classList.remove('dark');
+  await vi.waitFor(() => {
+    expect(drawn.props?.data).toMatchObject({ datasets: [{ backgroundColor: 'rgb(1, 1, 1)' }, {}] });
+  });
+});

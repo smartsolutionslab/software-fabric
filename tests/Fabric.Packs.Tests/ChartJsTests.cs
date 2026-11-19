@@ -150,7 +150,7 @@ public sealed partial class ChartJsTests
         chart.ShouldContain("import { type ChartConfiguration, Chart as ChartJs } from 'chart.js/auto';");
         chart.ShouldContain("import { Chart as ReactChart } from 'react-chartjs-2';");
         chart.ShouldContain("ChartJs.defaults.maintainAspectRatio = false;");
-        chart.ShouldContain("<ReactChart type={config.type} data={config.data} options={config.options} role=\"img\" aria-label={label} />");
+        chart.ShouldContain("<ReactChart type={themed.type} data={themed.data} options={themed.options} role=\"img\" aria-label={label} />");
         files["AGENTS.md"].ShouldContain("## Charts: Chart.js");
         files["AGENTS.md"].ShouldContain("<Chart config={...} label=\"...\" />");
         NamesECharts().IsMatch(files["AGENTS.md"]).ShouldBeFalse("AGENTS.md names no ECharts");
@@ -175,7 +175,7 @@ public sealed partial class ChartJsTests
         chart.ShouldContain("import { type ChartConfiguration, Chart as ChartJs } from 'chart.js/auto';");
         chart.ShouldContain("import { Chart } from 'vue-chartjs';");
         chart.ShouldContain("ChartJs.defaults.maintainAspectRatio = false;");
-        chart.ShouldContain("<Chart :type=\"config.type\" :data=\"config.data\" :options=\"config.options\" role=\"img\" :aria-label=\"label\" />");
+        chart.ShouldContain("<Chart :type=\"themed.type\" :data=\"themed.data\" :options=\"themed.options\" role=\"img\" :aria-label=\"label\" />");
         files.Keys.ShouldNotContain("web/app/src/components/chart.tsx");
         files["AGENTS.md"].ShouldContain("## Charts: Chart.js");
         files["AGENTS.md"].ShouldContain("<DataChart :config=\"...\" label=\"...\" />");
