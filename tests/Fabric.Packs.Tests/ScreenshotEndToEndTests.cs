@@ -95,11 +95,11 @@ public sealed class ScreenshotEndToEndTests
     }
 
     /// <summary>
-    /// Puts the comparison's failure in the test's output, which the xUnit report keeps although the test passes: the
-    /// e2e script's own lines, without the AppHost's output it prints after them.
+    /// Prints the comparison's failure to the run's log, where CI shows it although the test passes: the e2e script's
+    /// own lines, without the AppHost's output it prints after them.
     /// </summary>
     private static void Report(string output) =>
-        TestContext.Current.TestOutputHelper?.WriteLine(output.Split("--- AppHost output", 2)[0]);
+        Console.WriteLine(output.Split("--- AppHost output", 2)[0]);
 
     /// <summary>The committed baselines, relative to <c>web/app/e2e/__screenshots__</c>, in ordinal order.</summary>
     private static string[] Baselines(GeneratedProject project)
