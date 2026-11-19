@@ -328,7 +328,7 @@ public sealed class GenerativeDashboardsTests
         // and reloaded; and refused, with nothing pending or saved.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, e2eOutput);
-        e2eOutput.ShouldContain("5 passed");
+        e2eOutput.ShouldContain("7 passed");
     }
 
     [Fact]
@@ -368,7 +368,7 @@ public sealed class GenerativeDashboardsTests
         // Sign-in, the assistant's panel, the dashboard page, and the two of the dashboards agent, as with React.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, e2eOutput);
-        e2eOutput.ShouldContain("5 passed");
+        e2eOutput.ShouldContain("7 passed");
     }
 
     [Fact]

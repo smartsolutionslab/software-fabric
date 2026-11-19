@@ -118,7 +118,7 @@ public sealed class AgUiVueTests
         // The generated CI's own end-to-end step: the sign-in test and the panel's, against the AppHost with the stand-in model.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, e2eOutput);
-        e2eOutput.ShouldContain("2 passed");
+        e2eOutput.ShouldContain("4 passed");
     }
 
     private static string[] With(params string[] overrides) => [.. Vue, .. overrides];

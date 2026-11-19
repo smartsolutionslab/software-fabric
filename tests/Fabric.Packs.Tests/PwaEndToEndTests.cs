@@ -24,7 +24,7 @@ public sealed partial class PwaEndToEndTests
         // The generated CI's own end-to-end step: start the AppHost, wait for the app, run Playwright, stop.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, Explained(e2eExitCode, e2eOutput, testResults));
-        e2eOutput.ShouldContain("5 passed"); // and the billing page's three sample tests (#734)
+        e2eOutput.ShouldContain("7 passed"); // and the two glass checks (#698), and the billing page's three sample tests (#734)
 
         // The gate: a worker that keeps every same-origin answer, /api included, fails the offline test.
         var config = Path.Combine(web, "app", "vite.config.ts");
@@ -57,7 +57,7 @@ public sealed partial class PwaEndToEndTests
 
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, Explained(e2eExitCode, e2eOutput, Path.Combine(web, "app", "test-results")));
-        e2eOutput.ShouldContain("2 passed");
+        e2eOutput.ShouldContain("4 passed");
     }
 
     /// <summary>A failed run's output, and what the browser saw, since CI keeps no Playwright artifact (#791).</summary>
