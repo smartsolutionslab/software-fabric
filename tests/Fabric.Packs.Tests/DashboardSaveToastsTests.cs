@@ -4,10 +4,10 @@ using Fabric.Core.Generation;
 namespace Fabric.Packs.Tests;
 
 /// <summary>
-/// #735: where the app shell has toasts (shadcn with react-router, shadcn-vue with vue-router, in a single-page app,
-/// #695), the dashboards editor reports Save's success and failure through <c>notify</c> from <c>@/lib/notify</c>: a
-/// toast that is a status message or an alert, not text of its own beside the Save button. Without the shell (TanStack
-/// Router, the other UI libraries) the editor keeps its inline notice.
+/// #735: where the app shell has toasts (shadcn with react-router or TanStack Router, #695 and #736, or shadcn-vue with
+/// vue-router, in a single-page app), the dashboards editor reports Save's success and failure through <c>notify</c>
+/// from <c>@/lib/notify</c>: a toast that is a status message or an alert, not text of its own beside the Save button.
+/// Without the shell (the other UI libraries) the editor keeps its inline notice.
 /// </summary>
 public sealed partial class DashboardSaveToastsTests
 {
@@ -25,6 +25,8 @@ public sealed partial class DashboardSaveToastsTests
         { React, [Dashboards], ReactCanvas },
         { React, [Dashboards, "frontend.forms=tanstack-form", "frontend.validation=valibot"], ReactCanvas },
         { "saas-ai-react", [], ReactCanvas },
+        { React, [Dashboards, "frontend.routing=tanstack-router"], ReactCanvas },
+        { "saas-ai-react", ["frontend.routing=tanstack-router"], ReactCanvas },
         { Vue, [Dashboards], VueCanvas },
         { Vue, [Dashboards, "frontend.forms=tanstack-form"], VueCanvas },
         { Vue, [Dashboards, "frontend.forms=formkit"], VueCanvas },
@@ -33,10 +35,9 @@ public sealed partial class DashboardSaveToastsTests
     /// <summary>Projects with the editor and without the shell.</summary>
     public static TheoryData<string, string[], string> WithoutTheShell => new()
     {
-        { React, [Dashboards, "frontend.routing=tanstack-router"], ReactCanvas },
         { React, [Dashboards, "frontend.ui-library=radix-headless"], ReactCanvas },
         { React, [Dashboards, "frontend.ui-library=mui", "frontend.styling=css-modules"], ReactCanvas },
-        { "saas-ai-react", ["frontend.routing=tanstack-router"], ReactCanvas },
+        { React, [Dashboards, "frontend.routing=tanstack-router", "frontend.ui-library=radix-headless"], ReactCanvas },
         { Vue, [Dashboards, "frontend.ui-library=reka-ui"], VueCanvas },
         { Vue, [Dashboards, "frontend.ui-library=vuetify"], VueCanvas },
     };
@@ -88,6 +89,7 @@ public sealed partial class DashboardSaveToastsTests
     [Theory]
     [InlineData(React, "tsx")]
     [InlineData(React, "tsx", "frontend.forms=tanstack-form", "frontend.validation=valibot")]
+    [InlineData(React, "tsx", "frontend.routing=tanstack-router")]
     [InlineData(Vue, "ts")]
     public void The_editor_reports_save_in_the_shells_toasts_and_its_tests_pass(string profile, string extension, params string[] overrides)
     {
