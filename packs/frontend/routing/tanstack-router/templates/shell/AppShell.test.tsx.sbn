@@ -57,7 +57,9 @@ const report = createRoute({ getParentRoute: () => reports, path: '$reportId', c
 const routeTree = root.addChildren([start, reports.addChildren([report])]);
 
 async function renderOwnAt(path: string) {
-  render(<RouterProvider router={createRouter({ routeTree, history: createMemoryHistory({ initialEntries: [path] }) })} />);
+  render(
+    <RouterProvider router={createRouter({ routeTree, history: createMemoryHistory({ initialEntries: [path] }) })} />,
+  );
   await screen.findByRole('navigation', { name: 'breadcrumb' });
 }
 
