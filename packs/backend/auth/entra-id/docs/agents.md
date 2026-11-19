@@ -1,6 +1,17 @@
+{{~
+  # Staff sign in from a staff directory, AzureAd:StaffDirectories, whose users belong to no tenant (#614), where the
+  # tenant-column pack lets staff read across tenants. cross_tenant_reads is that pack's; no other tenancy defines it.
+  staff_directories = false
+  if project["backend.tenancy"] == "column"
+    staff_directories = cross_tenant_reads
+  end
+~}}
 ## Authentication: Microsoft Entra ID
 
 - The host accepts Entra ID access tokens for `AzureAd:Audience` from the directories `AzureAd:Tenants` lists (`AzureAd:Tenants:<tenant> = <directory id>`), and from no other. A new tenant is a new directory there, never code.
+{{~ if staff_directories ~}}
+- Staff sign in from the directories `AzureAd:StaffDirectories` lists (`AzureAd:StaffDirectories:<name> = <directory id>`), which are no tenant's; a directory is never in both lists. The app role `{{ cross_tenant_role }}` counts only in a staff directory's token: `EntraRoleClaims` drops it from a tenant's. Never grant staff access by a tenant directory's app role.
+{{~ end ~}}
 - Read claims by the names Entra ID gives them (`oid`, `preferred_username`, `tid`{{ if project["backend.authorization"] | array.contains "roles" }}, `roles`{{ end }}); claims are not renamed on the way in, so never read them by `ClaimTypes.*` except `ClaimTypes.Role`, which the role mapping fills.
 - Locally, `src/IdentityStandIn` stands in for Entra ID; its users and directories are in its `appsettings.json`. Only the AppHost references it, and no source under `src/` but the AppHost's and its own names it; the architecture rule `OnlyTheAppHostRunsTheStandIn` fails the build otherwise. A claim the application needs is Entra ID's to issue: add it to the stand-in locally, and document it in docs/adr for the app registration.
 - Every module route requires an authenticated user. Open an endpoint to anonymous callers only with an explicit `.AllowAnonymous()` where it is mapped, and a reason in the PR; the architecture rule `EveryEndpointDeclaresItsAuthorization` fails the build for an endpoint that declares neither.
