@@ -103,6 +103,21 @@ public sealed partial class TanStackAppShellTests
         files["web/app/src/auth/SignedIn.tsx"].ShouldContain("Signed in as");
     }
 
+    /// <summary>The module page's sample form (#734) reports what creating a sample did in the shell's toasts.</summary>
+    [Theory]
+    [InlineData(React)]
+    [InlineData("lean-crud")]
+    public void The_module_page_reports_a_created_sample_through_notify(string profile)
+    {
+        using var project = new GeneratedProject(profile, TanStackRouter);
+        project.AddModule("billing");
+        var page = File.ReadAllText(Path.Combine(project.ProjectDirectory, "web", "app", "src", "modules", "billing", "BillingPage.tsx"));
+
+        page.ShouldContain("import { notify } from '@/lib/notify';");
+        page.ShouldContain("notify.success(`The sample ${name} was created.`);");
+        page.ShouldNotContain("useState");
+    }
+
     /// <summary>Out of scope: with TanStack Router these keep the navigation bar they had, and get none of the shell's files.</summary>
     [Theory]
     [InlineData("industrial-event-driven-mfe", TanStackRouter)]
