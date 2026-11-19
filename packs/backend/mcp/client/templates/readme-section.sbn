@@ -1,3 +1,24 @@
+{{~ if project["backend.topology"] == "services" ~}}
+## External MCP servers
+
+The services use external MCP servers. Declare each one in `src/AppHost/AppHost.cs`, on the service hosts, never on the edge or in a module: its parameters before the loop over `builder.ServiceHosts()`, since a parameter is declared once, and the server on `service` inside the loop, so every service host can call it:
+
+```csharp
+var docsUrl = builder.AddParameter("mcp-docs-url");
+var docsToken = builder.AddParameter("mcp-docs-token", secret: true);
+var filesCommand = builder.AddParameter("mcp-files-command");
+
+foreach (var (module, project) in builder.ServiceHosts())
+{
+    // ...
+    service.WithMcpServerUrl("docs", docsUrl, docsToken)
+        .WithMcpServerCommand("files", filesCommand, ["--root", "/data"]);
+    // ...
+}
+```
+
+The edge runs no module code, so the AppHost refuses a server declared on it. Give the parameters values in the AppHost's user secrets (`dotnet user-secrets set Parameters:mcp-docs-url https://... --project src/AppHost`), never in a committed file. Code calls the tools through `IMcpTools`; `tests/Mcp.Tests` shows both kinds of server against a tiny one of its own, declared on every service host.
+{{~ else ~}}
 ## External MCP servers
 
 The host uses external MCP servers. Declare each one on the host in `src/AppHost/AppHost.cs`, never in a module:
@@ -8,3 +29,4 @@ host.WithMcpServerCommand("files", builder.AddParameter("mcp-files-command"), ["
 ```
 
 Give the parameters values in the AppHost's user secrets (`dotnet user-secrets set Parameters:mcp-docs-url https://... --project src/AppHost`), never in a committed file. Code calls the tools through `IMcpTools`; `tests/Mcp.Tests` shows both kinds of server against a tiny one of its own.
+{{~ end ~}}
