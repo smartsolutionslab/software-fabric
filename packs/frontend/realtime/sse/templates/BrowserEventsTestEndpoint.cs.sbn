@@ -1,0 +1,32 @@
+using {{ namespace }}.BuildingBlocks.Realtime;
+using {{ namespace }}.Host.Realtime;
+
+namespace Microsoft.AspNetCore.Builder;
+
+public static class BrowserEventsTestEndpoint
+{
+    /// <summary>
+    /// In Development, POST /&lt;module&gt;/server-events/test, under this service's own module, which sends a
+    /// <see cref="TestEvent"/> through <see cref="IBrowserEvents"/>: over the broker to the edge, and from there to every
+    /// browser with its stream open. It shows the whole way a service's event takes.{{ if project["backend.auth"] != "none" }} For signed-in users, as the module's routes are.{{ end }}
+    /// </summary>
+    public static WebApplication MapBrowserEventsTest(this WebApplication app)
+    {
+        {{ not_null "app" }}
+
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapPost("/" + ServiceModule.Name + "/server-events/test", async (TestEvent testEvent, IBrowserEvents browserEvents, CancellationToken cancellationToken) =>
+            {
+                await browserEvents.SendAsync(testEvent, cancellationToken);
+                return TypedResults.NoContent();
+            })
+{{~ if project["backend.auth"] != "none" ~}}
+                .RequireAuthorization()
+{{~ end ~}}
+                .ExcludeFromDescription();
+        }
+
+        return app;
+    }
+}

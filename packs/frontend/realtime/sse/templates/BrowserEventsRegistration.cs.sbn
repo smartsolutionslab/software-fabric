@@ -1,0 +1,14 @@
+using {{ namespace }}.BuildingBlocks.Realtime;
+using {{ namespace }}.Host.Realtime;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class BrowserEventsRegistration
+{
+    /// <summary>
+    /// <see cref="IBrowserEvents"/> for a service: it publishes the event on the broker, and the edge, which holds the
+    /// browsers' streams at /server-events, writes it to them.
+    /// </summary>
+    public static IServiceCollection AddBrowserEvents(this IServiceCollection services) =>
+        services.AddScoped<IBrowserEvents, BusBrowserEvents>();
+}

@@ -1,3 +1,40 @@
+{{~ if project["backend.topology"] == "services" ~}}
+using {{ namespace }}.Edge.Realtime;
+{{~ if project["backend.auth"] != "none" ~}}
+{{~ for name_space in accept_query_token_namespaces | string.split " " ~}}
+using {{ name_space }};
+{{~ end ~}}
+{{~ end ~}}
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class ServerEventsRegistration
+{
+{{~ if project["backend.auth"] == "none" ~}}
+    /// <summary>
+    /// The browsers' open streams on the edge, at /server-events. The services' browser events reach them over the
+    /// broker, through <c>BrowserEventConsumer</c>; the edge itself sends nothing else.
+    /// </summary>
+    public static IServiceCollection AddServerEvents(this IServiceCollection services)
+    {
+        services.AddSingleton<BrowserEventStreams>();
+        return services;
+    }
+{{~ else ~}}
+    /// <summary>
+    /// The browsers' open streams on the edge, at /server-events. The services' browser events reach them over the
+    /// broker, through <c>BrowserEventConsumer</c>; the edge itself sends nothing else. A browser's EventSource cannot
+    /// send a header, so the client puts the access token in the access_token query parameter; the bearer handler reads
+    /// it for the stream's path only.
+    /// </summary>
+    public static IServiceCollection AddServerEvents(this IServiceCollection services)
+    {
+        services.AddSingleton<BrowserEventStreams>();
+        return {{ accept_query_token "services" `"/server-events"` | string.replace "\n" "\n        " }};
+    }
+{{~ end ~}}
+}
+{{~ else ~}}
 using {{ namespace }}.BuildingBlocks.Realtime;
 using {{ namespace }}.Host.Realtime;
 {{~ if project["backend.auth"] != "none" ~}}
@@ -31,3 +68,4 @@ public static class ServerEventsRegistration
     }
 {{~ end ~}}
 }
+{{~ end ~}}

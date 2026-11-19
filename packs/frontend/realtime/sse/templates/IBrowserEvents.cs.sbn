@@ -1,7 +1,10 @@
 namespace {{ namespace }}.BuildingBlocks.Realtime;
 
 /// <summary>
-{{~ if project["backend.tenancy"] == "none" ~}}
+{{~ if project["backend.topology"] == "services" ~}}
+/// Sends an event to every browser with the event stream (/server-events) on the edge (src/Edge) open: it goes over
+/// the broker as a <see cref="BrowserEventV1"/>, which the edge writes to its browsers' streams.
+{{~ else if project["backend.tenancy"] == "none" ~}}
 /// Sends an event to every browser with the host's event stream (/server-events) open.
 {{~ else ~}}
 /// Sends an event to the current tenant's browsers with the host's event stream (/server-events) open; without a

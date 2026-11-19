@@ -13,15 +13,29 @@ Server code sends through `IBrowserEvents` (`src/BuildingBlocks/Realtime`), neve
 
 The browser connects with `@microsoft/signalr` through `/api`, like every other call{{ if signed_in }}, and the client takes the user's access token from `accessTokenFactory`. A browser cannot set a header on a WebSocket or an EventSource, so SignalR sends the token as the `access_token` query parameter there; the host's bearer handler reads it for the hub's path only{{ end }}. `ServerEvents` (`src/realtime/`) holds one connection for the app, and components listen with `useServerEvent(name, handler)`. SignalR picks the transport itself (WebSockets, then server-sent events, then long polling) and reconnects after a drop; `ServerEvents` starts the connection again when a first start fails or the reconnects run out, for as long as it is mounted.{{ if signed_in }} The host closes a connection once its access token expires, so the browser reconnects with a fresh token and the user and their tenant are checked again.{{ end }}
 
+{{~ if project["backend.topology"] == "services" ~}}
+With `backend.topology: services` (ADR-0017, amended), the hub is the edge's (`src/Edge/Realtime/EventsHub.cs`, mapped through `edge.endpoints`), since every browser is connected to the edge, and no service host maps one. A service's `IBrowserEvents` publishes a `BrowserEventV1` (`src/BuildingBlocks/Realtime`: the event's type name and the event as JSON) on the project's broker, without storing it first, and the edge's `BrowserEventConsumer` sends it to every connected browser. It is not an integration event: a browser event lost on the way is not sent again.
+
+In Development, each service maps `POST /<module>/server-events/test`, under its own module, which sends a `TestEvent` through its `IBrowserEvents`, so the whole way, service, broker, edge, browser, can be seen working; it is not mapped elsewhere and is not in the OpenAPI document.
+{{~ else ~}}
 In Development, `POST /hubs/events/test` with `{ "text": "..." }` sends a `TestEvent` the same way, so the push channel can be seen working; it is not mapped elsewhere and is not in the OpenAPI document.
+{{~ end ~}}
 
 ## Gates
 
 - `tests/Integration.Tests/ServerEventsTests.cs`, against the running application: {{ if tenanted }}a browser of the sender's tenant receives a test event and one of another tenant does not{{ else }}a connected browser receives a test event{{ end }}{{ if signed_in }}; a connection without a token is refused, and one whose token expires is closed{{ end }}.
 - `src/realtime/useServerEvent.test.{{ test }}` and `ServerEvents.test.{{ test }}`: a component receives the events it listens for and stops when it unmounts; a connection that fails to start or closes for good is started again while mounted.
+{{~ if project["backend.topology"] == "services" ~}}
+- `e2e/<module>-server-events.spec.ts`, one per service: the {{ if signed_in }}signed-in {{ end }}browser's own connection receives a test event that service sent.
+{{~ else ~}}
 - `e2e/server-events.spec.ts`: the {{ if signed_in }}signed-in {{ end }}browser's own connection receives a test event.
+{{~ end ~}}
 
 ## Consequences
 
+{{~ if project["backend.topology"] == "services" ~}}
+- The edge holds a connection per open tab. V1 runs one edge replica: a second would share the edge's queue, subscription or consumer group on the broker, so each event would reach only one replica's browsers. Running several needs one per replica, a later change.
+{{~ else ~}}
 - The hub holds a connection per open tab. One host instance needs nothing more; several need a backplane (Redis, or Azure SignalR Service) so that every instance reaches every browser.
+{{~ end ~}}
 - A browser that is not connected when an event is sent never sees it. Events say that something changed; a screen fetches the data again rather than trusting the event to carry all of it.

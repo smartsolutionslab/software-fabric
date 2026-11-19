@@ -1,0 +1,21 @@
+using System.Text.Json;
+using {{ namespace }}.BuildingBlocks.Realtime;
+using Wolverine;
+
+namespace {{ namespace }}.Host.Realtime;
+
+/// <summary>
+/// Sends a browser event to the edge (src/Edge), which every browser is connected to: as a <see cref="BrowserEventV1"/>
+/// on the broker, which the edge pushes to its browsers. The event is written as JSON with the web defaults, as the
+/// hub would write it.
+/// </summary>
+public sealed class BusBrowserEvents(IMessageBus bus) : IBrowserEvents
+{
+    public Task SendAsync<TEvent>(TEvent browserEvent, CancellationToken cancellationToken)
+        where TEvent : class
+    {
+        {{ not_null "browserEvent" }}
+
+        return bus.PublishAsync(new BrowserEventV1(typeof(TEvent).Name, JsonSerializer.SerializeToElement(browserEvent, JsonSerializerOptions.Web))).AsTask();
+    }
+}
