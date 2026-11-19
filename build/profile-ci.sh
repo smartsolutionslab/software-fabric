@@ -3,6 +3,8 @@
 # module, and runs what the generated project's own CI (.github/workflows/ci.yml) runs: backend format check, build,
 # tests and coverage gate, the web app's install, build, lint, tests and format check, and the end-to-end tests against the running
 # application.
+# A profile with a directory of its own under build/profile-ci/ gets the modules and files it holds as well, before the
+# first step.
 # Needs a Release build of the solution, Docker, Node 22 with pnpm, the Aspire CLI bundle and Playwright's Chromium;
 # jq for --combination.
 #
@@ -80,6 +82,16 @@ else
   fabric new "$project" --profile "$profile" "${sets[@]}"
 fi
 fabric add-module billing --project "$project"
+# A profile's own files (build/profile-ci/<profile>): the modules its `modules` file names, one per line, added after
+# billing, then its files/ tree copied over the project. saas-services-vue's are a second service and the test of an
+# event the two exchange (ADR-0017 D6).
+own="$repository/build/profile-ci/$profile"
+if [[ -n $profile && -d $own ]]; then
+  while IFS= read -r module; do
+    fabric add-module "$module" --project "$project"
+  done <"$own/modules"
+  cp -R "$own/files/." "$project/"
+fi
 cd "$project"
 passed=(generated)
 
