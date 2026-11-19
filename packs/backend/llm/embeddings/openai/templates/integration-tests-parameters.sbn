@@ -2,5 +2,14 @@
         // Embeddings use the chat model's openai-api-key, given its value above, against the fixture's stand-in.{{ else ~}}
         // A key-shaped value OpenAI does not accept: the host embeds against the fixture's stand-in, never OpenAI.
         builder.Configuration["Parameters:openai-api-key"] = "not-a-real-key";{{ end }}
+{{~ if project["backend.topology"] == "services" ~}}
+        // Every service host embeds; the edge does not. They are the AppHost's own, by its convention.
+        string[] embeddingHosts = [.. builder.ServiceHosts().Select(service => service.Module)];
+        foreach (var embeddingHost in builder.Resources.OfType<ProjectResource>().Where(resource => embeddingHosts.Contains(resource.Name)))
+        {
+            builder.CreateResourceBuilder(embeddingHost).WithEnvironment("OpenAI__EmbeddingEndpoint", embeddings.Endpoint);
+        }
+{{- else ~}}
         builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "host"))
             .WithEnvironment("OpenAI__EmbeddingEndpoint", embeddings.Endpoint);
+{{- end }}
