@@ -96,7 +96,8 @@ public sealed class VueSignInTests
         // The generated CI's own end-to-end step: start the AppHost, wait for the app, run Playwright, stop. Its
         // sign-in test (e2e/sign-in.spec.ts) is the oidc-client-ts pack's, the same file React gets.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
-        e2eExitCode.ShouldBe(0, e2eOutput);
+        // A failure says what the browser saw, from what Playwright leaves behind, since CI keeps none of it (#791).
+        e2eExitCode.ShouldBe(0, e2eExitCode == 0 ? e2eOutput : $"{e2eOutput}\n{PlaywrightFailure.Describe(Path.Combine(web, "app", "test-results"))}");
         e2eOutput.ShouldContain("2 passed");
     }
 }
