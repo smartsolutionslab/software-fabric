@@ -1,4 +1,6 @@
 {{~ probe = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
+{{~ # The module's sample (#734): its list and create form, in a single-page app with shadcn and a cached client. ~}}
+{{~ sample_page = project["frontend.architecture"] == "spa" && object.has_key(project, "frontend.ui-library") && project["frontend.ui-library"] == "shadcn" && object.has_key(project, "frontend.api-client") && (project["frontend.api-client"] == "rtk-query-codegen" || project["frontend.api-client"] == "orval") && module.name != "dashboards" && module.name != "assistant" ~}}
 {{~ if project["frontend.architecture"] == "micro-frontends" && probe ~}}
 import { Remote } from '@/remotes/Remote';
 import { useCanManage } from './useCanManage';
@@ -55,6 +57,128 @@ export function {{ module.namespace }}Page() {
       {permission === 'failed' && <p role="alert">Permissions for {{ module.name }} could not be loaded.</p>}
 {{~ end ~}}
       <AgentPanel agent="assistant" />
+    </main>
+  );
+}
+{{~ else if sample_page ~}}
+{{~ ns = module.namespace ~}}
+{{~ # With the app shell (#695) the result is a toast through notify; without it, a message beside the form. ~}}
+{{~ shell = project["frontend.routing"] == "react-router" ~}}
+{{~ # TanStack Table's DataTable draws its own loading and empty states (#696); beside AG Grid the page draws them. ~}}
+{{~ table = project["frontend.data-grid"] == "tanstack-table" ~}}
+import { Inbox } from 'lucide-react';
+{{~ if !shell ~}}
+import { useState } from 'react';
+{{~ end ~}}
+import type { {{ ns }}SampleDto } from '@/api/generated';
+import { Button } from '@/components/ui/button';
+import { DataTable } from '@/components/ui/data-table';
+import { columnsOf } from '@/components/ui/data-table-columns';
+import { EmptyState } from '@/components/ui/empty-state';
+{{~ if !table ~}}
+import { Skeleton } from '@/components/ui/skeleton';
+{{~ end ~}}
+{{~ if shell ~}}
+import { notify } from '@/lib/notify';
+{{~ end ~}}
+import { Create{{ ns }}SampleForm, sampleNameField } from './Create{{ ns }}SampleForm';
+{{~ if probe ~}}
+import { useCanManage } from './useCanManage';
+{{~ end ~}}
+import { useCreate{{ ns }}Sample, use{{ ns }}Samples } from './use{{ ns }}Samples';
+
+const samples = columnsOf<{{ ns }}SampleDto>();
+const columns = samples.columns([samples.accessor('name', { header: 'Name' })]);
+{{~ if table ~}}
+const none: {{ ns }}SampleDto[] = [];
+{{~ else ~}}
+const skeletonRows = ['first', 'second', 'third'];
+{{~ end ~}}
+
+/** The empty state's action: the form's name field, where the first sample is created. */
+function toTheForm() {
+  document.getElementById(sampleNameField)?.focus();
+}
+
+/**
+ * The module's screen, starting from its sample (AGENTS.md): the samples in a table, by name, and a form that creates
+ * one, shown in the table at once and taken out again if the host refuses it.{{ if probe }} "Manage" shows only to a
+ * caller its permission probe answers with 200, and any failure but a 403 shows as an alert.{{ end }}
+ */
+export function {{ ns }}Page() {
+  const { samples: rows, isLoading, isError } = use{{ ns }}Samples();
+  const { create, isSaving } = useCreate{{ ns }}Sample();
+{{~ if probe ~}}
+  const permission = useCanManage();
+{{~ end ~}}
+{{~ if !shell ~}}
+  const [message, setMessage] = useState<{ role: 'status' | 'alert'; text: string }>();
+{{~ end ~}}
+
+  async function onCreate(name: string) {
+    const created = await create(name);
+{{~ if shell ~}}
+    if (created) {
+      notify.success(`The sample ${name} was created.`);
+    } else {
+      notify.failure(`The sample ${name} could not be created.`);
+    }
+{{~ else ~}}
+    setMessage(
+      created
+        ? { role: 'status', text: `The sample ${name} was created.` }
+        : { role: 'alert', text: `The sample ${name} could not be created.` },
+    );
+{{~ end ~}}
+    return created;
+  }
+
+  const empty = (
+    <EmptyState
+      icon={<Inbox />}
+      action={
+        <Button type="button" variant="outline" onClick={toTheForm}>
+          Create a sample
+        </Button>
+      }
+    >
+      No samples yet.
+    </EmptyState>
+  );
+
+  return (
+    <main className="flex flex-col gap-6">
+      <h1>{{ ns }}</h1>
+{{~ if probe ~}}
+      {permission === 'granted' && <h2>Manage</h2>}
+      {permission === 'failed' && <p role="alert">Permissions for {{ module.name }} could not be loaded.</p>}
+{{~ end ~}}
+      <section aria-labelledby="{{ module.name }}-samples" className="flex flex-col gap-4">
+        <h2 id="{{ module.name }}-samples">Samples</h2>
+        <Create{{ ns }}SampleForm onCreate={onCreate} saving={isSaving} />
+{{~ if !shell ~}}
+        {message && <p role={message.role}>{message.text}</p>}
+{{~ end ~}}
+{{~ if table ~}}
+        {isError ? (
+          <p role="alert">The samples could not be loaded.</p>
+        ) : (
+          <DataTable columns={columns} data={rows ?? none} loading={isLoading} empty={empty} />
+        )}
+{{~ else ~}}
+        {isError && <p role="alert">The samples could not be loaded.</p>}
+        {!isError && isLoading && (
+          <div aria-busy="true" className="flex flex-col gap-2">
+            <span className="sr-only">Loading…</span>
+            {skeletonRows.map((row) => (
+              <Skeleton key={row} className="h-8 w-full" />
+            ))}
+          </div>
+        )}
+        {!isError && !isLoading && rows?.length === 0 && empty}
+        {!isError && !isLoading && rows !== undefined && rows.length > 0 && <DataTable columns={columns} data={rows} />}
+{{~ end ~}}
+      </section>
     </main>
   );
 }
