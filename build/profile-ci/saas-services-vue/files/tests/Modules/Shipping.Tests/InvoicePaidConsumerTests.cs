@@ -1,17 +1,23 @@
+using Shop.BuildingBlocks.Messaging;
 using Shop.Contracts.Billing;
 using Shop.Modules.Shipping.Application;
+using Shop.Modules.Shipping.Application.Commands.CreateSample;
 
 namespace Shop.Modules.Shipping.Tests;
 
 public class InvoicePaidConsumerTests
 {
     [Fact]
-    public void A_paid_invoice_is_recorded_as_received()
+    public async Task A_paid_invoice_is_recorded_as_a_sample_named_after_it()
     {
         var invoice = Guid.CreateVersion7();
+        var dispatcher = Substitute.For<IDispatcher>();
+        dispatcher.SendAsync(Arg.Any<CreateSample>(), Arg.Any<CancellationToken>()).Returns(Result<Guid, ApiError>.Success(Guid.CreateVersion7()));
 
-        InvoicePaidConsumer.Handle(new InvoicePaidV1(invoice));
+        await new InvoicePaidConsumer(dispatcher).HandleAsync(new InvoicePaidV1(invoice), TestContext.Current.CancellationToken);
 
-        InvoicePaidConsumer.Received.ShouldContain(invoice);
+        await dispatcher.Received(1).SendAsync(
+            Arg.Is<CreateSample>(command => command.Name.Value == $"Invoice {invoice} paid"),
+            Arg.Any<CancellationToken>());
     }
 }
