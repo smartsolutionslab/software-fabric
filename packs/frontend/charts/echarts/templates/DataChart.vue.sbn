@@ -1,8 +1,13 @@
+{{~ themed = object.has_key(project, "frontend.ui-library") && (project["frontend.ui-library"] == "shadcn" || project["frontend.ui-library"] == "shadcn-vue") ~}}
 <script setup lang="ts">
 // The whole of ECharts, every chart type and component, as echarts-for-react has it for React.
 import 'echarts';
 import type { EChartsOption } from 'echarts';
 import VChart from 'vue-echarts';
+{{~ if themed ~}}
+import { computed } from 'vue';
+import { echartsTheme, useChartTheme } from './chart-theme';
+{{~ end ~}}
 
 interface ChartProps {
   option: EChartsOption;
@@ -10,12 +15,20 @@ interface ChartProps {
   height?: number;
 }
 
+{{~ if themed ~}}
+/** An ECharts chart in the theme's colours, which follows dark mode; label names it for screen readers. */
+const { option, label, height = 320 } = defineProps<ChartProps>();
+
+const chartTheme = useChartTheme();
+const theme = computed(() => echartsTheme(chartTheme.value));
+{{~ else ~}}
 /** An ECharts chart; label names it for screen readers. */
 const { option, label, height = 320 } = defineProps<ChartProps>();
+{{~ end ~}}
 </script>
 
 <template>
   <div role="img" :aria-label="label">
-    <VChart :option="option" autoresize :style="{ height: `${height}px` }" />
+    <VChart :option="option"{{ if themed }} :theme="theme"{{ end }} autoresize :style="{ height: `${height}px` }" />
   </div>
 </template>

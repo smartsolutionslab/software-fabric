@@ -30,7 +30,11 @@ const palettes = `
   --border: rgb(50, 50, 50);
 }`;
 
-const revenue: EChartsOption = { xAxis: { type: 'category', data: ['January'] }, yAxis: {}, series: [{ type: 'bar', data: [3] }] };
+const revenue: EChartsOption = {
+  xAxis: { type: 'category', data: ['January'] },
+  yAxis: {},
+  series: [{ type: 'bar', data: [3] }],
+};
 
 let style: HTMLStyleElement;
 
@@ -56,8 +60,14 @@ test("a chart draws its series in the theme's --chart-1…5 and its text and lin
     color: ['rgb(1, 1, 1)', 'rgb(2, 2, 2)', 'rgb(3, 3, 3)', 'rgb(4, 4, 4)', 'rgb(5, 5, 5)'],
     backgroundColor: 'transparent',
     textStyle: { color: 'rgb(10, 10, 10)' },
-    categoryAxis: { axisLabel: { color: 'rgb(100, 100, 100)' }, splitLine: { lineStyle: { color: ['rgb(200, 200, 200)'] } } },
-    valueAxis: { axisLabel: { color: 'rgb(100, 100, 100)' }, splitLine: { lineStyle: { color: ['rgb(200, 200, 200)'] } } },
+    categoryAxis: {
+      axisLabel: { color: 'rgb(100, 100, 100)' },
+      splitLine: { lineStyle: { color: ['rgb(200, 200, 200)'] } },
+    },
+    valueAxis: {
+      axisLabel: { color: 'rgb(100, 100, 100)' },
+      splitLine: { lineStyle: { color: ['rgb(200, 200, 200)'] } },
+    },
   });
 });
 
@@ -66,11 +76,17 @@ test('a chart follows the theme into dark mode and back', async () => {
 
   document.documentElement.classList.add('dark');
   await vi.waitFor(() => {
-    expect(drawn.theme).toMatchObject({ color: ['rgb(201, 201, 201)', 'rgb(2, 2, 2)', 'rgb(3, 3, 3)', 'rgb(4, 4, 4)', 'rgb(5, 5, 5)'], textStyle: { color: 'rgb(250, 250, 250)' } });
+    expect(drawn.theme).toMatchObject({
+      color: ['rgb(201, 201, 201)', 'rgb(2, 2, 2)', 'rgb(3, 3, 3)', 'rgb(4, 4, 4)', 'rgb(5, 5, 5)'],
+      textStyle: { color: 'rgb(250, 250, 250)' },
+    });
   });
 
   document.documentElement.classList.remove('dark');
   await vi.waitFor(() => {
-    expect(drawn.theme).toMatchObject({ color: ['rgb(1, 1, 1)', 'rgb(2, 2, 2)', 'rgb(3, 3, 3)', 'rgb(4, 4, 4)', 'rgb(5, 5, 5)'], textStyle: { color: 'rgb(10, 10, 10)' } });
+    expect(drawn.theme).toMatchObject({
+      color: ['rgb(1, 1, 1)', 'rgb(2, 2, 2)', 'rgb(3, 3, 3)', 'rgb(4, 4, 4)', 'rgb(5, 5, 5)'],
+      textStyle: { color: 'rgb(10, 10, 10)' },
+    });
   });
 });

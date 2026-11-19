@@ -1,5 +1,10 @@
+{{~ themed = object.has_key(project, "frontend.ui-library") && (project["frontend.ui-library"] == "shadcn" || project["frontend.ui-library"] == "shadcn-vue") ~}}
 import { type ChartConfiguration, Chart as ChartJs } from 'chart.js/auto';
 import { Chart as ReactChart } from 'react-chartjs-2';
+{{~ if themed ~}}
+import { useMemo } from 'react';
+import { useChartTheme, withChartTheme } from './chart-theme';
+{{~ end ~}}
 
 // A chart fills its container, which is as high as the height it is given, rather than keeping its own aspect ratio.
 ChartJs.defaults.maintainAspectRatio = false;
@@ -10,11 +15,21 @@ interface ChartProps {
   height?: number;
 }
 
+{{~ if themed ~}}
+/** A Chart.js chart in the theme's colours, which follows dark mode; label names it for screen readers. */
+export function Chart({ config, label, height = 320 }: ChartProps) {
+  const theme = useChartTheme();
+  const themed = useMemo(() => withChartTheme(config, theme), [config, theme]);
+  return (
+    <div style={{ "{{" }} height {{ "}}" }}>
+      <ReactChart type={themed.type} data={themed.data} options={themed.options} role="img" aria-label={label} />
+{{~ else ~}}
 /** A Chart.js chart; label names it for screen readers. */
 export function Chart({ config, label, height = 320 }: ChartProps) {
   return (
     <div style={{ "{{" }} height {{ "}}" }}>
       <ReactChart type={config.type} data={config.data} options={config.options} role="img" aria-label={label} />
+{{~ end ~}}
     </div>
   );
 }

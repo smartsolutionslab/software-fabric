@@ -125,9 +125,10 @@ test('the columns control hides and shows columns from the keyboard and always k
   expect(button).toHaveAttribute('aria-expanded', 'false');
   expect(button).toHaveFocus();
 
+  // Name, the one column shown, cannot be hidden and is skipped: the first stop is Team.
   await user.keyboard('{Enter}');
   await user.tab();
-  await user.tab();
+  expect(within(shown).getByRole('checkbox', { name: 'Team' })).toHaveFocus();
   await user.keyboard(' ');
   expect(screen.getByRole('columnheader', { name: 'Team' })).toBeInTheDocument();
 });
@@ -138,16 +139,21 @@ test("a row's actions sit in its last cell, show on hover or focus, and are reac
   render(DataTable<Person>, {
     props: { columns, data },
     slots: {
-      actions: ({ row }: { row: Person }) => h('button', { type: 'button', onClick: () => edit(row) }, `Edit ${row.name}`),
+      actions: ({ row }: { row: Person }) =>
+        h('button', { type: 'button', onClick: () => edit(row) }, `Edit ${row.name}`),
     },
   });
 
   expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
-  const second = screen.getAllByRole('row')[2];
+  const second = screen.getByRole('row', { name: /^second/ });
   const lastCell = within(second).getAllByRole('cell').at(-1);
   expect(lastCell).toContainElement(screen.getByRole('button', { name: 'Edit second' }));
   expect(second).toHaveClass('group');
-  expect(lastCell?.firstElementChild).toHaveClass('opacity-0', 'group-hover:opacity-100', 'group-focus-within:opacity-100');
+  expect(lastCell?.firstElementChild).toHaveClass(
+    'opacity-0',
+    'group-hover:opacity-100',
+    'group-focus-within:opacity-100',
+  );
 
   // Past the table's own controls (Comfortable, Compact, Columns), the first row's action is next.
   for (let control = 0; control < 4; control++) {

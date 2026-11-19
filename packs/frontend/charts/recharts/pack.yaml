@@ -11,4 +11,5 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
+  - { kind: unit-test, describes: "With shadcn, chartColor gives the series the theme's --chart-1…5 in turn, which src/index.css swaps for dark mode (src/components/chart-colors.test.ts).", file: templates/chart-colors.test.ts.sbn }
   - { kind: lint-rule, describes: "Importing ECharts (echarts, echarts-for-react) or Chart.js (chart.js, react-chartjs-2) fails lint.", file: templates/restricted.sbn }

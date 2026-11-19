@@ -14,4 +14,5 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
+  - { kind: unit-test, describes: "With shadcn or shadcn-vue, the chart draws its series in the theme's --chart-1…5 and its text and lines in the theme's colours (oklch as rgb), and draws again in the dark palette when .dark is set on <html> and back (src/components/chart-theme.test.ts, chart.test.tsx, DataChart.test.ts).", file: templates/chart-theme.test.ts.sbn }
   - { kind: lint-rule, describes: "Importing Recharts or Chart.js (with Vue, vue-chartjs or Chart.js) fails lint.", file: templates/restricted.sbn }

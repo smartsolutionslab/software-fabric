@@ -1,1 +1,135 @@
-export {};
+{{~ vue = project["frontend.framework"] == "vue" ~}}
+import type { ChartConfiguration } from 'chart.js';
+{{~ if vue ~}}
+import { computed, type ComputedRef, onScopeDispose, shallowRef } from 'vue';
+{{~ else ~}}
+import { useEffect, useState } from 'react';
+{{~ end ~}}
+
+/**
+ * The colours a chart draws with, from the theme's variables in src/index.css: its series in --chart-1…5, its text in
+ * --foreground and --muted-foreground, its lines in --border. Each palette of src/index.css has its own, so they change
+ * with the theme; empty where a variable is not defined, and the chart library's own colours apply.
+ */
+export interface ChartTheme {
+  palette: string[];
+  text: string | undefined;
+  mutedText: string | undefined;
+  line: string | undefined;
+}
+
+const oklch = /^oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)(?:deg)?\s*(?:\/\s*([\d.]+)(%?))?\s*\)$/;
+
+/** A channel of linear sRGB as the 0–255 a screen shows, gamma applied and kept in range. */
+function channel(linear: number): number {
+  const gamma = linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055;
+  return Math.round(Math.min(Math.max(gamma, 0), 1) * 255);
+}
+
+/**
+ * An oklch() colour as rgb() or rgba(), which a canvas chart library's colour parser understands; any other colour as it
+ * is. The conversion is CSS Color 4's: oklch to oklab to linear sRGB.
+ */
+export function toRgb(color: string): string {
+  const match = oklch.exec(color);
+  if (match === null) {
+    return color;
+  }
+
+  const [, lightness, lightnessPercent, chroma, hue, alpha, alphaPercent] = match;
+  const l = Number(lightness) / (lightnessPercent === '%' ? 100 : 1);
+  const radians = (Number(hue) * Math.PI) / 180;
+  const a = Number(chroma) * Math.cos(radians);
+  const b = Number(chroma) * Math.sin(radians);
+  const long = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const medium = (l - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const short = (l - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const red = channel(4.0767416621 * long - 3.3077115913 * medium + 0.2309699292 * short);
+  const green = channel(-1.2684380046 * long + 2.6097574011 * medium - 0.3413193965 * short);
+  const blue = channel(-0.0041960863 * long - 0.7034186147 * medium + 1.707614701 * short);
+  if (alpha === undefined) {
+    return `rgb(${red}, ${green}, ${blue})`;
+  }
+
+  return `rgba(${red}, ${green}, ${blue}, ${Number(alpha) / (alphaPercent === '%' ? 100 : 1)})`;
+}
+
+/** The chart theme as the page shows it now: the light palette, or the dark one under .dark on <html>. */
+export function readChartTheme(): ChartTheme {
+  const style = getComputedStyle(document.documentElement);
+  const read = (name: string) => {
+    const value = style.getPropertyValue(name).trim();
+    return value === '' ? undefined : toRgb(value);
+  };
+  return {
+    palette: [1, 2, 3, 4, 5].flatMap((position) => read(`--chart-${position}`) ?? []),
+    text: read('--foreground'),
+    mutedText: read('--muted-foreground'),
+    line: read('--border'),
+  };
+}
+
+/** Calls back whenever the theme on <html> changes (src/theme sets .dark there), and returns what stops it. */
+export function onThemeChange(callback: () => void): () => void {
+  const observer = new MutationObserver(callback);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  return () => {
+    observer.disconnect();
+  };
+}
+
+// A pie, doughnut or polar area chart colours each slice; the others colour each series.
+const sliced = new Set(['pie', 'doughnut', 'polarArea']);
+
+/**
+ * The configuration with the theme in it: a series (or a slice) without colours of its own takes the palette's next one,
+ * and the text and grid lines take the theme's, unless the configuration sets them. The configuration given is left as
+ * it was.
+ */
+export function withChartTheme(config: ChartConfiguration, { palette, text, line }: ChartTheme): ChartConfiguration {
+  if (palette.length === 0) {
+    return config;
+  }
+
+  const colour = (position: number) => palette[position % palette.length];
+  const datasets = config.data.datasets.map((dataset, position) => {
+    if (dataset.backgroundColor !== undefined || dataset.borderColor !== undefined) {
+      return dataset;
+    }
+
+    const colours = sliced.has(config.type) ? dataset.data.map((_, slice) => colour(slice)) : colour(position);
+    return { ...dataset, backgroundColor: colours, borderColor: colours };
+  });
+  return {
+    ...config,
+    data: { ...config.data, datasets },
+    options: { color: text, borderColor: line, ...config.options },
+  } as ChartConfiguration;
+}
+{{~ if vue ~}}
+
+/** The chart theme, read again whenever the theme changes, for as long as the component that asks lives. */
+export function useChartTheme(): ComputedRef<ChartTheme> {
+  const theme = shallowRef(readChartTheme());
+  onScopeDispose(
+    onThemeChange(() => {
+      theme.value = readChartTheme();
+    }),
+  );
+  return computed(() => theme.value);
+}
+{{~ else ~}}
+
+/** The chart theme, read again whenever the theme changes. */
+export function useChartTheme(): ChartTheme {
+  const [theme, setTheme] = useState(readChartTheme);
+  useEffect(
+    () =>
+      onThemeChange(() => {
+        setTheme(readChartTheme());
+      }),
+    [],
+  );
+  return theme;
+}
+{{~ end ~}}
