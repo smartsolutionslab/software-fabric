@@ -12,7 +12,7 @@ Every library is installed in `src/main.ts` by a provider, `(app, root) => Compo
 
 Tests wait for a condition, never for a count. A fixed number of timer yields, or a settle right before an assertion, passes on the author's machine and fails on a loaded CI runner. A test waits with `findBy*` or `waitFor`, which poll the condition against a deadline. Driving fake timers forward (`vi.advanceTimersByTimeAsync`) is not waiting and stays allowed.
 
-Playwright runs end-to-end tests in `web/app/e2e` against the running application (`pnpm e2e` after starting the AppHost). In development the Vite server answers on http://localhost:5173 and forwards `/api/*` to the host, so the browser talks to one origin.
+Playwright runs end-to-end tests in `web/app/e2e` against the running application (`pnpm e2e` after starting the AppHost). In development the Vite server answers on http://localhost:5173 and forwards `/api/*` to the host, so the browser talks to one origin. Every start of the Vite server pre-bundles the app's dependencies afresh (`optimizeDeps.force`), from a scan of everything the app imports, so no page load finds one the pre-bundle lacks: Vite would otherwise reuse its cache while the lockfile and its config are unchanged, bundle a newly imported dependency only once a page asks for it, and reload that page, whose requests for the earlier bundles answer 504. The scan costs well under a second per start.
 
 ## Consequences
 
