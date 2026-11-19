@@ -106,7 +106,13 @@ public static class ServiceDocuments
         if (service["tags"] is JsonArray tags)
         {
             var known = Member(document, "tags", "components", () => new JsonArray());
+{{~ if project["backend.auth"] == "none" ~}}
+            // Without an identity provider the edge maps no path of its own: its tag is the one its services' operations now carry.
+            foreach (var tag in tags.Select(tag => tag?["name"]?.GetValue<string>() == serviceName ? new JsonObject { ["name"] = edgeName } : tag)
+                .Where(tag => !known.Any(existing => JsonNode.DeepEquals(existing, tag))))
+{{~ else ~}}
             foreach (var tag in tags.Where(tag => tag?["name"]?.GetValue<string>() != serviceName && !known.Any(existing => JsonNode.DeepEquals(existing, tag))))
+{{~ end ~}}
             {
                 known.Add(tag?.DeepClone());
             }
