@@ -1,3 +1,39 @@
+{{~ if project["backend.topology"] == "services" ~}}
+{{~ if project["backend.auth"] != "none" ~}}
+{{~ for name_space in accept_query_token_namespaces | string.split " " ~}}
+using {{ name_space }};
+{{~ end ~}}
+
+{{~ end ~}}
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class ServerEventsRegistration
+{
+{{~ if project["backend.auth"] == "none" ~}}
+    /// <summary>
+    /// SignalR on the edge, for its hub at /hubs/events. The services' browser events reach it over the broker, through
+    /// <c>BrowserEventConsumer</c>; the edge itself sends nothing else.
+    /// </summary>
+    public static IServiceCollection AddServerEvents(this IServiceCollection services)
+    {
+        services.AddSignalR();
+        return services;
+    }
+{{~ else ~}}
+    /// <summary>
+    /// SignalR on the edge, for its hub at /hubs/events. The services' browser events reach it over the broker, through
+    /// <c>BrowserEventConsumer</c>; the edge itself sends nothing else. A browser cannot put a header on a WebSocket or an
+    /// EventSource, so SignalR's client sends the access token as the access_token query parameter there; the bearer
+    /// handler reads it for the hub's path only.
+    /// </summary>
+    public static IServiceCollection AddServerEvents(this IServiceCollection services)
+    {
+        services.AddSignalR();
+        return {{ accept_query_token "services" `"/hubs/events"` | string.replace "\n" "\n        " }};
+    }
+{{~ end ~}}
+}
+{{~ else ~}}
 using {{ namespace }}.BuildingBlocks.Realtime;
 using {{ namespace }}.Host.Realtime;
 {{~ if project["backend.auth"] != "none" ~}}
@@ -31,3 +67,4 @@ public static class ServerEventsRegistration
     }
 {{~ end ~}}
 }
+{{~ end ~}}

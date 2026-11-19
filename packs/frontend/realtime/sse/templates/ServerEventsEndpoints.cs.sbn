@@ -1,11 +1,14 @@
 {{~ tenanted = project["backend.tenancy"] != "none"
-   signed_in = project["backend.auth"] != "none" ~}}
+   signed_in = project["backend.auth"] != "none"
+   services = project["backend.topology"] == "services" ~}}
 using System.Net.ServerSentEvents;
+{{~ if !services ~}}
 using {{ namespace }}.BuildingBlocks.Realtime;
+{{~ end ~}}
 {{~ if tenanted ~}}
 using {{ namespace }}.BuildingBlocks.Tenancy;
 {{~ end ~}}
-using {{ namespace }}.Host.Realtime;
+using {{ namespace }}.{{ if services }}Edge{{ else }}Host{{ end }}.Realtime;
 {{~ if signed_in ~}}
 using Microsoft.AspNetCore.Authentication;
 {{~ end ~}}
@@ -15,7 +18,13 @@ namespace Microsoft.AspNetCore.Builder;
 public static class ServerEventsEndpoints
 {
     /// <summary>
-{{~ if signed_in ~}}
+{{~ if services && signed_in ~}}
+    /// The browsers' event stream on the edge, GET /server-events, for signed-in users. What reaches it comes from the
+    /// services, over the broker; each service maps its own Development test endpoint, under its module.
+{{~ else if services ~}}
+    /// The browsers' event stream on the edge, GET /server-events, open to anyone (backend.auth: none). What reaches it
+    /// comes from the services, over the broker; each service maps its own Development test endpoint, under its module.
+{{~ else if signed_in ~}}
     /// The browsers' event stream, GET /server-events, for signed-in users, and in Development POST /server-events/test,
     /// which sends a <see cref="TestEvent"/> to the caller's browsers{{ if tenanted }} and the rest of their tenant's{{ end }}.
 {{~ else ~}}
@@ -37,6 +46,7 @@ public static class ServerEventsEndpoints
                 TypedResults.ServerSentEvents(AfterTheHeadersAsync(context.Response, streams.ListenAsync(context.RequestAborted))))
             .ExcludeFromDescription();
 {{~ end ~}}
+{{~ if !services ~}}
         if (app.Environment.IsDevelopment())
         {
             app.MapPost("/server-events/test", async (TestEvent testEvent, IBrowserEvents browserEvents, CancellationToken cancellationToken) =>
@@ -49,6 +59,7 @@ public static class ServerEventsEndpoints
 {{~ end ~}}
                 .ExcludeFromDescription();
         }
+{{~ end ~}}
 
         return app;
     }

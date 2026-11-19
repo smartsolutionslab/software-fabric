@@ -1,0 +1,18 @@
+using {{ namespace }}.BuildingBlocks.Realtime;
+using Microsoft.AspNetCore.SignalR;
+
+namespace {{ namespace }}.Edge.Realtime;
+
+/// <summary>
+/// Pushes a browser event a service published on the broker to every browser connected to the edge's hub, under the
+/// name the browser listens for.
+/// </summary>
+public sealed class BrowserEventConsumer(IHubContext<EventsHub> hub)
+{
+    public Task HandleAsync(BrowserEventV1 message, CancellationToken cancellationToken)
+    {
+        {{ not_null "message" }}
+
+        return hub.Clients.All.SendAsync(message.Type, message.Payload, cancellationToken);
+    }
+}

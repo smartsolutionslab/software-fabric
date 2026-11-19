@@ -1,1 +1,1 @@
-app.MapServerEvents();
+{{ if project["backend.topology"] == "services" }}app.MapBrowserEventsTest();{{ else }}app.MapServerEvents();{{ end }}

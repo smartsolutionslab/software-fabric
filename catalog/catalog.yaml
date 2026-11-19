@@ -609,9 +609,10 @@ dimensions:
     default: none
     options:
       none:    { tier: supported }
-      # With services the hub and the event stream belong on the edge, which #707 builds (ADR-0017).
-      signalr: { tier: experimental, conflicts: ["backend.topology == services"] }
-      sse:     { tier: experimental, conflicts: ["backend.topology == services"] }
+      # With services the hub or the event stream lives on the edge, and services send it browser events over the bus
+      # (ADR-0017, amended).
+      signalr: { tier: experimental }
+      sse:     { tier: experimental }
 
   frontend.agent-ui:
     scope: project
@@ -625,7 +626,7 @@ dimensions:
         tier: supported  # nightly run 42998190693
         note: "an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host"
         requires: ["frontend.architecture == spa"]
-        # With services the AG-UI endpoint belongs on the edge, which #707 builds (ADR-0017).
+        # With services the owning service speaks AG-UI and the edge forwards it, which #769 builds (ADR-0017, amended).
         conflicts: ["backend.topology == services"]
 
   frontend.auth-client:

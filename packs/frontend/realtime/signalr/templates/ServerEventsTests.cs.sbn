@@ -1,6 +1,10 @@
 {{~ tenanted = project["backend.tenancy"] != "none"
    signed_in = project["backend.auth"] != "none"
+   services = project["backend.topology"] == "services"
    usings = ["System.Collections.Concurrent", "System.Net.Http.Json", "Microsoft.AspNetCore.SignalR.Client"]
+   if services
+     usings = array.concat usings ["Aspire.Hosting", "Aspire.Hosting.ApplicationModel", "Microsoft.Extensions.DependencyInjection"]
+   end
    if signed_in
      usings = array.concat (usings | array.add "System.Net" | array.add "System.Net.Http.Headers") (short_lived_test_user_token_namespaces | string.split " ")
    end
@@ -19,7 +23,14 @@ using {{ name_space }};
 
 namespace {{ namespace }}.Integration.Tests;
 
+{{~ if services ~}}
+/// <summary>
+/// The edge's event hub (/hubs/events) seen from a browser's side: what it receives from every service, over the
+/// broker, and who may connect. The services are the AppHost's own, so a new module's sends too.
+/// </summary>
+{{~ else ~}}
 /// <summary>The host's event hub (/hubs/events) seen from a browser's side: what it receives, and who may connect.</summary>
+{{~ end ~}}
 {{~ integration_fixture_attributes ~}}
 public class ServerEventsTests({{ integration_fixture }})
 {
@@ -28,6 +39,10 @@ public class ServerEventsTests({{ integration_fixture }})
 
 {{~ end ~}}
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(30);
+{{~ if services ~}}
+
+    private static readonly string ServicesFolder = Path.Combine("src", "Services") + Path.DirectorySeparatorChar;
+{{~ end ~}}
 {{~ if tenanted ~}}
 
     {{ test_attribute }}
@@ -45,6 +60,28 @@ public class ServerEventsTests({{ integration_fixture }})
 
         {{ `firstBrowser.Received` | should_not_contain `secondText` }};
         {{ `secondBrowser.Received` | should_not_contain `firstText` }};
+    }
+{{~ else if services ~}}
+
+    {{ test_attribute }}
+    public async Task A_test_event_from_every_service_reaches_a_browser_connected_to_the_edge()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+{{~ if signed_in ~}}
+        using var sender = await {{ signed_in_host_client `"developer"` }};
+{{~ else ~}}
+        using var sender = {{ host_client }};
+{{~ end ~}}
+        await using var browser = await Browser.ConnectAsync(sender, cancellationToken);
+
+        List<string> received = [];
+        foreach (var module in Modules())
+        {
+            var text = await SendUntilReceivedAsync(sender, browser, module, cancellationToken);
+            received.Add($"{module} {browser.Received.Contains(text)}");
+        }
+
+        {{ `string.Join(", ", received)` | should_be `string.Join(", ", Modules().Select(module => $"{module} True"))` }};
     }
 {{~ else ~}}
 
@@ -91,6 +128,29 @@ public class ServerEventsTests({{ integration_fixture }})
     }
 {{~ end ~}}
 
+{{~ if services ~}}
+    /// <summary>The modules the AppHost started a service for: its projects under src/Services, named after their modules.</summary>
+    private List<string> Modules() =>
+        [.. {{ running_application }}.Services.GetRequiredService<DistributedApplicationModel>().Resources
+            .OfType<ProjectResource>()
+            .Where(resource => resource.GetProjectMetadata().ProjectPath.Contains(ServicesFolder, StringComparison.Ordinal))
+            .Select(resource => resource.Name)
+            .Order(StringComparer.Ordinal)];
+
+    /// <summary>
+    /// Sends test events from the module's service until the browser has received one, and returns its text: the event
+    /// crosses the broker and the edge, and a connection listens only once it has started, so an event sent at once may
+    /// reach nobody.
+    /// </summary>
+    private static async Task<string> SendUntilReceivedAsync(HttpClient sender, Browser browser, string module, CancellationToken cancellationToken)
+    {
+        var text = $"test event from {module} {Guid.CreateVersion7()}";
+        using var patience = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        patience.CancelAfter(Patience);
+        while (!browser.Received.Contains(text))
+        {
+            using var sent = await sender.PostAsJsonAsync(new Uri($"/{module}/server-events/test", UriKind.Relative), new { text }, patience.Token);
+{{~ else ~}}
     /// <summary>
     /// Sends test events until the browser has received one, and returns its text: a connection joins its group only
     /// once it has started, so an event sent at once may reach nobody.
@@ -103,6 +163,7 @@ public class ServerEventsTests({{ integration_fixture }})
         while (!browser.Received.Contains(text))
         {
             using var sent = await sender.PostAsJsonAsync(new Uri("/hubs/events/test", UriKind.Relative), new { text }, patience.Token);
+{{~ end ~}}
             sent.EnsureSuccessStatusCode();
             await Task.Delay(TimeSpan.FromMilliseconds(200), patience.Token);
         }

@@ -7,7 +7,7 @@ using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 
-namespace {{ namespace }}.Host.Realtime;
+namespace {{ namespace }}.{{ if project["backend.topology"] == "services" }}Edge{{ else }}Host{{ end }}.Realtime;
 
 /// <summary>
 /// The browsers' open streams at /server-events{{ if tenanted }}, each with its user's tenant{{ end }}. A stream that falls
