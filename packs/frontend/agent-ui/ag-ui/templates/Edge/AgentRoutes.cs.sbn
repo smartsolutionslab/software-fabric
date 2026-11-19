@@ -1,0 +1,49 @@
+{{~ signed_in = project["backend.auth"] != "none" ~}}
+using Yarp.ReverseProxy.Configuration;
+
+namespace {{ namespace }}.Edge.Agents;
+
+/// <summary>
+/// The edge's routes to the agents (ADR-0017, amended): before the edge starts listening, it asks every service the
+/// AppHost started for its agents' names, at GET /&lt;module&gt;/agents{{ if signed_in }}, with a token of its own
+/// (<see cref="EdgeClientToken"/>), since it holds no user's token then{{ end }}, and routes POST /agents/{name} to the
+/// service that owns the agent. A name two services list stops the edge, naming both. The edge never speaks AG-UI: it
+/// forwards the request and streams the service's answer back unchanged.
+/// </summary>
+public sealed class AgentRoutes(IHttpClientFactory clients, IConfiguration configuration) : IHostedLifecycleService
+{
+    /// <summary>The HttpClient the edge asks the services with.</summary>
+    public const string Client = "agent-routes";
+
+    /// <summary>The routes, empty until the table is read.</summary>
+    public InMemoryConfigProvider Provider { get; } = new([], []);
+
+    public async Task StartingAsync(CancellationToken cancellationToken)
+    {
+        using var client = clients.CreateClient(Client);
+        Dictionary<string, IReadOnlyList<string>> agentsByModule = [with(StringComparer.Ordinal)];
+        foreach (var module in ModuleRoutes.Modules(configuration))
+        {
+            agentsByModule[module] = await client.GetFromJsonAsync<List<string>>(new Uri("http://" + module + "/" + module + "/agents"), cancellationToken)
+                ?? throw new InvalidOperationException($"The service {module} answered no list of agents.");
+        }
+
+        var table = AgentRouteTable.From(agentsByModule);
+        if (table.Problems.Count > 0)
+        {
+            throw new InvalidOperationException("The edge cannot route POST /agents/{name}:" + Environment.NewLine + string.Join(Environment.NewLine, table.Problems));
+        }
+
+        Provider.Update(table.Routes(), []);
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StartedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StoppingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+}

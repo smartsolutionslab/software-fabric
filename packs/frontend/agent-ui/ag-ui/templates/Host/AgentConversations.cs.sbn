@@ -38,6 +38,11 @@ public sealed partial class AgentConversations
         return new AgentConversations(byName, problems);
     }
 
+{{~ if project["backend.topology"] == "services" ~}}
+    /// <summary>The names of the agents this host's module registers, in order: what the edge routes to this service.</summary>
+    public IReadOnlyList<string> Names => [.. byName.Keys.Order(StringComparer.Ordinal)];
+
+{{~ end ~}}
     /// <summary>The agent of that name, or null when no module registers one.</summary>
     public AgentConversation? Find(string agentName) => byName.GetValueOrDefault(agentName);
 

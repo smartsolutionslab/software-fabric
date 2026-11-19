@@ -4,20 +4,43 @@ namespace Microsoft.AspNetCore.Builder;
 
 public static class AgentUiEndpoints
 {
+{{~ if project["backend.topology"] == "services" ~}}
+    /// <summary>
+    /// The agent panel's endpoint for this service's own agents (ADR-0017, amended), <c>POST /&lt;module&gt;/agents/{name}</c>{{ if project["backend.auth"] == "none" }}, open to anyone (backend.auth: none){{ else }}, for signed-in users{{ end }}:
+    /// it reads the AG-UI input, sends the named agent's query through the dispatcher and streams the agent's updates back
+    /// as AG-UI events. Beside it, <c>GET /&lt;module&gt;/agents</c> lists the agents' names, which the edge reads once at
+    /// startup to forward the browser's <c>POST /agents/{name}</c> to the service that owns the agent. Neither is described
+    /// in the OpenAPI document: the panel speaks AG-UI, and the list is the edge's alone.
+    /// </summary>
+{{~ else ~}}
     /// <summary>
     /// <c>POST /agents/{name}</c>, the agent panel's one endpoint{{ if project["backend.auth"] == "none" }}, open to anyone (backend.auth: none){{ else }}, for signed-in users{{ end }}: it reads the AG-UI
     /// input, sends the named agent's query through the dispatcher and streams the agent's updates back as AG-UI events.
     /// The panel speaks AG-UI rather than the OpenAPI document's REST, so the endpoint is not described there.
     /// </summary>
+{{~ end ~}}
     public static WebApplication MapAgentUi(this WebApplication app)
     {
         {{ not_null "app" }}
 
+{{~ if project["backend.topology"] == "services" ~}}
+        app.MapPost("/" + ServiceModule.Name + "/agents/{name}", AgentRuns.RunAsync)
+{{~ if project["backend.auth"] != "none" ~}}
+            .RequireAuthorization()
+{{~ end ~}}
+            .ExcludeFromDescription();
+        app.MapGet("/" + ServiceModule.Name + "/agents", (AgentConversations conversations) => conversations.Names)
+{{~ if project["backend.auth"] != "none" ~}}
+            .RequireAuthorization()
+{{~ end ~}}
+            .ExcludeFromDescription();
+{{~ else ~}}
         app.MapPost("/agents/{name}", AgentRuns.RunAsync)
 {{~ if project["backend.auth"] != "none" ~}}
             .RequireAuthorization()
 {{~ end ~}}
             .ExcludeFromDescription();
+{{~ end ~}}
         return app;
     }
 }

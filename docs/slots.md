@@ -373,6 +373,8 @@ copy of it (*#322*).
 | `claim_mapping_adr` | Markdown for the claims ADR: which claims the provider maps, how to add one, and what is development only |
 | `claim_change_adr` | Markdown, the claims ADR's consequence of a new claim |
 | `add_claim_rule` | Markdown, the agent rule on adding a claim |
+| `edge_client_resources` | C# statements in the AppHost's resources, after the provider's: with services, the edge's own client-credentials client (`<name>-edge`), its secret the parameter `edge-client-secret` (*#769*) |
+| `edge_client_wiring` | chained calls on the edge, each starting on a new line, giving it `EdgeClient:TokenEndpoint`, `EdgeClient:ClientId`, `EdgeClient:ClientSecret` (and `EdgeClient:Scope` where the provider needs one) |
 
 Generic OIDC (`backend.auth.generic-oidc`, *#251*) reads standard claims
 under the provider's own names (`MapInboundClaims = false`): its

@@ -27,6 +27,37 @@ public sealed class TokenIssuer(StandInSettings settings, SigningKey key, TimePr
             "openid profile");
     }
 
+{{~ if project["backend.topology"] == "services" && object.has_key(project, "frontend.agent-ui") && project["frontend.agent-ui"] == "ag-ui" ~}}
+    /// <summary>An access token for the API issued to an application in its own name, as Entra ID's client-credentials grant issues one.</summary>
+    public string IssueForApplication(string authority, string directory, string application, TimeSpan lifetime)
+    {
+        {{ not_null "authority" }}
+        {{ not_null "directory" }}
+        {{ not_null "application" }}
+
+        var objectId = new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(application)).AsSpan(0, 16)).ToString();
+        var now = time.GetUtcNow().UtcDateTime;
+        return Handler.CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = Issuer(authority, directory),
+            Audience = settings.Audience,
+            IssuedAt = now,
+            NotBefore = now,
+            Expires = now + lifetime,
+            Claims = new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                ["ver"] = "2.0",
+                ["tid"] = directory,
+                ["oid"] = objectId,
+                ["sub"] = objectId,
+                ["azp"] = application,
+                ["idtyp"] = "app",
+            },
+            SigningCredentials = new SigningCredentials(key.Key, SecurityAlgorithms.RsaSha256),
+        });
+    }
+
+{{~ end ~}}
     private string Create(string authority, string name, string audience, TimeSpan lifetime, string? nonce)
     {
         var user = settings.Users[name];

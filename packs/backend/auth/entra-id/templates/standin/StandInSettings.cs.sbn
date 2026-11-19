@@ -17,4 +17,9 @@ public sealed class StandInSettings
 
     /// <summary>The local users by name; each one's password is their name.</summary>
     public IReadOnlyDictionary<string, StandInUser> Users { get; init; } = new Dictionary<string, StandInUser>(StringComparer.Ordinal);
+{{~ if project["backend.topology"] == "services" && object.has_key(project, "frontend.agent-ui") && project["frontend.agent-ui"] == "ag-ui" ~}}
+
+    /// <summary>The applications that sign in as themselves (the client-credentials grant), by client ID: each one's secret.</summary>
+    public IReadOnlyDictionary<string, string> Applications { get; init; } = new Dictionary<string, string>(StringComparer.Ordinal);
+{{~ end ~}}
 }

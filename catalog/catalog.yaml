@@ -625,9 +625,8 @@ dimensions:
       ag-ui:
         tier: supported  # nightly run 42998190693
         note: "an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host"
+        # With services the owning service speaks AG-UI and the edge forwards it (ADR-0017, amended).
         requires: ["frontend.architecture == spa"]
-        # With services the owning service speaks AG-UI and the edge forwards it, which #769 builds (ADR-0017, amended).
-        conflicts: ["backend.topology == services"]
 
   frontend.auth-client:
     scope: project
