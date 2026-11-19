@@ -1,0 +1,79 @@
+{{~ ns = module.namespace ~}}
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { afterEach, expect, test, vi } from 'vitest';
+import { useCreate{{ ns }}Sample, use{{ ns }}Samples } from './use{{ ns }}Samples';
+
+// The host, as GET and POST /{{ module.name }}/samples reach it through the typed client, which sends a Request.
+const host = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
+vi.stubGlobal('fetch', host);
+afterEach(() => host.mockReset());
+// Without Vitest's globals, Testing Library does not unmount between tests by itself.
+afterEach(cleanup);
+
+/** The method of a call, whether it came as a Request or as a URL with its options. */
+function methodOf(input: RequestInfo | URL, init?: RequestInit) {
+  return input instanceof Request ? input.method : init?.method;
+}
+
+const ada = { id: '0198c1a0-0000-7000-8000-000000000001', name: 'Ada' };
+const bea = { id: '0198c1a0-0000-7000-8000-000000000002', name: 'Bea' };
+
+function page(items: (typeof ada)[]) {
+  return Response.json({ items, totalCount: items.length, page: 1, pageSize: 20 });
+}
+
+// A query client of its own per test, so no answer is cached from the test before; it does not retry, so a failure
+// shows at once.
+function renderSamples() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  return renderHook(() => ({ list: use{{ ns }}Samples(), creation: useCreate{{ ns }}Sample() }), { wrapper }).result;
+}
+
+const names = (samples: { name: string }[] | undefined) => samples?.map((sample) => sample.name);
+
+test('a created sample is in the list before the server answers and stays once it is created', async () => {
+  let answer: (response: Response) => void = () => undefined;
+  let created = false;
+  host.mockImplementation(async (input, init) => {
+    if (methodOf(input, init) === 'POST') {
+      return new Promise<Response>((resolve) => {
+        answer = resolve;
+      });
+    }
+    return page(created ? [ada, bea] : [ada]);
+  });
+  const samples = renderSamples();
+  await waitFor(() => expect(names(samples.current.list.samples)).toEqual(['Ada']));
+
+  let creating: Promise<boolean> = Promise.resolve(false);
+  act(() => {
+    creating = samples.current.creation.create('Bea');
+  });
+
+  await waitFor(() => expect(names(samples.current.list.samples)).toEqual(['Ada', 'Bea']));
+  created = true;
+  answer(Response.json(bea.id, { status: 201 }));
+  await expect(creating).resolves.toBe(true);
+  await waitFor(() => expect(samples.current.list.samples?.map((sample) => sample.id)).toEqual([ada.id, bea.id]));
+});
+
+test('a sample the server refuses is taken out of the list again', async () => {
+  host.mockImplementation(async (input, init) =>
+    methodOf(input, init) === 'POST' ? Response.json({ title: 'No.' }, { status: 500 }) : page([ada]),
+  );
+  const samples = renderSamples();
+  await waitFor(() => expect(names(samples.current.list.samples)).toEqual(['Ada']));
+
+  let creating: Promise<boolean> = Promise.resolve(true);
+  act(() => {
+    creating = samples.current.creation.create('Bea');
+  });
+
+  await expect(creating).resolves.toBe(false);
+  await waitFor(() => expect(names(samples.current.list.samples)).toEqual(['Ada']));
+});

@@ -43,6 +43,7 @@ public sealed class VueFrontendTests
 
     /// <summary>A module's screen is found by convention: its link is in the navigation and leads to its page.</summary>
     private const string ModuleRouteTest = """
+        import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
         import { render, screen } from '@testing-library/vue';
         import userEvent from '@testing-library/user-event';
         import { expect, test, vi } from 'vitest';
@@ -56,10 +57,13 @@ public sealed class VueFrontendTests
           return { default: { render: () => h('p', 'The user menu') } };
         });
 
+        // The module's page lists its samples through the query client, as the app provides it; the host never answers.
+        vi.stubGlobal('fetch', () => new Promise<Response>(() => undefined));
+
         test('the billing link leads to the billing page', async () => {
           const router = createAppRouter(createMemoryHistory());
           await router.push('/');
-          render(App, { global: { plugins: [router] } });
+          render(App, { global: { plugins: [router, [VueQueryPlugin, { queryClient: new QueryClient() }]] } });
 
           await userEvent.click(screen.getByRole('link', { name: 'Billing' }));
 

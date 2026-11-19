@@ -1,0 +1,53 @@
+{{~ ns = module.namespace ~}}
+{{~ signed_in = project["backend.auth"] != "none" ~}}
+{{~ # FormKit shows a field's message beneath it, not as an alert. ~}}
+{{~ formkit = project["frontend.forms"] == "formkit" ~}}
+import { expect, type Page, test } from '@playwright/test';
+
+/** The {{ ns }} page, as a signed-in user opens it. */
+async function open{{ ns }}(page: Page) {
+  await page.goto('/');
+{{~ if signed_in ~}}
+  {{ browser_sign_in "page" "'developer'" }}
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+{{~ end ~}}
+  await page.goto('/{{ module.name }}');
+  await expect(page.getByRole('heading', { name: 'Samples' })).toBeVisible();
+}
+
+test('a user creates a {{ module.name }} sample and finds it in the list, after a reload too', async ({ page }) => {
+  const name = `E2E ${Date.now()}`;
+  await open{{ ns }}(page);
+
+  await page.getByRole('textbox', { name: 'Name' }).fill(name);
+  await page.getByRole('button', { name: 'Create sample' }).click();
+
+  await expect(page.getByRole('status').filter({ hasText: `The sample ${name} was created.` })).toBeVisible();
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+});
+
+test('a blank name is refused on the {{ module.name }} page and nothing is created', async ({ page }) => {
+  await open{{ ns }}(page);
+
+  await page.getByRole('button', { name: 'Create sample' }).click();
+
+{{~ if formkit ~}}
+  await expect(page.getByText('Give the sample a name.')).toBeVisible();
+{{~ else ~}}
+  await expect(page.getByRole('alert').filter({ hasText: 'Give the sample a name.' })).toBeVisible();
+{{~ end ~}}
+});
+
+test('without samples the {{ module.name }} page says so and its action leads to the form', async ({ page }) => {
+  // The host's list answers empty, whatever samples other tests created.
+  await page.route(/\/api\/{{ module.name }}\/samples\?/, (route) =>
+    route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }),
+  );
+  await open{{ ns }}(page);
+
+  await expect(page.getByText('No samples yet.')).toBeVisible();
+  await page.getByRole('button', { name: 'Create a sample' }).click();
+  await expect(page.getByRole('textbox', { name: 'Name' })).toBeFocused();
+});
