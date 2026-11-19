@@ -41,6 +41,10 @@ jobs:
       matrix:
         combination: ${{ fromJSON(needs.combinations.outputs.names) }}
     runs-on: ubuntu-latest
+    # Docker is the runner's container runtime. Named, Aspire's orchestrator asks only Docker; otherwise it also runs
+    # `podman container ls`, which has hung on the runners and failed AppHosts' dependency check (#827).
+    env:
+      ASPIRE_CONTAINER_RUNTIME: docker
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
