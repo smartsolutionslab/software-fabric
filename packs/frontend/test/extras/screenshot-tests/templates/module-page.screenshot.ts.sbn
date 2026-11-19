@@ -1,0 +1,56 @@
+{{~ ns = module.namespace ~}}
+{{~ signed_in = project["backend.auth"] != "none" ~}}
+{{~ # The accessibility tests write the page's data file; without them, the spec carries the same example itself. ~}}
+{{~ data_file = array.contains(project["frontend.test.extras"], "accessibility") ~}}
+{{~ rtk = project["frontend.api-client"] == "rtk-query-codegen" ~}}
+{{~ # The hook the data file keys the samples by: the generated client's, or the page's own where it reads them. ~}}
+{{~ stands_in = rtk || (project["frontend.api-client"] == "orval" && (project["frontend.framework"] == "react" || project["frontend.state"] != "pinia")) ~}}
+{{~ hook = stands_in ? "useGet" + ns + "Samples" + (rtk ? "Query" : "") : "use" + ns + "Samples" ~}}
+import { expect, type Page, test } from '@playwright/test';
+{{~ if data_file ~}}
+import { examples } from '../src/modules/{{ module.name }}/{{ ns }}Page.data';
+
+// The page shows its data file's example, never the samples other tests created in the database.
+const samples = examples.{{ hook }} as { items: { name: string }[] };
+{{~ else ~}}
+
+// The page shows this example, never the samples other tests created in the database.
+const samples = {
+  items: [
+    { id: '0198c1a0-0000-7000-8000-000000000001', name: 'Ada' },
+    { id: '0198c1a0-0000-7000-8000-000000000002', name: 'Bea' },
+  ],
+  totalCount: 2,
+  page: 1,
+  pageSize: 20,
+};
+{{~ end ~}}
+
+/** The {{ ns }} page{{ if signed_in }}, as a signed-in user opens it,{{ end }} once it shows every example sample in its font. */
+async function open{{ ns }}(page: Page) {
+{{~ if signed_in ~}}
+  await page.goto('/');
+  {{ browser_sign_in "page" "'developer'" }}
+  await expect(page.getByText('Signed in as developer')).toBeVisible();
+{{~ end ~}}
+  await page.goto('/{{ module.name }}');
+  await expect(page.getByRole('heading', { name: 'Samples' })).toBeVisible();
+  for (const { name } of samples.items) {
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
+  }
+  // The font comes with the app: wait until it has loaded rather than compare a fallback.
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+}
+
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`the {{ ns }} page looks as its committed screenshot in the ${colorScheme} theme`, async ({ page }) => {
+    // The system's theme before the first page loads, which the app follows until the user chooses one.
+    await page.emulateMedia({ colorScheme });
+    await page.route(/\/api\/{{ module.name }}\/samples\?/, (route) => route.fulfill({ json: samples }));
+    await open{{ ns }}(page);
+
+    await expect(page).toHaveScreenshot(`{{ module.name }}-page-${colorScheme}.png`, { fullPage: true });
+  });
+}

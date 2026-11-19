@@ -1,14 +1,19 @@
 option: frontend.test.extras.screenshot-tests
 files:
   - { template: templates/start-page.screenshot.ts.sbn, target: web/app/e2e/start-page.screenshot.ts }
+  # Each module page that starts from the sample (#734), in the light and the dark theme, from its data file's example.
+  - { template: templates/module-page.screenshot.ts.sbn, target: "web/app/e2e/{{ module.name }}-page.screenshot.ts", per-module: true, when: 'project["frontend.architecture"] == "spa" && object.has_key(project, "frontend.ui-library") && (project["frontend.ui-library"] == "shadcn" || project["frontend.ui-library"] == "shadcn-vue") && object.has_key(project, "frontend.api-client") && (project["frontend.api-client"] == "rtk-query-codegen" || project["frontend.api-client"] == "orval" || project["frontend.api-client"] == "openapi-fetch") && module.name != "dashboards" && module.name != "assistant"' }
   - { template: templates/screenshots.config.ts.sbn, target: web/app/e2e/screenshots.config.ts }
   - { template: templates/screenshots.sh.sbn, target: ".github/scripts/screenshots.sh" }
 slots:
   - { slot: web.scripts, template: templates/scripts.sbn }
   - { slot: e2e.after-tests, template: templates/e2e-after-tests.sbn }
+  # After e2e.sh, which runs the screenshot tests: the images of a failed comparison.
+  - { slot: ci.e2e-steps, template: templates/ci-e2e-steps.sbn, order: 50 }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
   - { kind: end-to-end-test, describes: "A start page that renders differently from its committed baseline (web/app/e2e/__screenshots__) fails .github/scripts/e2e.sh and the e2e job.", file: templates/start-page.screenshot.ts.sbn }
+  - { kind: end-to-end-test, describes: "Each module page that starts from the sample renders, in the light and the dark theme, its data file's example; a difference from its committed baseline of more than the 100 pixels e2e/screenshots.config.ts allows fails .github/scripts/e2e.sh, and the e2e job uploads the expected, actual and diff images as screenshot-diffs.", file: templates/module-page.screenshot.ts.sbn }
   - { kind: ci-step, describes: "The screenshots render only in Playwright's container pinned by digest, and .github/scripts/screenshots.sh refuses to run when @playwright/test is another version than the image's.", file: templates/screenshots.sh.sbn }
