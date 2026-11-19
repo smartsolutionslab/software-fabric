@@ -25,8 +25,8 @@ public readonly struct Result<TValue, TError> : Result<TValue, TError>.IUnionMem
 
     /// <summary>
     /// What makes the result a union, kept apart so that <see cref="Value"/> stays the success's value: the compiler
-    /// turns a case into a result with <c>Create</c>, which lets a handler write <c>Success(dto)</c> and the return type
-    /// supply the error type, and matches a case with <c>TryGetValue</c>, without boxing it.
+    /// matches a case with <c>TryGetValue</c>, without boxing it. A case becomes a result through the conversions below,
+    /// which the compiler prefers to <c>Create</c>.
     /// </summary>
     public interface IUnionMembers
     {
@@ -60,6 +60,14 @@ public readonly struct Result<TValue, TError> : Result<TValue, TError>.IUnionMem
     static Result<TValue, TError> IUnionMembers.Create(SuccessOutcome<TValue> outcome) => Success(outcome.Value);
 
     static Result<TValue, TError> IUnionMembers.Create(FailureOutcome<TError> outcome) => Failure(outcome.Error);
+
+    // What lets a handler write Success(dto) and the return type supply the error type. Through Create, a static abstract
+    // member, every such return was a constrained call, and code coverage made methods with one into IL the runtime
+    // refuses (InvalidProgramException) once a second covered process, such as the MigrationRunner the Testcontainers
+    // fixture starts, had loaded the same assembly. A conversion operator is a plain call.
+    public static implicit operator Result<TValue, TError>(SuccessOutcome<TValue> outcome) => Success(outcome.Value);
+
+    public static implicit operator Result<TValue, TError>(FailureOutcome<TError> outcome) => Failure(outcome.Error);
 
 #pragma warning disable CA1000 // Static factories on the generic type: Result<InvoiceDto, ApiError>.Success(dto) where no return type infers it.
     public static Result<TValue, TError> Success(TValue value) => new(value, default!, isSuccess: true);

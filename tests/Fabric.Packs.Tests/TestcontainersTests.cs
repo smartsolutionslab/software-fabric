@@ -193,6 +193,31 @@ public sealed partial class TestcontainersTests
     }
 
     /// <summary>
+    /// The host runs in the integration tests' process, so the code coverage test.sh measures instruments it, and the
+    /// runtime refused that instrumented code where it called a static abstract member (#817): a typed-outcomes
+    /// <c>Success(...)</c> or <c>Failure(...)</c> in <c>Dashboard.Create</c>, which converted to the result through its
+    /// union members, and ag-ui's registration reading each conversation's agent name. The generated CI's step, test.sh
+    /// over every test project and its coverage gate, passes with the dashboards (on xUnit and NUnit) and with ag-ui.
+    /// </summary>
+    [Theory]
+    [InlineData("saas-standard-react", new[] { "frontend.dashboards=user-editable", "backend.guards=bcl", "backend.absence=nullable", "backend.bus.transport=none", "backend.tenancy=none" })]
+    [InlineData("saas-standard-react", new[] { "frontend.dashboards=user-editable", "backend.guards=bcl", "backend.absence=nullable", "backend.bus.transport=none", "backend.tenancy=none", "backend.test.framework=nunit" })]
+    [InlineData("saas-ai-react", new string[0])]
+    public void The_host_in_the_integration_tests_runs_under_code_coverage(string profile, string[] overrides)
+    {
+        using var project = NewProject(profile, overrides);
+        project.Build();
+        DockerPorts.EnsureRunsAlone();
+
+        var (exitCode, output) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/test.sh");
+
+        // Each refused method once, with the frames that name it, rather than the whole run's output.
+        List<string> refused = [.. InvalidProgram().Matches(output).Select(match => match.Value).Distinct(StringComparer.Ordinal)];
+        refused.ShouldBeEmpty();
+        exitCode.ShouldBe(0, output);
+    }
+
+    /// <summary>
     /// A MigrationRunner that outlives the fixture's startup timeout is killed with the setup it fails, not left running
     /// (#314): the timeout comes from INTEGRATION_TESTS_STARTUP_TIMEOUT, here seconds, and the runner stalls forever
     /// after recording its process ID. <c>dotnet run</c> starts it as a child of its own, so only killing the whole
@@ -298,6 +323,9 @@ public sealed partial class TestcontainersTests
         standIns.ShouldBeEmpty();
         return project;
     }
+
+    [GeneratedRegex(@"InvalidProgramException.*(\r?\n.*){2}")]
+    private static partial Regex InvalidProgram();
 
     [GeneratedRegex(@"\bAspireFixture\b|Aspire\.Hosting|AppHost\.csproj|DistributedApplication")]
     private static partial Regex Aspire();

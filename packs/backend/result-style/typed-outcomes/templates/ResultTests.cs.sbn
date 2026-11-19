@@ -68,6 +68,19 @@ public class ResultTests
         {{ `Describe(Failure(NotFound))` | should_be `"billing.invoice-not-found"` }};
     }
 
+    {{ test_attribute }}
+    public void The_union_members_make_the_result_of_each_case()
+    {
+        {{ `Make<Result<int, ApiError>>(Success(42)).Value` | should_be `42` }};
+        {{ `Make<Result<int, ApiError>>(Failure(NotFound)).Error` | should_be `NotFound` }};
+    }
+
+    private static Result<int, ApiError> Make<TUnion>(SuccessOutcome<int> outcome)
+        where TUnion : Result<int, ApiError>.IUnionMembers => TUnion.Create(outcome);
+
+    private static Result<int, ApiError> Make<TUnion>(FailureOutcome<ApiError> outcome)
+        where TUnion : Result<int, ApiError>.IUnionMembers => TUnion.Create(outcome);
+
     private static string Describe(Result<int, ApiError> result) =>
         result switch
         {
