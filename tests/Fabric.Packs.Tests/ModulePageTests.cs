@@ -75,10 +75,10 @@ public sealed partial class ModulePageTests
         form.ShouldContain(validation == "zod" ? "from 'zod'" : "from 'valibot'");
     }
 
-    /// <summary>The shell's toasts where the shell is (react-router), a message beside the form elsewhere (tanstack-router).</summary>
+    /// <summary>The shell's toasts where the shell is: with shadcn, react-router's (#695) and TanStack Router's (#736).</summary>
     [Theory]
     [InlineData("frontend.routing=react-router", true)]
-    [InlineData("frontend.routing=tanstack-router", false)]
+    [InlineData("frontend.routing=tanstack-router", true)]
     public void The_result_is_a_toast_where_the_shell_is_and_a_message_beside_the_form_elsewhere(string routing, bool shell)
     {
         var page = WithBilling("saas-standard-react", routing)[Page];
