@@ -5,4 +5,5 @@
 - `src/App.tsx` is the app shell; it finds the modules' `routes.tsx` files for the sidebar, the routes, the breadcrumbs (`src/shell/Breadcrumbs.tsx`) and the command palette (`src/shell/CommandPalette.tsx`). A route's `title` is its name in all three. Its tests are `src/shell/AppShell.test.tsx`.
 {{~ end ~}}
 - Import from `react-router`, never `react-router-dom`.
-- Tests render routes inside `MemoryRouter`.
+- Every `Link` and `NavLink` carries `viewTransition`, and `navigate(to, { viewTransition: true })` asks for one too: the app runs a data router (`src/providers/AppRouter.tsx`), so a route change is a view transition where the browser has the View Transitions API, and changes the page as before where it has not. With reduced motion `src/index.css` takes the transition's animation away, so the page changes at once. No generated module has a detail page; to carry an element from a list row to its detail page, give the row's element and the detail page's heading the same CSS `view-transition-name`, unique on each page, never on more than one element at a time.
+- Tests render routes inside `MemoryRouter`; a test of a view transition renders `createMemoryRouter` with `RouterProvider` from `react-router/dom`, as `src/App.test.tsx` does.

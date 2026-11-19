@@ -25,6 +25,7 @@ declares-slots:
   - { slot: web.shell-actions, description: "Elements at the end of the app shell's navigation bar, indented as its links are (six spaces): controls of the whole app (a theme toggle, a user menu). With shadcn-vue in a single-page app they are the sidebar's footer, in contribution order." }
 slots:
   - { slot: web.dependencies, template: templates/dependency.sbn }
+  - { slot: web.styles, template: templates/view-transitions.css.sbn, order: 95 }
   - { slot: web.imports, template: templates/import.sbn, order: 10 }
   - { slot: web.providers, template: templates/provider.sbn, order: 20 }
   - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 10 }
@@ -32,7 +33,7 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: unit-test, describes: "The start page renders through the router and names the application (src/App.test.ts).", file: templates/App.test.ts.sbn }
+  - { kind: unit-test, describes: "The start page renders through the router and names the application, and the Home link goes to it inside document.startViewTransition where the browser has it and as before where it has not (src/App.test.ts).", file: templates/App.test.ts.sbn }
   - { kind: lint-rule, describes: "Importing unplugin-vue-router (file-based routes) fails lint: routes are declared in src/router.ts and each module's routes.ts.", file: templates/restricted.sbn }
   - { kind: unit-test, describes: "With shadcn-vue in a single-page app, the shell's sidebar lists the start page and every module from its routes.ts and collapses, the breadcrumbs follow the route, and Ctrl+K or Cmd+K opens a command palette the keyboard alone goes to a page with (src/shell/AppShell.test.ts).", file: templates/shell/AppShell.test.ts.sbn }
   - { kind: unit-test, describes: "With shadcn-vue and the accessibility tests, axe finds no violations in the shell, its open command palette and its collapsed sidebar, in the light and the dark theme (src/shell/AppShell.axe.test.ts).", file: templates/shell/AppShell.axe.test.ts.sbn }

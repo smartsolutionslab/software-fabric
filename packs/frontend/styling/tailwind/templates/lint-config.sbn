@@ -1,0 +1,40 @@
+{{~ vue = project["frontend.framework"] == "vue" ~}}
+  {
+    // Every animation runs only without prefers-reduced-motion: reduce (docs/adr). An animate-* or transition* class
+    // carries motion-safe: (or motion-reduce:), whether it is in a script's string{{ if vue }} or in a template{{ end }}.
+    files: ['src/**/*.{ts,{{ if vue }}vue{{ else }}tsx{{ end }}}'],
+    ignores: ['**/*.test.*'],
+    plugins: {
+      motion: {
+        rules: {
+          'respect-reduced-motion': {
+            meta: { type: 'problem' },
+            create(context) {
+              const unguarded =
+                /(?<=^|\s)((?!\S*motion-(?:safe|reduce):)(?:\S*:)?(?:animate-(?!none(?:\s|$))\S+|transition(?:-(?!none(?:\s|$))\S+)?))(?=\s|$)/g;
+              const check = (node, text) => {
+                for (const [, name] of text.matchAll(unguarded)) {
+                  context.report({
+                    node,
+                    message: `'${name}' animates whatever the reader's motion settings: write motion-safe:${name}.`,
+                  });
+                }
+              };
+              const script = {
+                Literal: (node) => typeof node.value === 'string' && check(node, node.value),
+                TemplateElement: (node) => check(node, node.value.raw),
+              };
+{{~ if vue ~}}
+              // A .vue file's template is not the script's tree: its parser visits the template's attributes apart.
+              const template = context.sourceCode.parserServices?.defineTemplateBodyVisitor;
+              return template ? template({ ...script, VLiteral: (node) => check(node, node.value) }, script) : script;
+{{~ else ~}}
+              return script;
+{{~ end ~}}
+            },
+          },
+        },
+      },
+    },
+    rules: { 'motion/respect-reduced-motion': 'error' },
+  }
