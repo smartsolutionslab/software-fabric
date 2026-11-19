@@ -1,0 +1,17 @@
+using {{ namespace }}.BuildingBlocks.Realtime;
+
+namespace {{ namespace }}.Edge.Realtime;
+
+/// <summary>
+/// Writes a browser event a service published on the broker to every stream open on the edge, under the name the
+/// browser listens for.
+/// </summary>
+public sealed class BrowserEventConsumer(BrowserEventStreams streams)
+{
+    public void Handle(BrowserEventV1 message)
+    {
+        {{ not_null "message" }}
+
+        streams.Send(message.Type, message.Payload);
+    }
+}

@@ -1,3 +1,34 @@
+{{~ if project["backend.topology"] == "services" ~}}
+using {{ namespace }}.Edge.Realtime;
+
+namespace Microsoft.AspNetCore.Builder;
+
+public static class ServerEventsEndpoints
+{
+    /// <summary>
+{{~ if project["backend.auth"] == "none" ~}}
+    /// The browsers' hub on the edge, open to anyone (backend.auth: none). What reaches it comes from the services, over
+    /// the broker; each service maps its own Development test endpoint, under its module.
+{{~ else ~}}
+    /// The browsers' hub on the edge, for signed-in users. What reaches it comes from the services, over the broker; each
+    /// service maps its own Development test endpoint, under its module.
+{{~ end ~}}
+    /// </summary>
+    public static WebApplication MapServerEvents(this WebApplication app)
+    {
+        {{ not_null "app" }}
+
+{{~ if project["backend.auth"] == "none" ~}}
+        app.MapHub<EventsHub>("/hubs/events");
+{{~ else ~}}
+        // A connection outlives the token it started with; closing it then makes the browser reconnect with a fresh one,
+        // so the user is checked again.
+        app.MapHub<EventsHub>("/hubs/events", options => options.CloseOnAuthenticationExpiration = true).RequireAuthorization();
+{{~ end ~}}
+        return app;
+    }
+}
+{{~ else ~}}
 using {{ namespace }}.BuildingBlocks.Realtime;
 using {{ namespace }}.Host.Realtime;
 
@@ -41,3 +72,4 @@ public static class ServerEventsEndpoints
         return app;
     }
 }
+{{~ end ~}}

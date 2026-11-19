@@ -31,9 +31,9 @@ declares-slots:
   # What exists once per application goes to the edge, src/Edge, instead (ADR-0017): /me, a hub, AG-UI. Each service is
   # its own MCP server, at /<module>/mcp (ADR-0017, amended 2026-11-18).
   - { slot: edge.packages, description: "<PackageReference> lines for the edge (src/Edge/Edge.csproj) alone, beside host.packages, which it renders too: the edge compiles src/Host as every service host does." }
-  - { slot: edge.services, description: "Statements registering services on the edge's builder, for what the edge maps itself (authentication, the OpenAPI document)." }
+  - { slot: edge.services, description: "Statements registering services on the edge's builder, for what the edge maps itself (authentication, the OpenAPI document, the hub or the event stream) and the broker it listens on." }
   - { slot: edge.middleware, description: "Statements adding middleware to the edge's built app, before the edge's own endpoints and the module routes are mapped." }
-  - { slot: edge.endpoints, description: "Endpoints the application has once, mapped on WebApplication app in the edge alone (/me); never in a service host (SingletonsLiveOnTheEdge)." }
+  - { slot: edge.endpoints, description: "Endpoints the application has once, mapped on WebApplication app in the edge alone (/me, the hub or the event stream); never in a service host (SingletonsLiveOnTheEdge)." }
 slots:
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
   - { slot: apphost.host, template: templates/apphost-host.sbn }

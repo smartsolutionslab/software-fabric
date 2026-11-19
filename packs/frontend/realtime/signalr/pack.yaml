@@ -3,11 +3,21 @@ files:
   - { template: templates/IBrowserEvents.cs.sbn, target: src/BuildingBlocks/Realtime/IBrowserEvents.cs }
   # With services, a service sends a browser event to the edge over the broker (ADR-0017).
   - { template: templates/BrowserEventV1.cs.sbn, target: src/BuildingBlocks/Realtime/BrowserEventV1.cs, when: 'project["backend.topology"] == "services"' }
-  - { template: templates/EventsHub.cs.sbn, target: src/Host/Realtime/EventsHub.cs }
-  - { template: templates/HubBrowserEvents.cs.sbn, target: src/Host/Realtime/HubBrowserEvents.cs }
+  - { template: templates/EventsHub.cs.sbn, target: src/Host/Realtime/EventsHub.cs, when: 'project["backend.topology"] != "services"' }
+  - { template: templates/HubBrowserEvents.cs.sbn, target: src/Host/Realtime/HubBrowserEvents.cs, when: 'project["backend.topology"] != "services"' }
   - { template: templates/TestEvent.cs.sbn, target: src/Host/Realtime/TestEvent.cs }
-  - { template: templates/ServerEventsRegistration.cs.sbn, target: src/Host/Wiring/ServerEventsRegistration.cs }
-  - { template: templates/ServerEventsEndpoints.cs.sbn, target: src/Host/Wiring/ServerEventsEndpoints.cs }
+  - { template: templates/ServerEventsRegistration.cs.sbn, target: src/Host/Wiring/ServerEventsRegistration.cs, when: 'project["backend.topology"] != "services"' }
+  - { template: templates/ServerEventsEndpoints.cs.sbn, target: src/Host/Wiring/ServerEventsEndpoints.cs, when: 'project["backend.topology"] != "services"' }
+  # With services the hub lives on the edge, which every browser is connected to, and a consumer there pushes what the
+  # services publish on the broker; every service host compiles src/Host, so none of it goes there (ADR-0017, amended).
+  # A service's IBrowserEvents publishes, and each service maps the Development test endpoint under its own module.
+  - { template: templates/EventsHub.cs.sbn, target: src/Edge/Realtime/EventsHub.cs, when: 'project["backend.topology"] == "services"' }
+  - { template: templates/BrowserEventConsumer.cs.sbn, target: src/Edge/Realtime/BrowserEventConsumer.cs, when: 'project["backend.topology"] == "services"' }
+  - { template: templates/ServerEventsRegistration.cs.sbn, target: src/Edge/Wiring/ServerEventsRegistration.cs, when: 'project["backend.topology"] == "services"' }
+  - { template: templates/ServerEventsEndpoints.cs.sbn, target: src/Edge/Wiring/ServerEventsEndpoints.cs, when: 'project["backend.topology"] == "services"' }
+  - { template: templates/BusBrowserEvents.cs.sbn, target: src/Host/Realtime/BusBrowserEvents.cs, when: 'project["backend.topology"] == "services"' }
+  - { template: templates/BrowserEventsRegistration.cs.sbn, target: src/Host/Wiring/BrowserEventsRegistration.cs, when: 'project["backend.topology"] == "services"' }
+  - { template: templates/BrowserEventsTestEndpoint.cs.sbn, target: src/Host/Wiring/BrowserEventsTestEndpoint.cs, when: 'project["backend.topology"] == "services"' }
   - { template: templates/ServerEventsTests.cs.sbn, target: tests/Integration.Tests/ServerEventsTests.cs }
   - { template: templates/connection.ts.sbn, target: web/app/src/realtime/connection.ts }
   # The connection's holder is a React context provider or a Vue component; useServerEvent is a hook or a composable,
@@ -23,10 +33,15 @@ files:
   - { template: templates/ServerEvents.test.ts.sbn, target: web/app/src/realtime/ServerEvents.test.ts, when: 'project["frontend.framework"] == "vue"' }
   - { template: templates/useServerEvent.test.ts.sbn, target: web/app/src/realtime/useServerEvent.test.ts, when: 'project["frontend.framework"] == "vue"' }
   - { template: templates/server-events-provider.ts.sbn, target: web/app/src/providers/serverEvents.ts, when: 'project["frontend.framework"] == "vue"' }
-  - { template: templates/server-events.spec.ts.sbn, target: web/app/e2e/server-events.spec.ts }
+  - { template: templates/server-events.spec.ts.sbn, target: web/app/e2e/server-events.spec.ts, when: 'project["backend.topology"] != "services"' }
+  # With services, one per service: each sends its own test event to the browser through the edge.
+  - { template: templates/server-events.spec.ts.sbn, target: "web/app/e2e/{{ module.name }}-server-events.spec.ts", per-module: true, when: 'project["backend.topology"] == "services"' }
 slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 30 }
   - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 30 }
+  # edge.* is declared only by the services topology: there the hub is the edge's.
+  - { slot: edge.services, template: templates/edge-services.sbn, order: 30, optional: true }
+  - { slot: edge.endpoints, template: templates/edge-endpoints.sbn, order: 30, optional: true }
   # With services only (the topology requires a broker, hence Wolverine): the route of BrowserEventV1 to the broker.
   - { slot: messaging.wolverine-options, template: templates/messaging-wolverine-options.sbn, optional: true }
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
@@ -39,9 +54,9 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: unit-test, describes: "Against the running application, a browser of the sender's tenant receives a server event and one of another tenant does not, a connection without a token is refused unless backend.auth is none, and with Keycloak one whose token expires is closed (tests/Integration.Tests/ServerEventsTests.cs).", file: templates/ServerEventsTests.cs.sbn }
+  - { kind: unit-test, describes: "Against the running application, a browser of the sender's tenant receives a server event and one of another tenant does not (with services, a browser connected to the edge receives a test event from every service, over the broker), a connection without a token is refused unless backend.auth is none, and with Keycloak one whose token expires is closed (tests/Integration.Tests/ServerEventsTests.cs).", file: templates/ServerEventsTests.cs.sbn }
   - { kind: unit-test, describes: "useServerEvent hands a component the events it subscribes to and unsubscribes when it unmounts (src/realtime/useServerEvent.test.tsx).", file: templates/useServerEvent.test.tsx.sbn }
   - { kind: unit-test, describes: "ServerEvents starts a connection again when its first start fails or its reconnects run out, and stops once unmounted (src/realtime/ServerEvents.test.tsx).", file: templates/ServerEvents.test.tsx.sbn }
   - { kind: unit-test, describes: "With Vue, useServerEvent hands a component the events it subscribes to and unsubscribes when it unmounts (src/realtime/useServerEvent.test.ts).", file: templates/useServerEvent.test.ts.sbn }
   - { kind: unit-test, describes: "With Vue, ServerEvents starts a connection again when its first start fails or its reconnects run out, and stops once unmounted (src/realtime/ServerEvents.test.ts).", file: templates/ServerEvents.test.ts.sbn }
-  - { kind: end-to-end-test, describes: "A signed-in browser's own connection receives a server event (e2e/server-events.spec.ts, run against the running AppHost).", file: templates/server-events.spec.ts.sbn }
+  - { kind: end-to-end-test, describes: "A signed-in browser's own connection receives a server event (e2e/server-events.spec.ts, run against the running AppHost; with services, e2e/<module>-server-events.spec.ts, one from each service through the edge).", file: templates/server-events.spec.ts.sbn }

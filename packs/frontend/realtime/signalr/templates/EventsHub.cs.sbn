@@ -1,7 +1,17 @@
 {{~ if project["backend.tenancy"] != "none" && project["backend.tenancy"] != "column" && project["backend.tenancy"] != "schema-per-tenant" ~}}
 #error The signalr pack groups browsers by tenant for backend.tenancy column and schema-per-tenant only so far (docs/adr/0006 of the generator).
 {{~ end ~}}
-{{~ if project["backend.tenancy"] == "none" ~}}
+{{~ if project["backend.topology"] == "services" ~}}
+using Microsoft.AspNetCore.SignalR;
+
+namespace {{ namespace }}.Edge.Realtime;
+
+/// <summary>
+/// The browsers' push channel at /hubs/events, on the edge, which every browser is connected to. Browsers only listen;
+/// the edge sends what the services publish through <see cref="BrowserEventConsumer"/>.
+/// </summary>
+public sealed class EventsHub : Hub;
+{{~ else if project["backend.tenancy"] == "none" ~}}
 using Microsoft.AspNetCore.SignalR;
 
 namespace {{ namespace }}.Host.Realtime;
