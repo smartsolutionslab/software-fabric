@@ -16,6 +16,7 @@ public sealed partial class ScreenshotTests
     private const string Spec = "web/app/e2e/start-page.screenshot.ts";
     private const string Config = "web/app/e2e/screenshots.config.ts";
     private const string Script = ".github/scripts/screenshots.sh";
+    private const string ModuleSpec = "web/app/e2e/billing-page.screenshot.ts";
 
     public static TheoryData<string> Profiles { get; } = ["saas-standard-react", "saas-standard-vue"];
 
@@ -126,6 +127,86 @@ public sealed partial class ScreenshotTests
     }
 
     [Theory]
+    [InlineData("saas-standard-react", "useGetBillingSamplesQuery")]
+    [InlineData("saas-standard-vue", "useGetBillingSamples")]
+    public void Each_module_page_is_compared_in_the_light_and_the_dark_theme_showing_its_data_files_example(string profile, string hook)
+    {
+        var files = AddModule(profile, Screenshots);
+
+        var spec = files[ModuleSpec];
+        spec.ShouldContain("import { examples } from '../src/modules/billing/BillingPage.data';");
+        spec.ShouldContain($"const samples = examples.{hook} as {{ items: {{ name: string }}[] }};");
+        spec.ShouldContain("for (const colorScheme of ['light', 'dark'] as const) {");
+        spec.ShouldContain("await page.emulateMedia({ colorScheme });");
+        spec.ShouldContain(".getByRole('button', { name: 'Sign In' }).click();");
+        spec.ShouldContain("await page.route(/\\/api\\/billing\\/samples\\?/, (route) => route.fulfill({ json: samples }));");
+        spec.ShouldContain("await page.goto('/billing');");
+        spec.ShouldContain("await expect(page.getByText(name, { exact: true })).toBeVisible();");
+        spec.ShouldContain("await page.evaluate(async () => {\n    await document.fonts.ready;\n  });");
+        spec.ShouldContain("await expect(page).toHaveScreenshot(`billing-page-${colorScheme}.png`, { fullPage: true });");
+        files.Keys.ShouldNotContain(path => path.Contains("__screenshots__", StringComparison.Ordinal) || path.EndsWith(".png", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Without_the_accessibility_tests_data_file_the_module_page_shows_the_same_example_written_in_its_screenshot_test()
+    {
+        var files = AddModule("saas-standard-react", "frontend.test.extras=screenshot-tests");
+
+        files.Keys.ShouldNotContain("web/app/src/modules/billing/BillingPage.data.ts");
+        var spec = files[ModuleSpec];
+        spec.ShouldNotContain("BillingPage.data");
+        spec.ShouldContain("const samples = {\n  items: [\n    { id: '0198c1a0-0000-7000-8000-000000000001', name: 'Ada' },\n    { id: '0198c1a0-0000-7000-8000-000000000002', name: 'Bea' },\n  ],\n  totalCount: 2,\n  page: 1,\n  pageSize: 20,\n};");
+        spec.ShouldContain("route.fulfill({ json: samples })");
+    }
+
+    [Fact]
+    public void Without_authentication_the_module_page_is_compared_without_signing_in()
+    {
+        var spec = AddModule("lean-crud", Screenshots, "backend.auth=none")[ModuleSpec];
+
+        spec.ShouldNotContain("Sign In");
+        spec.ShouldContain("await expect(page).toHaveScreenshot(`billing-page-${colorScheme}.png`, { fullPage: true });");
+    }
+
+    [Theory]
+    [InlineData("saas-standard-react", "frontend.ui-library=radix-headless")]
+    [InlineData("saas-standard-vue", "frontend.ui-library=vuetify")]
+    public void A_module_page_without_the_sample_gets_no_screenshot_test(string profile, string uiLibrary)
+    {
+        var files = AddModule(profile, Screenshots, uiLibrary);
+
+        files.Keys.ShouldNotContain(ModuleSpec);
+    }
+
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void Every_screenshot_is_compared_within_a_stated_threshold_with_animations_stopped(string profile)
+    {
+        var config = Files(profile, Screenshots)[Config];
+
+        config.ShouldContain("toHaveScreenshot: { maxDiffPixels: 100, threshold: 0.2, animations: 'disabled', caret: 'hide' }");
+    }
+
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void A_failed_comparison_uploads_its_expected_actual_and_diff_images_from_the_e2e_job(string profile)
+    {
+        var workflow = Files(profile, Screenshots)[".github/workflows/ci.yml"];
+
+        workflow.ShouldContain(
+            "      - run: bash .github/scripts/e2e.sh\n" +
+            "\n" +
+            "      # A screenshot that differs from its baseline: the baseline, what rendered and the difference between them.\n" +
+            "      - if: failure()\n" +
+            "        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2\n" +
+            "        with:\n" +
+            "          name: screenshot-diffs\n" +
+            "          path: web/app/test-results/screenshots\n" +
+            "          if-no-files-found: ignore\n");
+        Files(profile)[".github/workflows/ci.yml"].ShouldNotContain("screenshot-diffs");
+    }
+
+    [Theory]
     [MemberData(nameof(Profiles))]
     public void The_generator_writes_no_baseline(string profile)
     {
@@ -154,6 +235,30 @@ public sealed partial class ScreenshotTests
 
         agents.ShouldContain("## Screenshot tests");
         agents.ShouldContain("pnpm screenshots:update");
+        agents.ShouldContain("`web/app/e2e/<module>-page.screenshot.ts` compares each module's page in the light and the dark theme");
+        agents.ShouldContain("Update a baseline only when a change you meant alters how a page looks");
+        agents.ShouldContain("the `screenshot-diffs` artifact");
+    }
+
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void Without_the_option_a_module_gets_no_screenshot_test(string profile)
+    {
+        AddModule(profile).Keys.ShouldNotContain(ModuleSpec);
+    }
+
+    /// <summary>The files <c>fabric add-module billing</c> creates in a project of the profile with the overrides.</summary>
+    private static Dictionary<string, string> AddModule(string profile, params string[] overrides)
+    {
+        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, overrides);
+        generated.Errors.ShouldBeEmpty();
+        var fabricYaml = generated.Files.Single(file => file.Path == FabricFile.FileName).Content;
+        var record = FabricFile.Read(new StringReader(fabricYaml), FabricFile.FileName);
+
+        var addition = Generator.AddModule(Repository.Catalog, Repository.Packs.Packs, record, "billing", []);
+
+        addition.Errors.ShouldBeEmpty();
+        return addition.Created.ToDictionary(file => file.Path, file => file.Content);
     }
 
     private static Dictionary<string, string> Files(string profile, params string[] overrides)

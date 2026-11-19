@@ -9,6 +9,11 @@ export default defineConfig({
   testMatch: '*.screenshot.ts',
   outputDir: '../test-results/screenshots',
   snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}{ext}',
+  // A comparison fails when more than 100 pixels differ by more than Playwright's default colour distance (0.2):
+  // room for an anti-aliased edge, not for a word. Animations stop and the caret hides before each comparison.
+  expect: {
+    toHaveScreenshot: { maxDiffPixels: 100, threshold: 0.2, animations: 'disabled', caret: 'hide' },
+  },
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:5173',
     trace: 'retain-on-failure',
