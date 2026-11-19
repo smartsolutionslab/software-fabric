@@ -6,7 +6,11 @@
 
 The project uses external MCP servers, through the official C# SDK (`ModelContextProtocol.Core`).
 
+{{~ if project["backend.topology"] == "services" ~}}
+- **The AppHost declares every server**, on every service host, in its loop over them (ADR-0017): `WithMcpServerUrl` for a server reached over HTTP, `WithMcpServerCommand` for one the service host starts as a process. The URL or command is an Aspire parameter; a credential (a bearer token, a variable the process needs) is a secret parameter, and a credential declared without `secret: true` fails the AppHost. The edge runs no module code and creates no client, so a server declared on it fails the AppHost too.
+{{~ else ~}}
 - **The AppHost declares every server**, on the host: `WithMcpServerUrl` for a server reached over HTTP, `WithMcpServerCommand` for one the host starts as a process. The URL or command is an Aspire parameter; a credential (a bearer token, a variable the process needs) is a secret parameter, and a credential declared without `secret: true` fails the AppHost.
+{{~ end ~}}
 - **BuildingBlocks create the clients**, in one place (`AddMcpClients`), from what the AppHost declares; a malformed declaration fails the host at startup. A started server's process inherits only the basic environment (PATH, HOME, ...) and the variables declared for it, never the host's connection strings or another server's secret.
 - **Code calls a tool through `IMcpTools`**, whose signatures name no SDK and no `Microsoft.Extensions.AI` type, so a module that uses it still meets every rule about model clients.
 - **A chat client gets the tools through `UseMcpTools(allow)`** on its `ChatClientBuilder`: every declared server's tools are offered to the model as `<server>__<tool>`, so two servers' tools of the same name stay apart, and the calls it asks for run through `Microsoft.Extensions.AI`'s function invocation. The `backend.llm` provider that builds the chat client adds it.
