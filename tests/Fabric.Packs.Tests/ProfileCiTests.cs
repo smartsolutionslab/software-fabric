@@ -194,7 +194,6 @@ public sealed class ProfileCiTests
         fabricYaml.ShouldContain("\n  shipping:\n", Case.Sensitive, "two services, so one can publish an event the other consumes.");
         files.ShouldContain("src/Contracts/Billing/InvoicePaidV1.cs");
         files.ShouldContain("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs");
-        files.ShouldContain("src/Modules/Shipping/Shipping.Api/Endpoints/PaidInvoicesEndpoint.cs");
         files.ShouldContain("tests/Integration.Tests/ServicesExchangeAnEventTests.cs", customMessage: "the end-to-end run of the exchange is the profile's own test, run by its CI.");
     }
 

@@ -1,0 +1,53 @@
+using {{ namespace }}.BuildingBlocks.Messaging;
+using {{ namespace }}.BuildingBlocks.Modules;
+using Wolverine;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+/// <summary>
+/// What a consumer (<c>*Consumer</c>) may take by constructor or as a <c>Handle</c> parameter that Wolverine's generated
+/// code cannot build itself, because it takes the service provider or is made by a factory: Wolverine takes it from the
+/// message's scope instead.
+/// </summary>
+public static class ConsumerServices
+{
+    /// <summary>
+    /// Gives a consumer the dispatcher from the message's scope, so the handlers it sends commands and queries to run in
+    /// that scope too: the dispatcher finds its handlers through the service provider.
+    /// </summary>
+    public static WolverineOptions ResolveDispatcherFromScope(this WolverineOptions options)
+    {
+        {{ not_null "options" }}
+
+        options.CodeGeneration.AlwaysUseServiceLocationFor<IDispatcher>();
+        return options;
+    }
+
+    /// <summary>
+    /// Gives a consumer each module's own services from the message's scope: every interface a module's Application
+    /// project declares and its Infrastructure project implements, its unit of work and aggregate store among them.
+    /// Wolverine's generated code cannot build those itself (the unit of work takes the service provider, an event
+    /// store's adapters are made by a factory), and taking them all from one scope keeps them on one DbContext.
+    /// </summary>
+    public static WolverineOptions ResolveModuleServicesFromScope(this WolverineOptions options, IEnumerable<IModule> modules)
+    {
+        {{ not_null "options" }}
+        {{ not_null "modules" }}
+
+        foreach (var service in modules.SelectMany(ModuleServices).Distinct())
+        {
+            options.CodeGeneration.AlwaysUseServiceLocationFor(service);
+        }
+
+        return options;
+    }
+
+    private static IEnumerable<Type> ModuleServices(IModule module)
+    {
+        var application = ModuleAssemblies.Of(module, "Application");
+        return ModuleAssemblies.Of(module, "Infrastructure").GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false })
+            .SelectMany(type => type.GetInterfaces())
+            .Where(contract => contract.Assembly == application);
+    }
+}
