@@ -22,7 +22,7 @@
 ## Browser sign-in: oidc-client-ts
 
 - Read the signed-in user with `useAuth()` from `react-oidc-context`; never parse tokens yourself.
-{{~ if project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router" ~}}
+{{~ if project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && (project["frontend.routing"] == "react-router" || project["frontend.routing"] == "tanstack-router") ~}}
 - Who is signed in, and Sign out, are the shell's user menu (`src/auth/UserMenu.tsx`): the name is the host's `/me` answer (`useCurrentUser()` from `@/api/useCurrentUser`), not the token's.
 {{~ end ~}}
 - Do not add the `Authorization` header by hand; `src/api/baseApi.ts` does it for every generated endpoint.

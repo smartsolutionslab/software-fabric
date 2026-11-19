@@ -199,9 +199,28 @@ public sealed class FakeEmbeddingsServer : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Answers the request and closes the response, which keeps the connection open for the client's next request.
+    /// Disposing it instead would drop the connection it has just answered as kept open: the client's next request on
+    /// it, sent before the client sees it closed, ends without an answer. A request that fails is aborted.
+    /// </summary>
     private async Task AnswerAsync(HttpListenerContext context)
     {
-        using var response = context.Response;
+        try
+        {
+            await RespondAsync(context);
+            context.Response.Close();
+        }
+        catch
+        {
+            context.Response.Abort();
+            throw;
+        }
+    }
+
+    private async Task RespondAsync(HttpListenerContext context)
+    {
+        var response = context.Response;
 {{~ if chat ~}}
         if (context.Request.HttpMethod == "POST" && context.Request.Url?.AbsolutePath.TrimEnd('/') == "{{ if ollama }}/api/chat{{ else }}/v1/chat/completions{{ end }}")
         {

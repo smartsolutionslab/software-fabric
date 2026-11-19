@@ -15,7 +15,7 @@ end ~}}
 {{~ tanstack = project["frontend.forms"] == "tanstack-form" ~}}
 {{~ mui = project["frontend.ui-library"] == "mui" ~}}
 {{~ # With the app shell (#695) Save reports through notify, in the shell's toasts; without it, in a notice of its own. ~}}
-{{~ shell = ui == "shadcn" && project["frontend.routing"] == "react-router" ~}}
+{{~ shell = ui == "shadcn" && (project["frontend.routing"] == "react-router" || project["frontend.routing"] == "tanstack-router") ~}}
 {{~ hooks = shell ? "useEffect, useMemo, useState" : "useMemo, useState" ~}}
 {{~ if mui ~}}
 import { Box, Button, Stack, Typography } from '@mui/material';

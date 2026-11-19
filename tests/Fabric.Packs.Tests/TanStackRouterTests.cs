@@ -20,10 +20,13 @@ public sealed class TanStackRouterTests
         import userEvent from '@testing-library/user-event';
         import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
         import { Provider } from 'react-redux';
-        import { expect, test } from 'vitest';
+        import { expect, test, vi } from 'vitest';
         import { App } from '@/App';
         import { createAppRouter } from '@/router';
         import { store } from '@/store';
+
+        // The shell's user menu asks the host's /me; here it stands in, so this test checks the link and the page.
+        vi.mock('@/auth/UserMenu', () => ({ UserMenu: () => <p>The user menu</p> }));
 
         // The page lists the module's samples through the store, as the app's providers give it (#734).
         test('the billing link leads to the billing page', async () => {
@@ -117,10 +120,13 @@ public sealed class TanStackRouterTests
     private const string NestedPageTest = """
         import { render, screen } from '@testing-library/react';
         import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
-        import { expect, test } from 'vitest';
+        import { expect, test, vi } from 'vitest';
         import { axe } from 'vitest-axe';
         import { App } from '@/App';
         import { createAppRouter } from '@/router';
+
+        // The shell's user menu asks the host's /me through the app's providers, which this test does not render.
+        vi.mock('@/auth/UserMenu', () => ({ UserMenu: () => <p>The user menu</p> }));
 
         test('the invoice page has no accessibility violations axe can find', { timeout: 20_000 }, async () => {
           const { container } = render(
@@ -136,9 +142,12 @@ public sealed class TanStackRouterTests
         import { render, screen } from '@testing-library/react';
         import userEvent from '@testing-library/user-event';
         import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
-        import { expect, test } from 'vitest';
+        import { expect, test, vi } from 'vitest';
         import { App } from '@/App';
         import { createAppRouter } from '@/router';
+
+        // The shell's user menu asks the host's /me through the app's providers, which this test does not render.
+        vi.mock('@/auth/UserMenu', () => ({ UserMenu: () => <p>The user menu</p> }));
 
         test('a route below the billing module renders inside its page', async () => {
           render(<RouterProvider router={createAppRouter(createMemoryHistory(), <App />)} />);

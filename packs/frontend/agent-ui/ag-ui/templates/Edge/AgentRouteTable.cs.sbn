@@ -1,0 +1,53 @@
+using Yarp.ReverseProxy.Configuration;
+
+namespace {{ namespace }}.Edge.Agents;
+
+/// <summary>
+/// Which service owns each agent, from the names every service lists, and the edge's route to each: POST
+/// /agents/{name} goes to the owning service's POST /&lt;module&gt;/agents/{name}, unchanged otherwise.
+/// </summary>
+public sealed class AgentRouteTable
+{
+    private readonly SortedDictionary<string, string> owners;
+
+    private AgentRouteTable(SortedDictionary<string, string> owners, IReadOnlyList<string> problems)
+    {
+        this.owners = owners;
+        Problems = problems;
+    }
+
+    /// <summary>Each name two services list, in words; empty when none.</summary>
+    public IReadOnlyList<string> Problems { get; }
+
+    /// <summary>The table from every service's agents' names, by the module the service runs.</summary>
+    public static AgentRouteTable From(IReadOnlyDictionary<string, IReadOnlyList<string>> agentsByModule)
+    {
+        {{ not_null "agentsByModule" }}
+
+        List<string> problems = [];
+        SortedDictionary<string, string> owners = [with(StringComparer.Ordinal)];
+        foreach (var (module, agents) in agentsByModule.OrderBy(service => service.Key, StringComparer.Ordinal))
+        {
+            foreach (var agent in agents)
+            {
+                if (!owners.TryAdd(agent, module))
+                {
+                    problems.Add($"The services {owners[agent]} and {module} both name the agent '{agent}'; each agent's name is its own.");
+                }
+            }
+        }
+
+        return new AgentRouteTable(owners, problems);
+    }
+
+    /// <summary>One route per agent, to the cluster of its service, which the module routes declare.</summary>
+    public IReadOnlyList<RouteConfig> Routes() => [.. owners.Select(owner => Route(owner.Key, owner.Value))];
+
+    private static RouteConfig Route(string agent, string module) => new()
+    {
+        RouteId = "agents-" + agent,
+        ClusterId = module,
+        Match = new RouteMatch { Path = "/agents/" + agent, Methods = ["POST"] },
+        Transforms = [new Dictionary<string, string>(StringComparer.Ordinal) { ["PathPrefix"] = "/" + module }],
+    };
+}

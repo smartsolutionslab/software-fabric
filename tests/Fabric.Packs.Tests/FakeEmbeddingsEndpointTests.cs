@@ -188,7 +188,8 @@ public sealed class FakeEmbeddingsEndpointTests
     /// <summary>
     /// The generated integration tests, and one that indexes notes through the host and finds the nearest by its words,
     /// pass with the fixture's fake embeddings: the host embeds through the provider's own client, against the stand-in.
-    /// An answer the test holds back keeps the host's request waiting until it is released.
+    /// An answer the test holds back keeps the host's request waiting until it is released, and the server keeps open the
+    /// connection it answered on, so the host's next request on it is answered rather than cut off (#787).
     /// </summary>
     [Theory]
     [MemberData(nameof(Providers))]
@@ -210,6 +211,8 @@ public sealed class FakeEmbeddingsEndpointTests
     private static string NotesTests(string fixture) => $$"""
         using System.Net;
         using System.Net.Http.Json;
+        using System.Net.Sockets;
+        using System.Text;
 
         namespace Shop.Integration.Tests;
 
@@ -248,6 +251,37 @@ public sealed class FakeEmbeddingsEndpointTests
 
                 using var indexed = await indexing;
                 indexed.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+            }
+
+            [Fact]
+            public async Task The_fake_server_answers_a_second_request_on_the_connection_it_kept_open()
+            {
+                var cancellationToken = TestContext.Current.CancellationToken;
+                var server = new Uri(application.Embeddings.Endpoint);
+                using var client = new TcpClient();
+                await client.ConnectAsync(server.Host, server.Port, cancellationToken);
+                await using var connection = client.GetStream();
+
+                var first = await ResponseAsync(connection, server, cancellationToken);
+                var second = await ResponseAsync(connection, server, cancellationToken);
+
+                first.ShouldStartWith("HTTP/1.1 404");
+                first.ShouldNotContain("Connection: close", Case.Insensitive);
+                second.ShouldStartWith("HTTP/1.1 404", customMessage: "the server closed the connection it had answered as kept open");
+            }
+
+            /// <summary>Asks for a path the server does not answer, on the open connection, and reads its whole chunked reply.</summary>
+            private static async Task<string> ResponseAsync(NetworkStream connection, Uri server, CancellationToken cancellationToken)
+            {
+                await connection.WriteAsync(Encoding.ASCII.GetBytes($"GET /nothing-here HTTP/1.1\r\nHost: {server.Authority}\r\n\r\n"), cancellationToken);
+                var response = new StringBuilder();
+                var buffer = new byte[1];
+                while (!response.ToString().EndsWith("\r\n0\r\n\r\n", StringComparison.Ordinal) && await connection.ReadAsync(buffer, cancellationToken) == 1)
+                {
+                    response.Append((char)buffer[0]);
+                }
+
+                return response.ToString();
             }
 
             private sealed record Note(string Text);

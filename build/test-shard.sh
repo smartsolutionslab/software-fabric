@@ -32,7 +32,8 @@ if [ -z "$results" ]; then
 fi
 
 cd "$repository"
-arguments=(-c Release --no-build --results-directory "$results" --report-xunit-xml)
+# Each assembly names its report after itself and the shard (tests/Directory.Build.targets), so none overwrites another.
+arguments=(-c Release --no-build --results-directory "$results" --report-xunit-xml "-p:TestShard=$shard")
 if [ "$shard" -lt "$rest" ]; then
   line="${shards[$((shard - 1))]}"
   for name in $line; do

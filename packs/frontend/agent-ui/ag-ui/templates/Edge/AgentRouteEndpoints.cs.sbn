@@ -1,0 +1,26 @@
+using System.Net;
+
+namespace Microsoft.AspNetCore.Builder;
+
+public static class AgentRouteEndpoints
+{
+    /// <summary>
+    /// <c>POST /agents/{name}</c> for a name no service lists{{ if project["backend.auth"] != "none" }}, for signed-in users{{ end }}: 404, with the problem details and code
+    /// the owning service answers an unknown agent with. Every name a service lists has a route of its own (AgentRoutes),
+    /// which is more specific and wins.
+    /// </summary>
+    public static WebApplication MapAgentRoutes(this WebApplication app)
+    {
+        {{ not_null "app" }}
+
+        app.MapPost("/agents/{name}", (string name) => TypedResults.Problem(
+                title: $"There is no agent named '{name}'.",
+                statusCode: (int)HttpStatusCode.NotFound,
+                extensions: new Dictionary<string, object?> { ["code"] = "agents.not-found" }))
+{{~ if project["backend.auth"] != "none" ~}}
+            .RequireAuthorization()
+{{~ end ~}}
+            .ExcludeFromDescription();
+        return app;
+    }
+}

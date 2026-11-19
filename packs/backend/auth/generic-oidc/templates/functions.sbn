@@ -251,3 +251,16 @@ end
 func add_claim_rule
   ret "To add a claim: have production's provider issue it, and locally declare the attribute in `src/AppHost/realms/realm.json`'s user profile (`kc.user.profile.config`, `\"edit\": [\"admin\"]`), add an `oidc-usermodel-attribute-mapper` for it to the `<name>-web` client, and give local users a value under `attributes`."
 end
+func edge_client_resources
+  ret `// With services, the edge's own client in the realm, ` + name + `-edge, for what the edge asks the services itself: its
+// table of agents, at startup. Its secret is generated once and kept in the AppHost's user secrets; the realm import
+// reads it from Keycloak's environment, so none is committed.
+var edgeClientSecret = builder.AddResource(ParameterResourceBuilderExtensions.CreateDefaultPasswordParameter(builder, "edge-client-secret", special: false));
+identity.WithEnvironment("EDGE_CLIENT_SECRET", edgeClientSecret);`
+end
+func edge_client_wiring
+  ret `
+    .WithEnvironment("EdgeClient__TokenEndpoint", ReferenceExpression.Create($"{identity.GetEndpoint("http")}/realms/` + name + `/protocol/openid-connect/token"))
+    .WithEnvironment("EdgeClient__ClientId", "` + name + `-edge")
+    .WithEnvironment("EdgeClient__ClientSecret", edgeClientSecret)`
+end

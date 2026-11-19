@@ -1,4 +1,4 @@
-{{~ if project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router" ~}}
+{{~ if project["frontend.architecture"] == "spa" && (project["frontend.routing"] == "react-router" || project["frontend.routing"] == "tanstack-router") ~}}
 
 // jsdom measures nothing: the command palette (cmdk) observes its list's size and scrolls the picked item into view.
 globalThis.ResizeObserver ??= class {

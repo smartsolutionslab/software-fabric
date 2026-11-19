@@ -1,0 +1,64 @@
+import { Link, useMatches } from '@tanstack/react-router';
+import { Fragment } from 'react';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+
+type Match = ReturnType<typeof useMatches>[number];
+
+interface Crumb {
+  label: string;
+  path: string;
+  match: Match;
+}
+
+/**
+ * One step per address the route matches lead through: the root's is the start page, Home; each route below it is
+ * named by the title its route gives it (a module's routes.tsx does), or else by its step of the address. A route that
+ * shares its parent's address (the start page, an index route) adds no step.
+ */
+function crumbsOf(matches: readonly Match[]): Crumb[] {
+  const crumbs: Crumb[] = [];
+  for (const match of matches) {
+    const path = match.pathname.replace(/(.)\/$/, '$1');
+    if (path === crumbs.at(-1)?.path) {
+      continue;
+    }
+    const label =
+      path === '/' ? 'Home' : (match.staticData.title ?? decodeURIComponent(path.slice(path.lastIndexOf('/') + 1)));
+    crumbs.push({ label, path, match });
+  }
+  return crumbs;
+}
+
+/** Where the user is, from the route matches: every step a link but the current one. */
+export function Breadcrumbs() {
+  const crumbs = crumbsOf(useMatches());
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        {crumbs.map(({ label, path, match }, index) => (
+          <Fragment key={path}>
+            {index > 0 && <BreadcrumbSeparator />}
+            <BreadcrumbItem>
+              {index === crumbs.length - 1 ? (
+                <BreadcrumbPage>{label}</BreadcrumbPage>
+              ) : (
+                <BreadcrumbLink asChild>
+                  <Link to={match.fullPath} params={match.params}>
+                    {label}
+                  </Link>
+                </BreadcrumbLink>
+              )}
+            </BreadcrumbItem>
+          </Fragment>
+        ))}
+      </BreadcrumbList>
+    </Breadcrumb>
+  );
+}

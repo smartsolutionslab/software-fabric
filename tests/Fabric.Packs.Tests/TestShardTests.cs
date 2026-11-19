@@ -123,6 +123,40 @@ public sealed class TestShardTests : IDisposable
         output.ShouldContain($"There is no shard {past}", Case.Sensitive, output);
     }
 
+    [Fact]
+    public void Every_test_assembly_of_a_shard_writes_its_own_report_and_the_check_reads_each()
+    {
+        // The rest shard runs every test assembly in one dotnet test; this split leaves it one class of each to run.
+        // The reports used to be named after the instant they were written, so two assemblies finishing together wrote
+        // one file and the check found the other's tests in no shard (#795).
+        string[] kept = ["Fabric.Core.Tests.Rendering.ConditionalFileTests", "Fabric.Cli.Tests.VersionOptionTests", typeof(TestSplitTests).FullName!];
+        string[] assemblies = ["Fabric.Core.Tests", "Fabric.Cli.Tests", "Fabric.Packs.Tests"];
+        var paths = assemblies.Select(assembly => typeof(TestShardTests).Assembly.Location.Replace("Fabric.Packs.Tests", assembly, StringComparison.Ordinal)).ToArray();
+        var named = paths.SelectMany(Classes).Where(type => !kept.Contains(type)).ToArray();
+        var split = Path.Combine(reports, "split.txt");
+        File.WriteAllText(split, string.Join(' ', named) + "\n");
+        var results = Path.Combine(reports, "results", "shard-2");
+
+        var (shardExitCode, shardOutput) = Shell.Run(Repository.Root, "bash", "build/test-shard.sh", "2", results, split);
+
+        shardExitCode.ShouldBe(0, shardOutput);
+        Directory.GetFiles(results, "*.xml").Select(Path.GetFileName).Order(StringComparer.Ordinal)
+            .ShouldBe(assemblies.Select(assembly => $"{assembly}-shard-2.xunit.xml").Order(StringComparer.Ordinal), shardOutput);
+        var (_, output) = Shell.Run(Repository.Root, "bash", ["build/tests-all-ran.sh", Path.Combine(reports, "results"), .. paths]);
+        foreach (var type in kept)
+        {
+            output.ShouldContain($"  {type}\n", Case.Sensitive, output);
+        }
+    }
+
+    /// <summary>The classes with tests in a test assembly, as its runner lists them.</summary>
+    private static string[] Classes(string assembly)
+    {
+        var (exitCode, output) = DotNet.Run(Repository.Root, new Dictionary<string, string>(), assembly, "-list", "classes", "-noColor");
+        exitCode.ShouldBe(0, output);
+        return [.. output.Split('\n').Select(line => line.Trim()).Where(line => line.StartsWith("Fabric.", StringComparison.Ordinal))];
+    }
+
     /// <summary>Each shard's classes; comments and blank lines are not shards.</summary>
     private static List<string[]> ShardClasses() =>
     [

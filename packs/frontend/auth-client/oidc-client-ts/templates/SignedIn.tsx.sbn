@@ -48,7 +48,7 @@ export function SignedIn({ children }: { children: ReactNode }) {
     </>
   );
 }
-}%}{{~ else if project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router" ~}}
+}%}{{~ else if project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && (project["frontend.routing"] == "react-router" || project["frontend.routing"] == "tanstack-router") ~}}
 import { type ReactNode, useEffect } from 'react';
 import { hasAuthParams, useAuth } from 'react-oidc-context';
 

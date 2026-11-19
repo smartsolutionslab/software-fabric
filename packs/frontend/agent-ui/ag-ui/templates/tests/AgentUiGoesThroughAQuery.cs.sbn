@@ -1,5 +1,13 @@
+{{~ services = project["backend.topology"] == "services" ~}}
 using System.Reflection;
 using {{ namespace }}.BuildingBlocks.Modules;
+{{~ if services ~}}
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+{{~ end ~}}
 
 namespace {{ namespace }}.Architecture.Tests.Rules;
 
@@ -9,6 +17,12 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 /// the agent. So only the host speaks AG-UI, the host runs no agent itself, and nothing maps an agent with Agent
 /// Framework's AG-UI hosting, whose endpoint runs the agent directly. The rule reads what the compiled assemblies
 /// reference: an endpoint streaming an agent anywhere else fails it, naming its assembly.
+{{~ if services ~}}
+/// With services (ADR-0017, amended) every service host is such a host, at <c>POST /&lt;module&gt;/agents/{name}</c>,
+/// and the edge, which forwards <c>POST /agents/{name}</c> to the owning service, runs no agent: it references no Agent
+/// Framework package and, started without its hosted services, registers no agent to speak AG-UI for. It compiles
+/// src/Host as every service host does, so the AG-UI SDK is among its references; what it registers is what counts.
+{{~ end ~}}
 /// </summary>
 public sealed class AgentUiGoesThroughAQuery : IArchitectureRule
 {
@@ -19,6 +33,13 @@ public sealed class AgentUiGoesThroughAQuery : IArchitectureRule
     private const string AgentFrameworkHosting = "Microsoft.Agents.AI.Hosting.AGUI";
 
     private const string Endpoint = "POST /agents/{name}";
+{{~ if services ~}}
+
+    /// <summary>The edge's assembly, beside the tests (Architecture.Tests references src/Edge under an alias, so its Program hides no service host's).</summary>
+    private const string EdgeAssembly = "Host.dll";
+
+    private const string Conversations = "{{ namespace }}.Host.Agents.AgentConversations";
+{{~ end ~}}
 
     public string Description => "Only the host speaks AG-UI, and it runs no agent: POST /agents/{name} sends the agent's IAgentConversation query through the dispatcher.";
 
@@ -26,7 +47,11 @@ public sealed class AgentUiGoesThroughAQuery : IArchitectureRule
     {
         {{ not_null "model" }}
 
+{{~ if services ~}}
+        List<Assembly> hosts = [.. ServiceHostEntryPoints.All.Select(entryPoint => entryPoint.Assembly)];
+{{~ else ~}}
         var host = typeof(Program).Assembly;
+{{~ end ~}}
         List<Assembly> others = [.. model.ModuleAssemblies, typeof(IModule).Assembly];
         foreach (var assembly in others)
         {
@@ -36,6 +61,29 @@ public sealed class AgentUiGoesThroughAQuery : IArchitectureRule
             }
         }
 
+{{~ if services ~}}
+        foreach (var host in hosts)
+        {
+            foreach (var reference in References(host).Where(reference => Is(reference, AgentFramework) && !Is(reference, AgentFrameworkHosting)))
+            {
+                yield return $"{host.GetName().Name} references {reference}, but the host runs no agent: it sends the agent's IAgentConversation query through the dispatcher, and the query's handler runs the agent.";
+            }
+        }
+
+        var edge = Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, EdgeAssembly));
+        foreach (var reference in References(edge).Where(reference => Is(reference, AgentFramework) && !Is(reference, AgentFrameworkHosting)))
+        {
+            yield return $"The edge (src/Edge) references {reference}, but it runs no agent: it forwards {Endpoint} to the service that owns the agent.";
+        }
+
+        if (RegistersAgents(edge))
+        {
+            yield return "The edge (src/Edge) registers the modules' agents (AgentConversations), but it never speaks AG-UI: it forwards POST /agents/{name} to the service that owns the agent, which speaks it at POST /<module>/agents/{name}.";
+        }
+
+        foreach (var assembly in others.Concat(hosts).Append(edge))
+        {
+{{~ else ~}}
         foreach (var reference in References(host).Where(reference => Is(reference, AgentFramework) && !Is(reference, AgentFrameworkHosting)))
         {
             yield return $"{host.GetName().Name} references {reference}, but the host runs no agent: it sends the agent's IAgentConversation query through the dispatcher, and the query's handler runs the agent.";
@@ -43,6 +91,7 @@ public sealed class AgentUiGoesThroughAQuery : IArchitectureRule
 
         foreach (var assembly in others.Prepend(host))
         {
+{{~ end ~}}
             foreach (var reference in References(assembly).Where(reference => Is(reference, AgentFrameworkHosting)))
             {
                 yield return $"{assembly.GetName().Name} references {reference}, Agent Framework's AG-UI hosting, whose endpoint runs an agent itself; the host's {Endpoint} sends the agent's query through the dispatcher instead.";
@@ -55,4 +104,49 @@ public sealed class AgentUiGoesThroughAQuery : IArchitectureRule
 
     private static bool Is(string reference, string package) =>
         reference == package || reference.StartsWith(package + ".", StringComparison.Ordinal);
+{{~ if services ~}}
+
+    /// <summary>Whether the edge, built with every service it registers but none of its hosted services started, holds the modules' agents.</summary>
+    private static bool RegistersAgents(Assembly edge)
+    {
+        var entryPoint = edge.GetType("Program", throwOnError: true)!;
+        var conversations = edge.GetType(Conversations, throwOnError: true)!;
+        using var host = (IBuiltHost)Activator.CreateInstance(typeof(BuiltEdge<>).MakeGenericType(entryPoint))!;
+        return host.Services.GetService(conversations) is not null;
+    }
+
+    private interface IBuiltHost : IDisposable
+    {
+        IServiceProvider Services { get; }
+    }
+
+    /// <summary>
+    /// The edge with its services registered but nothing started: no hosted service runs, so it reads no service's
+    /// agents and the configuration Aspire would provide only has to be present, never reachable.
+    /// </summary>
+    private sealed class BuiltEdge<TEntryPoint> : WebApplicationFactory<TEntryPoint>, IBuiltHost
+        where TEntryPoint : class
+    {
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment(Environments.Development);
+{{~ if project["backend.bus.transport"] == "kafka" ~}}
+            builder.UseSetting("ConnectionStrings:messaging", "localhost:9092");
+{{~ else if project["backend.bus.transport"] != "none" ~}}
+            builder.UseSetting("ConnectionStrings:messaging", "amqp://localhost");
+{{~ end ~}}
+{{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
+            builder.UseSetting("Messaging:Queue", "unused");
+{{~ else if project["backend.bus.transport"] == "azure-service-bus" ~}}
+            builder.UseSetting("Messaging:Subscription", "unused");
+{{~ else if project["backend.bus.transport"] == "kafka" ~}}
+            builder.UseSetting("Messaging:ConsumerGroup", "unused");
+{{~ end ~}}
+{{~ if project["backend.auth"] != "none" ~}}
+            {{ unstarted_host_settings }}
+{{~ end ~}}
+            builder.ConfigureServices(services => services.RemoveAll<IHostedService>());
+        }
+    }
+{{~ end ~}}
 }

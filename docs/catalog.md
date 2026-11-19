@@ -317,7 +317,7 @@ Settings:
 
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
-| `ag-ui` | supported | `frontend.architecture == spa` | `backend.topology == services` | `saas-ai-react` | an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host |
+| `ag-ui` | supported | `frontend.architecture == spa` | — | `saas-ai-react` | an agent panel on @ag-ui/client, streaming text and tool calls; the AG-UI .NET SDK in the host |
 | `none` | supported | — | — | — | no agent panel; agents are reached through the project's own endpoints |
 
 ### `frontend.api-client`
