@@ -8,9 +8,13 @@ files:
   - { template: templates/Dispatcher.cs.sbn, target: src/BuildingBlocks/Messaging/Dispatcher.cs }
   - { template: templates/MessagingRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/MessagingRegistration.cs }
   - { template: templates/EveryRequestHasOneHandler.cs.sbn, target: tests/Architecture.Tests/Rules/EveryRequestHasOneHandler.cs }
+  # Only Wolverine builds consumers in generated code; without a broker there is no messaging library.
+  - { template: templates/ConsumerServices.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/ConsumerServices.cs, when: 'object.has_key(project, "backend.bus.library") && project["backend.bus.library"] == "wolverine"' }
 slots:
   - { slot: host.services, template: templates/host-services.sbn }
   - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn }
+  # Declared by bus.library wolverine; without a broker no pack declares it.
+  - { slot: messaging.wolverine-options, template: templates/wolverine-options.sbn, optional: true }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
