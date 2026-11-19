@@ -1,0 +1,11 @@
+{{ if project["frontend.realtime"] == "signalr" || project["frontend.realtime"] == "sse" }}
+    .WithReference(messaging)
+    .WaitFor(messaging)
+    .WithEnvironment(context =>
+    {
+        if (messagingManagement is not null)
+        {
+            context.EnvironmentVariables["ConnectionStrings__messaging-management"] = messagingManagement;
+        }
+    })
+    .WithEnvironment("Messaging__Subscription", "host"){{ end }}

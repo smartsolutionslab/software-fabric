@@ -5,6 +5,8 @@ files:
   - { template: templates/UnitOfWorkRegistration.cs.sbn, target: src/BuildingBlocks/Messaging/Wiring/UnitOfWorkRegistration.cs }
   - { template: templates/ModuleUnitOfWork.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/{{ module.namespace }}UnitOfWork.cs", per-module: true }
   - { template: templates/ConsumersHandleIntegrationEvents.cs.sbn, target: tests/Architecture.Tests/Rules/ConsumersHandleIntegrationEvents.cs }
+  # With services, the edge is on the broker, without a database, only when a realtime option sends it browser events (ADR-0017).
+  - { template: templates/EdgeMessaging.cs.sbn, target: src/Edge/Wiring/EdgeMessaging.cs, when: 'project["backend.topology"] == "services" && (project["frontend.realtime"] == "signalr" || project["frontend.realtime"] == "sse")' }
 declares-slots:
   - { slot: messaging.wolverine-options, description: "Statements on WolverineOptions options in src/Host/Wiring/Messaging.cs, after the consumers' discovery, each indented twelve spaces; IReadOnlyList<IModule> modules is in scope. Rendered only with a contribution." }
 slots:
@@ -13,6 +15,8 @@ slots:
   - { slot: host.packages, template: templates/host-packages.sbn }
   - { slot: host.services, template: templates/host-services.sbn, order: 20 }
   - { slot: modules.infrastructure, template: templates/module-infrastructure.sbn, order: 20 }
+  # edge.* is declared only by the services topology; the contribution renders only with a realtime option.
+  - { slot: edge.services, template: templates/edge-services.sbn, order: 20, optional: true }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md

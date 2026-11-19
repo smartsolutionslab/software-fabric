@@ -1,6 +1,8 @@
 option: frontend.realtime.sse
 files:
   - { template: templates/IBrowserEvents.cs.sbn, target: src/BuildingBlocks/Realtime/IBrowserEvents.cs }
+  # With services, a service sends a browser event to the edge over the broker (ADR-0017).
+  - { template: templates/BrowserEventV1.cs.sbn, target: src/BuildingBlocks/Realtime/BrowserEventV1.cs, when: 'project["backend.topology"] == "services"' }
   - { template: templates/BrowserEventStreams.cs.sbn, target: src/Host/Realtime/BrowserEventStreams.cs }
   - { template: templates/StreamBrowserEvents.cs.sbn, target: src/Host/Realtime/StreamBrowserEvents.cs }
   - { template: templates/TestEvent.cs.sbn, target: src/Host/Realtime/TestEvent.cs }
@@ -26,6 +28,8 @@ files:
 slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 30 }
   - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 30 }
+  # With services only (the topology requires a broker, hence Wolverine): the route of BrowserEventV1 to the broker.
+  - { slot: messaging.wolverine-options, template: templates/messaging-wolverine-options.sbn, optional: true }
   - { slot: web.imports, template: templates/import.sbn, order: 3 }
   - { slot: web.providers, template: templates/provider.sbn, order: 3 }
 agents:
