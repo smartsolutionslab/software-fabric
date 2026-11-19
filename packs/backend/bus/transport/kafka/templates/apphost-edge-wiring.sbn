@@ -1,0 +1,4 @@
+{{ if project["frontend.realtime"] == "signalr" || project["frontend.realtime"] == "sse" }}
+    .WithReference(messaging)
+    .WaitFor(messaging)
+    .WithEnvironment("Messaging__ConsumerGroup", "host"){{ end }}

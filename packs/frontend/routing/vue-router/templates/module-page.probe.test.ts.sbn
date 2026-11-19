@@ -1,3 +1,4 @@
+{{~ sample_page = project["frontend.architecture"] == "spa" && object.has_key(project, "frontend.ui-library") && (project["frontend.ui-library"] == "shadcn" || project["frontend.ui-library"] == "shadcn-vue") && object.has_key(project, "frontend.api-client") && (project["frontend.api-client"] == "rtk-query-codegen" || project["frontend.api-client"] == "orval" || project["frontend.api-client"] == "openapi-fetch") && module.name != "dashboards" && module.name != "assistant" ~}}
 {{~ remote = project["frontend.architecture"] == "micro-frontends" ~}}
 {{~ assistant = module.name == "assistant" && object.has_key(project, "frontend.agent-ui") && project["frontend.agent-ui"] == "ag-ui" ~}}
 {{~ if remote ~}}
@@ -58,6 +59,14 @@ vi.mock('@/agents/AgentPanel.vue', async () => {
   const { h } = await import('vue');
   return { default: { render: () => h('p', 'The agent panel') } };
 });
+{{~ end ~}}
+{{~ if sample_page ~}}
+
+// The page's samples come through use{{ module.namespace }}Samples, which the page's own test reads; here they are still loading.
+vi.mock('./use{{ module.namespace }}Samples', () => ({
+  use{{ module.namespace }}Samples: () => ({ samples: undefined, isLoading: true, isError: false }),
+  useCreate{{ module.namespace }}Sample: () => ({ create: () => Promise.resolve(false), isSaving: false }),
+}));
 {{~ end ~}}
 
 // The page asks the module's permission probe, whose own test, useCanManage.test.ts, reads a 200, a 403 and a failure;

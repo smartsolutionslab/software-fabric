@@ -489,8 +489,8 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `none` | supported | — | — | `lean-crud`, `saas-ai-react`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
-| `signalr` | experimental | — | `backend.topology == services` | `industrial-event-driven-mfe` | — |
-| `sse` | experimental | — | `backend.topology == services` | — | — |
+| `signalr` | experimental | — | — | `industrial-event-driven-mfe` | — |
+| `sse` | experimental | — | — | — | — |
 
 ### `frontend.routing`
 

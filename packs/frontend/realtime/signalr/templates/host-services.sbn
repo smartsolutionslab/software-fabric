@@ -1,1 +1,1 @@
-builder.Services.AddServerEvents();
+{{ if project["backend.topology"] == "services" }}builder.Services.AddBrowserEvents();{{ else }}builder.Services.AddServerEvents();{{ end }}

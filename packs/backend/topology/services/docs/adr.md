@@ -11,6 +11,9 @@ Every module runs in a host of its own, `src/Services/<Module>/Host`. The host's
 - A service host knows its module's route name at runtime: `ServiceModule.Name` (`src/Host/Wiring`) reads the `ModuleName` assembly metadata its project writes from the same `<ModuleName>`, so a service maps what is its own under `/<module>/...` with no configuration and no line per module. Assembly metadata rather than a setting from the AppHost's loop: hosts started without the AppHost (architecture rules, test hosts) know it too.
 - `src/Edge` is the one origin the frontend, the OpenAPI copy and the end-to-end tests talk to: a YARP host of its own. Its route table is built at startup from `Edge:Modules`, which the AppHost fills inside its loop with each service's module name, so `/<module>/...` goes to the service service discovery finds under that name, and nothing lists the modules. The edge forwards the caller's bearer token unchanged; every service validates it itself, for one audience.
 - What the application has once lives on the edge (`edge.*` slots): `/me`, and the OpenAPI document, which is the edge's own with every service's paths and schemas added (in Development, as the services serve theirs). The edge compiles `src/Host` as the services do, but runs no module.
+{{~ if project["frontend.realtime"] == "signalr" || project["frontend.realtime"] == "sse" ~}}
+- The browsers' {{ if project["frontend.realtime"] == "signalr" }}hub, `/hubs/events`,{{ else }}event stream, `/server-events`,{{ end }} is the edge's too: every browser is connected to the edge. A service sends a browser event through `IBrowserEvents`, which publishes a `BrowserEventV1` on the broker, not stored on the way; the edge, on the broker only for this, consumes it and pushes it to its browsers.
+{{~ end ~}}
 - A database per service on one server (ADR-0017, D2). The database pack declares the PostgreSQL or SQL Server server alone; inside its loop the AppHost gives each service a database of its own, named after its module (the resource `<module>-database`), and a run of `src/MigrationRunner` of its own (`<module>-migrations`), both under the connection name `database` the service already reads. The run migrates that module alone, named in `Migrations:Module`: its EF Core migrations and its event store's tables. Wolverine's outbox and inbox live in the service's database too. A service starts once its run has completed.
 - Modules talk to each other only through integration events over the broker; `src/Contracts` stays one project, which services reference, never each other.
 
@@ -22,4 +25,7 @@ Every module runs in a host of its own, `src/Services/<Module>/Host`. The host's
 - No module can query another's tables: they are in another database. A read model that spans modules is built from integration events.
 - Tests that need a database of their own (the read connection's, the vector index's) get one more database on the server, which no module's run migrates.
 - A request to a module passes the edge: one more hop, and the edge must be running for the frontend to reach any service.
+{{~ if project["frontend.realtime"] == "signalr" || project["frontend.realtime"] == "sse" ~}}
+- V1 runs one edge replica. A second would share the edge's queue, subscription or consumer group on the broker, so each browser event would reach only one replica's browsers; running several needs one per replica, a later change.
+{{~ end ~}}
 - Cross-module calls are events, never in-process calls: `module.communication: contract-interface` is not available.

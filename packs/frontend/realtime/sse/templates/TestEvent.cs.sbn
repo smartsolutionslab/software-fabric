@@ -1,4 +1,11 @@
 namespace {{ namespace }}.Host.Realtime;
 
+{{~ if project["backend.topology"] == "services" ~}}
+/// <summary>
+/// What a service's POST /&lt;module&gt;/server-events/test sends, in Development only, to show that the stream works
+/// from that service over the broker and the edge to the browser.
+/// </summary>
+{{~ else ~}}
 /// <summary>What POST /server-events/test sends, in Development only, to show that the stream works.</summary>
+{{~ end ~}}
 public sealed record TestEvent(string Text);

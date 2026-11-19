@@ -203,19 +203,19 @@ public sealed class ModuleScreenAccessibilityTests
         project.Write(DataOf(screen), example);
         var (populatedExitCode, populatedOutput, populated) = Statuses(project);
         populatedExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label behind the loading branch:\n{populatedOutput}");
-        populated.GetValueOrDefault(generated).ShouldBe(AxeChecks(vue, "passed", "passed", "failed", "failed"), populatedOutput);
+        populated.GetValueOrDefault(generated).ShouldBe(AxeChecks("passed", "passed", "failed", "failed"), populatedOutput);
 
         project.Write(screen, behindLoading.Replace(UnlabelledField, """<input type="text" aria-label="Invoice number" />""", StringComparison.Ordinal)
             .Replace("<input v-else type=\"text\" />", "<input v-else type=\"text\" aria-label=\"Invoice number\" />", StringComparison.Ordinal));
         var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
         labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
-        labelled.GetValueOrDefault(generated).ShouldBe(AxeChecks(vue, "passed", "passed", "passed", "passed"));
+        labelled.GetValueOrDefault(generated).ShouldBe(AxeChecks("passed", "passed", "passed", "passed"));
 
         project.Write(screen, behindLoading);
         project.Write(DataOf(screen), "export const examples: Record<string, unknown> = {};\n");
         var (loadingExitCode, loadingOutput, loading) = Statuses(project);
         loadingExitCode.ShouldBe(0, $"pnpm test:\n{loadingOutput}");
-        loading.GetValueOrDefault(generated).ShouldBe(AxeChecks(vue, "passed", "passed", "skipped", "skipped"));
+        loading.GetValueOrDefault(generated).ShouldBe(AxeChecks("passed", "passed", "skipped", "skipped"));
     }
 
     /// <summary>A screen that shows an unlabelled field only once RTK Query's <c>currentData</c> has come.</summary>
@@ -300,12 +300,12 @@ public sealed class ModuleScreenAccessibilityTests
         project.Write(DataOf(screen), example);
         var (populatedExitCode, populatedOutput, populated) = Statuses(project);
         populatedExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label shown only with the {hook} example:\n{populatedOutput}");
-        populated.GetValueOrDefault(generated).ShouldBe(AxeChecks(vue: false, "passed", "passed", "failed", "failed"), populatedOutput);
+        populated.GetValueOrDefault(generated).ShouldBe(AxeChecks("passed", "passed", "failed", "failed"), populatedOutput);
 
         project.Write(screen, behindData.Replace(UnlabelledField, """<input type="text" aria-label="Invoice number" />""", StringComparison.Ordinal));
         var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
         labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
-        labelled.GetValueOrDefault(generated).ShouldBe(AxeChecks(vue: false, "passed", "passed", "passed", "passed"));
+        labelled.GetValueOrDefault(generated).ShouldBe(AxeChecks("passed", "passed", "passed", "passed"));
     }
 
     /// <summary>A form whose field shows unless its mutation is saving: on first render, nothing is.</summary>
@@ -398,13 +398,13 @@ public sealed class ModuleScreenAccessibilityTests
         project.Write(screen, form);
         var (violationExitCode, violationOutput, violation) = Statuses(project);
         violationExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label on a form nobody has submitted:\n{violationOutput}");
-        violation.GetValueOrDefault(generated).ShouldBe(AxeChecks(client == "orval-vue", "failed", "failed", "skipped", "skipped"), violationOutput);
+        violation.GetValueOrDefault(generated).ShouldBe(AxeChecks("failed", "failed", "skipped", "skipped"), violationOutput);
 
         project.Write(screen, form.Replace("<input type=\"text\"", "<input type=\"text\" aria-label=\"Invoice number\"", StringComparison.Ordinal)
             .Replace("<input v-else type=\"text\"", "<input v-else type=\"text\" aria-label=\"Invoice number\"", StringComparison.Ordinal));
         var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
         labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
-        labelled.GetValueOrDefault(generated).ShouldBe(AxeChecks(client == "orval-vue", "passed", "passed", "skipped", "skipped"));
+        labelled.GetValueOrDefault(generated).ShouldBe(AxeChecks("passed", "passed", "skipped", "skipped"));
     }
 
     /// <summary>Each router, with the screen's own test skipping its axe check or with it commented out.</summary>
@@ -440,12 +440,12 @@ public sealed class ModuleScreenAccessibilityTests
         project.Write(OwnTestOf(screen), ownTest == "skipped" ? (vue ? VueSkippedOwnTest : ReactSkippedOwnTest) : CommentedOutOwnTest);
         var (violationExitCode, violationOutput, violation) = Statuses(project);
         violationExitCode.ShouldNotBe(0, $"pnpm test passed with a field without a label:\n{violationOutput}");
-        violation.GetValueOrDefault(generated).ShouldBe(AxeChecks(vue, "failed", "failed", "skipped", "skipped"), violationOutput);
+        violation.GetValueOrDefault(generated).ShouldBe(AxeChecks("failed", "failed", "skipped", "skipped"), violationOutput);
 
         project.Write(screen, (vue ? VueScreen : ReactScreen).Replace(UnlabelledField, """<input type="text" aria-label="Invoice number" />""", StringComparison.Ordinal));
         var (labelledExitCode, labelledOutput, labelled) = Statuses(project);
         labelledExitCode.ShouldBe(0, $"pnpm test:\n{labelledOutput}");
-        labelled.GetValueOrDefault(generated).ShouldBe(AxeChecks(vue, "passed", "passed", "skipped", "skipped"));
+        labelled.GetValueOrDefault(generated).ShouldBe(AxeChecks("passed", "passed", "skipped", "skipped"));
 
         File.Delete(Path.Combine(project.ProjectDirectory, generated));
         var (uncheckedExitCode, uncheckedOutput) = Shell.Run(web, "pnpm", "test");
@@ -618,10 +618,10 @@ public sealed class ModuleScreenAccessibilityTests
     }
 
     /// <summary>
-    /// A screen's axe check's statuses: as it loads and with its example data, light then dark; with React, also with
-    /// nothing to show (#734), which a data file without an empty example skips.
+    /// A screen's axe check's statuses: as it loads and with its example data, light then dark, and with nothing to show
+    /// (#734), which a data file without an empty example skips.
     /// </summary>
-    private static List<string> AxeChecks(bool vue, params string[] checks) => vue ? [.. checks] : [.. checks, "skipped", "skipped"];
+    private static List<string> AxeChecks(params string[] checks) => [.. checks, "skipped", "skipped"];
 
     /// <summary>
     /// Runs the web app's tests and answers their exit code and output, and the statuses vitest reports for each test

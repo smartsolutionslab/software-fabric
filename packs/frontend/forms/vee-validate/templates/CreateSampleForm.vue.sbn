@@ -1,0 +1,75 @@
+{{~ ns = module.namespace ~}}
+{{~ valibot = project["frontend.validation"] == "valibot" ~}}
+<script setup lang="ts">
+{{~ if valibot ~}}
+import * as v from 'valibot';
+import { useForm } from 'vee-validate';
+{{~ else ~}}
+import { useForm } from 'vee-validate';
+import { z } from 'zod';
+{{~ end ~}}
+import { Button } from '@/components/ui/button';
+import { toTypedSchema } from '@/forms/toTypedSchema';
+
+interface Create{{ ns }}SampleFormProps {
+  /** Creates the sample; resolves to whether it was created, which empties the field. */
+  onCreate: (name: string) => Promise<boolean>;
+  saving: boolean;
+}
+
+// Creates one of the module's samples: a name, checked here before the host checks it again.
+const { onCreate, saving } = defineProps<Create{{ ns }}SampleFormProps>();
+
+/** The id of the form's name field, which the page's empty state moves to through focus. */
+const sampleNameField = '{{ module.name }}-sample-name';
+
+{{~ if valibot ~}}
+const sampleSchema = v.object({
+  name: v.pipe(
+    v.string(),
+    v.trim(),
+    v.minLength(1, 'Give the sample a name.'),
+    v.maxLength(100, "A sample's name is at most 100 characters."),
+  ),
+});
+{{~ else ~}}
+const sampleSchema = z.object({
+  name: z.string().trim().min(1, 'Give the sample a name.').max(100, "A sample's name is at most 100 characters."),
+});
+{{~ end ~}}
+
+const { defineField, errors, handleSubmit, resetForm } = useForm({
+  validationSchema: toTypedSchema(sampleSchema),
+  initialValues: { name: '' },
+});
+const [name, nameAttributes] = defineField('name');
+
+const submit = handleSubmit(async (values) => {
+  if (await onCreate(values.name)) {
+    resetForm();
+  }
+});
+
+defineExpose({ focus: () => document.getElementById(sampleNameField)?.focus() });
+</script>
+
+{%{<template>
+  <form novalidate aria-label="New sample" class="flex flex-col gap-2" @submit="submit">
+    <label :for="sampleNameField" class="text-sm font-medium">Name</label>
+    <div class="flex gap-2">
+      <input
+        :id="sampleNameField"
+        v-model="name"
+        v-bind="nameAttributes"
+        autocomplete="off"
+        :aria-invalid="errors.name ? true : undefined"
+        :aria-describedby="errors.name ? `${sampleNameField}-error` : undefined"
+        class="flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+      />
+      <Button type="submit" :disabled="saving">Create sample</Button>
+    </div>
+    <p v-if="errors.name" :id="`${sampleNameField}-error`" role="alert" class="text-sm text-destructive">
+      {{ errors.name }}
+    </p>
+  </form>
+</template>}%}
