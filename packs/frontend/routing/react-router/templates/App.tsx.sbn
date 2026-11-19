@@ -60,7 +60,7 @@ export function App() {
                 <SidebarMenu>
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={pathname === '/'}>
-                      <NavLink to="/" end>
+                      <NavLink to="/" end viewTransition>
                         Home
                       </NavLink>
                     </SidebarMenuButton>
@@ -68,7 +68,9 @@ export function App() {
                   {moduleRoutes.map((route) => (
                     <SidebarMenuItem key={route.path}>
                       <SidebarMenuButton asChild isActive={isAt(pathname, `/${route.path}`)}>
-                        <NavLink to={route.path}>{route.title}</NavLink>
+                        <NavLink to={route.path} viewTransition>
+                          {route.title}
+                        </NavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
@@ -116,11 +118,11 @@ export function App() {
   return (
     <div>
       <Stack component="nav" aria-label="Modules" direction="row" spacing={2} sx={{ p: 1 }}>
-        <Link component={NavLink} to="/">
+        <Link component={NavLink} to="/" viewTransition>
           Home
         </Link>
         {moduleRoutes.map((route) => (
-          <Link key={route.path} component={NavLink} to={route.path}>
+          <Link key={route.path} component={NavLink} to={route.path} viewTransition>
             {route.title}
           </Link>
         ))}}%}{{- if slots["web.shell-actions"] != "" }}
@@ -153,9 +155,11 @@ export function App() {
   return (
     <div>
       <nav aria-label="Modules" {{ class_of "flex gap-4 p-2" "navigation" }}>
-        <NavLink to="/">Home</NavLink>
+        <NavLink to="/" viewTransition>
+          Home
+        </NavLink>
         {moduleRoutes.map((route) => (
-          <NavLink key={route.path} to={route.path}>
+          <NavLink key={route.path} to={route.path} viewTransition>
             {route.title}
           </NavLink>
         ))}

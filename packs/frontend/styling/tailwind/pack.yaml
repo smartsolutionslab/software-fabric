@@ -5,8 +5,10 @@ slots:
   - { slot: web.vite-imports, template: templates/vite-import.sbn, order: 10 }
   - { slot: web.vite-plugins, template: templates/vite-plugin.sbn, order: 10 }
   - { slot: web.styles, template: templates/styles.sbn, order: 10 }
+  - { slot: web.lint-configs, template: templates/lint-config.sbn }
 agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
   - { kind: ci-step, describes: "The stylesheet compiles with Tailwind during the build; an unknown utility in @apply fails it." }
+  - { kind: lint-rule, describes: "An animate-* or transition* class without motion-safe: (or motion-reduce:), in a script's string or a Vue template, fails lint (motion/respect-reduced-motion).", file: templates/lint-config.sbn }
