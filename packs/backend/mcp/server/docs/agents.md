@@ -9,7 +9,7 @@
 {{~ end ~}}
 - A marked record without a description, without exactly one handler{{ if policies }}, or naming a policy its module does not register{{ end }} fails the architecture rule `EveryMcpToolIsValid`, and would stop the host.
 {{~ if project["backend.topology"] == "services" ~}}
-- Each service is its own MCP server, at `/<module>/mcp` (`McpServerEndpoint.Route`, under `ServiceModule.Name`), offering only its own module's tools; the edge hosts none and forwards `/<module>/mcp` as every module route. Never map `/mcp` at a service's root (`SingletonsLiveOnTheEdge` fails the build) or on the edge.
+- Each service is its own MCP server, at `/<module>/mcp` (`McpServerEndpoint.Route`, under `ServiceModule.Name`), offering only its own module's tools, so a tool's name must be unique only within its service; the edge hosts none and forwards `/<module>/mcp` as every module route. Never map `/mcp` at a service's root (`SingletonsLiveOnTheEdge` fails the build) or on the edge.
 - Never reference the MCP SDK from a module; only the service hosts do{{ if auth }}. Each service's endpoint requires a signed-in caller, as the module routes do{{ end }}.
 - A new tool gets a test through the SDK's client, as its service's `tests/Services/<Module>/Mcp.Server.Tests` does: listed, called, refused{{ if policies }} without its policy{{ end }}.
 {{~ else ~}}
