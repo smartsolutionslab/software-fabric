@@ -154,7 +154,7 @@ export function PendingWidget({
 {{~ else ~}}
     <section
       aria-label={`Proposed: ${title}`}
-      {{ themed "flex h-full flex-col overflow-hidden rounded border border-dashed border-primary bg-card p-2" "flex h-full flex-col overflow-hidden rounded border border-dashed border-slate-900 bg-white p-2" "pending" }}
+      {{ themed "flex h-full flex-col overflow-hidden rounded border border-dashed border-primary bg-card p-2 shadow-elevation-1" "flex h-full flex-col overflow-hidden rounded border border-dashed border-slate-900 bg-white p-2" "pending" }}
     >
 {{~ end ~}}
       <header {{ class_of "flex flex-wrap items-center justify-between gap-2" "header" }}>

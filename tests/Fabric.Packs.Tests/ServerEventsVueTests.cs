@@ -117,7 +117,7 @@ public sealed class ServerEventsVueTests
         // The generated CI's own end-to-end step: the sign-in test and the server event's, against the AppHost.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, e2eOutput);
-        e2eOutput.ShouldContain("2 passed");
+        e2eOutput.ShouldContain("4 passed");
     }
 
     private static Dictionary<string, string> Files(string profile, string[] overrides)
