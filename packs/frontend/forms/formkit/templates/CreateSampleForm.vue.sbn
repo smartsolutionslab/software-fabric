@@ -1,0 +1,61 @@
+{{~ ns = module.namespace ~}}
+{{~ valibot = project["frontend.validation"] == "valibot" ~}}
+<script setup lang="ts">
+import { FormKit } from '@formkit/vue';
+{{~ if valibot ~}}
+import * as v from 'valibot';
+{{~ else ~}}
+import { z } from 'zod';
+{{~ end ~}}
+import { Button } from '@/components/ui/button';
+import { schemaSubmit } from '@/forms/schemaSubmit';
+
+interface Create{{ ns }}SampleFormProps {
+  /** Creates the sample; resolves to whether it was created, which empties the field. */
+  onCreate: (name: string) => Promise<boolean>;
+  saving: boolean;
+}
+
+// Creates one of the module's samples: a name, checked here before the host checks it again.
+const { onCreate, saving } = defineProps<Create{{ ns }}SampleFormProps>();
+
+/** The id of the form's name field, which the page's empty state moves to through focus. */
+const sampleNameField = '{{ module.name }}-sample-name';
+
+{{~ if valibot ~}}
+const sampleSchema = v.object({
+  name: v.pipe(
+    v.string(),
+    v.trim(),
+    v.minLength(1, 'Give the sample a name.'),
+    v.maxLength(100, "A sample's name is at most 100 characters."),
+  ),
+});
+{{~ else ~}}
+const sampleSchema = z.object({
+  name: z.string().trim().min(1, 'Give the sample a name.').max(100, "A sample's name is at most 100 characters."),
+});
+{{~ end ~}}
+
+const submit = schemaSubmit(sampleSchema, async ({ name }, form) => {
+  if (await onCreate(name)) {
+    form.reset();
+  }
+});
+
+defineExpose({ focus: () => document.getElementById(sampleNameField)?.focus() });
+</script>
+
+{%{<template>
+  <FormKit
+    type="form"
+    :actions="false"
+    :value="{ name: '' }"
+    aria-label="New sample"
+    form-class="flex flex-col gap-2"
+    @submit="submit"
+  >
+    <FormKit :id="sampleNameField" type="text" name="name" label="Name" autocomplete="off" />
+    <Button type="submit" :disabled="saving" class="self-start">Create sample</Button>
+  </FormKit>
+</template>}%}

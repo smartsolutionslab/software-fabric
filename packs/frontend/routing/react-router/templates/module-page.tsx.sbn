@@ -1,6 +1,6 @@
 {{~ probe = object.has_key(project, "backend.authorization") && array.size(project["backend.authorization"]) > 0 ~}}
 {{~ # The module's sample (#734): its list and create form, in a single-page app with shadcn and a cached client. ~}}
-{{~ sample_page = project["frontend.architecture"] == "spa" && object.has_key(project, "frontend.ui-library") && project["frontend.ui-library"] == "shadcn" && object.has_key(project, "frontend.api-client") && (project["frontend.api-client"] == "rtk-query-codegen" || project["frontend.api-client"] == "orval") && module.name != "dashboards" && module.name != "assistant" ~}}
+{{~ sample_page = project["frontend.architecture"] == "spa" && object.has_key(project, "frontend.ui-library") && (project["frontend.ui-library"] == "shadcn" || project["frontend.ui-library"] == "shadcn-vue") && object.has_key(project, "frontend.api-client") && (project["frontend.api-client"] == "rtk-query-codegen" || project["frontend.api-client"] == "orval" || project["frontend.api-client"] == "openapi-fetch") && module.name != "dashboards" && module.name != "assistant" ~}}
 {{~ if project["frontend.architecture"] == "micro-frontends" && probe ~}}
 import { Remote } from '@/remotes/Remote';
 import { useCanManage } from './useCanManage';
@@ -66,11 +66,15 @@ export function {{ module.namespace }}Page() {
 {{~ shell = project["frontend.routing"] == "react-router" ~}}
 {{~ # TanStack Table's DataTable draws its own loading and empty states (#696); beside AG Grid the page draws them. ~}}
 {{~ table = project["frontend.data-grid"] == "tanstack-table" ~}}
+{{~ # openapi-fetch's generated file holds the document's types, not named ones: the hook names the sample's. ~}}
+{{~ fetch = project["frontend.api-client"] == "openapi-fetch" ~}}
 import { Inbox } from 'lucide-react';
 {{~ if !shell ~}}
 import { useState } from 'react';
 {{~ end ~}}
+{{~ if !fetch ~}}
 import type { {{ ns }}SampleDto } from '@/api/generated';
+{{~ end ~}}
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { columnsOf } from '@/components/ui/data-table-columns';
@@ -85,7 +89,11 @@ import { Create{{ ns }}SampleForm, sampleNameField } from './Create{{ ns }}Sampl
 {{~ if probe ~}}
 import { useCanManage } from './useCanManage';
 {{~ end ~}}
+{{~ if fetch ~}}
+import { type {{ ns }}SampleDto, useCreate{{ ns }}Sample, use{{ ns }}Samples } from './use{{ ns }}Samples';
+{{~ else ~}}
 import { useCreate{{ ns }}Sample, use{{ ns }}Samples } from './use{{ ns }}Samples';
+{{~ end ~}}
 
 const samples = columnsOf<{{ ns }}SampleDto>();
 const columns = samples.columns([samples.accessor('name', { header: 'Name' })]);

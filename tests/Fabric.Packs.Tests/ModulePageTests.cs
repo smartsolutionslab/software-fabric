@@ -97,12 +97,10 @@ public sealed partial class ModulePageTests
         page.ShouldNotContain("loading={isLoading}");
     }
 
-    /// <summary>Out of scope in this PR, and keep the page they had: Vue (PR 3), the other UI libraries, openapi-fetch, micro-frontends.</summary>
+    /// <summary>Out of scope, and keep the page they had: the UI libraries without the shell's components, micro-frontends (Vue and openapi-fetch: ModulePageVueTests).</summary>
     [Theory]
-    [InlineData("saas-standard-vue")]
     [InlineData("saas-standard-react", "frontend.ui-library=mui", "frontend.styling=css-modules")]
     [InlineData("saas-standard-react", "frontend.ui-library=radix-headless")]
-    [InlineData("lean-crud", "frontend.api-client=openapi-fetch")]
     [InlineData("industrial-event-driven-mfe")]
     public void Elsewhere_the_page_is_unchanged(string profile, params string[] overrides)
     {
