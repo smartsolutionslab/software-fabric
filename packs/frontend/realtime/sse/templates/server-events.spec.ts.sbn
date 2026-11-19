@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 {{~ if project["backend.topology"] == "services" ~}}
-// Template literals: Prettier never wraps one, so the module's name cannot push either line past its printWidth.
+// Template literals, because Prettier never wraps one: however long the module's name, these lines stay as they are.
 const title = `a server event from the {{ module.name }} service reaches the {{ if project["backend.auth"] == "none" }}browser{{ else }}signed-in browser{{ end }} over its own stream`;
 const testEndpoint = `/api/{{ module.name }}/server-events/test`;
 
