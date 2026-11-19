@@ -109,6 +109,29 @@
 {{~ end ~}}
         }
       ]
+{{~ if project["backend.topology"] == "services" && object.has_key(project, "frontend.agent-ui") && project["frontend.agent-ui"] == "ag-ui" ~}}
+    },
+    {
+      "clientId": "{{ name }}-edge",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "secret": "${EDGE_CLIENT_SECRET}",
+      "protocolMappers": [
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "{{ name }}-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+{{~ end ~}}
     }
   ],
 {{~

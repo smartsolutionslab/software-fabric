@@ -1,0 +1,1 @@
+builder.Services.AddAgentRoutes(builder.Configuration);

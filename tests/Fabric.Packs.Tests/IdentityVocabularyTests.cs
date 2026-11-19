@@ -58,6 +58,8 @@ public sealed partial class IdentityVocabularyTests
         "claim_mapping_adr",
         "claim_change_adr",
         "add_claim_rule",
+        "edge_client_resources",
+        "edge_client_wiring",
     ];
 
     private static readonly string[] AuthClientVocabulary =

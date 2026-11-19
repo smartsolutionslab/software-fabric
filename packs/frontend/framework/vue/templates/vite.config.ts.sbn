@@ -19,6 +19,10 @@ export default defineConfig({
 {{- if slots["web.vite-plugins"] != "" }}
 {{ slots["web.vite-plugins"] }},{{ end }}
   ],
+  // Every start scans the app's imports again and pre-bundles all of them before a page loads. Vite would otherwise reuse
+  // node_modules/.vite while the lockfile and this file are unchanged, whatever the app imports now, and bundle the
+  // rest as a page asks for it: the page then reloads, and its requests for the bundles it had answer 504.
+  optimizeDeps: { force: true },
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: host
     ? { proxy: { '/api': { target: host, changeOrigin: true, rewrite: (path) => path.replace(/^\/api/, '') } } }

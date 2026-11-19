@@ -226,3 +226,26 @@ end
 func add_claim_rule
   ret "To add a claim: make it an optional claim of the app registration in Entra ID, and have the stand-in issue it (a property of `StandInUser`, set in `TokenIssuer`, and a value for the local users in `src/IdentityStandIn/appsettings.json`)."
 end
+func edge_client_resources
+  ret `// With services, the edge's own application at the stand-in, ` + name + `-edge, for what the edge asks the services
+// itself: its table of agents, at startup. Its secret is generated once and kept in the AppHost's user secrets.
+var edgeClientSecret = builder.AddResource(ParameterResourceBuilderExtensions.CreateDefaultPasswordParameter(builder, "edge-client-secret", special: false));
+identity?.WithEnvironment("StandIn__Applications__` + name + `-edge", edgeClientSecret);`
+end
+func edge_client_wiring
+  ret `
+    .WithEnvironment(environment =>
+    {
+        // Only while the stand-in runs: a deployment sets EdgeClient for the application it registers for the edge in
+        // Entra ID (docs/adr). The token comes from the first directory, which the host accepts.
+        if (identity is null)
+        {
+            return;
+        }
+
+        environment.EnvironmentVariables["EdgeClient__TokenEndpoint"] = ReferenceExpression.Create($"{identity.GetEndpoint("http")}/00000000-0000-0000-0000-00000000000a/oauth2/v2.0/token");
+        environment.EnvironmentVariables["EdgeClient__ClientId"] = "` + name + `-edge";
+        environment.EnvironmentVariables["EdgeClient__ClientSecret"] = edgeClientSecret.Resource;
+        environment.EnvironmentVariables["EdgeClient__Scope"] = "api://` + name + `-api/.default";
+    })`
+end

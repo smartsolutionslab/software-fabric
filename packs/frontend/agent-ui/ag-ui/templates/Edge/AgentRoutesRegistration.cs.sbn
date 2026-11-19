@@ -1,0 +1,31 @@
+using {{ namespace }}.Edge.Agents;
+using Yarp.ReverseProxy.Configuration;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class AgentRoutesRegistration
+{
+    /// <summary>
+    /// The edge's routes to the agents, read from the services the AppHost started (Edge:Modules) before the edge starts
+    /// listening; a source of routes beside the module routes, whose clusters they go to.
+    /// </summary>
+    public static IServiceCollection AddAgentRoutes(this IServiceCollection services, IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        services.AddSingleton<AgentRoutes>()
+            .AddHostedService(provider => provider.GetRequiredService<AgentRoutes>())
+            .AddSingleton<IProxyConfigProvider>(provider => provider.GetRequiredService<AgentRoutes>().Provider);
+{{~ if project["backend.auth"] != "none" ~}}
+        services.AddTransient<EdgeClientToken>();
+
+        // The token mint is a POST, which gets one attempt by default. Retrying it is safe: a second attempt mints a
+        // second token, and a second token supersedes the first, so nothing is applied twice.
+        services.AddHttpClient(EdgeClientToken.TokenClient).RetryEveryMethod();
+        services.AddHttpClient(AgentRoutes.Client).AddHttpMessageHandler<EdgeClientToken>();
+{{~ else ~}}
+        services.AddHttpClient(AgentRoutes.Client);
+{{~ end ~}}
+        return services;
+    }
+}

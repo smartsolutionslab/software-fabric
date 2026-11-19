@@ -5,10 +5,10 @@ namespace Fabric.Packs.Tests;
 
 /// <summary>
 /// <c>backend.topology: services</c> (ADR-0017) refuses what it cannot build yet, so the matrix never picks it: its
-/// integration tests run through the AppHost (<c>aspire-fixture</c>), never <c>testcontainers</c> (owner, #723), and
-/// AG-UI conflicts with it until #769, the sub-issue of #707 that makes it work, lifts it. The MCP server no longer does
-/// (#766): each service is its own. Nor do SignalR and SSE (#768): the hub and the stream live on the edge. A modular
-/// monolith keeps every one of these options.
+/// integration tests run through the AppHost (<c>aspire-fixture</c>), never <c>testcontainers</c> (owner, #723). The
+/// singletons #707 moved no longer conflict with it: each service is its own MCP server (#766), the hub and the stream
+/// live on the edge (#768), and the owning service speaks AG-UI while the edge forwards it (#769). A modular monolith
+/// keeps every one of these options.
 /// </summary>
 public sealed class ServicesUnsupportedOptionsTests
 {
@@ -21,7 +21,6 @@ public sealed class ServicesUnsupportedOptionsTests
     public static TheoryData<string[], string> Refused { get; } = new()
     {
         { ["backend.test.integration=testcontainers"], "backend.test.integration=testcontainers conflicts with backend.topology == services." },
-        { [.. Agents, "frontend.agent-ui=ag-ui"], "frontend.agent-ui=ag-ui conflicts with backend.topology == services." },
     };
 
     public static TheoryData<string[]> KeptByTheMonolith { get; } = new()
@@ -83,7 +82,6 @@ public sealed class ServicesUnsupportedOptionsTests
         {
             var name = combination.GetProperty("name").GetString();
             Choice(combination, "backend.test.integration").ShouldBe(["aspire-fixture"], name);
-            Choice(combination, "frontend.agent-ui").ShouldNotContain("ag-ui", name);
         }
     }
 
