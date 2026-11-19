@@ -1,5 +1,33 @@
-{{~ hook = project["frontend.api-client"] == "rtk-query-codegen" ? "useGetInvoicesQuery" : "useGetInvoices" ~}}
+{{~ rtk = project["frontend.api-client"] == "rtk-query-codegen" ~}}
+{{~ hook = rtk ? "useGetInvoicesQuery" : "useGetInvoices" ~}}
+{{~ # The module's sample (#734): the page lists its samples, so its examples are pages of them. ~}}
+{{~ sample_page = project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa" && object.has_key(project, "frontend.ui-library") && project["frontend.ui-library"] == "shadcn" && object.has_key(project, "frontend.api-client") && (project["frontend.api-client"] == "rtk-query-codegen" || project["frontend.api-client"] == "orval") && module.name != "dashboards" && module.name != "assistant" ~}}
+{{~ if sample_page ~}}
+{{~ samples = "useGet" + module.namespace + "Samples" + (rtk ? "Query" : "") ~}}
+// The example data {{ module.namespace }}Page's axe check shows the page with, by hook of the generated client: in examples
+// with data, in emptyExamples with nothing to show. A hook without an example answers as if its request were still on
+// its way. Give a hook of your own screen its examples beside the samples'.
+export const examples: Record<string, unknown> = {
+  {{ samples }}: {
+    items: [
+      { id: '0198c1a0-0000-7000-8000-000000000001', name: 'Ada' },
+      { id: '0198c1a0-0000-7000-8000-000000000002', name: 'Bea' },
+    ],
+    totalCount: 2,
+    page: 1,
+    pageSize: 20,
+  },
+};
+
+export const emptyExamples: Record<string, unknown> = {
+  {{ samples }}: { items: [], totalCount: 0, page: 1, pageSize: 20 },
+};
+{{~ else ~}}
 // The example data {{ module.namespace }}Page's axe check shows the page with, by hook of the generated client, for
-// instance { {{ hook }}: { items: [{ number: 'INV-1' }], totalCount: 1, page: 1, pageSize: 20 } }. Without an
+// instance { {{ hook }}: { items: [{ number: 'INV-1' }], totalCount: 1, page: 1, pageSize: 20 } }, and in
+// emptyExamples with nothing to show, { {{ hook }}: { items: [], totalCount: 0, page: 1, pageSize: 20 } }. Without an
 // example, {{ module.namespace }}Page.axe.test.{{ if project["frontend.framework"] == "vue" }}ts{{ else }}tsx{{ end }} checks the page only as it loads.
 export const examples: Record<string, unknown> = {};
+
+export const emptyExamples: Record<string, unknown> = {};
+{{~ end ~}}

@@ -9,8 +9,9 @@ using Microsoft.Extensions.Hosting;
 namespace {{ namespace }}.Architecture.Tests.Rules;
 
 /// <summary>
-/// What the application has once lives on the edge, src/Edge (ADR-0017): /me, a SignalR hub or event stream, the MCP
-/// server and the AG-UI endpoint. A service host that maps one of them answers it beside the edge, once per service. It
+/// What the application has once lives on the edge, src/Edge (ADR-0017): /me, a SignalR hub or event stream and the
+/// AG-UI endpoint. A service host that maps one of them answers it beside the edge, once per service. A service's MCP
+/// server is its own, at /&lt;module&gt;/mcp, never at its root, /mcp, where it would claim to be the application's. It
 /// reads every service host's own endpoint table once in Development and once in Production, so an endpoint mapped in
 /// only one of them is caught too.
 /// </summary>
@@ -18,10 +19,10 @@ public sealed class SingletonsLiveOnTheEdge : IArchitectureRule
 {
     private const string HubMetadata = "Microsoft.AspNetCore.SignalR.HubMetadata";
 
-    /// <summary>The route prefixes of what exists once: /me, the event stream, the MCP server, the AG-UI endpoint.</summary>
+    /// <summary>The route prefixes of what exists once, or must not look so: /me, the event stream, /mcp at the root, the AG-UI endpoint.</summary>
     private static readonly string[] Singletons = ["/me", "/hubs", "/server-events", "/mcp", "/agents"];
 
-    public string Description => "No service host maps /me, a hub, MCP or AG-UI: what the application has once lives on the edge.";
+    public string Description => "No service host maps /me, a hub, /mcp at its root or AG-UI: what the application has once lives on the edge.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {

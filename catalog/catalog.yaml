@@ -238,11 +238,10 @@ dimensions:
     default: []
     note: "Empty: the project neither exposes nor uses MCP services. Official C# MCP SDK. ADR-0010."
     options:
-      # With services the MCP endpoint belongs on the edge, which #707 builds (ADR-0017).
+      # With services each service is its own MCP server, at /<module>/mcp (ADR-0010 and ADR-0017, amended).
       server:
         tier: experimental
         note: "the project exposes MCP tools, opted in per command or query"
-        conflicts: ["backend.topology == services"]
       client: { tier: experimental, note: "the project uses external MCP servers" }
 
   # ─────────────────────────── Backend · per module ──────────────────────────

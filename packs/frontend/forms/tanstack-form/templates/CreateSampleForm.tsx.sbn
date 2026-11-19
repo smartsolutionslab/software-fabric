@@ -1,0 +1,91 @@
+{{~ ns = module.namespace ~}}
+{{~ valibot = project["frontend.validation"] == "valibot" ~}}
+import { revalidateLogic, useForm } from '@tanstack/react-form';
+{{~ if valibot ~}}
+import * as v from 'valibot';
+{{~ else ~}}
+import { z } from 'zod';
+{{~ end ~}}
+import { Button } from '@/components/ui/button';
+
+/** The id of the form's name field, which the page's empty state moves to. */
+export const sampleNameField = '{{ module.name }}-sample-name';
+
+{{~ if valibot ~}}
+const sampleSchema = v.object({
+  name: v.pipe(
+    v.string(),
+    v.trim(),
+    v.minLength(1, 'Give the sample a name.'),
+    v.maxLength(100, "A sample's name is at most 100 characters."),
+  ),
+});
+{{~ else ~}}
+const sampleSchema = z.object({
+  name: z.string().trim().min(1, 'Give the sample a name.').max(100, "A sample's name is at most 100 characters."),
+});
+{{~ end ~}}
+
+interface Create{{ ns }}SampleFormProps {
+  /** Creates the sample; resolves to whether it was created, which empties the field. */
+  onCreate: (name: string) => Promise<boolean>;
+  saving: boolean;
+}
+
+/** Creates one of the module's samples: a name, checked here before the host checks it again. */
+export function Create{{ ns }}SampleForm({ onCreate, saving }: Create{{ ns }}SampleFormProps) {
+  const form = useForm({
+    defaultValues: { name: '' },
+    validationLogic: revalidateLogic(),
+    validators: { onDynamic: sampleSchema },
+    onSubmit: async ({ value, formApi }) => {
+      const { name } = {{ if valibot }}v.parse(sampleSchema, value){{ else }}sampleSchema.parse(value){{ end }};
+      if (await onCreate(name)) {
+        formApi.reset();
+      }
+    },
+  });
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        void form.handleSubmit();
+      }}
+      noValidate
+      aria-label="New sample"
+      className="flex flex-col gap-2"
+    >
+      <label htmlFor={sampleNameField} className="text-sm font-medium">
+        Name
+      </label>
+      <form.Field name="name">
+        {({ name, state: { value, meta }, handleBlur, handleChange }) => (
+          <>
+            <div className="flex gap-2">
+              <input
+                id={sampleNameField}
+                name={name}
+                autoComplete="off"
+                value={value}
+                onBlur={handleBlur}
+                onChange={(event) => handleChange(event.target.value)}
+                aria-invalid={meta.errors.length > 0 ? true : undefined}
+                aria-describedby={meta.errors.length > 0 ? `${sampleNameField}-error` : undefined}
+                className="flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+              />
+              <Button type="submit" disabled={saving}>
+                Create sample
+              </Button>
+            </div>
+            {meta.errors.length > 0 && (
+              <p id={`${sampleNameField}-error`} role="alert" className="text-sm text-destructive">
+                {meta.errors[0]?.message}
+              </p>
+            )}
+          </>
+        )}
+      </form.Field>
+    </form>
+  );
+}

@@ -213,7 +213,7 @@ Settings:
 | Option | Tier | Requires | Conflicts | Profiles | Note |
 |---|---|---|---|---|---|
 | `client` | experimental | — | — | — | the project uses external MCP servers |
-| `server` | experimental | — | `backend.topology == services` | — | the project exposes MCP tools, opted in per command or query |
+| `server` | experimental | — | — | — | the project exposes MCP tools, opted in per command or query |
 
 ### `backend.mediator`
 

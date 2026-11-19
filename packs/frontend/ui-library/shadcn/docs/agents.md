@@ -11,4 +11,5 @@
 - `src/App.tsx` is the app shell: the sidebar (`@/components/ui/sidebar`) lists the start page and every module from its `routes.tsx`, the breadcrumbs and the command palette (Ctrl+K or Cmd+K) follow the routes too, so a new module needs nothing in the shell.
 - Report what a mutation did with `notify.success('…')` or `notify.failure('…')` from `@/lib/notify`: a toast that is a status message or an alert. Call it rather than sonner's `toast`, which gives a toast no role.
 {{~ end ~}}
+- While a list's query is pending, show `Skeleton`s (`@/components/ui/skeleton`) shaped like its content, not a `Loading…` paragraph; when it has nothing, an `EmptyState` (`@/components/ui/empty-state`): an icon (`<Inbox />` from lucide-react), one sentence saying what is missing and the primary action that fills it.
 - Compose screens from those components; do not install MUI, Ant Design, Mantine or Chakra (lint refuses them).

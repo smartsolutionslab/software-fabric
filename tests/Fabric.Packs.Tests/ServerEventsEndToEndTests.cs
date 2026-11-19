@@ -33,7 +33,7 @@ public sealed class ServerEventsEndToEndTests
         // The generated CI's own end-to-end step: start the AppHost, wait for the app, run Playwright, stop.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, e2eOutput);
-        e2eOutput.ShouldContain("2 passed");
+        e2eOutput.ShouldContain("5 passed"); // and the billing page's three sample tests (#734)
 
         // The gate: an event sent to every browser instead of its tenant's fails the generated integration tests.
         var sender = Path.Combine(project.ProjectDirectory, "src", "Host", "Realtime", "HubBrowserEvents.cs");

@@ -64,6 +64,8 @@ public sealed class SignInTests
     {
         using var project = new GeneratedProject("saas-standard-react");
         project.AddModule("billing");
+        // The page is the test's, so the module page's sample goes (#734).
+        project.DeleteSample("billing");
         project.WriteTypes("src/Modules/Billing/Billing.Api", NotesEndpoint);
         project.Build();
 

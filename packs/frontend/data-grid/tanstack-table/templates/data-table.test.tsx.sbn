@@ -1,15 +1,34 @@
-import { render, screen } from '@testing-library/react';
-import { expect, test } from 'vitest';
+{{~ shadcn = project["frontend.ui-library"] == "shadcn" ~}}
+import { {{ if shadcn }}cleanup, {{ end }}render, screen{{ if shadcn }}, within{{ end }} } from '@testing-library/react';
+import { {{ if shadcn }}afterEach, {{ end }}expect, test } from 'vitest';
 import { DataTable } from './data-table';
 import { columnsOf } from './data-table-columns';
 
 interface Person {
   name: string;
+{{~ if shadcn ~}}
+  team: string;
+{{~ end ~}}
 }
 
 const people = columnsOf<Person>();
+{{~ if shadcn ~}}
+const columns = people.columns([
+  people.accessor('name', { header: 'Name' }),
+  people.accessor('team', { header: 'Team' }),
+]);
+const data: Person[] = [
+  { name: 'first', team: 'blue' },
+  { name: 'second', team: 'green' },
+];
+const none: Person[] = [];
+
+// Without Vitest's globals, Testing Library does not unmount between tests by itself.
+afterEach(cleanup);
+{{~ else ~}}
 const columns = people.columns([people.accessor('name', { header: 'Name' })]);
 const data: Person[] = [{ name: 'first' }, { name: 'second' }];
+{{~ end ~}}
 
 test('the table shows a header and one row per item', () => {
   render(<DataTable columns={columns} data={data} />);
@@ -17,3 +36,34 @@ test('the table shows a header and one row per item', () => {
   expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
   expect(screen.getAllByRole('row')).toHaveLength(3);
 });
+{{~ if shadcn ~}}
+
+test('while its query is pending the table is busy, says it is loading and shows skeleton rows in its shape', () => {
+  const { container } = render(<DataTable columns={columns} data={none} loading empty={<p>No people yet.</p>} />);
+
+  const table = screen.getByRole('table', { name: 'Loading…', busy: true });
+  expect(within(table).getByRole('columnheader', { name: 'Team' })).toBeInTheDocument();
+  const skeletonRows = container.querySelectorAll('tbody tr');
+  expect(skeletonRows.length).toBeGreaterThan(0);
+  for (const row of skeletonRows) {
+    expect(row.querySelectorAll('td [data-slot="skeleton"]')).toHaveLength(2);
+  }
+  expect(screen.queryByText('No people yet.')).not.toBeInTheDocument();
+});
+
+test('a table without rows shows its empty state in place of them', () => {
+  render(<DataTable columns={columns} data={none} empty={<p>No people yet.</p>} />);
+
+  const table = screen.getByRole('table');
+  expect(table).not.toHaveAttribute('aria-busy');
+  const cell = within(table).getByRole('cell', { name: 'No people yet.' });
+  expect(cell).toHaveAttribute('colspan', '2');
+});
+
+test('a table with rows shows no empty state', () => {
+  render(<DataTable columns={columns} data={data} empty={<p>No people yet.</p>} />);
+
+  expect(screen.getByRole('cell', { name: 'second' })).toBeInTheDocument();
+  expect(screen.queryByText('No people yet.')).not.toBeInTheDocument();
+});
+{{~ end ~}}

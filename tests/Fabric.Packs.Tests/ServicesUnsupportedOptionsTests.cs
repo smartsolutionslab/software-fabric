@@ -6,8 +6,9 @@ namespace Fabric.Packs.Tests;
 /// <summary>
 /// <c>backend.topology: services</c> (ADR-0017) refuses what it cannot build yet, so the matrix never picks it: its
 /// integration tests run through the AppHost (<c>aspire-fixture</c>), never <c>testcontainers</c> (owner, #723), and
-/// the singletons #707 moves to the edge (the MCP server, SignalR, SSE and AG-UI) conflict with it until then. A modular
-/// monolith keeps every one of these options.
+/// the singletons #707 moves to the edge (SignalR, SSE and AG-UI) conflict with it until their sub-issues of #707 lift
+/// them. The MCP server is no longer one (#766): each service is its own. A modular monolith keeps every one of these
+/// options.
 /// </summary>
 public sealed class ServicesUnsupportedOptionsTests
 {
@@ -20,7 +21,6 @@ public sealed class ServicesUnsupportedOptionsTests
     public static TheoryData<string[], string> Refused { get; } = new()
     {
         { ["backend.test.integration=testcontainers"], "backend.test.integration=testcontainers conflicts with backend.topology == services." },
-        { ["backend.mcp=server"], "backend.mcp=server conflicts with backend.topology == services." },
         { ["frontend.realtime=signalr"], "frontend.realtime=signalr conflicts with backend.topology == services." },
         { ["frontend.realtime=sse"], "frontend.realtime=sse conflicts with backend.topology == services." },
         { [.. Agents, "frontend.agent-ui=ag-ui"], "frontend.agent-ui=ag-ui conflicts with backend.topology == services." },
@@ -85,7 +85,6 @@ public sealed class ServicesUnsupportedOptionsTests
         {
             var name = combination.GetProperty("name").GetString();
             Choice(combination, "backend.test.integration").ShouldBe(["aspire-fixture"], name);
-            Choice(combination, "backend.mcp").ShouldNotContain("server", name);
             Choice(combination, "frontend.realtime").ShouldBe(["none"], name);
             Choice(combination, "frontend.agent-ui").ShouldNotContain("ag-ui", name);
         }

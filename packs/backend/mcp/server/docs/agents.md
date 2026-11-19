@@ -8,5 +8,11 @@
 - A tool that needs a permission names its module's policy from `<Module>PolicyNames`: `[McpTool("...", Policy = BillingPolicyNames.Manage)]`. Never another module's, and never a string literal. A caller without it neither sees nor reaches the tool.
 {{~ end ~}}
 - A marked record without a description, without exactly one handler{{ if policies }}, or naming a policy its module does not register{{ end }} fails the architecture rule `EveryMcpToolIsValid`, and would stop the host.
+{{~ if project["backend.topology"] == "services" ~}}
+- Each service is its own MCP server, at `/<module>/mcp` (`McpServerEndpoint.Route`, under `ServiceModule.Name`), offering only its own module's tools; the edge hosts none and forwards `/<module>/mcp` as every module route. Never map `/mcp` at a service's root (`SingletonsLiveOnTheEdge` fails the build) or on the edge.
+- Never reference the MCP SDK from a module; only the service hosts do{{ if auth }}. Each service's endpoint requires a signed-in caller, as the module routes do{{ end }}.
+- A new tool gets a test through the SDK's client, as its service's `tests/Services/<Module>/Mcp.Server.Tests` does: listed, called, refused{{ if policies }} without its policy{{ end }}.
+{{~ else ~}}
 - Never reference the MCP SDK from a module; only the host does{{ if auth }}. The endpoint `/mcp` requires a signed-in caller, as the module routes do{{ end }}.
 - A new tool gets a test through the SDK's client, as `tests/Mcp.Server.Tests` does: listed, called, refused{{ if policies }} without its policy{{ end }}.
+{{~ end ~}}

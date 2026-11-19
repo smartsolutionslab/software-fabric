@@ -6,7 +6,11 @@
 
 ## Decision
 
+{{~ if project["backend.topology"] == "services" ~}}
+The project exposes MCP tools over HTTP, through the official C# SDK (`ModelContextProtocol.AspNetCore`, streamable HTTP, stateless). Each service is its own MCP server, at `/<module>/mcp`, offering only its own module's tools; the edge hosts none and forwards `/<module>/mcp` as it does every module route{{ if auth }}, with the caller's bearer token unchanged{{ end }} (the generator's ADR-0010 and ADR-0017, amended 2026-11-18).
+{{~ else ~}}
 The project exposes MCP tools over HTTP at `/mcp`, through the official C# SDK (`ModelContextProtocol.AspNetCore`, streamable HTTP, stateless).
+{{~ end ~}}
 
 - **A command or query is a tool only when marked** `[McpTool("description")]` on its record. Nothing is exposed by default, and `fabric add-module` marks nothing.
 - **A tool is its request.** Its name is `<module>_<request>` in snake case (`billing_find_invoice`), its input schema is the request record's, and a call reads the arguments into the record and sends it through `IDispatcher`, exactly as an endpoint does. The tool holds no logic: a successful `Result` comes back as JSON, a failed one as a tool error starting with the `ApiError`'s code.
@@ -20,7 +24,11 @@ The project exposes MCP tools over HTTP at `/mcp`, through the official C# SDK (
 {{~ end ~}}
 - **One definition of a valid tool**, `McpToolCatalog` in BuildingBlocks, serves both the host and the build: the host refuses to start on a marked request that is not a valid tool, and the architecture rule `EveryMcpToolIsValid` fails the build on the same problems. A marked record must be a command or a query, have a description and exactly one handler in its module{{ if policies }}, and name only a policy its own module registers{{ end }}.
 - **MCP code stays out of the modules.** The attribute and the catalog live in BuildingBlocks, which references no MCP package; only the host references the SDK. A module's Application project references nothing new.
+{{~ if project["backend.topology"] == "services" ~}}
+- **Tests never reach an external server or model.** Each service has its own `tests/Services/<Module>/Mcp.Server.Tests`, which runs that service's host in process with sample requests of its own and calls it with the SDK's client at `/<module>/mcp`. The integration tests call every service's `/<module>/mcp` through the edge.
+{{~ else ~}}
 - **Tests never reach an external server or model.** `tests/Mcp.Server.Tests` runs the real host in process with sample requests of its own and calls it with the SDK's client.
+{{~ end ~}}
 
 ## Consequences
 
