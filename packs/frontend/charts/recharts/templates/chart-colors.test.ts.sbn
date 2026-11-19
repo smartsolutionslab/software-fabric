@@ -1,0 +1,13 @@
+import { expect, test } from 'vitest';
+import { chartColor } from './chart-colors';
+
+test("a series takes the theme's --chart-1…5 in turn, which src/index.css swaps for dark mode, and starts again after the fifth", () => {
+  expect([0, 1, 2, 3, 4, 5].map(chartColor)).toEqual([
+    'var(--chart-1)',
+    'var(--chart-2)',
+    'var(--chart-3)',
+    'var(--chart-4)',
+    'var(--chart-5)',
+    'var(--chart-1)',
+  ]);
+});

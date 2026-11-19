@@ -2,6 +2,11 @@ option: frontend.charts.echarts
 files:
   - { template: templates/chart.tsx.sbn, target: web/app/src/components/chart.tsx, when: 'project["frontend.framework"] == "react"' }
   - { template: templates/DataChart.vue.sbn, target: web/app/src/components/DataChart.vue, when: 'project["frontend.framework"] == "vue"' }
+  # With shadcn or shadcn-vue, whose theme defines --chart-1…5, the chart draws in them and follows dark mode (#700).
+  - { template: templates/chart-theme.ts.sbn, target: web/app/src/components/chart-theme.ts, when: 'object.has_key(project, "frontend.ui-library") && (project["frontend.ui-library"] == "shadcn" || project["frontend.ui-library"] == "shadcn-vue")' }
+  - { template: templates/chart-theme.test.ts.sbn, target: web/app/src/components/chart-theme.test.ts, when: 'object.has_key(project, "frontend.ui-library") && (project["frontend.ui-library"] == "shadcn" || project["frontend.ui-library"] == "shadcn-vue")' }
+  - { template: templates/chart.test.tsx.sbn, target: web/app/src/components/chart.test.tsx, when: 'project["frontend.ui-library"] == "shadcn"' }
+  - { template: templates/DataChart.test.ts.sbn, target: web/app/src/components/DataChart.test.ts, when: 'project["frontend.ui-library"] == "shadcn-vue"' }
 slots:
   - { slot: web.dependencies, template: templates/dependencies.sbn }
   - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 60 }
@@ -9,4 +14,5 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
+  - { kind: unit-test, describes: "With shadcn or shadcn-vue, the chart draws its series in the theme's --chart-1…5 and its text and lines in the theme's colours (oklch as rgb), and draws again in the dark palette when .dark is set on <html> and back (src/components/chart-theme.test.ts, chart.test.tsx, DataChart.test.ts).", file: templates/chart-theme.test.ts.sbn }
   - { kind: lint-rule, describes: "Importing Recharts or Chart.js (with Vue, vue-chartjs or Chart.js) fails lint.", file: templates/restricted.sbn }

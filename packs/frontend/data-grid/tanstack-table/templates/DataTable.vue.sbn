@@ -9,63 +9,172 @@ end ~}}
 {{~ if project["frontend.ui-library"] == "shadcn-vue" ~}}
 <script setup lang="ts" generic="TRow extends RowData">
 import { type ColumnDef, FlexRender, type RowData, useTable } from '@tanstack/vue-table';
-import { computed, toRef } from 'vue';
+import { computed, ref, toRef, useId, useTemplateRef } from 'vue';
+import { cn } from '@/lib/utils';
+import { Button } from './button';
 import { Skeleton } from './skeleton';
 import { features, type Features } from './data-table-columns';
 
 /**
- * A plain table over TanStack Table; keep columns stable (module scope). While the query is pending (`loading`), the
- * table is busy and shows skeleton rows in its own shape instead of data; with no rows it shows its `empty` slot, such
- * as an `<EmptyState>`.
+ * A table over TanStack Table; keep columns stable (module scope). Its header stays in view while the rows scroll; above
+ * them, the reader picks the density and the columns shown. While the query is pending (`loading`), the table is busy
+ * and shows skeleton rows in its own shape instead of data; with no rows it shows its `empty` slot, such as an
+ * `<EmptyState>`. The `actions` slot fills a row's last cell, shown while the row is hovered or has focus; given the
+ * page its rows are of (`paging`, a `PagedResult` as the host answers it), it says below them which rows it shows of
+ * how many ("Showing 1–25 of 312").
  */
 const props = defineProps<{
   columns: ColumnDef<Features, TRow, unknown>[];
   data: TRow[];
   loading?: boolean;
+  paging?: { page: number | string; pageSize: number | string; totalCount: number | string };
 }>();
 
-defineSlots<{ empty?: () => unknown }>();
+const slots = defineSlots<{ empty?: () => unknown; actions?: (props: { row: TRow }) => unknown }>();
+
+type Density = 'comfortable' | 'compact';
+
+const densities: { value: Density; label: string }[] = [
+  { value: 'comfortable', label: 'Comfortable' },
+  { value: 'compact', label: 'Compact' },
+];
+const cellPadding: Record<Density, string> = { comfortable: 'px-2 py-2', compact: 'px-2 py-1' };
+const skeletonRows = ['first', 'second', 'third'];
 
 const table = useTable({ features, columns: props.columns, data: toRef(() => props.data) });
+const density = ref<Density>('comfortable');
+const choosing = ref(false);
+const columnsButton = useTemplateRef<InstanceType<typeof Button>>('columnsButton');
+const id = useId();
 const rows = computed(() => table.getRowModel().rows);
-const leafColumns = computed(() => table.getAllLeafColumns());
-const skeletonRows = ['first', 'second', 'third'];
+const allColumns = computed(() => table.getAllLeafColumns());
+const visibleColumns = computed(() => table.getVisibleLeafColumns());
+const span = computed(() => visibleColumns.value.length + (slots.actions ? 1 : 0));
+const cell = computed(() => cn('border-b', cellPadding[density.value]));
+
+/** "Showing 26–50 of 312", or nothing while loading, without a page or for a page without rows. */
+const summary = computed(() => {
+  const { paging, loading } = props;
+  if (loading || paging === undefined || rows.value.length === 0) {
+    return undefined;
+  }
+
+  const first = (Number(paging.page) - 1) * Number(paging.pageSize) + 1;
+  return `Showing ${first}–${first + rows.value.length - 1} of ${Number(paging.totalCount)}`;
+});
+
+function closeOnEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    choosing.value = false;
+    (columnsButton.value?.$el as HTMLElement | undefined)?.focus();
+  }
+}
 </script>
 
 <template>
-  <table class="w-full text-sm" :aria-busy="loading || undefined">
-    <caption v-if="loading" class="sr-only">
-      Loading…
-    </caption>
-    <thead>
-      <tr v-for="group in table.getHeaderGroups()" :key="group.id">
-        <th v-for="header in group.headers" :key="header.id" class="border-b p-2 text-left font-medium">
-          <FlexRender v-if="!header.isPlaceholder" :header="header" />
-        </th>
-      </tr>
-    </thead>
-    <tbody>
-      <template v-if="loading">
-        <tr v-for="row in skeletonRows" :key="row" aria-hidden="true">
-          <td v-for="column in leafColumns" :key="column.id" class="border-b p-2">
-            <Skeleton class="h-4 w-full" />
-          </td>
+  <div class="flex flex-col gap-2">
+    <div class="flex flex-wrap items-center justify-end gap-2">
+      <div role="group" aria-label="Density" class="flex gap-1">
+        <Button
+          v-for="option in densities"
+          :key="option.value"
+          type="button"
+          :variant="density === option.value ? 'secondary' : 'ghost'"
+          size="sm"
+          :aria-pressed="density === option.value"
+          @click="density = option.value"
+        >
+          {{ "{{" }} option.label {{ "}}" }}
+        </Button>
+      </div>
+      <div class="relative">
+        <Button
+          ref="columnsButton"
+          type="button"
+          variant="outline"
+          size="sm"
+          :aria-expanded="choosing"
+          :aria-controls="`${id}-columns`"
+          @click="choosing = !choosing"
+        >
+          Columns
+        </Button>
+        <fieldset
+          :id="`${id}-columns`"
+          :hidden="!choosing"
+          class="bg-popover text-popover-foreground absolute right-0 z-20 mt-1 flex min-w-40 flex-col gap-1 rounded-md border p-2 shadow-md"
+          @keydown="closeOnEscape"
+        >
+          <legend class="sr-only">Visible columns</legend>
+          <label v-for="column in allColumns" :key="column.id" class="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              :checked="column.getIsVisible()"
+              :disabled="column.getIsVisible() && visibleColumns.length === 1"
+              @change="column.toggleVisibility()"
+            />
+            {{ "{{" }} typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id {{ "}}" }}
+          </label>
+        </fieldset>
+      </div>
+    </div>
+    <table
+      class="w-full text-sm"
+      :data-density="density"
+      :aria-busy="loading || undefined"
+      :aria-describedby="summary === undefined ? undefined : `${id}-showing`"
+    >
+      <caption v-if="loading" class="sr-only">
+        Loading…
+      </caption>
+      <thead>
+        <tr v-for="group in table.getHeaderGroups()" :key="group.id">
+          <th
+            v-for="header in group.headers"
+            :key="header.id"
+            :class="cn('bg-background sticky top-0 z-10 text-left font-medium', cell)"
+          >
+            <FlexRender v-if="!header.isPlaceholder" :header="header" />
+          </th>
+          <th v-if="$slots.actions" :class="cn('bg-background sticky top-0 z-10', cell)">
+            <span class="sr-only">Actions</span>
+          </th>
         </tr>
-      </template>
-      <template v-else>
-        <tr v-for="row in rows" :key="row.id">
-          <td v-for="cell in row.getAllCells()" :key="cell.id" class="border-b p-2">
-            <FlexRender :cell="cell" />
-          </td>
-        </tr>
-        <tr v-if="rows.length === 0 && $slots.empty">
-          <td :colspan="leafColumns.length" class="p-2">
-            <slot name="empty" />
-          </td>
-        </tr>
-      </template>
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        <template v-if="loading">
+          <tr v-for="row in skeletonRows" :key="row" aria-hidden="true">
+            <td v-for="column in visibleColumns" :key="column.id" :class="cell">
+              <Skeleton class="h-4 w-full" />
+            </td>
+            <td v-if="$slots.actions" :class="cell" />
+          </tr>
+        </template>
+        <template v-else>
+          <tr v-for="row in rows" :key="row.id" class="group hover:bg-muted/50">
+            <td v-for="rowCell in row.getVisibleCells()" :key="rowCell.id" :class="cell">
+              <FlexRender :cell="rowCell" />
+            </td>
+            <td v-if="$slots.actions" :class="cell">
+              <div
+                class="flex justify-end gap-1 opacity-0 motion-safe:transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
+              >
+                <slot name="actions" :row="row.original" />
+              </div>
+            </td>
+          </tr>
+          <tr v-if="rows.length === 0 && $slots.empty">
+            <td :colspan="span" class="p-2">
+              <slot name="empty" />
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+    <p v-if="summary !== undefined" :id="`${id}-showing`" class="text-muted-foreground text-caption">
+      {{ "{{" }} summary {{ "}}" }}
+    </p>
+  </div>
 </template>
 {{~ else ~}}
 <script setup lang="ts" generic="TRow extends RowData">

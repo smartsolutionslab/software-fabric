@@ -23,10 +23,10 @@ function withPending(page: PagedResultOf{{ ns }}SampleDto, name: string): PagedR
   return { ...page, items, totalCount: Number(page.totalCount) + 1 };
 }
 
-/** The module's samples, a page at a time: undefined until the host answers. */
+/** The module's samples, a page at a time, and the page they are of: undefined until the host answers. */
 export function use{{ ns }}Samples() {
   const { data, isLoading, isError } = useGet{{ ns }}Samples(samplesPage);
-  return { samples: data?.items, isLoading, isError };
+  return { samples: data?.items, page: data, isLoading, isError };
 }
 
 /**
@@ -127,6 +127,7 @@ export function use{{ ns }}Samples() {
   onMounted(() => void store.load());
   return {
     samples: computed(() => store.page?.items),
+    page: computed(() => store.page),
     isLoading: computed(() => store.page === undefined && !store.failed),
     isError: computed(() => store.failed),
   };
@@ -162,10 +163,10 @@ function withPending(page: PagedResultOf{{ ns }}SampleDto, name: string): PagedR
   return { ...page, items, totalCount: Number(page.totalCount) + 1 };
 }
 
-/** The module's samples, a page at a time: undefined until the host answers. */
+/** The module's samples, a page at a time, and the page they are of: undefined until the host answers. */
 export function use{{ ns }}Samples() {
   const { data, isLoading, isError } = useGet{{ ns }}Samples(samplesPage);
-  return { samples: computed(() => data.value?.items), isLoading, isError };
+  return { samples: computed(() => data.value?.items), page: data, isLoading, isError };
 }
 
 /**

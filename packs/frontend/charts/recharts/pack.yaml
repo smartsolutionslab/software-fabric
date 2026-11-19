@@ -2,6 +2,8 @@ option: frontend.charts.recharts
 files:
   - { template: templates/chart.tsx.sbn, target: web/app/src/components/chart.tsx }
   - { template: templates/chart-colors.ts.sbn, target: web/app/src/components/chart-colors.ts }
+  # With shadcn, whose theme defines --chart-1…5, the series are coloured with them and follow dark mode (#700).
+  - { template: templates/chart-colors.test.ts.sbn, target: web/app/src/components/chart-colors.test.ts, when: 'object.has_key(project, "frontend.ui-library") && project["frontend.ui-library"] == "shadcn"' }
 slots:
   - { slot: web.dependencies, template: templates/dependencies.sbn }
   - { slot: web.restricted-imports, template: templates/restricted.sbn, order: 60 }
@@ -9,4 +11,5 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
+  - { kind: unit-test, describes: "With shadcn, chartColor gives the series the theme's --chart-1…5 in turn, which src/index.css swaps for dark mode (src/components/chart-colors.test.ts).", file: templates/chart-colors.test.ts.sbn }
   - { kind: lint-rule, describes: "Importing ECharts (echarts, echarts-for-react) or Chart.js (chart.js, react-chartjs-2) fails lint.", file: templates/restricted.sbn }

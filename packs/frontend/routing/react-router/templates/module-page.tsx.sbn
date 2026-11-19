@@ -114,7 +114,11 @@ function toTheForm() {
  * caller its permission probe answers with 200, and any failure but a 403 shows as an alert.{{ end }}
  */
 export function {{ ns }}Page() {
+{{~ if table ~}}
+  const { samples: rows, page, isLoading, isError } = use{{ ns }}Samples();
+{{~ else ~}}
   const { samples: rows, isLoading, isError } = use{{ ns }}Samples();
+{{~ end ~}}
   const { create, isSaving } = useCreate{{ ns }}Sample();
 {{~ if probe ~}}
   const permission = useCanManage();
@@ -171,7 +175,7 @@ export function {{ ns }}Page() {
         {isError ? (
           <p role="alert">The samples could not be loaded.</p>
         ) : (
-          <DataTable columns={columns} data={rows ?? none} loading={isLoading} empty={empty} />
+          <DataTable columns={columns} data={rows ?? none} loading={isLoading} empty={empty} paging={page} />
         )}
 {{~ else ~}}
         {isError && <p role="alert">The samples could not be loaded.</p>}
