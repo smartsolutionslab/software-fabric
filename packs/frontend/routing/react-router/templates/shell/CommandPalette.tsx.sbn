@@ -36,7 +36,7 @@ export function CommandPalette({ routes }: { routes: readonly ModuleRoute[] }) {
 
   const go = (to: string) => {
     setOpen(false);
-    void navigate(to);
+    void navigate(to, { viewTransition: true });
   };
 
   return (

@@ -28,7 +28,10 @@ public sealed partial class ShadcnComponentsTests
         }
         """;
 
-    /// <summary>An overlay with the classes shadcn's dialog gives its own: it animates with tw-animate-css.</summary>
+    /// <summary>
+    /// An overlay with the classes shadcn's dialog gives its own: it animates with tw-animate-css, each animation class made
+    /// <c>motion-safe:</c> as AGENTS.md asks of a component the CLI adds, since lint fails one without it (#697).
+    /// </summary>
     private const string CliOverlay = """
         import type { ComponentProps } from 'react';
         import { cn } from '@/lib/utils';
@@ -38,7 +41,7 @@ public sealed partial class ShadcnComponentsTests
             <div
               data-slot="dialog-overlay"
               className={cn(
-                'fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0',
+                'fixed inset-0 z-50 bg-black/50 motion-safe:data-[state=closed]:animate-out data-[state=closed]:fade-out-0 motion-safe:data-[state=open]:animate-in data-[state=open]:fade-in-0',
                 className,
               )}
               {...props}

@@ -20,10 +20,16 @@ end ~}}
   font-weight: 500;
   line-height: 1.25rem;
   text-decoration: none;
-  transition:
-    background-color 150ms,
-    border-color 150ms,
-    color 150ms;
+}
+
+/* The colours change gradually only for a reader whose system does not ask for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .button {
+    transition:
+      background-color 150ms,
+      border-color 150ms,
+      color 150ms;
+  }
 }
 
 .button:focus-visible {
