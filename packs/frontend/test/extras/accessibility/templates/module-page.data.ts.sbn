@@ -1,10 +1,12 @@
 {{~ rtk = project["frontend.api-client"] == "rtk-query-codegen" ~}}
 {{~ hook = rtk ? "useGetInvoicesQuery" : "useGetInvoices" ~}}
 {{~ # The module's sample (#734): the page lists its samples, so its examples are pages of them. ~}}
-{{~ sample_page = project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa" && object.has_key(project, "frontend.ui-library") && project["frontend.ui-library"] == "shadcn" && object.has_key(project, "frontend.api-client") && (project["frontend.api-client"] == "rtk-query-codegen" || project["frontend.api-client"] == "orval") && module.name != "dashboards" && module.name != "assistant" ~}}
+{{~ sample_page = project["frontend.architecture"] == "spa" && object.has_key(project, "frontend.ui-library") && (project["frontend.ui-library"] == "shadcn" || project["frontend.ui-library"] == "shadcn-vue") && object.has_key(project, "frontend.api-client") && (project["frontend.api-client"] == "rtk-query-codegen" || project["frontend.api-client"] == "orval" || project["frontend.api-client"] == "openapi-fetch") && module.name != "dashboards" && module.name != "assistant" ~}}
 {{~ if sample_page ~}}
-{{~ samples = "useGet" + module.namespace + "Samples" + (rtk ? "Query" : "") ~}}
-// The example data {{ module.namespace }}Page's axe check shows the page with, by hook of the generated client: in examples
+{{~ # The generated client's hooks stand in for the page's axe check; without them, the page's own composable does. ~}}
+{{~ stands_in = rtk || (project["frontend.api-client"] == "orval" && (project["frontend.framework"] == "react" || project["frontend.state"] != "pinia")) ~}}
+{{~ samples = stands_in ? "useGet" + module.namespace + "Samples" + (rtk ? "Query" : "") : "use" + module.namespace + "Samples" ~}}
+// The example data {{ module.namespace }}Page's axe check shows the page with, by hook{{ if stands_in }} of the generated client{{ end }}: in examples
 // with data, in emptyExamples with nothing to show. A hook without an example answers as if its request were still on
 // its way. Give a hook of your own screen its examples beside the samples'.
 export const examples: Record<string, unknown> = {

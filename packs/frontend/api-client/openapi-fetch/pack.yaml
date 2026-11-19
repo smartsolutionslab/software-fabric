@@ -1,5 +1,8 @@
 option: frontend.api-client.openapi-fetch
 files:
+  # The module's sample on its page (#734), in a single-page app with shadcn or shadcn-vue; the Vue composable's test is the vue-router pack's.
+  - { template: templates/Sample/useSamples.ts.sbn, target: "web/app/src/modules/{{ module.name }}/use{{ module.namespace }}Samples.ts", per-module: true, when: 'project["frontend.architecture"] == "spa" && object.has_key(project, "frontend.ui-library") && (project["frontend.ui-library"] == "shadcn" || project["frontend.ui-library"] == "shadcn-vue") && object.has_key(project, "frontend.api-client") && (project["frontend.api-client"] == "rtk-query-codegen" || project["frontend.api-client"] == "orval" || project["frontend.api-client"] == "openapi-fetch") && module.name != "dashboards" && module.name != "assistant"' }
+  - { template: templates/Sample/useSamples.test.tsx.sbn, target: "web/app/src/modules/{{ module.name }}/use{{ module.namespace }}Samples.test.tsx", per-module: true, when: 'project["frontend.framework"] == "react" && project["frontend.architecture"] == "spa" && object.has_key(project, "frontend.ui-library") && (project["frontend.ui-library"] == "shadcn" || project["frontend.ui-library"] == "shadcn-vue") && object.has_key(project, "frontend.api-client") && (project["frontend.api-client"] == "rtk-query-codegen" || project["frontend.api-client"] == "orval" || project["frontend.api-client"] == "openapi-fetch") && module.name != "dashboards" && module.name != "assistant"' }
   - { template: templates/openapi.json.sbn, target: web/app/openapi.json }
   - { template: templates/baseApi.ts.sbn, target: web/app/src/api/baseApi.ts }
   - { template: templates/gitignore.sbn, target: web/app/src/api/.gitignore }

@@ -1,4 +1,5 @@
 {{~ ns = module.namespace ~}}
+{{~ if project["frontend.framework"] == "react" ~}}
 import {
   getGet{{ ns }}SamplesQueryKey,
   type PagedResultOf{{ ns }}SampleDto,
@@ -62,3 +63,143 @@ export function useCreate{{ ns }}Sample() {
   };
   return { create, isSaving: isPending };
 }
+{{~ else if project["frontend.state"] == "pinia" ~}}
+import { defineStore } from 'pinia';
+import { computed, onMounted, ref } from 'vue';
+import { get{{ ns }}Samples, type PagedResultOf{{ ns }}SampleDto, post{{ ns }}Samples } from '@/api/generated';
+
+/** The page of samples the module's page lists: the first, as many as the host gives by default. */
+export const samplesPage = { page: 1, pageSize: 20 };
+
+let pending = 0;
+
+/** The page with the new sample in it, by name as the host lists them, until the host's own answer replaces it. */
+function withPending(page: PagedResultOf{{ ns }}SampleDto, name: string): PagedResultOf{{ ns }}SampleDto {
+  pending += 1;
+  const items = [...page.items, { id: `pending-${pending}`, name }].sort((first, second) =>
+    first.name < second.name ? -1 : first.name > second.name ? 1 : 0,
+  );
+  return { ...page, items, totalCount: Number(page.totalCount) + 1 };
+}
+
+/**
+ * The module's samples, a page at a time, and creating one. A new sample shows in the page at once, and the page as it
+ * was comes back when the host refuses it; a created one is asked for again, with the id the host gave it.
+ */
+export const use{{ ns }}SamplesStore = defineStore('{{ module.name }}-samples', () => {
+  const page = ref<PagedResultOf{{ ns }}SampleDto>();
+  const failed = ref(false);
+  const saving = ref(false);
+
+  async function load() {
+    try {
+      page.value = await get{{ ns }}Samples(samplesPage);
+      failed.value = false;
+    } catch {
+      failed.value = true;
+    }
+  }
+
+  async function create(name: string) {
+    const before = page.value;
+    if (before !== undefined) {
+      page.value = withPending(before, name);
+    }
+    saving.value = true;
+    try {
+      await post{{ ns }}Samples({ name });
+    } catch {
+      page.value = before;
+      return false;
+    } finally {
+      saving.value = false;
+    }
+    await load();
+    return true;
+  }
+
+  return { page, failed, saving, load, create };
+});
+
+/** The module's samples, asked for once the page is mounted: undefined until the host answers. */
+export function use{{ ns }}Samples() {
+  const store = use{{ ns }}SamplesStore();
+  onMounted(() => void store.load());
+  return {
+    samples: computed(() => store.page?.items),
+    isLoading: computed(() => store.page === undefined && !store.failed),
+    isError: computed(() => store.failed),
+  };
+}
+
+/** Creates a sample; resolves to whether the host created it. */
+export function useCreate{{ ns }}Sample() {
+  const store = use{{ ns }}SamplesStore();
+  return { create: store.create, isSaving: computed(() => store.saving) };
+}
+{{~ else ~}}
+import { computed } from 'vue';
+import {
+  getGet{{ ns }}SamplesQueryKey,
+  type PagedResultOf{{ ns }}SampleDto,
+  useGet{{ ns }}Samples,
+  usePost{{ ns }}Samples,
+} from '@/api/generated';
+
+/** The page of samples the module's page lists: the first, as many as the host gives by default. */
+export const samplesPage = { page: 1, pageSize: 20 };
+
+const samplesKey = getGet{{ ns }}SamplesQueryKey(samplesPage);
+
+let pending = 0;
+
+/** The cached page with the new sample in it, by name as the host lists them, until the host's own answer replaces it. */
+function withPending(page: PagedResultOf{{ ns }}SampleDto, name: string): PagedResultOf{{ ns }}SampleDto {
+  pending += 1;
+  const items = [...page.items, { id: `pending-${pending}`, name }].sort((first, second) =>
+    first.name < second.name ? -1 : first.name > second.name ? 1 : 0,
+  );
+  return { ...page, items, totalCount: Number(page.totalCount) + 1 };
+}
+
+/** The module's samples, a page at a time: undefined until the host answers. */
+export function use{{ ns }}Samples() {
+  const { data, isLoading, isError } = useGet{{ ns }}Samples(samplesPage);
+  return { samples: computed(() => data.value?.items), isLoading, isError };
+}
+
+/**
+ * Creates a sample; resolves to whether the host created it. The sample shows in the list at once: it is put into the
+ * cached page as the request leaves, and the page as it was put back when the host refuses it. Either way the page is
+ * asked for again, with the id the host gave a created one.
+ */
+export function useCreate{{ ns }}Sample() {
+  const { mutateAsync, isPending } = usePost{{ ns }}Samples({
+    mutation: {
+      onMutate: async ({ data }, { client }) => {
+        await client.cancelQueries({ queryKey: samplesKey });
+        const before = client.getQueryData<PagedResultOf{{ ns }}SampleDto>(samplesKey);
+        if (before !== undefined) {
+          client.setQueryData(samplesKey, withPending(before, data.name));
+        }
+        return { before };
+      },
+      onError: (_error, _variables, saved, { client }) => {
+        if (saved?.before !== undefined) {
+          client.setQueryData(samplesKey, saved.before);
+        }
+      },
+      onSettled: (_data, _error, _variables, _saved, { client }) => client.invalidateQueries({ queryKey: samplesKey }),
+    },
+  });
+  const create = async (name: string) => {
+    try {
+      await mutateAsync({ data: { name } });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  return { create, isSaving: isPending };
+}
+{{~ end ~}}

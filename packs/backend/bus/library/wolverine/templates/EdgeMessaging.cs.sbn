@@ -1,0 +1,92 @@
+using System.Reflection;
+using Wolverine;
+{{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
+using Wolverine.RabbitMQ;
+{{~ else if project["backend.bus.transport"] == "azure-service-bus" ~}}
+using Wolverine.AzureServiceBus;
+{{~ else ~}}
+using Confluent.Kafka;
+using Wolverine.Kafka;
+{{~ end ~}}
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+/// <summary>
+/// The edge on the project's broker (ADR-0017): it has no database, so it stores no message and takes what arrives
+/// without an inbox. It listens for the messages its own consumers (<c>*Consumer</c> in src/Edge) handle, each on the
+/// {{ if project["backend.bus.transport"] == "rabbitmq" }}exchange{{ else }}topic{{ end }} named after the message's full type name, where a service publishes it: the browser
+/// events services send. V1 runs one edge.
+/// </summary>
+public static class EdgeMessaging
+{
+    public static IServiceCollection AddEdgeMessaging(this IServiceCollection services, IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        var broker = configuration.GetConnectionString("messaging")
+            ?? throw new InvalidOperationException("Connection string 'messaging' is missing; Aspire provides it.");
+{{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
+        var queue = configuration["Messaging:Queue"]
+            ?? throw new InvalidOperationException("Messaging:Queue is missing; the AppHost names the edge's queue.");
+{{~ else if project["backend.bus.transport"] == "azure-service-bus" ~}}
+        var management = configuration.GetConnectionString("messaging-management") ?? broker;
+        var subscription = configuration["Messaging:Subscription"]
+            ?? throw new InvalidOperationException("Messaging:Subscription is missing; the AppHost names the edge's subscription.");
+{{~ else ~}}
+        var consumerGroup = configuration["Messaging:ConsumerGroup"]
+            ?? throw new InvalidOperationException("Messaging:ConsumerGroup is missing; the AppHost names the edge's consumer group.");
+{{~ end ~}}
+        var consumedMessages = ConsumedMessages(typeof(EdgeMessaging).Assembly);
+
+        services.AddWolverine(options =>
+        {
+            // Handler code is generated at startup. For production, pre-generate it (see docs/adr).
+            options.UseRuntimeCompilation();
+{{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
+            var rabbitMq = options.UseRabbitMq(new Uri(broker)).AutoProvision().DisableDeadLetterQueueing();
+            foreach (var consumed in consumedMessages)
+            {
+                rabbitMq.BindExchange(consumed.FullName!).ToQueue(queue);
+            }
+
+            if (consumedMessages.Count > 0)
+            {
+                options.ListenToRabbitQueue(queue);
+            }
+{{~ else if project["backend.bus.transport"] == "azure-service-bus" ~}}
+            options.UseAzureServiceBus(broker).AutoProvision().ConfigureListeners(listener => listener.DisableDeadLetterQueueing());
+            options.Transports.GetOrCreate<AzureServiceBusTransport>().ManagementConnectionString = management;
+            foreach (var consumed in consumedMessages)
+            {
+                options.ListenToAzureServiceBusSubscription(subscription).FromTopic(consumed.FullName!);
+            }
+{{~ else ~}}
+            options.UseKafka(broker).AutoProvision().ConfigureConsumers(consumer =>
+            {
+                consumer.GroupId = consumerGroup;
+                consumer.AutoOffsetReset = AutoOffsetReset.Earliest;
+            });
+            foreach (var consumed in consumedMessages)
+            {
+                options.ListenToKafkaTopic(consumed.FullName!);
+            }
+{{~ end ~}}
+
+            options.Discovery.DisableConventionalDiscovery();
+            options.Discovery.CustomizeHandlerDiscovery(query => query.Includes.WithNameSuffix("Consumer"));
+            options.Discovery.IncludeAssembly(typeof(EdgeMessaging).Assembly);
+        });
+
+        return services;
+    }
+
+    /// <summary>The messages the consumers (<c>*Consumer</c>) of the edge's own assembly handle.</summary>
+    private static List<Type> ConsumedMessages(Assembly edge) =>
+        [.. edge.GetTypes()
+            .Where(type => type is { IsClass: true, IsAbstract: false } && type.Name.EndsWith("Consumer", StringComparison.Ordinal))
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            .Where(method => method.Name.StartsWith("Handle", StringComparison.Ordinal) || method.Name.StartsWith("Consume", StringComparison.Ordinal))
+            .Select(method => method.GetParameters().FirstOrDefault()?.ParameterType)
+            .OfType<Type>()
+            .Distinct()];
+}

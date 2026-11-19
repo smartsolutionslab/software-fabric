@@ -1,0 +1,1 @@
+{{ if project["frontend.realtime"] == "signalr" || project["frontend.realtime"] == "sse" }}builder.Services.AddEdgeMessaging(builder.Configuration);{{ end }}

@@ -1,0 +1,11 @@
+using System.Text.Json;
+
+namespace {{ namespace }}.BuildingBlocks.Realtime;
+
+/// <summary>
+/// A browser event on its way from a service to the edge (src/Edge), which the browsers are connected to and which
+/// pushes it to them (ADR-0017): <paramref name="Type"/> is the name a browser listens under, <paramref name="Payload"/>
+/// the event as JSON. It is not an integration event and is not stored on the way: an event lost on the way is not
+/// sent again, and a browser that missed one refetches what it shows.
+/// </summary>
+public sealed record BrowserEventV1(string Type, JsonElement Payload);
