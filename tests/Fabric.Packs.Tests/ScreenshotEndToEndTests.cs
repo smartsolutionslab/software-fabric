@@ -119,10 +119,10 @@ public sealed class ScreenshotEndToEndTests
             : [];
     }
 
-    /// <summary>A visual change only the dark theme shows: the module page's section heading in another colour.</summary>
+    /// <summary>A visual change only the dark theme shows: the module page's section heading on another background.</summary>
     private static void ChangeTheDarkTheme(GeneratedProject project)
     {
         var styles = Path.Combine(project.ProjectDirectory, "web", "app", "src", "index.css");
-        File.AppendAllText(styles, "\n.dark h2 {\n  color: oklch(0.7 0.2 30);\n}\n");
+        File.AppendAllText(styles, "\n.dark h2 {\n  background: oklch(0.45 0.2 30);\n}\n");
     }
 }

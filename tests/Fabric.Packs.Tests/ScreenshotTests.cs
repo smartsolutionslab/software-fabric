@@ -184,7 +184,7 @@ public sealed partial class ScreenshotTests
     {
         var config = Files(profile, Screenshots)[Config];
 
-        config.ShouldContain("toHaveScreenshot: { maxDiffPixelRatio: 0.001, threshold: 0.2, animations: 'disabled', caret: 'hide' }");
+        config.ShouldContain("toHaveScreenshot: { maxDiffPixels: 100, threshold: 0.2, animations: 'disabled', caret: 'hide' }");
     }
 
     [Theory]
@@ -195,6 +195,7 @@ public sealed partial class ScreenshotTests
 
         workflow.ShouldContain(
             "      - run: bash .github/scripts/e2e.sh\n" +
+            "\n" +
             "      # A screenshot that differs from its baseline: the baseline, what rendered and the difference between them.\n" +
             "      - if: failure()\n" +
             "        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2\n" +
