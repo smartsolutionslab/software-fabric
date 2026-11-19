@@ -54,6 +54,13 @@ profiles:
     frontend.agent-ui: ag-ui
     frontend.dashboards: [user-editable, generative]
 
+  # ADR-0017 D6: the services topology's tested profile. Services require tenancy none in V1 (D3); its profile CI runs two
+  # services that exchange one integration event over RabbitMQ through the outbox (build/profile-ci/saas-services-vue).
+  saas-services-vue:
+    extends: saas-standard-vue
+    backend.topology: services
+    backend.tenancy: none
+
 # A `# nightly run <id>` comment names the nightly matrix run in which every combination containing the option
 # passed, which promoted it to supported (ADR-0003, amended 2026-11-06).
 dimensions:
