@@ -3,14 +3,26 @@ using Aspire.Hosting.ApplicationModel;
 
 namespace Aspire.Hosting;
 
+{{~ if project["backend.topology"] == "services" ~}}
+/// <summary>
+/// Declares the external MCP servers the service hosts use. Each one becomes configuration under
+/// <c>Mcp:Servers:&lt;name&gt;</c> of a service host, from which its <c>AddMcpClients</c> creates the clients; no module
+/// wires a server by hand. The edge runs no module code and creates no client, so a server declared on it is refused.
+/// </summary>
+{{~ else ~}}
 /// <summary>
 /// Declares the external MCP servers the host uses. Each one becomes configuration under <c>Mcp:Servers:&lt;name&gt;</c>,
 /// from which the host's <c>AddMcpClients</c> creates the clients; no module wires a server by hand.
 /// </summary>
+{{~ end ~}}
 public static partial class McpServers
 {
     /// <summary>A server reached over HTTP. A token, when the server needs one, is a secret sent as a bearer token.</summary>
+{{~ if project["backend.topology"] == "services" ~}}
+    /// <param name="host">A service host, which calls the server (<c>service</c> in the AppHost's loop); never the edge.</param>
+{{~ else ~}}
     /// <param name="host">The host project, which calls the server.</param>
+{{~ end ~}}
     /// <param name="name">The server's name; the host's code names it in calls.</param>
     /// <param name="url">The server's endpoint, a parameter: it differs per environment.</param>
     /// <param name="bearerToken">The token the server expects, a secret parameter; null when it expects none.</param>
@@ -22,6 +34,9 @@ public static partial class McpServers
     {
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(url);
+{{~ if project["backend.topology"] == "services" ~}}
+        RequireServiceHost(host);
+{{~ end ~}}
         var prefix = Prefix(name);
 
         host.WithEnvironment($"{prefix}__Url", url);
@@ -37,7 +52,11 @@ public static partial class McpServers
     /// A server the host starts as a process and talks to over standard input and output. The process sees the basic
     /// environment (PATH, HOME, ...) and the variables given here, never the host's own configuration or secrets.
     /// </summary>
+{{~ if project["backend.topology"] == "services" ~}}
+    /// <param name="host">A service host, which starts the server (<c>service</c> in the AppHost's loop); never the edge.</param>
+{{~ else ~}}
     /// <param name="host">The host project, which starts the server.</param>
+{{~ end ~}}
     /// <param name="name">The server's name; the host's code names it in calls.</param>
     /// <param name="command">The executable, a parameter: where it is installed differs per environment.</param>
     /// <param name="arguments">The arguments it is started with.</param>
@@ -52,6 +71,9 @@ public static partial class McpServers
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(arguments);
+{{~ if project["backend.topology"] == "services" ~}}
+        RequireServiceHost(host);
+{{~ end ~}}
         var prefix = Prefix(name);
 
         host.WithEnvironment($"{prefix}__Command", command);
@@ -68,6 +90,18 @@ public static partial class McpServers
         return host;
     }
 
+{{~ if project["backend.topology"] == "services" ~}}
+    /// <summary>Only a service host calls AddMcpClients; what is declared on the edge or another resource reaches no client.</summary>
+    private static void RequireServiceHost(IResourceBuilder<ProjectResource> host)
+    {
+        var project = Path.GetFullPath(host.Resource.GetProjectMetadata().ProjectPath);
+        if (!host.ApplicationBuilder.ServiceHosts().Any(service => string.Equals(Path.GetFullPath(service.ProjectPath), project, StringComparison.Ordinal)))
+        {
+            throw new ArgumentException($"'{host.Resource.Name}' is not a service host, so no MCP client reads a server declared on it; declare the server on service, in the AppHost's loop over builder.ServiceHosts().", nameof(host));
+        }
+    }
+
+{{~ end ~}}
     private static string Prefix(string name)
     {
         if (name is null || !ServerName().IsMatch(name))

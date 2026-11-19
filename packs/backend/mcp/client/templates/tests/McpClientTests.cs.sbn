@@ -133,6 +133,20 @@ public sealed class McpClientTests
         {{ `response.Text` | should_contain `"refused"` }};
     }
 
+{{~ if project["backend.topology"] == "services" ~}}
+    {{ test_attribute }}
+    public async Task A_server_declared_on_the_edge_fails_the_apphost_since_no_mcp_client_runs_there()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AppHost>(cancellationToken);
+        var edge = builder.CreateResourceBuilder(builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "host"));
+
+        var refusal = {{ should_throw `ArgumentException` `() => edge.WithMcpServerUrl("echo-server", builder.AddParameter("echo-server-url"))` }};
+
+        {{ `refusal.Message` | should_contain `"'host' is not a service host"` }};
+    }
+
+{{~ end ~}}
     /// <summary>The check a test passes when the call itself is not under test; a project checks the arguments.</summary>
     private static bool AllowEveryCall(McpToolCall call) => true;
 
