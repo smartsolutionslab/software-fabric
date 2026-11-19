@@ -8,10 +8,16 @@ const home = createRoute({ getParentRoute: () => rootRoute, path: '/', component
 
 /**
  * The app as the root route's page, the start page, then every module's route with the routes below it. Tests pass
- * createMemoryHistory() and <App />; the app passes createBrowserHistory() and what the providers wrap.
+ * createMemoryHistory() and <App />; the app passes createBrowserHistory() and what the providers wrap. Every
+ * navigation goes through the View Transitions API where the browser has it, and as before where not (docs/adr).
  */
 export function createAppRouter(history: RouterHistory, app: ReactNode) {
-  return createRouter({ history, routeTree: rootRoute.addChildren([home, ...moduleRoutes]), context: { app } });
+  return createRouter({
+    history,
+    routeTree: rootRoute.addChildren([home, ...moduleRoutes]),
+    context: { app },
+    defaultViewTransition: true,
+  });
 }
 
 declare module '@tanstack/react-router' {

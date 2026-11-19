@@ -1,0 +1,10 @@
+
+/* A route change is a view transition where the browser has the API: its default cross-fade. With reduced motion it
+   has no animation, so the page changes at once, as it does without the API. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}

@@ -47,7 +47,9 @@ export function Breadcrumbs({ routes }: { routes: readonly ModuleRoute[] }) {
                 <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
               ) : (
                 <BreadcrumbLink asChild>
-                  <Link to={crumb.to}>{crumb.label}</Link>
+                  <Link to={crumb.to} viewTransition>
+                    {crumb.label}
+                  </Link>
                 </BreadcrumbLink>
               )}
             </BreadcrumbItem>
