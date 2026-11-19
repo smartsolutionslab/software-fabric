@@ -1,0 +1,83 @@
+{{~ ns = module.namespace ~}}
+{{~ valibot = project["frontend.validation"] == "valibot" ~}}
+<script setup lang="ts">
+import { revalidateLogic, useForm } from '@tanstack/vue-form';
+{{~ if valibot ~}}
+import * as v from 'valibot';
+{{~ else ~}}
+import { z } from 'zod';
+{{~ end ~}}
+import { Button } from '@/components/ui/button';
+
+interface Create{{ ns }}SampleFormProps {
+  /** Creates the sample; resolves to whether it was created, which empties the field. */
+  onCreate: (name: string) => Promise<boolean>;
+  saving: boolean;
+}
+
+// Creates one of the module's samples: a name, checked here before the host checks it again.
+const { onCreate, saving } = defineProps<Create{{ ns }}SampleFormProps>();
+
+/** The id of the form's name field, which the page's empty state moves to through focus. */
+const sampleNameField = '{{ module.name }}-sample-name';
+
+{{~ if valibot ~}}
+const sampleSchema = v.object({
+  name: v.pipe(
+    v.string(),
+    v.trim(),
+    v.minLength(1, 'Give the sample a name.'),
+    v.maxLength(100, "A sample's name is at most 100 characters."),
+  ),
+});
+{{~ else ~}}
+const sampleSchema = z.object({
+  name: z.string().trim().min(1, 'Give the sample a name.').max(100, "A sample's name is at most 100 characters."),
+});
+{{~ end ~}}
+
+const form = useForm({
+  defaultValues: { name: '' },
+  validationLogic: revalidateLogic(),
+  validators: { onDynamic: sampleSchema },
+  onSubmit: async ({ value, formApi }) => {
+    const { name } = {{ if valibot }}v.parse(sampleSchema, value){{ else }}sampleSchema.parse(value){{ end }};
+    if (await onCreate(name)) {
+      formApi.reset();
+    }
+  },
+});
+const errors = form.useStore((state) => ({ name: state.fieldMeta.name?.errors[0]?.message }));
+
+function submit(event: Event) {
+  event.preventDefault();
+  void form.handleSubmit();
+}
+
+defineExpose({ focus: () => document.getElementById(sampleNameField)?.focus() });
+</script>
+
+{%{<template>
+  <form novalidate aria-label="New sample" class="flex flex-col gap-2" @submit="submit">
+    <label :for="sampleNameField" class="text-sm font-medium">Name</label>
+    <div class="flex gap-2">
+      <form.Field v-slot="{ field }" name="name">
+        <input
+          :id="sampleNameField"
+          :name="field.name"
+          :value="field.state.value"
+          autocomplete="off"
+          :aria-invalid="errors.name ? true : undefined"
+          :aria-describedby="errors.name ? `${sampleNameField}-error` : undefined"
+          class="flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+          @blur="field.handleBlur"
+          @input="field.handleChange(($event.target as HTMLInputElement).value)"
+        />
+      </form.Field>
+      <Button type="submit" :disabled="saving">Create sample</Button>
+    </div>
+    <p v-if="errors.name" :id="`${sampleNameField}-error`" role="alert" class="text-sm text-destructive">
+      {{ errors.name }}
+    </p>
+  </form>
+</template>}%}
