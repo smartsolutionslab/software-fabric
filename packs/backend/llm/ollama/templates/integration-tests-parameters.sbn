@@ -15,6 +15,20 @@ end ~}}
         {
             builder.Resources.Remove(resource);
         }
+{{~ if project["backend.topology"] == "services" ~}}
+
+        // Every service host calls the model and waits on it; the edge does neither. They are the AppHost's own, by its convention.
+        string[] modelHosts = [.. builder.ServiceHosts().Select(service => service.Module)];
+        foreach (var modelHost in builder.Resources.OfType<ProjectResource>().Where(resource => modelHosts.Contains(resource.Name)).ToList())
+        {
+            foreach (var wait in modelHost.Annotations.OfType<WaitAnnotation>().Where(wait => modelServer.Contains(wait.Resource.Name)).ToList())
+            {
+                modelHost.Annotations.Remove(wait);
+            }{{ if !stand_in }}
+
+            builder.CreateResourceBuilder(modelHost).WithEnvironment("Ollama__Endpoint", "http://localhost:9");{{ end }}
+        }
+{{- else ~}}
 
         var modelHost = builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "host");
         foreach (var wait in modelHost.Annotations.OfType<WaitAnnotation>().Where(wait => modelServer.Contains(wait.Resource.Name)).ToList())
@@ -23,3 +37,4 @@ end ~}}
         }{{ if !stand_in }}
 
         builder.CreateResourceBuilder(modelHost).WithEnvironment("Ollama__Endpoint", "http://localhost:9");{{ end }}
+{{- end }}

@@ -10,6 +10,20 @@
         {
             builder.Resources.Remove(resource);
         }
+{{~ if project["backend.topology"] == "services" ~}}
+
+        // Every service host embeds and waits on the model; the edge does neither. They are the AppHost's own, by its convention.
+        string[] embeddingHosts = [.. builder.ServiceHosts().Select(service => service.Module)];
+        foreach (var embeddingHost in builder.Resources.OfType<ProjectResource>().Where(resource => embeddingHosts.Contains(resource.Name)).ToList())
+        {
+            foreach (var wait in embeddingHost.Annotations.OfType<WaitAnnotation>().Where(wait => embeddingServer.Contains(wait.Resource.Name)).ToList())
+            {
+                embeddingHost.Annotations.Remove(wait);
+            }
+
+            builder.CreateResourceBuilder(embeddingHost).WithEnvironment("Ollama__Endpoint", embeddings.Endpoint);
+        }
+{{- else ~}}
 
         var embeddingHost = builder.Resources.OfType<ProjectResource>().Single(resource => resource.Name == "host");
         foreach (var wait in embeddingHost.Annotations.OfType<WaitAnnotation>().Where(wait => embeddingServer.Contains(wait.Resource.Name)).ToList())
@@ -18,3 +32,4 @@
         }
 
         builder.CreateResourceBuilder(embeddingHost).WithEnvironment("Ollama__Endpoint", embeddings.Endpoint);
+{{- end }}
