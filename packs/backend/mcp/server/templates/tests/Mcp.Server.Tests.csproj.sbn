@@ -1,9 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+{{~ if project["backend.topology"] == "services" ~}}
+  <!-- The {{ module.name }} service's MCP endpoint, in process, through the SDK's own client; the samples here stand in for its module's requests. -->
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Mcp.Server.Tests</RootNamespace>
+    <AssemblyName>{{ namespace }}.Services.{{ module.namespace }}.Mcp.Server.Tests</AssemblyName>
+  </PropertyGroup>
+{{~ else ~}}
   <!-- The host's MCP endpoint, in process, through the SDK's own client; the samples here stand in for a module's requests. -->
   <PropertyGroup>
     <RootNamespace>{{ namespace }}.Mcp.Server.Tests</RootNamespace>
   </PropertyGroup>
+{{~ end ~}}
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
@@ -11,7 +19,11 @@
   </ItemGroup>
 
   <ItemGroup>
+{{~ if project["backend.topology"] == "services" ~}}
+    <ProjectReference Include="../../../../src/Services/{{ module.namespace }}/Host/Host.csproj" />
+{{~ else ~}}
     <ProjectReference Include="../../src/Host/Host.csproj" />
+{{~ end ~}}
   </ItemGroup>
 
 </Project>

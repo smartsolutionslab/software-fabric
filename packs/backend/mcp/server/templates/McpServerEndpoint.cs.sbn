@@ -4,8 +4,16 @@ namespace Microsoft.AspNetCore.Builder;
 
 public static class McpServerEndpoint
 {
+{{~ if project["backend.topology"] == "services" ~}}
+    /// <summary>
+    /// The route MCP clients connect to: this service's own server, under its module's route name, which the edge forwards
+    /// as it does every /&lt;module&gt;/... route. Each service is its own MCP server; the edge hosts none.
+    /// </summary>
+    public static string Route => "/" + ServiceModule.Name + "/mcp";
+{{~ else ~}}
     /// <summary>The route MCP clients connect to.</summary>
     public const string Route = "/mcp";
+{{~ end ~}}
 
     /// <summary>
     /// The MCP endpoint (streamable HTTP){{ if project["backend.auth"] != "none" }}, for signed-in callers only, as the module routes are{{ end }}.

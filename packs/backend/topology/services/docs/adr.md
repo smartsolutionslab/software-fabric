@@ -18,7 +18,7 @@ Every module runs in a host of its own, `src/Services/<Module>/Host`. The host's
 
 - `fabric add-module` adds a service: the module and its host are new files, nothing existing changes.
 - One .NET process per module; `dotnet run --project src/AppHost` starts them all.
-- Four architecture rules keep the topology: no service host references another module's projects, every service host finds exactly one `IModule`, every service host knows its module's route name, and no service host maps what the application has once (`/me`, a hub, MCP, AG-UI).
+- Four architecture rules keep the topology: no service host references another module's projects, every service host finds exactly one `IModule`, every service host knows its module's route name, and no service host maps what the application has once (`/me`, a hub, AG-UI), nor an MCP server at its root (`/mcp`): a service's own MCP server is at `/<module>/mcp`.
 - No module can query another's tables: they are in another database. A read model that spans modules is built from integration events.
 - Tests that need a database of their own (the read connection's, the vector index's) get one more database on the server, which no module's run migrates.
 - A request to a module passes the edge: one more hop, and the edge must be running for the frontend to reach any service.

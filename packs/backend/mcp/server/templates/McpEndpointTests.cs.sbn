@@ -1,4 +1,95 @@
 {{~ auth = project["backend.auth"] != "none" ~}}
+{{~ if project["backend.topology"] == "services" ~}}
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>
+/// Every service's own MCP endpoint, /&lt;module&gt;/mcp, called through the edge as a client would, started through
+/// Aspire: the edge forwards it as every module route{{ if auth }}, with the caller's bearer token{{ end }}. A session begins with
+/// the protocol's initialize request. The services are the AppHost's own, so a new module's is called too.
+/// </summary>
+{{~ integration_fixture_attributes ~}}
+public class McpEndpointTests({{ integration_fixture }})
+{
+    private const string Initialize = """
+        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"integration-tests","version":"1.0.0"}}}
+        """;
+
+    private static readonly string ServicesFolder = Path.Combine("src", "Services") + Path.DirectorySeparatorChar;
+{{~ if auth ~}}
+
+    {{ test_attribute }}
+    public async Task An_anonymous_caller_is_unauthorized_by_every_service()
+    {
+        using var client = {{ host_client }};
+
+        var answers = await InitializeEveryServiceAsync(client);
+
+        {{ `answers` | should_be `Expected(HttpStatusCode.Unauthorized)` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_signed_in_user_starts_a_session_with_every_service()
+    {
+        using var client = await {{ signed_in_host_client `"developer"` }};
+
+        var answers = await InitializeEveryServiceAsync(client);
+
+        {{ `answers` | should_be `Expected(HttpStatusCode.OK)` }};
+    }
+{{~ else ~}}
+
+    {{ test_attribute }}
+    public async Task An_anonymous_caller_starts_a_session_with_every_service()
+    {
+        using var client = {{ host_client }};
+
+        var answers = await InitializeEveryServiceAsync(client);
+
+        {{ `answers` | should_be `Expected(HttpStatusCode.OK)` }};
+    }
+{{~ end ~}}
+
+    /// <summary>The modules the AppHost started a service for: its projects under src/Services, named after their modules.</summary>
+    private List<string> Modules() =>
+        [.. {{ running_application }}.Services.GetRequiredService<DistributedApplicationModel>().Resources
+            .OfType<ProjectResource>()
+            .Where(resource => resource.GetProjectMetadata().ProjectPath.Contains(ServicesFolder, StringComparison.Ordinal))
+            .Select(resource => resource.Name)
+            .Order(StringComparer.Ordinal)];
+
+    private string Expected(HttpStatusCode status) => string.Join(", ", Modules().Select(module => $"/{module}/mcp {status}"));
+
+    private async Task<string> InitializeEveryServiceAsync(HttpClient client)
+    {
+        List<string> answers = [];
+        foreach (var module in Modules())
+        {
+            using var response = await InitializeAsync(client, new Uri($"/{module}/mcp", UriKind.Relative));
+            answers.Add($"/{module}/mcp {response.StatusCode}");
+        }
+
+        return string.Join(", ", answers);
+    }
+
+    private static async Task<HttpResponseMessage> InitializeAsync(HttpClient client, Uri endpoint)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        {
+            Content = new StringContent(Initialize, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+        return await client.SendAsync(request, {{ test_cancellation_token }});
+    }
+}
+{{~ else ~}}
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -62,3 +153,4 @@ public class McpEndpointTests({{ integration_fixture }})
         return await client.SendAsync(request, {{ test_cancellation_token }});
     }
 }
+{{~ end ~}}

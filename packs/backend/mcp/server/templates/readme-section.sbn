@@ -1,10 +1,14 @@
 ## MCP tools
 
+{{~ if project["backend.topology"] == "services" ~}}
+Each service exposes its own module's MCP tools at `/<module>/mcp` (streamable HTTP), through the edge{{ if project["backend.auth"] != "none" }}, for signed-in callers{{ end }}. A command or query becomes a tool only when its record is marked:
+{{~ else ~}}
 The host exposes MCP tools at `/mcp` (streamable HTTP){{ if project["backend.auth"] != "none" }}, for signed-in callers{{ end }}. A command or query becomes a tool only when its record is marked:
+{{~ end ~}}
 
 ```csharp
 [McpTool("Finds an invoice by its number.")]
 public sealed record FindInvoice(string Number) : IQuery<Result<InvoiceDto, ApiError>>;
 ```
 
-It is offered as `billing_find_invoice`, with the record as its input schema, and a call goes through `IDispatcher` like an endpoint's. `tests/Mcp.Server.Tests` calls the host with the SDK's own client.
+It is offered as `billing_find_invoice`, with the record as its input schema, and a call goes through `IDispatcher` like an endpoint's. {{ if project["backend.topology"] == "services" }}Each service's `tests/Services/<Module>/Mcp.Server.Tests` calls its host{{ else }}`tests/Mcp.Server.Tests` calls the host{{ end }} with the SDK's own client.

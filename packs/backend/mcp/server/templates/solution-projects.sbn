@@ -1,1 +1,7 @@
+{{~ if project["backend.topology"] == "services" ~}}
+{{~ for module in modules ~}}
+  <Project Path="tests/Services/{{ module.namespace }}/Mcp.Server.Tests/Mcp.Server.Tests.csproj" />
+{{~ end ~}}
+{{~ else ~}}
   <Project Path="tests/Mcp.Server.Tests/Mcp.Server.Tests.csproj" />
+{{- end -}}
