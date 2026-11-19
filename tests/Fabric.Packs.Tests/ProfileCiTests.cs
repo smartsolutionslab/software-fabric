@@ -29,6 +29,8 @@ public sealed class ProfileCiTests
         }
         """;
 
+    private const string ServicesProfile = "saas-services-vue";
+
     private static readonly string[] CatalogProfiles = [.. Repository.Catalog.Profiles.Keys];
 
     /// <summary>The profiles the real packs generate alone, without stand-ins.</summary>
@@ -170,9 +172,57 @@ public sealed class ProfileCiTests
     }
 
     [Fact]
+    public void The_services_profile_is_saas_standard_vue_with_services_and_no_tenancy()
+    {
+        var services = ChoiceResolver.Resolve(Repository.Catalog, ServicesProfile, []).Choices.ShouldNotBeNull();
+        var vue = ChoiceResolver.Resolve(Repository.Catalog, "saas-standard-vue", []).Choices.ShouldNotBeNull();
+
+        services.Project["backend.topology"].ShouldBe(["services"]);
+        services.Project["backend.tenancy"].ShouldBe(["none"]);
+        string[] unchanged = ["backend.topology", "backend.tenancy"];
+        Flattened(services.Project, unchanged).ShouldBe(Flattened(vue.Project, unchanged), "every other choice is saas-standard-vue's.");
+        Flattened(services.ModuleDefaults, []).ShouldBe(Flattened(vue.ModuleDefaults, []));
+    }
+
+    [Fact]
+    public void Profile_CI_of_the_services_profile_adds_a_second_service_and_the_test_of_the_event_the_two_exchange()
+    {
+        var (_, output, fabricYaml, files) = ProfileCiUntilItsFirstStep(ServicesProfile);
+
+        fabricYaml.ShouldNotBeNull(output);
+        fabricYaml.ShouldContain("\n  billing:\n", Case.Sensitive, output);
+        fabricYaml.ShouldContain("\n  shipping:\n", Case.Sensitive, "two services, so one can publish an event the other consumes.");
+        files.ShouldContain("src/Contracts/Billing/InvoicePaidV1.cs");
+        files.ShouldContain("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs");
+        files.ShouldContain("tests/Integration.Tests/ServicesExchangeAnEventTests.cs", customMessage: "the end-to-end run of the exchange is the profile's own test, run by its CI.");
+    }
+
+    [Fact]
+    public void Profile_CI_of_a_profile_without_its_own_files_adds_the_one_module()
+    {
+        var (_, output, fabricYaml, files) = ProfileCiUntilItsFirstStep("saas-standard-vue");
+
+        fabricYaml.ShouldNotBeNull(output);
+        fabricYaml.ShouldContain("\n  billing:\n", Case.Sensitive, output);
+        fabricYaml.ShouldNotContain("shipping", Case.Sensitive, output);
+        files.ShouldNotContain("tests/Integration.Tests/ServicesExchangeAnEventTests.cs");
+    }
+
+    [Fact]
+    public void Every_profile_with_files_of_its_own_in_profile_CI_is_a_profile_of_the_catalog()
+    {
+        var directory = Path.Combine(Repository.Root, "build", "profile-ci");
+
+        var profiles = Directory.GetDirectories(directory).Select(Path.GetFileName).ToList();
+
+        profiles.ShouldNotBeEmpty();
+        profiles.ShouldBeSubsetOf(CatalogProfiles, "files for a profile the catalog does not have would never run.");
+    }
+
+    [Fact]
     public void An_override_is_what_profile_CI_generates()
     {
-        var (_, output, fabricYaml) = ProfileCiUntilItsFirstStep("saas-standard-react", "--set", "module.ddd-depth=strict");
+        var (_, output, fabricYaml, _) = ProfileCiUntilItsFirstStep("saas-standard-react", "--set", "module.ddd-depth=strict");
 
         output.ShouldContain("::group::saas-standard-react --set module.ddd-depth=strict: ", Case.Sensitive, output);
         fabricYaml.ShouldNotBeNull(output);
@@ -182,7 +232,7 @@ public sealed class ProfileCiTests
     [Fact]
     public void An_override_the_catalog_refuses_stops_profile_CI_before_its_first_step()
     {
-        var (exitCode, output, _) = ProfileCiUntilItsFirstStep("saas-standard-react", "--set", "frontend.design-system=no-such-option");
+        var (exitCode, output, _, _) = ProfileCiUntilItsFirstStep("saas-standard-react", "--set", "frontend.design-system=no-such-option");
 
         exitCode.ShouldNotBe(0, output);
         output.ShouldContain("'no-such-option' is not an option of frontend.design-system", Case.Sensitive, output);
@@ -192,7 +242,7 @@ public sealed class ProfileCiTests
     [Fact]
     public void An_argument_that_is_not_an_override_is_refused()
     {
-        var (exitCode, output, _) = ProfileCiUntilItsFirstStep("saas-standard-react", "module.ddd-depth=strict");
+        var (exitCode, output, _, _) = ProfileCiUntilItsFirstStep("saas-standard-react", "module.ddd-depth=strict");
 
         exitCode.ShouldBe(2, output);
         output.ShouldContain("Usage: build/profile-ci.sh <profile> [--set dimension=option ...]", Case.Sensitive, output);
@@ -202,7 +252,7 @@ public sealed class ProfileCiTests
     [Fact]
     public void A_matrix_combination_is_what_profile_CI_generates_with_no_profile()
     {
-        var (_, output, fabricYaml) = ProfileCiUntilItsFirstStep("--combination", "pair-1", "--matrix", Matrix);
+        var (_, output, fabricYaml, _) = ProfileCiUntilItsFirstStep("--combination", "pair-1", "--matrix", Matrix);
 
         output.ShouldContain("::group::combination pair-1: backend format check", Case.Sensitive, output);
         fabricYaml.ShouldNotBeNull(output);
@@ -214,7 +264,7 @@ public sealed class ProfileCiTests
     [Fact]
     public void Profile_CI_runs_only_the_steps_it_is_given()
     {
-        var (exitCode, output, fabricYaml) = ProfileCiUntilItsFirstStep("--combination", "pair-1", "--matrix", Matrix, "--steps", "generate");
+        var (exitCode, output, fabricYaml, _) = ProfileCiUntilItsFirstStep("--combination", "pair-1", "--matrix", Matrix, "--steps", "generate");
 
         exitCode.ShouldBe(0, output);
         output.ShouldNotContain("::group::", Case.Sensitive, output);
@@ -225,7 +275,7 @@ public sealed class ProfileCiTests
     [Fact]
     public void A_combination_the_matrix_lacks_stops_profile_CI_before_its_first_step()
     {
-        var (exitCode, output, _) = ProfileCiUntilItsFirstStep("--combination", "pair-9", "--matrix", Matrix);
+        var (exitCode, output, _, _) = ProfileCiUntilItsFirstStep("--combination", "pair-9", "--matrix", Matrix);
 
         exitCode.ShouldBe(1, output);
         output.ShouldContain("no combination pair-9 in ", Case.Sensitive, output);
@@ -240,7 +290,7 @@ public sealed class ProfileCiTests
     [InlineData("generate,build,e2e", "e2e needs web")]
     public void Steps_profile_CI_cannot_run_are_refused_before_generating(string steps, string message)
     {
-        var (exitCode, output, fabricYaml) = ProfileCiUntilItsFirstStep("saas-standard-react", "--steps", steps);
+        var (exitCode, output, fabricYaml, _) = ProfileCiUntilItsFirstStep("saas-standard-react", "--steps", steps);
 
         exitCode.ShouldBe(2, output);
         output.ShouldContain(message, Case.Sensitive, output);
@@ -250,7 +300,7 @@ public sealed class ProfileCiTests
     [Fact]
     public void A_profile_and_a_combination_together_are_refused()
     {
-        var (exitCode, output, _) = ProfileCiUntilItsFirstStep("saas-standard-react", "--combination", "pair-1", "--matrix", Matrix);
+        var (exitCode, output, _, _) = ProfileCiUntilItsFirstStep("saas-standard-react", "--combination", "pair-1", "--matrix", Matrix);
 
         exitCode.ShouldBe(2, output);
         output.ShouldContain("Usage: build/profile-ci.sh --combination <name>", Case.Sensitive, output);
@@ -262,7 +312,7 @@ public sealed class ProfileCiTests
     /// project's <c>fabric.yaml</c> can be read when the script got that far, and nothing is left behind. The test
     /// matrix is written there too.
     /// </summary>
-    private static (int ExitCode, string Output, string? FabricYaml) ProfileCiUntilItsFirstStep(params string[] arguments)
+    private static (int ExitCode, string Output, string? FabricYaml, IReadOnlyList<string> Files) ProfileCiUntilItsFirstStep(params string[] arguments)
     {
         var temporary = Directory.CreateTempSubdirectory("profile-ci-test-");
         try
@@ -293,12 +343,14 @@ public sealed class ProfileCiTests
             }
 
             process.WaitForExit();
-            var fabricYaml = Directory.GetDirectories(temporary.FullName)
-                .Select(work => Path.Combine(work, "shop", "fabric.yaml"))
-                .Where(File.Exists)
-                .Select(File.ReadAllText)
-                .SingleOrDefault();
-            return (stepped ? -1 : process.ExitCode, output + error.Result, fabricYaml);
+            var project = Directory.GetDirectories(temporary.FullName)
+                .Select(work => Path.Combine(work, "shop"))
+                .SingleOrDefault(path => File.Exists(Path.Combine(path, "fabric.yaml")));
+            var fabricYaml = project is null ? null : File.ReadAllText(Path.Combine(project, "fabric.yaml"));
+            IReadOnlyList<string> files = project is null
+                ? []
+                : [.. Directory.EnumerateFiles(project, "*", SearchOption.AllDirectories).Select(file => Path.GetRelativePath(project, file).Replace('\\', '/'))];
+            return (stepped ? -1 : process.ExitCode, output + error.Result, fabricYaml, files);
         }
         finally
         {
@@ -346,6 +398,10 @@ public sealed class ProfileCiTests
             Copy(file, Path.Combine(target, Path.GetRelativePath(source, file)));
         }
     }
+
+    /// <summary>The choices as <c>dimension=option,...</c> lines, in order, without the dimensions <paramref name="except"/> names.</summary>
+    private static string[] Flattened(IReadOnlyDictionary<string, IReadOnlyList<string>> choices, string[] except) =>
+        [.. choices.Where(choice => !except.Contains(choice.Key)).OrderBy(choice => choice.Key, StringComparer.Ordinal).Select(choice => $"{choice.Key}={string.Join(',', choice.Value)}")];
 
     /// <summary>Whether <paramref name="profile"/> selects the pack of <paramref name="option"/>, a project choice or a module default.</summary>
     private static bool Selects(string profile, string option)
