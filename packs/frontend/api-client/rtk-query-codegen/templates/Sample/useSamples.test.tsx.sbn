@@ -1,0 +1,86 @@
+{{~ ns = module.namespace ~}}
+import { configureStore } from '@reduxjs/toolkit';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { Provider } from 'react-redux';
+import { afterEach, expect, test, vi } from 'vitest';
+import { api } from '@/api/generated';
+import { useCreate{{ ns }}Sample, use{{ ns }}Samples } from './use{{ ns }}Samples';
+
+// RTK Query builds a Request from /api/..., which Node cannot parse without the browser's origin: here it has one.
+class BrowserRequest extends Request {
+  constructor(input: RequestInfo | URL, init?: RequestInit) {
+    super(typeof input === 'string' ? new URL(input, 'http://localhost') : input, init);
+  }
+}
+vi.stubGlobal('Request', BrowserRequest);
+
+// The host, as GET and POST /{{ module.name }}/samples reach it through the generated client.
+const host = vi.fn<(input: RequestInfo | URL) => Promise<Response>>();
+vi.stubGlobal('fetch', host);
+afterEach(() => host.mockReset());
+// Without Vitest's globals, Testing Library does not unmount between tests by itself.
+afterEach(cleanup);
+
+const ada = { id: '0198c1a0-0000-7000-8000-000000000001', name: 'Ada' };
+const bea = { id: '0198c1a0-0000-7000-8000-000000000002', name: 'Bea' };
+
+function page(items: (typeof ada)[]) {
+  return Response.json({ items, totalCount: items.length, page: 1, pageSize: 20 });
+}
+
+const isPost = (input: RequestInfo | URL) => input instanceof Request && input.method === 'POST';
+
+// A store of its own per test, so no answer is cached from the test before.
+function renderSamples() {
+  const store = configureStore({
+    reducer: { [api.reducerPath]: api.reducer },
+    middleware: (defaults) => defaults().concat(api.middleware),
+  });
+  const wrapper = ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>;
+  return renderHook(() => ({ list: use{{ ns }}Samples(), creation: useCreate{{ ns }}Sample() }), { wrapper }).result;
+}
+
+const names = (samples: { name: string }[] | undefined) => samples?.map((sample) => sample.name);
+
+test('a created sample is in the list before the server answers and stays once it is created', async () => {
+  let answer: (response: Response) => void = () => undefined;
+  let created = false;
+  host.mockImplementation(async (input) => {
+    if (isPost(input)) {
+      return new Promise<Response>((resolve) => {
+        answer = resolve;
+      });
+    }
+    return page(created ? [ada, bea] : [ada]);
+  });
+  const samples = renderSamples();
+  await waitFor(() => expect(names(samples.current.list.samples)).toEqual(['Ada']));
+
+  let creating: Promise<boolean> = Promise.resolve(false);
+  act(() => {
+    creating = samples.current.creation.create('Bea');
+  });
+
+  await waitFor(() => expect(names(samples.current.list.samples)).toEqual(['Ada', 'Bea']));
+  created = true;
+  answer(Response.json(bea.id, { status: 201 }));
+  await expect(creating).resolves.toBe(true);
+  await waitFor(() => expect(samples.current.list.samples?.map((sample) => sample.id)).toEqual([ada.id, bea.id]));
+});
+
+test('a sample the server refuses is taken out of the list again', async () => {
+  host.mockImplementation(async (input) =>
+    isPost(input) ? Response.json({ title: 'No.' }, { status: 500 }) : page([ada]),
+  );
+  const samples = renderSamples();
+  await waitFor(() => expect(names(samples.current.list.samples)).toEqual(['Ada']));
+
+  let creating: Promise<boolean> = Promise.resolve(true);
+  act(() => {
+    creating = samples.current.creation.create('Bea');
+  });
+
+  await expect(creating).resolves.toBe(false);
+  await waitFor(() => expect(names(samples.current.list.samples)).toEqual(['Ada']));
+});

@@ -23,7 +23,7 @@ public sealed partial class PwaEndToEndTests
         // The generated CI's own end-to-end step: start the AppHost, wait for the app, run Playwright, stop.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, e2eOutput);
-        e2eOutput.ShouldContain("2 passed");
+        e2eOutput.ShouldContain("5 passed"); // and the billing page's three sample tests (#734)
 
         // The gate: a worker that keeps every same-origin answer, /api included, fails the offline test.
         var config = Path.Combine(web, "app", "vite.config.ts");
@@ -31,6 +31,9 @@ public sealed partial class PwaEndToEndTests
         var everything = UrlPattern().Replace(shellOnly, "urlPattern: ({ sameOrigin }) => sameOrigin,\n${indent}handler:", 1);
         everything.ShouldNotBe(shellOnly);
         File.WriteAllText(config, everything);
+        // Such a worker also shows the billing page a stale list after a reload, which its sample's spec (#734) reports
+        // too; this gate is the offline test's alone.
+        File.Delete(Path.Combine(web, "app", "e2e", "billing-samples.spec.ts"));
 
         var (brokenExitCode, broken) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         brokenExitCode.ShouldNotBe(0, broken);

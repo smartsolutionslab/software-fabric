@@ -12,4 +12,5 @@
 - `src/App.vue` is the app shell: the sidebar (`@/components/ui/sidebar`) lists the start page and every module from its `routes.ts`, the breadcrumbs and the command palette (Ctrl+K or Cmd+K) follow the routes too, so a new module needs nothing in the shell.
 - Report what a mutation did with `notify.success('…')` or `notify.failure('…')` from `@/lib/notify`: a toast that is a status message or an alert. Call it rather than vue-sonner's `toast`, which gives a toast no role.
 {{~ end ~}}
+- While a list's query is pending, show `Skeleton`s (`@/components/ui/skeleton`) shaped like its content, not a `Loading…` paragraph; when it has nothing, an `EmptyState` (`@/components/ui/empty-state`): an icon in its `icon` slot (`<Inbox />` from @lucide/vue), one sentence saying what is missing and the primary action that fills it in its `action` slot.
 - Compose screens from those components; do not install PrimeVue, Vuetify, Quasar, Element Plus, Ant Design Vue, Naive UI or Headless UI (lint refuses them).

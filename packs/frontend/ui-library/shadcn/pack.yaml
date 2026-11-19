@@ -9,6 +9,11 @@ files:
   - { template: templates/theme/contrast.test.ts.sbn, target: web/app/src/theme/contrast.test.ts }
   - { template: templates/theme/ThemeToggle.tsx.sbn, target: web/app/src/theme/ThemeToggle.tsx }
   - { template: templates/theme/ThemeToggle.test.tsx.sbn, target: web/app/src/theme/ThemeToggle.test.tsx }
+  # Every list's loading and empty states (#696): the registry's skeleton, and an empty state of an icon, one sentence and
+  # the primary action. TanStack Table's DataTable draws both.
+  - { template: templates/skeleton.tsx.sbn, target: web/app/src/components/ui/skeleton.tsx }
+  - { template: templates/empty-state/empty-state.tsx.sbn, target: web/app/src/components/ui/empty-state.tsx }
+  - { template: templates/empty-state/empty-state.test.tsx.sbn, target: web/app/src/components/ui/empty-state.test.tsx }
   # The app shell (#695), in a single-page app with react-router: the registry's sidebar and what it uses, breadcrumbs,
   # the command palette (cmdk) and toasts (sonner), which src/lib/notify.tsx reports a mutation's result in.
   - { template: templates/shell/sidebar.tsx.sbn, target: web/app/src/components/ui/sidebar.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
@@ -16,7 +21,6 @@ files:
   - { template: templates/shell/tooltip.tsx.sbn, target: web/app/src/components/ui/tooltip.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
   - { template: templates/shell/separator.tsx.sbn, target: web/app/src/components/ui/separator.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
   - { template: templates/shell/input.tsx.sbn, target: web/app/src/components/ui/input.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
-  - { template: templates/shell/skeleton.tsx.sbn, target: web/app/src/components/ui/skeleton.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
   - { template: templates/shell/breadcrumb.tsx.sbn, target: web/app/src/components/ui/breadcrumb.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
   - { template: templates/shell/command.tsx.sbn, target: web/app/src/components/ui/command.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
   - { template: templates/shell/dialog.tsx.sbn, target: web/app/src/components/ui/dialog.tsx, when: 'project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" && project["frontend.routing"] == "react-router"' }
@@ -44,4 +48,5 @@ gates:
   - { kind: unit-test, describes: "Button renders a button in the theme's colours, has the registry's variants and sizes, and with asChild gives its child the button's look instead (src/components/ui/button.test.tsx).", file: templates/button.test.tsx.sbn }
   - { kind: unit-test, describes: "src/theme/contrast.test.ts reads both palettes of src/index.css, with a design system's tokens over them as built (light and dark), and fails when a text colour the components put on a background (foreground, card, popover, primary, secondary, accent, muted-foreground, destructive, sidebar) has less than WCAG AA's 4.5:1 in the light or the dark theme; jsdom computes no colours, so axe cannot.", file: templates/theme/contrast.test.ts.sbn }
   - { kind: unit-test, describes: "The theme toggle follows the system until a choice is made, remembers it, still works with storage blocked, and index.html sets the stored or system theme before the first paint (src/theme/ThemeToggle.test.tsx, src/theme/theme.test.ts).", file: templates/theme/ThemeToggle.test.tsx.sbn }
+  - { kind: unit-test, describes: "The empty state shows its sentence and its action and hides its icon from screen readers (src/components/ui/empty-state.test.tsx).", file: templates/empty-state/empty-state.test.tsx.sbn }
   - { kind: unit-test, describes: "With react-router in a single-page app, notify reports a mutation's success in a toast as a status message and its failure as an alert (src/lib/notify.test.tsx).", file: templates/shell/notify.test.tsx.sbn }

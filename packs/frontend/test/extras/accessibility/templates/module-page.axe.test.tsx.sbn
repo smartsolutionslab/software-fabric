@@ -26,7 +26,7 @@ import { SignedInAsDeveloper } from '@/auth/SignedInAsDeveloper';
 import { createAppRouter } from '@/router';
 {{~ end ~}}
 {{~ if stands_in ~}}
-import { examples } from './{{ module.namespace }}Page.data';
+import * as data from './{{ module.namespace }}Page.data';
 {{~ end ~}}
 {{~ if !tanstack ~}}
 import { {{ module.namespace }}Page } from './{{ module.namespace }}Page';
@@ -44,10 +44,10 @@ vi.mock('@/dashboards/DashboardEditor', () => ({ DashboardEditor: () => <p>The d
 {{~ if stands_in ~}}
 
 // The page renders on its own, without {{ if client == "orval" }}a query client{{ else }}the store{{ end }} or the host. Each hook of the generated client answers
-// as if its request were still on its way or, once the page is shown with its data, with its example in the data file.
-const shown = vi.hoisted(() => ({ withExamples: false }));
+// as if its request were still on its way or, once the page is shown with data, with its example in the data file:
+// examples, or emptyExamples for the page with nothing to show.
+const shown = vi.hoisted(() => ({ examples: undefined as Record<string, unknown> | undefined }));
 vi.mock('@/api/generated', async (importOriginal) => {
-  const { examples } = await import('@/modules/{{ module.name }}/{{ module.namespace }}Page.data');
 {{~ if client == "orval" ~}}
   const state = (data: unknown, loading: boolean) => ({
     data,
@@ -63,7 +63,9 @@ vi.mock('@/api/generated', async (importOriginal) => {
     mutateAsync: vi.fn(),
   });
   const answer = (hook: string) =>
-    shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
+    shown.examples !== undefined && hook in shown.examples
+      ? state(shown.examples[hook], false)
+      : state(undefined, true);
   // A mutation nobody has triggered is idle, not saving: the page shows as it first does.
   const idle = {
     data: undefined,
@@ -98,7 +100,9 @@ vi.mock('@/api/generated', async (importOriginal) => {
     isError: false,
   });
   const answer = (hook: string) =>
-    shown.withExamples && hook in examples ? state(examples[hook], false) : state(undefined, true);
+    shown.examples !== undefined && hook in shown.examples
+      ? state(shown.examples[hook], false)
+      : state(undefined, true);
   // A mutation nobody has triggered is idle, not saving: the page shows as it first does.
   const idle = {
     data: undefined,
@@ -125,6 +129,12 @@ vi.mock('@/api/generated', async (importOriginal) => {
 });
 {{~ end ~}}
 
+{{~ if stands_in ~}}
+const { examples } = data;
+// A data file written before it had an empty example has none: the page is then not checked with nothing to show.
+const emptyExamples = (data as { emptyExamples?: Record<string, unknown> }).emptyExamples ?? {};
+
+{{~ end ~}}
 // Whatever else asks the host waits for an answer that never comes.
 vi.stubGlobal('fetch', () => new Promise<Response>(() => undefined));
 
@@ -132,7 +142,7 @@ vi.stubGlobal('fetch', () => new Promise<Response>(() => undefined));
 afterEach(cleanup);
 {{~ if stands_in ~}}
 afterEach(() => {
-  shown.withExamples = false;
+  shown.examples = undefined;
 });
 {{~ end ~}}
 {{~ if themes != "" ~}}
@@ -251,7 +261,7 @@ test.each(themes)(
 
 // Until {{ module.namespace }}Page.data.ts has an example (AGENTS.md), the page is checked only as it loads.
 test.runIf(Object.keys(examples).length > 0)('the {{ module.namespace }} page passes axe with its example data', async () => {
-  shown.withExamples = true;
+  shown.examples = examples;
   const container = {{ if tanstack }}await {{ end }}renderPage();
 
   expect(await axe(container)).toHaveNoViolations();
@@ -261,7 +271,31 @@ test.runIf(Object.keys(examples).length > 0)('the {{ module.namespace }} page pa
 test.runIf(Object.keys(examples).length > 0).each(themes)(
   'the {{ module.namespace }} page passes axe with its example data in the $name theme',
   async ({ switchOn }) => {
-    shown.withExamples = true;
+    shown.examples = examples;
+    switchOn();
+    const container = {{ if tanstack }}await {{ end }}renderPage();
+
+    expect(await axe(container)).toHaveNoViolations();
+  },
+);
+{{~ end ~}}
+
+// Until {{ module.namespace }}Page.data.ts has an empty example (AGENTS.md), the page is not checked with nothing to show.
+test.runIf(Object.keys(emptyExamples).length > 0)(
+  'the {{ module.namespace }} page passes axe when it has nothing to show',
+  async () => {
+    shown.examples = emptyExamples;
+    const container = {{ if tanstack }}await {{ end }}renderPage();
+
+    expect(await axe(container)).toHaveNoViolations();
+  },
+);
+{{~ if themes != "" ~}}
+
+test.runIf(Object.keys(emptyExamples).length > 0).each(themes)(
+  'the {{ module.namespace }} page passes axe when it has nothing to show in the $name theme',
+  async ({ switchOn }) => {
+    shown.examples = emptyExamples;
     switchOn();
     const container = {{ if tanstack }}await {{ end }}renderPage();
 

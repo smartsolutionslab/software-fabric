@@ -1,0 +1,82 @@
+{{~ ns = module.namespace ~}}
+{{~ valibot = project["frontend.validation"] == "valibot" ~}}
+{{~ if valibot ~}}
+import { valibotResolver } from '@hookform/resolvers/valibot';
+import { useForm } from 'react-hook-form';
+import * as v from 'valibot';
+{{~ else ~}}
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+{{~ end ~}}
+import { Button } from '@/components/ui/button';
+
+/** The id of the form's name field, which the page's empty state moves to. */
+export const sampleNameField = '{{ module.name }}-sample-name';
+
+{{~ if valibot ~}}
+const sampleSchema = v.object({
+  name: v.pipe(
+    v.string(),
+    v.trim(),
+    v.minLength(1, 'Give the sample a name.'),
+    v.maxLength(100, "A sample's name is at most 100 characters."),
+  ),
+});
+
+type SampleForm = v.InferOutput<typeof sampleSchema>;
+{{~ else ~}}
+const sampleSchema = z.object({
+  name: z.string().trim().min(1, 'Give the sample a name.').max(100, "A sample's name is at most 100 characters."),
+});
+
+type SampleForm = z.infer<typeof sampleSchema>;
+{{~ end ~}}
+
+interface Create{{ ns }}SampleFormProps {
+  /** Creates the sample; resolves to whether it was created, which empties the field. */
+  onCreate: (name: string) => Promise<boolean>;
+  saving: boolean;
+}
+
+/** Creates one of the module's samples: a name, checked here before the host checks it again. */
+export function Create{{ ns }}SampleForm({ onCreate, saving }: Create{{ ns }}SampleFormProps) {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<SampleForm>({ resolver: {{ if valibot }}valibotResolver{{ else }}zodResolver{{ end }}(sampleSchema), defaultValues: { name: '' } });
+
+  const onSubmit = handleSubmit(async ({ name }) => {
+    if (await onCreate(name)) {
+      reset();
+    }
+  });
+
+  return (
+    <form onSubmit={onSubmit} noValidate aria-label="New sample" className="flex flex-col gap-2">
+      <label htmlFor={sampleNameField} className="text-sm font-medium">
+        Name
+      </label>
+      <div className="flex gap-2">
+        <input
+          id={sampleNameField}
+          autoComplete="off"
+          aria-invalid={errors.name ? true : undefined}
+          aria-describedby={errors.name ? `${sampleNameField}-error` : undefined}
+          className="flex h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
+          {...register('name')}
+        />
+        <Button type="submit" disabled={saving}>
+          Create sample
+        </Button>
+      </div>
+      {errors.name && (
+        <p id={`${sampleNameField}-error`} role="alert" className="text-sm text-destructive">
+          {errors.name.message}
+        </p>
+      )}
+    </form>
+  );
+}

@@ -1,0 +1,53 @@
+{{~ ns = module.namespace ~}}
+import { api, type {{ ns }}SampleDto, useGet{{ ns }}SamplesQuery, usePost{{ ns }}SamplesMutation } from '@/api/generated';
+
+/** The page of samples the module's page lists: the first, as many as the host gives by default. */
+export const samplesPage = { page: 1, pageSize: 20 };
+
+let pending = 0;
+
+/** The cached page with the new sample in it, by name as the host lists them, until the host's own answer replaces it. */
+function withPending(samples: {{ ns }}SampleDto[], name: string): {{ ns }}SampleDto[] {
+  pending += 1;
+  return [...samples, { id: `pending-${pending}`, name }].sort((first, second) =>
+    first.name < second.name ? -1 : first.name > second.name ? 1 : 0,
+  );
+}
+
+// A created sample shows in the list at once: it is put into the cached page as the request leaves, taken out again
+// when the host refuses it, and the page is asked for again once the host has it, with the id the host gave it.
+api.enhanceEndpoints({
+  endpoints: {
+    post{{ ns }}Samples: {
+      async onQueryStarted({ create{{ ns }}SampleRequest }, { dispatch, queryFulfilled }) {
+        const patch = dispatch(
+          api.util.updateQueryData('get{{ ns }}Samples', samplesPage, (page) => {
+            page.items = withPending(page.items, create{{ ns }}SampleRequest.name);
+            page.totalCount = Number(page.totalCount) + 1;
+          }),
+        );
+        try {
+          await queryFulfilled;
+          void dispatch(
+            api.endpoints.get{{ ns }}Samples.initiate(samplesPage, { subscribe: false, forceRefetch: true }),
+          );
+        } catch {
+          patch.undo();
+        }
+      },
+    },
+  },
+});
+
+/** The module's samples, a page at a time: undefined until the host answers. */
+export function use{{ ns }}Samples() {
+  const { data, isLoading, isError } = useGet{{ ns }}SamplesQuery(samplesPage);
+  return { samples: data?.items, isLoading, isError };
+}
+
+/** Creates a sample; resolves to whether the host created it. */
+export function useCreate{{ ns }}Sample() {
+  const [post, { isLoading }] = usePost{{ ns }}SamplesMutation();
+  const create = async (name: string) => !('error' in (await post({ create{{ ns }}SampleRequest: { name } })));
+  return { create, isSaving: isLoading };
+}
