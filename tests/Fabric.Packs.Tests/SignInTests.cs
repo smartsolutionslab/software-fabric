@@ -88,6 +88,6 @@ public sealed class SignInTests
         // The generated CI's own end-to-end step: start the AppHost, wait for the app, run Playwright, stop.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         e2eExitCode.ShouldBe(0, e2eOutput);
-        e2eOutput.ShouldContain("2 passed");
+        e2eOutput.ShouldContain("4 passed");
     }
 }

@@ -98,6 +98,6 @@ public sealed class VueSignInTests
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
         // A failure says what the browser saw, from what Playwright leaves behind, since CI keeps none of it (#791).
         e2eExitCode.ShouldBe(0, e2eExitCode == 0 ? e2eOutput : $"{e2eOutput}\n{PlaywrightFailure.Describe(Path.Combine(web, "app", "test-results"))}");
-        e2eOutput.ShouldContain("2 passed");
+        e2eOutput.ShouldContain("4 passed");
     }
 }
