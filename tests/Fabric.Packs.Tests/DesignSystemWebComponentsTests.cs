@@ -211,7 +211,7 @@ public sealed class DesignSystemWebComponentsTests
         File.WriteAllText(badge, source.Replace(declaration, mutation, StringComparison.Ordinal));
         RunWeb(project, "install");
 
-        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "--filter", "@shop/ui", "test");
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), BrowserTester.Diagnostics, "pnpm", "--filter", "@shop/ui", "test");
 
         BrowserTester.ShouldHaveStarted(output);
         exitCode.ShouldNotBe(0, output);
@@ -234,7 +234,7 @@ public sealed class DesignSystemWebComponentsTests
         File.WriteAllText(tokens, source.Replace(ink, $"\"50\": {{ \"$value\": \"{colour}\" }}", StringComparison.Ordinal));
         RunWeb(project, "install");
 
-        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "--filter", "@shop/ui", "test");
+        var (exitCode, output) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), BrowserTester.Diagnostics, "pnpm", "--filter", "@shop/ui", "test");
 
         BrowserTester.ShouldHaveStarted(output);
         exitCode.ShouldBe(0, output);
@@ -336,7 +336,7 @@ public sealed class DesignSystemWebComponentsTests
         var web = Path.Combine(project.ProjectDirectory, "web");
         foreach (var step in steps)
         {
-            var (exitCode, output) = Shell.Run(web, "pnpm", step);
+            var (exitCode, output) = Shell.Run(web, BrowserTester.Diagnostics, "pnpm", step);
             BrowserTester.ShouldHaveStarted(output);
             exitCode.ShouldBe(0, $"pnpm {step}:\n{output}");
         }
