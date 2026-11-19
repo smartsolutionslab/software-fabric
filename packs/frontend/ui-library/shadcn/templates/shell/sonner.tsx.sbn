@@ -25,6 +25,7 @@ function Toaster({ ...props }: ToasterProps) {
           '--border-radius': 'var(--radius)',
         } as CSSProperties
       }
+      toastOptions={{ style: { boxShadow: 'var(--elevation-3)' } }}
       {...props}
     />
   );

@@ -161,7 +161,7 @@ export function DataTable<TRow extends RowData>({
             id={`${id}-columns`}
             hidden={!choosing}
             onKeyDown={closeOnEscape}
-            className="bg-popover text-popover-foreground absolute right-0 z-20 mt-1 flex min-w-40 flex-col gap-1 rounded-md border p-2 shadow-md"
+            className="bg-popover text-popover-foreground absolute right-0 z-20 mt-1 flex min-w-40 flex-col gap-1 rounded-md border p-2 shadow-elevation-2"
           >
             <legend className="sr-only">Visible columns</legend>
             {table.getAllLeafColumns().map((column) => (
