@@ -9,6 +9,9 @@ internal static class BrowserTester
     /// <summary>What vitest's orchestrator says when a test file's iframe did not report ready in time.</summary>
     private const string NotReady = "did not become ready within";
 
+    /// <summary>The environment a ui browser test run gets, so that a tester that never starts leaves its cause in the output.</summary>
+    public static IReadOnlyDictionary<string, string> Diagnostics { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
     public static bool NeverStarted(string output) => output.Contains(NotReady, StringComparison.Ordinal);
 
     /// <summary>Fails, with the whole output, when the browser tester never started; a run that did is left to the caller.</summary>

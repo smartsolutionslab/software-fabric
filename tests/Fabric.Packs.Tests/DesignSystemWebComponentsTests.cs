@@ -238,6 +238,7 @@ public sealed class DesignSystemWebComponentsTests
 
         BrowserTester.ShouldHaveStarted(output);
         exitCode.ShouldBe(0, output);
+        output.ShouldContain("vitest:browser:playwright", Case.Sensitive, "the run printed no account of its browser page, so a tester that never starts would not name its cause");
     }
 
     [Theory]
