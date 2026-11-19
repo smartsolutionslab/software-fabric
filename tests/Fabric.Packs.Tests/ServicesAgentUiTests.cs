@@ -80,7 +80,8 @@ public sealed partial class ServicesAgentUiTests
         notFound.ShouldContain(".RequireAuthorization()");
         notFound.ShouldContain(".ExcludeFromDescription()");
 
-        foreach (var (path, content) in files.Where(file => file.Key.StartsWith("src/Edge/", StringComparison.Ordinal)))
+        // The edge's own code; Edge.csproj references the AG-UI SDK because the edge compiles src/Host as every service host does.
+        foreach (var (path, content) in files.Where(file => file.Key.StartsWith("src/Edge/", StringComparison.Ordinal) && file.Key.EndsWith(".cs", StringComparison.Ordinal)))
         {
             content.ShouldNotContain("AGUI", customMessage: $"{path}: the edge never speaks AG-UI.");
             content.ShouldNotContain("AgentConversations", customMessage: $"{path}: the edge runs no agent.");
