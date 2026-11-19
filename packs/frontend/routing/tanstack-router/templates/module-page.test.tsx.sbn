@@ -10,7 +10,12 @@ import { {{ ns }}Page } from './{{ ns }}Page';
 // The page's data comes through use{{ ns }}Samples, whose own test reads the host and the optimistic update; here the
 // samples, and what creating one answers, are the test's.
 const samples = vi.hoisted(() => ({
-  list: { samples: undefined as { id: string; name: string }[] | undefined, isLoading: false, isError: false },
+  list: {
+    samples: undefined as { id: string; name: string }[] | undefined,
+    page: undefined as { totalCount: number; page: number; pageSize: number } | undefined,
+    isLoading: false,
+    isError: false,
+  },
   create: vi.fn<(name: string) => Promise<boolean>>(),
 }));
 vi.mock('./use{{ ns }}Samples', () => ({
@@ -29,7 +34,7 @@ const ada = { id: '0198c1a0-0000-7000-8000-000000000001', name: 'Ada' };
 const bea = { id: '0198c1a0-0000-7000-8000-000000000002', name: 'Bea' };
 
 beforeEach(() => {
-  samples.list = { samples: [ada, bea], isLoading: false, isError: false };
+  samples.list = { samples: [ada, bea], page: undefined, isLoading: false, isError: false };
   samples.create.mockReset();
 {{~ if shell ~}}
   notify.success.mockReset();
@@ -47,8 +52,22 @@ test('the page lists the samples by name', async () => {
   expect(screen.queryByText('No samples yet.')).not.toBeInTheDocument();
 });
 
+{{~ if project["frontend.data-grid"] == "tanstack-table" ~}}
+test('below the samples the page says which of how many it shows, from the page the host answered', () => {
+  samples.list = {
+    samples: [ada, bea],
+    page: { totalCount: 42, page: 1, pageSize: 20 },
+    isLoading: false,
+    isError: false,
+  };
+  render(<{{ ns }}Page />);
+
+  expect(screen.getByRole('table')).toHaveAccessibleDescription('Showing 1–2 of 42');
+});
+
+{{~ end ~}}
 test('while the samples load the page shows skeleton rows', () => {
-  samples.list = { samples: undefined, isLoading: true, isError: false };
+  samples.list = { samples: undefined, page: undefined, isLoading: true, isError: false };
 
   const { container } = render(<{{ ns }}Page />);
 
@@ -59,7 +78,7 @@ test('while the samples load the page shows skeleton rows', () => {
 });
 
 test('without samples the page says so and its action leads to the form', async () => {
-  samples.list = { samples: [], isLoading: false, isError: false };
+  samples.list = { samples: [], page: undefined, isLoading: false, isError: false };
   render(<{{ ns }}Page />);
 
   expect(screen.getByText('No samples yet.')).toBeVisible();
