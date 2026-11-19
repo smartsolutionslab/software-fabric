@@ -311,6 +311,144 @@ public sealed class SaasStandardReactTests
         RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword).ShouldBe(0);
     }
 
+    /// <summary>
+    /// With the hand-rolled mediator, a consumer that takes the dispatcher and its module's unit of work by constructor, as
+    /// the agent rules allow, runs: Wolverine cannot build either (both take the service provider), so they come from the
+    /// message's scope (#822). Before, Wolverine refused the consumer and the event went to the dead letters.
+    /// </summary>
+    [Fact]
+    public async Task A_consumer_that_takes_the_dispatcher_and_its_modules_unit_of_work_dispatches_a_command_and_publishes()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.AddModule("shipping");
+        project.Write("src/Contracts/Billing/InvoicePaidV1.cs", """
+            namespace Shop.Contracts.Billing;
+
+            public sealed record InvoicePaidV1(Guid InvoiceId) : IntegrationEvent;
+            """);
+        project.Write("src/Contracts/Shipping/ShipmentScheduledV1.cs", """
+            namespace Shop.Contracts.Shipping;
+
+            public sealed record ShipmentScheduledV1(Guid InvoiceId) : IntegrationEvent;
+            """);
+        project.Write("src/Modules/Billing/Billing.Api/PayInvoice.cs", PayInvoice);
+        project.WriteTypes("src/Modules/Shipping/Shipping.Application/Commands/ScheduleShipment", """
+            using System.Collections.Concurrent;
+            using Shop.BuildingBlocks.Messaging;
+
+            namespace Shop.Modules.Shipping.Application.Commands.ScheduleShipment;
+
+            public sealed record ScheduleShipment(Guid InvoiceId) : ICommand<Result<Guid, ApiError>>;
+
+            public sealed class ScheduleShipmentHandler : ICommandHandler<ScheduleShipment, Result<Guid, ApiError>>
+            {
+                public static ConcurrentBag<Guid> Scheduled { get; } = [];
+
+                public Task<Result<Guid, ApiError>> HandleAsync(ScheduleShipment command, CancellationToken cancellationToken)
+                {
+                    Ensure.That(command).IsNotNull();
+
+                    Scheduled.Add(command.InvoiceId);
+                    return Task.FromResult(Result<Guid, ApiError>.Success(command.InvoiceId));
+                }
+            }
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Application/InvoicePaidConsumer.cs", """
+            using Shop.BuildingBlocks.Messaging;
+            using Shop.BuildingBlocks.Tenancy;
+            using Shop.Contracts.Billing;
+            using Shop.Contracts.Shipping;
+            using Shop.Modules.Shipping.Application.Commands.ScheduleShipment;
+
+            namespace Shop.Modules.Shipping.Application;
+
+            public sealed class InvoicePaidConsumer(IDispatcher dispatcher, IShippingUnitOfWork unitOfWork)
+            {
+                public async Task HandleAsync(InvoicePaidV1 message, CancellationToken cancellationToken)
+                {
+                    Ensure.That(message).IsNotNull();
+
+                    using var tenant = TenantScope.Begin(message.Metadata.TenantId ?? throw new InvalidOperationException("The event carries no tenant."));
+                    await dispatcher.SendAsync(new ScheduleShipment(message.InvoiceId), cancellationToken);
+                    await unitOfWork.PublishAsync(new ShipmentScheduledV1(message.InvoiceId));
+                    await unitOfWork.CommitAsync(cancellationToken);
+                }
+            }
+            """);
+        project.Write("src/Modules/Shipping/Shipping.Api/Shipments.cs", """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.Modules.Shipping.Application.Commands.ScheduleShipment;
+
+            namespace Shop.Modules.Shipping.Api;
+
+            public sealed class Shipments : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints) =>
+                    endpoints.MapGet("/scheduled", () => ScheduleShipmentHandler.Scheduled.ToArray()).AllowAnonymous();
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Application/ShipmentScheduledConsumer.cs", """
+            using System.Collections.Concurrent;
+            using Shop.Contracts.Shipping;
+
+            namespace Shop.Modules.Billing.Application;
+
+            public static class ShipmentScheduledConsumer
+            {
+                public static ConcurrentBag<Guid> Received { get; } = [];
+
+                public static void Handle(ShipmentScheduledV1 message)
+                {
+                    Ensure.That(message).IsNotNull();
+
+                    Received.Add(message.InvoiceId);
+                }
+            }
+            """);
+        project.Write("src/Modules/Billing/Billing.Api/ScheduledShipments.cs", """
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.AspNetCore.Routing;
+            using Shop.BuildingBlocks.Api;
+            using Shop.Modules.Billing.Application;
+
+            namespace Shop.Modules.Billing.Api;
+
+            public sealed class ScheduledShipments : IEndpoint
+            {
+                public void Map(IEndpointRouteBuilder endpoints) =>
+                    endpoints.MapGet("/shipments/scheduled", () => ShipmentScheduledConsumer.Received.ToArray()).AllowAnonymous();
+            }
+            """);
+        project.Build();
+
+        using var postgres = Container.Postgres(DatabasePassword);
+        using var rabbitMq = Container.RabbitMq();
+        using var host = project.StartHost(Dependencies(postgres, rabbitMq));
+
+        var invoice = Guid.CreateVersion7();
+        (await host.PostAsync($"/billing/invoices/{invoice}/pay")).StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        // The command the consumer dispatched ran, and the event it published through its unit of work reached billing.
+        var scheduled = "[]";
+        var published = "[]";
+        for (var attempt = 0; attempt < 120 && !(scheduled.Contains(invoice.ToString(), StringComparison.Ordinal) && published.Contains(invoice.ToString(), StringComparison.Ordinal)); attempt++)
+        {
+            await Task.Delay(500, TestContext.Current.CancellationToken);
+            scheduled = await (await host.GetAsync("/shipping/scheduled")).Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            published = await (await host.GetAsync("/billing/shipments/scheduled")).Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        }
+
+        var deadLetters = RedeliveredEvent.WolverineDeadLetters(postgres, DatabasePassword) == 0
+            ? string.Empty
+            : postgres.Psql(DatabasePassword, "select exception_message from wolverine.wolverine_dead_letters");
+        scheduled.ShouldContain(invoice.ToString(), customMessage: $"Dead letters: {deadLetters}");
+        published.ShouldContain(invoice.ToString(), customMessage: $"Dead letters: {deadLetters}");
+        deadLetters.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task A_consumer_that_always_fails_is_retried_with_backoff_then_dead_lettered()
     {
