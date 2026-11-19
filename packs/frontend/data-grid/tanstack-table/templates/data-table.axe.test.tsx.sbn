@@ -54,7 +54,7 @@ const states = [
   { state: 'when it is empty', table: () => <DataTable columns={columns} data={none} empty={empty} /> },
   { state: 'with rows', table: () => <DataTable columns={columns} data={data} empty={empty} /> },
   {
-    state: 'with row actions, its page and the columns control open',
+    state: 'with actions, a page and columns open',
     table: () => (
       <DataTable
         columns={columns}

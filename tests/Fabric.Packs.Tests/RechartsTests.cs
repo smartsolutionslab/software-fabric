@@ -56,9 +56,9 @@ public sealed partial class RechartsTests
           expect(await axe(container)).toHaveNoViolations();
         });
 
-        test('series colours come from one palette, which starts again after its last colour', () => {
-          expect(chartColor(0)).toBe('#5470c6');
-          expect(chartColor(9)).toBe(chartColor(0));
+        test('series colours come from the theme palette, which starts again after its last colour', () => {
+          expect(chartColor(0)).toBe('var(--chart-1)');
+          expect(chartColor(5)).toBe(chartColor(0));
         });
         """;
 
@@ -133,7 +133,7 @@ public sealed partial class RechartsTests
 
         var plain = Escapes().Replace(testOutput, string.Empty);
         plain.ShouldContain("✓ src/pages/RevenueChart.test.tsx > a recharts chart is an image named by its label, with no axe violations", customMessage: testOutput);
-        plain.ShouldContain("✓ src/pages/RevenueChart.test.tsx > series colours come from one palette, which starts again after its last colour", customMessage: testOutput);
+        plain.ShouldContain("✓ src/pages/RevenueChart.test.tsx > series colours come from the theme palette, which starts again after its last colour", customMessage: testOutput);
         project.Write("web/app/src/pages/OtherLibraries.ts", OtherChartLibraries);
         var (exitCode, lintOutput) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "lint");
         exitCode.ShouldNotBe(0, lintOutput);

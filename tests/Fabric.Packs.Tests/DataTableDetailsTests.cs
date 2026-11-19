@@ -82,8 +82,8 @@ public sealed partial class DataTableDetailsTests
             $"{table}.test.{test} > a row's actions sit in its last cell, show on hover or focus, and are reached with the keyboard",
             $"{table}.test.{test} > with a page of a longer list the table says which rows it shows of how many, and screen readers hear it with the table",
             $"{table}.test.{test} > the table says nothing of its page while it loads or when it has no rows",
-            $"{table}.axe.test.{test} > the table has no accessibility violations axe can find with row actions, its page and the columns control open in the light theme",
-            $"{table}.axe.test.{test} > the table has no accessibility violations axe can find with row actions, its page and the columns control open in the dark theme",
+            $"{table}.axe.test.{test} > the table has no accessibility violations axe can find with actions, a page and columns open in the light theme",
+            $"{table}.axe.test.{test} > the table has no accessibility violations axe can find with actions, a page and columns open in the dark theme",
             $"src/modules/billing/BillingPageSamples.test.{test} > below the samples the page says which of how many it shows, from the page the host answered",
         ];
         foreach (var name in passed)

@@ -52,7 +52,7 @@ const states = [
   { state: 'when it is empty', props: { columns, data: none } },
   { state: 'with rows', props: { columns, data } },
   {
-    state: 'with row actions, its page and the columns control open',
+    state: 'with actions, a page and columns open',
     props: { columns, data, paging: { page: 1, pageSize: 25, totalCount: 312 } },
     open: true,
   },
