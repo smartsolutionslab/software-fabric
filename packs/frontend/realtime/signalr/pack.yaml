@@ -1,6 +1,8 @@
 option: frontend.realtime.signalr
 files:
   - { template: templates/IBrowserEvents.cs.sbn, target: src/BuildingBlocks/Realtime/IBrowserEvents.cs }
+  # With services, a service sends a browser event to the edge over the broker (ADR-0017).
+  - { template: templates/BrowserEventV1.cs.sbn, target: src/BuildingBlocks/Realtime/BrowserEventV1.cs, when: 'project["backend.topology"] == "services"' }
   - { template: templates/EventsHub.cs.sbn, target: src/Host/Realtime/EventsHub.cs }
   - { template: templates/HubBrowserEvents.cs.sbn, target: src/Host/Realtime/HubBrowserEvents.cs }
   - { template: templates/TestEvent.cs.sbn, target: src/Host/Realtime/TestEvent.cs }
@@ -25,6 +27,8 @@ files:
 slots:
   - { slot: host.services, template: templates/host-services.sbn, order: 30 }
   - { slot: host.endpoints, template: templates/host-endpoints.sbn, order: 30 }
+  # With services only (the topology requires a broker, hence Wolverine): the route of BrowserEventV1 to the broker.
+  - { slot: messaging.wolverine-options, template: templates/messaging-wolverine-options.sbn, optional: true }
   - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
   - { slot: tests.packages, template: templates/tests-packages.sbn }
   - { slot: web.dependencies, template: templates/dependencies.sbn }

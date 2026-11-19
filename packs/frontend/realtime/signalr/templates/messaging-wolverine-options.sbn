@@ -1,0 +1,13 @@
+{{~ if project["backend.topology"] == "services" ~}}
+
+            // A browser event goes to the broker, where the edge listens for it on the {{ if project["backend.bus.transport"] == "rabbitmq" }}exchange{{ else }}topic{{ end }} named after its type
+            // (src/Edge/Wiring/EdgeMessaging.cs); it is not stored first, whatever the outbox does for integration events.
+            options.PublishMessage<{{ namespace }}.BuildingBlocks.Realtime.BrowserEventV1>()
+{{~ if project["backend.bus.transport"] == "rabbitmq" ~}}
+                .ToRabbitExchange(typeof({{ namespace }}.BuildingBlocks.Realtime.BrowserEventV1).FullName!)
+{{~ else if project["backend.bus.transport"] == "azure-service-bus" ~}}
+                .ToAzureServiceBusTopic(typeof({{ namespace }}.BuildingBlocks.Realtime.BrowserEventV1).FullName!)
+{{~ else ~}}
+                .ToKafkaTopic(typeof({{ namespace }}.BuildingBlocks.Realtime.BrowserEventV1).FullName!)
+{{~ end ~}}
+                .BufferedInMemory();{{ end }}
