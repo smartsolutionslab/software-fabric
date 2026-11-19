@@ -14,6 +14,7 @@ public sealed partial class DataTableDetailsTests
 {
     private const string React = "saas-standard-react";
     private const string Vue = "saas-standard-vue";
+    private const string TanStackRouter = "frontend.routing=tanstack-router";
 
     [Theory]
     [InlineData(React, false)]
@@ -40,6 +41,19 @@ public sealed partial class DataTableDetailsTests
         var files = Files(profile, withModule: true);
 
         files[path].ShouldContain(paging);
+    }
+
+    /// <summary>#826: the TanStack Router module page gives it the page too, whichever client fetched it.</summary>
+    [Theory]
+    [InlineData(React)]
+    [InlineData("lean-crud")]
+    [InlineData("lean-crud", "frontend.api-client=openapi-fetch")]
+    public void With_TanStack_Router_the_module_page_gives_its_sample_list_the_page_the_host_answered(string profile, params string[] overrides)
+    {
+        var files = Files(profile, true, [TanStackRouter, .. overrides]);
+
+        files["web/app/src/modules/billing/BillingPage.tsx"].ShouldContain("paging={page}");
+        files["web/app/src/modules/billing/BillingPageSamples.test.tsx"].ShouldContain("Showing 1–2 of 42");
     }
 
     /// <summary>Out of scope: these keep the table and columns they had.</summary>
