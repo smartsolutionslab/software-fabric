@@ -62,8 +62,8 @@ export function {{ module.namespace }}Page() {
 }
 {{~ else if sample_page ~}}
 {{~ ns = module.namespace ~}}
-{{~ # With the app shell (#695) the result is a toast through notify; without it, a message beside the form. ~}}
-{{~ shell = project["frontend.routing"] == "react-router" ~}}
+{{~ # With the app shell (#736) the result is a toast through notify; without it, a message beside the form. ~}}
+{{~ shell = project["frontend.ui-library"] == "shadcn" && project["frontend.architecture"] == "spa" ~}}
 {{~ # TanStack Table's DataTable draws its own loading and empty states (#696); beside AG Grid the page draws them. ~}}
 {{~ table = project["frontend.data-grid"] == "tanstack-table" ~}}
 {{~ # openapi-fetch's generated file holds the document's types, not named ones: the hook names the sample's. ~}}

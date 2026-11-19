@@ -1,7 +1,7 @@
 {{~ # The grid's class names are react-grid-layout's, or grid-layout-plus's for Vue; everything else is the same page. ~}}
 {{~ vue = project["frontend.framework"] == "vue" ~}}
 {{~ # With the app shell (#695) Save reports in a toast through notify; without it, in a notice beside the button. ~}}
-{{~ shell = (project["frontend.ui-library"] == "shadcn" && project["frontend.routing"] == "react-router") || (project["frontend.ui-library"] == "shadcn-vue" && project["frontend.routing"] == "vue-router") ~}}
+{{~ shell = (project["frontend.ui-library"] == "shadcn" && (project["frontend.routing"] == "react-router" || project["frontend.routing"] == "tanstack-router")) || (project["frontend.ui-library"] == "shadcn-vue" && project["frontend.routing"] == "vue-router") ~}}
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 /** Where the element is on the page; it must be visible. */
