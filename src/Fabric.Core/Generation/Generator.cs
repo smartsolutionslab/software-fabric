@@ -191,6 +191,14 @@ public static class Generator
         return New(catalog, packs, name, profile, profile, overrides);
     }
 
+    public static GenerationResult New(
+        CatalogModel catalog,
+        IReadOnlyDictionary<string, PackManifest> packs,
+        string name,
+        string? profile,
+        IReadOnlyList<string> overrides,
+        string? rootNamespace) => New(catalog, packs, name, profile, overrides);
+
     /// <param name="profile">The profile the choices are resolved from, if any.</param>
     /// <param name="recordedProfile">The profile <c>fabric.yaml</c> names, which a regeneration keeps even when the
     /// catalog no longer has it.</param>

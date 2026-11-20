@@ -20,7 +20,10 @@ public static partial class FabricFile
 
     private const int Version = 1;
 
-    public static string Write(CatalogModel catalog, string name, string? profile, ProjectChoices choices)
+    public static string Write(CatalogModel catalog, string name, string? profile, ProjectChoices choices) =>
+        Write(catalog, name, profile, choices, rootNamespace: null);
+
+    public static string Write(CatalogModel catalog, string name, string? profile, ProjectChoices choices, string? rootNamespace)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(name);

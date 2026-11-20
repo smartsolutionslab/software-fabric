@@ -105,6 +105,23 @@ public sealed class ChangeCommandTests : IDisposable
     }
 
     [Fact]
+    public void A_project_recorded_with_a_root_namespace_keeps_it_through_a_change()
+    {
+        var namespaced = Path.Combine(root, "namespaced", "shop");
+        New(namespaced, "--namespace", "Acme.Shop").ExitCode.ShouldBe(0);
+        Git.Run(namespaced, "init", "-q");
+        Git.Commit(namespaced, "generate in Acme.Shop");
+
+        var run = CliRun.Of(
+            "change", "--project", namespaced, "--set", "frontend.color-scheme=orange", "--catalog", Paths.RepositoryCatalog, "--packs", Paths.RepositoryPacks);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldNotContain("conflict");
+        File.ReadAllText(Path.Combine(namespaced, "fabric.yaml")).ShouldContain("\nnamespace: Acme.Shop\n");
+        Tree(namespaced).ShouldBe(Fresh("--namespace", "Acme.Shop", "--set", "frontend.color-scheme=orange"));
+    }
+
+    [Fact]
     public void A_project_another_fabric_wrote_is_refused_until_it_is_upgraded_and_left_untouched()
     {
         var fabricYaml = Read("fabric.yaml");

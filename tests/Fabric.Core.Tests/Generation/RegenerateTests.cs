@@ -240,6 +240,66 @@ public sealed class RegenerateTests : IDisposable
     }
 
     [Fact]
+    public void A_recorded_root_namespace_reaches_every_module_add_module_writes_and_stays_recorded()
+    {
+        var packs = PacksWithModuleNamespaceFile();
+        var generated = Generator.New(Fixtures.MinimalCatalog, packs, "shop", "minimal", [], "SmartSolutionsLab.Shop");
+        generated.Errors.ShouldBeEmpty();
+
+        var addition = Generator.AddModule(Fixtures.MinimalCatalog, packs, Record(generated.Files), "billing", []);
+
+        addition.Errors.ShouldBeEmpty();
+        addition.Created.Single(file => file.Path == "src/billing/Namespace.txt").Content.ShouldBe("SmartSolutionsLab.Shop.Modules.Billing\n");
+        addition.FabricYaml!.ShouldContain("\nnamespace: SmartSolutionsLab.Shop\n");
+    }
+
+    [Fact]
+    public void Regenerating_a_project_recorded_with_a_root_namespace_writes_what_new_and_add_module_wrote()
+    {
+        var packs = PacksWithModuleNamespaceFile();
+        var generated = Generator.New(Fixtures.MinimalCatalog, packs, "shop", "minimal", [], "SmartSolutionsLab.Shop");
+        List<RenderedFile> written = [.. generated.Files];
+        foreach (var module in (string[])["shipping", "billing"])
+        {
+            var addition = Generator.AddModule(Fixtures.MinimalCatalog, packs, Record(written), module, []);
+            addition.Errors.ShouldBeEmpty();
+            written = [.. written.Where(file => file.Path != FabricFile.FileName), .. addition.Created, new(FabricFile.FileName, addition.FabricYaml!)];
+        }
+
+        var regenerated = Generator.Regenerate(Fixtures.MinimalCatalog, packs, Record(written));
+
+        regenerated.Errors.ShouldBeEmpty();
+        regenerated.Files.ShouldBe(written.OrderBy(file => file.Path, StringComparer.Ordinal));
+        regenerated.Files.Single(file => file.Path == "src/shipping/Namespace.txt").Content.ShouldBe("SmartSolutionsLab.Shop.Modules.Shipping\n");
+        Regeneration.From(Record(written)).Namespace.ShouldBe("SmartSolutionsLab.Shop");
+    }
+
+    [Fact]
+    public void A_project_recorded_without_a_root_namespace_regenerates_with_none()
+    {
+        var written = NewThenAdd(Fixtures.MinimalPacks, "minimal", [], "billing");
+
+        Regeneration.From(Record(written)).Namespace.ShouldBeNull();
+    }
+
+    /// <summary>The fixture packs, with a per-module file that shows the project's and the module's namespace.</summary>
+    private IReadOnlyDictionary<string, PackManifest> PacksWithModuleNamespaceFile()
+    {
+        var pack = Path.Combine(packsRoot, "module", "style", "ddd");
+        File.WriteAllText(Path.Combine(pack, "templates", "namespace.sbn"), "{{ namespace }}.Modules.{{ module.namespace }}\n");
+        var manifest = Path.Combine(pack, "pack.yaml");
+        File.WriteAllText(
+            manifest,
+            File.ReadAllText(manifest).Replace(
+                "files:\n",
+                "files:\n  - { template: templates/namespace.sbn, target: \"src/{{ module.name }}/Namespace.txt\", per-module: true }\n",
+                StringComparison.Ordinal));
+        var loaded = PackLoader.Load(packsRoot, Fixtures.MinimalCatalog);
+        loaded.Errors.ShouldBeEmpty();
+        return loaded.Packs;
+    }
+
+    [Fact]
     public void Spells_out_every_choice_and_setting_for_new_and_every_module_value_for_add_module_in_order()
     {
         var written = NewThenAdd(
