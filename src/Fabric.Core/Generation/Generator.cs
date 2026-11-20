@@ -168,13 +168,13 @@ public static class Generator
         FabricRecord project,
         IReadOnlyList<string> newPacks)
     {
-        var rendered = Renderer.Render(catalog, composition, choices, project.Name);
+        var rendered = Renderer.Render(catalog, composition, choices, project.Name, project.RootNamespace);
         if (rendered.Errors.Count > 0)
         {
             return AdditionFailure(rendered.Errors);
         }
 
-        var fabricYaml = FabricFile.Write(catalog, project.Name, project.Profile, choices);
+        var fabricYaml = FabricFile.Write(catalog, project.Name, project.Profile, choices, project.Namespace);
         return new ModuleAddition([], fabricYaml, [])
         {
             Experimental = ExperimentalOptions.Chosen(catalog, choices),
