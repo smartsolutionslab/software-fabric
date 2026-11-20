@@ -36,9 +36,7 @@ public sealed partial class PwaEndToEndTests
         File.Delete(Path.Combine(web, "app", "e2e", "billing-samples.spec.ts"));
 
         var (brokenExitCode, broken) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
-        brokenExitCode.ShouldNotBe(0, broken);
-        broken.ShouldContain($"1 failed\n    [chromium] › e2e/offline.spec.ts");
-        broken.ShouldContain("Received: 200");
+        OfflineGate.ShouldBeItsVerdict(brokenExitCode, broken);
     }
 
     [Fact]
