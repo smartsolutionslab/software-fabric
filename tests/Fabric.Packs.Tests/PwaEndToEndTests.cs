@@ -37,12 +37,8 @@ public sealed partial class PwaEndToEndTests
         File.Delete(Path.Combine(web, "app", "e2e", "billing-samples.spec.ts"));
 
         var (brokenExitCode, broken) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
-        brokenExitCode.ShouldNotBe(0, broken);
-        // The gate's verdict is the offline test failing at its last line, the cached /api answer; a failure anywhere else
-        // is not that verdict, and says what the browser saw (#782).
-        var verdict = $"not the gate's verdict (the offline test failing on a cached /api answer):\n{broken}\n{PlaywrightFailure.Describe(testResults)}";
-        broken.ShouldContain($"1 failed\n    [chromium] › e2e/offline.spec.ts", customMessage: verdict);
-        broken.ShouldContain("Received: 200", customMessage: verdict);
+        // A run that failed elsewhere than the gate's verdict says what the browser saw too, since CI keeps no trace (#782).
+        OfflineGate.ShouldBeItsVerdict(brokenExitCode, Explained(brokenExitCode, broken, testResults));
     }
 
     [Fact]

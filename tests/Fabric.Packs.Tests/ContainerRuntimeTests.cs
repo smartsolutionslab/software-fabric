@@ -1,143 +1,72 @@
+using Fabric.Core.Generation;
 using YamlDotNet.RepresentationModel;
 
 namespace Fabric.Packs.Tests;
 
 /// <summary>
-/// Every workflow job that sets up the Aspire CLI bundle, to start AppHosts, names Docker as their container runtime
-/// (#827). Without a runtime named, Aspire's orchestrator asks every runtime it knows whether it runs, podman included,
-/// which GitHub's runners carry. A <c>podman container ls</c> that hung there, and outlived the job, failed the AppHost's
-/// dependency check in three test classes ("Application orchestrator dependency check returned an error: The operation
-/// has timed out"). Each case starts a minimal AppHost with its job's environment and a podman that only records that it
-/// was asked.
+/// A generated CI job that starts an AppHost names Docker as Aspire's container runtime (#830). Unnamed, Aspire 13.6.5's
+/// orchestrator also runs <c>podman container ls</c>, and GitHub's runners carry podman: that call hung past the job and
+/// failed the AppHost's dependency check. A job starts an AppHost when it runs <c>.github/scripts/e2e.sh</c>, or runs
+/// <c>.github/scripts/test.sh</c> in a project whose tests reference Aspire's testing host. A job that starts none names
+/// no runtime.
 /// </summary>
-public sealed class ContainerRuntimeTests : IClassFixture<ContainerRuntimeTests.MinimalAppHost>
+public sealed class ContainerRuntimeTests
 {
-    private readonly MinimalAppHost appHost;
+    private const string Variable = "ASPIRE_CONTAINER_RUNTIME";
+    private const string AspireTestingHost = "<PackageReference Include=\"Aspire.Hosting.Testing\" />";
 
-    public ContainerRuntimeTests(MinimalAppHost appHost)
+    public static TheoryData<string> Profiles => [.. Repository.Catalog.Profiles.Keys];
+
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void Every_job_of_a_profile_that_starts_an_AppHost_names_Docker(string profile)
     {
-        this.appHost = appHost;
-    }
+        var starting = Jobs(profile).Where(job => job.StartsAnAppHost).ToList();
 
-    public static TheoryData<string, string> Jobs
-    {
-        get
-        {
-            var jobs = new TheoryData<string, string>();
-            foreach (var path in Directory.EnumerateFiles(Path.Combine(Repository.Root, ".github", "workflows"), "*.yml").Order(StringComparer.Ordinal))
-            {
-                var workflow = Workflow(path);
-                foreach (var (name, job) in (YamlMappingNode)workflow["jobs"])
-                {
-                    if (SetsUpAspire((YamlMappingNode)job))
-                    {
-                        jobs.Add(Path.GetFileName(path), ((YamlScalarNode)name).Value!);
-                    }
-                }
-            }
-
-            return jobs;
-        }
-    }
-
-    [Fact]
-    public void Some_workflow_job_sets_up_the_Aspire_CLI()
-    {
-        Jobs.Count.ShouldBeGreaterThan(0);
+        starting.ShouldNotBeEmpty();
+        starting.ShouldAllBe(job => job.Runtime == "docker");
     }
 
     [Theory]
-    [MemberData(nameof(Jobs))]
-    public void An_AppHost_started_in_the_jobs_environment_never_asks_podman(string workflow, string job)
+    [MemberData(nameof(Profiles))]
+    public void No_job_of_a_profile_that_starts_no_AppHost_names_a_runtime(string profile) =>
+        Jobs(profile).Where(job => !job.StartsAnAppHost).ShouldAllBe(job => job.Runtime == null);
+
+    [Fact]
+    public void With_testcontainers_the_backend_job_starts_no_AppHost_and_names_no_runtime()
     {
-        var workflowNode = Workflow(Path.Combine(Repository.Root, ".github", "workflows", workflow));
-        var jobNode = (YamlMappingNode)((YamlMappingNode)workflowNode["jobs"])[job];
-        // Only the job's own setting counts, not one this test process inherited: an empty value is no runtime named.
-        var environment = new Dictionary<string, string> { ["ASPIRE_CONTAINER_RUNTIME"] = string.Empty, ["DOTNET_ASPIRE_CONTAINER_RUNTIME"] = string.Empty };
-        foreach (var (name, value) in Environment(workflowNode).Concat(Environment(jobNode)))
-        {
-            environment[name] = value;
-        }
+        var jobs = Jobs("saas-standard-react", "backend.test.integration=testcontainers").ToDictionary(job => job.Name);
 
-        var (exitCode, output, podman) = appHost.Start(environment);
-
-        exitCode.ShouldBe(0, output);
-        podman.ShouldBeEmpty($"{workflow}'s {job} job lets Aspire ask podman whether it runs; name Docker with ASPIRE_CONTAINER_RUNTIME.");
+        jobs["backend"].StartsAnAppHost.ShouldBeFalse();
+        jobs["backend"].Runtime.ShouldBeNull();
+        jobs["e2e"].Runtime.ShouldBe("docker");
     }
 
-    private static YamlMappingNode Workflow(string path)
+    private static List<Job> Jobs(string profile, params string[] overrides)
     {
+        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", profile, overrides);
+        generated.Errors.ShouldBeEmpty();
+        var testsStartTheAppHost = generated.Files
+            .Any(file => file.Path.StartsWith("tests/", StringComparison.Ordinal) && file.Path.EndsWith(".csproj", StringComparison.Ordinal) && file.Content.Contains(AspireTestingHost, StringComparison.Ordinal));
         var stream = new YamlStream();
-        stream.Load(new StringReader(File.ReadAllText(path)));
-        return (YamlMappingNode)stream.Documents[0].RootNode;
+        stream.Load(new StringReader(generated.Files.Single(file => file.Path == ".github/workflows/ci.yml").Content));
+        var jobs = (YamlMappingNode)((YamlMappingNode)stream.Documents[0].RootNode)["jobs"];
+
+        return [.. jobs.Children.Select(job =>
+        {
+            var runs = ((YamlSequenceNode)((YamlMappingNode)job.Value)["steps"]).Children
+                .Select(step => Scalar(step, "run") ?? "")
+                .ToList();
+            var startsAnAppHost = runs.Any(run => run.Contains(".github/scripts/e2e.sh", StringComparison.Ordinal))
+                || (testsStartTheAppHost && runs.Any(run => run.Contains(".github/scripts/test.sh", StringComparison.Ordinal)));
+            return new Job(((YamlScalarNode)job.Key).Value!, startsAnAppHost, Scalar(Value(job.Value, "env"), Variable));
+        })];
     }
 
-    private static bool SetsUpAspire(YamlMappingNode job) =>
-        job.Children.TryGetValue(new YamlScalarNode("steps"), out var steps)
-        && ((YamlSequenceNode)steps).Children.Cast<YamlMappingNode>().Any(step =>
-            step.Children.TryGetValue(new YamlScalarNode("run"), out var run)
-            && ((YamlScalarNode)run).Value!.Contains("aspire.cli@", StringComparison.Ordinal));
+    private static YamlNode? Value(YamlNode? node, string key) =>
+        node is YamlMappingNode mapping && mapping.Children.TryGetValue(new YamlScalarNode(key), out var value) ? value : null;
 
-    /// <summary>The literal variables of a workflow's or job's <c>env</c>; an expression is the runner's to fill.</summary>
-    private static IEnumerable<KeyValuePair<string, string>> Environment(YamlMappingNode node) =>
-        node.Children.TryGetValue(new YamlScalarNode("env"), out var env)
-            ? ((YamlMappingNode)env).Children
-                .Select(entry => KeyValuePair.Create(((YamlScalarNode)entry.Key).Value!, ((YamlScalarNode)entry.Value).Value!))
-                .Where(entry => !entry.Value.Contains("${{", StringComparison.Ordinal))
-            : [];
+    private static string? Scalar(YamlNode? node, string key) => (Value(node, key) as YamlScalarNode)?.Value;
 
-    /// <summary>An AppHost with no resources that starts and stops, built once, and a podman that records its arguments.</summary>
-    public sealed class MinimalAppHost : IDisposable
-    {
-        private const string Program = """
-            var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = args, DisableDashboard = true });
-            await using var app = builder.Build();
-            await app.StartAsync();
-            await app.StopAsync();
-            """;
-
-        private readonly string root = Directory.CreateTempSubdirectory("fabric-apphost-").FullName;
-
-        public MinimalAppHost()
-        {
-            File.WriteAllText(Path.Combine(root, "AppHost.csproj"), $"""
-                <Project Sdk="Aspire.AppHost.Sdk/13.6.5">
-                  <PropertyGroup>
-                    <OutputType>Exe</OutputType>
-                    <TargetFramework>{GeneratedProject.TargetFramework}</TargetFramework>
-                    <ImplicitUsings>enable</ImplicitUsings>
-                    <Nullable>enable</Nullable>
-                  </PropertyGroup>
-                </Project>
-                """);
-            File.WriteAllText(Path.Combine(root, "Program.cs"), Program);
-            var (exitCode, output) = Shell.Run(root, "dotnet", "build", "-c", "Release");
-            exitCode.ShouldBe(0, output);
-
-            var podman = Path.Combine(root, "podman-bin", "podman");
-            Directory.CreateDirectory(Path.GetDirectoryName(podman)!);
-            File.WriteAllText(podman, $"#!/bin/sh\necho \"$*\" >> \"{Calls}\"\n");
-            if (!OperatingSystem.IsWindows())
-            {
-                File.SetUnixFileMode(podman, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-            }
-        }
-
-        private string Calls => Path.Combine(root, "podman-calls");
-
-        /// <summary>Starts and stops the AppHost with the given environment and the recording podman first on the PATH.</summary>
-        public (int ExitCode, string Output, string Podman) Start(IReadOnlyDictionary<string, string> environment)
-        {
-            File.Delete(Calls);
-            var path = $"{Path.Combine(root, "podman-bin")}:{System.Environment.GetEnvironmentVariable("PATH")}";
-            var (exitCode, output) = Shell.Run(
-                root,
-                new Dictionary<string, string>(environment) { ["PATH"] = path },
-                "dotnet",
-                Path.Combine("bin", "Release", GeneratedProject.TargetFramework, "AppHost.dll"));
-            return (exitCode, output, File.Exists(Calls) ? File.ReadAllText(Calls) : string.Empty);
-        }
-
-        public void Dispose() => Directory.Delete(root, recursive: true);
-    }
+    private sealed record Job(string Name, bool StartsAnAppHost, string? Runtime);
 }

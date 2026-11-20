@@ -197,11 +197,16 @@ public sealed partial class TestcontainersTests
     /// runtime refused that instrumented code where it called a static abstract member (#817): a typed-outcomes
     /// <c>Success(...)</c> or <c>Failure(...)</c> in <c>Dashboard.Create</c>, which converted to the result through its
     /// union members, and ag-ui's registration reading each conversation's agent name. The generated CI's step, test.sh
-    /// over every test project and its coverage gate, passes with the dashboards (on xUnit and NUnit) and with ag-ui.
+    /// over every test project and its coverage gate, passes with the dashboards (on xUnit and NUnit) and with ag-ui. The
+    /// minimal result style and <c>Option&lt;T&gt;</c> have the same union members (#832), but generated code never converts
+    /// a case through them: their cases' constructors are internal to the Kernel, every minimal result is made with
+    /// <c>Result&lt;,&gt;.Success</c> or <c>Failure</c>, and no template turns a <c>None</c> into an option. The dashboards
+    /// with both stay covered here so that one that starts to is caught.
     /// </summary>
     [Theory]
     [InlineData("saas-standard-react", new[] { "frontend.dashboards=user-editable", "backend.guards=bcl", "backend.absence=nullable", "backend.bus.transport=none", "backend.tenancy=none" })]
     [InlineData("saas-standard-react", new[] { "frontend.dashboards=user-editable", "backend.guards=bcl", "backend.absence=nullable", "backend.bus.transport=none", "backend.tenancy=none", "backend.test.framework=nunit" })]
+    [InlineData("saas-standard-react", new[] { "frontend.dashboards=user-editable", "backend.result-style=minimal", "backend.absence=option", "backend.bus.transport=none", "backend.tenancy=none" })]
     [InlineData("saas-ai-react", new string[0])]
     public void The_host_in_the_integration_tests_runs_under_code_coverage(string profile, string[] overrides)
     {
