@@ -17,12 +17,13 @@ public sealed partial class PwaEndToEndTests
         project.Build();
 
         var web = Path.Combine(project.ProjectDirectory, "web");
+        var testResults = Path.Combine(web, "app", "test-results");
         var (installExitCode, install) = Shell.Run(web, "pnpm", "install");
         installExitCode.ShouldBe(0, install);
 
         // The generated CI's own end-to-end step: start the AppHost, wait for the app, run Playwright, stop.
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
-        e2eExitCode.ShouldBe(0, e2eOutput);
+        e2eExitCode.ShouldBe(0, Explained(e2eExitCode, e2eOutput, testResults));
         e2eOutput.ShouldContain("7 passed"); // and the two glass checks (#698), and the billing page's three sample tests (#734)
 
         // The gate: a worker that keeps every same-origin answer, /api included, fails the offline test.
@@ -36,7 +37,8 @@ public sealed partial class PwaEndToEndTests
         File.Delete(Path.Combine(web, "app", "e2e", "billing-samples.spec.ts"));
 
         var (brokenExitCode, broken) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
-        OfflineGate.ShouldBeItsVerdict(brokenExitCode, broken);
+        // A run that failed elsewhere than the gate's verdict says what the browser saw too, since CI keeps no trace (#782).
+        OfflineGate.ShouldBeItsVerdict(brokenExitCode, Explained(brokenExitCode, broken, testResults));
     }
 
     [Fact]
@@ -45,13 +47,18 @@ public sealed partial class PwaEndToEndTests
         using var project = new GeneratedProject("saas-standard-react", "frontend.pwa=yes", "backend.auth=none", "backend.tenancy=none");
         project.Build();
 
-        var (installExitCode, install) = Shell.Run(Path.Combine(project.ProjectDirectory, "web"), "pnpm", "install");
+        var web = Path.Combine(project.ProjectDirectory, "web");
+        var (installExitCode, install) = Shell.Run(web, "pnpm", "install");
         installExitCode.ShouldBe(0, install);
 
         var (e2eExitCode, e2eOutput) = Shell.Run(project.ProjectDirectory, "bash", ".github/scripts/e2e.sh");
-        e2eExitCode.ShouldBe(0, e2eOutput);
+        e2eExitCode.ShouldBe(0, Explained(e2eExitCode, e2eOutput, Path.Combine(web, "app", "test-results")));
         e2eOutput.ShouldContain("4 passed");
     }
+
+    /// <summary>A failed run's output, and what the browser saw, since CI keeps no Playwright artifact (#791).</summary>
+    private static string Explained(int exitCode, string output, string testResults) =>
+        exitCode == 0 ? output : $"{output}\n{PlaywrightFailure.Describe(testResults)}";
 
     [GeneratedRegex(@"urlPattern: [\s\S]*?,\n(?<indent>\s*)handler:")]
     private static partial Regex UrlPattern();

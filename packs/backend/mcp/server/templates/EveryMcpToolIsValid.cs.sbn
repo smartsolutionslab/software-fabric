@@ -24,7 +24,9 @@ public sealed class EveryMcpToolIsValid : IArchitectureRule
     {
         {{ not_null "model" }}
 
+{{~ if project["backend.topology"] != "services" ~}}
         List<McpToolDefinition> tools = [];
+{{~ end ~}}
         List<string> problems = [];
         foreach (var application in model.ModuleAssemblies.Where(assembly => assembly.GetName().Name!.EndsWith(ApplicationSuffix, StringComparison.Ordinal)))
         {
@@ -36,11 +38,19 @@ public sealed class EveryMcpToolIsValid : IArchitectureRule
 {{~ else ~}}
             var scan = McpToolCatalog.Scan(module, application);
 {{~ end ~}}
+{{~ if project["backend.topology"] != "services" ~}}
             tools.AddRange(scan.Tools);
+{{~ end ~}}
             problems.AddRange(scan.Problems);
         }
 
+{{~ if project["backend.topology"] == "services" ~}}
+        // Each service host is its own MCP server with its one module's tools, so a name must be unique only within its
+        // module, which the scan checks: two services may offer the same name.
+        return problems.Distinct(StringComparer.Ordinal);
+{{~ else ~}}
         // The host checks all modules' tools together, so the rule does too: two modules may produce the same name.
         return problems.Concat(McpToolCatalog.Collisions(tools)).Distinct(StringComparer.Ordinal);
+{{~ end ~}}
     }
 }

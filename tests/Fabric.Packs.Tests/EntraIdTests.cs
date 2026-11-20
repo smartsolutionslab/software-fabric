@@ -100,7 +100,7 @@ public sealed partial class EntraIdTests
         ((string?)settings["Directories"]!["tenant-b"]).ShouldBe(TenantB);
 
         var users = settings["Users"]!.AsObject().ToDictionary(user => user.Key, user => user.Value!);
-        users.Keys.ShouldBe(["developer", "developer-b", "visitor", "clerk", "analyst", "outsider"], ignoreOrder: true);
+        users.Keys.ShouldBe(["developer", "developer-b", "visitor", "clerk", "analyst", "staff", "outsider"], ignoreOrder: true);
         ((string?)users["developer-b"]["Directory"]).ShouldBe("tenant-b");
         ((string?)users["visitor"]["Directory"]).ShouldBe("tenant-a");
         users["developer"]["Roles"]!.AsArray().Select(role => (string?)role).ShouldBe(["manager"]);
@@ -108,6 +108,7 @@ public sealed partial class EntraIdTests
         ((string?)users["analyst"]["Department"]).ShouldBe("finance");
         ((string?)users["outsider"]["Directory"]).ShouldBe("elsewhere");
         settings["Directories"]!["elsewhere"].ShouldNotBeNull();
+        ((string?)users["staff"]["Directory"]).ShouldBe("staff");
     }
 
     [Fact]

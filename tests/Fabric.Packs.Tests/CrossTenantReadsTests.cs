@@ -4,8 +4,8 @@ using Fabric.Core.Generation;
 namespace Fabric.Packs.Tests;
 
 /// <summary>
-/// Staff read across tenants (#610): with <c>backend.tenancy=column</c>, <c>backend.authorization</c> containing roles
-/// and Keycloak or generic OIDC, an endpoint mapped with <c>.RequireAuthorization(&lt;Module&gt;PolicyNames.ReadAllTenants)
+/// Staff read across tenants (#610, #614): with <c>backend.tenancy=column</c>, <c>backend.authorization</c> containing
+/// roles and Keycloak, generic OIDC or Entra ID, an endpoint mapped with <c>.RequireAuthorization(&lt;Module&gt;PolicyNames.ReadAllTenants)
 /// .AcrossTenants()</c> reads every tenant's rows for a user holding the role <c>staff</c>, and writes nothing. Every
 /// other combination generates what it did before.
 /// </summary>
@@ -30,6 +30,8 @@ public sealed class CrossTenantReadsTests
     [InlineData("backend.auth=keycloak", RolesAndClaims)]
     [InlineData("backend.auth=generic-oidc", Roles)]
     [InlineData("backend.auth=generic-oidc", RolesAndClaims)]
+    [InlineData("backend.auth=entra-id", Roles)]
+    [InlineData("backend.auth=entra-id", RolesAndClaims)]
     public void With_a_tenant_column_and_roles_a_module_gets_a_read_all_tenants_policy_that_requires_the_staff_role(string auth, string authorization)
     {
         using var project = new GeneratedProject(Profile, auth, authorization);
@@ -66,8 +68,7 @@ public sealed class CrossTenantReadsTests
     [Theory]
     [InlineData(Profile, new string[0])]
     [InlineData(Profile, new[] { "backend.authorization=claims" })]
-    [InlineData(Profile, new[] { "backend.auth=entra-id", Roles })]
-    [InlineData(Profile, new[] { "backend.auth=entra-id", RolesAndClaims })]
+    [InlineData(Profile, new[] { "backend.auth=entra-id" })]
     [InlineData(Profile, new[] { "backend.tenancy=schema-per-tenant", Roles })]
     [InlineData("lean-crud", new[] { Roles })]
     public void Any_other_combination_has_no_cross_tenant_reads(string profile, string[] overrides)
@@ -110,12 +111,67 @@ public sealed class CrossTenantReadsTests
     }
 
     [Fact]
-    public void With_entra_id_the_tenant_column_adr_says_why_staff_cannot_read_across_tenants_yet()
+    public void With_entra_id_staff_sign_in_from_a_staff_directory_that_is_no_tenants()
     {
-        var adr = Adr(Files(Profile, "backend.auth=entra-id", Roles), "Tenancy: a tenant column");
+        var files = Files(Profile, "backend.auth=entra-id", Roles);
 
-        adr.ShouldContain("reading across tenants needs `IgnoreQueryFilters()`");
-        adr.ShouldContain("`AcrossTenants()` is not generated with Entra ID");
+        var standIn = JsonNode.Parse(files["src/IdentityStandIn/appsettings.json"])!["StandIn"]!;
+        var directories = standIn["Directories"]!.AsObject().ToDictionary(directory => directory.Key, directory => (string?)directory.Value);
+        directories["staff"].ShouldBe("00000000-0000-0000-0000-0000000000ff");
+        var users = standIn["Users"]!.AsObject().ToDictionary(user => user.Key, user => user.Value!);
+        ((string?)users["staff"]["Directory"]).ShouldBe("staff");
+        users["staff"]["Roles"]!.AsArray().Select(role => (string?)role).ShouldBe(["staff"]);
+        users["developer"]["Roles"]!.AsArray().Select(role => (string?)role).ShouldBe(["manager"]);
+        files["src/AppHost/Wiring/StandInWiring.cs"].ShouldContain(".WithEnvironment(\"AzureAd__StaffDirectories__staff\", \"00000000-0000-0000-0000-0000000000ff\")");
+        files["src/Host/Wiring/Authentication.cs"].ShouldContain("\"AzureAd:StaffDirectories\"");
+        files["src/Host/EntraRoleClaims.cs"].ShouldContain("CrossTenantRole.Name");
+
+        var tenancy = Adr(files, "Tenancy: a tenant column");
+        tenancy.ShouldNotContain("`AcrossTenants()` is not generated with Entra ID");
+        tenancy.ShouldNotContain("reading across tenants needs `IgnoreQueryFilters()`");
+        Adr(files, "Authentication: Microsoft Entra ID").ShouldContain("`AzureAd:StaffDirectories:<name> = <directory id>`");
+        files["AGENTS.md"].ShouldContain("`AzureAd:StaffDirectories`");
+
+        // Without roles there is no staff directory.
+        var withoutRoles = Files(Profile, "backend.auth=entra-id");
+        withoutRoles.Where(file => file.Value.Contains("StaffDirectories", StringComparison.Ordinal)).Select(file => file.Key).ShouldBeEmpty();
+        JsonNode.Parse(withoutRoles["src/IdentityStandIn/appsettings.json"])!["StandIn"]!["Users"]!.AsObject().Select(user => user.Key).ShouldNotContain("staff");
+    }
+
+    [Fact]
+    public void With_entra_id_and_testcontainers_the_in_process_host_accepts_the_staff_directory()
+    {
+        var files = Files(Profile, "backend.auth=entra-id", Roles, "backend.test.integration=testcontainers");
+
+        files["tests/Integration.Tests/ContainerFixture.cs"].ShouldContain("settings[\"AzureAd:StaffDirectories:staff\"] = \"00000000-0000-0000-0000-0000000000ff\";");
+    }
+
+    /// <summary>
+    /// With Entra ID, against the running Aspire stack and the stand-in: staff of the staff directory read both tenants'
+    /// rows (200), a tenant's user is refused (403), so is a tenant's user whose own directory assigned them the staff app
+    /// role, and an anonymous caller is not let in (401).
+    /// </summary>
+    [Fact]
+    public void With_entra_id_staff_of_the_staff_directory_read_every_tenants_rows_and_no_one_else_does()
+    {
+        using var project = new GeneratedProject(Profile, "backend.auth=entra-id", Roles);
+        project.AddModule("billing");
+        project.WriteTypes("src/Modules/Billing/Billing.Api/Endpoints", NotesEndpoints("""
+            endpoints.MapGet("/notes/all-tenants", ListAsync).RequireAuthorization(BillingPolicyNames.ReadAllTenants).AcrossTenants().ExcludeFromDescription();
+            """));
+        project.Write("tests/Integration.Tests/CrossTenantTests.cs", EntraIdCrossTenantIntegrationTests);
+        MigrationTests.AddNotesWithAMigration(project);
+
+        // A user of tenant-a's directory whose directory assigned them the staff app role, as a tenant's administrator can.
+        var settingsPath = Path.Combine(project.ProjectDirectory, "src/IdentityStandIn/appsettings.json");
+        var settings = JsonNode.Parse(File.ReadAllText(settingsPath))!;
+        settings["StandIn"]!["Users"]!["tenant-staff"] = new JsonObject { ["Directory"] = "tenant-a", ["Roles"] = new JsonArray("staff") };
+        File.WriteAllText(settingsPath, settings.ToJsonString());
+
+        var (exitCode, output) = project.Test("tests/Integration.Tests/Integration.Tests.csproj");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("failed: 0", customMessage: output);
     }
 
     [Fact]
@@ -305,6 +361,73 @@ public sealed class CrossTenantReadsTests
                 var notes = await staff.GetFromJsonAsync<string[]>(AllTenants, cancellationToken);
                 notes.ShouldNotBeNull();
                 notes.ShouldContain("a note bulk deletes must not reach");
+            }
+
+            private async Task AddAsync(string user, string text, CancellationToken cancellationToken)
+            {
+                using var client = await aspire.CreateHostClientAsync(user);
+                using var response = await client.PostAsJsonAsync(Notes, new { Text = text }, cancellationToken);
+                response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+            }
+        }
+        """;
+
+    private const string EntraIdCrossTenantIntegrationTests = """
+        using System.Net;
+        using System.Net.Http.Json;
+
+        namespace Shop.Integration.Tests;
+
+        public class CrossTenantTests(AspireFixture aspire)
+        {
+            private static readonly Uri Notes = new("/billing/notes", UriKind.Relative);
+            private static readonly Uri AllTenants = new("/billing/notes/all-tenants", UriKind.Relative);
+
+            [Fact]
+            public async Task Staff_of_the_staff_directory_read_both_tenants_rows()
+            {
+                var cancellationToken = TestContext.Current.CancellationToken;
+                await AddAsync("developer", "a note of tenant a", cancellationToken);
+                await AddAsync("developer-b", "a note of tenant b", cancellationToken);
+                using var staff = await aspire.CreateHostClientAsync("staff");
+
+                using var response = await staff.GetAsync(AllTenants, cancellationToken);
+
+                response.StatusCode.ShouldBe(HttpStatusCode.OK);
+                var notes = await response.Content.ReadFromJsonAsync<string[]>(cancellationToken);
+                notes.ShouldNotBeNull();
+                notes.ShouldContain("a note of tenant a");
+                notes.ShouldContain("a note of tenant b");
+            }
+
+            [Fact]
+            public async Task A_tenants_user_is_forbidden()
+            {
+                using var developer = await aspire.CreateHostClientAsync("developer");
+
+                using var response = await developer.GetAsync(AllTenants, TestContext.Current.CancellationToken);
+
+                response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+            }
+
+            [Fact]
+            public async Task A_tenants_user_holding_the_staff_app_role_of_their_own_directory_is_forbidden()
+            {
+                using var tenantStaff = await aspire.CreateHostClientAsync("tenant-staff");
+
+                using var response = await tenantStaff.GetAsync(AllTenants, TestContext.Current.CancellationToken);
+
+                response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+            }
+
+            [Fact]
+            public async Task An_anonymous_caller_is_unauthorized()
+            {
+                using var anonymous = aspire.CreateHostClient();
+
+                using var response = await anonymous.GetAsync(AllTenants, TestContext.Current.CancellationToken);
+
+                response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
             }
 
             private async Task AddAsync(string user, string text, CancellationToken cancellationToken)

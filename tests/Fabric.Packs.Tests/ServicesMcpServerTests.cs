@@ -50,6 +50,54 @@ public sealed partial class ServicesMcpServerTests
         }
         """;
 
+    private const string FindInvoiceInBilling = """
+        using Shop.BuildingBlocks.Mcp;
+        using Shop.BuildingBlocks.Messaging;
+
+        namespace Shop.Modules.Billing.Application.Queries.FindInvoice;
+
+        [McpTool("Finds an invoice.")]
+        public sealed record FindInvoice : IQuery<Result<int, ApiError>>;
+
+        public sealed class FindInvoiceHandler : IQueryHandler<FindInvoice, Result<int, ApiError>>
+        {
+            public Task<Result<int, ApiError>> HandleAsync(FindInvoice query, CancellationToken cancellationToken) =>
+                Task.FromResult<Result<int, ApiError>>(Success(0));
+        }
+        """;
+
+    private const string ArchivedFindInvoiceInBilling = """
+        using Shop.BuildingBlocks.Mcp;
+        using Shop.BuildingBlocks.Messaging;
+
+        namespace Shop.Modules.Billing.Application.Queries.Archive;
+
+        [McpTool("Finds an archived invoice.")]
+        public sealed record FindInvoice : IQuery<Result<int, ApiError>>;
+
+        public sealed class FindArchivedInvoiceHandler : IQueryHandler<FindInvoice, Result<int, ApiError>>
+        {
+            public Task<Result<int, ApiError>> HandleAsync(FindInvoice query, CancellationToken cancellationToken) =>
+                Task.FromResult<Result<int, ApiError>>(Success(0));
+        }
+        """;
+
+    private const string InvoiceInBillingFind = """
+        using Shop.BuildingBlocks.Mcp;
+        using Shop.BuildingBlocks.Messaging;
+
+        namespace Shop.Modules.BillingFind.Application.Queries.Invoice;
+
+        [McpTool("Finds an invoice, too.")]
+        public sealed record Invoice : IQuery<Result<int, ApiError>>;
+
+        public sealed class InvoiceHandler : IQueryHandler<Invoice, Result<int, ApiError>>
+        {
+            public Task<Result<int, ApiError>> HandleAsync(Invoice query, CancellationToken cancellationToken) =>
+                Task.FromResult<Result<int, ApiError>>(Success(0));
+        }
+        """;
+
     [Fact]
     public void With_services_each_service_host_maps_its_mcp_server_under_its_module_and_the_edge_maps_none()
     {
@@ -76,7 +124,8 @@ public sealed partial class ServicesMcpServerTests
         files.Keys.ShouldNotContain(path => path.StartsWith("tests/Mcp.Server.Tests/", StringComparison.Ordinal), "a services project has no MCP server tests against src/Host.");
         foreach (var module in new[] { "Billing", "OrderItems" })
         {
-            var project = files[$"tests/Services/{module}/Mcp.Server.Tests/Mcp.Server.Tests.csproj"];
+            files.ShouldNotContainKey($"tests/Services/{module}/Mcp.Server.Tests/Mcp.Server.Tests.csproj", "test.sh names a coverage report after its project's file: one name for every service keeps only the last report.");
+            var project = files[$"tests/Services/{module}/Mcp.Server.Tests/{module}.Mcp.Server.Tests.csproj"];
             project.ShouldContain($"<ProjectReference Include=\"../../../../src/Services/{module}/Host/Host.csproj\" />");
             project.ShouldNotContain("src/Host/Host.csproj");
             files.Keys.ShouldContain($"tests/Services/{module}/Mcp.Server.Tests/McpHost.cs");
@@ -99,7 +148,29 @@ public sealed partial class ServicesMcpServerTests
     }
 
     [Fact]
-    public void Each_services_mcp_server_offers_its_own_modules_tools_and_its_server_tests_and_the_architecture_tests_pass()
+    public void With_services_each_service_s_tool_names_are_checked_within_the_service_and_not_across_services()
+    {
+        using var project = new GeneratedProject(Profile, Services);
+        project.AddModule("billing");
+        project.AddModule("billing-find");
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/FindInvoice", FindInvoiceInBilling);
+        project.WriteTypes("src/Modules/Billing/Billing.Application/Queries/Archive", ArchivedFindInvoiceInBilling);
+        project.WriteTypes("src/Modules/BillingFind/BillingFind.Application/Queries/Invoice", InvoiceInBillingFind);
+        project.Build();
+
+        var (exitCode, output) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain(
+            "Shop.Modules.Billing.Application.Queries.Archive.FindInvoice and Shop.Modules.Billing.Application.Queries.FindInvoice.FindInvoice would all be the MCP tool billing_find_invoice",
+            customMessage: "two requests of one service still cannot share a tool name.");
+        output.ShouldNotContain(
+            "Shop.Modules.BillingFind.Application.Queries.Invoice.Invoice",
+            customMessage: "billing-find is its own service, its own MCP server: its billing_find_invoice is no other service's.");
+    }
+
+    [Fact]
+    public void Each_services_mcp_server_offers_its_own_modules_tools_its_coverage_report_reaches_the_gate_and_its_tests_pass()
     {
         using var project = new GeneratedProject(Profile, Services);
         project.AddModule("billing");
@@ -110,9 +181,24 @@ public sealed partial class ServicesMcpServerTests
         project.Write("tests/Services/Shipping/Mcp.Server.Tests/ServiceToolsTests.cs", ServiceTools("shipping_count_parcels", "billing_count_invoices"));
         project.Build();
 
+        // Each service's MCP server tests load only their own module, so the gate sees a module's Application only if
+        // that service's coverage report survived test.sh. Which file names the projects have is not the point.
+        string[] serverTests =
+        [
+            .. Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "tests", "Services"), "*.Tests.csproj", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(project.ProjectDirectory, path).Replace('\\', '/'))
+                .Order(StringComparer.Ordinal),
+        ];
+        serverTests.Length.ShouldBe(2);
+        var (_, gateOutput) = Shell.Run(project.ProjectDirectory, "bash", [".github/scripts/test.sh", .. serverTests]);
         foreach (var module in new[] { "Billing", "Shipping" })
         {
-            var (exitCode, output) = project.Test($"tests/Services/{module}/Mcp.Server.Tests/Mcp.Server.Tests.csproj");
+            gateOutput.ShouldMatch($@"Shop\.Modules\.{module}\.Application: \d+(\.\d)? % line coverage", $"the {module} service's coverage report did not reach the gate:\n{gateOutput}");
+        }
+
+        foreach (var module in new[] { "Billing", "Shipping" })
+        {
+            var (exitCode, output) = project.Test($"tests/Services/{module}/Mcp.Server.Tests/{module}.Mcp.Server.Tests.csproj");
             exitCode.ShouldBe(0, output);
             output.ShouldContain("failed: 0");
             Succeeded().IsMatch(output).ShouldBeTrue(output);

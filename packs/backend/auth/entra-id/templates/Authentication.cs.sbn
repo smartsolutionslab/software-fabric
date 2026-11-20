@@ -1,3 +1,11 @@
+{{~
+  # Staff sign in from a staff directory, AzureAd:StaffDirectories, whose users belong to no tenant (#614), where the
+  # tenant-column pack lets staff read across tenants. cross_tenant_reads is that pack's; no other tenancy defines it.
+  staff_directories = false
+  if project["backend.tenancy"] == "column"
+    staff_directories = cross_tenant_reads
+  end
+~}}
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -5,12 +13,20 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class Authentication
 {
     private const string Tenants = "AzureAd:Tenants";
+{{~ if staff_directories ~}}
+
+    private const string StaffDirectories = "AzureAd:StaffDirectories";
+{{~ end ~}}
 
     /// <summary>
     /// Microsoft Entra ID access tokens (v2.0) for AzureAd:Audience, from the directories AzureAd:Tenants lists, one per
     /// tenant (AzureAd:Tenants:&lt;tenant&gt; = &lt;directory id&gt;), at the Entra ID instance AzureAd:Instance. A token
     /// of any other directory has an issuer the host does not accept. Claims keep the names Entra ID gives them (tid,
     /// preferred_username, roles, ...): none is renamed on the way in.
+{{~ if staff_directories ~}}
+    /// Staff sign in from the directories AzureAd:StaffDirectories lists (AzureAd:StaffDirectories:&lt;name&gt; =
+    /// &lt;directory id&gt;), which are no tenant's.
+{{~ end ~}}
     /// </summary>
     public static IServiceCollection AddEntraIdAuthentication(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
@@ -27,14 +43,14 @@ public static class Authentication
         string[] instances = configuration["AzureAd:BrowserInstance"]?.TrimEnd('/') is { } browserInstance
             ? [instance, browserInstance]
             : [instance];
-        List<string> issuers = [.. configuration.GetSection(Tenants).GetChildren()
+        List<string> issuers = [.. {{ if staff_directories }}Directories(configuration){{ else }}configuration.GetSection(Tenants).GetChildren()
             .Select(tenant => tenant.Value)
-            .OfType<string>()
+            .OfType<string>(){{ end }}
             .SelectMany(directory => instances.Select(issuedAt => $"{issuedAt}/{directory}/v2.0"))];
 {{~ else ~}}
-        List<string> issuers = [.. configuration.GetSection(Tenants).GetChildren()
+        List<string> issuers = [.. {{ if staff_directories }}Directories(configuration){{ else }}configuration.GetSection(Tenants).GetChildren()
             .Select(tenant => tenant.Value)
-            .OfType<string>()
+            .OfType<string>(){{ end }}
             .Select(directory => $"{instance}/{directory}/v2.0")];
 {{~ end ~}}
         if (issuers.Count == 0)
@@ -56,4 +72,22 @@ public static class Authentication
         services.AddAuthorization();
         return services;
     }
+{{~ if staff_directories ~}}
+
+    /// <summary>
+    /// The tenants' directories and the staff directories, whose tokens the host accepts. A directory is one or the other:
+    /// a staff directory's users belong to no tenant, and only there does the app role staff count.
+    /// </summary>
+    private static List<string> Directories(IConfiguration configuration)
+    {
+        List<string> tenants = [.. configuration.GetSection(Tenants).GetChildren().Select(tenant => tenant.Value).OfType<string>()];
+        List<string> staff = [.. configuration.GetSection(StaffDirectories).GetChildren().Select(directory => directory.Value).OfType<string>()];
+        if (staff.Intersect(tenants, StringComparer.OrdinalIgnoreCase).FirstOrDefault() is { } both)
+        {
+            throw new InvalidOperationException($"The directory {both} is in {Tenants} and in {StaffDirectories}; a directory is a tenant's or staff's, never both.");
+        }
+
+        return [.. tenants, .. staff];
+    }
+{{~ end ~}}
 }
