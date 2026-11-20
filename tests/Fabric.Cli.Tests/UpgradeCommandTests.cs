@@ -441,6 +441,36 @@ public sealed class UpgradeCommandTests : IDisposable
     }
 
     [Fact]
+    public void Names_the_hand_registrations_of_adapters_when_the_upgrade_brings_the_rule_that_fails_on_them()
+    {
+        AddFile(
+            Path.Combine(newPacks, "base", "core"),
+            "registered-once.sbn",
+            "tests/Architecture.Tests/Rules/EveryModuleServiceIsRegisteredOnce.cs",
+            perModule: false,
+            "// rule\n");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldContain(
+            "  - that no module registers by hand a store AddModuleAdapters registers by convention: the architecture rule " +
+            "EveryModuleServiceIsRegisteredOnce fails on such a second registration, naming it; delete the hand registration.\n");
+    }
+
+    [Fact]
+    public void Does_not_name_hand_registrations_of_adapters_when_the_upgrade_does_not_touch_the_rule()
+    {
+        AddFile(Path.Combine(newPacks, "module", "style", "ddd"), "endpoint.sbn", "src/{{ module.name }}/Endpoint.cs", perModule: true, "// endpoint\n");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldContain("migration");
+        run.Output.ShouldNotContain("EveryModuleServiceIsRegisteredOnce");
+    }
+
+    [Fact]
     public void A_probe_test_is_not_added_beside_a_module_page_the_project_rewrote_and_the_summary_names_it()
     {
         AddFile(Path.Combine(newPacks, "module", "style", "ddd"), "probe.sbn", ProbeTest, perModule: true, "// {{ module.namespace }}Page shows Manage\n");
