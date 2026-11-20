@@ -17,6 +17,10 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Docker is the runner's container runtime. Named, Aspire's orchestrator asks only Docker; otherwise it also runs
+    # `podman container ls`, which has hung on the runners and failed AppHosts' dependency check (#827).
+    env:
+      ASPIRE_CONTAINER_RUNTIME: docker
     permissions:
       contents: read
       packages: write
