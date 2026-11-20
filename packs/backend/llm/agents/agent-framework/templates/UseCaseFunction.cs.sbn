@@ -8,9 +8,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-{{~ if option ~}}
 using System.Text.Json.Serialization.Metadata;
-{{~ end ~}}
 using {{ namespace }}.BuildingBlocks.Messaging;
 using Microsoft.Extensions.AI;
 
@@ -37,6 +35,9 @@ internal sealed class UseCaseFunction : AIFunction
         TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { OptionsAreRequired } },
 {{~ else ~}}
         Converters = { new PageJsonConverter(), new PageSizeJsonConverter() },
+        // Named here, not left to the first schema or call: AIJsonUtilities would otherwise set it on the shared
+        // instance while a tool built on another thread may already have made it read-only.
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
 {{~ end ~}}
     };
 {{~ if option ~}}
