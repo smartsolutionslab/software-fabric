@@ -1,4 +1,15 @@
 {{~ ns = module.namespace ~}}
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ func assign(indent, head, value)
+  if fits(indent, head + " " + value)
+    ret head + " " + value
+  end
+  ret head + "\n  " + value
+end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 <script setup lang="ts">
 {{~ if valibot ~}}
@@ -18,7 +29,7 @@ interface Create{{ ns }}SampleFormProps {
 }
 
 // Creates one of the module's samples: a name, checked here before the host checks it again.
-const { onCreate, saving } = defineProps<Create{{ ns }}SampleFormProps>();
+{{ assign 0 "const { onCreate, saving } =" ("defineProps<Create" + ns + "SampleFormProps>();") }}
 
 /** The id of the form's name field, which the page's empty state moves to through focus. */
 const sampleNameField = '{{ module.name }}-sample-name';

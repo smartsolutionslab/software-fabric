@@ -1,3 +1,16 @@
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ func braces(indent, before, entries, after)
+  line = before + "{ " + (entries | array.join ", ") + " }" + after
+  if fits(indent, line)
+    ret line
+  end
+  pad = "  "
+  ret before + "{\n" + pad + (entries | array.join (",\n" + pad)) + ",\n}" + after
+end ~}}
 {{~ rtk = project["frontend.api-client"] == "rtk-query-codegen" ~}}
 {{~ hook = rtk ? "useGetInvoicesQuery" : "useGetInvoices" ~}}
 {{~ # The module's sample (#734): the page lists its samples, so its examples are pages of them. ~}}
@@ -22,7 +35,7 @@ export const examples: Record<string, unknown> = {
 };
 
 export const emptyExamples: Record<string, unknown> = {
-  {{ samples }}: { items: [], totalCount: 0, page: 1, pageSize: 20 },
+  {{ braces 2 (samples + ": ") ["items: []", "totalCount: 0", "page: 1", "pageSize: 20"] "," }}
 };
 {{~ else ~}}
 // The example data {{ module.namespace }}Page's axe check shows the page with, by hook of the generated client, for
