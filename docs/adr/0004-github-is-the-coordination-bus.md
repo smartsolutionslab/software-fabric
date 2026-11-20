@@ -28,6 +28,8 @@ set on a claim and removed when it ends, so a claimed issue looks taken
 even without a board; the branch, not the label, is the lock. The lane is a `lane:<name>` label, so
 eligibility needs no board access. A human assignee means the issue
 belongs to that human, without exception.
+An issue whose `## Depends on` section names an issue that is still open
+waits for it (amendment of 2026-11-20 below).
 
 **Claim.** The branch is the lock. The agent pushes an empty claim
 commit to `agent/<issue>`; a second agent's claim, built on a
@@ -171,3 +173,31 @@ jobs pass while a review is postponed, so a protection that requires them instea
   named `origin/<base>` cannot stand in for the branch, in a full checkout, and the pull request's head from
   `refs/pull/<number>/head`. A head that moved while the retry ran is left
   to the next run.
+
+## Amendment (2026-11-20, #849)
+
+**Context.** The protocol knew no dependencies: an issue could carry `agent:ready` only once everything it depends on
+was done, so a developer released each issue by hand and became the dispatcher. PharmaTraining, with 55 issues each
+listing its dependencies, wrote a stop-gap that labels issues `agent:ready` when an issue closes and hourly.
+
+**Decision (owner, 2026-11-20).** Dependencies are part of eligibility, read when an agent asks for work.
+
+- **Source:** the `## Depends on` section of the issue body, up to the next heading of level one or two. A reference
+  is `#12` (same repository) or `owner/repo#34` (another repository); references elsewhere in the body do not count.
+  GitHub's native "blocked by" relations are not read.
+- **Check:** `next.sh` skips an issue while any of its dependencies is not closed, and goes on to the next one. Named
+  (`next.sh <lane> <executor> <issue>`), it exits 1 and names the open dependencies. `agent:ready` may therefore be set
+  when an issue is written.
+- **No promote step.** No workflow or script labels issues when their dependencies close; nothing about the issue
+  changes when it becomes eligible.
+
+**Consequences.**
+
+- Each candidate `next.sh` reaches costs one REST read per dependency; candidates after the one claimed are not read.
+- A dependency that cannot be read (deleted, private to the session's token, or GitHub failing) is not known to be
+  closed: it holds the issue like an open one and is named with "(could not be read)". A typo in a reference therefore
+  holds its issue until someone corrects the body; it never holds the rest of the lane.
+- Dependencies are checked before the claim, not again after it: a dependency added or reopened during the seconds a
+  claim takes does not undo it.
+- A project that carries its own promote step (PharmaTraining's `board-promote`) drops it with its next
+  `fabric upgrade`.
