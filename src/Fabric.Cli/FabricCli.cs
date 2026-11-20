@@ -81,10 +81,15 @@ public static class FabricCli
             Description = "A JSON file of dimension to option (or to a list of options), such as a combination of build/matrix.json, " +
                 "to generate from instead of a profile. Overrides apply on top of it.",
         };
+        var rootNamespace = new Option<string?>("--namespace")
+        {
+            Description = "The root C# namespace, such as SmartSolutionsLab.PharmaTraining. Defaults to the name in PascalCase.",
+        };
         var command = new Command("new", "Generate a project from a profile, or a choice set file, plus overrides.")
         {
             directory,
             name,
+            rootNamespace,
             profile,
             choices,
             set,

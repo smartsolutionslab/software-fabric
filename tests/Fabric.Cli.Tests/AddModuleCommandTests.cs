@@ -43,6 +43,19 @@ public sealed class AddModuleCommandTests : IDisposable
     }
 
     [Fact]
+    public void Keeps_a_recorded_root_namespace_in_fabric_yaml()
+    {
+        var withNamespace = Path.Combine(Path.GetDirectoryName(project)!, "pharma");
+        CliRun.Of("new", withNamespace, "--profile", "minimal", "--namespace", "Acme.Pharma", "--catalog", Paths.FixtureCatalog, "--packs", Paths.FixturePacks)
+            .ExitCode.ShouldBe(0);
+
+        var run = CliRun.Of("add-module", "billing", "--project", withNamespace, "--catalog", Paths.FixtureCatalog, "--packs", Paths.FixturePacks);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        File.ReadAllText(Path.Combine(withNamespace, "fabric.yaml")).ShouldContain("\nname: pharma\nnamespace: Acme.Pharma\n");
+    }
+
+    [Fact]
     public void A_name_over_63_characters_fails_and_writes_nothing()
     {
         var name = "m" + new string('a', 63);

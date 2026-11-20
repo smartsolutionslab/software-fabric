@@ -56,6 +56,44 @@ public class FabricFileTests
     }
 
     [Fact]
+    public void Writes_a_chosen_root_namespace_straight_after_the_name()
+    {
+        FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices, "SmartSolutionsLab.Shop")
+            .ShouldContain("\nname: shop\nnamespace: SmartSolutionsLab.Shop\nprofile: minimal\n");
+    }
+
+    [Fact]
+    public void Without_a_root_namespace_writes_exactly_what_it_wrote_before()
+    {
+        FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices, rootNamespace: null)
+            .ShouldBe(FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices));
+    }
+
+    [Fact]
+    public void Reads_a_recorded_root_namespace_and_reads_none_as_null()
+    {
+        var withNamespace = FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices, "SmartSolutionsLab.Shop");
+        var without = FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices);
+
+        var record = FabricFile.Read(new StringReader(withNamespace), FabricFile.FileName);
+        record.Namespace.ShouldBe("SmartSolutionsLab.Shop");
+        record.RootNamespace.ShouldBe("SmartSolutionsLab.Shop");
+        var plain = FabricFile.Read(new StringReader(without), FabricFile.FileName);
+        plain.Namespace.ShouldBeNull();
+        plain.RootNamespace.ShouldBe("Shop");
+    }
+
+    [Fact]
+    public void A_recorded_namespace_that_is_not_a_csharp_namespace_is_refused_when_read()
+    {
+        var text = FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices)
+            .Replace("name: shop\n", "name: shop\nnamespace: smart-solutions.Shop\n", StringComparison.Ordinal);
+
+        Should.Throw<FabricFileException>(() => FabricFile.Read(new StringReader(text), FabricFile.FileName))
+            .Message.ShouldContain("namespace 'smart-solutions.Shop' must be a C# namespace");
+    }
+
+    [Fact]
     public void Records_the_generator_version_as_semver_without_build_metadata()
     {
         var generator = FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices).Split('\n')[2];

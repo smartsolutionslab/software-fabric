@@ -12,6 +12,9 @@ namespace Fabric.Core.Generation;
 /// </summary>
 public sealed record Regeneration(string Name, string? Profile, IReadOnlyList<string> Overrides, IReadOnlyList<RegeneratedModule> Modules)
 {
+    /// <summary>The root namespace <c>fabric.yaml</c> records, or <c>null</c> when it records none.</summary>
+    public string? Namespace { get; init; }
+
     public static Regeneration From(FabricRecord record)
     {
         ArgumentNullException.ThrowIfNull(record);

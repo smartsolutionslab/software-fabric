@@ -608,6 +608,39 @@ public sealed class UpgradeCommandTests : IDisposable
     }
 
     [Fact]
+    public void A_project_recorded_with_a_root_namespace_upgrades_to_exactly_what_this_fabric_writes_fresh_with_it()
+    {
+        var directory = Path.Combine(root, "namespaced");
+        Directory.CreateDirectory(directory);
+        var fabric = OldFabric.Create(directory, OldVersion, Paths.FixtureCatalog, oldPacks);
+        var namespaced = Path.Combine(directory, "shop");
+        Run(fabric, ["new", namespaced, "--namespace", "Acme.Shop", .. NewArguments]);
+        foreach (var module in Modules)
+        {
+            Run(fabric, ["add-module", module, "--project", namespaced]);
+        }
+
+        Git.Run(namespaced, "init", "-q");
+        Git.Commit(namespaced, "generate with fabric 0.0.1 in Acme.Shop");
+
+        var run = CliRun.Of("upgrade", "--project", namespaced, "--from", fabric, "--catalog", Paths.FixtureCatalog, "--packs", newPacks);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        Git.Run(namespaced, "ls-files", "-u").ShouldBeEmpty();
+        var fresh = Path.Combine(root, "fresh-namespaced", "shop");
+        CliRun.Of(["new", fresh, "--namespace", "Acme.Shop", .. NewArguments, "--catalog", Paths.FixtureCatalog, "--packs", newPacks]).ExitCode.ShouldBe(0);
+        foreach (var module in Modules)
+        {
+            CliRun.Of("add-module", module, "--project", fresh, "--catalog", Paths.FixtureCatalog, "--packs", newPacks).ExitCode.ShouldBe(0);
+        }
+
+        Tree(namespaced).ShouldBe(Tree(fresh));
+        File.ReadAllText(Path.Combine(namespaced, "fabric.yaml")).ShouldContain("\nnamespace: Acme.Shop\n");
+        File.ReadAllText(Path.Combine(namespaced, ".claude/agents/backend-engineer.md")).ShouldStartWith("# Backend engineer (Acme.Shop)\n");
+        run.Output.ShouldNotContain(".claude/agents/backend-engineer.md");
+    }
+
+    [Fact]
     public void A_fabric_yaml_without_a_generator_version_is_refused_and_the_project_left_alone()
     {
         Write("fabric.yaml", string.Join('\n', Read("fabric.yaml").Split('\n').Where(line => !line.StartsWith("generator: ", StringComparison.Ordinal))));
