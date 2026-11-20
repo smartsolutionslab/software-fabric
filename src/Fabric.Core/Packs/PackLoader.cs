@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Fabric.Core.Catalog;
+using Fabric.Core.Generation;
 using Json.Schema;
 using YamlDotNet.Core;
 using YamlDotNet.RepresentationModel;
@@ -178,6 +179,14 @@ public static class PackLoader
         {
             // The modules decide which module-scoped packs are selected, so such a pack cannot decide the modules.
             yield return $"brings modules, but {pack.Dimension} is module-scoped; only a base or project-scoped pack may bring a module.";
+        }
+
+        foreach (var module in pack.Modules.Keys)
+        {
+            if (Names.ModuleLengthProblem(module) is { } tooLong)
+            {
+                yield return $"brings module '{module}', which {tooLong}";
+            }
         }
 
         foreach (var path in ReferencedPaths(pack))

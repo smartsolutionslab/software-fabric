@@ -319,6 +319,17 @@ public sealed class PackModuleTests : IDisposable
     }
 
     [Fact]
+    public void A_declared_module_name_over_63_characters_is_rejected()
+    {
+        var name = "m" + new string('a', 63);
+        Declare("backend.api-protocols.rest", $"modules: {{ {name}: {{}} }}");
+
+        PackLoader.Load(packsRoot, Fixtures.MinimalCatalog).Errors.ShouldBe([
+            $"backend/api-protocols/rest/pack.yaml: brings module '{name}', which is 64 characters; a module's name is its PostgreSQL schema name, and PostgreSQL identifiers are at most 63 characters.",
+        ]);
+    }
+
+    [Fact]
     public void A_declared_module_name_that_is_not_lower_kebab_case_is_rejected_by_the_schema()
     {
         Declare("backend.api-protocols.rest", "modules: { Reports: {} }");

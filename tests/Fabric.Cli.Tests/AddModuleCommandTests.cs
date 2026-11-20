@@ -43,6 +43,20 @@ public sealed class AddModuleCommandTests : IDisposable
     }
 
     [Fact]
+    public void A_name_over_63_characters_fails_and_writes_nothing()
+    {
+        var name = "m" + new string('a', 63);
+        var before = File.ReadAllText(Path.Combine(project, "fabric.yaml"));
+
+        var run = AddModule(name);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain($"error: module name '{name}' is 64 characters; a module's name is its PostgreSQL schema name, and PostgreSQL identifiers are at most 63 characters.");
+        Directory.Exists(Path.Combine(project, "src", name)).ShouldBeFalse();
+        File.ReadAllText(Path.Combine(project, "fabric.yaml")).ShouldBe(before);
+    }
+
+    [Fact]
     public void Adding_the_same_module_twice_fails()
     {
         AddModule("billing").ExitCode.ShouldBe(0);

@@ -205,7 +205,9 @@ this pack.
 A base or project-scoped pack may bring modules (ADR-0005). Each key is a
 module name, each value the module-scoped choices it pins, an option or a
 list for a multi-select dimension
-(`PackModuleTests.A_pin_may_be_written_as_a_list`):
+(`PackModuleTests.A_pin_may_be_written_as_a_list`). A module name is its
+PostgreSQL schema name, so it is at most 63 characters, as in `add-module`
+(`PackModuleTests.A_declared_module_name_over_63_characters_is_rejected`):
 
 ```yaml
 modules:

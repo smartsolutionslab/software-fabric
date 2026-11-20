@@ -1,11 +1,43 @@
 {{~ ns = module.namespace ~}}
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ func imports(names)
+  line = "import { " + (names | array.join ", ") + " } from '@/api/generated';"
+  if fits(0, line)
+    ret line
+  end
+  ret "import {\n  " + (names | array.join ",\n  ") + ",\n} from '@/api/generated';"
+end ~}}
+{{~ func with_pending
+  page = "PagedResultOf" + ns + "SampleDto"
+  line = "function withPending(page: " + page + ", name: string): " + page + " {"
+  if fits(0, line)
+    ret line
+  end
+  ret "function withPending(\n  page: " + page + ",\n  name: string,\n): " + page + " {"
+end ~}}
+{{~ func samples_query
+  call = "useGet" + ns + "Samples(samplesPage);"
+  if fits(2, "const { data, isLoading, isError } = " + call)
+    ret "  const { data, isLoading, isError } = " + call
+  end
+  ret "  const { data, isLoading, isError } =\n    " + call
+end ~}}
+{{~ func cached_page
+  call = "client.getQueryData<PagedResultOf" + ns + "SampleDto>(samplesKey);"
+  if fits(8, "const before = " + call)
+    ret "        const before = " + call
+  end
+  if fits(10, call)
+    ret "        const before =\n          " + call
+  end
+  ret "        const before =\n          client.getQueryData<PagedResultOf" + ns + "SampleDto>(\n            samplesKey,\n          );"
+end ~}}
 {{~ if project["frontend.framework"] == "react" ~}}
-import {
-  getGet{{ ns }}SamplesQueryKey,
-  type PagedResultOf{{ ns }}SampleDto,
-  useGet{{ ns }}Samples,
-  usePost{{ ns }}Samples,
-} from '@/api/generated';
+{{ imports ["getGet" + ns + "SamplesQueryKey", "type PagedResultOf" + ns + "SampleDto", "useGet" + ns + "Samples", "usePost" + ns + "Samples"] }}
 
 /** The page of samples the module's page lists: the first, as many as the host gives by default. */
 export const samplesPage = { page: 1, pageSize: 20 };
@@ -15,7 +47,7 @@ const samplesKey = getGet{{ ns }}SamplesQueryKey(samplesPage);
 let pending = 0;
 
 /** The cached page with the new sample in it, by name as the host lists them, until the host's own answer replaces it. */
-function withPending(page: PagedResultOf{{ ns }}SampleDto, name: string): PagedResultOf{{ ns }}SampleDto {
+{{ with_pending }}
   pending += 1;
   const items = [...page.items, { id: `pending-${pending}`, name }].sort((first, second) =>
     first.name < second.name ? -1 : first.name > second.name ? 1 : 0,
@@ -25,7 +57,7 @@ function withPending(page: PagedResultOf{{ ns }}SampleDto, name: string): PagedR
 
 /** The module's samples, a page at a time, and the page they are of: undefined until the host answers. */
 export function use{{ ns }}Samples() {
-  const { data, isLoading, isError } = useGet{{ ns }}Samples(samplesPage);
+{{ samples_query }}
   return { samples: data?.items, page: data, isLoading, isError };
 }
 
@@ -39,7 +71,7 @@ export function useCreate{{ ns }}Sample() {
     mutation: {
       onMutate: async ({ data }, { client }) => {
         await client.cancelQueries({ queryKey: samplesKey });
-        const before = client.getQueryData<PagedResultOf{{ ns }}SampleDto>(samplesKey);
+{{ cached_page }}
         if (before !== undefined) {
           client.setQueryData(samplesKey, withPending(before, data.name));
         }
@@ -66,7 +98,7 @@ export function useCreate{{ ns }}Sample() {
 {{~ else if project["frontend.state"] == "pinia" ~}}
 import { defineStore } from 'pinia';
 import { computed, onMounted, ref } from 'vue';
-import { get{{ ns }}Samples, type PagedResultOf{{ ns }}SampleDto, post{{ ns }}Samples } from '@/api/generated';
+{{ imports ["get" + ns + "Samples", "type PagedResultOf" + ns + "SampleDto", "post" + ns + "Samples"] }}
 
 /** The page of samples the module's page lists: the first, as many as the host gives by default. */
 export const samplesPage = { page: 1, pageSize: 20 };
@@ -74,7 +106,7 @@ export const samplesPage = { page: 1, pageSize: 20 };
 let pending = 0;
 
 /** The page with the new sample in it, by name as the host lists them, until the host's own answer replaces it. */
-function withPending(page: PagedResultOf{{ ns }}SampleDto, name: string): PagedResultOf{{ ns }}SampleDto {
+{{ with_pending }}
   pending += 1;
   const items = [...page.items, { id: `pending-${pending}`, name }].sort((first, second) =>
     first.name < second.name ? -1 : first.name > second.name ? 1 : 0,
@@ -86,7 +118,8 @@ function withPending(page: PagedResultOf{{ ns }}SampleDto, name: string): PagedR
  * The module's samples, a page at a time, and creating one. A new sample shows in the page at once, and the page as it
  * was comes back when the host refuses it; a created one is asked for again, with the id the host gave it.
  */
-export const use{{ ns }}SamplesStore = defineStore('{{ module.name }}-samples', () => {
+{{~ store_head = "export const use" + ns + "SamplesStore = defineStore('" + module.name + "-samples', () => {" ~}}
+{{~ capture store ~}}
   const page = ref<PagedResultOf{{ ns }}SampleDto>();
   const failed = ref(false);
   const saving = ref(false);
@@ -119,7 +152,19 @@ export const use{{ ns }}SamplesStore = defineStore('{{ module.name }}-samples', 
   }
 
   return { page, failed, saving, load, create };
+{{~ end ~}}
+{{~ if fits(0, store_head) ~}}
+{{ store_head }}
+{{ store | string.rstrip }}
 });
+{{~ else ~}}
+export const use{{ ns }}SamplesStore = defineStore(
+  '{{ module.name }}-samples',
+  () => {
+{{ regex.replace (store | string.rstrip) "(?m)^(?=.)" "  " }}
+  },
+);
+{{~ end ~}}
 
 /** The module's samples, asked for once the page is mounted: undefined until the host answers. */
 export function use{{ ns }}Samples() {
@@ -140,12 +185,7 @@ export function useCreate{{ ns }}Sample() {
 }
 {{~ else ~}}
 import { computed } from 'vue';
-import {
-  getGet{{ ns }}SamplesQueryKey,
-  type PagedResultOf{{ ns }}SampleDto,
-  useGet{{ ns }}Samples,
-  usePost{{ ns }}Samples,
-} from '@/api/generated';
+{{ imports ["getGet" + ns + "SamplesQueryKey", "type PagedResultOf" + ns + "SampleDto", "useGet" + ns + "Samples", "usePost" + ns + "Samples"] }}
 
 /** The page of samples the module's page lists: the first, as many as the host gives by default. */
 export const samplesPage = { page: 1, pageSize: 20 };
@@ -155,7 +195,7 @@ const samplesKey = getGet{{ ns }}SamplesQueryKey(samplesPage);
 let pending = 0;
 
 /** The cached page with the new sample in it, by name as the host lists them, until the host's own answer replaces it. */
-function withPending(page: PagedResultOf{{ ns }}SampleDto, name: string): PagedResultOf{{ ns }}SampleDto {
+{{ with_pending }}
   pending += 1;
   const items = [...page.items, { id: `pending-${pending}`, name }].sort((first, second) =>
     first.name < second.name ? -1 : first.name > second.name ? 1 : 0,
@@ -165,7 +205,7 @@ function withPending(page: PagedResultOf{{ ns }}SampleDto, name: string): PagedR
 
 /** The module's samples, a page at a time, and the page they are of: undefined until the host answers. */
 export function use{{ ns }}Samples() {
-  const { data, isLoading, isError } = useGet{{ ns }}Samples(samplesPage);
+{{ samples_query }}
   return { samples: computed(() => data.value?.items), page: data, isLoading, isError };
 }
 
@@ -179,7 +219,7 @@ export function useCreate{{ ns }}Sample() {
     mutation: {
       onMutate: async ({ data }, { client }) => {
         await client.cancelQueries({ queryKey: samplesKey });
-        const before = client.getQueryData<PagedResultOf{{ ns }}SampleDto>(samplesKey);
+{{ cached_page }}
         if (before !== undefined) {
           client.setQueryData(samplesKey, withPending(before, data.name));
         }

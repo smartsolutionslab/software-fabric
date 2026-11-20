@@ -31,6 +31,11 @@ public static class Generator
             return AdditionFailure([$"module name '{name}' must be lower-case letters, digits and hyphens, starting with a letter."]);
         }
 
+        if (Names.ModuleLengthProblem(name) is { } tooLong)
+        {
+            return AdditionFailure([$"module name '{name}' {tooLong}"]);
+        }
+
         var before = Composer.Compose(catalog, packs, project.Choices);
         if (PackModules.Declarers(before.Packs).TryGetValue(name, out var declarers))
         {
