@@ -1,4 +1,17 @@
 {{~ ns = module.namespace ~}}
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ func braces(indent, before, entries, after)
+  line = before + "{ " + (entries | array.join ", ") + " }" + after
+  if fits(indent, line)
+    ret line
+  end
+  pad = "  "
+  ret before + "{\n" + pad + (entries | array.join (",\n" + pad)) + ",\n}" + after
+end ~}}
 {{~ valibot = project["frontend.validation"] == "valibot" ~}}
 {{~ if valibot ~}}
 import { valibotResolver } from '@hookform/resolvers/valibot';
@@ -40,7 +53,7 @@ interface Create{{ ns }}SampleFormProps {
 }
 
 /** Creates one of the module's samples: a name, checked here before the host checks it again. */
-export function Create{{ ns }}SampleForm({ onCreate, saving }: Create{{ ns }}SampleFormProps) {
+{{ braces 0 ("export function Create" + ns + "SampleForm(") ["onCreate", "saving"] (": Create" + ns + "SampleFormProps) {") }}
   const {
     register,
     handleSubmit,

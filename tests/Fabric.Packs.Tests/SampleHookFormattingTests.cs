@@ -3,10 +3,11 @@ using Fabric.Core.Generation;
 namespace Fabric.Packs.Tests;
 
 /// <summary>
-/// #844: the hook each api-client pack writes for a module's sample, <c>use&lt;Module&gt;Samples.ts</c>, is printed as
-/// Prettier prints it at the web app's own <c>printWidth</c> for a module name of any length up to 63, so
-/// <c>pnpm format:check</c> passes straight after <c>fabric add-module</c>. The profiles' modules have short names, so
-/// their own format checks cannot see a line that only breaks, or only joins, for a longer or a shorter one.
+/// #844, #853: every file <c>fabric add-module</c> writes under <c>web/</c> (the sample hook <c>use&lt;Module&gt;Samples.ts</c>
+/// and its test, the page, its data, routes, form and tests, the e2e spec) is printed as Prettier prints it at the web
+/// app's own <c>printWidth</c> for a module name of any length up to 63, so <c>pnpm format:check</c> passes straight after
+/// <c>fabric add-module</c>. The profiles' modules have short names, so their own format checks cannot see a line that
+/// only breaks, or only joins, for a longer or a shorter one.
 /// </summary>
 public sealed class SampleHookFormattingTests
 {
@@ -22,7 +23,7 @@ public sealed class SampleHookFormattingTests
         "warehouseinventoryreplenishmentplanningandorderfulfilmentreturn",
     ];
 
-    /// <summary>Every branch of every api-client pack's hook: the client, and for Vue whether Pinia or TanStack Query holds server data.</summary>
+    /// <summary>Every branch of every api-client pack's hook: the client, and for Vue whether Pinia or TanStack Query holds server data. The framework decides the page, routes, form and tests the module gets beside it.</summary>
     public static TheoryData<string, string[]> Clients => new()
     {
         { "saas-standard-react", [] },
@@ -36,25 +37,30 @@ public sealed class SampleHookFormattingTests
 
     [Theory]
     [MemberData(nameof(Clients))]
-    public void The_sample_hook_is_prettier_clean_for_every_module_name_up_to_63_characters(string profile, string[] overrides)
+    public void Every_web_file_add_module_writes_is_prettier_clean_for_every_module_name_up_to_63_characters(string profile, string[] overrides)
     {
         using var project = new GeneratedProject(profile, overrides);
         var record = FabricFile.Read(new StringReader(File.ReadAllText(Path.Combine(project.ProjectDirectory, FabricFile.FileName))), FabricFile.FileName);
-        List<string> hooks = [];
+        var app = Path.Combine(project.ProjectDirectory, "web", "app");
+        List<string> files = [];
         foreach (var name in ModuleNames())
         {
             var addition = Generator.AddModule(Repository.Catalog, Repository.Packs.Packs, record, name, []);
             addition.Errors.ShouldBeEmpty();
-            var hook = $"web/app/src/modules/{name}/use{Names.ToPascalCase(name)}Samples.ts";
-            project.Write(hook, addition.Created.Single(file => file.Path == hook).Content);
-            hooks.Add(hook["web/app/".Length..]);
+            foreach (var file in addition.Created.Where(file => file.Path.StartsWith("web/", StringComparison.Ordinal)))
+            {
+                project.Write(file.Path, file.Content);
+                files.Add(Path.GetRelativePath(app, Path.Combine(project.ProjectDirectory, file.Path)));
+            }
         }
+
+        files.ShouldContain($"src/modules/{LongestNames[0]}/use{Names.ToPascalCase(LongestNames[0])}Samples.ts");
 
         var web = Path.Combine(project.ProjectDirectory, "web");
         var (installExitCode, installOutput) = Shell.Run(web, "pnpm", "install");
         installExitCode.ShouldBe(0, $"pnpm install:\n{installOutput}");
 
-        var (exitCode, output) = Shell.Run(Path.Combine(web, "app"), "pnpm", ["exec", "prettier", "--check", .. hooks]);
+        var (exitCode, output) = Shell.Run(app, "pnpm", ["exec", "prettier", "--check", .. files]);
 
         exitCode.ShouldBe(0, output);
     }
