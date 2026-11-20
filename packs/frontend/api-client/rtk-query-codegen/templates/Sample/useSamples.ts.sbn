@@ -1,5 +1,19 @@
 {{~ ns = module.namespace ~}}
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ if fits(0, "import { api, type " + ns + "SampleDto, useGet" + ns + "SamplesQuery, usePost" + ns + "SamplesMutation } from '@/api/generated';") ~}}
 import { api, type {{ ns }}SampleDto, useGet{{ ns }}SamplesQuery, usePost{{ ns }}SamplesMutation } from '@/api/generated';
+{{~ else ~}}
+import {
+  api,
+  type {{ ns }}SampleDto,
+  useGet{{ ns }}SamplesQuery,
+  usePost{{ ns }}SamplesMutation,
+} from '@/api/generated';
+{{~ end ~}}
 
 /** The page of samples the module's page lists: the first, as many as the host gives by default. */
 export const samplesPage = { page: 1, pageSize: 20 };
@@ -7,7 +21,14 @@ export const samplesPage = { page: 1, pageSize: 20 };
 let pending = 0;
 
 /** The cached page with the new sample in it, by name as the host lists them, until the host's own answer replaces it. */
+{{~ if fits(0, "function withPending(samples: " + ns + "SampleDto[], name: string): " + ns + "SampleDto[] {") ~}}
 function withPending(samples: {{ ns }}SampleDto[], name: string): {{ ns }}SampleDto[] {
+{{~ else ~}}
+function withPending(
+  samples: {{ ns }}SampleDto[],
+  name: string,
+): {{ ns }}SampleDto[] {
+{{~ end ~}}
   pending += 1;
   return [...samples, { id: `pending-${pending}`, name }].sort((first, second) =>
     first.name < second.name ? -1 : first.name > second.name ? 1 : 0,
@@ -19,17 +40,47 @@ function withPending(samples: {{ ns }}SampleDto[], name: string): {{ ns }}Sample
 api.enhanceEndpoints({
   endpoints: {
     post{{ ns }}Samples: {
-      async onQueryStarted({ create{{ ns }}SampleRequest }, { dispatch, queryFulfilled }) {
+      async onQueryStarted(request, { dispatch, queryFulfilled }) {
+{{~ if fits(8, "const { name } = request.create" + ns + "SampleRequest;") ~}}
+        const { name } = request.create{{ ns }}SampleRequest;
+{{~ else ~}}
+        const { name } =
+          request.create{{ ns }}SampleRequest;
+{{~ end ~}}
         const patch = dispatch(
+{{~ if fits(10, "api.util.updateQueryData('get" + ns + "Samples', samplesPage, (page) => {") ~}}
           api.util.updateQueryData('get{{ ns }}Samples', samplesPage, (page) => {
-            page.items = withPending(page.items, create{{ ns }}SampleRequest.name);
+            page.items = withPending(page.items, name);
             page.totalCount = Number(page.totalCount) + 1;
           }),
+{{~ else ~}}
+          api.util.updateQueryData(
+            'get{{ ns }}Samples',
+            samplesPage,
+            (page) => {
+              page.items = withPending(page.items, name);
+              page.totalCount = Number(page.totalCount) + 1;
+            },
+          ),
+{{~ end ~}}
         );
         try {
           await queryFulfilled;
           void dispatch(
-            api.endpoints.get{{ ns }}Samples.initiate(samplesPage, { subscribe: false, forceRefetch: true }),
+{{~ if fits(12, "api.endpoints.get" + ns + "Samples.initiate(samplesPage, {") ~}}
+            api.endpoints.get{{ ns }}Samples.initiate(samplesPage, {
+              subscribe: false,
+              forceRefetch: true,
+            }),
+{{~ else ~}}
+            api.endpoints.get{{ ns }}Samples.initiate(
+              samplesPage,
+              {
+                subscribe: false,
+                forceRefetch: true,
+              },
+            ),
+{{~ end ~}}
           );
         } catch {
           patch.undo();
@@ -41,13 +92,43 @@ api.enhanceEndpoints({
 
 /** The module's samples, a page at a time, and the page they are of: undefined until the host answers. */
 export function use{{ ns }}Samples() {
+{{~ if fits(2, "const { data, isLoading, isError } = useGet" + ns + "SamplesQuery(samplesPage);") ~}}
   const { data, isLoading, isError } = useGet{{ ns }}SamplesQuery(samplesPage);
+{{~ else if fits(4, "useGet" + ns + "SamplesQuery(samplesPage);") ~}}
+  const { data, isLoading, isError } =
+    useGet{{ ns }}SamplesQuery(samplesPage);
+{{~ else ~}}
+  const { data, isLoading, isError } =
+    useGet{{ ns }}SamplesQuery(
+      samplesPage,
+    );
+{{~ end ~}}
   return { samples: data?.items, page: data, isLoading, isError };
 }
 
 /** Creates a sample; resolves to whether the host created it. */
 export function useCreate{{ ns }}Sample() {
+{{~ if fits(2, "const [post, { isLoading }] = usePost" + ns + "SamplesMutation();") ~}}
   const [post, { isLoading }] = usePost{{ ns }}SamplesMutation();
-  const create = async (name: string) => !('error' in (await post({ create{{ ns }}SampleRequest: { name } })));
+{{~ else ~}}
+  const [post, { isLoading }] =
+    usePost{{ ns }}SamplesMutation();
+{{~ end ~}}
+  const create = async (name: string) => {
+{{~ if fits(4, "const result = await post({ create" + ns + "SampleRequest: { name } });") ~}}
+    const result = await post({ create{{ ns }}SampleRequest: { name } });
+{{~ else if fits(6, "create" + ns + "SampleRequest: { name },") ~}}
+    const result = await post({
+      create{{ ns }}SampleRequest: { name },
+    });
+{{~ else ~}}
+    const result = await post({
+      create{{ ns }}SampleRequest: {
+        name,
+      },
+    });
+{{~ end ~}}
+    return !('error' in result);
+  };
   return { create, isSaving: isLoading };
 }

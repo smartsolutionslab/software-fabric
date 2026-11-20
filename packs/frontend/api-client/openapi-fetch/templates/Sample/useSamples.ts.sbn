@@ -1,13 +1,39 @@
 {{~ ns = module.namespace ~}}
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ func schema(declaration, name)
+  line = declaration + " = components['schemas']['" + name + "'];"
+  if fits(0, line)
+    ret line
+  end
+  ret declaration + " =\n  components['schemas']['" + name + "'];"
+end ~}}
+{{~ func call(indent, shift, method, options, option)
+  pad = "" | string.pad_left indent
+  head = "const { data } = await api." + method + "('/" + module.name + "/samples', "
+  if fits(indent + shift, head + options + ");")
+    ret pad + head + options + ");"
+  end
+  ret pad + head + "{\n" + pad + "  " + option + ",\n" + pad + "});"
+end ~}}
+{{~ func samples_get(indent, shift)
+  ret call(indent, shift, "GET", "{ params: { query: samplesPage } }", "params: { query: samplesPage }")
+end ~}}
+{{~ func samples_post(indent)
+  ret call(indent, 0, "POST", "{ body: { name } }", "body: { name }")
+end ~}}
 {{~ if project["frontend.framework"] == "react" ~}}
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/baseApi';
 import type { components } from '@/api/generated';
 
 /** One of the module's samples, as the host lists it. */
-export type {{ ns }}SampleDto = components['schemas']['{{ ns }}SampleDto'];
+{{ schema ("export type " + ns + "SampleDto") (ns + "SampleDto") }}
 
-type SamplesPage = components['schemas']['PagedResultOf{{ ns }}SampleDto'];
+{{ schema "type SamplesPage" ("PagedResultOf" + ns + "SampleDto") }}
 
 /** The page of samples the module's page lists: the first, as many as the host gives by default. */
 export const samplesPage = { page: 1, pageSize: 20 };
@@ -29,7 +55,10 @@ function withPending(page: SamplesPage, name: string): SamplesPage {
 export function use{{ ns }}Samples() {
   const { data, isLoading, isError } = useQuery({
     queryKey: samplesKey,
-    queryFn: async () => (await api.GET('/{{ module.name }}/samples', { params: { query: samplesPage } })).data,
+    queryFn: async () => {
+{{ samples_get 6 0 }}
+      return data;
+    },
   });
   return { samples: data?.items, page: data, isLoading, isError };
 }
@@ -42,7 +71,10 @@ export function use{{ ns }}Samples() {
 export function useCreate{{ ns }}Sample() {
   const client = useQueryClient();
   const { mutateAsync, isPending } = useMutation({
-    mutationFn: async (name: string) => (await api.POST('/{{ module.name }}/samples', { body: { name } })).data,
+    mutationFn: async (name: string) => {
+{{ samples_post 6 }}
+      return data;
+    },
     onMutate: async (name) => {
       await client.cancelQueries({ queryKey: samplesKey });
       const before = client.getQueryData<SamplesPage>(samplesKey);
@@ -75,9 +107,9 @@ import { api } from '@/api/baseApi';
 import type { components } from '@/api/generated';
 
 /** One of the module's samples, as the host lists it. */
-export type {{ ns }}SampleDto = components['schemas']['{{ ns }}SampleDto'];
+{{ schema ("export type " + ns + "SampleDto") (ns + "SampleDto") }}
 
-type SamplesPage = components['schemas']['PagedResultOf{{ ns }}SampleDto'];
+{{ schema "type SamplesPage" ("PagedResultOf" + ns + "SampleDto") }}
 
 /** The page of samples the module's page lists: the first, as many as the host gives by default. */
 export const samplesPage = { page: 1, pageSize: 20 };
@@ -97,14 +129,20 @@ function withPending(page: SamplesPage, name: string): SamplesPage {
  * The module's samples, a page at a time, and creating one. A new sample shows in the page at once, and the page as it
  * was comes back when the host refuses it; a created one is asked for again, with the id the host gave it.
  */
-export const use{{ ns }}SamplesStore = defineStore('{{ module.name }}-samples', () => {
+{{~ store_head = "export const use" + ns + "SamplesStore = defineStore('" + module.name + "-samples', () => {" ~}}
+{{~ shift = 2 ~}}
+{{~ if fits(0, store_head)
+  shift = 0
+end ~}}
+{{~ capture store ~}}
   const page = ref<SamplesPage>();
   const failed = ref(false);
   const saving = ref(false);
 
   async function load() {
     try {
-      page.value = (await api.GET('/{{ module.name }}/samples', { params: { query: samplesPage } })).data;
+{{ samples_get 6 shift }}
+      page.value = data;
       failed.value = false;
     } catch {
       failed.value = true;
@@ -130,7 +168,19 @@ export const use{{ ns }}SamplesStore = defineStore('{{ module.name }}-samples', 
   }
 
   return { page, failed, saving, load, create };
+{{~ end ~}}
+{{~ if shift == 0 ~}}
+{{ store_head }}
+{{ store | string.rstrip }}
 });
+{{~ else ~}}
+export const use{{ ns }}SamplesStore = defineStore(
+  '{{ module.name }}-samples',
+  () => {
+{{ regex.replace (store | string.rstrip) "(?m)^(?=.)" "  " }}
+  },
+);
+{{~ end ~}}
 
 /** The module's samples, asked for once the page is mounted: undefined until the host answers. */
 export function use{{ ns }}Samples() {
@@ -156,9 +206,9 @@ import { api } from '@/api/baseApi';
 import type { components } from '@/api/generated';
 
 /** One of the module's samples, as the host lists it. */
-export type {{ ns }}SampleDto = components['schemas']['{{ ns }}SampleDto'];
+{{ schema ("export type " + ns + "SampleDto") (ns + "SampleDto") }}
 
-type SamplesPage = components['schemas']['PagedResultOf{{ ns }}SampleDto'];
+{{ schema "type SamplesPage" ("PagedResultOf" + ns + "SampleDto") }}
 
 /** The page of samples the module's page lists: the first, as many as the host gives by default. */
 export const samplesPage = { page: 1, pageSize: 20 };
@@ -180,7 +230,10 @@ function withPending(page: SamplesPage, name: string): SamplesPage {
 export function use{{ ns }}Samples() {
   const { data, isLoading, isError } = useQuery({
     queryKey: samplesKey,
-    queryFn: async () => (await api.GET('/{{ module.name }}/samples', { params: { query: samplesPage } })).data,
+    queryFn: async () => {
+{{ samples_get 6 0 }}
+      return data;
+    },
   });
   return { samples: computed(() => data.value?.items), page: data, isLoading, isError };
 }
@@ -193,7 +246,10 @@ export function use{{ ns }}Samples() {
 export function useCreate{{ ns }}Sample() {
   const client = useQueryClient();
   const { mutateAsync, isPending } = useMutation({
-    mutationFn: async (name: string) => (await api.POST('/{{ module.name }}/samples', { body: { name } })).data,
+    mutationFn: async (name: string) => {
+{{ samples_post 6 }}
+      return data;
+    },
     onMutate: async (name) => {
       await client.cancelQueries({ queryKey: samplesKey });
       const before = client.getQueryData<SamplesPage>(samplesKey);
