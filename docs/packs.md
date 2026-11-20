@@ -263,7 +263,7 @@ Templates are [Scriban](https://github.com/scriban/scriban).
 | Name | Content |
 |---|---|
 | `name` | The project's name, lower kebab-case (`smart-shop`) |
-| `namespace` | The same in PascalCase (`SmartShop`), for C# namespaces |
+| `namespace` | The root C# namespace: the name in PascalCase (`SmartShop`), or what `fabric new --namespace` chose (`SmartSolutionsLab.SmartShop`), which `fabric.yaml` then records. Templates use it only as a prefix of a namespace, never as a single identifier, since it may contain dots |
 | `project["<dimension>"]` | The project's choice: a string, or a list for multi-valued dimensions |
 | `module_defaults["<dimension>"]` | What new modules start from |
 | `settings["<dimension>.<option>.<setting>"]` | A chosen option's setting, a number: the value `fabric.yaml` records, the declared default unless set (`settings["backend.llm.extras.evals.threshold"]` is `4`). Only chosen options' settings are present (ADR-0014) |

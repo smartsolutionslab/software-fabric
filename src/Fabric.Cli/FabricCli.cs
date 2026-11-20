@@ -130,7 +130,7 @@ public static class FabricCli
                 return Fail(error, loaded.Errors);
             }
 
-            var generated = Generator.New(catalogModel, loaded.Packs, projectName, result.GetValue(profile), overrides);
+            var generated = Generator.New(catalogModel, loaded.Packs, projectName, result.GetValue(profile), overrides, result.GetValue(rootNamespace));
             if (generated.Errors.Count > 0)
             {
                 return Fail(error, generated.Errors);

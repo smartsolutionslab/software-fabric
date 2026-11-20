@@ -129,6 +129,11 @@ public static class Upgrader
         var regeneration = Regeneration.From(record);
         Directory.CreateDirectory(Path.GetDirectoryName(directory)!);
         List<string> arguments = ["new", directory, "--name", regeneration.Name];
+        if (regeneration.Namespace is { } rootNamespace)
+        {
+            arguments.AddRange(["--namespace", rootNamespace]);
+        }
+
         if (regeneration.Profile is { } profile)
         {
             arguments.AddRange(["--profile", profile]);
@@ -189,6 +194,7 @@ public static class Upgrader
         var regeneration = Regeneration.From(record);
         var text = new StringBuilder()
             .AppendLine(CultureInfo.InvariantCulture, $"name {regeneration.Name}")
+            .AppendLine(CultureInfo.InvariantCulture, $"namespace {regeneration.Namespace}")
             .AppendLine(CultureInfo.InvariantCulture, $"profile {regeneration.Profile}")
             .AppendLine(string.Join(' ', regeneration.Overrides.Order(StringComparer.Ordinal)));
         foreach (var module in regeneration.Modules)

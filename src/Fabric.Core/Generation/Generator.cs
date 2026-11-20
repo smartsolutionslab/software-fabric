@@ -93,20 +93,20 @@ public static class Generator
         }
 
         var moduleOnly = after with { Files = [.. after.Files.Where(file => file.Module == name)] };
-        var rendered = Renderer.Render(catalog, moduleOnly, choices, project.Name);
+        var rendered = Renderer.Render(catalog, moduleOnly, choices, project.Name, project.RootNamespace);
         if (rendered.Errors.Count > 0)
         {
             return AdditionFailure(rendered.Errors);
         }
 
-        var documentBefore = Renderer.Render(catalog, OpenApiDocumentOnly(before), project.Choices, project.Name);
-        var documentAfter = Renderer.Render(catalog, OpenApiDocumentOnly(after), choices, project.Name);
+        var documentBefore = Renderer.Render(catalog, OpenApiDocumentOnly(before), project.Choices, project.Name, project.RootNamespace);
+        var documentAfter = Renderer.Render(catalog, OpenApiDocumentOnly(after), choices, project.Name, project.RootNamespace);
         if (documentBefore.Errors.Count + documentAfter.Errors.Count > 0)
         {
             return AdditionFailure([.. documentBefore.Errors.Union(documentAfter.Errors, StringComparer.Ordinal)]);
         }
 
-        return new ModuleAddition(rendered.Files, FabricFile.Write(catalog, project.Name, project.Profile, choices), [])
+        return new ModuleAddition(rendered.Files, FabricFile.Write(catalog, project.Name, project.Profile, choices, project.Namespace), [])
         {
             Experimental = ExperimentalOptions.Chosen(catalog, choices),
             OpenApi = OpenApiAdded(documentBefore.Files, documentAfter.Files, name, project.Choices.Modules.Keys),
@@ -188,16 +188,26 @@ public static class Generator
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(overrides);
 
-        return New(catalog, packs, name, profile, profile, overrides);
+        return New(catalog, packs, name, profile, profile, overrides, rootNamespace: null);
     }
 
+    /// <param name="rootNamespace">The namespace the project's code is in, recorded in <c>fabric.yaml</c>; <c>null</c> for the
+    /// project's name in PascalCase, which <c>fabric.yaml</c> then does not record.</param>
     public static GenerationResult New(
         CatalogModel catalog,
         IReadOnlyDictionary<string, PackManifest> packs,
         string name,
         string? profile,
         IReadOnlyList<string> overrides,
-        string? rootNamespace) => New(catalog, packs, name, profile, overrides);
+        string? rootNamespace)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(packs);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(overrides);
+
+        return New(catalog, packs, name, profile, profile, overrides, rootNamespace);
+    }
 
     /// <param name="profile">The profile the choices are resolved from, if any.</param>
     /// <param name="recordedProfile">The profile <c>fabric.yaml</c> names, which a regeneration keeps even when the
@@ -208,12 +218,18 @@ public static class Generator
         string name,
         string? profile,
         string? recordedProfile,
-        IReadOnlyList<string> overrides)
+        IReadOnlyList<string> overrides,
+        string? rootNamespace)
     {
 
         if (!Names.IsValid(name))
         {
             return Failure([$"project name '{name}' must be lower-case letters, digits and hyphens, starting with a letter."]);
+        }
+
+        if (rootNamespace is not null && Names.NamespaceProblem(rootNamespace) is { } namespaceProblem)
+        {
+            return Failure([namespaceProblem]);
         }
 
         var resolution = ChoiceResolver.Resolve(catalog, profile, overrides);
@@ -267,13 +283,13 @@ public static class Generator
             return Failure(compositionErrors);
         }
 
-        var rendered = Renderer.Render(catalog, composition, choices, name);
+        var rendered = Renderer.Render(catalog, composition, choices, name, rootNamespace ?? Names.ToPascalCase(name));
         if (rendered.Errors.Count > 0)
         {
             return Failure(rendered.Errors);
         }
 
-        var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, name, recordedProfile, choices));
+        var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, name, recordedProfile, choices, rootNamespace));
         return new GenerationResult([.. rendered.Files.Append(fabricFile).OrderBy(file => file.Path, StringComparer.Ordinal)], [])
         {
             Experimental = ExperimentalOptions.Chosen(catalog, choices),
@@ -295,7 +311,7 @@ public static class Generator
         // Every recorded choice is an override, so the profile only fills what fabric.yaml does not record. A profile the
         // catalog no longer has cannot do that, and the record still names it.
         var profile = regeneration.Profile is { } named && catalog.Profiles.ContainsKey(named) ? named : null;
-        var generated = New(catalog, packs, regeneration.Name, profile, regeneration.Profile, regeneration.Overrides);
+        var generated = New(catalog, packs, regeneration.Name, profile, regeneration.Profile, regeneration.Overrides, regeneration.Namespace);
         if (generated.Errors.Count > 0)
         {
             return generated;

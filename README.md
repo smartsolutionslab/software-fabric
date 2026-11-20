@@ -59,6 +59,13 @@ fabric matrix --catalog catalog/catalog.yaml --packs packs --extra build/matrix-
 fabric reference --catalog catalog/catalog.yaml --output docs/catalog.md
 ```
 
+`fabric new --namespace SmartSolutionsLab.Shop` writes the project's C#
+in that root namespace instead of the name in PascalCase (`Shop`), and
+records it in `fabric.yaml`; `add-module`, `upgrade` and `change` use the
+recorded one. It must be dotted C# names (ASCII letters, digits and
+underscores, each starting with a letter, none a keyword), not under
+`System` or `Microsoft`. Without it, nothing is recorded.
+
 `fabric upgrade` brings a generated project up to the running fabric
 (ADR-0016). In the project, the top of a git repository with a clean working
 tree, it writes the project again from `fabric.yaml` twice: with the running
