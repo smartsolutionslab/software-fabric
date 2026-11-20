@@ -51,7 +51,7 @@ public sealed class IdentityProviderSuppressionTests
     {
         var files = Files(provider);
         var agents = files["AGENTS.md"];
-        var adr = files.Single(file => file.Key.EndsWith($"-backend-auth-{provider}.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.EndsWith($"/backend-auth-{provider}.md", StringComparison.Ordinal)).Value;
 
         agents.ShouldContain("Never silence a rule with `#pragma`");
         agents.ShouldNotContain("ASPIREHOSTINGKEYCLOAK001");

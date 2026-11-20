@@ -155,7 +155,7 @@ public sealed class FrontendPermissionTests
     {
         var files = Files(VueProfile, VueOverrides(authClient, authorization));
         var agents = files["AGENTS.md"];
-        var adr = files.Single(file => file.Key.EndsWith($"-frontend-auth-client-{authClient}.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.EndsWith($"/frontend-auth-client-{authClient}.md", StringComparison.Ordinal)).Value;
 
         agents.ShouldContain("Hiding an element is a convenience, never protection: the backend policy decides.");
         agents.ShouldContain(composable);

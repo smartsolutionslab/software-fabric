@@ -81,8 +81,8 @@ public sealed partial class GenericOidcTests
     public void The_decision_records_and_the_permission_tests_describe_the_providers_claims_not_keycloaks()
     {
         var files = Files(GenericOidc, RolesAndClaims);
-        var tenancy = files.Single(file => file.Key.EndsWith("-backend-tenancy-column.md", StringComparison.Ordinal)).Value;
-        var roles = files.Single(file => file.Key.EndsWith("-backend-authorization-roles.md", StringComparison.Ordinal)).Value;
+        var tenancy = files.Single(file => file.Key.EndsWith("/backend-tenancy-column.md", StringComparison.Ordinal)).Value;
+        var roles = files.Single(file => file.Key.EndsWith("/backend-authorization-roles.md", StringComparison.Ordinal)).Value;
         var permissionTests = files["web/app/src/auth/RequirePermission.test.tsx"];
 
         tenancy.ShouldContain("`tenant` claim");

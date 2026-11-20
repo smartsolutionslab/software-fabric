@@ -111,7 +111,7 @@ public sealed partial class RadixHeadlessTests
         section.ShouldContain("lint refuses them");
         (styling == "css-modules" ? section.Contains("`button.module.css`", StringComparison.Ordinal) : section.Contains("Tailwind", StringComparison.Ordinal)).ShouldBeTrue(section);
 
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-ui-library-radix-headless.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-ui-library-radix-headless.md", StringComparison.Ordinal)).Value;
         adr.ShouldStartWith(title);
         if (styling == "css-modules")
         {

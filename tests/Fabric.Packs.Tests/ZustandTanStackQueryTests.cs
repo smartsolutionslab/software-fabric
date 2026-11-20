@@ -50,7 +50,7 @@ public sealed class ZustandTanStackQueryTests
         files["AGENTS.md"].ShouldContain("## Frontend state: Zustand and TanStack Query");
         files["AGENTS.md"].ShouldContain("src/stores/");
         files["AGENTS.md"].ShouldNotContain("## Frontend state: TanStack Query\n");
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-state-zustand-tanstack-query.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-state-zustand-tanstack-query.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("@tanstack/react-query");
         adr.ShouldContain("never holds a copy of server data");
     }

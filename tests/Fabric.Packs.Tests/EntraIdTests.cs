@@ -114,9 +114,9 @@ public sealed partial class EntraIdTests
     public void The_decision_records_and_the_permission_tests_describe_entra_ids_claims_and_the_missing_end_to_end_tests()
     {
         var files = Files(EntraId, RolesAndClaims);
-        var adr = files.Single(file => file.Key.EndsWith("-backend-auth-entra-id.md", StringComparison.Ordinal)).Value;
-        var tenancy = files.Single(file => file.Key.EndsWith("-backend-tenancy-column.md", StringComparison.Ordinal)).Value;
-        var roles = files.Single(file => file.Key.EndsWith("-backend-authorization-roles.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.EndsWith("/backend-auth-entra-id.md", StringComparison.Ordinal)).Value;
+        var tenancy = files.Single(file => file.Key.EndsWith("/backend-tenancy-column.md", StringComparison.Ordinal)).Value;
+        var roles = files.Single(file => file.Key.EndsWith("/backend-authorization-roles.md", StringComparison.Ordinal)).Value;
         var permissionTests = files["web/app/src/auth/RequirePermission.test.tsx"];
 
         adr.ShouldContain("No end-to-end tests");

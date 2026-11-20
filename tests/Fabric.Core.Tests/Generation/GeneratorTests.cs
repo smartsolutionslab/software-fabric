@@ -22,10 +22,10 @@ public class GeneratorTests
             "AGENTS.md",
             "README.md",
             "config/database.txt",
-            "docs/adr/0001-base-core.md",
-            "docs/adr/0002-backend-database-postgres.md",
-            "docs/adr/0003-backend-api-protocols-rest.md",
-            "docs/adr/0004-module-style-ddd.md",
+            "docs/adr/fabric/backend-api-protocols-rest.md",
+            "docs/adr/fabric/backend-database-postgres.md",
+            "docs/adr/fabric/base-core.md",
+            "docs/adr/fabric/module-style-ddd.md",
             "fabric.yaml",
         ]);
         Content(result, "config/database.txt").ShouldBe("provider=postgres\nread by: rest\n");
@@ -124,9 +124,9 @@ public class GeneratorTests
     }
 
     [Fact]
-    public void Every_selected_pack_gets_its_adr_numbered_in_selection_order()
+    public void Every_selected_pack_gets_its_adr_named_after_its_option_under_docs_adr_fabric()
     {
-        Content(New("minimal"), "docs/adr/0002-backend-database-postgres.md").ShouldBe("# ADR: backend.database.postgres\n");
+        Content(New("minimal"), "docs/adr/fabric/backend-database-postgres.md").ShouldBe("# ADR: backend.database.postgres\n");
     }
 
     [Theory]

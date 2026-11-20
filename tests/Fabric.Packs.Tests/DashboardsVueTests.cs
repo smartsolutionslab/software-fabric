@@ -67,7 +67,7 @@ public sealed class DashboardsVueTests
         files.Keys.ShouldNotContain(path => path.EndsWith(".tsx", StringComparison.Ordinal));
         files["web/app/src/index.css"].ShouldNotContain("grid-layout");
         files["AGENTS.md"].ShouldContain("DashboardEditor.vue");
-        files["docs/adr/" + Adr(files)].ShouldContain("grid-layout-plus 1.1.1");
+        files[Adr(files)].ShouldContain("grid-layout-plus 1.1.1");
     }
 
     [Fact]
@@ -164,9 +164,9 @@ public sealed class DashboardsVueTests
         e2eOutput.ShouldContain("4 passed");
     }
 
-    /// <summary>The generated ADR of the dashboards option, whatever number its place in the selection gives it.</summary>
+    /// <summary>The path of the dashboards option's generated ADR.</summary>
     private static string Adr(Dictionary<string, string> files) =>
-        Path.GetFileName(files.Keys.Single(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("-frontend-dashboards-user-editable.md", StringComparison.Ordinal)));
+        files.Keys.Single(path => path == "docs/adr/fabric/frontend-dashboards-user-editable.md");
 
     private static Dictionary<string, string> Files(params string[] overrides) => Generated(Profile, overrides);
 

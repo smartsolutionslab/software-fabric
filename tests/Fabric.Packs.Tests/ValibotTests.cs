@@ -191,8 +191,8 @@ public sealed partial class ValibotTests
             files["AGENTS.md"].ShouldContain("## Validation: Valibot", customMessage: profile);
             files["AGENTS.md"].ShouldContain("type Invoice = v.InferOutput<typeof invoiceSchema>", customMessage: profile);
             files["AGENTS.md"].ShouldNotContain("zod", Case.Insensitive, profile);
-            files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("-frontend-validation-valibot.md", StringComparison.Ordinal), profile);
-            files.Keys.ShouldNotContain(path => path.EndsWith("-frontend-validation-zod.md", StringComparison.Ordinal), profile);
+            files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("/frontend-validation-valibot.md", StringComparison.Ordinal), profile);
+            files.Keys.ShouldNotContain(path => path.EndsWith("/frontend-validation-zod.md", StringComparison.Ordinal), profile);
         }
     }
 
@@ -218,8 +218,8 @@ public sealed partial class ValibotTests
         files[AdapterTest].ShouldNotContain("zod");
         files["web/app/eslint.config.js"].ShouldContain("'@vee-validate/valibot'");
         files["web/app/package.json"].ShouldNotContain("@vee-validate/");
-        files["docs/adr/0033-frontend-forms-vee-validate.md"].ShouldContain("Valibot");
-        files["docs/adr/0033-frontend-forms-vee-validate.md"].ShouldNotContain("zod", Case.Insensitive);
+        files["docs/adr/fabric/frontend-forms-vee-validate.md"].ShouldContain("Valibot");
+        files["docs/adr/fabric/frontend-forms-vee-validate.md"].ShouldNotContain("zod", Case.Insensitive);
     }
 
     [Fact]
@@ -258,7 +258,7 @@ public sealed partial class ValibotTests
         files["web/app/src/dashboards/DashboardAssistant.vue"].ShouldContain("toTypedSchema(questionSchema)");
         files["web/app/src/dashboards/proposal.ts"].ShouldContain("v.safeParse(proposalSchema, value)");
         WebSources(files).ShouldNotContain(source => source.Value.Contains("zod", StringComparison.Ordinal), "no web source names zod");
-        files.Single(file => file.Key.EndsWith("-frontend-dashboards-user-editable.md", StringComparison.Ordinal)).Value.ShouldContain("vee-validate and Valibot");
+        files.Single(file => file.Key.EndsWith("/frontend-dashboards-user-editable.md", StringComparison.Ordinal)).Value.ShouldContain("vee-validate and Valibot");
     }
 
     [Fact]

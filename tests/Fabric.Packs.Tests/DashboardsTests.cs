@@ -281,7 +281,7 @@ public sealed class DashboardsTests
         configuration.ShouldContain("builder.ToTable(\"dashboards\");");
         files["src/Modules/Dashboards/Dashboards.Infrastructure/Migrations/20261105000000_CreateDashboards.cs"]
             .ShouldBe(Files(Profile, Dashboards, "backend.tenancy=none")["src/Modules/Dashboards/Dashboards.Infrastructure/Migrations/20261105000000_CreateDashboards.cs"]);
-        files.Single(file => file.Key.EndsWith("-frontend-dashboards-user-editable.md", StringComparison.Ordinal)).Value
+        files.Single(file => file.Key.EndsWith("/frontend-dashboards-user-editable.md", StringComparison.Ordinal)).Value
             .ShouldContain("not in one transaction");
     }
 

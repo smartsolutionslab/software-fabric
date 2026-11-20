@@ -511,7 +511,7 @@ public sealed partial class VuetifyTests
     }
 
     private static string Adr(Dictionary<string, string> files, string option) =>
-        files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith($"-{option}.md", StringComparison.Ordinal)).Value;
+        files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith($"/{option}.md", StringComparison.Ordinal)).Value;
 
     private static void RunWeb(GeneratedProject project, params string[] steps)
     {

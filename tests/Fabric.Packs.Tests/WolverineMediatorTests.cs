@@ -234,7 +234,7 @@ public sealed class WolverineMediatorTests
         project.Build();
 
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "AGENTS.md")).ShouldContain("## Mediator: Wolverine");
-        File.ReadAllText(Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs", "adr"), "*-backend-mediator-wolverine.md").Single())
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "docs", "adr", "fabric", "backend-mediator-wolverine.md"))
             .ShouldContain("# Mediator: Wolverine");
 
         var (moduleExitCode, moduleOutput) = project.Test("tests/Modules/Billing.Tests/Billing.Tests.csproj");

@@ -741,7 +741,7 @@ public sealed class AgUiTests
 
     /// <summary>The agent panel's ADR, whatever number the generated project gives it.</summary>
     private static string AgentUiAdr(Dictionary<string, string> files) =>
-        files[files.Keys.Single(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("-frontend-agent-ui-ag-ui.md", StringComparison.Ordinal))];
+        files[files.Keys.Single(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("/frontend-agent-ui-ag-ui.md", StringComparison.Ordinal))];
 
     /// <summary>The rule of every error eslint's stylish output lists (<c>  4:26  error  message  rule</c>), in order.</summary>
     private static string LintFindings(string output) =>

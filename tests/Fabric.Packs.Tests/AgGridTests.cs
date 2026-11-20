@@ -167,8 +167,8 @@ public sealed partial class AgGridTests
         files["web/app/eslint.config.js"].ShouldNotContain("'ag-grid-*'");
         files["AGENTS.md"].ShouldContain("## Data grid: AG Grid (community)");
         files["AGENTS.md"].ShouldNotContain("TanStack Table");
-        files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("-frontend-data-grid-ag-grid.md", StringComparison.Ordinal));
-        files.Keys.ShouldNotContain(path => path.EndsWith("-frontend-data-grid-tanstack-table.md", StringComparison.Ordinal));
+        files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("/frontend-data-grid-ag-grid.md", StringComparison.Ordinal));
+        files.Keys.ShouldNotContain(path => path.EndsWith("/frontend-data-grid-tanstack-table.md", StringComparison.Ordinal));
         WebSources(files).ShouldNotContain(source => source.Value.Contains("@tanstack/react-table", StringComparison.Ordinal), "no web source imports TanStack Table");
     }
 
@@ -331,7 +331,7 @@ public sealed partial class AgGridTests
     }
 
     private static string Adr(Dictionary<string, string> files) =>
-        files.Single(file => file.Key.EndsWith("-frontend-data-grid-ag-grid.md", StringComparison.Ordinal)).Value;
+        files.Single(file => file.Key.EndsWith("/frontend-data-grid-ag-grid.md", StringComparison.Ordinal)).Value;
 
     private static IEnumerable<KeyValuePair<string, string>> WebSources(Dictionary<string, string> files) =>
         files.Where(file => file.Key.StartsWith("web/app/src/", StringComparison.Ordinal) && Regex.IsMatch(file.Key, @"\.(ts|tsx|vue)$"));
