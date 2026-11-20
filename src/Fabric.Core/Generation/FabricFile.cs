@@ -38,7 +38,7 @@ public static partial class FabricFile
             .Append("name: ").Append(Scalar(name)).Append('\n');
         if (rootNamespace is not null)
         {
-            text.Append("namespace: ").Append(rootNamespace).Append('\n');
+            text.Append("namespace: ").Append(Scalar(rootNamespace)).Append('\n');
         }
 
         if (profile is not null)

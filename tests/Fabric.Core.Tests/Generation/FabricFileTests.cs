@@ -84,6 +84,15 @@ public class FabricFileTests
     }
 
     [Fact]
+    public void A_root_namespace_a_yaml_reader_would_take_for_a_boolean_is_quoted_and_reads_back_as_written()
+    {
+        var text = FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices, "yes");
+
+        text.ShouldContain("\nnamespace: \"yes\"\n");
+        FabricFile.Read(new StringReader(text), FabricFile.FileName).Namespace.ShouldBe("yes");
+    }
+
+    [Fact]
     public void A_recorded_namespace_that_is_not_a_csharp_namespace_is_refused_when_read()
     {
         var text = FabricFile.Write(Fixtures.MinimalCatalog, "shop", "minimal", Choices)
