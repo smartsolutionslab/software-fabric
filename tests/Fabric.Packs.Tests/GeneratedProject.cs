@@ -50,6 +50,27 @@ internal sealed partial class GeneratedProject : IDisposable
     }
 
     /// <summary>
+    /// Writes the project again as <c>fabric upgrade</c> regenerates it, from its <c>fabric.yaml</c> with these modules
+    /// recorded in this order, each with its overrides of the module defaults: one per <c>add-module</c>.
+    /// </summary>
+    public void Regenerate(params (string Name, string[] Overrides)[] modules)
+    {
+        var record = FabricFile.Read(new StringReader(File.ReadAllText(Path.Combine(ProjectDirectory, FabricFile.FileName))), FabricFile.FileName);
+        OrderedDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> recorded = [];
+        foreach (var (name, overrides) in modules)
+        {
+            recorded.Add(name, overrides
+                .Select(assignment => assignment.Split('=', 2))
+                .ToDictionary(assignment => assignment[0], assignment => (IReadOnlyList<string>)assignment[1].Split(','), StringComparer.Ordinal));
+        }
+
+        var regenerated = Generator.Regenerate(Repository.Catalog, packs, record with { Choices = record.Choices with { Modules = recorded } });
+        regenerated.Errors.ShouldBeEmpty();
+        Directory.Delete(ProjectDirectory, recursive: true);
+        ProjectWriter.Write(ProjectDirectory, regenerated.Files).ShouldBeNull();
+    }
+
+    /// <summary>
     /// Drops the module's sample (#734) as AGENTS.md says: every file and folder with Sample in its name in the module and
     /// its tests, its integration test and its Migrations folder, and in the web app its page's hook, form and tests. For a test that needs
     /// the module without it; a test that writes the page itself writes its data file too.

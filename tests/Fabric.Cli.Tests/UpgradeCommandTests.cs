@@ -120,7 +120,9 @@ public sealed class UpgradeCommandTests : IDisposable
 
     private CliRun UpgradeFromOld() => Upgrade("--from", oldFabric);
 
-    private string Read(string path) => File.ReadAllText(Path.Combine(project, path));
+    private string Read(string path) => Read(project, path);
+
+    private static string Read(string directory, string path) => File.ReadAllText(Path.Combine(directory, path));
 
     private void Write(string path, string content) => Write(project, path, content);
 
@@ -199,6 +201,35 @@ public sealed class UpgradeCommandTests : IDisposable
         run.Output.ShouldContain("  A src/billing/page.test.md");
         run.Output.ShouldNotContain("conflict");
         run.Output.ShouldNotContain("builds");
+    }
+
+    [Fact]
+    public void A_project_with_a_module_of_a_style_new_did_not_choose_comes_out_exactly_as_this_fabric_writes_it_fresh()
+    {
+        var mixed = Path.Combine(root, "mixed", "shop");
+        Run(oldFabric, ["new", mixed, .. NewArguments]);
+        Git.Run(mixed, "init", "-q");
+        Git.Commit(mixed, "generate with fabric 0.0.1");
+        Run(oldFabric, ["add-module", "audit", "--project", mixed, "--set", "module.style=crud"]);
+        Git.Commit(mixed, "add audit with fabric 0.0.1");
+
+        var run = CliRun.Of(["upgrade", "--project", mixed, "--from", oldFabric, "--catalog", Paths.FixtureCatalog, "--packs", newPacks]);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldStartWith($"upgraded shop from fabric {OldVersion} to fabric {Running}; nothing is committed.");
+        run.Output.ShouldContain("  M README.md");
+        run.Output.ShouldContain("  A docs/notes.md");
+        run.Output.ShouldNotContain("conflict");
+        Git.Run(mixed, "ls-files", "-u").ShouldBeEmpty();
+
+        var fresh = Path.Combine(root, "fresh-mixed", "shop");
+        CliRun.Of(["new", fresh, .. NewArguments, "--catalog", Paths.FixtureCatalog, "--packs", newPacks]).ExitCode.ShouldBe(0);
+        Git.Run(fresh, "init", "-q");
+        Git.Commit(fresh, "generate");
+        var added = CliRun.Of("add-module", "audit", "--set", "module.style=crud", "--project", fresh, "--catalog", Paths.FixtureCatalog, "--packs", newPacks);
+        added.ExitCode.ShouldBe(0, added.Error);
+        Tree(mixed).ShouldBe(Tree(fresh));
+        Read(mixed, "README.md").ShouldContain("## modules: crud");
     }
 
     [Fact]

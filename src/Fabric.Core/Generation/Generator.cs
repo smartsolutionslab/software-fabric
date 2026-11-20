@@ -9,8 +9,9 @@ namespace Fabric.Core.Generation;
 public static class Generator
 {
     /// <summary>
-    /// Adds a module to a generated project. Only creates files: an option whose pack is new to the project and
-    /// contributes project-wide content is refused, because that content would have to be merged into existing files.
+    /// Adds a module to a generated project. A module whose packs the project already has only creates files; one that
+    /// selects a pack new to the project, another style or event store, gives the whole project with the module instead,
+    /// for the caller to merge (ADR-0005, amended 2026-11-20).
     /// </summary>
     public static ModuleAddition AddModule(
         CatalogModel catalog,
@@ -82,14 +83,12 @@ public static class Generator
         }
 
         var alreadySelected = before.Packs.Select(pack => pack.Option).ToHashSet(StringComparer.Ordinal);
-        var refused = after.Packs
+        List<string> newPacks = [.. after.Packs
             .Where(pack => !alreadySelected.Contains(pack.Option))
-            .Select(ProjectWideRefusal)
-            .OfType<string>()
-            .ToList();
-        if (refused.Count > 0)
+            .Select(pack => $"{pack.Dimension}={pack.OptionName}")];
+        if (newPacks.Count > 0)
         {
-            return AdditionFailure(refused);
+            return WholeProject(catalog, after, choices, project, newPacks);
         }
 
         var moduleOnly = after with { Files = [.. after.Files.Where(file => file.Module == name)] };
@@ -161,16 +160,27 @@ public static class Generator
                 .Where(member => before?.AsObject().ContainsKey(member.Key) != true)
                 .Select(member => new KeyValuePair<string, JsonNode>(member.Key, member.Value!.DeepClone()))];
 
-    private static string? ProjectWideRefusal(PackManifest pack)
+    /// <summary>The project with the module, as <c>fabric new</c> would write it with every module composed at once.</summary>
+    private static ModuleAddition WholeProject(
+        CatalogModel catalog,
+        Composition composition,
+        ProjectChoices choices,
+        FabricRecord project,
+        IReadOnlyList<string> newPacks)
     {
-        var projectWide = pack.Files.Where(file => !file.PerModule).Select(file => $"file {file.Target}")
-            .Concat(pack.Slots.Select(slot => $"slot {slot.Slot}"))
-            .ToList();
+        var rendered = Renderer.Render(catalog, composition, choices, project.Name);
+        if (rendered.Errors.Count > 0)
+        {
+            return AdditionFailure(rendered.Errors);
+        }
 
-        return projectWide.Count == 0
-            ? null
-            : $"{pack.Dimension}={pack.OptionName} is new to this project and its pack contributes to project-wide files " +
-              $"({string.Join(", ", projectWide)}); add-module only creates files, so choose it when generating the project or add it by hand.";
+        var fabricYaml = FabricFile.Write(catalog, project.Name, project.Profile, choices);
+        return new ModuleAddition([], fabricYaml, [])
+        {
+            Experimental = ExperimentalOptions.Chosen(catalog, choices),
+            NewPacks = newPacks,
+            Project = [.. rendered.Files.Append(new RenderedFile(FabricFile.FileName, fabricYaml)).OrderBy(file => file.Path, StringComparer.Ordinal)],
+        };
     }
 
     private static ModuleAddition AdditionFailure(IReadOnlyList<string> errors) => new([], null, errors);
@@ -274,7 +284,9 @@ public static class Generator
 
     /// <summary>
     /// Writes a project again from its <c>fabric.yaml</c> alone (ADR-0016 E4), with the calls <see cref="Regeneration"/>
-    /// spells out: <see cref="New"/>, then <see cref="AddModule"/> for each module <c>new</c> did not bring, in order.
+    /// spells out: <see cref="New"/>, then <see cref="AddModule"/> for each module <c>new</c> did not bring, in order. A
+    /// module that brings packs new to the project replaces the tree with the whole project it gives, which is what
+    /// <c>add-module</c>'s merge leaves in a project nobody edited.
     /// A choice set this catalog rejects fails with the catalog's own errors, as <c>fabric new</c> would.
     /// </summary>
     public static GenerationResult Regenerate(CatalogModel catalog, IReadOnlyDictionary<string, PackManifest> packs, FabricRecord project)
@@ -316,6 +328,13 @@ public static class Generator
             if (addition.FabricYaml is not { } fabricYaml)
             {
                 return Failure([.. addition.Errors.Select(error => $"add-module {module.Name}: {error}")]);
+            }
+
+            if (addition.Project is { } whole)
+            {
+                files = whole.ToDictionary(file => file.Path, StringComparer.Ordinal);
+                experimental = addition.Experimental;
+                continue;
             }
 
             if (addition.Created.FirstOrDefault(file => files.ContainsKey(file.Path)) is { } existing)

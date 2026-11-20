@@ -47,7 +47,7 @@ public static class ChoiceChanger
             return Failure([gitError!]);
         }
 
-        if (NotThisFabric(record, catalog) is { } refusal)
+        if (GeneratedMerge.NotThisFabric(record, catalog, "fabric change", "the change") is { } refusal)
         {
             return Failure([refusal]);
         }
@@ -80,32 +80,23 @@ public static class ChoiceChanger
             return Failure([$"{FabricFile.FileName} with {theirsLabel} cannot be generated:", .. theirs.Errors]);
         }
 
-        var scratch = Directory.CreateTempSubdirectory("fabric-change-").FullName;
-        try
+        var (outcome, mergeError) = GeneratedMerge.Merge(
+            repository,
+            record.Name,
+            baseGeneration.Files,
+            theirs.Files,
+            ("project", string.Join(' ', changes.Select(change => $"{change.Dimension}={change.From}")), theirsLabel));
+        if (outcome is null)
         {
-            var (baseTree, baseError) = WriteTree(repository, baseGeneration, Path.Combine(scratch, "base"), record.Name);
-            var (theirsTree, theirsError) = WriteTree(repository, theirs, Path.Combine(scratch, "theirs"), record.Name);
-            if (baseTree is null || theirsTree is null)
-            {
-                return Failure([(baseError ?? theirsError)!]);
-            }
+            return Failure([mergeError!]);
+        }
 
-            var outcome = repository.Merge(
-                baseTree,
-                theirsTree,
-                ("project", string.Join(' ', changes.Select(change => $"{change.Dimension}={change.From}")), theirsLabel),
-                Path.Combine(scratch, "merge"));
-            var hasOpenApiDocument = theirs.Files.Any(file => file.Path == UpgradeSummary.OpenApiDocument);
-            var hasBaseApi = theirs.Files.Any(file => file.Path == UpgradeSummary.BaseApi);
-            return new UpgradeResult(UpgradeSummary.WriteChange(record.Name, changes, outcome, hasOpenApiDocument, hasBaseApi), [])
-            {
-                Experimental = theirs.Experimental,
-            };
-        }
-        finally
+        var hasOpenApiDocument = theirs.Files.Any(file => file.Path == UpgradeSummary.OpenApiDocument);
+        var hasBaseApi = theirs.Files.Any(file => file.Path == UpgradeSummary.BaseApi);
+        return new UpgradeResult(UpgradeSummary.WriteChange(record.Name, changes, outcome, hasOpenApiDocument, hasBaseApi), [])
         {
-            Directory.Delete(scratch, recursive: true);
-        }
+            Experimental = theirs.Experimental,
+        };
     }
 
     /// <summary>
@@ -146,33 +137,6 @@ public static class ChoiceChanger
         }
 
         return (changed, refusals);
-    }
-
-    /// <summary>
-    /// Base is what this fabric writes for the recorded choices, so the project must be one this fabric and catalog wrote
-    /// (ADR-0016 C3); otherwise every difference between the generators would be taken as the project's own edit.
-    /// </summary>
-    private static string? NotThisFabric(FabricRecord record, CatalogModel catalog)
-    {
-        if (record.Generator != GeneratorVersion.Current)
-        {
-            var writer = record.Generator is { } version ? $"was written by fabric {version}" : "records no generator version";
-            return $"{FabricFile.FileName} {writer}, not this fabric {GeneratorVersion.Current}; run fabric upgrade first, so the change " +
-                "is the only difference fabric change merges (ADR-0016 C3).";
-        }
-
-        return record.Catalog == catalog.Hash
-            ? null
-            : $"{FabricFile.FileName} records catalog {record.Catalog ?? "none"}, but this fabric's catalog is {catalog.Hash}; " +
-              "fabric change merges against what this catalog writes, so it refuses a project another catalog generated (ADR-0016 C3).";
-    }
-
-    private static (string? Tree, string? Error) WriteTree(GitRepository repository, GenerationResult generation, string scratch, string name)
-    {
-        var directory = Path.Combine(scratch, name);
-        return ProjectWriter.Write(directory, generation.Files) is { } error
-            ? (null, error)
-            : (repository.WriteTree(directory, scratch + ".index"), null);
     }
 
     private static UpgradeResult Failure(IReadOnlyList<string> errors) => new(null, errors);
