@@ -117,7 +117,7 @@ public sealed class McpClientTests
     private static GeneratedProject NewProject()
     {
         var project = new GeneratedProject(Profile, McpClient);
-        var standIns = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs", "adr"))
+        var standIns = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs", "adr", "fabric"))
             .Where(file => File.ReadAllText(file).Contains("This option's pack is not written yet.", StringComparison.Ordinal))
             .Select(Path.GetFileName)
             .ToList();
