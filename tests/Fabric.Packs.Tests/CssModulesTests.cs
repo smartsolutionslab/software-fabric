@@ -46,7 +46,7 @@ public sealed partial class CssModulesTests
             var agents = files["AGENTS.md"];
             agents.ShouldContain("## Styling: CSS Modules");
             agents.ShouldNotContain("## Styling: Tailwind");
-            files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("-frontend-styling-css-modules.md", StringComparison.Ordinal));
+            files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("/frontend-styling-css-modules.md", StringComparison.Ordinal));
         }
     }
 
@@ -164,7 +164,7 @@ public sealed partial class CssModulesTests
         section = section[..section.IndexOf("\n## ", 1, StringComparison.Ordinal)];
         section.ShouldNotContain("Tailwind");
         section.ShouldContain("CSS module");
-        Adr(files, "-frontend-architecture-micro-frontends.md").ShouldNotContain("Tailwind");
+        Adr(files, "/frontend-architecture-micro-frontends.md").ShouldNotContain("Tailwind");
     }
 
     [Fact]

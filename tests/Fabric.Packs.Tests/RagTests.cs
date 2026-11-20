@@ -200,7 +200,7 @@ public sealed class RagTests
     {
         var files = Files(Profile, "backend.llm=openai", Rag, "backend.tenancy=column");
 
-        var adr = files.Single(file => file.Key.EndsWith("-backend-llm-extras-rag.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.EndsWith("/backend-llm-extras-rag.md", StringComparison.Ordinal)).Value;
         adr.ShouldNotContain("`schema-per-tenant` or `database-per-tenant`", Case.Sensitive, "the pack supports a schema per tenant");
         adr.ShouldContain("This pack keeps vectors apart by a tenant column or a schema per tenant: with `database-per-tenant` tenancy the build fails rather than sharing vectors between tenants.");
     }
@@ -225,7 +225,7 @@ public sealed class RagTests
         store.ShouldContain("if (passages.Count < count)");
         store.ShouldContain("$\"WITH records AS MATERIALIZED (SELECT key, content, embedding FROM {Table}) \" +");
         store.ShouldContain("\"SELECT key, content, embedding <=> $1 FROM records ORDER BY embedding <=> $1, key LIMIT $2\"");
-        var adr = files.Single(file => file.Key.EndsWith("-backend-llm-extras-rag.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.EndsWith("/backend-llm-extras-rag.md", StringComparison.Ordinal)).Value;
         adr.ShouldNotContain("does not come back short");
         adr.ShouldContain("ranks every record of the module exactly");
         files["AGENTS.md"].ShouldContain("A search returns as many records as asked whenever the module has that many");
@@ -399,7 +399,7 @@ public sealed class RagTests
     private static GeneratedProject NewProject(string llm, string embeddings, params string[] more)
     {
         var project = new GeneratedProject(Profile, [.. Overrides(llm, embeddings), .. more]);
-        var standIns = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs", "adr"))
+        var standIns = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs", "adr", "fabric"))
             .Where(file => File.ReadAllText(file).Contains("This option's pack is not written yet.", StringComparison.Ordinal))
             .Select(Path.GetFileName)
             .ToList();

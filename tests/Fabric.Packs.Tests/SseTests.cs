@@ -96,7 +96,7 @@ public sealed class SseTests
         files["AGENTS.md"].ShouldContain("## Realtime: server-sent events");
         files["AGENTS.md"].ShouldContain("IBrowserEvents");
         files["AGENTS.md"].ShouldContain("src/realtime/ServerEvents.tsx");
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-realtime-sse.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-realtime-sse.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("access_token");
         adr.ShouldContain("e2e/server-events.spec.ts");
     }

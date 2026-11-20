@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Fabric.Core.Packs;
 
 namespace Fabric.Core.Upgrade;
 
@@ -17,6 +18,8 @@ public static class UpgradeSummary
     public const string BaseApi = "web/app/src/api/baseApi.ts";
 
     private const string WebSource = "web/app/src/";
+
+    private const string AdrDirectory = "docs/adr/";
 
     /// <summary>
     /// Writes the summary. <paramref name="hasOpenApiDocument"/> and <paramref name="hasBaseApi"/> say whether the
@@ -92,7 +95,10 @@ public static class UpgradeSummary
             text,
             "conflicts to resolve, then git add and commit",
             outcome.Conflicts.Select(conflict => $"{Describe(conflict.Kind, theirs)}: {conflict.Path}").ToList());
+        var moves = MovedPackAdrs(outcome);
+        Section(text, $"pack ADRs moved under {Composer.PackAdrDirectory}", moves.Select(move => $"{move.From} -> {move.To}").ToList());
         var notes = NotGuaranteed(outcome, hasOpenApiDocument, hasBaseApi);
+        notes.AddRange(MoveNotes(moves));
         notes.AddRange(extraNotes);
         if (notes.Count > 0)
         {
@@ -125,6 +131,51 @@ public static class UpgradeSummary
         ConflictKind.DeletedByGenerator => $"changed by the project, deleted by {theirs}",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
+
+    /// <summary>
+    /// The pack ADRs fabric 0.7.0 and earlier numbered by their place among the selected packs,
+    /// <c>docs/adr/NNNN-&lt;dimension&gt;-&lt;option&gt;.md</c>, that this merge removes while it adds the same name under
+    /// <see cref="Composer.PackAdrDirectory"/> (ADR-0018). <c>Edited</c>: the project had changed the old file, so its
+    /// removal is a conflict.
+    /// </summary>
+    private static List<(string From, string To, bool Edited)> MovedPackAdrs(UpgradeOutcome outcome)
+    {
+        var added = outcome.Taken.Where(file => file.Status == 'A').Select(file => file.Path).ToHashSet(StringComparer.Ordinal);
+        return [.. outcome.Taken.Where(file => file.Status == 'D').Select(file => (file.Path, Edited: false))
+            .Concat(outcome.Conflicts.Where(conflict => conflict.Kind == ConflictKind.DeletedByGenerator).Select(conflict => (conflict.Path, Edited: true)))
+            .Select(removed => (From: removed.Path, To: Composer.PackAdrDirectory + UnnumberedName(removed.Path), removed.Edited))
+            .Where(move => move.To != Composer.PackAdrDirectory && added.Contains(move.To))
+            .OrderBy(move => move.From, StringComparer.Ordinal)];
+    }
+
+    /// <summary><c>base-core.md</c> for <c>docs/adr/0001-base-core.md</c>; empty for any other path.</summary>
+    private static string UnnumberedName(string path)
+    {
+        if (!path.StartsWith(AdrDirectory, StringComparison.Ordinal))
+        {
+            return string.Empty;
+        }
+
+        var name = path[AdrDirectory.Length..];
+        return name.Length > 5 && !name.Contains('/', StringComparison.Ordinal) && name[..4].All(char.IsAsciiDigit) && name[4] == '-'
+            ? name[5..]
+            : string.Empty;
+    }
+
+    private static IEnumerable<string> MoveNotes(List<(string From, string To, bool Edited)> moves)
+    {
+        if (moves.Count == 0)
+        {
+            yield break;
+        }
+
+        yield return "- that the project's own ADRs, docs and code cite the moved pack ADRs by their new names: search for each old file name " +
+            $"and its number (ADR-NNNN) and point them at the new name under {Composer.PackAdrDirectory}.";
+        foreach (var move in moves.Where(move => move.Edited))
+        {
+            yield return $"- that the project's edits of a moved pack ADR reach its new name: carry them from {move.From} to {move.To}, then git rm the old file.";
+        }
+    }
 
     /// <summary>D1's list, each only where the upgrade touched what it is about.</summary>
     private static List<string> NotGuaranteed(UpgradeOutcome outcome, bool hasOpenApiDocument, bool hasBaseApi)

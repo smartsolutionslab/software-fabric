@@ -247,7 +247,7 @@ public sealed partial class TanStackFormTests
         files["AGENTS.md"].ShouldContain("`schema.parse(value)`");
         files["AGENTS.md"].ShouldNotContain("## Forms: React Hook Form");
         Adr(files).ShouldContain("TanStack Form");
-        files.Keys.ShouldNotContain(path => path.EndsWith("-frontend-forms-react-hook-form.md", StringComparison.Ordinal));
+        files.Keys.ShouldNotContain(path => path.EndsWith("/frontend-forms-react-hook-form.md", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -417,7 +417,7 @@ public sealed partial class TanStackFormTests
 
     /// <summary>The generated ADR of an option, by the end of its file name; the forms option's by default.</summary>
     private static string Adr(Dictionary<string, string> files, string option = "forms-tanstack-form") =>
-        files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith($"-frontend-{option}.md", StringComparison.Ordinal)).Value;
+        files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith($"/frontend-{option}.md", StringComparison.Ordinal)).Value;
 
     private static IEnumerable<KeyValuePair<string, string>> WebSources(Dictionary<string, string> files) =>
         files.Where(file => file.Key.StartsWith("web/", StringComparison.Ordinal) && Regex.IsMatch(file.Key, @"\.(ts|tsx|vue)$"));

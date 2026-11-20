@@ -483,7 +483,7 @@ public sealed partial class FormKitTests
 
     /// <summary>The generated ADR of an option, by the end of its file name; the forms option's by default.</summary>
     private static string Adr(Dictionary<string, string> files, string option = "forms-formkit") =>
-        files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith($"-frontend-{option}.md", StringComparison.Ordinal)).Value;
+        files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith($"/frontend-{option}.md", StringComparison.Ordinal)).Value;
 
     private static IEnumerable<KeyValuePair<string, string>> WebSources(Dictionary<string, string> files) =>
         files.Where(file => file.Key.StartsWith("web/", StringComparison.Ordinal) && Regex.IsMatch(file.Key, @"\.(ts|tsx|vue)$"));

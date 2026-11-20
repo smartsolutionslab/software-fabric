@@ -99,7 +99,7 @@ public sealed class NxTests
 
         files["AGENTS.md"].ShouldContain("## Frontend workspace: Nx");
         files["AGENTS.md"].ShouldContain("nx run-many");
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-workspace-nx.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-workspace-nx.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("neverConnectToCloud");
         adr.ShouldContain(".nx/cache");
     }

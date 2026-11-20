@@ -547,7 +547,7 @@ public sealed partial class MuiTests
     }
 
     private static string Adr(Dictionary<string, string> files, string option) =>
-        files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith($"-{option}.md", StringComparison.Ordinal)).Value;
+        files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith($"/{option}.md", StringComparison.Ordinal)).Value;
 
     private static IEnumerable<KeyValuePair<string, string>> WebSources(Dictionary<string, string> files) =>
         files.Where(file => file.Key.StartsWith("web/app/src/", StringComparison.Ordinal) && Regex.IsMatch(file.Key, @"\.(ts|tsx)$"));

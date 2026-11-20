@@ -84,7 +84,7 @@ public sealed class ServerEventsVueTests
         files["AGENTS.md"].ShouldContain("useServerEvent<InvoicePaidV1>('InvoicePaidV1', handler)");
         files["AGENTS.md"].ShouldContain("src/realtime/ServerEvents.vue");
         files["AGENTS.md"].ShouldNotContain("useCallback");
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-realtime-signalr.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-realtime-signalr.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("src/realtime/useServerEvent.test.ts");
         adr.ShouldNotContain(".tsx");
     }

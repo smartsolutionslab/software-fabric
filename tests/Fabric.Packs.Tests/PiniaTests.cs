@@ -60,7 +60,7 @@ public sealed class PiniaTests
         files["AGENTS.md"].ShouldContain("src/stores/");
         files["AGENTS.md"].ShouldNotContain("## Frontend state: Pinia and TanStack Query");
         files["AGENTS.md"].ShouldNotContain("useGetBillingNotes");
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-state-pinia.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-state-pinia.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("src/stores/");
         adr.ShouldContain("getBillingNotes");
         adr.ShouldNotContain("QueryClient");

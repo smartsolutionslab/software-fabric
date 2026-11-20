@@ -81,8 +81,8 @@ public sealed partial class GenericOidcTests
     public void The_decision_records_and_the_permission_tests_describe_the_providers_claims_not_keycloaks()
     {
         var files = Files(GenericOidc, RolesAndClaims);
-        var tenancy = files.Single(file => file.Key.EndsWith("-backend-tenancy-column.md", StringComparison.Ordinal)).Value;
-        var roles = files.Single(file => file.Key.EndsWith("-backend-authorization-roles.md", StringComparison.Ordinal)).Value;
+        var tenancy = files.Single(file => file.Key.EndsWith("/backend-tenancy-column.md", StringComparison.Ordinal)).Value;
+        var roles = files.Single(file => file.Key.EndsWith("/backend-authorization-roles.md", StringComparison.Ordinal)).Value;
         var permissionTests = files["web/app/src/auth/RequirePermission.test.tsx"];
 
         tenancy.ShouldContain("`tenant` claim");
@@ -179,7 +179,7 @@ public sealed partial class GenericOidcTests
     private static GeneratedProject NewProject(params string[] overrides)
     {
         var project = new GeneratedProject(Profile, overrides);
-        var standIns = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs", "adr"))
+        var standIns = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs", "adr", "fabric"))
             .Where(file => File.ReadAllText(file).Contains("This option's pack is not written yet.", StringComparison.Ordinal))
             .Select(Path.GetFileName)
             .ToList();

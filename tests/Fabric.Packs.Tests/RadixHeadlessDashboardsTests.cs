@@ -92,7 +92,7 @@ public sealed partial class RadixHeadlessDashboardsTests
     {
         var files = Files([RadixHeadless, .. AgentsAndDashboards]);
 
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-agent-ui-ag-ui.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-agent-ui-ag-ui.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("built from the project's Radix `Button` and React Hook Form");
         adr.ShouldNotContain("shadcn/ui");
     }

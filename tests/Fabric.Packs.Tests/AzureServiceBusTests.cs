@@ -70,7 +70,7 @@ public sealed class AzureServiceBusTests
         messaging.ShouldContain("GetConnectionString(\"messaging-management\")");
 
         File.ReadAllText(Path.Combine(project.ProjectDirectory, "AGENTS.md")).ShouldContain("## Message transport: Azure Service Bus");
-        File.ReadAllText(Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs", "adr"), "*-backend-bus-transport-azure-service-bus.md").Single())
+        File.ReadAllText(Path.Combine(project.ProjectDirectory, "docs", "adr", "fabric", "backend-bus-transport-azure-service-bus.md"))
             .ShouldContain("# Message transport: Azure Service Bus");
 
         var (architectureExitCode, architectureOutput) = project.Test("tests/Architecture.Tests/Architecture.Tests.csproj");

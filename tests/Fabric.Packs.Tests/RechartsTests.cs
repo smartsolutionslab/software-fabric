@@ -88,8 +88,8 @@ public sealed partial class RechartsTests
         files["AGENTS.md"].ShouldContain("## Charts: Recharts");
         files["AGENTS.md"].ShouldContain("`chartColor(position)` from `@/components/chart-colors`");
         NamesECharts().IsMatch(files["AGENTS.md"]).ShouldBeFalse("AGENTS.md names no ECharts");
-        files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("-frontend-charts-recharts.md", StringComparison.Ordinal));
-        files.Keys.ShouldNotContain(path => path.EndsWith("-frontend-charts-echarts.md", StringComparison.Ordinal));
+        files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("/frontend-charts-recharts.md", StringComparison.Ordinal));
+        files.Keys.ShouldNotContain(path => path.EndsWith("/frontend-charts-echarts.md", StringComparison.Ordinal));
         WebSources(files).ShouldNotContain(source => NamesECharts().IsMatch(source.Value), "no web source names echarts");
     }
 
