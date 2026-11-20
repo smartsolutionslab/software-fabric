@@ -23,9 +23,12 @@ The project exposes MCP tools over HTTP at `/mcp`, through the official C# SDK (
 - **A tool that needs a permission names its module's policy, typed**: `[McpTool("...", Policy = BillingPolicyNames.Manage)]`, from the `<Module>PolicyNames` its Application project declares and its `<Module>Policies` registers. The SDK's authorization filters check it before the call, so a caller without it neither sees the tool in the list nor reaches the handler.
 {{~ end ~}}
 - **One definition of a valid tool**, `McpToolCatalog` in BuildingBlocks, serves both the host and the build: the host refuses to start on a marked request that is not a valid tool, and the architecture rule `EveryMcpToolIsValid` fails the build on the same problems. A marked record must be a command or a query, have a description and exactly one handler in its module{{ if policies }}, and name only a policy its own module registers{{ end }}.
+{{~ if project["backend.topology"] == "services" ~}}
+- **A tool's name is unique within its service.** Each service offers only its own module's tools, so the rule checks names per service, as each service host does at startup: two services may offer the same name.
+{{~ end ~}}
 - **MCP code stays out of the modules.** The attribute and the catalog live in BuildingBlocks, which references no MCP package; only the host references the SDK. A module's Application project references nothing new.
 {{~ if project["backend.topology"] == "services" ~}}
-- **Tests never reach an external server or model.** Each service has its own `tests/Services/<Module>/Mcp.Server.Tests`, which runs that service's host in process with sample requests of its own and calls it with the SDK's client at `/<module>/mcp`. The integration tests call every service's `/<module>/mcp` through the edge.
+- **Tests never reach an external server or model.** Each service has its own `tests/Services/<Module>/Mcp.Server.Tests` (`<Module>.Mcp.Server.Tests.csproj`, so each keeps its own coverage report), which runs that service's host in process with sample requests of its own and calls it with the SDK's client at `/<module>/mcp`. The integration tests call every service's `/<module>/mcp` through the edge.
 {{~ else ~}}
 - **Tests never reach an external server or model.** `tests/Mcp.Server.Tests` runs the real host in process with sample requests of its own and calls it with the SDK's client.
 {{~ end ~}}
