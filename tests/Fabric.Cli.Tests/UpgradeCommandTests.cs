@@ -217,7 +217,8 @@ public sealed class UpgradeCommandTests : IDisposable
 
         run.ExitCode.ShouldBe(0, run.Error);
         run.Output.ShouldStartWith($"upgraded shop from fabric {OldVersion} to fabric {Running}; nothing is committed.");
-        run.Output.ShouldContain("  A src/audit/page.test.md");
+        run.Output.ShouldContain("  M README.md");
+        run.Output.ShouldContain("  A docs/notes.md");
         run.Output.ShouldNotContain("conflict");
         Git.Run(mixed, "ls-files", "-u").ShouldBeEmpty();
 

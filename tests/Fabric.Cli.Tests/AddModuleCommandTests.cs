@@ -201,21 +201,21 @@ public sealed class AddModuleCommandTests : IDisposable
     }
 
     /// <summary>What this build writes from scratch for the project's fabric.yaml, as fabric upgrade regenerates it.</summary>
-    private Dictionary<string, string> Fresh()
+    private SortedDictionary<string, string> Fresh()
     {
         var catalog = CatalogReader.ReadFile(Paths.FixtureCatalog);
         var packs = PackLoader.Load(Paths.FixturePacks, catalog).Packs;
         var record = FabricFile.Read(new StringReader(Read(FabricFile.FileName)), FabricFile.FileName);
         var regenerated = Generator.Regenerate(catalog, packs, record);
         regenerated.Errors.ShouldBeEmpty();
-        return regenerated.Files.ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
+        return new(regenerated.Files.ToDictionary(file => file.Path, file => file.Content), StringComparer.Ordinal);
     }
 
-    private static Dictionary<string, string> Tree(string directory) =>
-        Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
+    private static SortedDictionary<string, string> Tree(string directory) =>
+        new(Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
             .Select(file => Path.GetRelativePath(directory, file).Replace('\\', '/'))
             .Where(path => !path.StartsWith(".git/", StringComparison.Ordinal))
-            .ToDictionary(path => path, path => File.ReadAllText(Path.Combine(directory, path)), StringComparer.Ordinal);
+            .ToDictionary(path => path, path => File.ReadAllText(Path.Combine(directory, path))), StringComparer.Ordinal);
 
     /// <summary>The lines of fabric.yaml that say which generator and which catalog wrote it.</summary>
     private static string[] Stamp(string fabricYaml) =>
