@@ -516,7 +516,7 @@ public sealed class UpgradeCommandTests : IDisposable
         Git.Run(numbered, "ls-files", "-u").ShouldBeEmpty();
         var expected = Fresh();
         expected["docs/adr/0006-our-own-decision.md"] = "# Our own decision\n";
-        Tree(numbered).ShouldBe(expected);
+        Tree(numbered).OrderBy(file => file.Key, StringComparer.Ordinal).ShouldBe(expected.OrderBy(file => file.Key, StringComparer.Ordinal));
         run.Output.ShouldContain(
             $"pack ADRs moved under docs/adr/fabric/ (5):{Environment.NewLine}" +
             $"  docs/adr/0001-backend-api-protocols-grpc.md -> docs/adr/fabric/backend-api-protocols-grpc.md{Environment.NewLine}");
