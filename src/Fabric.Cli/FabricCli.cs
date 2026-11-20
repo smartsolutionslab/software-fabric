@@ -165,7 +165,11 @@ public static class FabricCli
             Description = "The generated project to add the module to. Defaults to the current directory.",
             DefaultValueFactory = _ => ".",
         };
-        var command = new Command("add-module", "Add a module (bounded context) to a generated project. Only creates files.")
+        var command = new Command(
+            "add-module",
+            "Add a module (bounded context) to a generated project. Creates its files; a module of a style or event store new to " +
+            "the project is merged into it as fabric change merges a choice, in the top of a git repository with a clean working " +
+            "tree (ADR-0005). Conflicts are left as git conflicts; nothing is committed.")
         {
             name,
             set,
@@ -201,6 +205,19 @@ public static class FabricCli
             if (addition.FabricYaml is not { } fabricYaml)
             {
                 return Fail(error, addition.Errors);
+            }
+
+            if (addition.Project is not null)
+            {
+                var merge = ModuleMerger.Merge(projectDirectory, record, moduleName, addition, catalogModel, loaded.Packs);
+                if (merge.Summary is not { } summary)
+                {
+                    return Fail(error, merge.Errors);
+                }
+
+                output.Write(summary);
+                WarnExperimental(error, merge.Experimental);
+                return 0;
             }
 
             if (ProjectWriter.Add(projectDirectory, addition.Created, fabricYaml, addition.OpenApi) is { } writeError)

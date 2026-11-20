@@ -62,6 +62,34 @@ export function {{ module.namespace }}Page() {
 }
 {{~ else if sample_page ~}}
 {{~ ns = module.namespace ~}}
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ func imports(names, from)
+  line = "import { " + (names | array.join ", ") + " } from '" + from + "';"
+  if fits(0, line)
+    ret line
+  end
+  ret "import {\n  " + (names | array.join ",\n  ") + ",\n} from '" + from + "';"
+end ~}}
+{{~ func braces(indent, before, entries, after)
+  line = before + "{ " + (entries | array.join ", ") + " }" + after
+  if fits(indent, line)
+    ret line
+  end
+  pad = "  "
+  ret before + "{\n" + pad + (entries | array.join (",\n" + pad)) + ",\n}" + after
+end ~}}
+{{~ func element(indent, open, attributes, close)
+  line = open + " " + (attributes | array.join " ") + close
+  if fits(indent, line)
+    ret line
+  end
+  pad = "  "
+  ret open + "\n" + pad + (attributes | array.join ("\n" + pad)) + "\n" + (close | string.lstrip)
+end ~}}
 {{~ # With the app shell (#695) the result is a toast through notify; without it, a message beside the form. ~}}
 {{~ shell = project["frontend.routing"] == "react-router" ~}}
 {{~ # TanStack Table's DataTable draws its own loading and empty states (#696); beside AG Grid the page draws them. ~}}
@@ -85,14 +113,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 {{~ if shell ~}}
 import { notify } from '@/lib/notify';
 {{~ end ~}}
-import { Create{{ ns }}SampleForm, sampleNameField } from './Create{{ ns }}SampleForm';
+{{ imports ["Create" + ns + "SampleForm", "sampleNameField"] ("./Create" + ns + "SampleForm") }}
 {{~ if probe ~}}
 import { useCanManage } from './useCanManage';
 {{~ end ~}}
 {{~ if fetch ~}}
-import { type {{ ns }}SampleDto, useCreate{{ ns }}Sample, use{{ ns }}Samples } from './use{{ ns }}Samples';
+{{ imports ["type " + ns + "SampleDto", "useCreate" + ns + "Sample", "use" + ns + "Samples"] ("./use" + ns + "Samples") }}
 {{~ else ~}}
-import { useCreate{{ ns }}Sample, use{{ ns }}Samples } from './use{{ ns }}Samples';
+{{ imports ["useCreate" + ns + "Sample", "use" + ns + "Samples"] ("./use" + ns + "Samples") }}
 {{~ end ~}}
 
 const samples = columnsOf<{{ ns }}SampleDto>();
@@ -115,9 +143,9 @@ function toTheForm() {
  */
 export function {{ ns }}Page() {
 {{~ if table ~}}
-  const { samples: rows, page, isLoading, isError } = use{{ ns }}Samples();
+  {{ braces 2 "const " ["samples: rows", "page", "isLoading", "isError"] (" = use" + ns + "Samples();") }}
 {{~ else ~}}
-  const { samples: rows, isLoading, isError } = use{{ ns }}Samples();
+  {{ braces 2 "const " ["samples: rows", "isLoading", "isError"] (" = use" + ns + "Samples();") }}
 {{~ end ~}}
   const { create, isSaving } = useCreate{{ ns }}Sample();
 {{~ if probe ~}}
@@ -165,9 +193,9 @@ export function {{ ns }}Page() {
       {permission === 'granted' && <h2>Manage</h2>}
       {permission === 'failed' && <p role="alert">Permissions for {{ module.name }} could not be loaded.</p>}
 {{~ end ~}}
-      <section aria-labelledby="{{ module.name }}-samples" className="flex flex-col gap-4">
+      {{ element 6 "<section" ["aria-labelledby=\"" + module.name + "-samples\"", "className=\"flex flex-col gap-4\""] ">" }}
         <h2 id="{{ module.name }}-samples">Samples</h2>
-        <Create{{ ns }}SampleForm onCreate={onCreate} saving={isSaving} />
+        {{ element 8 ("<Create" + ns + "SampleForm") ["onCreate={onCreate}", "saving={isSaving}"] " />" }}
 {{~ if !shell ~}}
         {message && <p role={message.role}>{message.text}</p>}
 {{~ end ~}}

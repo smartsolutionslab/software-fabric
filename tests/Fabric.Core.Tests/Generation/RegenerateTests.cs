@@ -68,6 +68,31 @@ public sealed class RegenerateTests : IDisposable
     }
 
     [Fact]
+    public void A_project_with_modules_of_a_style_new_did_not_choose_regenerates_with_each_styles_project_wide_content_once()
+    {
+        var generated = Generator.New(Fixtures.MinimalCatalog, Fixtures.MinimalPacks, "shop", "minimal", []);
+        generated.Errors.ShouldBeEmpty();
+        var record = Record(generated.Files);
+        OrderedDictionary<string, IReadOnlyDictionary<string, IReadOnlyList<string>>> modules = [];
+        modules.Add("shipping", new Dictionary<string, IReadOnlyList<string>> { ["module.style"] = ["ddd"] });
+        modules.Add("audit", new Dictionary<string, IReadOnlyList<string>> { ["module.style"] = ["crud"] });
+        modules.Add("billing", new Dictionary<string, IReadOnlyList<string>> { ["module.style"] = ["ddd"] });
+        var mixed = record with { Choices = record.Choices with { Modules = modules } };
+
+        var regenerated = Generator.Regenerate(Fixtures.MinimalCatalog, Fixtures.MinimalPacks, mixed);
+
+        regenerated.Errors.ShouldBeEmpty();
+        var files = regenerated.Files.ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
+        files["src/shipping/README.md"].ShouldBe("# shipping (ddd)\n");
+        files["src/audit/README.md"].ShouldBe("# audit (crud)\n");
+        files["src/billing/README.md"].ShouldBe("# billing (ddd)\n");
+        files["README.md"].Split("## modules: ddd").Length.ShouldBe(2);
+        files["README.md"].Split("## modules: crud").Length.ShouldBe(2);
+        files[FabricFile.FileName].ShouldEndWith(
+            "modules:\n  shipping:\n    module.style: ddd\n  audit:\n    module.style: crud\n  billing:\n    module.style: ddd\n");
+    }
+
+    [Fact]
     public void Regenerating_a_project_without_a_profile_writes_no_profile_either()
     {
         var written = NewThenAdd(Fixtures.MinimalPacks, null, ["backend.database=sqlserver"], "billing");

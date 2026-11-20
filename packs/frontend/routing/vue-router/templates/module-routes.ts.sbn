@@ -1,4 +1,17 @@
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ func braces(indent, before, entries, after)
+  line = before + "{ " + (entries | array.join ", ") + " }" + after
+  if fits(indent, line)
+    ret line
+  end
+  pad = "  "
+  ret before + "{\n" + pad + (entries | array.join (",\n" + pad)) + ",\n}" + after
+end ~}}
 import type { ModuleRoute } from '@/modules';
 import {{ module.namespace }}Page from './{{ module.namespace }}Page.vue';
 
-export const route: ModuleRoute = { path: '{{ module.name }}', title: '{{ module.namespace }}', component: {{ module.namespace }}Page };
+{{ braces 0 "export const route: ModuleRoute = " ["path: '" + module.name + "'", "title: '" + module.namespace + "'", "component: " + module.namespace + "Page"] ";" }}

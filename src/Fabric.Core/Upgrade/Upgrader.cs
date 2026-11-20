@@ -153,6 +153,9 @@ public static class Upgrader
                 continue;
             }
 
+            // An add-module that merges a module of a new style into the project (ADR-0005, amended 2026-11-20) needs it
+            // committed in a git repository of its own.
+            GitRepository.CommitScratch(directory);
             var added = old.Run(
                 Path.GetDirectoryName(directory)!,
                 ["add-module", module.Name, "--project", directory, .. module.Overrides.SelectMany(assignment => (string[])["--set", assignment])]);
@@ -160,6 +163,11 @@ public static class Upgrader
             {
                 return (null, $"fabric {recorded} could not regenerate {FabricFile.FileName}: {added.Printed}");
             }
+        }
+
+        if (Directory.Exists(Path.Combine(directory, ".git")))
+        {
+            Directory.Delete(Path.Combine(directory, ".git"), recursive: true);
         }
 
         var written = Read(directory);

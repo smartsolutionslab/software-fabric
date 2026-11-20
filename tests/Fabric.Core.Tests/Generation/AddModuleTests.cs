@@ -139,11 +139,28 @@ public class AddModuleTests
     }
 
     [Fact]
-    public void Rejects_an_option_whose_pack_would_change_existing_files()
+    public void A_module_whose_packs_the_project_has_only_creates_files_and_has_nothing_to_merge()
     {
-        Add(Generated("minimal"), "billing", "module.style=crud").Errors.ShouldBe([
-            "module.style=crud is new to this project and its pack contributes to project-wide files (slot readme.sections); " +
-            "add-module only creates files, so choose it when generating the project or add it by hand.",
-        ]);
+        var addition = Add(Generated("minimal"), "billing");
+
+        addition.NewPacks.ShouldBeEmpty();
+        addition.Project.ShouldBeNull();
+    }
+
+    [Fact]
+    public void An_option_new_to_the_project_gives_the_whole_project_with_the_module_to_merge_and_creates_nothing_by_itself()
+    {
+        var addition = Add(Generated("minimal"), "billing", "module.style=crud");
+
+        addition.Errors.ShouldBeEmpty();
+        addition.NewPacks.ShouldBe(["module.style=crud"]);
+        addition.Created.ShouldBeEmpty();
+        addition.OpenApi.ShouldBeNull();
+        var project = addition.Project.ShouldNotBeNull().ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
+        project["src/billing/README.md"].ShouldBe("# billing (crud)\n");
+        project["README.md"].ShouldContain("## modules: ddd");
+        project["README.md"].ShouldContain("## modules: crud");
+        project[FabricFile.FileName].ShouldBe(addition.FabricYaml);
+        addition.FabricYaml.ShouldNotBeNull().ShouldEndWith("modules:\n  billing:\n    module.style: crud\n");
     }
 }

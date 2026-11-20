@@ -77,6 +77,31 @@ public static class UpgradeSummary
             []);
     }
 
+    /// <summary>
+    /// Writes the summary of <c>add-module</c> for a module that selects packs new to the project (ADR-0005, amended
+    /// 2026-11-20): the same sections as an upgrade's, with <c>add-module &lt;module&gt;</c> standing where an upgrade names
+    /// the new generator.
+    /// </summary>
+    public static string WriteModule(
+        string name,
+        string module,
+        IReadOnlyList<string> newPacks,
+        UpgradeOutcome outcome,
+        bool hasOpenApiDocument,
+        bool hasBaseApi)
+    {
+        ArgumentNullException.ThrowIfNull(newPacks);
+        ArgumentNullException.ThrowIfNull(outcome);
+
+        return Write(
+            $"added module {module} to {name}, merging in what its packs new to the project write ({string.Join(", ", newPacks)}); nothing is committed.",
+            $"add-module {module}",
+            outcome,
+            hasOpenApiDocument,
+            hasBaseApi,
+            []);
+    }
+
     /// <param name="theirs">What wrote the merged-in tree, as the sections name it.</param>
     private static string Write(
         string headline,

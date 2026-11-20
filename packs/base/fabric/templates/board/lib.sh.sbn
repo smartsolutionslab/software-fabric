@@ -139,6 +139,34 @@ board_eligible_jq='.state == "open" and (.assignees | length) == 0
   and ([.labels[].name] | index("agent:ready") != null and index("lane:" + $lane) != null
        and (any(. == "agent:blocked" or startswith("needs:")) | not))'
 
+# The issues an issue depends on: the references (#12, or owner/repo#34 in another repository) in the "## Depends on"
+# section of its body, up to the next heading of level one or two, as jq over one issue printing one per line, in
+# order, each once. References elsewhere in the body are not dependencies.
+board_dependencies_jq='[(.body // "") | gsub("\r"; "") | split("\n")
+  | (map(test("^##\\s+Depends on\\s*$"; "i")) | index(true)) as $start
+  | if $start == null then empty else .[$start + 1:] end
+  | (map(test("^##?\\s")) | index(true)) as $end
+  | (if $end == null then . else .[:$end] end) | .[]
+  | scan("(?<![A-Za-z0-9_./-])((?:[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+)?)#([0-9]+)")
+  | if .[0] == "" then "#\(.[1])" else "\(.[0])#\(.[1])" end]
+  | reduce .[] as $reference ([]; if index([$reference]) == null then . + [$reference] else . end) | .[]'
+
+# Prints the dependencies of an issue (its JSON) that are not closed, one per line; one that cannot be read is not
+# known to be closed and is printed with " (could not be read)". Returns 1 only when the issue's body cannot be parsed.
+board_open_dependencies() {
+  local references reference target state
+  references="$(jq -r "$board_dependencies_jq" <<< "$1")" || return 1
+  while read -r reference; do
+    [ -n "$reference" ] || continue
+    target="${reference%#*}"
+    if ! state="$(gh api "repos/${target:-$repo}/issues/${reference##*#}" | jq -r '.state // empty')"; then
+      echo "$reference (could not be read)"
+    elif [ "$state" != closed ]; then
+      echo "$reference"
+    fi
+  done <<< "$references"
+}
+
 # Returns 0 when the issue is eligible in the lane now, 2 when it is not, 1 when it could not be read.
 board_eligible() {
   local state

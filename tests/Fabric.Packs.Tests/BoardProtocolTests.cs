@@ -31,11 +31,12 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Directory.Delete(Path.GetDirectoryName(origin)!, recursive: true);
     }
 
-    private static JsonObject Issue(int number, string title, string[] labels, string[]? assignees = null, string state = "open") => new()
+    private static JsonObject Issue(int number, string title, string[] labels, string[]? assignees = null, string state = "open", string? body = null) => new()
     {
         ["number"] = number,
         ["title"] = title,
         ["state"] = state,
+        ["body"] = body,
         ["labels"] = new JsonArray([.. labels.Select(label => (JsonNode)new JsonObject { ["name"] = label })]),
         ["assignees"] = new JsonArray([.. (assignees ?? []).Select(login => (JsonNode)new JsonObject { ["login"] = login })]),
     };
@@ -44,6 +45,14 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
 
     private void Issues(params JsonObject[] issues) =>
         File.WriteAllText(Path.Combine(state, "issues.json"), new JsonArray([.. issues]).ToJsonString());
+
+    /// <summary>The issues of another repository, which the stand-in answers for that repository only.</summary>
+    private void IssuesOf(string repository, params JsonObject[] issues)
+    {
+        var directory = Path.Combine(state, "repos", repository);
+        Directory.CreateDirectory(directory);
+        File.WriteAllText(Path.Combine(directory, "issues.json"), new JsonArray([.. issues]).ToJsonString());
+    }
 
     private string Origin(params string[] arguments) => BoardProject.Git(state, ["--git-dir", origin, .. arguments]);
 
@@ -366,6 +375,87 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Origin("for-each-ref", "refs/heads/agent/").ShouldBeEmpty();
     }
 
+    [Fact]
+    public void An_issue_waits_while_an_issue_it_depends_on_is_open_and_is_claimed_once_they_are_closed()
+    {
+        Issues(
+            Issue(3, "Model invoices", ["lane:backend"]),
+            Issue(5, "Add customers", ReadyBackend, state: "closed"),
+            Issue(7, "Pay an invoice", ReadyBackend, body: "Pays it.\n\n## Depends on\n\n- #3\n- #5\n\n## Done when\n\n- It is paid.\n"),
+            Issue(9, "Refund an invoice", ReadyBackend));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("9 agent/9");
+        HasBranch("agent/7").ShouldBeFalse();
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+
+        Bash(state, ["-c", ChangeIssue(3, ".state = \"closed\"")]);
+        var (secondExitCode, secondOutput) = Run("next.sh", "backend", "codex-cloud/lane-backend");
+
+        secondExitCode.ShouldBe(0, secondOutput);
+        secondOutput.Trim().ShouldBe("7 agent/7");
+    }
+
+    [Fact]
+    public void An_issue_whose_dependency_in_another_repository_is_open_waits_for_it()
+    {
+        IssuesOf("acme/billing", Issue(4, "Charge a card", ["lane:backend"]));
+        Issues(Issue(7, "Pay an invoice", ReadyBackend, body: "## Depends on\n\n- acme/billing#4\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(3, output);
+        HasBranch("agent/7").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void An_issue_whose_dependencies_are_all_closed_is_claimed_and_references_outside_the_section_do_not_count()
+    {
+        IssuesOf("acme/billing", Issue(4, "Charge a card", ["lane:backend"], state: "closed"));
+        Issues(
+            Issue(3, "Model invoices", ["lane:backend"]),
+            Issue(5, "Add customers", ReadyBackend, state: "closed"),
+            Issue(7, "Pay an invoice", ReadyBackend, body: "Follows #3.\n\n## Depends on\n\n- #5\n- acme/billing#4 (cards)\n\n## Done when\n\n- #3 still reads well.\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(0, output);
+        output.Trim().ShouldBe("7 agent/7");
+    }
+
+    [Fact]
+    public void A_named_issue_with_open_dependencies_is_refused_naming_them()
+    {
+        IssuesOf("acme/billing", Issue(4, "Charge a card", ["lane:backend"]), Issue(5, "Store a card", ["lane:backend"], state: "closed"));
+        Issues(
+            Issue(3, "Model invoices", ["lane:backend"]),
+            Issue(6, "Add customers", ReadyBackend, state: "closed"),
+            Issue(9, "Refund an invoice", ReadyBackend, body: "## Depends on\n\n- #3\n- #6\n- acme/billing#4\n- acme/billing#5\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "9");
+
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe("Not claiming #9: its dependencies are not closed: #3, acme/billing#4.");
+        Origin("for-each-ref", "refs/heads/agent/").ShouldBeEmpty();
+        Labels(IssueState(9)).ShouldNotContain("agent:claimed");
+    }
+
+    [Fact]
+    public void A_dependency_that_cannot_be_read_holds_the_issue_and_is_named()
+    {
+        Issues(Issue(9, "Refund an invoice", ReadyBackend, body: "## Depends on\n\n- acme/gone#1\n"));
+
+        var (listExitCode, listOutput) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "9");
+
+        listExitCode.ShouldBe(3, listOutput);
+        exitCode.ShouldBe(1, output);
+        output.ShouldContain("Not claiming #9: its dependencies are not closed: acme/gone#1 (could not be read).");
+        Origin("for-each-ref", "refs/heads/agent/").ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("needs:decision")]
     [InlineData("needs:human")]
@@ -400,8 +490,11 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     };
 
     /// <summary>A jq update applied to issue 7 in the fake GitHub, as a shell command.</summary>
-    private string ChangeIssue7(string update) =>
-        $"jq 'map(if .number == 7 then {update} else . end)' '{state}/issues.json' > '{state}/issues.tmp' && mv '{state}/issues.tmp' '{state}/issues.json'";
+    private string ChangeIssue7(string update) => ChangeIssue(7, update);
+
+    /// <summary>A jq update applied to one issue in the fake GitHub, as a shell command.</summary>
+    private string ChangeIssue(int number, string update) =>
+        $"jq 'map(if .number == {number} then {update} else . end)' '{state}/issues.json' > '{state}/issues.tmp' && mv '{state}/issues.tmp' '{state}/issues.json'";
 
     [Theory]
     [MemberData(nameof(ChangesThatEndEligibility))]

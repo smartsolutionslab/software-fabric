@@ -1,4 +1,16 @@
 {{~ ns = module.namespace ~}}
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ func test_head(title)
+  head = "test('" + title + "', async ({"
+  if fits(0, head + " page }) => {")
+    ret head + " page }) => {"
+  end
+  ret head + "\n  page,\n}) => {"
+end ~}}
 {{~ signed_in = project["backend.auth"] != "none" ~}}
 import { expect, type Page, test } from '@playwright/test';
 
@@ -13,7 +25,7 @@ async function open{{ ns }}(page: Page) {
   await expect(page.getByRole('heading', { name: 'Samples' })).toBeVisible();
 }
 
-test('a user creates a {{ module.name }} sample and finds it in the list, after a reload too', async ({ page }) => {
+{{ test_head ("a user creates a " + module.name + " sample and finds it in the list, after a reload too") }}
   const name = `E2E ${Date.now()}`;
   await open{{ ns }}(page);
 
@@ -26,7 +38,7 @@ test('a user creates a {{ module.name }} sample and finds it in the list, after 
   await expect(page.getByText(name, { exact: true })).toBeVisible();
 });
 
-test('a blank name is refused on the {{ module.name }} page and nothing is created', async ({ page }) => {
+{{ test_head ("a blank name is refused on the " + module.name + " page and nothing is created") }}
   await open{{ ns }}(page);
 
   await page.getByRole('button', { name: 'Create sample' }).click();
@@ -34,7 +46,7 @@ test('a blank name is refused on the {{ module.name }} page and nothing is creat
   await expect(page.getByRole('alert').filter({ hasText: 'Give the sample a name.' })).toBeVisible();
 });
 
-test('without samples the {{ module.name }} page says so and its action leads to the form', async ({ page }) => {
+{{ test_head ("without samples the " + module.name + " page says so and its action leads to the form") }}
   // The host's list answers empty, whatever samples other tests created.
   await page.route(/\/api\/{{ module.name }}\/samples\?/, (route) =>
     route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }),

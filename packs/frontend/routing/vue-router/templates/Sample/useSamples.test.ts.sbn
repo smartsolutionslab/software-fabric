@@ -1,4 +1,16 @@
 {{~ ns = module.namespace ~}}
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ func imports(names, from)
+  line = "import { " + (names | array.join ", ") + " } from '" + from + "';"
+  if fits(0, line)
+    ret line
+  end
+  ret "import {\n  " + (names | array.join ",\n  ") + ",\n} from '" + from + "';"
+end ~}}
 {{~ pinia = project["frontend.state"] == "pinia" ~}}
 {{~ if pinia ~}}
 import { createPinia } from 'pinia';
@@ -8,7 +20,7 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
 import { cleanup, render, waitFor } from '@testing-library/vue';
 import { afterEach, expect, test, vi } from 'vitest';
 import { defineComponent } from 'vue';
-import { useCreate{{ ns }}Sample, use{{ ns }}Samples } from './use{{ ns }}Samples';
+{{ imports ["useCreate" + ns + "Sample", "use" + ns + "Samples"] ("./use" + ns + "Samples") }}
 
 // The host, as GET and POST /{{ module.name }}/samples reach it through the API client.
 const host = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();

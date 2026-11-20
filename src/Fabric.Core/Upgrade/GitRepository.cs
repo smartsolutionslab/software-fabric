@@ -47,6 +47,30 @@ internal sealed class GitRepository
     }
 
     /// <summary>
+    /// Commits every file under <paramref name="directory"/>, a scratch tree, to a repository of its own, made there first
+    /// if it has none, without the machine's identity, signing or hooks.
+    /// </summary>
+    public static void CommitScratch(string directory)
+    {
+        Required(Git(directory, "init", "-q"));
+        Required(Git(directory, "add", "--all", "--force"));
+        Required(Git(
+            directory,
+            "-c",
+            "user.name=fabric",
+            "-c",
+            "user.email=fabric@localhost",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "--no-verify",
+            "-m",
+            "fabric upgrade base"));
+    }
+
+    /// <summary>
     /// Writes every file under <paramref name="directory"/> into the repository as a tree object, through a scratch index,
     /// with the repository's own attributes and settings, as committing those files to it would.
     /// </summary>

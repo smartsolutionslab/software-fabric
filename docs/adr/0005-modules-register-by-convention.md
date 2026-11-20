@@ -99,3 +99,56 @@ The consequence above, that add-module stays a pure file creator, holds for
 every file but this one: the copy is a file a tool writes, never one people
 edit by hand, and inserting new keys into it cannot conflict with parallel
 module work any more than the integration tests rewriting it can.
+
+## Amendment (owner, 2026-11-20, #848)
+
+The owner's decision on #848, option (b) of two. The text above stands;
+where this section differs, it takes precedence.
+
+**Context.** A project could not hold modules of different styles. Each
+style and event store has a pack with project-wide content (the
+`BuildingBlocks.Domain` or `BuildingBlocks.EventSourcing` projects, Marten's
+store and its `host.services` and `migration-runner.steps` contributions),
+and `add-module` refused any pack new to the project that had some, because
+that content would have to be merged into files that may have changed. So
+whichever style `fabric new` chose, the other was refused, and `fabric
+upgrade` refused a mixed project made by hand too. The alternative set aside,
+(a), was to let `fabric new` take the modules up front.
+
+**Decision.** "`add-module` only creates files" holds unless the module
+brings a pack new to the project.
+
+- **Which modules merge.** A module whose packs the project already has
+  keeps the create-only path above, with no git requirement. A module that
+  selects any pack the project does not have yet (another style, another
+  event store) merges instead.
+- **How it merges.** As `fabric change` does (ADR-0016 C3): this fabric
+  writes the project from the `fabric.yaml` it records (base) and the whole
+  project with the module, every module composed at once as `fabric new`
+  composes them (theirs), and merges theirs into the project three-way with
+  D8's merge. Overlapping edits stay git conflicts and the summary lists
+  them; nothing is committed. The new packs' files, slot contributions, ADRs
+  and agent rules all reach the project in that one merge, written once
+  whatever the number of modules that use them.
+- **Preconditions,** only in that case: the top of a git repository with a
+  clean working tree (D8), and a project this fabric and catalog wrote, so
+  `fabric.yaml` records the running version and catalog hash (C3's version
+  rule). Each refusal is given before the project is touched.
+- **Regeneration.** `fabric upgrade` replays `new` and `add-module` from
+  `fabric.yaml` (ADR-0016 E4). At a module that brings new packs the
+  regenerated tree becomes that whole project, which is exactly what the
+  merge leaves in a project nobody edited, so a mixed project regenerates
+  without a refusal. The old fabric that writes an upgrade's base runs its
+  `add-module` calls in a scratch tree committed to a git repository of its
+  own, so a merging `add-module` can run there too.
+
+**Consequences.**
+
+- A project can hold DDD, event-sourced and CRUD modules, each on the event
+  store its module chooses, with each style's project-wide content once.
+- The whole-project render puts every module where `fabric new` puts it, so
+  the merge that brings a new style also lists the earlier modules in the
+  `.slnx`, and may conflict with a `dotnet sln add` line the project already
+  has for one of them.
+- The first module of a new style needs a commit first and may leave
+  conflicts; every later module of that style is created as before.

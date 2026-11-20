@@ -448,9 +448,13 @@ the new module adds into the frontend's copy of the OpenAPI document,
 `web.openapi-paths` or `web.openapi-schemas` contribution loops over
 `modules` gets a later module's entries there without rewriting the copy.
 If a module chooses an option
-whose pack the project does not use yet, and that pack has project files
-or slot contributions, add-module refuses: that content would have to be
-merged into files that may have changed
-(`AddModuleTests.Rejects_an_option_whose_pack_would_change_existing_files`).
-Keep project-wide content of module options small, or expect it to be
-chosen at generation time.
+whose pack the project does not use yet, another style or event store,
+add-module merges instead (ADR-0005, amended for #848): it writes the whole
+project with the module and merges it three-way into the project, against
+what the project's `fabric.yaml` writes, as `fabric change` does; that needs
+a git repository with a clean working tree, and a project this fabric and
+catalog wrote
+(`AddModuleTests.An_option_new_to_the_project_gives_the_whole_project_with_the_module_to_merge_and_creates_nothing_by_itself`).
+Project-wide content of module options then reaches existing files as a
+reviewed merge, so keep it small and in slots: what overlaps a project's
+edits is left as a git conflict.

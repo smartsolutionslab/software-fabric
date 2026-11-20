@@ -58,7 +58,10 @@ web/
 ## Modules register by convention, never by list
 
 `fabric add-module` only creates files (ADR-0001), so nothing may need a
-line per module in a shared file. The one file it extends is the frontend's
+line per module in a shared file. (A module of a style or event store new to
+the project is merged in instead, as `fabric change` merges a choice:
+ADR-0005, amended for #848. That merge brings the new packs, never a line
+for the module.) The one file it extends is the frontend's
 copy of the OpenAPI document, with the new module's paths and schemas
 (ADR-0005, amended for #609). Proposed in ADR-0005:
 

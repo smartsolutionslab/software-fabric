@@ -1,3 +1,30 @@
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ func braces(indent, before, entries, after)
+  line = before + "{ " + (entries | array.join ", ") + " }" + after
+  if fits(indent, line)
+    ret line
+  end
+  pad = "  "
+  ret before + "{\n" + pad + (entries | array.join (",\n" + pad)) + ",\n}" + after
+end ~}}
+{{~ func assign(indent, head, value)
+  if fits(indent, head + " " + value)
+    ret head + " " + value
+  end
+  ret head + "\n  " + value
+end ~}}
+{{~ # A test's call: on one line when its head fits, else one argument per line, the callback's body indented once more. ~}}
+{{~ func test_call(head, arguments, callback, body)
+  line = head + "(" + (arguments | array.join ", ") + ", " + callback + " {"
+  if fits(0, line)
+    ret line + "\n" + body + "});"
+  end
+  ret head + "(\n  " + (arguments | array.join ",\n  ") + ",\n  " + callback + " {\n" + (regex.replace body "(?m)^(?=.)" "  ") + "  },\n);"
+end ~}}
 {{~ editor = module.name == "dashboards" && object.has_key(project, "frontend.dashboards") && array.contains(project["frontend.dashboards"], "user-editable") && project["frontend.api-client"] == "rtk-query-codegen" ~}}
 {{~ tanstack = project["frontend.routing"] == "tanstack-router" ~}}
 {{~ client = object.has_key(project, "frontend.api-client") ? project["frontend.api-client"] : "" ~}}
@@ -140,12 +167,12 @@ vi.mock('@/api/generated', async (importOriginal) => {
 const shown = vi.hoisted(() => ({ examples: undefined as Record<string, unknown> | undefined }));
 vi.mock('./use{{ module.namespace }}Samples', () => ({
   use{{ module.namespace }}Samples: () => {
-    const page = shown.examples?.use{{ module.namespace }}Samples as { items: unknown[] } | undefined;
+    {{ assign 4 ("const page = shown.examples?.use" + module.namespace + "Samples as") "{ items: unknown[] } | undefined;" }}
     return page === undefined
       ? { samples: undefined, isLoading: true, isError: false }
       : { samples: page.items, isLoading: false, isError: false };
   },
-  useCreate{{ module.namespace }}Sample: () => ({ create: vi.fn(), isSaving: false }),
+  {{ braces 2 ("useCreate" + module.namespace + "Sample: () => (") ["create: vi.fn()", "isSaving: false"] ")," }}
 }));
 {{~ end ~}}
 
@@ -260,11 +287,12 @@ function renderPage() {
 
 // Whichever test renders first in a file also pays for warming up jsdom, React and axe, which in a larger project under
 // parallel load passes 2.5 s of the default 5 s.
-test('the {{ module.namespace }} page has no accessibility violations axe can find', { timeout: 20_000 }, async () => {
+{{~ capture body ~}}
   const container = {{ if tanstack }}await {{ end }}renderPage();
 
   expect(await axe(container)).toHaveNoViolations();
-});
+{{~ end ~}}
+{{ test_call "test" ["'the " + module.namespace + " page has no accessibility violations axe can find'", "{ timeout: 20_000 }"] "async () =>" body }}
 {{~ if themes != "" ~}}
 
 test.each(themes)(
@@ -280,12 +308,13 @@ test.each(themes)(
 {{~ if with_data ~}}
 
 // Until {{ module.namespace }}Page.data.ts has an example (AGENTS.md), the page is checked only as it loads.
-test.runIf(Object.keys(examples).length > 0)('the {{ module.namespace }} page passes axe with its example data', async () => {
+{{~ capture body ~}}
   shown.examples = examples;
   const container = {{ if tanstack }}await {{ end }}renderPage();
 
   expect(await axe(container)).toHaveNoViolations();
-});
+{{~ end ~}}
+{{ test_call "test.runIf(Object.keys(examples).length > 0)" ["'the " + module.namespace + " page passes axe with its example data'"] "async () =>" body }}
 {{~ if themes != "" ~}}
 
 test.runIf(Object.keys(examples).length > 0).each(themes)(
@@ -301,15 +330,13 @@ test.runIf(Object.keys(examples).length > 0).each(themes)(
 {{~ end ~}}
 
 // Until {{ module.namespace }}Page.data.ts has an empty example (AGENTS.md), the page is not checked with nothing to show.
-test.runIf(Object.keys(emptyExamples).length > 0)(
-  'the {{ module.namespace }} page passes axe when it has nothing to show',
-  async () => {
-    shown.examples = emptyExamples;
-    const container = {{ if tanstack }}await {{ end }}renderPage();
+{{~ capture body ~}}
+  shown.examples = emptyExamples;
+  const container = {{ if tanstack }}await {{ end }}renderPage();
 
-    expect(await axe(container)).toHaveNoViolations();
-  },
-);
+  expect(await axe(container)).toHaveNoViolations();
+{{~ end ~}}
+{{ test_call "test.runIf(Object.keys(emptyExamples).length > 0)" ["'the " + module.namespace + " page passes axe when it has nothing to show'"] "async () =>" body }}
 {{~ if themes != "" ~}}
 
 test.runIf(Object.keys(emptyExamples).length > 0).each(themes)(
