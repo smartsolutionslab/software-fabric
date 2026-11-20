@@ -60,4 +60,18 @@ public sealed class BrowserTesterTests
         failure.Message.ShouldStartWith("the browser tester never started (timeout), not the gate's verdict");
         failure.Message.ShouldContain(TimedOut);
     }
+
+    /// <summary>
+    /// Vitest's own message says only to check the browser console, which a CI log never shows. The run is told to print
+    /// what would name the cause instead: the Playwright provider's account of the page (opened, ready, crashed), each
+    /// request the page could not make, and Vite's dependency optimiser, whose re-optimising mid-run reloads the page
+    /// under the tester (#813).
+    /// </summary>
+    [Fact]
+    public void A_ui_browser_test_run_prints_the_pages_life_its_refused_requests_and_vites_dependency_optimisation()
+    {
+        BrowserTester.Diagnostics.ShouldContainKey("DEBUG");
+        BrowserTester.Diagnostics["DEBUG"].Split(',').ShouldBe(["vitest:browser:playwright", "vite:deps"], ignoreOrder: true);
+        BrowserTester.Diagnostics.ShouldContainKeyAndValue("VITEST_PW_DEBUG", "1");
+    }
 }
