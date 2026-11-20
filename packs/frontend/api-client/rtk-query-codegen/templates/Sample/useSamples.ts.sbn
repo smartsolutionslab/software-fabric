@@ -41,12 +41,7 @@ api.enhanceEndpoints({
   endpoints: {
     post{{ ns }}Samples: {
       async onQueryStarted(request, { dispatch, queryFulfilled }) {
-{{~ if fits(8, "const { name } = request.create" + ns + "SampleRequest;") ~}}
         const { name } = request.create{{ ns }}SampleRequest;
-{{~ else ~}}
-        const { name } =
-          request.create{{ ns }}SampleRequest;
-{{~ end ~}}
         const patch = dispatch(
 {{~ if fits(10, "api.util.updateQueryData('get" + ns + "Samples', samplesPage, (page) => {") ~}}
           api.util.updateQueryData('get{{ ns }}Samples', samplesPage, (page) => {
@@ -94,38 +89,22 @@ api.enhanceEndpoints({
 export function use{{ ns }}Samples() {
 {{~ if fits(2, "const { data, isLoading, isError } = useGet" + ns + "SamplesQuery(samplesPage);") ~}}
   const { data, isLoading, isError } = useGet{{ ns }}SamplesQuery(samplesPage);
-{{~ else if fits(4, "useGet" + ns + "SamplesQuery(samplesPage);") ~}}
-  const { data, isLoading, isError } =
-    useGet{{ ns }}SamplesQuery(samplesPage);
 {{~ else ~}}
   const { data, isLoading, isError } =
-    useGet{{ ns }}SamplesQuery(
-      samplesPage,
-    );
+    useGet{{ ns }}SamplesQuery(samplesPage);
 {{~ end ~}}
   return { samples: data?.items, page: data, isLoading, isError };
 }
 
 /** Creates a sample; resolves to whether the host created it. */
 export function useCreate{{ ns }}Sample() {
-{{~ if fits(2, "const [post, { isLoading }] = usePost" + ns + "SamplesMutation();") ~}}
   const [post, { isLoading }] = usePost{{ ns }}SamplesMutation();
-{{~ else ~}}
-  const [post, { isLoading }] =
-    usePost{{ ns }}SamplesMutation();
-{{~ end ~}}
   const create = async (name: string) => {
 {{~ if fits(4, "const result = await post({ create" + ns + "SampleRequest: { name } });") ~}}
     const result = await post({ create{{ ns }}SampleRequest: { name } });
-{{~ else if fits(6, "create" + ns + "SampleRequest: { name },") ~}}
-    const result = await post({
-      create{{ ns }}SampleRequest: { name },
-    });
 {{~ else ~}}
     const result = await post({
-      create{{ ns }}SampleRequest: {
-        name,
-      },
+      create{{ ns }}SampleRequest: { name },
     });
 {{~ end ~}}
     return !('error' in result);

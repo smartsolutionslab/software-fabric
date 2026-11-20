@@ -24,10 +24,7 @@ end ~}}
   if fits(2, "const { data, isLoading, isError } = " + call)
     ret "  const { data, isLoading, isError } = " + call
   end
-  if fits(4, call)
-    ret "  const { data, isLoading, isError } =\n    " + call
-  end
-  ret "  const { data, isLoading, isError } =\n    useGet" + ns + "Samples(\n      samplesPage,\n    );"
+  ret "  const { data, isLoading, isError } =\n    " + call
 end ~}}
 {{~ func cached_page
   call = "client.getQueryData<PagedResultOf" + ns + "SampleDto>(samplesKey);"
