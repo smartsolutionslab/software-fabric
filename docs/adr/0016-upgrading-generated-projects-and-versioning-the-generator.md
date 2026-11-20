@@ -2,7 +2,8 @@
 
 **Status:** Accepted (owner, 2026-11-11, review of PR #572: every
 recommendation, D1 to D8, accepted). Amended (owner, 2026-11-18, #720):
-a changed choice is applied by `fabric change`, C1 to C3 below.
+a changed choice is applied by `fabric change`, C1 to C3 below. Amended
+(owner, 2026-11-20, #845): D1's line on hand registrations of adapters.
 **Date:** 2026-11-11
 
 ## Context
@@ -150,7 +151,10 @@ RTK Query, as the generator writes them); that a module page's new probe test
 (`<Name>Page.probe.test.*`) is added, when the project's `<Name>Page.*`
 differs from what the recorded version wrote (the test asserts the generated
 page, so the upgrade leaves it out and names it; the project generates it with
-fabric and adds it by hand if the page keeps a Manage section); and that the
+fabric and adds it by hand if the page keeps a Manage section); that a hand
+registration of an adapter the convention now registers is deleted, when the
+upgrade brings or changes the rule `EveryModuleServiceIsRegisteredOnce` (it
+fails on such a registration and names it; delete it); and that the
 project's own ADRs and code agree with a changed pack ADR.
 
 The OpenAPI line is not a further choice: it is the same "may not build" that
@@ -167,6 +171,12 @@ five pages it had rewritten, as a plain new file, and 15 of its tests failed
 until the files were deleted by hand. "Differs" is decided by comparing the
 page in the base tree with the project's HEAD, as git compares them; a page
 the project left as generated still gets its probe test.
+The adapter line records the owner's decision of 2026-11-20 (#845): the
+convention registration 0.8.0 added (`AddModuleAdapters`) registers a
+module's stores, which every project generated before it registers by hand,
+and the pilot's trial upgrade to 0.8.0 (fabric-pilot#85) registered each store
+twice without a word. The summary does not search the project's code for such
+a registration; the architecture rule names it.
 
 ### D2. Where the old generator comes from
 

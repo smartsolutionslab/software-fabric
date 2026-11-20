@@ -21,6 +21,9 @@ public static class UpgradeSummary
 
     private const string AdrDirectory = "docs/adr/";
 
+    /// <summary>The ef-core pack's rule that fails on a store registered by hand and by AddModuleAdapters (#845).</summary>
+    private const string RegisteredOnceRule = "tests/Architecture.Tests/Rules/EveryModuleServiceIsRegisteredOnce.cs";
+
     /// <summary>
     /// Writes the summary. <paramref name="hasOpenApiDocument"/> and <paramref name="hasBaseApi"/> say whether the
     /// project's choices write <see cref="OpenApiDocument"/> and <see cref="BaseApi"/>, so the summary names each only
@@ -216,6 +219,14 @@ public static class UpgradeSummary
         {
             notes.Add($"- that generated client code under {WebSource} works with the project's {BaseApi}: it relies on that file's " +
                 "exports and its base query's error type as fabric writes them (FetchBaseQueryError with RTK Query); keep them, then run pnpm build in web/app.");
+        }
+
+        // A project generated before AddModuleAdapters (0.8.0) registers its stores by hand. Which registrations are
+        // its own cannot be told from the generated trees, so the rule names them and the summary only says so.
+        if (paths.Contains(RegisteredOnceRule, StringComparer.Ordinal))
+        {
+            notes.Add("- that no module registers by hand a store AddModuleAdapters registers by convention: the architecture rule " +
+                "EveryModuleServiceIsRegisteredOnce fails on such a second registration, naming it; delete the hand registration.");
         }
 
         if (paths.Any(path => path.StartsWith("docs/adr/", StringComparison.Ordinal)))

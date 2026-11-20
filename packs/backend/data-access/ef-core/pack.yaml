@@ -5,6 +5,7 @@ files:
   - { template: templates/ModuleContext.cs.sbn, target: "src/Modules/{{ module.namespace }}/{{ module.namespace }}.Infrastructure/Persistence/{{ module.namespace }}DbContext.cs", per-module: true }
   - { template: templates/OneDbContextPerModule.cs.sbn, target: tests/Architecture.Tests/Rules/OneDbContextPerModule.cs }
   - { template: templates/SqlCommandsAreNotLoggedAtInformation.cs.sbn, target: tests/Architecture.Tests/Rules/SqlCommandsAreNotLoggedAtInformation.cs }
+  - { template: templates/EveryModuleServiceIsRegisteredOnce.cs.sbn, target: tests/Architecture.Tests/Rules/EveryModuleServiceIsRegisteredOnce.cs }
   - { template: templates/NoServices.cs.sbn, target: src/BuildingBlocks/Persistence/NoServices.cs }
   - { template: templates/MigrationRunner.csproj.sbn, target: src/MigrationRunner/MigrationRunner.csproj }
   - { template: templates/MigrationRunner.cs.sbn, target: src/MigrationRunner/Program.cs }
@@ -54,3 +55,4 @@ adr: docs/adr.md
 gates:
   - { kind: architecture-test, describes: "Each module has at most one DbContext, in its Infrastructure project, deriving from ModuleDbContext.", file: templates/OneDbContextPerModule.cs.sbn }
   - { kind: architecture-test, describes: "No shipped appsettings*.json logs EF Core's SQL commands (Microsoft.EntityFrameworkCore.Database.Command) at Information, and no executable project under src (the AppHost aside) ships without an appsettings.json, which would leave it at the Information default.", file: templates/SqlCommandsAreNotLoggedAtInformation.cs.sbn }
+  - { kind: architecture-test, describes: "Each module, its services registered through its IModule as the host does, registers every service type of its Application project once: a hand registration of a store AddModuleAdapters already registers fails, naming each implementation and lifetime.", file: templates/EveryModuleServiceIsRegisteredOnce.cs.sbn }
