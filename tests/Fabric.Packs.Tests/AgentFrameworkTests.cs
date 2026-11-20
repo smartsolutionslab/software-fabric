@@ -182,6 +182,124 @@ public sealed class AgentFrameworkTests
         }
         """;
 
+    // The building blocks and these tests, loaded again into a context of their own: a fresh process's first use of the
+    // tools' serializer options, whatever other tests have built or called before. Tools built on several threads at once
+    // is how TUnit runs a module's agent tests.
+    private const string ToolsAtFirstUse = """
+        using System.Reflection;
+        using System.Runtime.Loader;
+        using System.Text.Json;
+        using Shop.BuildingBlocks.Agents;
+        using Shop.BuildingBlocks.Messaging;
+        using Shouldly;
+        using Xunit;
+
+        namespace Shop.Agents.Tests;
+
+        public sealed class ToolsAtFirstUseTests
+        {
+            private const int Threads = 8;
+
+            [Fact]
+            public void Before_any_tool_is_built_the_serializer_options_of_a_tool_name_their_resolver()
+            {
+                var context = new FirstUse();
+                try
+                {
+                    var function = context.LoadFromAssemblyName(typeof(DispatcherTool).Assembly.GetName())
+                        .GetType("Shop.BuildingBlocks.Agents.UseCaseFunction", throwOnError: true)!;
+                    var options = function.GetFields(BindingFlags.NonPublic | BindingFlags.Static)
+                        .Where(field => field.FieldType == typeof(JsonSerializerOptions))
+                        .ToList();
+
+                    options.ShouldNotBeEmpty();
+                    foreach (var field in options)
+                    {
+                        ((JsonSerializerOptions)field.GetValue(null)!).TypeInfoResolver.ShouldNotBeNull(field.Name);
+                    }
+                }
+                finally
+                {
+                    context.Unload();
+                }
+            }
+
+            [Fact]
+            public void Tools_built_on_several_threads_at_first_use_all_get_their_schema()
+            {
+                List<string> failures = [];
+                for (var run = 0; run < 500 && failures.Count == 0; run++)
+                {
+                    var context = new FirstUse();
+                    try
+                    {
+                        var build = context.LoadFromAssemblyName(typeof(ToolsAtFirstUseTests).Assembly.GetName())
+                            .GetType(typeof(ToolsAtFirstUseTests).FullName!, throwOnError: true)!
+                            .GetMethod(nameof(BuildAtOnce))!;
+                        failures.AddRange((IReadOnlyList<string>)build.Invoke(null, null)!);
+                    }
+                    finally
+                    {
+                        context.Unload();
+                    }
+                }
+
+                failures.ShouldBeEmpty();
+            }
+
+            public static IReadOnlyList<string> BuildAtOnce()
+            {
+                List<string> failures = [];
+                using var barrier = new Barrier(Threads);
+                var threads = Enumerable.Range(0, Threads).Select(_ => new Thread(() =>
+                {
+                    // Warm, so the threads reach the schema together rather than one at a time.
+                    DispatcherTool.Problems(typeof(CountWords));
+                    barrier.SignalAndWait();
+                    try
+                    {
+                        DispatcherTool.For<CountWords>(new NoDispatcher(), "Counts the words of a text.");
+                    }
+                    catch (InvalidOperationException exception)
+                    {
+                        lock (failures)
+                        {
+                            failures.Add(exception.ToString());
+                        }
+                    }
+                })).ToList();
+                foreach (var thread in threads)
+                {
+                    thread.Start();
+                }
+
+                foreach (var thread in threads)
+                {
+                    thread.Join();
+                }
+
+                return failures;
+            }
+
+            private sealed class FirstUse() : AssemblyLoadContext(isCollectible: true)
+            {
+                protected override Assembly? Load(AssemblyName assemblyName) =>
+                    assemblyName.Name == typeof(DispatcherTool).Assembly.GetName().Name || assemblyName.Name == typeof(FirstUse).Assembly.GetName().Name
+                        ? LoadFromAssemblyPath(Path.Combine(AppContext.BaseDirectory, assemblyName.Name + ".dll"))
+                        : null;
+            }
+
+            private sealed class NoDispatcher : IDispatcher
+            {
+                public Task<TResult> SendAsync<TResult>(ICommand<TResult> command, CancellationToken cancellationToken) =>
+                    throw new InvalidOperationException("Building a tool never dispatches.");
+
+                public Task<TResult> QueryAsync<TResult>(IQuery<TResult> query, CancellationToken cancellationToken) =>
+                    throw new InvalidOperationException("Building a tool never dispatches.");
+            }
+        }
+        """;
+
     private const string AgentWithoutTheChoice = """
         using Microsoft.Agents.AI;
         using Microsoft.Extensions.AI;
@@ -372,6 +490,26 @@ public sealed class AgentFrameworkTests
         output.ShouldContain("failed: 0");
         output.ShouldContain("succeeded: 30");
         output.ShouldNotContain("Without_an_http_caller_a_tool_is_refused");
+    }
+
+    [Theory]
+    [InlineData("backend.absence=nullable", "backend.result-style=minimal", "backend.guards=bcl")]
+    [InlineData("backend.absence=option")]
+    public void Tools_built_at_once_at_first_use_get_their_schema_with_either_absence(params string[] absence)
+    {
+        using var project = NewProject([Anthropic, AgentFramework, .. absence]);
+        project.WriteTypes("tests/Agents.Tests", ToolsAtFirstUse);
+        project.Build();
+
+        // Alone, so no other test class takes the threads apart.
+        var (exitCode, output) = project.DotNetCommand(
+            new Dictionary<string, string>(),
+            "test", "--project", "tests/Agents.Tests/Agents.Tests.csproj", "-c", "Release", "--no-build", "--no-ansi",
+            "--", "--filter-class", "Shop.Agents.Tests.ToolsAtFirstUseTests");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("succeeded: 2", customMessage: output);
+        output.ShouldContain("failed: 0", customMessage: output);
     }
 
     [Fact]
