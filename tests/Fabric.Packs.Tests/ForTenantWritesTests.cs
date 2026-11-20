@@ -5,7 +5,7 @@ namespace Fabric.Packs.Tests;
 
 /// <summary>
 /// Staff write into one tenant's rows (#629, owner decisions of 2026-11-12): with <c>backend.tenancy=column</c>,
-/// <c>backend.authorization</c> containing roles and Keycloak or generic OIDC, an endpoint mapped with
+/// <c>backend.authorization</c> containing roles and Keycloak, generic OIDC or Entra ID, an endpoint mapped with
 /// <c>.RequireAuthorization(&lt;Module&gt;PolicyNames.WriteForTenants).ForTenant()</c> runs its handler in the tenant its
 /// route names, for a user holding the role <c>staff</c>; a tenant missing from <c>Tenancy:Tenants</c> answers 404, and
 /// <c>TenantScope.Begin</c> is banned from request code. Every other combination generates what it did before.
@@ -36,6 +36,8 @@ public sealed class ForTenantWritesTests
     [InlineData("backend.auth=keycloak", RolesAndClaims)]
     [InlineData("backend.auth=generic-oidc", Roles)]
     [InlineData("backend.auth=generic-oidc", RolesAndClaims)]
+    [InlineData("backend.auth=entra-id", Roles)]
+    [InlineData("backend.auth=entra-id", RolesAndClaims)]
     public void With_a_tenant_column_and_roles_a_module_gets_a_write_for_tenants_policy_and_the_host_a_tenant_list(string auth, string authorization)
     {
         using var project = new GeneratedProject(Profile, auth, authorization);
@@ -61,7 +63,7 @@ public sealed class ForTenantWritesTests
     [Theory]
     [InlineData(Profile, new string[0])]
     [InlineData(Profile, new[] { "backend.authorization=claims" })]
-    [InlineData(Profile, new[] { "backend.auth=entra-id", Roles })]
+    [InlineData(Profile, new[] { "backend.auth=entra-id" })]
     [InlineData(Profile, new[] { "backend.tenancy=schema-per-tenant", Roles })]
     [InlineData("lean-crud", new[] { Roles })]
     [InlineData(WithRag, new string[0])]
@@ -117,14 +119,6 @@ public sealed class ForTenantWritesTests
         var withoutRoles = Files(Profile);
         Adr(withoutRoles, "Tenancy: a tenant column").ShouldNotContain("ForTenant()");
         withoutRoles["AGENTS.md"].ShouldNotContain("ForTenant()");
-    }
-
-    [Fact]
-    public void With_entra_id_the_tenant_column_adr_says_why_staff_cannot_write_for_a_tenant_yet()
-    {
-        var adr = Adr(Files(Profile, "backend.auth=entra-id", Roles), "Tenancy: a tenant column");
-
-        adr.ShouldContain("`ForTenant()` is not generated with Entra ID");
     }
 
     [Fact]

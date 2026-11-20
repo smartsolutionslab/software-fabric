@@ -19,6 +19,15 @@
     users = users | array.add { name: "clerk", roles: roles, department: "sales", directory: "tenant-a" }
     users = users | array.add { name: "analyst", roles: false, department: "finance", directory: "tenant-a" }
   end
+  # Staff sign in from a directory of their own, which is no tenant's: they read every tenant's rows on endpoints that
+  # opt in. cross_tenant_reads is the tenant-column pack's; no other tenancy defines it.
+  staff = false
+  if project["backend.tenancy"] == "column"
+    staff = cross_tenant_reads
+  end
+  if staff
+    users = users | array.add { name: cross_tenant_role, roles: false, staff: true, department: null, directory: "staff" }
+  end
   # A user of a directory the AppHost does not give the host: their tokens are refused.
   users = users | array.add { name: "outsider", roles: false, department: null, directory: "elsewhere" }
 ~}}
@@ -37,13 +46,16 @@
     "Directories": {
       "tenant-a": "00000000-0000-0000-0000-00000000000a",
       "tenant-b": "00000000-0000-0000-0000-00000000000b",
+{{~ if staff ~}}
+      "staff": "00000000-0000-0000-0000-0000000000ff",
+{{~ end ~}}
       "elsewhere": "00000000-0000-0000-0000-0000000000ee"
     },
     "Users": {
 {{~ for user in users ~}}
       "{{ user.name }}": {
         "Directory": "{{ user.directory }}",
-        "Roles": [{{ if user.roles }}"manager"{{ end }}]{{ if user.department }},
+        "Roles": [{{ if user.staff }}"{{ cross_tenant_role }}"{{ else if user.roles }}"manager"{{ end }}]{{ if user.department }},
         "Department": "{{ user.department }}"{{ end }}
       }{{ if !for.last }},{{ end }}
 {{~ end ~}}
