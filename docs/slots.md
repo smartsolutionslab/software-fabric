@@ -16,8 +16,9 @@ fabric.yaml                     generator
 README.md  CLAUDE.md            base
 AGENTS.md                       base; every pack's agents-md via agents.sections
 .claude/agents/<role>.md        base; every pack's brief for that role via agents.brief.<role>
-docs/adr/NNNN-<dimension>-<option>.md
-                                generator; one per pack, numbered in selection order
+docs/adr/fabric/<dimension>-<option>.md
+                                generator; one per pack, unnumbered (ADR-0018)
+docs/adr/NNNN-<title>.md        the project's own ADRs; the generator writes none
 global.json  .editorconfig  Directory.Build.props  Directory.Packages.props  build.proj
 Solution.slnx                   base
 .config/dotnet-tools.json       base; tools by slot (dotnet-ef from ef-core)
@@ -626,7 +627,8 @@ Tailwind palette class.
 2. **The generator writes what every pack already declares.** Today
    `adr`, `agents.agents-md` and `agents.briefs` are validated but not
    used. The generator renders each pack's ADR to
-   `docs/adr/NNNN-<dimension>-<option>.md` (numbered in selection order)
+   `docs/adr/NNNN-<dimension>-<option>.md` (numbered in selection order;
+   since #840 `docs/adr/fabric/<dimension>-<option>.md`, ADR-0018)
    and contributes `agents-md` and briefs to the reserved slots
    `agents.sections` and `agents.brief.<role>`, which the base declares.
    Packs may not contribute to those slots themselves.

@@ -421,8 +421,11 @@ integration-fixture and identity-provider vocabularies).
 ## What the generator writes from every pack
 
 - **ADR:** each selected pack's `adr` is rendered to
-  `docs/adr/NNNN-<dimension>-<option>.md`, numbered in selection order, base
-  first (`GeneratorTests.Every_selected_pack_gets_its_adr_numbered_in_selection_order`).
+  `docs/adr/fabric/<dimension>-<option>.md`, named after the option and
+  unnumbered, so the name never depends on the other choices or the generator
+  version, and `docs/adr/` itself is left to the project's own numbered ADRs
+  (ADR-0018;
+  `GeneratorTests.Every_selected_pack_gets_its_adr_named_after_its_option_under_docs_adr_fabric`).
 - **AGENTS.md:** each selected pack's `agents-md` is a contribution to
   `agents.sections`, in selection order
   (`GeneratorTests.Every_selected_pack_contributes_its_agents_md_to_agents_md_in_selection_order`).
