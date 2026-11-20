@@ -233,6 +233,45 @@ public sealed class UpgradeCommandTests : IDisposable
     }
 
     [Fact]
+    public void A_namespaced_project_keeps_its_namespace_through_an_add_module_merge_and_upgrades_to_exactly_a_fresh_generation()
+    {
+        foreach (var packs in (string[])[oldPacks, newPacks])
+        {
+            AddFile(
+                Path.Combine(packs, "module", "style", "crud"),
+                "namespace.sbn",
+                "src/{{ module.name }}/Namespace.txt",
+                perModule: true,
+                "{{ namespace }}.Modules.{{ module.namespace }}\n");
+        }
+
+        var fresh = Path.Combine(root, "fresh-namespaced-mixed", "shop");
+        CliRun.Of(["new", fresh, "--namespace", "Acme.Shop", .. NewArguments, "--catalog", Paths.FixtureCatalog, "--packs", newPacks]).ExitCode.ShouldBe(0);
+        Git.Run(fresh, "init", "-q");
+        Git.Commit(fresh, "generate in Acme.Shop");
+        var added = CliRun.Of("add-module", "audit", "--set", "module.style=crud", "--project", fresh, "--catalog", Paths.FixtureCatalog, "--packs", newPacks);
+        added.ExitCode.ShouldBe(0, added.Error);
+        added.Output.ShouldContain("merging in what its packs new to the project write");
+        Read(fresh, "src/audit/Namespace.txt").ShouldBe("Acme.Shop.Modules.Audit\n");
+        Read(fresh, ".claude/agents/backend-engineer.md").ShouldStartWith("# Backend engineer (Acme.Shop)\n");
+        Read(fresh, "fabric.yaml").ShouldContain("\nname: shop\nnamespace: Acme.Shop\n");
+
+        var mixed = Path.Combine(root, "namespaced-mixed", "shop");
+        Run(oldFabric, ["new", mixed, "--namespace", "Acme.Shop", .. NewArguments]);
+        Git.Run(mixed, "init", "-q");
+        Git.Commit(mixed, "generate with fabric 0.0.1 in Acme.Shop");
+        Run(oldFabric, ["add-module", "audit", "--project", mixed, "--set", "module.style=crud"]);
+        Git.Commit(mixed, "add audit with fabric 0.0.1");
+
+        var run = CliRun.Of(["upgrade", "--project", mixed, "--from", oldFabric, "--catalog", Paths.FixtureCatalog, "--packs", newPacks]);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldNotContain("conflict");
+        Git.Run(mixed, "ls-files", "-u").ShouldBeEmpty();
+        Tree(mixed).ShouldBe(Tree(fresh));
+    }
+
+    [Fact]
     public void An_edit_the_pack_change_does_not_overlap_is_kept_and_the_pack_change_merged_into_it()
     {
         Write("README.md", Read("README.md") + "Our own notes.\n");
