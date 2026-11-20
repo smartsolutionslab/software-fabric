@@ -11,6 +11,7 @@ namespace Fabric.Core.Generation;
 /// <c>fabric.yaml</c>: the record of what a generated project chose. Written once by <c>fabric new</c>, extended by
 /// <c>fabric add-module</c>, and read by agents and tools. <c>generator</c> and <c>catalog</c> record the generator's
 /// version and the hash of the catalog that wrote it last; files from before they were recorded have neither.
+/// <c>namespace</c>, the root namespace, appears only when one was chosen; without it the project's name in PascalCase is.
 /// Multi-valued dimensions are always lists. <c>settings</c>, the numbers chosen options declare (ADR-0014), appears
 /// only when there are any.
 /// </summary>
@@ -35,6 +36,11 @@ public static partial class FabricFile
             .Append("generator: ").Append(GeneratorVersion.Current).Append('\n')
             .Append("catalog: ").Append(catalog.Hash).Append('\n')
             .Append("name: ").Append(Scalar(name)).Append('\n');
+        if (rootNamespace is not null)
+        {
+            text.Append("namespace: ").Append(rootNamespace).Append('\n');
+        }
+
         if (profile is not null)
         {
             text.Append("profile: ").Append(Scalar(profile)).Append('\n');
@@ -90,7 +96,7 @@ public static partial class FabricFile
 
         var source = new YamlSource(sourceName, message => new FabricFileException(message));
         var root = source.Mapping(stream.Documents[0].RootNode, FileName);
-        var fields = source.Fields(root, FileName, "fabric", "generator", "catalog", "name", "profile", "project", "settings", "module-defaults", "modules");
+        var fields = source.Fields(root, FileName, "fabric", "generator", "catalog", "name", "namespace", "profile", "project", "settings", "module-defaults", "modules");
 
         var versionNode = fields.Required("fabric");
         var version = source.Integer(versionNode, "fabric", FileName);
@@ -104,6 +110,16 @@ public static partial class FabricFile
         {
             var moduleName = source.Scalar(key, "a module name");
             modules.Add(moduleName, ReadValues(source, value, $"module '{moduleName}'"));
+        }
+
+        string? rootNamespace = null;
+        if (fields.Optional("namespace") is { } namespaceNode)
+        {
+            rootNamespace = source.Scalar(namespaceNode, FileName);
+            if (Names.NamespaceProblem(rootNamespace) is { } problem)
+            {
+                throw source.Error(namespaceNode, problem);
+            }
         }
 
         OrderedDictionary<string, decimal> settings = [];
@@ -129,6 +145,7 @@ public static partial class FabricFile
         {
             Generator = fields.Optional("generator") is { } generator ? source.Scalar(generator, FileName) : null,
             Catalog = fields.Optional("catalog") is { } catalog ? source.Scalar(catalog, FileName) : null,
+            Namespace = rootNamespace,
         };
     }
 
