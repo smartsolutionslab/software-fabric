@@ -1,0 +1,96 @@
+using {{ namespace }}.BuildingBlocks.Email;
+using MailKit.Security;
+using Microsoft.Extensions.Configuration;
+
+namespace {{ namespace }}.Email.Tests;
+
+public class SmtpSettingsTests
+{
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `"smtp://relay.example.com:587", "relay.example.com", 587, SecureSocketOptions.StartTls` }}
+    {{ test_case_attribute `"smtps://relay.example.com:465", "relay.example.com", 465, SecureSocketOptions.SslOnConnect` }}
+    public void A_mail_server_is_reached_over_tls_whatever_it_advertises(string connection, string host, int port, SecureSocketOptions security)
+    {
+        var settings = SmtpSettings.From(Configuration(connection));
+
+        {{ `settings` | should_be `new SmtpSettings(host, port, "noreply@example.com", security)` }};
+    }
+
+    {{ test_attribute }}
+    public void Only_a_configuration_that_says_so_sends_unencrypted()
+    {
+        var settings = SmtpSettings.From(Configuration("smtp://localhost:1025", ("Email:AllowUnencryptedSmtp", "true")));
+
+        {{ `settings.Security` | should_be `SecureSocketOptions.None` }};
+    }
+
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `"http://relay.example.com:25"` }}
+    {{ test_case_attribute `"relay.example.com"` }}
+    public void A_connection_string_that_names_no_smtp_server_is_refused(string connection)
+    {
+        {{ should_throw "InvalidOperationException" "() => SmtpSettings.From(Configuration(connection))" }};
+    }
+
+    {{ test_attribute }}
+    public void Without_a_mail_server_nothing_is_sent()
+    {
+        {{ should_throw "InvalidOperationException" "() => SmtpSettings.From(new ConfigurationBuilder().Build())" }};
+    }
+
+    {{ test_attribute }}
+    public void A_user_name_and_a_password_sign_in_to_the_server()
+    {
+        var settings = SmtpSettings.From(Configuration(
+            "smtps://relay.example.com:465",
+            ("Email:SmtpUserName", "portal"),
+            ("Email:SmtpPassword", "correct-horse")));
+
+        {{ `settings.Credentials` | should_be `new SmtpCredentials("portal", "correct-horse")` }};
+    }
+
+    {{ test_attribute }}
+    public void Without_a_user_name_and_a_password_the_server_is_not_signed_in_to()
+    {
+        var settings = SmtpSettings.From(Configuration("smtps://relay.example.com:465"));
+
+        {{ `settings.Credentials` | should_be_null }};
+    }
+
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `"Email:SmtpUserName", "portal"` }}
+    {{ test_case_attribute `"Email:SmtpPassword", "correct-horse"` }}
+    public void A_user_name_without_a_password_or_a_password_without_a_user_name_is_refused(string key, string value)
+    {
+        {{ should_throw "InvalidOperationException" "() => SmtpSettings.From(Configuration(\"smtps://relay.example.com:465\", (key, value)))" }};
+    }
+
+    {{ test_attribute }}
+    public void The_settings_name_the_user_but_never_show_the_password()
+    {
+        var settings = SmtpSettings.From(Configuration(
+            "smtps://relay.example.com:465",
+            ("Email:SmtpUserName", "portal"),
+            ("Email:SmtpPassword", "correct-horse")));
+
+        var text = settings.ToString();
+
+        {{ `text` | should_contain `"portal"` }};
+        {{ `text` | should_not_contain `"correct-horse"` }};
+    }
+
+    private static IConfiguration Configuration(string connection, params (string Key, string Value)[] more)
+    {
+        Dictionary<string, string?> values = new()
+        {
+            ["ConnectionStrings:mail"] = connection,
+            ["Email:SenderAddress"] = "noreply@example.com",
+        };
+        foreach (var (key, value) in more)
+        {
+            values[key] = value;
+        }
+
+        return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+    }
+}

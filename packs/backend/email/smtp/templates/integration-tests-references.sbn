@@ -1,0 +1,4 @@
+{{~ rag = object.has_key(project, "backend.llm.extras") && array.contains(project["backend.llm.extras"], "rag") ~}}
+{{~ if project["backend.test.integration"] != "testcontainers" && !rag ~}}
+    <!-- The e-mail tests send through the building block's sender. -->
+    <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />{{ end }}

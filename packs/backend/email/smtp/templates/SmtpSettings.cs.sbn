@@ -1,0 +1,61 @@
+using MailKit.Security;
+using Microsoft.Extensions.Configuration;
+
+namespace {{ namespace }}.BuildingBlocks.Email;
+
+/// <summary>
+/// Where e-mail goes, whom it is from, and how it is encrypted: the connection string <c>mail</c>
+/// (<c>smtp://host:port</c> for STARTTLS, <c>smtps://host:port</c> for TLS from the start) and
+/// <c>Email:SenderAddress</c>. A server that does not offer TLS is refused, unless <c>Email:AllowUnencryptedSmtp</c> is
+/// true, which only the AppHost sets, for the local Mailpit. A server that requires authentication is signed in to with
+/// <c>Email:SmtpUserName</c> and <c>Email:SmtpPassword</c>, given together; without them nothing signs in, as with
+/// Mailpit.
+/// </summary>
+public sealed record SmtpSettings(string Host, int Port, string SenderAddress, SecureSocketOptions Security, SmtpCredentials? Credentials = null)
+{
+    private const string MailConnectionName = "mail";
+
+    private const string SenderAddressKey = "Email:SenderAddress";
+
+    private const string AllowUnencryptedKey = "Email:AllowUnencryptedSmtp";
+
+    private const string UserNameKey = "Email:SmtpUserName";
+
+    private const string PasswordKey = "Email:SmtpPassword";
+
+    public static SmtpSettings From(IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        var connection = configuration.GetConnectionString(MailConnectionName)
+            ?? throw new InvalidOperationException($"Connection string '{MailConnectionName}' is missing; the AppHost provides Mailpit's in development.");
+        var sender = configuration[SenderAddressKey]
+            ?? throw new InvalidOperationException($"{SenderAddressKey} is missing; the AppHost provides it in development.");
+        if (!Uri.TryCreate(connection, UriKind.Absolute, out var server) || server.Scheme is not ("smtp" or "smtps"))
+        {
+            throw new InvalidOperationException($"Connection string '{MailConnectionName}' must be smtp://host:port or smtps://host:port.");
+        }
+
+        var security = server.Scheme == "smtps" ? SecureSocketOptions.SslOnConnect
+            : configuration.GetValue<bool>(AllowUnencryptedKey) ? SecureSocketOptions.None
+            : SecureSocketOptions.StartTls;
+        return new SmtpSettings(server.Host, server.Port, sender, security, SignInFrom(configuration));
+    }
+
+    private static SmtpCredentials? SignInFrom(IConfiguration configuration)
+    {
+        var userName = configuration[UserNameKey];
+        var password = configuration[PasswordKey];
+        if (string.IsNullOrEmpty(userName) && string.IsNullOrEmpty(password))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(password))
+        {
+            throw new InvalidOperationException($"{UserNameKey} and {PasswordKey} are given together or not at all.");
+        }
+
+        return new SmtpCredentials(userName, password);
+    }
+}

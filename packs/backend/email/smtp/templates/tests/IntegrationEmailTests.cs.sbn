@@ -1,0 +1,72 @@
+using System.Net.Http.Json;
+using System.Text.Json.Nodes;
+using {{ namespace }}.BuildingBlocks.Email;
+using Microsoft.Extensions.Configuration;
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>
+/// E-mail through the building block's sender to the AppHost's Mailpit, configured with the settings the AppHost gives
+/// the host in run mode: Mailpit offers no TLS, so only leave to send unencrypted (Email:AllowUnencryptedSmtp) reaches
+/// it, and without that leave the send is refused before anything is delivered.
+/// </summary>
+{{~ integration_fixture_attributes ~}}
+public class EmailTests({{ integration_fixture }})
+{
+    {{ test_attribute }}
+    public async Task An_email_sent_through_the_sender_reaches_mailpit()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var subject = $"Sent {Guid.CreateVersion7()}";
+
+        await Sender(allowUnencrypted: true).SendAsync(new EmailMessage("customer@example.com", subject, "Sent through IEmailSender."), cancellationToken);
+
+        {{ `(await CaughtAsync(subject, 1, cancellationToken))` | should_be `1` }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_server_without_tls_is_refused_and_nothing_is_delivered()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var subject = $"Refused {Guid.CreateVersion7()}";
+
+        await {{ should_throw_async "NotSupportedException" "() => Sender(allowUnencrypted: false).SendAsync(new EmailMessage(\"customer@example.com\", subject, \"Never delivered.\"), cancellationToken)" }};
+
+        {{ `(await CaughtAsync(subject, 0, cancellationToken))` | should_be `0` }};
+    }
+
+    private IEmailSender Sender(bool allowUnencrypted)
+    {
+        var smtp = {{ running_application }}.GetEndpoint("mailpit", "smtp");
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:mail"] = $"smtp://{smtp.Host}:{smtp.Port}",
+                ["Email:SenderAddress"] = "noreply@example.com",
+                ["Email:AllowUnencryptedSmtp"] = allowUnencrypted ? "true" : "false",
+            })
+            .Build();
+        return new MailKitEmailSender(SmtpSettings.From(configuration));
+    }
+
+    /// <summary>How many messages Mailpit caught with this subject, through its API, waiting up to 30 seconds for at least <paramref name="expected"/>.</summary>
+    private async Task<int> CaughtAsync(string subject, int expected, CancellationToken cancellationToken)
+    {
+        using var mailpit = new HttpClient { BaseAddress = {{ running_application }}.GetEndpoint("mailpit", "http") };
+        var query = Uri.EscapeDataString($"subject:\"{subject}\"");
+        var caught = 0;
+        for (var attempt = 0; attempt < 30; attempt++)
+        {
+            var found = await mailpit.GetFromJsonAsync<JsonObject>(new Uri($"/api/v1/search?query={query}", UriKind.Relative), cancellationToken);
+            caught = found?["messages"]?.AsArray().Count ?? 0;
+            if (caught >= expected)
+            {
+                return caught;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        }
+
+        return caught;
+    }
+}
