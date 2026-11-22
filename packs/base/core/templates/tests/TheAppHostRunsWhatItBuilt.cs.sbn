@@ -5,15 +5,13 @@ namespace {{ namespace }}.Architecture.Tests.Rules;
 
 /// <summary>
 /// The AppHost's build compiles every project it runs, so Aspire starts each with <c>dotnet run --no-build</c>: an
-/// <c>AddProject&lt;Projects.X&gt;</c>, or <c>AddBuiltProject</c> for a project found by path. <c>AddProject</c> with a
+/// <c>AddProject&lt;Projects.X&gt;</c>{{ if project["backend.topology"] == "services" }}, or <c>AddBuiltProject</c> for a project found by path{{ end }}. <c>AddProject</c> with a
 /// path rebuilds the project at every start, all of them at once on a test run's start-up. Sources are parsed, not
 /// grepped: a comment is prose.
 /// </summary>
 public sealed class TheAppHostRunsWhatItBuilt : IArchitectureRule
 {
-    private const string Helper = "src/AppHost/Wiring/BuiltProjects.cs";
-
-    public string Description => "The AppHost adds every project from its own build: AddProject<Projects.X> or AddBuiltProject, never AddProject with a path, which Aspire rebuilds at every start.";
+    public string Description => "The AppHost adds every project from its own build: AddProject<Projects.X>{{ if project["backend.topology"] == "services" }} or AddBuiltProject{{ end }}, never AddProject with a path, which Aspire rebuilds at every start.";
 
     public IEnumerable<string> Violations(ArchitectureModel model)
     {
@@ -24,7 +22,7 @@ public sealed class TheAppHostRunsWhatItBuilt : IArchitectureRule
         List<string> violations = [];
         foreach (var path in Directory.EnumerateFiles(appHost, "*.cs", SearchOption.AllDirectories)
             .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
-            .Where(path => path != Helper && !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
+            .Where(path => !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
             .Order(StringComparer.Ordinal))
         {
             var source = CSharpSyntaxTree.ParseText(File.ReadAllText(Path.Combine(root, path))).GetRoot();
@@ -32,7 +30,7 @@ public sealed class TheAppHostRunsWhatItBuilt : IArchitectureRule
             {
                 if (call.Expression is MemberAccessExpressionSyntax { Name: IdentifierNameSyntax { Identifier.Text: "AddProject" } name })
                 {
-                    violations.Add($"{path}:{name.GetLocation().GetLineSpan().StartLinePosition.Line + 1}: adds a project by path with AddProject, so Aspire rebuilds it at every start; add it with AddBuiltProject, which runs it from the AppHost's build.");
+                    violations.Add($"{path}:{name.GetLocation().GetLineSpan().StartLinePosition.Line + 1}: adds a project by path with AddProject, so Aspire rebuilds it at every start; {{ if project["backend.topology"] == "services" }}add it with AddBuiltProject, which runs it from the AppHost's build{{ else }}reference it from AppHost.csproj and add it as AddProject<Projects.X>, which runs it from the AppHost's build{{ end }}.");
                 }
             }
         }
