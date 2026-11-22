@@ -71,7 +71,7 @@ public class CatalogReaderTests
         var catalog = ReadRepositoryCatalog();
 
         catalog.Dimensions.Keys.First().ShouldBe("backend.database");
-        catalog.Dimensions.Keys.Last().ShouldBe("backend.data-access.reads");
+        catalog.Dimensions.Keys.Last().ShouldBe("backend.email");
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public class CatalogReaderTests
         reads.Options["dapper"].Tier.ShouldBe(SupportTier.Supported);
         reads.Options["dapper"].Requires.Select(condition => condition.ToString()).ShouldBe(["backend.tenancy == none"]);
         catalog.Dimensions["backend.data-access"].Options.Keys.ShouldBe(["ef-core"]);
-        catalog.Dimensions.Keys.Last().ShouldBe("backend.data-access.reads");
+        catalog.Dimensions.Keys.Last().ShouldBe("backend.email");
     }
 
     [Fact]

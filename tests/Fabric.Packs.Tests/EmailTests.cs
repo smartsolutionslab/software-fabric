@@ -6,8 +6,8 @@ namespace Fabric.Packs.Tests;
 /// <summary>
 /// <c>backend.email: smtp</c> (generator ADR-0019): e-mail over SMTP with MailKit, behind <c>IEmailSender</c> in
 /// <c>src/BuildingBlocks/Email</c>, shaped after fabric-pilot's hand-written sending. In run mode the host sends to the
-/// base's Mailpit, unencrypted; when publishing, the AppHost declares the SMTP sign-in as parameters. No profile chooses
-/// it, so no profile changes but for the Mailpit declaration R3 moves out of the run-mode block.
+/// base's Mailpit, unencrypted; when publishing, the AppHost declares the SMTP sign-in as parameters. Every profile takes
+/// <c>none</c>, whose pack (the generator needs one per chosen option) fails a module that references MailKit or MimeKit.
 /// </summary>
 [Collection(FixedPorts.Name)]
 public sealed class EmailTests
@@ -69,7 +69,7 @@ public sealed class EmailTests
         email.Default.ShouldBe(["none"]);
         email.Options.Keys.ShouldBe(["none", "smtp"]);
         Repository.Packs.Packs.Keys.ShouldContain("backend.email.smtp");
-        Repository.Packs.Packs.Keys.ShouldNotContain("backend.email.none");
+        Repository.Packs.Packs.Keys.ShouldContain("backend.email.none");
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public sealed class EmailTests
         {
             var paths = Files(profile).Keys.ToList();
             paths.ShouldNotContain(path => EmailFiles.Contains(path), profile);
-            paths.ShouldNotContain("docs/adr/fabric/backend-email-none.md", profile);
+            paths.ShouldContain("tests/Architecture.Tests/Rules/NoEmail.cs", profile);
         }
     }
 
@@ -229,6 +229,29 @@ public sealed class EmailTests
         output.ShouldNotContain("'Email:SenderAddress'");
         output.ShouldNotContain("'Email:SmtpUserName'");
         output.ShouldNotContain("not-a-real-smtp-password");
+    }
+
+    [Fact]
+    public void Without_email_a_module_referencing_mailkit_fails_the_architecture_tests_naming_it()
+    {
+        using var project = new GeneratedProject(Profile);
+        project.AddModule("billing");
+        project.Write("Directory.Packages.props", File.ReadAllText(Path.Combine(project.ProjectDirectory, "Directory.Packages.props"))
+            .Replace("</ItemGroup>", "  <PackageVersion Include=\"MailKit\" Version=\"5.0.0\" />\n  </ItemGroup>", StringComparison.Ordinal));
+        project.Write("src/Modules/Billing/Billing.Application/Billing.Application.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <ItemGroup>
+                <PackageReference Include="MailKit" />
+              </ItemGroup>
+            </Project>
+            """);
+        project.Write("src/Modules/Billing/Billing.Application/DirectMail.cs", ApplicationNamingMimeKit);
+        project.Build();
+
+        var (exitCode, output) = project.Test(ArchitectureTests);
+
+        exitCode.ShouldNotBe(0, output);
+        output.ShouldContain("Shop.Modules.Billing.Application references MimeKit.Core, but this project sends no e-mail (backend.email: none).");
     }
 
     [Fact]
