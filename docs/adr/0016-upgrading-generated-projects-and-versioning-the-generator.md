@@ -4,6 +4,8 @@
 recommendation, D1 to D8, accepted). Amended (owner, 2026-11-18, #720):
 a changed choice is applied by `fabric change`, C1 to C3 below. Amended
 (owner, 2026-11-20, #845): D1's line on hand registrations of adapters.
+Amended (owner, 2026-11-22, #861): C2 also allows M5's dimensions to be
+changeable, see the note at C2 and ADR-0019.
 **Date:** 2026-11-11
 
 ## Context
@@ -429,6 +431,13 @@ marked dimension that
 Marked today: `frontend.color-scheme` and `frontend.font` (#699). A font
 change also changes the font's package in `web/app/package.json`, so the
 project installs its dependencies again before its lockfile is current.
+
+(Amended 2026-11-22, #861: besides a presentation dimension, `changeable`
+may mark a dimension M5 adds after a pilot built it by hand:
+`backend.email`, `backend.blob-storage` and `deploy.target`, so that the
+pilot moves onto the pack with `fabric change` (X1 on #602). The lint above
+is unchanged. The decision and its reasoning are in ADR-0019, "Amendment of
+ADR-0016 C2".)
 
 ### C3. What `fabric change` requires, does and guarantees
 
