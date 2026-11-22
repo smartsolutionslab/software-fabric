@@ -16,8 +16,8 @@ public class CatalogReaderTests
         var catalog = ReadRepositoryCatalog();
 
         catalog.Version.ShouldBe(1);
-        catalog.Dimensions.Count.ShouldBe(55);
-        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(146);
+        catalog.Dimensions.Count.ShouldBe(56);
+        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(148);
         catalog.Profiles.Keys.ShouldBe(
             ["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud", "saas-strict-react", "saas-ai-react", "saas-services-vue"],
             ignoreOrder: false);
@@ -62,7 +62,7 @@ public class CatalogReaderTests
     public void The_repository_catalog_marks_the_colour_scheme_the_font_and_email_changeable_after_generation_and_nothing_else()
     {
         ReadRepositoryCatalog().Dimensions.Values.Where(dimension => dimension.Changeable).Select(dimension => dimension.Id)
-            .ShouldBe(["backend.email", "frontend.color-scheme", "frontend.font"]);
+            .ShouldBe(["frontend.color-scheme", "frontend.font", "backend.email"]);
     }
 
     [Fact]

@@ -434,7 +434,7 @@ public class ChoiceResolverTests
         var choices = ResolveSuccessfully("saas-standard-vue");
 
         choices.Project.Keys.First().ShouldBe("backend.database");
-        choices.Project.Keys.Last().ShouldBe("backend.data-access.reads");
+        choices.Project.Keys.Last().ShouldBe("backend.email");
     }
 
     [Fact]
