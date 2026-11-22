@@ -1,8 +1,8 @@
 # ADR-0020: Blob storage, `backend.blob-storage` (`none`, `azure-blob`)
 
-**Status:** Proposed. Waits for the owner's review (#864, M5-04); merged only once the owner accepts it. It records
-the owner's decisions B1 to B3 and X1 (2026-11-21 and 2026-11-22, on #602) and makes no new ones; the points neither
-those decisions nor the pilots settle are listed under "Open for the owner's review", each with a recommendation.
+**Status:** Accepted (owner, 2026-11-22, at the review of PR #870 for #864, M5-04). It records the owner's decisions
+B1 to B3 and X1 (2026-11-21 and 2026-11-22, on #602), and O1 to O5, which the owner decided at the review by accepting
+each recommendation as written.
 **Date:** 2026-11-22
 
 ## Context
@@ -144,24 +144,27 @@ What PharmaTraining left open, by its own ADR 0002's Consequences:
 
 - **A building block, `src/BuildingBlocks/Blobs`**, which alone names the Azure Storage SDK. A module takes its own
   module's store (#602: `ModuleBlobStore<TModule>`), which offers fabric-pilot's two operations (store a stream under
-  a name, open one as `Option<Stream>`) and, as O1 decides, PharmaTraining's two signed URLs (create-only upload,
-  read), with PharmaTraining's `BlobName` and `BlobUrlLifetime` guarding what it is given. No operation takes a
-  container.
+  a name, open one as `Option<Stream>`), both create-only (O5), with PharmaTraining's `BlobName` guarding the names it
+  is given. PharmaTraining's signed URLs, guarded by its `BlobUrlLifetime`, follow once a pilot has signed one in
+  Azure (O1). No operation takes a container, and none copies between containers (O2).
 - **A container per module**, as a database schema is per module (#602; PharmaTraining's decision (c)):
   - modular monolith: the AppHost adds one account and its `blobs` connection, as fabric-pilot does; each module's
     store uses a container named after the module, created on first write, so no shared file gains a line per module
     (ADR-0005);
   - services: the AppHost adds the module's container in its loop over the services, as PharmaTraining does, and
     hands each service its own as `blobs` (ADR-0017).
-- **Tenancy branches (ADR-0006).** `none`: names as given. `column`: the tenant prefix above (B2).
+- **Tenancy branches (ADR-0006).** `none`: names as given. `column` and `schema-per-tenant`: the tenant prefix
+  above (B2, O3).
 - **Slots**: `apphost.resources` (the account, Azurite with a data volume), `apphost.service-resources` (the
   container per service), `apphost.host-wiring` (`.WithReference`), `host.services` and the package versions; all
   exist today (`docs/slots.md`).
 - **Gates** (#602, each seen failing first in M5-05):
-  1. an architecture rule that the Azure Storage SDK is referenced only where the building block allows (see O4);
+  1. an architecture rule that the Azure Storage SDK is referenced only from `src/BuildingBlocks/Blobs` (O4), as
+     PharmaTraining's `BlobStorageSdkStaysInBuildingBlocks` does;
   2. `ModulesUseOnlyTheirOwnContainer`, an architecture rule;
-  3. an integration test that one tenant cannot read another tenant's blob by name (B2), and, where the pack signs
-     URLs (O1), PharmaTraining's `BlobStorageTests`: each URL does what it may and nothing else, on Azurite;
+  3. an integration test that one tenant cannot read another tenant's blob by name (B2, with `column` and
+     `schema-per-tenant`), and one that a second write to a name is refused (O5); when signed URLs follow (O1),
+     PharmaTraining's `BlobStorageTests` with them: each URL does what it may and nothing else;
   4. the volume test, fabric-pilot's `BlobStorageTests`;
   5. with services, PharmaTraining's `AppHostBlobContainersTests`: every service reads its own container as `blobs`
      and no other.
@@ -170,20 +173,21 @@ What PharmaTraining left open, by its own ADR 0002's Consequences:
   and content type before it records it, since a signed URL cannot limit either (PharmaTraining ADR 0002); another
   module's files come through `src/Contracts`, never its container; the key is never in a settings file.
 
-## Open for the owner's review
+### Decided at the owner's review (2026-11-22)
 
-None of these is decided here. Each needs the owner's answer in this ADR's review before M5-05 builds on it.
+The pilots and B1 to B3 left five points open. The draft of this ADR gave each its options and a recommendation; the
+owner accepted every recommendation as written. Each is kept with its reasoning.
 
 - **O1. Signing when deployed.** fabric-pilot's deployed account has no key (`allowSharedKeyAccess: false`), and
   Aspire's publisher (D2) provisions accounts the same way, so PharmaTraining's account-key signing works only on
   Azurite. Neither pilot has signed a URL in Azure. Options: (a) the pack signs with a user delegation key under the
   app's identity, locally and deployed, so there is one code path, and M5-05 shows it on Azurite and in one deployed
   run; (b) the pack ships the stream operations only and leaves signed URLs until pharma-training#114 has deployed
-  them; (c) account-key signing as PharmaTraining has it, deployed with shared keys enabled. **Recommended: (b)**,
-  with signed URLs added once a pilot has signed one in Azure (E3, E7: nothing the pilot has not run); (c) re-opens
-  what both pilots' deployments rule out.
+  them; (c) account-key signing as PharmaTraining has it, deployed with shared keys enabled. **Decided: (b)**, with
+  signed URLs added once a pilot has signed one in Azure (E3, E7: nothing the pilot has not run); (c) re-opens what
+  both pilots' deployments rule out.
 - **O2. Server-side copies between modules.** The owner's B1 describes PharmaTraining as using them; its ADR 0002
-  records them as intended, with the mechanism open for pharma-training#41. **Recommended:** the pack ships no
+  records them as intended, with the mechanism open for pharma-training#41. **Decided:** the pack ships no
   cross-container copy and no operation that names another module's container; a module that needs another's file is
   told through an integration event and fetches or receives it as #41 decides, and the pack adds that once #41 is
   merged.
@@ -191,15 +195,15 @@ None of these is decided here. Each needs the owner's answer in this ADR's revie
   (ADR-0006). Options: (a) the same tenant prefix as `column`, read from the same `ITenantContext`, with the same
   integration test; (b) refuse `azure-blob` with `schema-per-tenant` in one sentence until a pilot has it. A catalog
   refusal would name `backend.blob-storage` in an option's `conflicts`, which C2's lint forbids for a changeable
-  dimension, so (b) also needs that lint amended. **Recommended: (a)**: the blob name is the only place a tenant can
+  dimension, so (b) also needs that lint amended. **Decided: (a)**: the blob name is the only place a tenant can
   go, whichever way the database separates tenants.
 - **O4. Where the SDK may be named.** #602 proposed "only from Infrastructure and BuildingBlocks"; PharmaTraining's
   rule is stricter, BuildingBlocks only (`BlobStorageSdkStaysInBuildingBlocks`), and fabric-pilot's store is in the
-  module's Infrastructure. **Recommended:** BuildingBlocks only. With a building block every module uses, a module that
+  module's Infrastructure. **Decided:** BuildingBlocks only. With a building block every module uses, a module that
   names the SDK can only be building a second, unscoped client, which is how B2 and `ModulesUseOnlyTheirOwnContainer`
   would be bypassed.
 - **O5. Overwrite.** fabric-pilot's upload replaces a blob; PharmaTraining's upload URL is create-only.
-  **Recommended:** create-only for both operations, names being module-generated, so that a name, once written, always
+  **Decided:** create-only for both operations, names being module-generated, so that a name, once written, always
   holds the same bytes; a module that replaces a file writes it under a new name.
 
 ## Consequences
@@ -211,6 +215,8 @@ None of these is decided here. Each needs the owner's answer in this ADR's revie
   belong to `deploy.target` on Aspire's publisher (D2, M5-07), not to this pack. Aspire's publish-mode role
   assignments are account-wide, so until M5-07 narrows them, a container per module is enforced by configuration and
   by the store's shape, not by the storage service (PharmaTraining ADR 0002).
+- Under O1 the pack does not yet replace PharmaTraining's signed URLs: until they are added, its `IBlobUrls` stays
+  its own code beside the generated store when it moves through `fabric change`.
 - A file two modules need is stored twice, once in each module's container, as under PharmaTraining's decision (c).
 - Azurite adds a container to every local run and to the integration fixture; PharmaTraining measured no startup cost
   (PR #124).
