@@ -99,7 +99,14 @@ case "${positional[0]} ${positional[1]:-}" in
         # fail-issue-read holds the number of the single-issue read that fails, as a server error would.
         reads=$(( $(cat "$state/issue-reads" 2>/dev/null || echo 0) + 1 )); echo "$reads" > "$state/issue-reads"
         if [ "$(cat "$state/fail-issue-read" 2>/dev/null)" = "$reads" ]; then echo '{"message":"Service Unavailable"}' >&2; exit 1; fi
-        jq --argjson number "${path#issues/}" '.[] | select(.number == $number)' "$issues" ;;
+        # Another repository's issues are in repos/<owner>/<repo>/issues.json; one without that file is not found.
+        source_issues="$issues"
+        target="${positional[1]#repos/}"; target="${target%/issues/*}"
+        if [ "$target" != "$GITHUB_REPOSITORY" ]; then
+          source_issues="$state/repos/$target/issues.json"
+          if [ ! -e "$source_issues" ]; then echo '{"message":"Not Found"}' >&2; exit 1; fi
+        fi
+        jq --argjson number "${path#issues/}" '.[] | select(.number == $number)' "$source_issues" ;;
       "POST issues/"*"/comments")
         n="${path#issues/}"; n="${n%/comments}"; file="$state/comments/$n.json"; mkdir -p "$state/comments"
         [ -e "$file" ] || echo '[]' > "$file"

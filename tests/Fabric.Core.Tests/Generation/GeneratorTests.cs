@@ -22,14 +22,84 @@ public class GeneratorTests
             "AGENTS.md",
             "README.md",
             "config/database.txt",
-            "docs/adr/0001-base-core.md",
-            "docs/adr/0002-backend-database-postgres.md",
-            "docs/adr/0003-backend-api-protocols-rest.md",
-            "docs/adr/0004-module-style-ddd.md",
+            "docs/adr/fabric/backend-api-protocols-rest.md",
+            "docs/adr/fabric/backend-database-postgres.md",
+            "docs/adr/fabric/base-core.md",
+            "docs/adr/fabric/module-style-ddd.md",
             "fabric.yaml",
         ]);
         Content(result, "config/database.txt").ShouldBe("provider=postgres\nread by: rest\n");
         Content(result, "fabric.yaml").ShouldContain("name: shop\nprofile: minimal\n");
+    }
+
+    [Fact]
+    public void A_root_namespace_given_to_new_is_what_templates_see_and_what_fabric_yaml_records()
+    {
+        var result = Generator.New(Fixtures.MinimalCatalog, Fixtures.MinimalPacks, "shop", "minimal", [], "SmartSolutionsLab.Shop");
+
+        result.Errors.ShouldBeEmpty();
+        Content(result, ".claude/agents/backend-engineer.md").ShouldStartWith("# Backend engineer (SmartSolutionsLab.Shop)\n");
+        Content(result, "fabric.yaml").ShouldContain("name: shop\nnamespace: SmartSolutionsLab.Shop\nprofile: minimal\n");
+    }
+
+    [Fact]
+    public void Without_a_root_namespace_the_namespace_is_the_project_name_in_pascal_case_and_fabric_yaml_records_none()
+    {
+        var result = New("minimal");
+
+        Content(result, ".claude/agents/backend-engineer.md").ShouldStartWith("# Backend engineer (Shop)\n");
+        Content(result, "fabric.yaml").ShouldNotContain("namespace");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("smart-solutions.Shop")]
+    [InlineData("Smart Solutions")]
+    [InlineData("Acme..Shop")]
+    [InlineData(".Acme")]
+    [InlineData("Acme.")]
+    [InlineData("1Acme.Shop")]
+    [InlineData("Acme.2Shop")]
+    [InlineData("_Acme")]
+    [InlineData("Äcme.Shop")]
+    [InlineData("Acme.class")]
+    [InlineData("namespace.Shop")]
+    public void Refuses_a_root_namespace_that_is_not_a_dotted_csharp_namespace(string rootNamespace)
+    {
+        var result = Generator.New(Fixtures.MinimalCatalog, Fixtures.MinimalPacks, "shop", "minimal", [], rootNamespace);
+
+        result.Files.ShouldBeEmpty();
+        result.Errors.ShouldBe([
+            $"namespace '{rootNamespace}' must be a C# namespace: names of ASCII letters, digits and underscores, each starting with a letter " +
+            "and none a C# keyword, separated by dots.",
+        ]);
+    }
+
+    [Theory]
+    [InlineData("System")]
+    [InlineData("System.Shop")]
+    [InlineData("Microsoft.Shop")]
+    public void Refuses_a_root_namespace_under_system_or_microsoft(string rootNamespace)
+    {
+        var result = Generator.New(Fixtures.MinimalCatalog, Fixtures.MinimalPacks, "shop", "minimal", [], rootNamespace);
+
+        result.Files.ShouldBeEmpty();
+        result.Errors.ShouldBe([
+            $"namespace '{rootNamespace}' is under System or Microsoft, which a generated project keeps for .NET's own types and its wiring code.",
+        ]);
+    }
+
+    [Theory]
+    [InlineData("Shop")]
+    [InlineData("SmartSolutionsLab.PharmaTraining")]
+    [InlineData("acme.shop_2")]
+    [InlineData("Acme.Systems.Microsoft")]
+    public void Accepts_a_dotted_csharp_namespace(string rootNamespace)
+    {
+        var result = Generator.New(Fixtures.MinimalCatalog, Fixtures.MinimalPacks, "shop", "minimal", [], rootNamespace);
+
+        result.Errors.ShouldBeEmpty();
+        Content(result, "fabric.yaml").ShouldContain($"\nnamespace: {rootNamespace}\n");
     }
 
     [Fact]
@@ -124,9 +194,9 @@ public class GeneratorTests
     }
 
     [Fact]
-    public void Every_selected_pack_gets_its_adr_numbered_in_selection_order()
+    public void Every_selected_pack_gets_its_adr_named_after_its_option_under_docs_adr_fabric()
     {
-        Content(New("minimal"), "docs/adr/0002-backend-database-postgres.md").ShouldBe("# ADR: backend.database.postgres\n");
+        Content(New("minimal"), "docs/adr/fabric/backend-database-postgres.md").ShouldBe("# ADR: backend.database.postgres\n");
     }
 
     [Theory]

@@ -60,6 +60,34 @@ const permission = useCanManage();
 </template>
 {{~ else if sample_page ~}}
 {{~ ns = module.namespace ~}}
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ func imports(names, from)
+  line = "import { " + (names | array.join ", ") + " } from '" + from + "';"
+  if fits(0, line)
+    ret line
+  end
+  ret "import {\n  " + (names | array.join ",\n  ") + ",\n} from '" + from + "';"
+end ~}}
+{{~ func braces(indent, before, entries, after)
+  line = before + "{ " + (entries | array.join ", ") + " }" + after
+  if fits(indent, line)
+    ret line
+  end
+  pad = "  "
+  ret before + "{\n" + pad + (entries | array.join (",\n" + pad)) + ",\n}" + after
+end ~}}
+{{~ func element(indent, open, attributes, close)
+  line = open + " " + (attributes | array.join " ") + close
+  if fits(indent, line)
+    ret line
+  end
+  pad = "  "
+  ret open + "\n" + pad + (attributes | array.join ("\n" + pad)) + "\n" + (close | string.lstrip)
+end ~}}
 {{~ # TanStack Table's DataTable draws its own loading and empty states (#696); beside AG Grid the page draws them. ~}}
 {{~ table = project["frontend.data-grid"] == "tanstack-table" ~}}
 {{~ # openapi-fetch's generated file holds the document's types, not named ones: the composable names the sample's. ~}}
@@ -83,9 +111,9 @@ import Create{{ ns }}SampleForm from './Create{{ ns }}SampleForm.vue';
 import { useCanManage } from './useCanManage';
 {{~ end ~}}
 {{~ if fetch ~}}
-import { type {{ ns }}SampleDto, useCreate{{ ns }}Sample, use{{ ns }}Samples } from './use{{ ns }}Samples';
+{{ imports ["type " + ns + "SampleDto", "useCreate" + ns + "Sample", "use" + ns + "Samples"] ("./use" + ns + "Samples") }}
 {{~ else ~}}
-import { useCreate{{ ns }}Sample, use{{ ns }}Samples } from './use{{ ns }}Samples';
+{{ imports ["useCreate" + ns + "Sample", "use" + ns + "Samples"] ("./use" + ns + "Samples") }}
 {{~ end ~}}
 
 // The module's screen, starting from its sample (AGENTS.md): the samples in a table, by name, and a form that creates
@@ -100,9 +128,9 @@ const skeletonRows = ['first', 'second', 'third'];
 {{~ end ~}}
 
 {{~ if table ~}}
-const { samples: rows, page, isLoading, isError } = use{{ ns }}Samples();
+{{ braces 0 "const " ["samples: rows", "page", "isLoading", "isError"] (" = use" + ns + "Samples();") }}
 {{~ else ~}}
-const { samples: rows, isLoading, isError } = use{{ ns }}Samples();
+{{ braces 0 "const " ["samples: rows", "isLoading", "isError"] (" = use" + ns + "Samples();") }}
 {{~ end ~}}
 const { create, isSaving } = useCreate{{ ns }}Sample();
 {{~ if probe ~}}
@@ -128,9 +156,9 @@ async function onCreate(name: string) {
     <h2 v-if="permission === 'granted'">Manage</h2>
     <p v-if="permission === 'failed'" role="alert">Permissions for {{ module.name }} could not be loaded.</p>
 {{~ end ~}}
-    <section aria-labelledby="{{ module.name }}-samples" class="flex flex-col gap-4">
+    {{ element 4 "<section" ['aria-labelledby="' + module.name + '-samples"', 'class="flex flex-col gap-4"'] ">" }}
       <h2 id="{{ module.name }}-samples">Samples</h2>
-      <Create{{ ns }}SampleForm ref="form" :on-create="onCreate" :saving="isSaving" />
+      {{ element 6 ("<Create" + ns + "SampleForm") ['ref="form"', ':on-create="onCreate"', ':saving="isSaving"'] " />" }}
       <p v-if="isError" role="alert">The samples could not be loaded.</p>
 {{~ if table ~}}
       <DataTable v-else :columns="columns" :data="rows ?? none" :loading="isLoading" :paging="page">

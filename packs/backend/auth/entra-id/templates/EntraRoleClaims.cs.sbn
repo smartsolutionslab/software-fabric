@@ -1,15 +1,39 @@
+{{~
+  # Staff sign in from a staff directory, AzureAd:StaffDirectories, whose users belong to no tenant (#614), where the
+  # tenant-column pack lets staff read across tenants. cross_tenant_reads is that pack's; no other tenancy defines it.
+  staff_directories = false
+  if project["backend.tenancy"] == "column"
+    staff_directories = cross_tenant_reads
+  end
+~}}
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+{{~ if staff_directories ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
 
 namespace {{ namespace }}.Host;
 
 /// <summary>
 /// Entra ID lists the user's app roles in the token's <c>roles</c> claim; ASP.NET reads roles from
 /// <c>ClaimTypes.Role</c>. This copies them there, so a module's policies can <c>RequireRole</c>.
+{{~ if staff_directories ~}}
+/// <see cref="CrossTenantRole.Name"/> counts only in a token of a directory AzureAd:StaffDirectories lists: every directory
+/// assigns the application's app roles to its own users, so a tenant's administrator could assign it to a tenant's user.
+/// </summary>
+public sealed class EntraRoleClaims(IConfiguration configuration) : IClaimsTransformation
+{
+    private const string RolesClaim = "roles";
+
+    private const string DirectoryClaim = "tid";
+
+    private const string StaffDirectories = "AzureAd:StaffDirectories";
+{{~ else ~}}
 /// </summary>
 public sealed class EntraRoleClaims : IClaimsTransformation
 {
     private const string RolesClaim = "roles";
+{{~ end ~}}
 
     public Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
     {
@@ -21,9 +45,15 @@ public sealed class EntraRoleClaims : IClaimsTransformation
         }
 
         // ASP.NET may transform the same principal more than once per request; a role already there is not added again.
+{{~ if staff_directories ~}}
+        var staff = IsStaffDirectory(identity.FindFirst(DirectoryClaim)?.Value);
+{{~ end ~}}
         var missing = identity.FindAll(RolesClaim)
             .Select(claim => claim.Value)
             .Distinct(StringComparer.Ordinal)
+{{~ if staff_directories ~}}
+            .Where(role => staff || role != CrossTenantRole.Name)
+{{~ end ~}}
             .Where(role => !identity.HasClaim(ClaimTypes.Role, role))
             .ToList();
         if (missing.Count == 0)
@@ -35,4 +65,11 @@ public sealed class EntraRoleClaims : IClaimsTransformation
         ((ClaimsIdentity)transformed.Identity!).AddClaims(missing.Select(role => new Claim(ClaimTypes.Role, role)));
         return Task.FromResult(transformed);
     }
+{{~ if staff_directories ~}}
+
+    private bool IsStaffDirectory(string? directory) =>
+        directory is not null
+            && configuration.GetSection(StaffDirectories).GetChildren()
+                .Any(staff => string.Equals(staff.Value, directory, StringComparison.OrdinalIgnoreCase));
+{{~ end ~}}
 }

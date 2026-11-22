@@ -1,0 +1,73 @@
+using {{ namespace }}.BuildingBlocks.Modules;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// AddModuleAdapters registers a module's stores over its DbContext as the Application interfaces they implement, so a
+/// hand registration of the same interface is a second registration: DI resolves the last one, whatever its lifetime or
+/// implementation, and says nothing. Each module's services are registered as the host registers them, through its
+/// <see cref="IModule"/>, and every service type of its Application assembly must appear once.
+/// </summary>
+public sealed class EveryModuleServiceIsRegisteredOnce : IArchitectureRule
+{
+    private const string ModulePrefix = "{{ namespace }}.Modules.";
+
+    private const string ApiSuffix = ".Api";
+
+    private const string ApplicationSuffix = ".Application";
+
+    public string Description => "Each module registers every service its Application project declares once, by convention or by hand, never both.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:database"] = "Host=localhost" })
+            .Build();
+
+        return [.. model.ModuleAssemblies
+            .Where(assembly => assembly.GetName().Name!.EndsWith(ApiSuffix, StringComparison.Ordinal))
+            .OrderBy(assembly => assembly.GetName().Name, StringComparer.Ordinal)
+            .SelectMany(api => api.GetTypes()
+                .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(IModule).IsAssignableFrom(type))
+                .OrderBy(type => type.FullName, StringComparer.Ordinal)
+                .SelectMany(module => Duplicates(api.GetName().Name![..^ApiSuffix.Length], module, configuration)))];
+    }
+
+    private static IEnumerable<string> Duplicates(string assemblyPrefix, Type module, IConfiguration configuration)
+    {
+        var services = new ServiceCollection();
+        ((IModule)Activator.CreateInstance(module)!).AddServices(services, configuration);
+
+        var application = assemblyPrefix + ApplicationSuffix;
+        var name = assemblyPrefix.StartsWith(ModulePrefix, StringComparison.Ordinal) ? assemblyPrefix[ModulePrefix.Length..] : assemblyPrefix;
+        return services
+            .Where(service => service.ServiceType.Assembly.GetName().Name == application)
+            .GroupBy(service => (service.ServiceType, service.ServiceKey))
+            .Where(registrations => registrations.Count() > 1)
+            .OrderBy(registrations => registrations.Key.ServiceType.FullName, StringComparer.Ordinal)
+            .Select(registrations => $"The module {name} registers {registrations.Key.ServiceType.FullName} {registrations.Count()} times: "
+                + $"{string.Join(", ", registrations.Select(Describe))}. DI resolves the last one and ignores the others; "
+                + "keep one registration. A store over the module's DbContext is registered by AddModuleAdapters, so delete its hand registration.");
+    }
+
+    private static string Describe(ServiceDescriptor service)
+    {
+        var implementation = service.IsKeyedService ? service.KeyedImplementationType : service.ImplementationType;
+        if (implementation is not null)
+        {
+            return $"{implementation.FullName} ({service.Lifetime})";
+        }
+
+        var instance = service.IsKeyedService ? service.KeyedImplementationInstance : service.ImplementationInstance;
+        if (instance is not null)
+        {
+            return $"an instance of {instance.GetType().FullName} ({service.Lifetime})";
+        }
+
+        return $"a factory ({service.Lifetime})";
+    }
+}

@@ -110,7 +110,7 @@ public sealed class TurborepoTests
 
         files["AGENTS.md"].ShouldContain("## Frontend workspace: Turborepo");
         files["AGENTS.md"].ShouldContain("turbo run");
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-workspace-turborepo.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-workspace-turborepo.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("remoteCache");
         adr.ShouldContain(".turbo/cache");
     }
@@ -120,7 +120,7 @@ public sealed class TurborepoTests
     {
         var files = Files("saas-standard-react", Turborepo);
 
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-workspace-turborepo.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-workspace-turborepo.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("## Telemetry");
         adr.ShouldContain("turbo telemetry disable");
         adr.ShouldContain("TURBO_TELEMETRY_DISABLED=1");

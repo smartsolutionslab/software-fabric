@@ -14,6 +14,13 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+{{~ if project["backend.test.integration"] == "aspire-fixture" ~}}
+    # The integration tests start the AppHost through Aspire's testing host.
+    # Aspire's orchestrator also asks podman whether it runs unless the runtime is named; GitHub's runners carry podman,
+    # and that call can hang past the job and fail the AppHost's dependency check.
+    env:
+      ASPIRE_CONTAINER_RUNTIME: docker
+{{~ end ~}}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
@@ -35,6 +42,11 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    # The end-to-end tests start the AppHost.
+    # Aspire's orchestrator also asks podman whether it runs unless the runtime is named; GitHub's runners carry podman,
+    # and that call can hang past the job and fail the AppHost's dependency check.
+    env:
+      ASPIRE_CONTAINER_RUNTIME: docker
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0

@@ -154,8 +154,8 @@ public sealed partial class ChartJsTests
         files["AGENTS.md"].ShouldContain("## Charts: Chart.js");
         files["AGENTS.md"].ShouldContain("<Chart config={...} label=\"...\" />");
         NamesECharts().IsMatch(files["AGENTS.md"]).ShouldBeFalse("AGENTS.md names no ECharts");
-        files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("-frontend-charts-chartjs.md", StringComparison.Ordinal));
-        files.Keys.ShouldNotContain(path => path.EndsWith("-frontend-charts-echarts.md", StringComparison.Ordinal));
+        files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("/frontend-charts-chartjs.md", StringComparison.Ordinal));
+        files.Keys.ShouldNotContain(path => path.EndsWith("/frontend-charts-echarts.md", StringComparison.Ordinal));
         WebSources(files).ShouldNotContain(source => NamesECharts().IsMatch(source.Value), "no web source names echarts");
     }
 
@@ -180,7 +180,7 @@ public sealed partial class ChartJsTests
         files["AGENTS.md"].ShouldContain("## Charts: Chart.js");
         files["AGENTS.md"].ShouldContain("<DataChart :config=\"...\" label=\"...\" />");
         NamesECharts().IsMatch(files["AGENTS.md"]).ShouldBeFalse("AGENTS.md names no ECharts");
-        files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("-frontend-charts-chartjs.md", StringComparison.Ordinal));
+        files.Keys.ShouldContain(path => path.StartsWith("docs/adr/", StringComparison.Ordinal) && path.EndsWith("/frontend-charts-chartjs.md", StringComparison.Ordinal));
         WebSources(files).ShouldNotContain(source => NamesECharts().IsMatch(source.Value), "no web source names echarts");
     }
 

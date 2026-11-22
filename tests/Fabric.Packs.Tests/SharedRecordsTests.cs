@@ -4,7 +4,7 @@ namespace Fabric.Packs.Tests;
 
 /// <summary>
 /// Records shared by all tenants (#623, owner decisions of 2026-11-12): with <c>backend.tenancy=column</c>,
-/// <c>backend.authorization</c> containing roles and Keycloak or generic OIDC, an entity type configured with
+/// <c>backend.authorization</c> containing roles and Keycloak, generic OIDC or Entra ID, an entity type configured with
 /// <c>SharedByAllTenants()</c> has no tenant column and no tenant filter, so every tenant's users read its records; only
 /// an endpoint mapped with <c>.RequireAuthorization(&lt;Module&gt;PolicyNames.WriteSharedRecords).WritesSharedRecords()</c>
 /// writes them, and an event published there carries no tenant. With rag, <c>SharedVectorIndex&lt;TContext&gt;</c> keeps
@@ -40,6 +40,8 @@ public sealed class SharedRecordsTests
     [InlineData("backend.auth=keycloak", RolesAndClaims)]
     [InlineData("backend.auth=generic-oidc", Roles)]
     [InlineData("backend.auth=generic-oidc", RolesAndClaims)]
+    [InlineData("backend.auth=entra-id", Roles)]
+    [InlineData("backend.auth=entra-id", RolesAndClaims)]
     public void With_a_tenant_column_and_roles_a_module_gets_a_write_shared_records_policy_that_requires_the_staff_role(string auth, string authorization)
     {
         using var project = new GeneratedProject(Profile, auth, authorization);
@@ -80,10 +82,21 @@ public sealed class SharedRecordsTests
         files["src/BuildingBlocks/Rag/ModuleVectorIndex.cs"].ShouldBe(Files(WithRag)["src/BuildingBlocks/Rag/ModuleVectorIndex.cs"]);
     }
 
+    [Fact]
+    public void With_entra_id_and_rag_shared_records_get_a_vector_index_and_a_table_of_their_own()
+    {
+        var files = Files(WithRag, "backend.auth=entra-id", RolesAndClaims);
+
+        foreach (var file in SharedVectorFiles)
+        {
+            files.Keys.ShouldContain(file);
+        }
+    }
+
     [Theory]
     [InlineData(Profile, new string[0])]
     [InlineData(Profile, new[] { "backend.authorization=claims" })]
-    [InlineData(Profile, new[] { "backend.auth=entra-id", Roles })]
+    [InlineData(Profile, new[] { "backend.auth=entra-id" })]
     [InlineData(Profile, new[] { "backend.tenancy=schema-per-tenant", Roles })]
     [InlineData("lean-crud", new[] { Roles })]
     [InlineData(WithRag, new string[0])]
@@ -124,14 +137,6 @@ public sealed class SharedRecordsTests
         var withoutRoles = Files(Profile);
         Adr(withoutRoles, "Tenancy: a tenant column").ShouldNotContain("SharedByAllTenants");
         withoutRoles["AGENTS.md"].ShouldContain("using var tenant = TenantScope.Begin(message.Metadata.TenantId);");
-    }
-
-    [Fact]
-    public void With_entra_id_the_tenant_column_adr_says_why_there_are_no_shared_records_yet()
-    {
-        var adr = Adr(Files(Profile, "backend.auth=entra-id", Roles), "Tenancy: a tenant column");
-
-        adr.ShouldContain("`WritesSharedRecords()` is not generated with Entra ID");
     }
 
     [Fact]

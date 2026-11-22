@@ -23,6 +23,12 @@ public static partial class Composer
     /// <summary>Followed by a role; filled by the generator with every selected pack's brief for that role.</summary>
     public const string AgentBriefSlotPrefix = "agents.brief.";
 
+    /// <summary>
+    /// Where every selected pack's ADR goes, named after its option and unnumbered (ADR-0018): <c>docs/adr/</c> itself
+    /// belongs to the project and its own numbered ADRs.
+    /// </summary>
+    public const string PackAdrDirectory = "docs/adr/fabric/";
+
     private static readonly string?[] ProjectOnly = [null];
 
     public static Composition Compose(CatalogModel catalog, IReadOnlyDictionary<string, PackManifest> packs, ProjectChoices choices)
@@ -115,9 +121,9 @@ public static partial class Composer
             }
         }
 
-        foreach (var (pack, index) in selected.Select((pack, index) => (pack, index)))
+        foreach (var pack in selected)
         {
-            var target = $"docs/adr/{index + 1:0000}-{pack.Option.Replace('.', '-')}.md";
+            var target = $"{PackAdrDirectory}{pack.Option.Replace('.', '-')}.md";
             Claim(claims, files, new ComposedFile(pack, new PackFile(pack.Adr, target, PerModule: false), target, null), errors);
         }
 

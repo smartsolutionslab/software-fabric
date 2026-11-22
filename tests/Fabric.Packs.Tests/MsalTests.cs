@@ -79,8 +79,8 @@ public sealed partial class MsalTests
     public void The_decision_records_and_agent_rules_name_the_development_certificate_and_the_missing_end_to_end_tests(string profile, string client)
     {
         var files = Files(profile, EntraId, Msal);
-        var adr = files.Single(file => file.Key.EndsWith("-frontend-auth-client-msal.md", StringComparison.Ordinal)).Value;
-        var entraId = files.Single(file => file.Key.EndsWith("-backend-auth-entra-id.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.EndsWith("/frontend-auth-client-msal.md", StringComparison.Ordinal)).Value;
+        var entraId = files.Single(file => file.Key.EndsWith("/backend-auth-entra-id.md", StringComparison.Ordinal)).Value;
         var agents = files["AGENTS.md"];
 
         adr.ShouldContain(client);

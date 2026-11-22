@@ -122,7 +122,7 @@ public sealed class OpenApiFetchTests
             files["AGENTS.md"].ShouldContain("api.GET('/billing/notes')");
             files["AGENTS.md"].ShouldNotContain("get...QueryKey()");
             files["AGENTS.md"].ShouldNotContain("orval");
-            var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-api-client-openapi-fetch.md", StringComparison.Ordinal)).Value;
+            var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-api-client-openapi-fetch.md", StringComparison.Ordinal)).Value;
             adr.ShouldContain("openapi-typescript");
             adr.ShouldContain("web/app/openapi.json");
         }

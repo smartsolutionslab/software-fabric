@@ -120,12 +120,29 @@ public sealed class UpgradeCommandTests : IDisposable
 
     private CliRun UpgradeFromOld() => Upgrade("--from", oldFabric);
 
-    private string Read(string path) => File.ReadAllText(Path.Combine(project, path));
+    private string Read(string path) => Read(project, path);
 
-    private void Write(string path, string content)
+    private static string Read(string directory, string path) => File.ReadAllText(Path.Combine(directory, path));
+
+    private void Write(string path, string content) => Write(project, path, content);
+
+    private static void Write(string directory, string path, string content)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(project, path))!);
-        File.WriteAllText(Path.Combine(project, path), content);
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.Combine(directory, path))!);
+        File.WriteAllText(Path.Combine(directory, path), content);
+    }
+
+    /// <summary>The same project, generated and committed by a fabric that numbered its pack ADRs, as 0.7.0 and earlier did.</summary>
+    private (string Project, string Fabric) NumberedProject()
+    {
+        var directory = Path.Combine(root, "numbered");
+        Directory.CreateDirectory(directory);
+        var fabric = OldFabric.Create(directory, OldVersion, Paths.FixtureCatalog, oldPacks, numberedAdrs: true);
+        var numbered = Path.Combine(directory, "shop");
+        Generate(fabric, numbered);
+        Git.Run(numbered, "init", "-q");
+        Git.Commit(numbered, "generate with fabric 0.0.1, numbered");
+        return (numbered, fabric);
     }
 
     private string Unmerged() => Git.Run(project, "ls-files", "-u");
@@ -135,6 +152,32 @@ public sealed class UpgradeCommandTests : IDisposable
         [.. Unmerged().Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Where(line => line.EndsWith("\t" + path, StringComparison.Ordinal))
             .Select(line => line.Split('\t')[0].Split(' ')[2])];
+
+    /// <summary>Adds a base pack to the new packs: every project selects it, so an upgrade adds it.</summary>
+    private void AddBasePack(string name)
+    {
+        var pack = Path.Combine(newPacks, "base", name);
+        Directory.CreateDirectory(Path.Combine(pack, "templates"));
+        Directory.CreateDirectory(Path.Combine(pack, "docs"));
+        File.WriteAllText(Path.Combine(pack, "templates", "gate.sbn"), "// gate\n");
+        File.WriteAllText(Path.Combine(pack, "docs", "agents.md"), $"## {name}\n");
+        File.WriteAllText(Path.Combine(pack, "docs", "adr.md"), $"# ADR: base.{name}\n");
+        File.WriteAllText(
+            Path.Combine(pack, "pack.yaml"),
+            $"option: base.{name}\nfiles: []\nagents:\n  agents-md: docs/agents.md\nadr: docs/adr.md\n" +
+            "gates:\n  - { kind: unit-test, describes: \"Fixture gate.\", file: templates/gate.sbn }\n");
+    }
+
+    /// <summary>Every ADR in the project, the generator's and its own, by path.</summary>
+    private static List<string> Adrs(string directory) =>
+        [.. Tree(directory).Keys.Where(path => path.StartsWith("docs/adr/", StringComparison.Ordinal)).Order(StringComparer.Ordinal)];
+
+    /// <summary>The number an ADR's file name starts with (<c>0006</c> of <c>0006-our-decision.md</c>), if it has one.</summary>
+    private static string? Number(string path)
+    {
+        var name = Path.GetFileName(path);
+        return name.Length > 5 && name[..4].All(char.IsAsciiDigit) && name[4] == '-' ? name[..4] : null;
+    }
 
     private void ShouldBeUntouched(string head)
     {
@@ -158,6 +201,74 @@ public sealed class UpgradeCommandTests : IDisposable
         run.Output.ShouldContain("  A src/billing/page.test.md");
         run.Output.ShouldNotContain("conflict");
         run.Output.ShouldNotContain("builds");
+    }
+
+    [Fact]
+    public void A_project_with_a_module_of_a_style_new_did_not_choose_comes_out_exactly_as_this_fabric_writes_it_fresh()
+    {
+        var mixed = Path.Combine(root, "mixed", "shop");
+        Run(oldFabric, ["new", mixed, .. NewArguments]);
+        Git.Run(mixed, "init", "-q");
+        Git.Commit(mixed, "generate with fabric 0.0.1");
+        Run(oldFabric, ["add-module", "audit", "--project", mixed, "--set", "module.style=crud"]);
+        Git.Commit(mixed, "add audit with fabric 0.0.1");
+
+        var run = CliRun.Of(["upgrade", "--project", mixed, "--from", oldFabric, "--catalog", Paths.FixtureCatalog, "--packs", newPacks]);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldStartWith($"upgraded shop from fabric {OldVersion} to fabric {Running}; nothing is committed.");
+        run.Output.ShouldContain("  M README.md");
+        run.Output.ShouldContain("  A docs/notes.md");
+        run.Output.ShouldNotContain("conflict");
+        Git.Run(mixed, "ls-files", "-u").ShouldBeEmpty();
+
+        var fresh = Path.Combine(root, "fresh-mixed", "shop");
+        CliRun.Of(["new", fresh, .. NewArguments, "--catalog", Paths.FixtureCatalog, "--packs", newPacks]).ExitCode.ShouldBe(0);
+        Git.Run(fresh, "init", "-q");
+        Git.Commit(fresh, "generate");
+        var added = CliRun.Of("add-module", "audit", "--set", "module.style=crud", "--project", fresh, "--catalog", Paths.FixtureCatalog, "--packs", newPacks);
+        added.ExitCode.ShouldBe(0, added.Error);
+        Tree(mixed).ShouldBe(Tree(fresh));
+        Read(mixed, "README.md").ShouldContain("## modules: crud");
+    }
+
+    [Fact]
+    public void A_namespaced_project_keeps_its_namespace_through_an_add_module_merge_and_upgrades_to_exactly_a_fresh_generation()
+    {
+        foreach (var packs in (string[])[oldPacks, newPacks])
+        {
+            AddFile(
+                Path.Combine(packs, "module", "style", "crud"),
+                "namespace.sbn",
+                "src/{{ module.name }}/Namespace.txt",
+                perModule: true,
+                "{{ namespace }}.Modules.{{ module.namespace }}\n");
+        }
+
+        var fresh = Path.Combine(root, "fresh-namespaced-mixed", "shop");
+        CliRun.Of(["new", fresh, "--namespace", "Acme.Shop", .. NewArguments, "--catalog", Paths.FixtureCatalog, "--packs", newPacks]).ExitCode.ShouldBe(0);
+        Git.Run(fresh, "init", "-q");
+        Git.Commit(fresh, "generate in Acme.Shop");
+        var added = CliRun.Of("add-module", "audit", "--set", "module.style=crud", "--project", fresh, "--catalog", Paths.FixtureCatalog, "--packs", newPacks);
+        added.ExitCode.ShouldBe(0, added.Error);
+        added.Output.ShouldContain("merging in what its packs new to the project write");
+        Read(fresh, "src/audit/Namespace.txt").ShouldBe("Acme.Shop.Modules.Audit\n");
+        Read(fresh, ".claude/agents/backend-engineer.md").ShouldStartWith("# Backend engineer (Acme.Shop)\n");
+        Read(fresh, "fabric.yaml").ShouldContain("\nname: shop\nnamespace: Acme.Shop\n");
+
+        var mixed = Path.Combine(root, "namespaced-mixed", "shop");
+        Run(oldFabric, ["new", mixed, "--namespace", "Acme.Shop", .. NewArguments]);
+        Git.Run(mixed, "init", "-q");
+        Git.Commit(mixed, "generate with fabric 0.0.1 in Acme.Shop");
+        Run(oldFabric, ["add-module", "audit", "--project", mixed, "--set", "module.style=crud"]);
+        Git.Commit(mixed, "add audit with fabric 0.0.1");
+
+        var run = CliRun.Of(["upgrade", "--project", mixed, "--from", oldFabric, "--catalog", Paths.FixtureCatalog, "--packs", newPacks]);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldNotContain("conflict");
+        Git.Run(mixed, "ls-files", "-u").ShouldBeEmpty();
+        Tree(mixed).ShouldBe(Tree(fresh));
     }
 
     [Fact]
@@ -400,6 +511,36 @@ public sealed class UpgradeCommandTests : IDisposable
     }
 
     [Fact]
+    public void Names_the_hand_registrations_of_adapters_when_the_upgrade_brings_the_rule_that_fails_on_them()
+    {
+        AddFile(
+            Path.Combine(newPacks, "base", "core"),
+            "registered-once.sbn",
+            "tests/Architecture.Tests/Rules/EveryModuleServiceIsRegisteredOnce.cs",
+            perModule: false,
+            "// rule\n");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldContain(
+            "  - that no module registers by hand a store AddModuleAdapters registers by convention: the architecture rule " +
+            "EveryModuleServiceIsRegisteredOnce fails on such a second registration, naming it; delete the hand registration.\n");
+    }
+
+    [Fact]
+    public void Does_not_name_hand_registrations_of_adapters_when_the_upgrade_does_not_touch_the_rule()
+    {
+        AddFile(Path.Combine(newPacks, "module", "style", "ddd"), "endpoint.sbn", "src/{{ module.name }}/Endpoint.cs", perModule: true, "// endpoint\n");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldContain("migration");
+        run.Output.ShouldNotContain("EveryModuleServiceIsRegisteredOnce");
+    }
+
+    [Fact]
     public void A_probe_test_is_not_added_beside_a_module_page_the_project_rewrote_and_the_summary_names_it()
     {
         AddFile(Path.Combine(newPacks, "module", "style", "ddd"), "probe.sbn", ProbeTest, perModule: true, "// {{ module.namespace }}Page shows Manage\n");
@@ -432,6 +573,110 @@ public sealed class UpgradeCommandTests : IDisposable
         run.Output.ShouldContain("  A web/app/src/modules/billing/BillingPage.probe.test.tsx");
         run.Output.ShouldContain("  A web/app/src/modules/shipping/ShippingPage.probe.test.tsx");
         run.Output.ShouldNotContain("is added: the project's page");
+    }
+
+    [Fact]
+    public void An_upgrade_that_adds_a_pack_renames_no_pack_adr_and_writes_none_under_a_number_the_project_uses()
+    {
+        var packAdrs = Adrs(project);
+        var own = $"docs/adr/{packAdrs.Count + 1:0000}-our-own-decision.md";
+        Write(own, "# Our own decision\n");
+        Git.Commit(project, "our own adr");
+        AddBasePack("audit");
+
+        var run = UpgradeFromOld();
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        Unmerged().ShouldBeEmpty();
+        var after = Adrs(project);
+        packAdrs.ShouldBeSubsetOf(after);
+        Read(own).ShouldBe("# Our own decision\n");
+        after.Except(packAdrs).Except([own]).ShouldHaveSingleItem();
+        after.Select(Number).OfType<string>().GroupBy(number => number).Where(group => group.Count() > 1).Select(group => group.Key).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Pack_adrs_an_older_fabric_numbered_move_under_docs_adr_fabric_and_the_projects_own_adrs_stay()
+    {
+        var (numbered, numberedFabric) = NumberedProject();
+        Write(numbered, "docs/adr/0006-our-own-decision.md", "# Our own decision\n");
+        Git.Commit(numbered, "our own adr");
+
+        var run = CliRun.Of("upgrade", "--project", numbered, "--from", numberedFabric, "--catalog", Paths.FixtureCatalog, "--packs", newPacks);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        Adrs(numbered).ShouldBe([
+            "docs/adr/0006-our-own-decision.md",
+            "docs/adr/fabric/backend-api-protocols-grpc.md",
+            "docs/adr/fabric/backend-api-protocols-rest.md",
+            "docs/adr/fabric/backend-database-postgres.md",
+            "docs/adr/fabric/base-core.md",
+            "docs/adr/fabric/module-style-ddd.md",
+        ]);
+        Git.Run(numbered, "ls-files", "-u").ShouldBeEmpty();
+        var expected = Fresh();
+        expected["docs/adr/0006-our-own-decision.md"] = "# Our own decision\n";
+        Tree(numbered).OrderBy(file => file.Key, StringComparer.Ordinal).ShouldBe(expected.OrderBy(file => file.Key, StringComparer.Ordinal));
+        run.Output.ShouldContain(
+            $"pack ADRs moved under docs/adr/fabric/ (5):{Environment.NewLine}" +
+            $"  docs/adr/0001-backend-api-protocols-grpc.md -> docs/adr/fabric/backend-api-protocols-grpc.md{Environment.NewLine}");
+        run.Output.ShouldContain("  docs/adr/0004-base-core.md -> docs/adr/fabric/base-core.md");
+        run.Output.ShouldContain(
+            "  - that the project's own ADRs, docs and code cite the moved pack ADRs by their new names: search for each old file name " +
+            "and its number (ADR-NNNN) and point them at the new name under docs/adr/fabric/.");
+        run.Output.ShouldNotContain("0006-our-own-decision");
+    }
+
+    [Fact]
+    public void A_numbered_pack_adr_the_project_edited_is_a_conflict_at_its_old_name_and_the_summary_says_where_the_edits_go()
+    {
+        var (numbered, numberedFabric) = NumberedProject();
+        File.AppendAllText(Path.Combine(numbered, "docs/adr/0003-backend-database-postgres.md"), "Our note.\n");
+        Git.Commit(numbered, "our note on the database");
+
+        var run = CliRun.Of("upgrade", "--project", numbered, "--from", numberedFabric, "--catalog", Paths.FixtureCatalog, "--packs", newPacks);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        File.ReadAllText(Path.Combine(numbered, "docs/adr/0003-backend-database-postgres.md")).ShouldContain("Our note.\n");
+        File.ReadAllText(Path.Combine(numbered, "docs/adr/fabric/backend-database-postgres.md")).ShouldBe("# ADR: backend.database.postgres\n");
+        run.Output.ShouldContain($"  changed by the project, deleted by fabric {Running}: docs/adr/0003-backend-database-postgres.md");
+        run.Output.ShouldContain("  docs/adr/0003-backend-database-postgres.md -> docs/adr/fabric/backend-database-postgres.md");
+        run.Output.ShouldContain(
+            "  - that the project's edits of a moved pack ADR reach its new name: carry them from docs/adr/0003-backend-database-postgres.md " +
+            "to docs/adr/fabric/backend-database-postgres.md, then git rm the old file.");
+    }
+
+    [Fact]
+    public void A_project_recorded_with_a_root_namespace_upgrades_to_exactly_what_this_fabric_writes_fresh_with_it()
+    {
+        var directory = Path.Combine(root, "namespaced");
+        Directory.CreateDirectory(directory);
+        var fabric = OldFabric.Create(directory, OldVersion, Paths.FixtureCatalog, oldPacks);
+        var namespaced = Path.Combine(directory, "shop");
+        Run(fabric, ["new", namespaced, "--namespace", "Acme.Shop", .. NewArguments]);
+        foreach (var module in Modules)
+        {
+            Run(fabric, ["add-module", module, "--project", namespaced]);
+        }
+
+        Git.Run(namespaced, "init", "-q");
+        Git.Commit(namespaced, "generate with fabric 0.0.1 in Acme.Shop");
+
+        var run = CliRun.Of("upgrade", "--project", namespaced, "--from", fabric, "--catalog", Paths.FixtureCatalog, "--packs", newPacks);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        Git.Run(namespaced, "ls-files", "-u").ShouldBeEmpty();
+        var fresh = Path.Combine(root, "fresh-namespaced", "shop");
+        CliRun.Of(["new", fresh, "--namespace", "Acme.Shop", .. NewArguments, "--catalog", Paths.FixtureCatalog, "--packs", newPacks]).ExitCode.ShouldBe(0);
+        foreach (var module in Modules)
+        {
+            CliRun.Of("add-module", module, "--project", fresh, "--catalog", Paths.FixtureCatalog, "--packs", newPacks).ExitCode.ShouldBe(0);
+        }
+
+        Tree(namespaced).ShouldBe(Tree(fresh));
+        File.ReadAllText(Path.Combine(namespaced, "fabric.yaml")).ShouldContain("\nnamespace: Acme.Shop\n");
+        File.ReadAllText(Path.Combine(namespaced, ".claude/agents/backend-engineer.md")).ShouldStartWith("# Backend engineer (Acme.Shop)\n");
+        run.Output.ShouldNotContain(".claude/agents/backend-engineer.md");
     }
 
     [Fact]

@@ -129,6 +129,11 @@ public static class Upgrader
         var regeneration = Regeneration.From(record);
         Directory.CreateDirectory(Path.GetDirectoryName(directory)!);
         List<string> arguments = ["new", directory, "--name", regeneration.Name];
+        if (regeneration.Namespace is { } rootNamespace)
+        {
+            arguments.AddRange(["--namespace", rootNamespace]);
+        }
+
         if (regeneration.Profile is { } profile)
         {
             arguments.AddRange(["--profile", profile]);
@@ -148,6 +153,9 @@ public static class Upgrader
                 continue;
             }
 
+            // An add-module that merges a module of a new style into the project (ADR-0005, amended 2026-11-20) needs it
+            // committed in a git repository of its own.
+            GitRepository.CommitScratch(directory);
             var added = old.Run(
                 Path.GetDirectoryName(directory)!,
                 ["add-module", module.Name, "--project", directory, .. module.Overrides.SelectMany(assignment => (string[])["--set", assignment])]);
@@ -155,6 +163,11 @@ public static class Upgrader
             {
                 return (null, $"fabric {recorded} could not regenerate {FabricFile.FileName}: {added.Printed}");
             }
+        }
+
+        if (Directory.Exists(Path.Combine(directory, ".git")))
+        {
+            Directory.Delete(Path.Combine(directory, ".git"), recursive: true);
         }
 
         var written = Read(directory);
@@ -189,6 +202,7 @@ public static class Upgrader
         var regeneration = Regeneration.From(record);
         var text = new StringBuilder()
             .AppendLine(CultureInfo.InvariantCulture, $"name {regeneration.Name}")
+            .AppendLine(CultureInfo.InvariantCulture, $"namespace {regeneration.Namespace}")
             .AppendLine(CultureInfo.InvariantCulture, $"profile {regeneration.Profile}")
             .AppendLine(string.Join(' ', regeneration.Overrides.Order(StringComparer.Ordinal)));
         foreach (var module in regeneration.Modules)

@@ -12,7 +12,7 @@ using Scriban.Syntax;
 namespace Fabric.Core.Rendering;
 
 /// <summary>
-/// Renders a composition with Scriban. Templates see <c>name</c>, <c>namespace</c>, <c>project</c>,
+/// Renders a composition with Scriban. Templates see <c>name</c>, <c>namespace</c> (the root namespace), <c>project</c>,
 /// <c>module_defaults</c>, <c>modules</c>, <c>settings</c> (chosen options' numbers, by <c>dimension.option.setting</c>), <c>module</c> (per-module files only) and <c>slots</c> (files only). Nothing from the clock or the machine is
 /// available, unknown variables are errors, and output uses LF, so the same input always renders the same bytes.
 /// A file's <c>when</c> condition sees the same names as its template; the file is written only when it is <c>true</c>.
@@ -21,13 +21,22 @@ public static partial class Renderer
 {
     public static RenderedProject Render(CatalogModel catalog, Composition composition, ProjectChoices choices, string name)
     {
+        ArgumentNullException.ThrowIfNull(name);
+
+        return Render(catalog, composition, choices, name, Names.ToPascalCase(name));
+    }
+
+    /// <param name="rootNamespace">What templates see as <c>namespace</c>, in place of the name in PascalCase.</param>
+    public static RenderedProject Render(CatalogModel catalog, Composition composition, ProjectChoices choices, string name, string rootNamespace)
+    {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(composition);
         ArgumentNullException.ThrowIfNull(choices);
         ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(rootNamespace);
 
         List<string> errors = [];
-        var model = Model(catalog, choices, name);
+        var model = Model(catalog, choices, name, rootNamespace);
         var functions = Functions(composition, errors);
 
         var slots = new ScriptObject();
@@ -188,7 +197,7 @@ public static partial class Renderer
         return builtins;
     }
 
-    private static ScriptObject Model(CatalogModel catalog, ProjectChoices choices, string name)
+    private static ScriptObject Model(CatalogModel catalog, ProjectChoices choices, string name, string rootNamespace)
     {
         var modules = new ScriptArray();
         foreach (var (moduleName, values) in choices.Modules)
@@ -199,7 +208,7 @@ public static partial class Renderer
         return new ScriptObject
         {
             ["name"] = name,
-            ["namespace"] = Names.ToPascalCase(name),
+            ["namespace"] = rootNamespace,
             ["project"] = Values(catalog, choices.Project),
             ["module_defaults"] = Values(catalog, choices.ModuleDefaults),
             ["modules"] = modules,

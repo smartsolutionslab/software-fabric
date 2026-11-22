@@ -1,7 +1,13 @@
+using Fabric.Core.Catalog;
+using Fabric.Core.Generation;
+using Fabric.Core.Packs;
+
 namespace Fabric.Cli.Tests;
 
 public sealed class AddModuleCommandTests : IDisposable
 {
+    private const string OwnNotes = "Our own notes.\n";
+
     private readonly string project = Path.Combine(Directory.CreateTempSubdirectory("fabric-add-").FullName, "shop");
 
     public AddModuleCommandTests()
@@ -34,6 +40,33 @@ public sealed class AddModuleCommandTests : IDisposable
 
         before.Length.ShouldBe(2);
         Stamp(File.ReadAllText(Path.Combine(project, "fabric.yaml"))).ShouldBe(before);
+    }
+
+    [Fact]
+    public void Keeps_a_recorded_root_namespace_in_fabric_yaml()
+    {
+        var withNamespace = Path.Combine(Path.GetDirectoryName(project)!, "pharma");
+        CliRun.Of("new", withNamespace, "--profile", "minimal", "--namespace", "Acme.Pharma", "--catalog", Paths.FixtureCatalog, "--packs", Paths.FixturePacks)
+            .ExitCode.ShouldBe(0);
+
+        var run = CliRun.Of("add-module", "billing", "--project", withNamespace, "--catalog", Paths.FixtureCatalog, "--packs", Paths.FixturePacks);
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        File.ReadAllText(Path.Combine(withNamespace, "fabric.yaml")).ShouldContain("\nname: pharma\nnamespace: Acme.Pharma\n");
+    }
+
+    [Fact]
+    public void A_name_over_63_characters_fails_and_writes_nothing()
+    {
+        var name = "m" + new string('a', 63);
+        var before = File.ReadAllText(Path.Combine(project, "fabric.yaml"));
+
+        var run = AddModule(name);
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain($"error: module name '{name}' is 64 characters; a module's name is its PostgreSQL schema name, and PostgreSQL identifiers are at most 63 characters.");
+        Directory.Exists(Path.Combine(project, "src", name)).ShouldBeFalse();
+        File.ReadAllText(Path.Combine(project, "fabric.yaml")).ShouldBe(before);
     }
 
     [Fact]
@@ -94,6 +127,122 @@ public sealed class AddModuleCommandTests : IDisposable
             Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public void A_module_of_a_style_new_to_the_project_is_merged_into_it_keeping_its_edits_as_fabric_change_merges()
+    {
+        Commit("generate");
+        Write("README.md", Read("README.md") + OwnNotes);
+        Commit("our notes");
+
+        var run = AddModule("billing", "--set", "module.style=crud");
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldStartWith(
+            "added module billing to shop, merging in what its packs new to the project write (module.style=crud); nothing is committed.");
+        run.Output.ShouldContain("  M README.md");
+        run.Output.ShouldContain("  A src/billing/README.md");
+        run.Output.ShouldContain("  M fabric.yaml");
+        run.Output.ShouldNotContain("conflict");
+        Git.Run(project, "ls-files", "-u").ShouldBeEmpty();
+        Read("src/billing/README.md").ShouldBe("# billing (crud)\n");
+        Read("README.md").ShouldContain("## modules: crud");
+        Read("README.md").ShouldEndWith(OwnNotes);
+        Read("fabric.yaml").ShouldEndWith("modules:\n  billing:\n    module.style: crud\n");
+
+        var fresh = Fresh();
+        fresh["README.md"] += OwnNotes;
+        Tree(project).ShouldBe(fresh);
+    }
+
+    [Fact]
+    public void A_module_of_the_projects_style_after_one_of_a_new_style_is_created_without_a_merge()
+    {
+        Commit("generate");
+        AddModule("billing", "--set", "module.style=crud").ExitCode.ShouldBe(0);
+        Commit("add billing");
+
+        var run = AddModule("audit", "--set", "module.style=crud");
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        run.Output.ShouldBe($"added module audit with 1 file.{Environment.NewLine}");
+        Read("src/audit/README.md").ShouldBe("# audit (crud)\n");
+        Tree(project).ShouldBe(Fresh());
+    }
+
+    [Fact]
+    public void A_module_of_a_style_new_to_the_project_is_refused_outside_a_git_repository_and_nothing_is_written()
+    {
+        var before = Tree(project);
+
+        var run = AddModule("billing", "--set", "module.style=crud");
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("module.style=crud is new to the project");
+        run.Error.ShouldContain("is not the top of a git repository");
+        Tree(project).ShouldBe(before);
+    }
+
+    [Fact]
+    public void A_module_of_a_style_new_to_the_project_is_refused_with_uncommitted_changes_and_nothing_is_written()
+    {
+        Commit("generate");
+        Write("README.md", Read("README.md") + OwnNotes);
+        var before = Tree(project);
+
+        var run = AddModule("billing", "--set", "module.style=crud");
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("has uncommitted changes");
+        Tree(project).ShouldBe(before);
+    }
+
+    [Fact]
+    public void A_module_of_a_style_new_to_the_project_is_refused_in_a_project_another_fabric_wrote()
+    {
+        var fabricYaml = Read("fabric.yaml");
+        Write("fabric.yaml", string.Join('\n', fabricYaml.Split('\n').Select(line => line.StartsWith("generator: ", StringComparison.Ordinal) ? "generator: 0.0.1" : line)));
+        Commit("generate with fabric 0.0.1");
+        var before = Tree(project);
+
+        var run = AddModule("billing", "--set", "module.style=crud");
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("fabric.yaml was written by fabric 0.0.1");
+        run.Error.ShouldContain("run fabric upgrade first");
+        Tree(project).ShouldBe(before);
+    }
+
+    private string Read(string path) => File.ReadAllText(Path.Combine(project, path));
+
+    private void Write(string path, string content) => File.WriteAllText(Path.Combine(project, path), content);
+
+    private void Commit(string message)
+    {
+        if (!Directory.Exists(Path.Combine(project, ".git")))
+        {
+            Git.Run(project, "init", "-q");
+        }
+
+        Git.Commit(project, message);
+    }
+
+    /// <summary>What this build writes from scratch for the project's fabric.yaml, as fabric upgrade regenerates it.</summary>
+    private SortedDictionary<string, string> Fresh()
+    {
+        var catalog = CatalogReader.ReadFile(Paths.FixtureCatalog);
+        var packs = PackLoader.Load(Paths.FixturePacks, catalog).Packs;
+        var record = FabricFile.Read(new StringReader(Read(FabricFile.FileName)), FabricFile.FileName);
+        var regenerated = Generator.Regenerate(catalog, packs, record);
+        regenerated.Errors.ShouldBeEmpty();
+        return new(regenerated.Files.ToDictionary(file => file.Path, file => file.Content), StringComparer.Ordinal);
+    }
+
+    private static SortedDictionary<string, string> Tree(string directory) =>
+        new(Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories)
+            .Select(file => Path.GetRelativePath(directory, file).Replace('\\', '/'))
+            .Where(path => !path.StartsWith(".git/", StringComparison.Ordinal))
+            .ToDictionary(path => path, path => File.ReadAllText(Path.Combine(directory, path))), StringComparer.Ordinal);
 
     /// <summary>The lines of fabric.yaml that say which generator and which catalog wrote it.</summary>
     private static string[] Stamp(string fabricYaml) =>

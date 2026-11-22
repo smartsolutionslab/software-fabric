@@ -81,10 +81,15 @@ public static class FabricCli
             Description = "A JSON file of dimension to option (or to a list of options), such as a combination of build/matrix.json, " +
                 "to generate from instead of a profile. Overrides apply on top of it.",
         };
+        var rootNamespace = new Option<string?>("--namespace")
+        {
+            Description = "The root C# namespace, such as SmartSolutionsLab.PharmaTraining. Defaults to the name in PascalCase.",
+        };
         var command = new Command("new", "Generate a project from a profile, or a choice set file, plus overrides.")
         {
             directory,
             name,
+            rootNamespace,
             profile,
             choices,
             set,
@@ -125,7 +130,7 @@ public static class FabricCli
                 return Fail(error, loaded.Errors);
             }
 
-            var generated = Generator.New(catalogModel, loaded.Packs, projectName, result.GetValue(profile), overrides);
+            var generated = Generator.New(catalogModel, loaded.Packs, projectName, result.GetValue(profile), overrides, result.GetValue(rootNamespace));
             if (generated.Errors.Count > 0)
             {
                 return Fail(error, generated.Errors);
@@ -160,7 +165,11 @@ public static class FabricCli
             Description = "The generated project to add the module to. Defaults to the current directory.",
             DefaultValueFactory = _ => ".",
         };
-        var command = new Command("add-module", "Add a module (bounded context) to a generated project. Only creates files.")
+        var command = new Command(
+            "add-module",
+            "Add a module (bounded context) to a generated project. Creates its files; a module of a style or event store new to " +
+            "the project is merged into it as fabric change merges a choice, in the top of a git repository with a clean working " +
+            "tree (ADR-0005). Conflicts are left as git conflicts; nothing is committed.")
         {
             name,
             set,
@@ -196,6 +205,19 @@ public static class FabricCli
             if (addition.FabricYaml is not { } fabricYaml)
             {
                 return Fail(error, addition.Errors);
+            }
+
+            if (addition.Project is not null)
+            {
+                var merge = ModuleMerger.Merge(projectDirectory, record, moduleName, addition, catalogModel, loaded.Packs);
+                if (merge.Summary is not { } summary)
+                {
+                    return Fail(error, merge.Errors);
+                }
+
+                output.Write(summary);
+                WarnExperimental(error, merge.Experimental);
+                return 0;
             }
 
             if (ProjectWriter.Add(projectDirectory, addition.Created, fabricYaml, addition.OpenApi) is { } writeError)

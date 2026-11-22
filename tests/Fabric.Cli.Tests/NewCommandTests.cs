@@ -23,9 +23,38 @@ public sealed class NewCommandTests : IDisposable
 
         run.ExitCode.ShouldBe(0);
         run.Output.ShouldBe($"created {Path.Combine(root, "shop")} with 15 files.{Environment.NewLine}");
-        Tree("shop").Keys.ShouldContain("docs/adr/0005-module-style-crud.md");
+        Tree("shop").Keys.ShouldContain("docs/adr/fabric/module-style-crud.md");
         Tree("shop")["fabric.yaml"].ShouldContain("name: shop\n");
         Tree("shop")["fabric.yaml"].ShouldContain("backend.api-protocols: [rest, grpc]\n");
+    }
+
+    [Fact]
+    public void A_root_namespace_is_what_the_project_is_written_in_and_what_fabric_yaml_records()
+    {
+        var run = New("pharma-training", "--profile", "minimal", "--namespace", "SmartSolutionsLab.PharmaTraining");
+
+        run.ExitCode.ShouldBe(0, run.Error);
+        Tree("pharma-training")["fabric.yaml"].ShouldContain("\nname: pharma-training\nnamespace: SmartSolutionsLab.PharmaTraining\n");
+        Tree("pharma-training")[".claude/agents/backend-engineer.md"].ShouldStartWith("# Backend engineer (SmartSolutionsLab.PharmaTraining)\n");
+    }
+
+    [Fact]
+    public void Without_a_root_namespace_the_project_is_written_byte_for_byte_as_before()
+    {
+        New("shop", "--profile", "minimal").ExitCode.ShouldBe(0);
+
+        Tree("shop")["fabric.yaml"].ShouldNotContain("namespace");
+        Tree("shop")[".claude/agents/backend-engineer.md"].ShouldStartWith("# Backend engineer (Shop)\n");
+    }
+
+    [Fact]
+    public void A_root_namespace_that_is_not_a_csharp_namespace_is_refused_and_nothing_written()
+    {
+        var run = New("shop", "--profile", "minimal", "--namespace", "smart-solutions.Shop");
+
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("namespace 'smart-solutions.Shop' must be a C# namespace");
+        Directory.Exists(Path.Combine(root, "shop")).ShouldBeFalse();
     }
 
     [Fact]

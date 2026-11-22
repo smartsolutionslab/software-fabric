@@ -37,10 +37,9 @@ public sealed class EfCoreReadsTests
             Repository.Packs.Packs.Where(pack => !pack.Key.StartsWith(Reads + ".", StringComparison.Ordinal)).ToDictionary(),
             profile);
 
-        var adrs = without.Keys.Count(path => path.StartsWith("docs/adr/", StringComparison.Ordinal));
         without.Keys.Except(with.Keys).ShouldBeEmpty(profile);
         with.Keys.Except(without.Keys).Order(StringComparer.Ordinal).ToList().ShouldBe(
-            [$"docs/adr/{adrs + 1:0000}-backend-data-access-reads-ef-core.md", "tests/Architecture.Tests/Rules/NoDapper.cs"],
+            ["docs/adr/fabric/backend-data-access-reads-ef-core.md", "tests/Architecture.Tests/Rules/NoDapper.cs"],
             customMessage: profile);
         with.Keys.Where(path => without.ContainsKey(path) && with[path] != without[path]).Order(StringComparer.Ordinal).ToList().ShouldBe(
             ["AGENTS.md", "fabric.yaml"],

@@ -6,7 +6,7 @@ namespace Aspire.Hosting;
 /// </summary>
 public static class StandInWiring
 {
-    /// <summary>The host accepts the stand-in's tokens for the audience, from its two directories.</summary>
+    /// <summary>The host accepts the stand-in's tokens for the audience, from its two directories{{ if project["backend.tenancy"] == "column" }}{{ if cross_tenant_reads }} and its staff directory{{ end }}{{ end }}.</summary>
     public static IResourceBuilder<ProjectResource> WithStandIn(this IResourceBuilder<ProjectResource> host, IResourceBuilder<ProjectResource>? identity, string audience)
     {
         ArgumentNullException.ThrowIfNull(host);
@@ -20,7 +20,9 @@ public static class StandInWiring
             .WithEnvironment("AzureAd__Instance", identity.GetEndpoint("http"))
             .WithEnvironment("AzureAd__Audience", audience)
             .WithEnvironment("AzureAd__Tenants__tenant-a", "00000000-0000-0000-0000-00000000000a")
-            .WithEnvironment("AzureAd__Tenants__tenant-b", "00000000-0000-0000-0000-00000000000b"){{ if project["frontend.auth-client"] == "msal" }}
+            .WithEnvironment("AzureAd__Tenants__tenant-b", "00000000-0000-0000-0000-00000000000b"){{ if project["backend.tenancy"] == "column" }}{{ if cross_tenant_reads }}
+            // Staff sign in from a directory of their own, which is no tenant's.
+            .WithEnvironment("AzureAd__StaffDirectories__staff", "00000000-0000-0000-0000-0000000000ff"){{ end }}{{ end }}{{ if project["frontend.auth-client"] == "msal" }}
             // The browser signs in at the https address, so its tokens name their issuers there.
             .WithEnvironment("AzureAd__BrowserInstance", identity.GetEndpoint("https")){{ end }};
     }

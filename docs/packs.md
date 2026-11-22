@@ -205,7 +205,9 @@ this pack.
 A base or project-scoped pack may bring modules (ADR-0005). Each key is a
 module name, each value the module-scoped choices it pins, an option or a
 list for a multi-select dimension
-(`PackModuleTests.A_pin_may_be_written_as_a_list`):
+(`PackModuleTests.A_pin_may_be_written_as_a_list`). A module name is its
+PostgreSQL schema name, so it is at most 63 characters, as in `add-module`
+(`PackModuleTests.A_declared_module_name_over_63_characters_is_rejected`):
 
 ```yaml
 modules:
@@ -261,7 +263,7 @@ Templates are [Scriban](https://github.com/scriban/scriban).
 | Name | Content |
 |---|---|
 | `name` | The project's name, lower kebab-case (`smart-shop`) |
-| `namespace` | The same in PascalCase (`SmartShop`), for C# namespaces |
+| `namespace` | The root C# namespace: the name in PascalCase (`SmartShop`), or what `fabric new --namespace` chose (`SmartSolutionsLab.SmartShop`), which `fabric.yaml` then records. Templates use it only as a prefix of a namespace, never as a single identifier, since it may contain dots |
 | `project["<dimension>"]` | The project's choice: a string, or a list for multi-valued dimensions |
 | `module_defaults["<dimension>"]` | What new modules start from |
 | `settings["<dimension>.<option>.<setting>"]` | A chosen option's setting, a number: the value `fabric.yaml` records, the declared default unless set (`settings["backend.llm.extras.evals.threshold"]` is `4`). Only chosen options' settings are present (ADR-0014) |
@@ -421,8 +423,11 @@ integration-fixture and identity-provider vocabularies).
 ## What the generator writes from every pack
 
 - **ADR:** each selected pack's `adr` is rendered to
-  `docs/adr/NNNN-<dimension>-<option>.md`, numbered in selection order, base
-  first (`GeneratorTests.Every_selected_pack_gets_its_adr_numbered_in_selection_order`).
+  `docs/adr/fabric/<dimension>-<option>.md`, named after the option and
+  unnumbered, so the name never depends on the other choices or the generator
+  version, and `docs/adr/` itself is left to the project's own numbered ADRs
+  (ADR-0018;
+  `GeneratorTests.Every_selected_pack_gets_its_adr_named_after_its_option_under_docs_adr_fabric`).
 - **AGENTS.md:** each selected pack's `agents-md` is a contribution to
   `agents.sections`, in selection order
   (`GeneratorTests.Every_selected_pack_contributes_its_agents_md_to_agents_md_in_selection_order`).
@@ -443,9 +448,13 @@ the new module adds into the frontend's copy of the OpenAPI document,
 `web.openapi-paths` or `web.openapi-schemas` contribution loops over
 `modules` gets a later module's entries there without rewriting the copy.
 If a module chooses an option
-whose pack the project does not use yet, and that pack has project files
-or slot contributions, add-module refuses: that content would have to be
-merged into files that may have changed
-(`AddModuleTests.Rejects_an_option_whose_pack_would_change_existing_files`).
-Keep project-wide content of module options small, or expect it to be
-chosen at generation time.
+whose pack the project does not use yet, another style or event store,
+add-module merges instead (ADR-0005, amended for #848): it writes the whole
+project with the module and merges it three-way into the project, against
+what the project's `fabric.yaml` writes, as `fabric change` does; that needs
+a git repository with a clean working tree, and a project this fabric and
+catalog wrote
+(`AddModuleTests.An_option_new_to_the_project_gives_the_whole_project_with_the_module_to_merge_and_creates_nothing_by_itself`).
+Project-wide content of module options then reaches existing files as a
+reviewed merge, so keep it small and in slots: what overlaps a project's
+edits is left as a git conflict.

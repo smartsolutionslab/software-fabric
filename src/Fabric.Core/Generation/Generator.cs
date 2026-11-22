@@ -9,8 +9,9 @@ namespace Fabric.Core.Generation;
 public static class Generator
 {
     /// <summary>
-    /// Adds a module to a generated project. Only creates files: an option whose pack is new to the project and
-    /// contributes project-wide content is refused, because that content would have to be merged into existing files.
+    /// Adds a module to a generated project. A module whose packs the project already has only creates files; one that
+    /// selects a pack new to the project, another style or event store, gives the whole project with the module instead,
+    /// for the caller to merge (ADR-0005, amended 2026-11-20).
     /// </summary>
     public static ModuleAddition AddModule(
         CatalogModel catalog,
@@ -28,6 +29,11 @@ public static class Generator
         if (!Names.IsValid(name))
         {
             return AdditionFailure([$"module name '{name}' must be lower-case letters, digits and hyphens, starting with a letter."]);
+        }
+
+        if (Names.ModuleLengthProblem(name) is { } tooLong)
+        {
+            return AdditionFailure([$"module name '{name}' {tooLong}"]);
         }
 
         var before = Composer.Compose(catalog, packs, project.Choices);
@@ -77,31 +83,29 @@ public static class Generator
         }
 
         var alreadySelected = before.Packs.Select(pack => pack.Option).ToHashSet(StringComparer.Ordinal);
-        var refused = after.Packs
+        List<string> newPacks = [.. after.Packs
             .Where(pack => !alreadySelected.Contains(pack.Option))
-            .Select(ProjectWideRefusal)
-            .OfType<string>()
-            .ToList();
-        if (refused.Count > 0)
+            .Select(pack => $"{pack.Dimension}={pack.OptionName}")];
+        if (newPacks.Count > 0)
         {
-            return AdditionFailure(refused);
+            return WholeProject(catalog, after, choices, project, newPacks);
         }
 
         var moduleOnly = after with { Files = [.. after.Files.Where(file => file.Module == name)] };
-        var rendered = Renderer.Render(catalog, moduleOnly, choices, project.Name);
+        var rendered = Renderer.Render(catalog, moduleOnly, choices, project.Name, project.RootNamespace);
         if (rendered.Errors.Count > 0)
         {
             return AdditionFailure(rendered.Errors);
         }
 
-        var documentBefore = Renderer.Render(catalog, OpenApiDocumentOnly(before), project.Choices, project.Name);
-        var documentAfter = Renderer.Render(catalog, OpenApiDocumentOnly(after), choices, project.Name);
+        var documentBefore = Renderer.Render(catalog, OpenApiDocumentOnly(before), project.Choices, project.Name, project.RootNamespace);
+        var documentAfter = Renderer.Render(catalog, OpenApiDocumentOnly(after), choices, project.Name, project.RootNamespace);
         if (documentBefore.Errors.Count + documentAfter.Errors.Count > 0)
         {
             return AdditionFailure([.. documentBefore.Errors.Union(documentAfter.Errors, StringComparer.Ordinal)]);
         }
 
-        return new ModuleAddition(rendered.Files, FabricFile.Write(catalog, project.Name, project.Profile, choices), [])
+        return new ModuleAddition(rendered.Files, FabricFile.Write(catalog, project.Name, project.Profile, choices, project.Namespace), [])
         {
             Experimental = ExperimentalOptions.Chosen(catalog, choices),
             OpenApi = OpenApiAdded(documentBefore.Files, documentAfter.Files, name, project.Choices.Modules.Keys),
@@ -156,16 +160,27 @@ public static class Generator
                 .Where(member => before?.AsObject().ContainsKey(member.Key) != true)
                 .Select(member => new KeyValuePair<string, JsonNode>(member.Key, member.Value!.DeepClone()))];
 
-    private static string? ProjectWideRefusal(PackManifest pack)
+    /// <summary>The project with the module, as <c>fabric new</c> would write it with every module composed at once.</summary>
+    private static ModuleAddition WholeProject(
+        CatalogModel catalog,
+        Composition composition,
+        ProjectChoices choices,
+        FabricRecord project,
+        IReadOnlyList<string> newPacks)
     {
-        var projectWide = pack.Files.Where(file => !file.PerModule).Select(file => $"file {file.Target}")
-            .Concat(pack.Slots.Select(slot => $"slot {slot.Slot}"))
-            .ToList();
+        var rendered = Renderer.Render(catalog, composition, choices, project.Name, project.RootNamespace);
+        if (rendered.Errors.Count > 0)
+        {
+            return AdditionFailure(rendered.Errors);
+        }
 
-        return projectWide.Count == 0
-            ? null
-            : $"{pack.Dimension}={pack.OptionName} is new to this project and its pack contributes to project-wide files " +
-              $"({string.Join(", ", projectWide)}); add-module only creates files, so choose it when generating the project or add it by hand.";
+        var fabricYaml = FabricFile.Write(catalog, project.Name, project.Profile, choices, project.Namespace);
+        return new ModuleAddition([], fabricYaml, [])
+        {
+            Experimental = ExperimentalOptions.Chosen(catalog, choices),
+            NewPacks = newPacks,
+            Project = [.. rendered.Files.Append(new RenderedFile(FabricFile.FileName, fabricYaml)).OrderBy(file => file.Path, StringComparer.Ordinal)],
+        };
     }
 
     private static ModuleAddition AdditionFailure(IReadOnlyList<string> errors) => new([], null, errors);
@@ -183,7 +198,25 @@ public static class Generator
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(overrides);
 
-        return New(catalog, packs, name, profile, profile, overrides);
+        return New(catalog, packs, name, profile, profile, overrides, rootNamespace: null);
+    }
+
+    /// <param name="rootNamespace">The namespace the project's code is in, recorded in <c>fabric.yaml</c>; <c>null</c> for the
+    /// project's name in PascalCase, which <c>fabric.yaml</c> then does not record.</param>
+    public static GenerationResult New(
+        CatalogModel catalog,
+        IReadOnlyDictionary<string, PackManifest> packs,
+        string name,
+        string? profile,
+        IReadOnlyList<string> overrides,
+        string? rootNamespace)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(packs);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(overrides);
+
+        return New(catalog, packs, name, profile, profile, overrides, rootNamespace);
     }
 
     /// <param name="profile">The profile the choices are resolved from, if any.</param>
@@ -195,12 +228,18 @@ public static class Generator
         string name,
         string? profile,
         string? recordedProfile,
-        IReadOnlyList<string> overrides)
+        IReadOnlyList<string> overrides,
+        string? rootNamespace)
     {
 
         if (!Names.IsValid(name))
         {
             return Failure([$"project name '{name}' must be lower-case letters, digits and hyphens, starting with a letter."]);
+        }
+
+        if (rootNamespace is not null && Names.NamespaceProblem(rootNamespace) is { } namespaceProblem)
+        {
+            return Failure([namespaceProblem]);
         }
 
         var resolution = ChoiceResolver.Resolve(catalog, profile, overrides);
@@ -254,13 +293,13 @@ public static class Generator
             return Failure(compositionErrors);
         }
 
-        var rendered = Renderer.Render(catalog, composition, choices, name);
+        var rendered = Renderer.Render(catalog, composition, choices, name, rootNamespace ?? Names.ToPascalCase(name));
         if (rendered.Errors.Count > 0)
         {
             return Failure(rendered.Errors);
         }
 
-        var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, name, recordedProfile, choices));
+        var fabricFile = new RenderedFile(FabricFile.FileName, FabricFile.Write(catalog, name, recordedProfile, choices, rootNamespace));
         return new GenerationResult([.. rendered.Files.Append(fabricFile).OrderBy(file => file.Path, StringComparer.Ordinal)], [])
         {
             Experimental = ExperimentalOptions.Chosen(catalog, choices),
@@ -269,7 +308,9 @@ public static class Generator
 
     /// <summary>
     /// Writes a project again from its <c>fabric.yaml</c> alone (ADR-0016 E4), with the calls <see cref="Regeneration"/>
-    /// spells out: <see cref="New"/>, then <see cref="AddModule"/> for each module <c>new</c> did not bring, in order.
+    /// spells out: <see cref="New"/>, then <see cref="AddModule"/> for each module <c>new</c> did not bring, in order. A
+    /// module that brings packs new to the project replaces the tree with the whole project it gives, which is what
+    /// <c>add-module</c>'s merge leaves in a project nobody edited.
     /// A choice set this catalog rejects fails with the catalog's own errors, as <c>fabric new</c> would.
     /// </summary>
     public static GenerationResult Regenerate(CatalogModel catalog, IReadOnlyDictionary<string, PackManifest> packs, FabricRecord project)
@@ -282,7 +323,7 @@ public static class Generator
         // Every recorded choice is an override, so the profile only fills what fabric.yaml does not record. A profile the
         // catalog no longer has cannot do that, and the record still names it.
         var profile = regeneration.Profile is { } named && catalog.Profiles.ContainsKey(named) ? named : null;
-        var generated = New(catalog, packs, regeneration.Name, profile, regeneration.Profile, regeneration.Overrides);
+        var generated = New(catalog, packs, regeneration.Name, profile, regeneration.Profile, regeneration.Overrides, regeneration.Namespace);
         if (generated.Errors.Count > 0)
         {
             return generated;
@@ -311,6 +352,13 @@ public static class Generator
             if (addition.FabricYaml is not { } fabricYaml)
             {
                 return Failure([.. addition.Errors.Select(error => $"add-module {module.Name}: {error}")]);
+            }
+
+            if (addition.Project is { } whole)
+            {
+                files = whole.ToDictionary(file => file.Path, StringComparer.Ordinal);
+                experimental = addition.Experimental;
+                continue;
             }
 
             if (addition.Created.FirstOrDefault(file => files.ContainsKey(file.Path)) is { } existing)

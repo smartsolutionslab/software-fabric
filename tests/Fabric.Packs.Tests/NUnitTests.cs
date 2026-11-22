@@ -115,7 +115,7 @@ public sealed partial class NUnitTests
     private static GeneratedProject NewProject(string profile, params string[] more)
     {
         var project = new GeneratedProject(profile, [NUnit, .. more]);
-        var standIns = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs", "adr"))
+        var standIns = Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs", "adr", "fabric"))
             .Where(file => File.ReadAllText(file).Contains(StandIn, StringComparison.Ordinal))
             .Select(Path.GetFileName)
             .ToList();

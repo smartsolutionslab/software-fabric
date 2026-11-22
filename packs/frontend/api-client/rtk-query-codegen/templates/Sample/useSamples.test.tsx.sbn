@@ -1,11 +1,31 @@
 {{~ ns = module.namespace ~}}
+{{~ # Prettier prints a statement on one line when it fits the web app's printWidth (120) and breaks it when it does not, so
+    # every line the module's name lengthens is written the way Prettier prints it at that length. ~}}
+{{~ func fits(indent, line)
+  ret indent + (line | string.size) <= 120
+end ~}}
+{{~ func imports(names, from)
+  line = "import { " + (names | array.join ", ") + " } from '" + from + "';"
+  if fits(0, line)
+    ret line
+  end
+  ret "import {\n  " + (names | array.join ",\n  ") + ",\n} from '" + from + "';"
+end ~}}
+{{~ func braces(indent, before, entries, after)
+  line = before + "{ " + (entries | array.join ", ") + " }" + after
+  if fits(indent, line)
+    ret line
+  end
+  pad = "  "
+  ret before + "{\n" + pad + (entries | array.join (",\n" + pad)) + ",\n}" + after
+end ~}}
 import { configureStore } from '@reduxjs/toolkit';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { Provider } from 'react-redux';
 import { afterEach, expect, test, vi } from 'vitest';
 import { api } from '@/api/generated';
-import { useCreate{{ ns }}Sample, use{{ ns }}Samples } from './use{{ ns }}Samples';
+{{ imports ["useCreate" + ns + "Sample", "use" + ns + "Samples"] ("./use" + ns + "Samples") }}
 
 // RTK Query builds a Request from /api/..., which Node cannot parse without the browser's origin: here it has one.
 class BrowserRequest extends Request {
@@ -38,7 +58,8 @@ function renderSamples() {
     middleware: (defaults) => defaults().concat(api.middleware),
   });
   const wrapper = ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>;
-  return renderHook(() => ({ list: use{{ ns }}Samples(), creation: useCreate{{ ns }}Sample() }), { wrapper }).result;
+  {{ braces 2 "const useListAndCreation = () => (" ["list: use" + ns + "Samples()", "creation: useCreate" + ns + "Sample()"] ");" }}
+  return renderHook(useListAndCreation, { wrapper }).result;
 }
 
 const names = (samples: { name: string }[] | undefined) => samples?.map((sample) => sample.name);

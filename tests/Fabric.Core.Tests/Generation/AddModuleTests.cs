@@ -49,6 +49,27 @@ public class AddModuleTests
     }
 
     [Fact]
+    public void Rejects_a_name_longer_than_a_postgresql_identifier()
+    {
+        var name = "m" + new string('a', 63);
+
+        Add(Generated("minimal"), name).Errors.ShouldBe([
+            $"module name '{name}' is 64 characters; a module's name is its PostgreSQL schema name, and PostgreSQL identifiers are at most 63 characters.",
+        ]);
+    }
+
+    [Fact]
+    public void Accepts_a_name_of_63_characters()
+    {
+        var name = "m" + new string('a', 62);
+
+        var addition = Add(Generated("minimal"), name);
+
+        addition.Errors.ShouldBeEmpty();
+        addition.Created.ShouldHaveSingleItem().Path.ShouldBe($"src/{name}/README.md");
+    }
+
+    [Fact]
     public void Rejects_a_module_that_already_exists()
     {
         var withBilling = FabricFile.Read(new StringReader(Add(Generated("minimal"), "billing").FabricYaml!), FabricFile.FileName);
@@ -118,11 +139,28 @@ public class AddModuleTests
     }
 
     [Fact]
-    public void Rejects_an_option_whose_pack_would_change_existing_files()
+    public void A_module_whose_packs_the_project_has_only_creates_files_and_has_nothing_to_merge()
     {
-        Add(Generated("minimal"), "billing", "module.style=crud").Errors.ShouldBe([
-            "module.style=crud is new to this project and its pack contributes to project-wide files (slot readme.sections); " +
-            "add-module only creates files, so choose it when generating the project or add it by hand.",
-        ]);
+        var addition = Add(Generated("minimal"), "billing");
+
+        addition.NewPacks.ShouldBeEmpty();
+        addition.Project.ShouldBeNull();
+    }
+
+    [Fact]
+    public void An_option_new_to_the_project_gives_the_whole_project_with_the_module_to_merge_and_creates_nothing_by_itself()
+    {
+        var addition = Add(Generated("minimal"), "billing", "module.style=crud");
+
+        addition.Errors.ShouldBeEmpty();
+        addition.NewPacks.ShouldBe(["module.style=crud"]);
+        addition.Created.ShouldBeEmpty();
+        addition.OpenApi.ShouldBeNull();
+        var project = addition.Project.ShouldNotBeNull().ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
+        project["src/billing/README.md"].ShouldBe("# billing (crud)\n");
+        project["README.md"].ShouldContain("## modules: ddd");
+        project["README.md"].ShouldContain("## modules: crud");
+        project[FabricFile.FileName].ShouldBe(addition.FabricYaml);
+        addition.FabricYaml.ShouldNotBeNull().ShouldEndWith("modules:\n  billing:\n    module.style: crud\n");
     }
 }

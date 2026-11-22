@@ -225,12 +225,12 @@ public class ComposerTests
     }
 
     [Fact]
-    public void Every_selected_pack_contributes_its_adr_as_a_numbered_file()
+    public void Every_selected_pack_contributes_its_adr_as_a_file_named_after_its_option()
     {
         var composition = Composer.Compose(Catalog, Packs(Base, Postgres, Ddd), Choices());
 
         var adrs = composition.Files.Where(file => file.Target.StartsWith("docs/adr/", StringComparison.Ordinal)).ToList();
-        adrs.Select(file => file.Target).ShouldBe(["docs/adr/0001-base-core.md", "docs/adr/0002-backend-database-postgres.md", "docs/adr/0003-module-style-ddd.md"]);
+        adrs.Select(file => file.Target).ShouldBe(["docs/adr/fabric/base-core.md", "docs/adr/fabric/backend-database-postgres.md", "docs/adr/fabric/module-style-ddd.md"]);
         adrs.ShouldAllBe(file => file.File.Template == "docs/adr.md");
     }
 

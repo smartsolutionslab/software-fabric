@@ -180,11 +180,11 @@ public sealed partial class ServicesAgentUiTests
         files["AGENTS.md"].ShouldContain("POST /<module>/agents/{name}");
         files["AGENTS.md"].ShouldContain("client-credentials");
         files["AGENTS.md"].ShouldNotContain("(`/me`, a hub, AG-UI)", customMessage: "AG-UI is spoken by the owning service, not mapped on the edge.");
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-agent-ui-ag-ui.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-agent-ui-ag-ui.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("POST /<module>/agents/{name}");
         adr.ShouldContain("client-credentials");
         adr.ShouldContain("refuses to start");
-        var topology = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-backend-topology-services.md", StringComparison.Ordinal)).Value;
+        var topology = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/backend-topology-services.md", StringComparison.Ordinal)).Value;
         topology.ShouldNotContain("(`/me`, a hub, AG-UI)");
     }
 

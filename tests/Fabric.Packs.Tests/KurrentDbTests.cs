@@ -244,7 +244,7 @@ public sealed class KurrentDbTests
         File.Exists(Path.Combine(project.ProjectDirectory, "src/Modules/Billing/Billing.Infrastructure/EventStore/BillingAggregateStore.cs")).ShouldBeTrue();
         File.Exists(Path.Combine(project.ProjectDirectory, "tests/Architecture.Tests/Rules/OnlyInfrastructureUsesKurrentDb.cs")).ShouldBeTrue();
         Read(project, "AGENTS.md").ShouldContain("## Event store: KurrentDB");
-        Directory.EnumerateFiles(Path.Combine(project.ProjectDirectory, "docs/adr"), "*-module-event-store-kurrentdb.md").ShouldHaveSingleItem();
+        File.Exists(Path.Combine(project.ProjectDirectory, "docs/adr/fabric/module-event-store-kurrentdb.md")).ShouldBeTrue();
 
         // KurrentDB creates a stream on its first append: the MigrationRunner has nothing to create.
         Read(project, "src/MigrationRunner/Program.cs").ShouldNotContain("EventStore");

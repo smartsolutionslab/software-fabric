@@ -86,7 +86,7 @@ public sealed partial class RekaUiCssModulesTests
         section.ShouldContain("`BaseButton.module.css`");
         section.ShouldNotContain("Tailwind");
 
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-ui-library-reka-ui.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-ui-library-reka-ui.md", StringComparison.Ordinal)).Value;
         adr.ShouldStartWith("# UI components: Reka UI with CSS Modules");
         adr.ShouldNotContain("Tailwind");
     }

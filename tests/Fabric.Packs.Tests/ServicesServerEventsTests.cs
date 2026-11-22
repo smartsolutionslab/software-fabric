@@ -177,11 +177,11 @@ public sealed partial class ServicesServerEventsTests
         files["AGENTS.md"].ShouldContain("BrowserEventV1");
         files["AGENTS.md"].ShouldContain("POST /<module>/server-events/test");
         files["AGENTS.md"].ShouldContain("one edge replica");
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith($"-frontend-realtime-{realtime}.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith($"/frontend-realtime-{realtime}.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("src/Edge");
         adr.ShouldContain("BrowserEventV1");
         adr.ShouldContain("one edge replica");
-        var topology = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-backend-topology-services.md", StringComparison.Ordinal)).Value;
+        var topology = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/backend-topology-services.md", StringComparison.Ordinal)).Value;
         topology.ShouldContain("one edge replica");
     }
 

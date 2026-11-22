@@ -50,7 +50,7 @@ public sealed class TanStackQueryVueTests
         files["AGENTS.md"].ShouldContain("## Frontend state: TanStack Query");
         files["AGENTS.md"].ShouldContain("VueQueryPlugin");
         files["AGENTS.md"].ShouldNotContain("useState");
-        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("-frontend-state-tanstack-query.md", StringComparison.Ordinal)).Value;
+        var adr = files.Single(file => file.Key.StartsWith("docs/adr/", StringComparison.Ordinal) && file.Key.EndsWith("/frontend-state-tanstack-query.md", StringComparison.Ordinal)).Value;
         adr.ShouldContain("@tanstack/vue-query");
         adr.ShouldContain("src/providers/query.ts");
         adr.ShouldNotContain("React");
