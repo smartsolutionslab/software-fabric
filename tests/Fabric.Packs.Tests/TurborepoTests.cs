@@ -23,7 +23,7 @@ public sealed class TurborepoTests
         package.ShouldContain("\"lint\": \"turbo run lint\"");
         package.ShouldContain("\"test\": \"turbo run test\"");
         package.ShouldContain("\"turbo\": \"2.11.11\"");
-        package.ShouldContain("\"packageManager\": \"pnpm@10.0.0\"");
+        package.ShouldContain("\"packageManager\": \"pnpm@", customMessage: "the version is PnpmVersionTests' to check");
         package.ShouldNotContain("--recursive");
     }
 
