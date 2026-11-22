@@ -1,0 +1,12 @@
+namespace Aspire.Hosting;
+
+/// <summary>
+/// A project the AppHost's own build compiles (a <c>ProjectReference</c> of AppHost.csproj), so Aspire starts it with
+/// <c>dotnet run --no-build</c>, as it does a <c>Projects</c> type. Added by path, Aspire would rebuild it at every start.
+/// </summary>
+public sealed class BuiltProject(string projectPath) : IProjectMetadata
+{
+    public string ProjectPath { get; } = projectPath;
+
+    public bool SuppressBuild => true;
+}

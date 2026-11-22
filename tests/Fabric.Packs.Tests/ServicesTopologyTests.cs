@@ -64,7 +64,7 @@ public sealed class ServicesTopologyTests
         var appHost = files["src/AppHost/AppHost.cs"];
 
         appHost.ShouldContain("foreach (var (module, project) in builder.ServiceHosts())");
-        appHost.ShouldContain("builder.AddProject(module, project)");
+        appHost.ShouldContain("builder.AddBuiltProject(module, project)");
         appHost.ShouldContain(".WithReference(messaging)");
         appHost.ShouldNotContain("billing", Case.Insensitive);
         appHost.ShouldNotContain("shipping", Case.Insensitive);

@@ -47,7 +47,7 @@ public sealed class EdgeHostTests
         var files = WithModules("billing", "shipping");
         var appHost = files["src/AppHost/AppHost.cs"];
 
-        var edge = appHost.IndexOf("""var host = builder.AddProject("host", "../Edge/Edge.csproj")""", StringComparison.Ordinal);
+        var edge = appHost.IndexOf("""var host = builder.AddBuiltProject("host", "../Edge/Edge.csproj")""", StringComparison.Ordinal);
         var loop = appHost.IndexOf("foreach (var (module, project) in builder.ServiceHosts())", StringComparison.Ordinal);
         edge.ShouldBeGreaterThanOrEqualTo(0, appHost);
         loop.ShouldBeGreaterThan(edge, "the loop hands each service to the edge, so the edge comes first.");

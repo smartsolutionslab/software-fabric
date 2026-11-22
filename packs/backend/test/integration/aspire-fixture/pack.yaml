@@ -16,4 +16,4 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: unit-test, describes: "The running application: every resource healthy, the host healthy, and the gates of the chosen API, identity and tenancy options.", file: templates/HostTests.cs.sbn }
+  - { kind: unit-test, describes: "The running application: every resource healthy, every project started from the AppHost's build (--no-build), the host healthy, and the gates of the chosen API, identity and tenancy options.", file: templates/HostTests.cs.sbn }

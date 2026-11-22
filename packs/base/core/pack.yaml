@@ -31,6 +31,8 @@ files:
   - { template: templates/pull_request_template.md.sbn, target: ".github/pull_request_template.md" }
   - { template: templates/AppHost/AppHost.csproj.sbn, target: src/AppHost/AppHost.csproj }
   - { template: templates/AppHost/AppHost.cs.sbn, target: src/AppHost/AppHost.cs }
+  - { template: templates/AppHost/BuiltProject.cs.sbn, target: src/AppHost/Wiring/BuiltProject.cs }
+  - { template: templates/AppHost/BuiltProjects.cs.sbn, target: src/AppHost/Wiring/BuiltProjects.cs }
   - { template: templates/AppHost/appsettings.json.sbn, target: src/AppHost/appsettings.json }
   - { template: templates/AppHost/launchSettings.json.sbn, target: src/AppHost/Properties/launchSettings.json }
   - { template: templates/ServiceDefaults/ServiceDefaults.csproj.sbn, target: src/ServiceDefaults/ServiceDefaults.csproj }
@@ -67,6 +69,7 @@ files:
   - { template: templates/tests/RetryEveryMethodOptsAClientBackIn.cs.sbn, target: tests/Architecture.Tests/Rules/RetryEveryMethodOptsAClientBackIn.cs }
   - { template: templates/tests/StandardResilienceHandlerOnlyInServiceDefaults.cs.sbn, target: tests/Architecture.Tests/Rules/StandardResilienceHandlerOnlyInServiceDefaults.cs }
   - { template: templates/tests/WorkflowActionsArePinned.cs.sbn, target: tests/Architecture.Tests/Rules/WorkflowActionsArePinned.cs }
+  - { template: templates/tests/TheAppHostRunsWhatItBuilt.cs.sbn, target: tests/Architecture.Tests/Rules/TheAppHostRunsWhatItBuilt.cs }
   - { template: templates/tests/GlobalJsonSelectsTheTestingPlatform.cs.sbn, target: tests/Architecture.Tests/Rules/GlobalJsonSelectsTheTestingPlatform.cs }
   - { template: templates/tests/NoSecretInSettings.cs.sbn, target: tests/Architecture.Tests/Rules/NoSecretInSettings.cs }
   - { template: templates/Host/CurrentUser.cs.sbn, target: src/Host/CurrentUser.cs, when: 'project["backend.auth"] != "none"' }
@@ -164,6 +167,7 @@ gates:
   - { kind: architecture-test, describes: "With authorization choices (backend.authorization not empty): every policy a module endpoint names is registered by that module's IModulePolicies, and by no other module.", file: templates/tests/EveryEndpointPolicyIsRegisteredByItsModule.cs.sbn }
   - { kind: architecture-test, describes: "With authorization choices (backend.authorization not empty): no two modules register a policy under the same name, whether or not an endpoint or MCP tool names it; the host refuses to start on the same names (ModulePolicyOwners), naming both modules.", file: templates/tests/EveryPolicyIsRegisteredByOneModule.cs.sbn }
   - { kind: architecture-test, describes: "Every workflow step uses an action pinned to a full commit SHA, a local action or a docker image by digest.", file: templates/tests/WorkflowActionsArePinned.cs.sbn }
+  - { kind: architecture-test, describes: "The AppHost adds every project from its own build (AddProject<Projects.X> or AddBuiltProject), never AddProject with a path, which Aspire rebuilds at every start.", file: templates/tests/TheAppHostRunsWhatItBuilt.cs.sbn }
   - { kind: architecture-test, describes: "global.json's test.runner is Microsoft.Testing.Platform, without which dotnet test --project fails with MSB1001: Unknown switch; the violation names global.json.", file: templates/tests/GlobalJsonSelectsTheTestingPlatform.cs.sbn }
   - { kind: analyzer, describes: "DateTime.Now, DateTime.UtcNow, DateTimeOffset.Now and DateTimeOffset.UtcNow are banned (RS0030) in every project but the AppHost; the time comes from TimeProvider.", file: templates/TimeBannedSymbols.txt.sbn }
   - { kind: analyzer, describes: "Guid.NewGuid is banned (RS0030) in every project but the AppHost, tests included; every Guid is a time-ordered Guid.CreateVersion7().", file: templates/IdentifierBannedSymbols.txt.sbn }

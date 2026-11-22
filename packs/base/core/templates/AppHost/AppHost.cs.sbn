@@ -12,7 +12,7 @@ foreach (var (module, project) in builder.ServiceHosts())
 
 {{~ end ~}}
     // Every service's launch profile names the same port; under the AppHost each gets one of its own.
-    var service = builder.AddProject(module, project)
+    var service = builder.AddBuiltProject(module, project)
         .WithEndpoint("http", endpoint => endpoint.Port = null)
         .WithHttpHealthCheck("/health"){{ slots["apphost.host-wiring"] | string.replace "\n" "\n    " }};
 

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
@@ -12,7 +13,11 @@ namespace {{ namespace }}.Integration.Tests;
 /// <summary>The whole application, started once per test run on empty containers.</summary>
 public sealed class AspireFixture : {{ test_lifetime }}
 {
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(5);
+    // Twice the slowest start-up measured on fabric's profile CI (profile-saas-services-vue, the profile that starts the
+    // most projects: an edge and a host per module), until measured there: 204 s, the slowest of six CI runs of a
+    // seven-module services project. The fixture writes each start-up's time to the test output, so a slower runner
+    // shows in the log before it reaches this limit.
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(7);
 
     private DistributedApplication? app;{{ if slots["integration-tests.members"] != "" }}
 
@@ -22,6 +27,7 @@ public sealed class AspireFixture : {{ test_lifetime }}
 
     {{ test_setup }}
     {
+        var startup = Stopwatch.StartNew();
         using var timeout = new CancellationTokenSource(StartupTimeout);
         var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AppHost>(timeout.Token);
 
@@ -39,6 +45,7 @@ public sealed class AspireFixture : {{ test_lifetime }}
         app = await builder.BuildAsync(timeout.Token);
         await app.StartAsync(timeout.Token);
         await app.ResourceNotifications.WaitForResourceHealthyAsync("host", timeout.Token);
+        Console.WriteLine($"The application started in {startup.Elapsed.TotalSeconds:F0} s (limit {StartupTimeout.TotalSeconds:F0} s).");
     }
 
     public HttpClient CreateHostClient() => App.CreateHttpClient("host");

@@ -1,0 +1,22 @@
+using Aspire.Hosting.ApplicationModel;
+
+namespace Aspire.Hosting;
+
+/// <summary>
+/// Adds a project the AppHost finds by path (its services, found by convention) and runs it from the AppHost's build,
+/// as <c>AddProject&lt;Projects.X&gt;</c> does. The architecture rule TheAppHostRunsWhatItBuilt keeps every other
+/// <c>AddProject</c> by path out of the AppHost.
+/// </summary>
+public static class BuiltProjects
+{
+    /// <param name="projectPath">The project file, relative to the AppHost's directory; the AppHost.csproj references it,
+    /// so building the AppHost builds it.</param>
+    public static IResourceBuilder<ProjectResource> AddBuiltProject(this IDistributedApplicationBuilder builder, string name, string projectPath)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        var path = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, projectPath));
+        return builder.AddProject(name, path)
+            .WithAnnotation<IProjectMetadata>(new BuiltProject(path), ResourceAnnotationMutationBehavior.Replace);
+    }
+}
