@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using {{ namespace }}.BuildingBlocks.Email;
+using Aspire.Hosting.Testing;
 using Microsoft.Extensions.Configuration;
 
 namespace {{ namespace }}.Integration.Tests;
@@ -35,7 +36,7 @@ public class EmailTests({{ integration_fixture }})
         {{ `(await CaughtAsync(subject, 0, cancellationToken))` | should_be `0` }};
     }
 
-    private IEmailSender Sender(bool allowUnencrypted)
+    private MailKitEmailSender Sender(bool allowUnencrypted)
     {
         var smtp = {{ running_application }}.GetEndpoint("mailpit", "smtp");
         var configuration = new ConfigurationBuilder()

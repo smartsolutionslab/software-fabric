@@ -7,7 +7,9 @@ if (builder.ExecutionContext.IsRunMode)
 {{~ if keycloak ~}}
     // Keycloak's email (verification, reset password) lands in Mailpit, whose inbox is http://localhost:8025; the realm points SMTP at it.
 {{~ end ~}}
-{{~ if email ~}}
+{{~ if email && keycloak ~}}
+    // The host's e-mail lands there too; a deployment sends through its own SMTP server.
+{{~ else if email ~}}
     // The host's e-mail lands in Mailpit, whose inbox is http://localhost:8025; a deployment sends through its own SMTP server.
 {{~ end ~}}
     mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.33")
