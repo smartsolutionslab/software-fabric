@@ -1,0 +1,135 @@
+{{~ tenanted = project["backend.tenancy"] == "column" || project["backend.tenancy"] == "schema-per-tenant"
+option = project["backend.absence"] == "option"
+opened = "Stream?"
+if option
+  opened = "Option<Stream>"
+end ~}}
+{{~ if project["backend.tenancy"] != "none" && !tenanted ~}}
+#error The blob storage pack puts the tenant into every blob name under a tenant column or a schema per tenant, so it supports backend.tenancy none, column and schema-per-tenant only so far (docs/adr/0006 of the generator): with backend.tenancy {{ project["backend.tenancy"] }} one tenant could read another's files.
+{{~ end ~}}
+using Azure;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+{{~ if tenanted ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+{{~ end ~}}
+
+namespace {{ namespace }}.BuildingBlocks.Blobs;
+
+/// <summary>
+/// One module's files, in the module's own container (<see cref="BlobContainers"/>): a stream stored under a name, and
+/// opened again by it. A write is create-only, so a name, once written, always holds the same bytes; a module that
+/// replaces a file writes it under a new name. A module uses this only with a type of its own as
+/// <typeparamref name="TModule"/>, and never reaches another module's container.
+{{~ if tenanted ~}}
+/// Every name belongs to the current tenant, from <see cref="ITenantContext"/> as the module's DbContext reads it, never
+/// from the caller: the store keeps a file under <c>&lt;tenant&gt;/&lt;name&gt;</c>, so a tenant opens only its own files,
+/// whatever name it gives, and without a tenant nothing is opened or written.
+{{~ end ~}}
+/// </summary>
+/// <typeparam name="TModule">A type of the module's own, usually the class that takes the store: it names the module.</typeparam>
+public sealed class ModuleBlobStore<TModule>
+    where TModule : class
+{
+    private readonly BlobContainerClient container;
+{{~ if tenanted ~}}
+
+    private readonly ITenantContext tenants;
+
+    public ModuleBlobStore(BlobContainers containers, ITenantContext tenants)
+        : this(Container(containers), tenants)
+    {
+    }
+
+    internal ModuleBlobStore(BlobContainerClient container, ITenantContext tenants)
+    {
+        {{ not_null "container" }}
+        {{ not_null "tenants" }}
+        this.container = container;
+        this.tenants = tenants;
+    }
+{{~ else ~}}
+
+    public ModuleBlobStore(BlobContainers containers)
+        : this(Container(containers))
+    {
+    }
+
+    internal ModuleBlobStore(BlobContainerClient container)
+    {
+        {{ not_null "container" }}
+        this.container = container;
+    }
+{{~ end ~}}
+
+    /// <summary>Stores the content under the name; a name already written is refused, and keeps what it holds.</summary>
+    public async Task UploadAsync(BlobName name, Stream content, CancellationToken cancellationToken)
+    {
+        {{ not_null "name" }}
+        {{ not_null "content" }}
+
+{{~ if tenanted ~}}
+        var blob = container.GetBlobClient(TenantName(name).Value);
+{{~ else ~}}
+        var blob = container.GetBlobClient(name.Value);
+{{~ end ~}}
+        await container.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
+        try
+        {
+            await blob.UploadAsync(content, new BlobUploadOptions { Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All } }, cancellationToken);
+        }
+        catch (RequestFailedException written) when (written.ErrorCode == BlobErrorCode.BlobAlreadyExists || written.ErrorCode == BlobErrorCode.ConditionNotMet)
+        {
+            throw new InvalidOperationException($"'{name}' is already stored in the container {container.Name}: a name, once written, always holds the same bytes. Store the new content under a new name.", written);
+        }
+    }
+
+    /// <summary>The content stored under the name, for the caller to read and dispose; none when nothing is.</summary>
+    public async Task<{{ opened }}> OpenReadAsync(BlobName name, CancellationToken cancellationToken)
+    {
+        {{ not_null "name" }}
+
+{{~ if tenanted ~}}
+        if (tenants.TenantId is null)
+        {
+            return {{ if option }}Option<Stream>.None{{ else }}null{{ end }};
+        }
+
+        var blob = container.GetBlobClient(TenantName(name).Value);
+{{~ else ~}}
+        var blob = container.GetBlobClient(name.Value);
+{{~ end ~}}
+        try
+        {
+            var download = await blob.DownloadStreamingAsync(cancellationToken: cancellationToken);
+            return {{ if option }}Option<Stream>.Some(download.Value.Content){{ else }}download.Value.Content{{ end }};
+        }
+        catch (RequestFailedException missing) when (missing.ErrorCode == BlobErrorCode.BlobNotFound || missing.ErrorCode == BlobErrorCode.ContainerNotFound)
+        {
+            return {{ if option }}Option<Stream>.None{{ else }}null{{ end }};
+        }
+    }
+
+    private static BlobContainerClient Container(BlobContainers containers)
+    {
+        {{ not_null "containers" }}
+        return containers.For(typeof(TModule));
+    }
+{{~ if tenanted ~}}
+
+    /// <summary>
+    /// The name under the current tenant's own folder; a tenant is one segment, so no tenant's folder lies in another's.
+    /// Without a tenant there is no folder, and nothing is written.
+    /// </summary>
+    private BlobName TenantName(BlobName name)
+    {
+        var tenant = tenants.TenantId ?? throw new InvalidOperationException($"Cannot store '{name}' without a tenant.");
+        if (tenant.Contains('/', StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"The tenant '{tenant}' cannot own blobs: a tenant is one segment of a blob name, without '/'.");
+        }
+
+        return BlobName.From($"{tenant}/{name}");
+    }
+{{~ end ~}}
+}

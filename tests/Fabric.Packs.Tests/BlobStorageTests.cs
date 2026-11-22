@@ -329,7 +329,7 @@ public sealed class BlobStorageTests
 
         exitCode.ShouldBe(0, output);
         output.ShouldContain("failed: 0");
-        output.ShouldContain("Every_service_reads_its_own_container_as_blobs_and_no_other");
+        output.ShouldContain("succeeded: 22", customMessage: "the services project runs AppHostBlobContainersTests' two tests beside the monolith's twenty.");
     }
 
     [Theory]

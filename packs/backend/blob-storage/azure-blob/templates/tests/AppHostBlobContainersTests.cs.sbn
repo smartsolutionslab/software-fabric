@@ -1,0 +1,82 @@
+using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Azure;
+using Aspire.Hosting.Testing;
+using Microsoft.Extensions.Logging.Abstractions;
+
+namespace {{ namespace }}.Blobs.Tests;
+
+/// <summary>
+/// The blob containers in the AppHost's application model, which is built and never started: one per service, named after
+/// its module, on the one storage emulator, and each service reads its own as the connection string <c>blobs</c>.
+/// </summary>
+public sealed class AppHostBlobContainersTests
+{
+    private const string ConnectionString = "ConnectionStrings__blobs";
+
+    private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(1);
+
+    {{ test_attribute }}
+    public async Task Every_service_has_a_container_named_after_its_module()
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource({{ test_cancellation_token }});
+        timeout.CancelAfter(Timeout);
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AppHost>(timeout.Token);
+
+        var modules = Services(builder).Select(service => service.Name).ToList();
+        var containers = builder.Resources.OfType<AzureBlobStorageContainerResource>().ToList();
+        var storage = {{ `builder.Resources.OfType<AzureStorageResource>()` | should_have_single_item }};
+
+        {{ `storage.Name` | should_be `"storage"` }};
+        {{ `storage.IsEmulator` | should_be_true }};
+        {{ `containers.Select(container => container.Name).Order(StringComparer.Ordinal)` | should_be `modules.Select(module => $"{module}-blobs").Order(StringComparer.Ordinal)` }};
+        foreach (var module in modules)
+        {
+            var container = containers.Single(candidate => candidate.Name == $"{module}-blobs");
+            {{ `container.BlobContainerName` | should_be `module` }};
+            {{ `container.Parent.Parent` | should_be_same_as `storage` }};
+        }
+    }
+
+    {{ test_attribute }}
+    public async Task Every_service_reads_its_own_container_as_blobs_and_no_other()
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource({{ test_cancellation_token }});
+        timeout.CancelAfter(Timeout);
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AppHost>(timeout.Token);
+
+        var services = Services(builder);
+        var modules = services.Select(service => service.Name).ToList();
+
+        foreach (var service in services)
+        {
+            var configuration = await ExecutionConfigurationBuilder.Create(service)
+                .WithEnvironmentVariablesConfig()
+                .BuildAsync(new DistributedApplicationExecutionContext(DistributedApplicationOperation.Publish), NullLogger.Instance, timeout.Token);
+            var environment = configuration.EnvironmentVariables.ToDictionary(variable => variable.Key, variable => variable.Value, StringComparer.Ordinal);
+
+            {{ `environment.ContainsKey(ConnectionString)` | should_be_true `$"{service.Name} does not read a blob container as 'blobs'."` }};
+            {{ `environment[ConnectionString]` | should_be `$"{{{service.Name}-blobs.connectionString}}"` }};
+            foreach (var other in modules.Where(module => module != service.Name))
+            {
+                {{ `environment.Values` | should_all_be `value => !value.Contains($"{{{other}-blobs.", StringComparison.Ordinal)` `$"{service.Name} must not read {other}'s container."` }};
+            }
+        }
+    }
+
+    /// <summary>Every module's service host, found as the AppHost finds them: src/Services/*/Host/Host.csproj.</summary>
+    private static List<ProjectResource> Services(IDistributedApplicationTestingBuilder builder) =>
+        [.. builder.Resources.OfType<ProjectResource>()
+            .Where(project => IsServiceHost(project.GetProjectMetadata().ProjectPath))
+            .OrderBy(project => project.Name, StringComparer.Ordinal)];
+
+    private static bool IsServiceHost(string projectPath)
+    {
+        var host = Path.GetDirectoryName(projectPath);
+        var service = Path.GetDirectoryName(host);
+        var services = Path.GetDirectoryName(service);
+        return Path.GetFileName(projectPath) == "Host.csproj"
+            && Path.GetFileName(host) == "Host"
+            && Path.GetFileName(services) == "Services";
+    }
+}

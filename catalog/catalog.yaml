@@ -705,3 +705,17 @@ dimensions:
         note: "query handlers read with Dapper over IReadConnection, in SQL for the project's one database"
         # Reason: Dapper's SQL bypasses the tenant column's EF Core query filter, so any tenancy would read every tenant's rows.
         requires: ["backend.tenancy == none"]
+
+  # ─────────────────────────── Backend · blob storage ────────────────────────
+  # Last in the catalog (ADR-0020): every profile takes none, and its AGENTS.md section comes after every other.
+
+  backend.blob-storage:
+    scope: project
+    default: none
+    # Changeable (ADR-0020 X1): a pilot moves from its hand-written store to the pack with fabric change, so nothing in
+    # the catalog may name this dimension (ADR-0016 C2); the pack branches on tenancy and topology with when (ADR-0006).
+    changeable: true
+    note: "Files kept by name outside the database, in a container per module. ADR-0020."
+    options:
+      none:       { tier: experimental, note: "the project stores no files outside its database" }
+      azure-blob: { tier: experimental, note: "Azure Blob Storage: Azurite locally, a storage account when deployed; a module's names carry its tenant under tenancy" }

@@ -1,0 +1,2 @@
+{{ if project["backend.test.integration"] == "aspire-fixture" && !(object.has_key(project, "backend.llm.extras") && (array.contains project["backend.llm.extras"] "rag")) }}    <!-- The blob store tests use the building block's store against the application's Azurite. -->
+    <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />{{ end }}

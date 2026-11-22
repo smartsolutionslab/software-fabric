@@ -1,0 +1,160 @@
+{{~ tenanted = project["backend.tenancy"] == "column" || project["backend.tenancy"] == "schema-per-tenant"
+option = project["backend.absence"] == "option" ~}}
+{{~ if project["backend.test.integration"] != "testcontainers" ~}}
+using Aspire.Hosting.Testing;
+{{~ end ~}}
+using Azure.Storage.Blobs;
+using {{ namespace }}.BuildingBlocks.Blobs;
+{{~ if tenanted ~}}
+using {{ namespace }}.BuildingBlocks.Tenancy;
+using Microsoft.AspNetCore.Http;
+{{~ end ~}}
+
+namespace {{ namespace }}.Integration.Tests;
+
+/// <summary>
+/// <see cref="ModuleBlobStore{TModule}"/> against the application's Azurite, each test in a container of its own: a
+/// file comes back unchanged, and a name, once written, keeps its first bytes (create-only).
+{{~ if tenanted ~}}
+/// Every name belongs to the tenant of the current work, here a <see cref="TenantScope"/> as in consumers and jobs,
+/// never to the caller: one tenant cannot read another's file, not even by the full name it is stored under.
+{{~ end ~}}
+/// </summary>
+{{~ integration_fixture_attributes ~}}
+public sealed class BlobStoreTests({{ integration_fixture }})
+{
+    /// <summary>The storage emulator's well-known development account, which Azurite runs under Aspire and Testcontainers alike.</summary>
+    private const string DevelopmentAccount = "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;" +
+        "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;";
+{{~ if tenanted ~}}
+
+    private const string TenantA = "tenant-a";
+
+    private const string TenantB = "tenant-b";
+
+    private readonly HttpTenantContext tenants = new(new HttpContextAccessor());
+{{~ end ~}}
+
+    {{ test_attribute }}
+    public async Task A_file_comes_back_unchanged_and_a_name_never_written_opens_nothing()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var store = Store(NewContainer());
+        var name = NewName();
+        byte[] content = [1, 2, 3, 5, 8, 13];
+{{~ if tenanted ~}}
+        using var tenant = TenantScope.Begin(TenantA);
+{{~ end ~}}
+
+        using (var upload = new MemoryStream(content))
+        {
+            await store.UploadAsync(name, upload, cancellationToken);
+        }
+
+        {{ `(await ContentAsync(await store.OpenReadAsync(name, cancellationToken)))` | should_be `content` }};
+        {{ `(await ContentAsync(await store.OpenReadAsync(NewName(), cancellationToken)))` | should_be_null }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_second_write_to_a_name_is_refused_and_the_name_keeps_its_first_bytes()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var store = Store(NewContainer());
+        var name = NewName();
+        byte[] first = [1, 1, 1];
+{{~ if tenanted ~}}
+        using var tenant = TenantScope.Begin(TenantA);
+{{~ end ~}}
+
+        using (var upload = new MemoryStream(first))
+        {
+            await store.UploadAsync(name, upload, cancellationToken);
+        }
+
+        using var again = new MemoryStream([2, 2, 2]);
+        await {{ should_throw_async `InvalidOperationException` `() => store.UploadAsync(name, again, cancellationToken)` }};
+        {{ `(await ContentAsync(await store.OpenReadAsync(name, cancellationToken)))` | should_be `first` }};
+    }
+{{~ if tenanted ~}}
+
+    {{ test_attribute }}
+    public async Task A_tenant_cannot_read_another_tenants_blob_by_its_full_name()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var container = NewContainer();
+        var store = Store(container);
+        var name = NewName();
+        byte[] content = [4, 2];
+        using (TenantScope.Begin(TenantA))
+        {
+            using var upload = new MemoryStream(content);
+            await store.UploadAsync(name, upload, cancellationToken);
+        }
+
+        using (TenantScope.Begin(TenantB))
+        {
+            {{ `(await ContentAsync(await store.OpenReadAsync(name, cancellationToken)))` | should_be_null }};
+            {{ `(await ContentAsync(await store.OpenReadAsync(BlobName.From($"{TenantA}/{name}"), cancellationToken)))` | should_be_null }};
+        }
+
+        using (TenantScope.Begin(TenantA))
+        {
+            {{ `(await ContentAsync(await store.OpenReadAsync(name, cancellationToken)))` | should_be `content` }};
+        }
+
+        {{ `(await container.GetBlobClient($"{TenantA}/{name}").ExistsAsync(cancellationToken)).Value` | should_be_true }};
+    }
+
+    {{ test_attribute }}
+    public async Task Without_a_tenant_the_store_opens_nothing_and_writes_nothing()
+    {
+        var cancellationToken = {{ test_cancellation_token }};
+        var container = NewContainer();
+        var store = Store(container);
+        var name = NewName();
+        using (TenantScope.Begin(TenantA))
+        {
+            using var upload = new MemoryStream([7]);
+            await store.UploadAsync(name, upload, cancellationToken);
+        }
+
+        {{ `(await ContentAsync(await store.OpenReadAsync(name, cancellationToken)))` | should_be_null }};
+        using var unowned = new MemoryStream([9]);
+        var other = NewName();
+        await {{ should_throw_async `InvalidOperationException` `() => store.UploadAsync(other, unowned, cancellationToken)` }};
+        {{ `(await container.GetBlobClient(other.Value).ExistsAsync(cancellationToken)).Value` | should_be_false }};
+    }
+{{~ end ~}}
+
+    private static BlobName NewName() => BlobName.From($"files/{Guid.CreateVersion7()}");
+
+    /// <summary>What was opened, read to its end; null when nothing was.</summary>
+    private static async Task<byte[]?> ContentAsync({{ if option }}Option<Stream>{{ else }}Stream?{{ end }} opened)
+    {
+{{~ if option ~}}
+        if (!opened.HasValue)
+        {
+            return null;
+        }
+
+        await using var stream = opened.Value;
+{{~ else ~}}
+        if (opened is null)
+        {
+            return null;
+        }
+
+        await using var stream = opened;
+{{~ end ~}}
+        using var content = new MemoryStream();
+        await stream.CopyToAsync(content, {{ test_cancellation_token }});
+        return content.ToArray();
+    }
+
+    /// <summary>The store over a container of the test's own on the application's Azurite, beside every module's.</summary>
+    private {{ if !tenanted }}static {{ end }}ModuleBlobStore<BlobStoreTests> Store(BlobContainerClient container) => new(container{{ if tenanted }}, tenants{{ end }});
+
+    private BlobContainerClient NewContainer() =>
+        new BlobServiceClient($"{DevelopmentAccount}BlobEndpoint={ {{- running_application }}.GetEndpoint("storage", "blob")}devstoreaccount1;")
+            .GetBlobContainerClient($"tests-{Guid.CreateVersion7():N}");
+}

@@ -1,0 +1,23 @@
+using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Testing;
+
+namespace {{ namespace }}.Blobs.Tests;
+
+/// <summary>The AppHost's blob storage as a developer runs it, read from the application model without starting it.</summary>
+public sealed class AppHostBlobStorageTests
+{
+    /// <summary>
+    /// The database keeps its rows in a volume, so Azurite must keep the files in one too: otherwise a restarted AppHost
+    /// keeps rows that name files it has lost.
+    /// </summary>
+    {{ test_attribute }}
+    public async Task The_blob_storage_keeps_its_files_in_a_volume_as_the_database_keeps_its_rows()
+    {
+        await using var builder = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AppHost>({{ test_cancellation_token }});
+
+        var storage = builder.Resources.Single(resource => resource.Name == "storage");
+
+        {{ `storage.Annotations.OfType<ContainerMountAnnotation>().Any(mount => mount.Type == ContainerMountType.Volume)` | should_be_true }};
+    }
+}

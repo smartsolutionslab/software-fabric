@@ -1,0 +1,58 @@
+using {{ namespace }}.BuildingBlocks.Blobs;
+
+namespace {{ namespace }}.Blobs.Tests;
+
+/// <summary>
+/// The forms Aspire gives the <c>blobs</c> connection: Azurite's connection string, a deployed account's blob endpoint,
+/// and either with the container a service reads (<c>ContainerName=...</c>); and the container a module's name gives.
+/// </summary>
+public sealed class BlobContainersTests
+{
+    {{ test_attribute }}
+    public void A_connection_string_makes_a_client_for_its_account_and_blob_endpoint()
+    {
+        var (service, container) = BlobContainers.Connect("UseDevelopmentStorage=true");
+
+        {{ `service.AccountName` | should_be `"devstoreaccount1"` }};
+        {{ `service.Uri` | should_be `new Uri("http://127.0.0.1:10000/devstoreaccount1")` }};
+        {{ `container` | should_be_null }};
+    }
+
+    {{ test_attribute }}
+    public void A_blob_endpoint_makes_a_client_for_that_endpoint_without_a_key()
+    {
+        var (service, container) = BlobContainers.Connect("https://shop.blob.core.windows.net/");
+
+        {{ `service.Uri` | should_be `new Uri("https://shop.blob.core.windows.net/")` }};
+        {{ `service.CanGenerateAccountSasUri` | should_be_false }};
+        {{ `container` | should_be_null }};
+    }
+
+    {{ test_attribute }}
+    public void A_services_connection_names_its_container_beside_the_account()
+    {
+        var (local, localContainer) = BlobContainers.Connect("UseDevelopmentStorage=true;ContainerName=billing");
+        var (deployed, deployedContainer) = BlobContainers.Connect("Endpoint=https://shop.blob.core.windows.net/;ContainerName=order-handling");
+
+        {{ `local.AccountName` | should_be `"devstoreaccount1"` }};
+        {{ `localContainer` | should_be `"billing"` }};
+        {{ `deployed.Uri` | should_be `new Uri("https://shop.blob.core.windows.net/")` }};
+        {{ `deployedContainer` | should_be `"order-handling"` }};
+    }
+
+    {{ test_cases_attribute }}
+    {{ test_case_attribute ('"' + namespace + '.Modules.Billing.Infrastructure", "billing"') }}
+    {{ test_case_attribute ('"' + namespace + '.Modules.OrderHandling.Application", "order-handling"') }}
+    public void A_modules_container_is_named_after_the_module(string assembly, string container)
+    {
+        {{ `BlobContainers.NameOf(assembly)` | should_be `container` }};
+    }
+
+    {{ test_cases_attribute }}
+    {{ test_case_attribute ('"' + namespace + '.Integration.Tests"') }}
+    {{ test_case_attribute ('"' + namespace + '.Modules.Hr.Infrastructure"') }}
+    public void A_type_outside_a_module_or_a_module_name_azure_cannot_take_has_no_container(string assembly)
+    {
+        {{ should_throw `InvalidOperationException` `() => BlobContainers.NameOf(assembly)` }};
+    }
+}

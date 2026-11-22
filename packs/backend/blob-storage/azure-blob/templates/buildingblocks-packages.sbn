@@ -1,0 +1,5 @@
+    <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="Azure.Identity" />
+    <!-- The blob store tests reach a container of their own, beside every module's, through the store's internal constructor. -->
+    <InternalsVisibleTo Include="Integration.Tests" />
+    <InternalsVisibleTo Include="Blobs.Tests" />

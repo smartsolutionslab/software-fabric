@@ -1,0 +1,8 @@
+option: backend.blob-storage.none
+files:
+  - { template: templates/NoBlobStorage.cs.sbn, target: tests/Architecture.Tests/Rules/NoBlobStorage.cs }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No module references the Azure Storage SDK (Azure.Storage.*): the project stores no files outside its database.", file: templates/NoBlobStorage.cs.sbn }
