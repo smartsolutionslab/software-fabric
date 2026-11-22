@@ -11,13 +11,3 @@ var keycloak = builder.AddContainer("keycloak", "quay.io/keycloak/keycloak", "26
     .WithHttpHealthCheck("/health/ready", endpointName: "management")
     .WithBindMount("./realms", "/opt/keycloak/data/import", isReadOnly: true);
 keycloak.WithVolume(VolumeNameGenerator.Generate(keycloak, "data"), "/opt/keycloak/data");
-
-if (builder.ExecutionContext.IsRunMode)
-{
-    // Keycloak's email (verification, reset password) lands in Mailpit, whose inbox is http://localhost:8025; the realm points SMTP at it.
-    var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.33")
-        .WithHttpEndpoint(port: 8025, targetPort: 8025)
-        .WithEndpoint(targetPort: 1025, name: "smtp")
-        .WithHttpHealthCheck("/livez");
-    keycloak.WaitFor(mailpit);
-}
