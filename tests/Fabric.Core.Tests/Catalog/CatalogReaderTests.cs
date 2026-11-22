@@ -59,10 +59,10 @@ public class CatalogReaderTests
     }
 
     [Fact]
-    public void The_repository_catalog_marks_the_colour_scheme_and_the_font_changeable_after_generation_and_nothing_else()
+    public void The_repository_catalog_marks_the_colour_scheme_the_font_and_email_changeable_after_generation_and_nothing_else()
     {
         ReadRepositoryCatalog().Dimensions.Values.Where(dimension => dimension.Changeable).Select(dimension => dimension.Id)
-            .ShouldBe(["frontend.color-scheme", "frontend.font"]);
+            .ShouldBe(["backend.email", "frontend.color-scheme", "frontend.font"]);
     }
 
     [Fact]
