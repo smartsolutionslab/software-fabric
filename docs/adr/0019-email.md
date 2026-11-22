@@ -1,8 +1,9 @@
 # ADR-0019: E-mail, `backend.email` (`none`, `smtp`)
 
-**Status:** Proposed, waiting for the owner's review (#861, M5-01). It records decisions the owner has already made:
+**Status:** Accepted (owner, 2026-11-22, at the review of PR #871 for #861, M5-01). It records the owner's decisions
 E1 to E3 and X1 (2026-11-21, on #602) and the amendment of ADR-0016 C2 (2026-11-22, on #602, from the review of
-PR #869). It makes no decision of its own; where the decisions leave something to the pack's task (M5-02), it says so.
+PR #869), and R1 to R4, which the owner decided at the review by accepting each point as drafted. Where the decisions
+leave something to the pack's task (M5-02), it says so.
 **Date:** 2026-11-22
 
 ## Context
@@ -138,7 +139,7 @@ project's code calls. The owner decided on 2026-11-22 that this ADR amends C2, s
 it by hand: `backend.email`, `backend.blob-storage` and `deploy.target`. C2's catalog lint is not amended: a marked
 dimension is still project-scoped and still named by no other dimension's `active-when`, `requires` or
 `default-from`, nor by any option's `requires` or `conflicts`. Should one of them fail that lint, it is a question for
-that dimension's ADR, not settled here. Any other non-presentation dimension stays unchangeable until the owner marks it.
+that dimension's ADR (R4). Any other non-presentation dimension stays unchangeable until the owner marks it.
 
 **Why.** C2's line kept `fabric change` to choices whose merge rewrites files a project rarely edits. A dimension that
 starts from `none` is close to that case: its pack adds files the project has not got and fills slots in files the
@@ -156,6 +157,25 @@ generated types, a lockfile may need reinstalling, and the summary does not sear
 hand-written version it replaces.
 
 ADR-0016 carries a note at C2 that points here.
+
+### Decisions at the review (owner, 2026-11-22, PR #871)
+
+The draft put four points to the owner's review; the owner accepted each as drafted.
+
+- **R1: "behind `when`" is a condition in the template.** ADR-0006's `when` is a key of a file entry, and Mailpit is
+  a contribution to a slot of `AppHost.cs`, a file the base already writes. The condition therefore sits at the top of
+  that contribution, which ADR-0006 also allows, and an empty render leaves no trace. `when` on slot entries would
+  need a generator change and an amendment of ADR-0006 that E2 does not ask for.
+- **R2: the condition names keycloak alone until M5-02.** `backend.email` is not in the catalog yet, and a template
+  reads a dimension the project does not have as nothing, so `!= "none"` would hold for every project and add Mailpit
+  everywhere. M5-02 widens it to keycloak or `backend.email` other than `none`.
+- **R3: `mailpit` stays declared inside the run-mode block here; M5-02 moves it out.** M5-02's host wiring needs it,
+  as the pilot's `src/AppHost/AppHost.cs:42` declares it before the block. Doing it in #861 would break the
+  byte-identical output #861 requires, so the change and its profile diff are M5-02's.
+- **R4: the C2 amendment names exactly `backend.email`, `backend.blob-storage` and `deploy.target`, and leaves C2's
+  lint unchanged.** The owner's decision of 2026-11-22 covers M5's dimensions, not any non-presentation dimension, and
+  nothing in it relaxes the checks that keep a change from reaching past its own files. A dimension among the three
+  that cannot pass the lint is a question for its own ADR.
 
 ## Consequences
 
