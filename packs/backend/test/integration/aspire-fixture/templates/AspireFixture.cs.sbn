@@ -13,10 +13,11 @@ namespace {{ namespace }}.Integration.Tests;
 /// <summary>The whole application, started once per test run on empty containers.</summary>
 public sealed class AspireFixture : {{ test_lifetime }}
 {
-    // Twice the slowest start-up measured on fabric's profile CI (profile-saas-services-vue, the profile that starts the
-    // most projects: an edge and a host per module), until measured there: 204 s, the slowest of six CI runs of a
-    // seven-module services project. The fixture writes each start-up's time to the test output, so a slower runner
-    // shows in the log before it reaches this limit.
+    // Start-up grows with the projects the AppHost starts, all from its build (--no-build). fabric's profile CI
+    // (profile-saas-services-vue: an edge and two services, the most projects of any profile) started in 69 s on a
+    // 2-core GitHub runner; a seven-module services project took up to 204 s over six CI runs. The limit is twice the
+    // slower, so a project several modules larger than the profile still starts. The fixture writes each start-up's
+    // time to the test output, so a slower runner shows in the log before it reaches this limit.
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(7);
 
     private DistributedApplication? app;{{ if slots["integration-tests.members"] != "" }}
