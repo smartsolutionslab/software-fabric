@@ -31,7 +31,6 @@ files:
   - { template: templates/pull_request_template.md.sbn, target: ".github/pull_request_template.md" }
   - { template: templates/AppHost/AppHost.csproj.sbn, target: src/AppHost/AppHost.csproj }
   - { template: templates/AppHost/AppHost.cs.sbn, target: src/AppHost/AppHost.cs }
-  - { template: templates/AppHost/BuiltProject.cs.sbn, target: src/AppHost/Wiring/BuiltProject.cs }
   - { template: templates/AppHost/BuiltProjects.cs.sbn, target: src/AppHost/Wiring/BuiltProjects.cs }
   - { template: templates/AppHost/appsettings.json.sbn, target: src/AppHost/appsettings.json }
   - { template: templates/AppHost/launchSettings.json.sbn, target: src/AppHost/Properties/launchSettings.json }
