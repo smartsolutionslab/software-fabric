@@ -154,7 +154,20 @@ public sealed class BlobStoreTests({{ integration_fixture }})
     /// <summary>The store over a container of the test's own on the application's Azurite, beside every module's.</summary>
     private {{ if !tenanted }}static {{ end }}ModuleBlobStore<BlobStoreTests> Store(BlobContainerClient container) => new(container{{ if tenanted }}, tenants{{ end }});
 
-    private BlobContainerClient NewContainer() =>
-        new BlobServiceClient($"{DevelopmentAccount}BlobEndpoint={ {{- running_application }}.GetEndpoint("storage", "blob")}devstoreaccount1;")
+    /// <summary>
+    /// The SDK reads the account from an emulator's path only when the host is an IP address; under a name such as
+    /// <c>localhost</c> it takes the account for the container, and a blob's address loses its container. Aspire's own
+    /// connection string names Azurite by <c>127.0.0.1</c> for this reason, so the test reaches it the same way.
+    /// </summary>
+    private BlobContainerClient NewContainer()
+    {
+        var endpoint = new UriBuilder({{ running_application }}.GetEndpoint("storage", "blob"));
+        if (string.Equals(endpoint.Host, "localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            endpoint.Host = "127.0.0.1";
+        }
+
+        return new BlobServiceClient($"{DevelopmentAccount}BlobEndpoint={endpoint.Uri}devstoreaccount1;")
             .GetBlobContainerClient($"tests-{Guid.CreateVersion7():N}");
+    }
 }

@@ -362,7 +362,10 @@ public sealed class BlobStorageTests
         var (exitCode, output) = BlobStoreTests(project);
 
         exitCode.ShouldNotBe(0, output);
-        output.ShouldContain("A_tenant_cannot_read_another_tenants_blob_by_its_full_name");
+        output.ShouldContain("failed Shop.Integration.Tests.BlobStoreTests.A_tenant_cannot_read_another_tenants_blob_by_its_full_name");
+        output.ShouldContain("should be null", customMessage: "the tenant test must fail on reading another tenant's file, not on its setup.");
+        output.ShouldContain("failed: 1", customMessage: "only the tenant test may fail: the store's other tests do not depend on the prefix.");
+        output.ShouldNotContain("ContainerNotFound");
     }
 
     private static (int ExitCode, string Output) BlobStoreTests(GeneratedProject project) =>
