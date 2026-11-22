@@ -212,3 +212,79 @@ is outside the matrix domain. *Dropped:* the option leaves the catalog (M3-10).
 
 Marten with tenancy other than none is not deferred but ruled out by the
 catalog (M3-05), and built only if a pilot needs it.
+
+## M5 tasks
+
+The catalog dimensions the M4 decisions deferred (E3, E7): a pilot builds each
+one by hand first, and its pack is designed from that working code. The
+owner's decisions of 2026-11-21 on #602 set the scope and the order: e-mail
+now; file storage once smartsolutionslab/pharma-training#3 is merged, with a
+second pilot; `deploy.target` after the first deployment that is observed and
+used.
+
+Each task is one issue, one PR, tests first. Lanes are as in
+`docs/owners.yml`; "after" names the issues a task needs closed first, and its
+issue lists them under `## Depends on`, which `next.sh` honours.
+
+Every new dimension is marked `changeable` (X1): once its pack lands, a pilot
+moves from its hand-written version to the pack through `fabric change`, the
+only way the pack is proven on the code it was designed from. ADR-0016 C2
+marks only presentation dimensions changeable today (`frontend.color-scheme`,
+`frontend.font`), so M5-01's ADR, the first of M5's, records X1 as its
+amendment.
+
+### E-mail
+
+| # | Task | Done when |
+|---|---|---|
+| M5-01 | Lane `generator`. Supervised: the ADR for `backend.email`, options `none` and `smtp` (MailKit), drawn from fabric-pilot's hand-written sending (E1), with X1 as above. In its own PR before the pack (ADR-0002), Mailpit moves out of `backend/auth/keycloak`'s AppHost resources into the base, behind `when` (E2, ADR-0006), so e-mail has it under every auth option | ADR accepted at the owner's review; Mailpit runs in run mode under keycloak as before, and every existing profile generates byte-identical output |
+| M5-02 | Lane `packs-backend`, after M5-01. `backend.email.smtp`, project scope, default `none`: `src/BuildingBlocks/Email` (`IEmailSender`, `EmailMessage`, `SmtpSettings`, `Wiring/AddEmail`), `tests/Fakes/FakeEmailSender`, the SMTP parameters in `apphost.resources` when publishing, the run-mode settings in `apphost.host-wiring`, and `host.services`. AGENTS.md rules: send from a consumer or reaction, never an endpoint; a failed send throws; deduplicate on `Metadata.EventIdentifier`, with the at-most-once claim left to module code (E3); tests use the fake | Gates seen failing first: `OnlyTheEmailWiringNamesMailKit`, `NoSmtpPasswordInSettings`, and an integration test that an e-mail sent through `IEmailSender` reaches Mailpit and a server without TLS is refused; the matrix rows with `smtp` green; `backend.email` is `changeable` (X1) |
+| M5-03 | Lane `generator`, after M5-02. fabric-pilot moves to `backend.email=smtp` with `fabric change` (X1), in place of its hand-written sending | Merged PR in fabric-pilot, its CI green, its Notifications module sending through the generated `IEmailSender` |
+
+### File storage
+
+PharmaTraining is the second pilot (B1): smartsolutionslab/pharma-training#3
+builds blob storage by hand with one container per module across seven
+services, short-lived signed upload and read URLs, and server-side copies
+between services instead of shared containers. PharmaTraining has tenancy
+`none` and fabric-pilot tenancy `column`, so both tenancy branches have a
+pilot. Beside these tasks, a fabric-pilot issue puts the tenant into its blob
+names (B2), so its isolation no longer rests on lookup order.
+
+| # | Task | Done when |
+|---|---|---|
+| M5-04 | Lane `generator`, after smartsolutionslab/pharma-training#3. Supervised: the ADR for `backend.blob-storage`, options `none` and `azure-blob` (Azurite locally, Azure Blob Storage when deployed), written from the two pilots' hand-written stores (B1); no S3 or MinIO option (B3) | ADR accepted at the owner's review, citing both pilots |
+| M5-05 | Lane `packs-backend`, after M5-04. `backend.blob-storage.azure-blob` as the ADR shapes it, with branches for the tenancy options (ADR-0006) | Gates seen failing first, among them an integration test that one tenant cannot read another tenant's blob by name; the matrix rows with `azure-blob` green; `backend.blob-storage` is `changeable` (X1) |
+
+### Deployment: `deploy.target`
+
+Built on Aspire's own publisher (`aspire publish` / `aspire deploy`, an Azure
+Container Apps environment in the AppHost), not hand-written Bicep (D2): each
+pack's Aspire resource is its deployment, which keeps the per-pack slots
+small. smartsolutionslab/pharma-training#114 deploys this way.
+
+| # | Task | Done when |
+|---|---|---|
+| M5-06 | Lane `generator`. The trigger (D1): the first real deployment that is observed and used, fabric-pilot's or smartsolutionslab/pharma-training#114, whichever comes first | The owner names that deployment in the issue and closes it |
+| M5-07 | Lane `generator`, after M5-06. Supervised: the ADR for `deploy.target` on Aspire's publisher (D2), with that deployment's lessons (D1), and the slots it needs. Kubernetes stays deferred (D3); the services topology is not excluded up front (D4) | ADR accepted at the owner's review |
+| M5-08 | Lane `packs-backend`, after M5-07. `deploy.target.azure-container-apps`, with the contributions of the resource packs the pilot's profile uses. If smartsolutionslab/pharma-training#114, the first services deployment, shows a gap, the catalog refuses that combination with one sentence until it is fixed (D4) | Gates seen failing first; the matrix rows with `azure-container-apps` green; `deploy.target` is `changeable` (X1) |
+
+### Pilot issues
+
+Opened in fabric-pilot, not on this repository's board:
+
+- B2: the tenant in its blob names, beside M5-04 and M5-05.
+- P1: an ADR recording PDFsharp (fabric-pilot#10) and its lessons: Linux
+  fonts, the invariant culture, reading the text back in tests.
+- X2: ADRs for its four hand-written pieces, so each M5 pack ADR can cite
+  them.
+
+### Deferred and dropped
+
+| Candidate | Decision |
+|---|---|
+| PDF generation | Dropped as a catalog dimension (P1): almost all of it is the module's own layout code, so a pack could ship only a package reference, a font resolver and an "only Infrastructure names PDFsharp" rule; it adds no AppHost resource, host wiring or deployment; and a `none \| pdfsharp` dimension is a library choice inside one module that costs permanent maintenance and matrix pairs (ADR-0003). Its lessons go into fabric-pilot's own ADR; PharmaTraining builds its certificate PDF in its own module (Z2, smartsolutionslab/pharma-training#50) |
+| A provider-API e-mail option (ACS, SendGrid) | Deferred until a pilot proves one (E1) |
+| `deploy.target.kubernetes` | Deferred until a pilot needs it (D3) |
+| S3 or MinIO blob storage | Not in V1 (B3) |
+| A building block for the at-most-once send claim | Not built: an AGENTS.md rule, with the pattern in module code (E3) |
