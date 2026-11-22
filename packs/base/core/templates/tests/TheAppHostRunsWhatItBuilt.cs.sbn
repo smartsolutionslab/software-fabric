@@ -30,7 +30,7 @@ public sealed class TheAppHostRunsWhatItBuilt : IArchitectureRule
             {
                 if (call.Expression is MemberAccessExpressionSyntax { Name: IdentifierNameSyntax { Identifier.Text: "AddProject" } name })
                 {
-                    violations.Add($"{path}:{name.GetLocation().GetLineSpan().StartLinePosition.Line + 1}: adds a project by path with AddProject, so Aspire rebuilds it at every start; {{ if project["backend.topology"] == "services" }}add it with AddBuiltProject, which runs it from the AppHost's build{{ else }}reference it from AppHost.csproj and add it as AddProject<Projects.X>, which runs it from the AppHost's build{{ end }}.");
+                    violations.Add($"{path}:{name.GetLocation().GetLineSpan().StartLinePosition.Line + 1}: adds a project by path with AddProject, so Aspire rebuilds it at every start; {{ if project["backend.topology"] == "services" }}add it with AddBuiltProject, which runs it from the AppHost's build{{ else }}reference it from the AppHost's project file and add it as AddProject<Projects.X>, which runs it from the AppHost's build{{ end }}.");
                 }
             }
         }
