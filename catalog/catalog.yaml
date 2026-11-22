@@ -697,7 +697,8 @@ dimensions:
     scope: project
     default: none
     # Changeable (ADR-0020 X1): a pilot moves from its hand-written store to the pack with fabric change, so nothing in
-    # the catalog may name this dimension (ADR-0016 C2); the pack branches on tenancy and topology with when (ADR-0006).
+    # the catalog may name this dimension (ADR-0016 C2, as ADR-0019 amends it); the pack branches on tenancy and topology
+    # with when (ADR-0006).
     changeable: true
     note: "Files kept by name outside the database, in a container per module. ADR-0020."
     options:
