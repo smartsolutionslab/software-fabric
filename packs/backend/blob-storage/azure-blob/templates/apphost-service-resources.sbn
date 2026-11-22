@@ -1,0 +1,3 @@
+// The service's own blob container on the one storage account, named after its module; it reads it as the
+// connection string blobs, and no other.
+var blobs = storage.AddBlobContainer($"{module}-blobs", module);

@@ -3,5 +3,9 @@
 - The project calls models deployed in its own Azure OpenAI resource through the resource's OpenAI v1 endpoint (`<endpoint>/openai/v1/`), with Microsoft's `Microsoft.Extensions.AI.OpenAI` adapter over the official `OpenAI` package. Only `src/BuildingBlocks/Llm/Wiring/AzureOpenAIChatClient.cs` names them; every other piece of code takes `IChatClient`. Do not add `Azure.AI.OpenAI`.
 - The endpoint is the AppHost's parameter `azure-openai-endpoint` and the key its secret parameter `azure-openai-api-key`. Set them with `dotnet user-secrets set Parameters:<name> <value> --project src/AppHost` locally and in the deployment's secret store elsewhere; never write the key anywhere in the repository, a log or a test. An endpoint that already ends in `/v1` (such as `https://api.openai.com/v1`, with an OpenAI key) is used as is; any other gets `/openai/v1/` appended. Do not add a second client or a provider switch for it.
 - The deployment is the AppHost's parameter `azure-openai-deployment`, `gpt-5-mini` by default; it must name a deployment in the resource. A use case that needs more reasoning is a decision to change it there, to a `gpt-5` deployment, at a higher price per token; never hard-code a deployment name in a module.
+{{~ if project["backend.blob-storage"] == "azure-blob" ~}}
+- The key is the model's only authentication: no model client signs in with a credential, and there is no credential switch. `Azure.Identity` is for the storage account alone: only `src/BuildingBlocks/Blobs` uses it, for the storage account's managed identity; never reference it from the model's wiring.
+{{~ else ~}}
 - The key is the only authentication. Managed identity is a separate decision; do not add `Azure.Identity` or a credential switch.
+{{~ end ~}}
 - Need streaming, tools or structured output? Use `IChatClient`'s own (`GetStreamingResponseAsync`, `ChatOptions.Tools`, `GetResponseAsync<T>`), not the SDK's types.

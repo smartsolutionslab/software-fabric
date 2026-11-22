@@ -1,0 +1,12 @@
+{{~ if project["backend.topology"] == "services" ~}}
+// Blob storage: Azurite with a data volume locally, an Azure Storage account when deployed; each service gets a
+// container of its own, named after its module, in the loop over the services.
+var storage = builder.AddAzureStorage("storage")
+    .RunAsEmulator(azurite => azurite.WithDataVolume());
+{{~ else ~}}
+// Blob storage: Azurite with a data volume locally, an Azure Storage account when deployed. Each module keeps its
+// files in a container named after it, which its store creates on the first write.
+var blobs = builder.AddAzureStorage("storage")
+    .RunAsEmulator(azurite => azurite.WithDataVolume())
+    .AddBlobs("blobs");
+{{~ end ~}}

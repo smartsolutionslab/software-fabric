@@ -1,0 +1,241 @@
+using System.Reflection;
+using System.Reflection.Emit;
+using {{ namespace }}.BuildingBlocks.Blobs;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// A module's files are its own: every <see cref="ModuleBlobStore{TModule}"/> a module's type names, in a field,
+/// property, signature, local or method body, names a type of that module's own, never a generic parameter a caller
+/// could fill with another module's type; and no module names <see cref="BlobContainers"/>, the account behind every
+/// module's container. Another module's files are reached through <c>src/Contracts</c>, never through its container.
+/// </summary>
+public sealed class ModulesUseOnlyTheirOwnContainer : IArchitectureRule
+{
+    private const string ModulesPrefix = "{{ namespace }}.Modules.";
+
+    private const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+
+    /// <summary>Compared by name: the module assemblies are loaded from the test output, beside this one.</summary>
+    private static readonly string Store = typeof(ModuleBlobStore<>).FullName!;
+
+    private static readonly string Containers = typeof(BlobContainers).FullName!;
+
+    private static readonly Dictionary<short, OpCode> OpCodesByValue = typeof(OpCodes)
+        .GetFields(BindingFlags.Public | BindingFlags.Static)
+        .Select(field => (OpCode)field.GetValue(null)!)
+        .ToDictionary(code => code.Value);
+
+    public string Description => "A module uses ModuleBlobStore<TModule> only with a type of its own, never over a generic parameter, and never names BlobContainers: no module reaches another module's container.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        List<string> violations = [];
+        foreach (var assembly in model.ModuleAssemblies)
+        {
+            var module = ModuleOf(assembly);
+            foreach (var type in assembly.GetTypes().Where(type => !IsCompilerGenerated(type)))
+            {
+                violations.AddRange(UsesOf(type)
+                    .SelectMany(use => Findings(use.Type, type, module))
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal));
+            }
+        }
+
+        return violations;
+    }
+
+    private static string? ModuleOf(Assembly assembly)
+    {
+        var name = assembly.GetName().Name ?? string.Empty;
+        if (!name.StartsWith(ModulesPrefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var rest = name[ModulesPrefix.Length..];
+        var dot = rest.IndexOf('.', StringComparison.Ordinal);
+        return dot < 0 ? rest : rest[..dot];
+    }
+
+    private static bool IsCompilerGenerated(Type type) =>
+        type.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), inherit: false) && type.DeclaringType is not null;
+
+    /// <summary>What the type names, its compiler-generated nested types (lambdas, async state machines) included.</summary>
+    private static IEnumerable<Use> UsesOf(Type type)
+    {
+        var types = new[] { type }.Concat(type.GetNestedTypes(Declared).Where(IsCompilerGenerated).SelectMany(Nested));
+        return types.SelectMany(UsesInside);
+    }
+
+    private static IEnumerable<Type> Nested(Type type) =>
+        new[] { type }.Concat(type.GetNestedTypes(Declared).SelectMany(Nested));
+
+    private static List<Use> UsesInside(Type type)
+    {
+        List<Type> named = [];
+        if (type.BaseType is { } baseType)
+        {
+            named.Add(baseType);
+        }
+
+        named.AddRange(type.GetInterfaces());
+        named.AddRange(type.GetFields(Declared).Select(field => field.FieldType));
+        named.AddRange(type.GetProperties(Declared).Select(property => property.PropertyType));
+        List<Use> uses = [];
+        foreach (var method in type.GetMethods(Declared).Cast<MethodBase>().Concat(type.GetConstructors(Declared)))
+        {
+            named.AddRange(method.GetParameters().Select(parameter => parameter.ParameterType));
+            if (method is MethodInfo info)
+            {
+                named.Add(info.ReturnType);
+            }
+
+            uses.AddRange(BodyOf(method));
+        }
+
+        uses.AddRange(named.Select(used => new Use(used)));
+        return uses;
+    }
+
+    /// <summary>What a method body names: its locals' types, and the types, fields and methods its instructions call, create or load.</summary>
+    private static List<Use> BodyOf(MethodBase method)
+    {
+        var body = method.GetMethodBody();
+        var il = body?.GetILAsByteArray();
+        if (body is null || il is null)
+        {
+            return [];
+        }
+
+        List<Use> uses = [.. body.LocalVariables.Select(local => new Use(local.LocalType))];
+        var typeArguments = method.DeclaringType?.IsGenericType == true ? method.DeclaringType.GetGenericArguments() : null;
+        var methodArguments = method.IsGenericMethod ? method.GetGenericArguments() : null;
+        var position = 0;
+        while (position < il.Length)
+        {
+            var value = (short)il[position++];
+            if (value == 0xFE && position < il.Length)
+            {
+                value = (short)(0xFE00 | il[position++]);
+            }
+
+            if (!OpCodesByValue.TryGetValue(value, out var code))
+            {
+                break;
+            }
+
+            if (code.OperandType is OperandType.InlineMethod or OperandType.InlineField or OperandType.InlineType or OperandType.InlineTok)
+            {
+                uses.AddRange(Resolve(method.Module, BitConverter.ToInt32(il, position), typeArguments, methodArguments));
+            }
+
+            position += OperandSize(code.OperandType, il, position);
+        }
+
+        return uses;
+    }
+
+    private static IEnumerable<Use> Resolve(Module module, int token, Type[]? typeArguments, Type[]? methodArguments)
+    {
+        MemberInfo? member;
+        try
+        {
+            member = module.ResolveMember(token, typeArguments, methodArguments);
+        }
+        catch (ArgumentException)
+        {
+            yield break;
+        }
+
+        switch (member)
+        {
+            case Type type:
+                yield return new Use(type);
+                break;
+            case FieldInfo field:
+                yield return new Use(field.FieldType);
+                if (field.DeclaringType is { } fieldOwner)
+                {
+                    yield return new Use(fieldOwner);
+                }
+
+                break;
+            case MethodBase called:
+                if (called.DeclaringType is { } methodOwner)
+                {
+                    yield return new Use(methodOwner);
+                }
+
+                if (called.IsGenericMethod)
+                {
+                    foreach (var argument in called.GetGenericArguments())
+                    {
+                        yield return new Use(argument);
+                    }
+                }
+
+                if (called is MethodInfo info)
+                {
+                    yield return new Use(info.ReturnType);
+                }
+
+                break;
+        }
+    }
+
+    private static int OperandSize(OperandType operand, byte[] il, int position) => operand switch
+    {
+        OperandType.InlineNone => 0,
+        OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
+        OperandType.InlineVar => 2,
+        OperandType.InlineI8 or OperandType.InlineR => 8,
+        OperandType.InlineSwitch => 4 + (4 * BitConverter.ToInt32(il, position)),
+        _ => 4,
+    };
+
+    /// <summary>The violations inside a named type: the account itself, or a store over another module's type or a generic parameter, wherever it is nested.</summary>
+    private static IEnumerable<string> Findings(Type used, Type type, string? module)
+    {
+        if (used.HasElementType)
+        {
+            return Findings(used.GetElementType()!, type, module);
+        }
+
+        if (used.FullName == Containers)
+        {
+            return [$"{type.FullName} (module {module}) uses BlobContainers, the account behind every module's container. A module takes its ModuleBlobStore<TModule>."];
+        }
+
+        if (!used.IsGenericType)
+        {
+            return [];
+        }
+
+        var arguments = used.GetGenericArguments();
+        List<string> findings = [];
+        if (used.GetGenericTypeDefinition().FullName == Store)
+        {
+            var owner = arguments[0];
+            if (owner.IsGenericParameter)
+            {
+                findings.Add($"{type.FullName} (module {module}) uses ModuleBlobStore<{owner.Name}> over a generic parameter, which a caller could fill with another module's type. A module's store names a type of its own.");
+            }
+            else if (ModuleOf(owner.Assembly) is var other && other != module)
+            {
+                findings.Add(other is null
+                    ? $"{type.FullName} (module {module}) uses ModuleBlobStore<{owner.Name}>, which names no module. A module's store names a type of its own."
+                    : $"{type.FullName} (module {module}) uses ModuleBlobStore<{owner.Name}>, module {other}'s container. A module keeps only its own files; reach another module's through src/Contracts.");
+            }
+        }
+
+        findings.AddRange(arguments.Where(argument => !argument.IsGenericParameter).SelectMany(argument => Findings(argument, type, module)));
+        return findings;
+    }
+
+    /// <summary>A type a module's type names.</summary>
+    private sealed record Use(Type Type);
+}

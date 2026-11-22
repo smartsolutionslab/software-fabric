@@ -16,8 +16,8 @@ public class CatalogReaderTests
         var catalog = ReadRepositoryCatalog();
 
         catalog.Version.ShouldBe(1);
-        catalog.Dimensions.Count.ShouldBe(56);
-        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(148);
+        catalog.Dimensions.Count.ShouldBe(57);
+        catalog.Dimensions.Values.Sum(dimension => dimension.Options.Count).ShouldBe(150);
         catalog.Profiles.Keys.ShouldBe(
             ["saas-standard-react", "saas-standard-vue", "industrial-event-driven-mfe", "lean-crud", "saas-strict-react", "saas-ai-react", "saas-services-vue"],
             ignoreOrder: false);
@@ -59,10 +59,11 @@ public class CatalogReaderTests
     }
 
     [Fact]
-    public void The_repository_catalog_marks_the_colour_scheme_the_font_and_email_changeable_after_generation_and_nothing_else()
+    public void The_repository_catalog_marks_the_colour_scheme_the_font_blob_storage_and_email_changeable_after_generation_and_nothing_else()
     {
+        // Blob storage by ADR-0020 X1: a pilot moves from its hand-written store to the pack with fabric change.
         ReadRepositoryCatalog().Dimensions.Values.Where(dimension => dimension.Changeable).Select(dimension => dimension.Id)
-            .ShouldBe(["frontend.color-scheme", "frontend.font", "backend.email"]);
+            .ShouldBe(["frontend.color-scheme", "frontend.font", "backend.blob-storage", "backend.email"]);
     }
 
     [Fact]

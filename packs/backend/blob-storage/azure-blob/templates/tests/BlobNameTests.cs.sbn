@@ -1,0 +1,40 @@
+{{~ refused = "ArgumentException"
+if project["backend.guards"] == "ensure-that"
+  refused = "GuardException"
+end ~}}
+using {{ namespace }}.BuildingBlocks.Blobs;
+
+namespace {{ namespace }}.Blobs.Tests;
+
+/// <summary>A blob name reaches exactly the blob a module meant: relative, segment by segment, never outside its path.</summary>
+public sealed class BlobNameTests
+{
+    {{ test_attribute }}
+    public void A_relative_path_of_segments_is_a_name()
+    {
+        {{ `BlobName.From("invoices/0199a3c2-7d10-7c4e-9a51-2f4b8f0c1d2e/scan.pdf").Value` | should_be `"invoices/0199a3c2-7d10-7c4e-9a51-2f4b8f0c1d2e/scan.pdf"` }};
+        {{ `BlobName.From(new string('a', BlobName.MaxLength)).Value.Length` | should_be `BlobName.MaxLength` }};
+    }
+
+    {{ test_cases_attribute }}
+    {{ test_case_attribute `""` }}
+    {{ test_case_attribute `" "` }}
+    {{ test_case_attribute `"/invoices/scan.pdf"` }}
+    {{ test_case_attribute `"invoices/"` }}
+    {{ test_case_attribute `"invoices//scan.pdf"` }}
+    {{ test_case_attribute `"invoices/./scan.pdf"` }}
+    {{ test_case_attribute `"invoices/../payroll/scan.pdf"` }}
+    {{ test_case_attribute `".."` }}
+    {{ test_case_attribute `"invoices\\scan.pdf"` }}
+    {{ test_case_attribute `"invoices/scan\n.pdf"` }}
+    public void A_name_that_could_reach_another_path_is_refused(string name)
+    {
+        {{ should_throw refused `() => BlobName.From(name)` }};
+    }
+
+    {{ test_attribute }}
+    public void A_name_longer_than_azure_takes_is_refused()
+    {
+        {{ should_throw refused `() => BlobName.From(new string('a', BlobName.MaxLength + 1))` }};
+    }
+}

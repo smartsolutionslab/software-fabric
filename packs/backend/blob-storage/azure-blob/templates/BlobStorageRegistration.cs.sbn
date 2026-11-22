@@ -1,0 +1,28 @@
+{{~ tenanted = project["backend.tenancy"] == "column" || project["backend.tenancy"] == "schema-per-tenant" ~}}
+using {{ namespace }}.BuildingBlocks.Blobs;
+using Microsoft.Extensions.Configuration;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class BlobStorageRegistration
+{
+    /// <summary>
+    /// Registers the blob storage account and <see cref="ModuleBlobStore{TModule}"/> for every module. The connection
+    /// string <c>blobs</c> is read when a store first needs its container; registering connects to nothing.
+{{~ if tenanted ~}}
+    /// A store is scoped, as the tenant source it reads is.
+{{~ end ~}}
+    /// </summary>
+    public static IServiceCollection AddModuleBlobStores(this IServiceCollection services, IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        return services
+            .AddSingleton(_ => new BlobContainers(configuration))
+{{~ if tenanted ~}}
+            .AddScoped(typeof(ModuleBlobStore<>));
+{{~ else ~}}
+            .AddSingleton(typeof(ModuleBlobStore<>));
+{{~ end ~}}
+    }
+}

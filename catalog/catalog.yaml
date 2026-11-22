@@ -690,6 +690,21 @@ dimensions:
       inter: { tier: experimental }
       geist: { tier: experimental, note: "with Geist Mono for monospace text (identifiers, codes)" }
 
+  # ─────────────────────────── Backend · blob storage ────────────────────────
+  # Before the reads (#247) and e-mail (ADR-0019), which come last: every profile takes none (ADR-0020).
+
+  backend.blob-storage:
+    scope: project
+    default: none
+    # Changeable (ADR-0020 X1): a pilot moves from its hand-written store to the pack with fabric change, so nothing in
+    # the catalog may name this dimension (ADR-0016 C2, as ADR-0019 amends it); the pack branches on tenancy and topology
+    # with when (ADR-0006).
+    changeable: true
+    note: "Files kept by name outside the database, in a container per module. ADR-0020."
+    options:
+      none:       { tier: experimental, note: "the project stores no files outside its database" }
+      azure-blob: { tier: experimental, note: "Azure Blob Storage: Azurite locally, a storage account when deployed; a module's names carry its tenant under tenancy" }
+
   # ─────────────────────────── Backend · data access add-ons ─────────────────
   # Last in the catalog (owner decision on #247): a dimension active in every profile renumbers no profile's ADRs here.
 

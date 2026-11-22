@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The blob store's names and connections, and the AppHost's blob storage read from its model, which is never started: no Docker. -->
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Blobs.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/AppHost/AppHost.csproj" />
+    <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />
+  </ItemGroup>
+
+</Project>

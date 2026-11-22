@@ -1,0 +1,118 @@
+{{~ services = project["backend.topology"] == "services" ~}}
+using System.Globalization;
+using System.Text;
+using Azure.Identity;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.Configuration;
+
+namespace {{ namespace }}.BuildingBlocks.Blobs;
+
+/// <summary>
+/// The project's blob storage account, from the connection string <c>blobs</c> that Aspire gives in either of its forms:
+/// Azurite's connection string locally, or, deployed, the account's blob endpoint, reached with the app's Azure identity
+/// rather than a key (ADR-0020 of the generator).
+{{~ if services ~}}
+/// Each service reads its own module's container as <c>blobs</c>, so the connection names it (<c>ContainerName=...</c>):
+/// a service reaches that container and no other.
+{{~ else ~}}
+/// Each module keeps its files in a container named after the module, as its tables are in a schema of its own; the
+/// store creates it on its first write, so no shared file names a module.
+{{~ end ~}}
+/// The connection is read when a container is first needed: registering connects to nothing. Only the module stores
+/// use this; a module takes its <see cref="ModuleBlobStore{TModule}"/>, never the account.
+/// </summary>
+public sealed class BlobContainers
+{
+    public const string ConnectionStringName = "blobs";
+
+    private const string ContainerNameKey = "ContainerName";
+
+    private const string EndpointKey = "Endpoint";
+
+    private const string ModulesPrefix = "{{ namespace }}.Modules.";
+
+    private readonly Lazy<(BlobServiceClient Service, string? Container)> account;
+
+    public BlobContainers(IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        account = new Lazy<(BlobServiceClient, string?)>(() => Connect(configuration.GetConnectionString(ConnectionStringName)
+            ?? throw new InvalidOperationException($"Connection string '{ConnectionStringName}' is missing; Aspire provides it.")));
+    }
+
+    /// <summary>The container of the module <paramref name="module"/> belongs to.</summary>
+    public BlobContainerClient For(Type module)
+    {
+        {{ not_null "module" }}
+
+{{~ if services ~}}
+        var (service, container) = account.Value;
+        return service.GetBlobContainerClient(container
+            ?? throw new InvalidOperationException($"Connection string '{ConnectionStringName}' names no container ({ContainerNameKey}=...); it must be the service's own '<module>-blobs' resource from the AppHost, not the storage account."));
+{{~ else ~}}
+        return account.Value.Service.GetBlobContainerClient(NameOf(module.Assembly.GetName().Name ?? string.Empty));
+{{~ end ~}}
+    }
+
+    /// <summary>
+    /// A client and, when the connection names one, its container, for a connection in any of the forms Aspire gives:
+    /// a connection string (Azurite's), a blob endpoint, or either with <c>ContainerName=...</c>.
+    /// </summary>
+    public static (BlobServiceClient Service, string? Container) Connect(string connection)
+    {
+        {{ not_blank "connection" }}
+
+        if (Uri.TryCreate(connection, UriKind.Absolute, out var endpoint))
+        {
+            return (new BlobServiceClient(endpoint, new DefaultAzureCredential()), null);
+        }
+
+        // Kept as written, not through DbConnectionStringBuilder, which quotes a base64 key's trailing '=' the SDK then reads.
+        var parts = connection.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var container = parts.Where(part => IsKey(part, ContainerNameKey)).Select(ValueOf).FirstOrDefault();
+        var rest = parts.Where(part => !IsKey(part, ContainerNameKey)).ToList();
+        if (rest is [var only] && IsKey(only, EndpointKey) && Uri.TryCreate(ValueOf(only), UriKind.Absolute, out var accountEndpoint))
+        {
+            return (new BlobServiceClient(accountEndpoint, new DefaultAzureCredential()), container);
+        }
+
+        return (new BlobServiceClient(string.Join(';', rest)), container);
+    }
+
+    /// <summary>
+    /// The container of a module assembly, <c>{{ namespace }}.Modules.&lt;Module&gt;.&lt;Layer&gt;</c>: the module's name in
+    /// lower case with hyphens (<c>OrderHandling</c> is <c>order-handling</c>), which Azure takes as a container name from
+    /// 3 to 63 characters.
+    /// </summary>
+    internal static string NameOf(string assembly)
+    {
+        var dot = assembly.StartsWith(ModulesPrefix, StringComparison.Ordinal) ? assembly.IndexOf('.', ModulesPrefix.Length) : -1;
+        if (dot < 0)
+        {
+            throw new InvalidOperationException($"{assembly} is not a module's assembly ({ModulesPrefix}<Module>.<Layer>): a module's blob store names a type of its own module.");
+        }
+
+        var module = assembly[ModulesPrefix.Length..dot];
+        var name = new StringBuilder();
+        foreach (var character in module)
+        {
+            if (char.IsUpper(character) && name.Length > 0)
+            {
+                name.Append('-');
+            }
+
+            name.Append(char.ToLower(character, CultureInfo.InvariantCulture));
+        }
+
+        return name.Length is >= 3 and <= 63
+            ? name.ToString()
+            : throw new InvalidOperationException($"Module {module} cannot have a blob container: Azure names a container with 3 to 63 characters, and '{name}' has {name.Length}.");
+    }
+
+    private static bool IsKey(string part, string key) =>
+        part.IndexOf('=', StringComparison.Ordinal) is var separator and > 0
+            && string.Equals(part[..separator].Trim(), key, StringComparison.OrdinalIgnoreCase);
+
+    private static string ValueOf(string part) => part[(part.IndexOf('=', StringComparison.Ordinal) + 1)..].Trim();
+}
