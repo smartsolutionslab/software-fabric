@@ -1,11 +1,23 @@
-{{ if project["backend.auth"] == "keycloak" -}}
+{{~ keycloak = project["backend.auth"] == "keycloak"
+email = project["backend.email"] != "none" ~}}
+{{ if keycloak || email -}}
+IResourceBuilder<ContainerResource>? mailpit = null;
 if (builder.ExecutionContext.IsRunMode)
 {
+{{~ if keycloak ~}}
     // Keycloak's email (verification, reset password) lands in Mailpit, whose inbox is http://localhost:8025; the realm points SMTP at it.
-    var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.33")
+{{~ end ~}}
+{{~ if email && keycloak ~}}
+    // The host's e-mail lands there too; a deployment sends through its own SMTP server.
+{{~ else if email ~}}
+    // The host's e-mail lands in Mailpit, whose inbox is http://localhost:8025; a deployment sends through its own SMTP server.
+{{~ end ~}}
+    mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.33")
         .WithHttpEndpoint(port: 8025, targetPort: 8025)
         .WithEndpoint(targetPort: 1025, name: "smtp")
         .WithHttpHealthCheck("/livez");
+{{~ if keycloak ~}}
     keycloak.WaitFor(mailpit);
+{{~ end ~}}
 }
 {{- end }}

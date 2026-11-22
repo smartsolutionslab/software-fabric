@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../../src/Modules/{{ module.namespace }}/{{ module.namespace }}.Api/{{ module.namespace }}.Api.csproj" />
-{{~ if project["backend.llm"] != "none" ~}}
+{{~ if project["backend.llm"] != "none" || project["backend.email"] != "none" ~}}
     <Compile Include="../../Fakes/*.cs" Link="Fakes/%(Filename)%(Extension)" />
 {{~ end ~}}
   </ItemGroup>

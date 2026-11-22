@@ -1,0 +1,4 @@
+// E-mail goes to Mailpit in run mode. A deployed SMTP server that requires authentication (Azure Communication Services
+// and most providers) gets the user name smtp-user-name and the secret smtp-password, given together or not at all.
+var smtpUserName = mailpit is null ? builder.AddParameter("smtp-user-name") : null;
+var smtpPassword = mailpit is null ? builder.AddParameter("smtp-password", secret: true) : null;

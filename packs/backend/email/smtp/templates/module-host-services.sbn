@@ -1,0 +1,2 @@
+        // The host registers the project's IEmailSender; a module's test stands in for it and never sends e-mail.
+        services.AddSingleton<{{ namespace }}.BuildingBlocks.Email.IEmailSender>(_ => new {{ namespace }}.Tests.Fakes.FakeEmailSender());

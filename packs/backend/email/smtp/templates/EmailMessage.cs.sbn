@@ -1,0 +1,4 @@
+namespace {{ namespace }}.BuildingBlocks.Email;
+
+/// <summary>A plain-text e-mail to one address; the sender is the configured address (<c>Email:SenderAddress</c>).</summary>
+public sealed record EmailMessage(string To, string Subject, string Body);
