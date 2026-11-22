@@ -154,7 +154,7 @@ public sealed class EmailTests
 
         appHost.ShouldContain("IResourceBuilder<ContainerResource>? mailpit = null;");
         appHost.ShouldContain("mailpit = builder.AddContainer(\"mailpit\", \"axllent/mailpit\", \"v1.33\")");
-        appHost.ShouldNotContain("keycloak");
+        appHost.ShouldNotContain(".WaitFor(mailpit)");
         appHost.ShouldContain(".WithEmail(mailpit, smtpUserName, smtpPassword)");
     }
 
