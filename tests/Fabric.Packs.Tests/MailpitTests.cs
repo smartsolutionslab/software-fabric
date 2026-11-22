@@ -1,6 +1,11 @@
+using Fabric.Core.Generation;
+
 namespace Fabric.Packs.Tests;
 
-/// <summary>Keycloak's email reaches Mailpit when the AppHost runs; publishing the AppHost adds no Mailpit.</summary>
+/// <summary>
+/// Keycloak's email reaches Mailpit when the AppHost runs; publishing the AppHost adds no Mailpit. Mailpit is the base's
+/// resource (#861), so that e-mail can have it under every auth option.
+/// </summary>
 [Collection(FixedPorts.Name)]
 public sealed class MailpitTests
 {
@@ -26,6 +31,32 @@ public sealed class MailpitTests
             }
         }
         """;
+
+    [Fact]
+    public void The_base_adds_mailpit_to_the_apphost_and_no_option_pack_does()
+    {
+        var adding = Repository.Packs.Packs.Values
+            .SelectMany(pack => pack.Slots
+                .Where(contribution => contribution.Slot == "apphost.resources")
+                .Where(contribution => File.ReadAllText(Path.Combine(pack.Directory, contribution.Template)).Contains("\"mailpit\"", StringComparison.Ordinal))
+                .Select(_ => pack.Option))
+            .ToList();
+
+        adding.ShouldBe(["base.core"]);
+    }
+
+    [Fact]
+    public void Under_keycloak_mailpit_runs_in_run_mode_and_keycloak_waits_for_it_as_before()
+    {
+        var generated = Generator.New(Repository.Catalog, Repository.Packs.Packs, "shop", "saas-standard-react", []);
+        generated.Errors.ShouldBeEmpty();
+        var appHost = generated.Files.Single(file => file.Path == "src/AppHost/AppHost.cs").Content;
+
+        var runMode = appHost.IndexOf("if (builder.ExecutionContext.IsRunMode)", StringComparison.Ordinal);
+        runMode.ShouldBeGreaterThan(appHost.IndexOf("var keycloak = ", StringComparison.Ordinal));
+        appHost.IndexOf("builder.AddContainer(\"mailpit\", \"axllent/mailpit\", \"v1.33\")", StringComparison.Ordinal).ShouldBeGreaterThan(runMode);
+        appHost.ShouldContain("keycloak.WaitFor(mailpit);");
+    }
 
     [Fact]
     public void A_reset_password_email_reaches_mailpit_in_run_mode_and_publish_mode_has_no_mailpit()
