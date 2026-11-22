@@ -1,0 +1,49 @@
+using {{ namespace }}.BuildingBlocks.Email;
+using MailKit.Security;
+
+namespace {{ namespace }}.Email.Tests;
+
+/// <summary>
+/// What the sender does against a server that never accepts the message or offers no TLS. Sending through a real server
+/// is in the integration tests, against the AppHost's Mailpit.
+/// </summary>
+public class MailKitEmailSenderTests
+{
+    private static readonly EmailMessage Message = new("customer@example.com", "Order shipped", "Your order is on its way.");
+
+    {{ test_attribute }}
+    public async Task A_send_the_caller_cancels_stops_before_the_server_has_accepted_the_message()
+    {
+        await using var server = new StallingSmtpServer();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource({{ test_cancellation_token }});
+        var sending = Sender(server.Port, SecureSocketOptions.None).SendAsync(Message, cancellation.Token);
+
+        await server.DataReceived.WaitAsync(TimeSpan.FromSeconds(10), {{ test_cancellation_token }});
+        await cancellation.CancelAsync();
+
+        await {{ should_throw_async "OperationCanceledException" ("() => sending.WaitAsync(TimeSpan.FromSeconds(10), " + test_cancellation_token + ")") }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_server_that_offers_no_starttls_is_refused_when_tls_is_required()
+    {
+        await using var server = new StallingSmtpServer();
+
+        await {{ should_throw_async "NotSupportedException" ("() => Sender(server.Port, SecureSocketOptions.StartTls).SendAsync(Message, " + test_cancellation_token + ")") }};
+
+        {{ `server.DataReceived.IsCompleted` | should_be_false }};
+    }
+
+    {{ test_attribute }}
+    public async Task A_server_that_does_not_speak_tls_is_refused_when_tls_comes_first()
+    {
+        await using var server = new StallingSmtpServer();
+
+        await {{ should_throw_async "SslHandshakeException" ("() => Sender(server.Port, SecureSocketOptions.SslOnConnect).SendAsync(Message, " + test_cancellation_token + ")") }};
+
+        {{ `server.DataReceived.IsCompleted` | should_be_false }};
+    }
+
+    private static MailKitEmailSender Sender(int port, SecureSocketOptions security) =>
+        new(new SmtpSettings("127.0.0.1", port, "noreply@example.com", security));
+}

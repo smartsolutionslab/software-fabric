@@ -1,0 +1,34 @@
+using MailKit;
+using MailKit.Net.Smtp;
+using MimeKit;
+
+namespace {{ namespace }}.BuildingBlocks.Email;
+
+/// <summary>
+/// Sends each e-mail over its own SMTP connection, encrypted as <see cref="SmtpSettings"/> says and signed in to with its
+/// credentials when it has them. A server that refuses them fails the send like any other delivery failure.
+/// </summary>
+public sealed class MailKitEmailSender(SmtpSettings settings) : IEmailSender
+{
+    public async Task SendAsync(EmailMessage message, CancellationToken cancellationToken)
+    {
+        {{ not_null "message" }}
+
+        using var email = new MimeMessage();
+        email.From.Add(MailboxAddress.Parse(settings.SenderAddress));
+        email.To.Add(MailboxAddress.Parse(message.To));
+        email.Subject = message.Subject;
+        email.Body = new TextPart("plain") { Text = message.Body };
+
+        // Per network operation; the caller's token bounds the whole send.
+        using var client = new SmtpClient { Timeout = (int)TimeSpan.FromSeconds(30).TotalMilliseconds };
+        await client.ConnectAsync(settings.Host, settings.Port, settings.Security, cancellationToken);
+        if (settings.Credentials is { } credentials)
+        {
+            await client.AuthenticateAsync(credentials.UserName, credentials.Password, cancellationToken);
+        }
+
+        await client.SendAsync(email, cancellationToken);
+        await client.DisconnectAsync(quit: true, cancellationToken);
+    }
+}

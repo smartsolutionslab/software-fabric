@@ -1,0 +1,8 @@
+option: backend.email.none
+files:
+  - { template: templates/NoEmail.cs.sbn, target: tests/Architecture.Tests/Rules/NoEmail.cs }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No module references MailKit or MimeKit: the project sends no e-mail.", file: templates/NoEmail.cs.sbn }

@@ -1,0 +1,31 @@
+using {{ namespace }}.BuildingBlocks.Email;
+
+namespace {{ namespace }}.Tests.Fakes;
+
+/// <summary>
+/// E-mail in tests: keeps every message it is given instead of sending it, and fails the next send when told to, as an
+/// SMTP server that is down would. No test sends real e-mail; a test reads what was sent from <see cref="Sent"/>.
+/// </summary>
+public sealed class FakeEmailSender : IEmailSender
+{
+    private readonly List<EmailMessage> sent = [];
+
+    /// <summary>Every message sent, in the order it came.</summary>
+    public IReadOnlyList<EmailMessage> Sent => sent;
+
+    /// <summary>Makes the next send throw, as a failed delivery does, so the caller's message is retried.</summary>
+    public bool FailsNextSend { get; set; }
+
+    public Task SendAsync(EmailMessage message, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (FailsNextSend)
+        {
+            FailsNextSend = false;
+            throw new IOException("The SMTP server is unreachable.");
+        }
+
+        sent.Add(message);
+        return Task.CompletedTask;
+    }
+}

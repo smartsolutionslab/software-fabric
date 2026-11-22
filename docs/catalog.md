@@ -142,6 +142,18 @@ resolved choices contain it: set by the profile or one it extends, or taken as a
 | `postgres` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-services-vue`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
 | `sqlserver` | supported | — | — | — | — |
 
+### `backend.email`
+
+- Scope: project
+- Default: `none`
+- Changeable after generation: `fabric change --set backend.email=<option>` (ADR-0016 C1)
+- Note: E-mail the project sends, behind IEmailSender (src/BuildingBlocks/Email). ADR-0019.
+
+| Option | Tier | Requires | Conflicts | Profiles | Note |
+|---|---|---|---|---|---|
+| `none` | experimental | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-services-vue`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | the project sends no e-mail |
+| `smtp` | experimental | — | — | — | over SMTP with MailKit, into Mailpit when the AppHost runs |
+
 ### `backend.errors`
 
 - Scope: project

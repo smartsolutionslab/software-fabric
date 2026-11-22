@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The e-mail building block alone: its settings, and its sender against a loopback SMTP server. Sending to Mailpit is the integration tests'. -->
+  <PropertyGroup>
+    <RootNamespace>{{ namespace }}.Email.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/BuildingBlocks/BuildingBlocks.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,10 @@
+namespace {{ namespace }}.BuildingBlocks.Email;
+
+/// <summary>
+/// Sends e-mail over the project's SMTP server. A failure throws, so the consumer or reaction that sends is retried;
+/// it sends again on a retry, so it deduplicates on the event it handles.
+/// </summary>
+public interface IEmailSender
+{
+    Task SendAsync(EmailMessage message, CancellationToken cancellationToken);
+}

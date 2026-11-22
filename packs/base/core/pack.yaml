@@ -146,7 +146,8 @@ slots:
   # With services, /me exists once, on the edge (ADR-0017); edge.* is declared only by the services topology.
   - { slot: edge.endpoints, template: templates/Host/edge-endpoints.sbn, order: 10, optional: true }
   # Mailpit, the inbox for e-mail sent locally, in run mode only: after the identity provider's resources, which
-  # wait for it (E2 on #602, #861). Only with keycloak until e-mail needs it: its realm points SMTP at the host mailpit.
+  # wait for it (E2 on #602, #861). With keycloak, whose realm points SMTP at the host mailpit, or with backend.email
+  # smtp, whose host wiring names it (ADR-0019 R2, R3).
   - { slot: apphost.resources, template: templates/AppHost/mailpit-resources.sbn, order: 21 }
   - { slot: tests.module-host-services, template: templates/Llm/module-host-services.sbn }
   - { slot: dependabot.nuget-ignore, template: templates/dependabot-nuget-ignore.sbn }
