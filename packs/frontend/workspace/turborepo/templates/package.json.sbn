@@ -1,7 +1,7 @@
 {
   "name": "{{ name }}-web",
   "private": true,
-  "packageManager": "pnpm@10.0.0",
+  "packageManager": "pnpm@{{ pnpm_version }}",
   "scripts": {
     "build": "turbo run build",
     "lint": "turbo run lint",
