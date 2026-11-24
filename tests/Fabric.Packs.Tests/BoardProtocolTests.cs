@@ -456,6 +456,52 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Origin("for-each-ref", "refs/heads/agent/").ShouldBeEmpty();
     }
 
+    [Fact]
+    public void An_issue_that_waits_on_something_outside_the_repository_is_skipped_naming_it_and_claimed_once_the_section_is_empty()
+    {
+        Issues(
+            Issue(7, "Take Npgsql 11", ReadyBackend, body: "Moves off the release candidate.\n\n## Waits on\n\n- Npgsql.EntityFrameworkCore.PostgreSQL 11.0.0 on NuGet.\n- Profile CI green with it.\n\n## Done when\n\n- No prerelease package.\n"),
+            Issue(9, "Refund an invoice", ReadyBackend));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("Skipping #7: it waits on: Npgsql.EntityFrameworkCore.PostgreSQL 11.0.0 on NuGet.");
+        output.ShouldContain("9 agent/9");
+        HasBranch("agent/7").ShouldBeFalse();
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+
+        Bash(state, ["-c", ChangeIssue(7, ".body = \"Moves off the release candidate.\\n\\n## Waits on\\n\\n## Done when\\n\\n- No prerelease package.\\n\"")]);
+        var (secondExitCode, secondOutput) = Run("next.sh", "backend", "codex-cloud/lane-backend");
+
+        secondExitCode.ShouldBe(0, secondOutput);
+        secondOutput.Trim().ShouldBe("7 agent/7");
+    }
+
+    [Fact]
+    public void A_named_issue_that_waits_on_something_outside_the_repository_is_refused_naming_it()
+    {
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: "## Waits on\n\nNpgsql.EntityFrameworkCore.PostgreSQL 11.0.0 on NuGet.\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "7");
+
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe("Not claiming #7: it waits on: Npgsql.EntityFrameworkCore.PostgreSQL 11.0.0 on NuGet.");
+        Origin("for-each-ref", "refs/heads/agent/").ShouldBeEmpty();
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+    }
+
+    [Fact]
+    public void Waits_on_in_prose_or_under_another_heading_does_not_hold_an_issue()
+    {
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: "This no longer waits on Npgsql.\n\n## Done when\n\n- Waits on nothing.\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(0, output);
+        output.Trim().ShouldBe("7 agent/7");
+    }
+
     [Theory]
     [InlineData("needs:decision")]
     [InlineData("needs:human")]
