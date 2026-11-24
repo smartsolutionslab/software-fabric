@@ -7,7 +7,8 @@
 # Eligible: open, labelled agent:ready and lane:<lane>, no assignee, not claimed, blocked or escalated (needs:*): an
 # escalation no owner had capacity for keeps agent:ready and has no assignee, but still waits for a developer. An issue
 # whose "## Depends on" section names an issue that is not closed (#12, owner/repo#34) waits for it too, so agent:ready
-# may be set up front.
+# may be set up front. One whose "## Waits on" section has text waits on something outside the repository (a release
+# upstream, say) until that section is emptied or removed.
 # The list is a snapshot, so each candidate is read again before its claim and once more after it: an issue assigned,
 # closed or escalated meanwhile is not claimed, or is given straight back.
 # The branch is the lock: a claim commit pushed onto a new branch, or onto a parked one, succeeds for one agent only.
@@ -90,6 +91,11 @@ if [ -n "$named" ]; then
     echo "Not claiming #$named: $reason." >&2
     exit 1
   fi
+  waits="$(jq -r "$board_waits_on_jq" <<< "$state")"
+  if [ -n "$waits" ]; then
+    echo "Not claiming #$named: it waits on: $waits" >&2
+    exit 1
+  fi
   if ! waiting="$(board_open_dependencies "$state")"; then
     echo "Not claiming #$named: its dependencies could not be read (above)." >&2
     exit 1
@@ -115,7 +121,13 @@ candidates="$(jq -r --arg lane "$lane" "map(select(($board_eligible_jq) and ([.l
 
 while read -r issue; do
   [ -n "$issue" ] || continue
-  if ! waiting="$(board_open_dependencies "$(jq -c --argjson number "$issue" '.[] | select(.number == $number)' <<< "$listed")")"; then
+  candidate="$(jq -c --argjson number "$issue" '.[] | select(.number == $number)' <<< "$listed")"
+  waits="$(jq -r "$board_waits_on_jq" <<< "$candidate")"
+  if [ -n "$waits" ]; then
+    echo "Skipping #$issue: it waits on: $waits" >&2
+    continue
+  fi
+  if ! waiting="$(board_open_dependencies "$candidate")"; then
     echo "The dependencies of #$issue could not be read (above); nothing was claimed." >&2
     exit 1
   fi

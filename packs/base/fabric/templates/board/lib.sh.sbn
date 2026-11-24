@@ -151,6 +151,16 @@ board_dependencies_jq='[(.body // "") | gsub("\r"; "") | split("\n")
   | if .[0] == "" then "#\(.[1])" else "\(.[0])#\(.[1])" end]
   | reduce .[] as $reference ([]; if index([$reference]) == null then . + [$reference] else . end) | .[]'
 
+# What an issue waits on outside the repository: the first line of its "## Waits on" section with text, up to the next
+# heading of level one or two and without a list marker, as jq over one issue; nothing when the section is absent or
+# empty. Such an issue is not handed out until whoever finds the condition met empties or removes the section (#882).
+board_waits_on_jq='[(.body // "") | gsub("\r"; "") | split("\n")
+  | (map(test("^##\\s+Waits on\\s*$"; "i")) | index(true)) as $start
+  | if $start == null then empty else .[$start + 1:] end
+  | (map(test("^##?\\s")) | index(true)) as $end
+  | (if $end == null then . else .[:$end] end) | .[]
+  | sub("^\\s*([-*+]\\s+)?"; "") | sub("\\s+$"; "") | select(length > 0)] | first // empty'
+
 # Prints the dependencies of an issue (its JSON) that are not closed, one per line; one that cannot be read is not
 # known to be closed and is printed with " (could not be read)". Returns 1 only when the issue's body cannot be parsed.
 board_open_dependencies() {
