@@ -14,7 +14,7 @@ CI runs the same three on every pull request and keeps no Turborepo cache betwee
 
 Turborepo's default is kept: `turbo` sends anonymous usage telemetry unless it is turned off, and the generated project neither turns it off nor changes CI for it. To opt out, run `turbo telemetry disable` once on a machine, or set `TURBO_TELEMETRY_DISABLED=1` or `DO_NOT_TRACK=1` in the environment, for example in CI.
 
-`web/pnpm-workspace.yaml` sets `minimumReleaseAge: 1440`: pnpm installs no version published less than a day ago. A just-published release is often not yet served by the registry, nor are its new dependencies (`ERR_PNPM_NO_MATCHING_VERSION`, `ERR_PNPM_FETCH_404`), and a day lets a bad or compromised release be withdrawn before it reaches the workspace. CI fails when the setting is missing.
+`web/pnpm-workspace.yaml` sets `minimumReleaseAge: 1440`: pnpm installs no version published less than a day ago. A just-published release is often not yet served by the registry, nor are its new dependencies (`ERR_PNPM_NO_MATCHING_VERSION`, `ERR_PNPM_FETCH_404`), and a day lets a bad or compromised release be withdrawn before it reaches the workspace. CI fails when the setting is missing or below a day.
 
 ## Consequences
 

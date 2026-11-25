@@ -4,6 +4,6 @@ packages:
 # pnpm installs no version published less than a day ago (1440 minutes). A just-published
 # release is often not yet served, nor are its new dependencies (ERR_PNPM_NO_MATCHING_VERSION,
 # ERR_PNPM_FETCH_404), and a day lets a bad release be withdrawn first. To take a security fix
-# sooner, list only that version under minimumReleaseAgeExclude ("- <package>@<version>"), with
-# the reason in the pull request. Never remove this setting.
+# sooner, list only that version under minimumReleaseAgeExclude (- "<package>@<version>",
+# quoted), with the reason in the pull request. Never remove or lower this setting.
 minimumReleaseAge: 1440

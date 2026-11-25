@@ -10,7 +10,7 @@ Nx caches `build`, `lint` and `test` locally, in `web/.nx/cache`. A task whose i
 
 CI runs the same three on every pull request and keeps no Nx cache between runs, so every package is built, linted and tested from scratch on every run; a cached success can never stand in for a check.
 
-`web/pnpm-workspace.yaml` sets `minimumReleaseAge: 1440`: pnpm installs no version published less than a day ago. A just-published release is often not yet served by the registry, nor are its new dependencies (`ERR_PNPM_NO_MATCHING_VERSION`, `ERR_PNPM_FETCH_404`), and a day lets a bad or compromised release be withdrawn before it reaches the workspace. CI fails when the setting is missing.
+`web/pnpm-workspace.yaml` sets `minimumReleaseAge: 1440`: pnpm installs no version published less than a day ago. A just-published release is often not yet served by the registry, nor are its new dependencies (`ERR_PNPM_NO_MATCHING_VERSION`, `ERR_PNPM_FETCH_404`), and a day lets a bad or compromised release be withdrawn before it reaches the workspace. CI fails when the setting is missing or below a day.
 
 ## Consequences
 
