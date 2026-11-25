@@ -509,6 +509,7 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     [InlineData("## Waits on ##")]
     [InlineData("##  Waits  on")]
     [InlineData("## waits on")]
+    [InlineData("# Waits on")]
     public void A_waits_on_heading_written_another_way_still_holds_the_issue(string heading)
     {
         Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: $"{heading}\r\n\r\nNpgsql 11.0.0 on NuGet.\r\n"));
@@ -531,6 +532,32 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
 
         exitCode.ShouldBe(0, output);
         output.Trim().ShouldBe("7 agent/7");
+    }
+
+    [Fact]
+    public void A_first_line_of_control_characters_alone_does_not_hide_the_reason_after_it()
+    {
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: "## Waits on\n\n\u001b\u0007\nNpgsql 11.0.0 on NuGet.\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "7");
+
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe("Not claiming #7: it waits on: Npgsql 11.0.0 on NuGet.");
+    }
+
+    [Fact]
+    public void A_body_full_of_unclosed_comments_is_read_in_a_few_seconds_and_still_holds_the_issue()
+    {
+        // Comments are stripped in linear time: a regex rescanning to the end of the body from every unclosed "<!--" took
+        // about ten seconds per issue at GitHub's maximum body size.
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: "## Waits on\n\nNpgsql 11.0.0 on NuGet.\n" + string.Concat(Enumerable.Repeat("<!--", 16000))));
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "7");
+
+        stopwatch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(5));
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe("Not claiming #7: it waits on: Npgsql 11.0.0 on NuGet.");
     }
 
     [Fact]
