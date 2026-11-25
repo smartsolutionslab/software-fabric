@@ -16,4 +16,4 @@ agents:
   agents-md: docs/agents.md
 adr: docs/adr.md
 gates:
-  - { kind: ci-step, describes: "The frontend job installs the workspace and runs build, lint and test in every package; any failure fails CI.", file: templates/ci-steps.sbn }
+  - { kind: ci-step, describes: "The frontend job installs the workspace and runs build, lint and test in every package; any failure fails CI. The workspace sets a minimumReleaseAge (web/pnpm-workspace.yaml, minimumReleaseAge: 1440), so pnpm installs no release less than a day old; CI fails when it is missing.", file: templates/ci-steps.sbn }
