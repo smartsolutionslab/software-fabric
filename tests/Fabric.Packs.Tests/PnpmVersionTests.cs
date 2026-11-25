@@ -132,7 +132,7 @@ public sealed partial class PnpmVersionTests
     [GeneratedRegex(@"func pnpm_version\b")]
     private static partial Regex Definition();
 
-    [GeneratedRegex(@"pnpm/action-setup@[^\n]*\n(?:[ \t]+(?!- )[^\n]*\n)*?[ \t]+version:", RegexOptions.None)]
+    [GeneratedRegex(@"pnpm/action-setup@[^\n]*\n(?:(?>[ \t]+)(?!- |version:)[^\n]*\n)*(?>[ \t]+)version:", RegexOptions.None)]
     private static partial Regex ActionSetupVersion();
 
     [GeneratedRegex(@"\bpnpm \d+\b")]
