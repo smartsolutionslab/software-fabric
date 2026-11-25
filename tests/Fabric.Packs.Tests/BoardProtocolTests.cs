@@ -545,6 +545,19 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         output.Trim().ShouldBe("Not claiming #7: it waits on: Npgsql 11.0.0 on NuGet.");
     }
 
+    [Theory]
+    [InlineData("<!-- äääääääääääääääääääää -->\n## Waits on\n\nNpgsql 11.0.0 on NuGet.\n")]
+    [InlineData("## Waits on\n\n<!-- ✓✓✓✓✓✓ -->Npgsql 11.0.0 on NuGet.\n")]
+    public void A_comment_with_text_beyond_ascii_does_not_hide_what_follows_it(string body)
+    {
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: body));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "7");
+
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe("Not claiming #7: it waits on: Npgsql 11.0.0 on NuGet.");
+    }
+
     [Fact]
     public void A_body_full_of_unclosed_comments_is_read_in_a_few_seconds_and_still_holds_the_issue()
     {
