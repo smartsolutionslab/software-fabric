@@ -22,7 +22,7 @@ public sealed class NxTests
         package.ShouldContain("\"lint\": \"nx run-many -t lint\"");
         package.ShouldContain("\"test\": \"nx run-many -t test\"");
         package.ShouldContain("\"nx\": \"24.0.6\"");
-        package.ShouldContain("\"packageManager\": \"pnpm@10.0.0\"");
+        package.ShouldContain("\"packageManager\": \"pnpm@", customMessage: "the version is PnpmVersionTests' to check");
         package.ShouldNotContain("--recursive");
     }
 

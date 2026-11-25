@@ -141,6 +141,7 @@ declares-slots:
   - { slot: dependabot.nuget-ignore, description: "Entries of the NuGet entry's ignore list in .github/dependabot.yml, indented six spaces: one per package version the contributing pack holds back on purpose, each under a comment saying why and naming the smartsolutionslab/software-fabric issue that lifts the hold (whose change removes the entry)." }
   - { slot: ci.e2e-steps, description: "Steps of the e2e CI job after .NET and Aspire are set up: build, start the application, run the end-to-end tests. No contribution, no job." }
 slots:
+  - { slot: templates.functions, template: templates/functions.sbn }
   # With an identity provider: GET /me, reading the claim the provider names (user_name_claim).
   - { slot: host.endpoints, template: templates/Host/host-endpoints.sbn, order: 10 }
   # With services, /me exists once, on the edge (ADR-0017); edge.* is declared only by the services topology.
