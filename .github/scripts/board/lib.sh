@@ -154,17 +154,20 @@ board_dependencies_jq='[(.body // "") | gsub("\r"; "") | split("\n")
 # What an issue waits on outside the repository: the first line of its "## Waits on" section with text, up to the next
 # heading of level one or two and without a list marker, as jq over one issue; nothing when the section is absent or
 # empty. Such an issue is not handed out until whoever finds the condition met empties or removes the section (#882).
-# The heading is matched leniently ("### Waits on", "## Waits on:", indented), so a near miss holds the issue rather
-# than handing it out; HTML comments and a lone "Nothing." or "None" count as empty. The line comes from the issue's
-# author, so control characters are dropped and it is cut to 200 characters before anything prints it.
-board_waits_on_jq='[(.body // "") | gsub("\r"; "") | gsub("<!--(.|\n)*?-->"; "") | split("\n")
-  | (map(test("^ {0,3}#{2,6}\\s+waits\\s+on\\s*:?\\s*#*\\s*$"; "i")) | index(true)) as $start
+# The heading is matched leniently ("# Waits on" to "###### Waits on", "## Waits on:", indented), so a near miss holds
+# the issue rather than handing it out; HTML comments (stripped in linear time; an unclosed one hides the rest, as on
+# GitHub) and a lone "Nothing." or "None" count as empty. The line comes from the issue's author, so control characters
+# are dropped from every line before blank ones are skipped, and it is cut to 200 characters before anything prints it.
+board_waits_on_jq='[(.body // "") | gsub("\r"; "")
+  | split("<!--") | .[0] + ([.[1:][] | index("-->") as $close | if $close == null then "" else .[$close + 3:] end] | join(""))
+  | split("\n")
+  | (map(test("^ {0,3}#{1,6}\\s+waits\\s+on\\s*:?\\s*#*\\s*$"; "i")) | index(true)) as $start
   | if $start == null then empty else .[$start + 1:] end
   | (map(test("^ {0,3}##?\\s")) | index(true)) as $end
   | (if $end == null then . else .[:$end] end) | .[]
-  | sub("^\\s*([-*+]\\s+)?"; "") | sub("\\s+$"; "")
+  | gsub("[\\x00-\\x1f\\x7f]"; "") | sub("^\\s*([-*+]\\s+)?"; "") | sub("\\s+$"; "")
   | select(length > 0 and (test("^(nothing|none)\\.?$"; "i") | not))]
-  | (first // empty) | gsub("[\\x00-\\x1f\\x7f]"; "") | .[:200]'
+  | (first // empty) | .[:200]'
 
 # Prints the dependencies of an issue (its JSON) that are not closed, one per line; one that cannot be read is not
 # known to be closed and is printed with " (could not be read)". Returns 1 only when the issue's body cannot be parsed.
