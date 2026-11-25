@@ -50,7 +50,10 @@ public sealed partial class PnpmVersionTests
     public void This_repositorys_workflows_set_up_the_stated_pnpm_version()
     {
         List<string> setups = [];
-        foreach (var path in Directory.EnumerateFiles(Path.Combine(Repository.Root, ".github", "workflows"), "*.yml").Order(StringComparer.Ordinal))
+        foreach (var path in Directory.EnumerateFiles(Path.Combine(Repository.Root, ".github"), "*.*", SearchOption.AllDirectories)
+            .Where(path => path.EndsWith(".yml", StringComparison.Ordinal) || path.EndsWith(".yaml", StringComparison.Ordinal))
+            .Where(path => File.ReadAllText(path).Contains("pnpm/action-setup@", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal))
         {
             var workflow = new YamlStream();
             workflow.Load(new StringReader(File.ReadAllText(path)));
@@ -72,6 +75,44 @@ public sealed partial class PnpmVersionTests
         setups.ShouldAllBe(setup => setup.EndsWith($": {Version()}", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Only_the_base_pack_defines_pnpm_version()
+    {
+        // templates.functions contributions are joined in pack order and the last definition wins, so a second one would
+        // silently override the base's.
+        var defining = Directory.EnumerateFiles(Path.Combine(Repository.Root, "packs"), "*.sbn", SearchOption.AllDirectories)
+            .Where(path => Definition().IsMatch(File.ReadAllText(path)))
+            .Select(path => Path.GetRelativePath(Repository.Root, path).Replace('\\', '/'))
+            .ToList();
+
+        defining.ShouldBe([Functions]);
+    }
+
+    [Fact]
+    public void No_pack_sets_up_a_pnpm_version_of_its_own()
+    {
+        // A pack's pnpm/action-setup step reads the version from packageManager; a version: on it would override that.
+        var setting = Directory.EnumerateFiles(Path.Combine(Repository.Root, "packs"), "*.sbn", SearchOption.AllDirectories)
+            .Where(path => ActionSetupVersion().IsMatch(File.ReadAllText(path)))
+            .Select(path => Path.GetRelativePath(Repository.Root, path).Replace('\\', '/'))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        setting.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void No_pack_names_a_pnpm_major_in_prose()
+    {
+        var named = Directory.EnumerateFiles(Path.Combine(Repository.Root, "packs"), "*.sbn", SearchOption.AllDirectories)
+            .Where(path => PnpmMajor().IsMatch(File.ReadAllText(path)))
+            .Select(path => Path.GetRelativePath(Repository.Root, path).Replace('\\', '/'))
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        named.ShouldBeEmpty();
+    }
+
     /// <summary>The version the base pack's <c>pnpm_version</c> function returns.</summary>
     private static string Version()
     {
@@ -87,4 +128,13 @@ public sealed partial class PnpmVersionTests
 
     [GeneratedRegex(@"pnpm@\d")]
     private static partial Regex PinnedPnpm();
+
+    [GeneratedRegex(@"func pnpm_version\b")]
+    private static partial Regex Definition();
+
+    [GeneratedRegex(@"pnpm/action-setup@[^\n]*\n(?:[ \t]+(?!- )[^\n]*\n)*?[ \t]+version:", RegexOptions.None)]
+    private static partial Regex ActionSetupVersion();
+
+    [GeneratedRegex(@"\bpnpm \d+\b")]
+    private static partial Regex PnpmMajor();
 }
