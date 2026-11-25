@@ -1,1 +1,1 @@
-- Node.js 22 and pnpm 10, the major `web/package.json`'s `packageManager` pins (`corepack enable` provides it): the AppHost's `web` resource runs `pnpm` and does not start without both on `PATH`.
+- Node.js 22 and pnpm {{ pnpm_version }}, the version `web/package.json`'s `packageManager` pins (`corepack enable` provides it): the AppHost's `web` resource runs `pnpm` and does not start without both on `PATH`.
