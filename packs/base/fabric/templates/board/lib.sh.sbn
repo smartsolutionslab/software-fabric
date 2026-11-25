@@ -159,7 +159,7 @@ board_dependencies_jq='[(.body // "") | gsub("\r"; "") | split("\n")
 # GitHub) and a lone "Nothing." or "None" count as empty. The line comes from the issue's author, so control characters
 # are dropped from every line before blank ones are skipped, and it is cut to 200 characters before anything prints it.
 board_waits_on_jq='[(.body // "") | gsub("\r"; "")
-  | split("<!--") | .[0] + ([.[1:][] | index("-->") as $close | if $close == null then "" else .[$close + 3:] end] | join(""))
+  | split("<!--") | .[0] + ([.[1:][] | split("-->") | if length == 1 then "" else .[1:] | join("-->") end] | join(""))
   | split("\n")
   | (map(test("^ {0,3}#{1,6}\\s+waits\\s+on\\s*:?\\s*#*\\s*$"; "i")) | index(true)) as $start
   | if $start == null then empty else .[$start + 1:] end
