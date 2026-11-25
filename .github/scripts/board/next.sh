@@ -91,7 +91,10 @@ if [ -n "$named" ]; then
     echo "Not claiming #$named: $reason." >&2
     exit 1
   fi
-  waits="$(jq -r "$board_waits_on_jq" <<< "$state")"
+  if ! waits="$(jq -r "$board_waits_on_jq" <<< "$state")"; then
+    echo "Not claiming #$named: its body could not be read." >&2
+    exit 1
+  fi
   if [ -n "$waits" ]; then
     echo "Not claiming #$named: it waits on: $waits" >&2
     exit 1
@@ -122,7 +125,10 @@ candidates="$(jq -r --arg lane "$lane" "map(select(($board_eligible_jq) and ([.l
 while read -r issue; do
   [ -n "$issue" ] || continue
   candidate="$(jq -c --argjson number "$issue" '.[] | select(.number == $number)' <<< "$listed")"
-  waits="$(jq -r "$board_waits_on_jq" <<< "$candidate")"
+  if ! waits="$(jq -r "$board_waits_on_jq" <<< "$candidate")"; then
+    echo "The body of #$issue could not be read; nothing was claimed." >&2
+    exit 1
+  fi
   if [ -n "$waits" ]; then
     echo "Skipping #$issue: it waits on: $waits" >&2
     continue

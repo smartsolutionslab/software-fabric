@@ -217,7 +217,10 @@ lane, and `release.sh` left it eligible, so each needed an escalation before it 
   script can check.
 - **Check:** `next.sh` skips an issue while the section has text, and names the first line of it ("Skipping #551: it waits
   on: Npgsql.EntityFrameworkCore.PostgreSQL 11.0.0 on NuGet."). Named, it exits 1 with the same reason. "Waits on" in
-  prose or under another heading does not count.
+  prose or under another heading does not count, but the heading itself is matched leniently (`### Waits on`,
+  `## Waits on:`, indented), so a near miss holds the issue instead of handing it out. HTML comments and a lone
+  "Nothing." or "None" count as empty. The line is printed without control characters and at most 200 characters long:
+  it is the issue author's text, and it reaches every agent's output.
 - **Release:** whoever finds the condition met empties or removes the section, saying in a comment what they checked.
   `agent:ready` may stay on throughout, as with dependencies.
 
@@ -225,6 +228,7 @@ lane, and `release.sh` left it eligible, so each needed an escalation before it 
 
 - An issue that waits on something outside can be written `agent:ready` with its condition stated, and stays out of every
   agent's way until a person or an agent removes the section.
+- Anyone who can edit the issue body can lift the hold, as with `## Depends on` and the labels.
 - Nobody is told when the condition is met: the section is prose, so checking it is a person's or an agent's task, as
   before, but a wrong label no longer puts the issue in the queue.
 
