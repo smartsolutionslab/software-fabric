@@ -1,0 +1,48 @@
+namespace {{ namespace }}.BuildingBlocks.Blobs;
+
+/// <summary>
+/// The name of a blob in a module's own container, folders separated by <c>/</c>: 1 to <see cref="MaxLength"/>
+/// characters, relative, with no empty, <c>.</c> or <c>..</c> segment and no backslash or control character, so a name
+/// reaches exactly the blob the module meant and never one outside the path it chose. A module makes its names itself
+/// (a Guid v7 segment), never from user input such as a file name.
+/// </summary>
+public sealed record BlobName
+{
+    public const int MaxLength = 1024;
+
+    private BlobName(string value) => Value = value;
+
+    public string Value { get; }
+
+    public static BlobName From(string value)
+    {
+{{~ if project["backend.guards"] == "ensure-that" ~}}
+        Ensure.That(value)
+            .IsNotNullOrWhiteSpace()
+            .HasMaxLength(MaxLength)
+            .Satisfies(name => !name.Any(character => character == '\\' || char.IsControl(character)), "must not contain a backslash or a control character.")
+            .Satisfies(name => name.Split('/').All(IsSegment), "must be a relative path whose segments are neither empty, '.' nor '..'.");
+{{~ else ~}}
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        if (value.Length > MaxLength)
+        {
+            throw new ArgumentException($"must be at most {MaxLength} characters.", nameof(value));
+        }
+
+        if (value.Any(character => character == '\\' || char.IsControl(character)))
+        {
+            throw new ArgumentException("must not contain a backslash or a control character.", nameof(value));
+        }
+
+        if (!value.Split('/').All(IsSegment))
+        {
+            throw new ArgumentException("must be a relative path whose segments are neither empty, '.' nor '..'.", nameof(value));
+        }
+{{~ end ~}}
+        return new BlobName(value);
+    }
+
+    public override string ToString() => Value;
+
+    private static bool IsSegment(string segment) => segment.Length > 0 && segment != "." && segment != "..";
+}

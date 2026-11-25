@@ -690,6 +690,21 @@ dimensions:
       inter: { tier: experimental }
       geist: { tier: experimental, note: "with Geist Mono for monospace text (identifiers, codes)" }
 
+  # ─────────────────────────── Backend · blob storage ────────────────────────
+  # Before the reads (#247) and e-mail (ADR-0019), which come last: every profile takes none (ADR-0020).
+
+  backend.blob-storage:
+    scope: project
+    default: none
+    # Changeable (ADR-0020 X1): a pilot moves from its hand-written store to the pack with fabric change, so nothing in
+    # the catalog may name this dimension (ADR-0016 C2, as ADR-0019 amends it); the pack branches on tenancy and topology
+    # with when (ADR-0006).
+    changeable: true
+    note: "Files kept by name outside the database, in a container per module. ADR-0020."
+    options:
+      none:       { tier: experimental, note: "the project stores no files outside its database" }
+      azure-blob: { tier: experimental, note: "Azure Blob Storage: Azurite locally, a storage account when deployed; a module's names carry its tenant under tenancy" }
+
   # ─────────────────────────── Backend · data access add-ons ─────────────────
   # Last in the catalog (owner decision on #247): a dimension active in every profile renumbers no profile's ADRs here.
 
@@ -705,3 +720,17 @@ dimensions:
         note: "query handlers read with Dapper over IReadConnection, in SQL for the project's one database"
         # Reason: Dapper's SQL bypasses the tenant column's EF Core query filter, so any tenancy would read every tenant's rows.
         requires: ["backend.tenancy == none"]
+
+  # ─────────────────────────── Backend · e-mail ──────────────────────────────
+  # Last in the catalog (ADR-0019): every profile takes none, and its AGENTS.md section comes after every other.
+
+  backend.email:
+    scope: project
+    default: none
+    # Changeable (ADR-0019 X1, its amendment of ADR-0016 C2): fabric-pilot moves from its hand-written sending to the pack
+    # with fabric change, so nothing in the catalog may name this dimension; the base reads it for Mailpit (R2).
+    changeable: true
+    note: "E-mail the project sends, behind IEmailSender (src/BuildingBlocks/Email). ADR-0019."
+    options:
+      none: { tier: experimental, note: "the project sends no e-mail" }
+      smtp: { tier: experimental, note: "over SMTP with MailKit, into Mailpit when the AppHost runs" }

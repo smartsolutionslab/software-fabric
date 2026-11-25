@@ -1,2 +1,2 @@
-builder.AddProject("host", "../Edge/Edge.csproj")
+builder.AddBuiltProject("host", "../Edge/Edge.csproj")
     .WithHttpHealthCheck("/health")

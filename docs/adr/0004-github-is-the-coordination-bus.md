@@ -29,7 +29,9 @@ even without a board; the branch, not the label, is the lock. The lane is a `lan
 eligibility needs no board access. A human assignee means the issue
 belongs to that human, without exception.
 An issue whose `## Depends on` section names an issue that is still open
-waits for it (amendment of 2026-11-20 below).
+waits for it (amendment of 2026-11-20 below), and one whose `## Waits on`
+section has text waits on something outside the repository (amendment of
+2026-11-24 below).
 
 **Claim.** The branch is the lock. The agent pushes an empty claim
 commit to `agent/<issue>`; a second agent's claim, built on a
@@ -201,3 +203,33 @@ listing its dependencies, wrote a stop-gap that labels issues `agent:ready` when
   claim takes does not undo it.
 - A project that carries its own promote step (PharmaTraining's `board-promote`) drops it with its next
   `fabric upgrade`.
+
+## Amendment (2026-11-24, #882)
+
+**Context.** Some issues wait on something outside the repository: a release upstream, a nightly failure recurring. Their
+text said "Not agent:ready until ...", which nothing reads, so the label alone decided. #551, #559 and #615 were labelled
+`agent:ready` by hand while their condition was unmet. `next.sh` handed the lowest-numbered of them to every agent in the
+lane, and `release.sh` left it eligible, so each needed an escalation before it left the queue.
+
+**Decision (owner, 2026-11-24).** A `## Waits on` section of the issue body, beside `## Depends on`; no label.
+
+- **Source:** the section up to the next heading of level one or two. Its text is prose: what the issue waits on, which no
+  script can check.
+- **Check:** `next.sh` skips an issue while the section has text, and names the first line of it ("Skipping #551: it waits
+  on: Npgsql.EntityFrameworkCore.PostgreSQL 11.0.0 on NuGet."). Named, it exits 1 with the same reason. "Waits on" in
+  prose or under another heading does not count, but the heading itself is matched leniently (`### Waits on`,
+  `## Waits on:`, `# Waits on`, indented), so a near miss holds the issue instead of handing it out. HTML comments and
+  a lone "Nothing." or "None" count as empty; comments are stripped in linear time, and an unclosed one hides the rest
+  of the body, as GitHub renders it. The line is printed without control characters and at most 200 characters long:
+  it is the issue author's text, and it reaches every agent's output.
+- **Release:** whoever finds the condition met empties or removes the section, saying in a comment what they checked.
+  `agent:ready` may stay on throughout, as with dependencies.
+
+**Consequences.**
+
+- An issue that waits on something outside can be written `agent:ready` with its condition stated, and stays out of every
+  agent's way until a person or an agent removes the section.
+- Anyone who can edit the issue body can lift the hold, as with `## Depends on` and the labels.
+- Nobody is told when the condition is met: the section is prose, so checking it is a person's or an agent's task, as
+  before, but a wrong label no longer puts the issue in the queue.
+

@@ -77,6 +77,18 @@ resolved choices contain it: set by the profile or one it extends, or taken as a
 | `claims` | experimental | — | — | — | access by claim or profile information (department, email_verified, a custom attribute) |
 | `roles` | experimental | — | — | — | access by role: the identity provider's roles in the token |
 
+### `backend.blob-storage`
+
+- Scope: project
+- Default: `none`
+- Changeable after generation: `fabric change --set backend.blob-storage=<option>` (ADR-0016 C1)
+- Note: Files kept by name outside the database, in a container per module. ADR-0020.
+
+| Option | Tier | Requires | Conflicts | Profiles | Note |
+|---|---|---|---|---|---|
+| `azure-blob` | experimental | — | — | — | Azure Blob Storage: Azurite locally, a storage account when deployed; a module's names carry its tenant under tenancy |
+| `none` | experimental | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-services-vue`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | the project stores no files outside its database |
+
 ### `backend.bus.library`
 
 - Scope: project
@@ -129,6 +141,18 @@ resolved choices contain it: set by the profile or one it extends, or taken as a
 |---|---|---|---|---|---|
 | `postgres` | supported | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-services-vue`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | — |
 | `sqlserver` | supported | — | — | — | — |
+
+### `backend.email`
+
+- Scope: project
+- Default: `none`
+- Changeable after generation: `fabric change --set backend.email=<option>` (ADR-0016 C1)
+- Note: E-mail the project sends, behind IEmailSender (src/BuildingBlocks/Email). ADR-0019.
+
+| Option | Tier | Requires | Conflicts | Profiles | Note |
+|---|---|---|---|---|---|
+| `none` | experimental | — | — | `industrial-event-driven-mfe`, `lean-crud`, `saas-ai-react`, `saas-services-vue`, `saas-standard-react`, `saas-standard-vue`, `saas-strict-react` | the project sends no e-mail |
+| `smtp` | experimental | — | — | — | over SMTP with MailKit, into Mailpit when the AppHost runs |
 
 ### `backend.errors`
 

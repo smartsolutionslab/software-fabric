@@ -1,0 +1,14 @@
+        // The AppHost's blob storage, "storage": Azurite, the image the Aspire integration runs, with the emulator's
+        // well-known development account. Its blob endpoint is what the blob store tests reach.
+        var storage = await StartAsync(
+            new ContainerBuilder("mcr.microsoft.com/azure-storage/azurite:3.35.0")
+                .WithCommand("azurite-blob", "--blobHost", "0.0.0.0", "--skipApiVersionCheck")
+                .WithPortBinding(10000, assignRandomHostPort: true)
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Azurite Blob service successfully listens"))
+                .Build(),
+            cancellationToken);
+        var blobEndpoint = new Uri($"http://{storage.Hostname}:{storage.GetMappedPublicPort(10000)}");
+        Resources.Add("storage", "blob", blobEndpoint);
+        settings["ConnectionStrings:blobs"] = "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;" +
+            "AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;" +
+            $"BlobEndpoint={blobEndpoint}devstoreaccount1;";

@@ -1,0 +1,69 @@
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+
+namespace {{ namespace }}.Email.Tests;
+
+/// <summary>
+/// A plain-text SMTP server on the loopback for one client. It offers no extensions (no STARTTLS), answers every command
+/// up to the end of the message's data, and then never answers, as a server that has not accepted the message yet.
+/// </summary>
+public sealed class StallingSmtpServer : IAsyncDisposable
+{
+    private readonly TcpListener listener = new(IPAddress.Loopback, 0);
+
+    private readonly TaskCompletionSource dataReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private readonly CancellationTokenSource stopping = new();
+
+    private readonly Task serving;
+
+    public StallingSmtpServer()
+    {
+        listener.Start();
+        serving = ServeAsync(stopping.Token);
+    }
+
+    public int Port => ((IPEndPoint)listener.LocalEndpoint).Port;
+
+    /// <summary>Completes once the client has sent the whole message, up to the line with the single dot.</summary>
+    public Task DataReceived => dataReceived.Task;
+
+    public async ValueTask DisposeAsync()
+    {
+        await stopping.CancelAsync();
+        listener.Stop();
+        await Task.WhenAny(serving);
+        stopping.Dispose();
+    }
+
+    private async Task ServeAsync(CancellationToken cancellationToken)
+    {
+        using var client = await listener.AcceptTcpClientAsync(cancellationToken);
+        await using var stream = client.GetStream();
+        using var reader = new StreamReader(stream, Encoding.ASCII);
+        await using var writer = new StreamWriter(stream, Encoding.ASCII) { NewLine = "\r\n", AutoFlush = true };
+        await writer.WriteLineAsync("220 localhost ESMTP");
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+        {
+            switch (line.Split(' ')[0].ToUpperInvariant())
+            {
+                case "DATA":
+                    await writer.WriteLineAsync("354 End data with <CR><LF>.<CR><LF>");
+                    while (await reader.ReadLineAsync(cancellationToken) is { } data && data != ".")
+                    {
+                    }
+
+                    dataReceived.TrySetResult();
+                    await Task.Delay(Timeout.Infinite, cancellationToken);
+                    return;
+                case "QUIT":
+                    await writer.WriteLineAsync("221 Bye");
+                    return;
+                default:
+                    await writer.WriteLineAsync("250 OK");
+                    break;
+            }
+        }
+    }
+}

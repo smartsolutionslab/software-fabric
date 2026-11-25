@@ -1,0 +1,42 @@
+option: backend.blob-storage.azure-blob
+# ADR-0020: Azurite locally, a storage account when deployed; a container per module; the SDK only in
+# src/BuildingBlocks/Blobs (O4); stream operations alone, create-only (O1, O2, O5); the tenant in every name under a
+# tenant column or a schema per tenant (B2, O3). The dimension is changeable (X1), so the pack branches on other choices
+# with when (ADR-0006) and nothing in the catalog names it.
+files:
+  - { template: templates/BlobName.cs.sbn, target: src/BuildingBlocks/Blobs/BlobName.cs }
+  - { template: templates/BlobContainers.cs.sbn, target: src/BuildingBlocks/Blobs/BlobContainers.cs }
+  - { template: templates/ModuleBlobStore.cs.sbn, target: src/BuildingBlocks/Blobs/ModuleBlobStore.cs }
+  - { template: templates/BlobStorageRegistration.cs.sbn, target: src/BuildingBlocks/Blobs/Wiring/BlobStorageRegistration.cs }
+  - { template: templates/BlobStorageSdkStaysInBuildingBlocks.cs.sbn, target: tests/Architecture.Tests/Rules/BlobStorageSdkStaysInBuildingBlocks.cs }
+  - { template: templates/ModulesUseOnlyTheirOwnContainer.cs.sbn, target: tests/Architecture.Tests/Rules/ModulesUseOnlyTheirOwnContainer.cs }
+  - { template: templates/tests/BlobStoreTests.cs.sbn, target: tests/Integration.Tests/BlobStoreTests.cs }
+  - { template: templates/tests/Blobs.Tests.csproj.sbn, target: tests/Blobs.Tests/Blobs.Tests.csproj }
+  - { template: templates/tests/BlobNameTests.cs.sbn, target: tests/Blobs.Tests/BlobNameTests.cs }
+  - { template: templates/tests/BlobContainersTests.cs.sbn, target: tests/Blobs.Tests/BlobContainersTests.cs }
+  - { template: templates/tests/AppHostBlobStorageTests.cs.sbn, target: tests/Blobs.Tests/AppHostBlobStorageTests.cs }
+  - { template: templates/tests/AppHostBlobContainersTests.cs.sbn, target: tests/Blobs.Tests/AppHostBlobContainersTests.cs, when: 'project["backend.topology"] == "services"' }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-versions.sbn }
+  - { slot: apphost.packages, template: templates/apphost-package.sbn }
+  - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 40 }
+  # With backend.topology services only, the only topology that renders the slot: the service's own container.
+  - { slot: apphost.service-resources, template: templates/apphost-service-resources.sbn, order: 40 }
+  - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 40 }
+  - { slot: buildingblocks.packages, template: templates/buildingblocks-packages.sbn }
+  - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: solution.projects, template: templates/solution-projects.sbn }
+  - { slot: readme.sections, template: templates/readme-section.sbn }
+  - { slot: integration-tests.references, template: templates/integration-tests-references.sbn, optional: true }
+  # With backend.test.integration testcontainers only (ADR-0002: dropped where no pack declares the slot).
+  - { slot: integration-tests.resources, template: templates/testcontainers-resources.sbn, order: 40, optional: true }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "No module assembly references the Azure Storage SDK (Azure.Storage.*): modules take ModuleBlobStore<TModule> from src/BuildingBlocks/Blobs (ADR-0020 O4).", file: templates/BlobStorageSdkStaysInBuildingBlocks.cs.sbn }
+  - { kind: architecture-test, describes: "A module's types use ModuleBlobStore<TModule> only with a type of their own module, in a signature, field, local or method body, never over a generic parameter, and never name BlobContainers: one keeping another module's files fails the build, naming the type and both modules.", file: templates/ModulesUseOnlyTheirOwnContainer.cs.sbn }
+  - { kind: unit-test, describes: "Against the application's Azurite: a file comes back unchanged, a second write to a name is refused and the name keeps its first bytes (O5); under a tenant column or a schema per tenant, one tenant cannot read another tenant's blob, not even by the full name it is stored under, and without a tenant nothing is opened or written (B2).", file: templates/tests/BlobStoreTests.cs.sbn }
+  - { kind: unit-test, describes: "From the AppHost's model, never started: Azurite keeps its files in a volume, as the database keeps its rows.", file: templates/tests/AppHostBlobStorageTests.cs.sbn }
+  - { kind: unit-test, describes: "With services, from the AppHost's model: every service has a container named after its module on the one storage account, and reads its own as blobs and no other.", file: templates/tests/AppHostBlobContainersTests.cs.sbn }
+  - { kind: unit-test, describes: "A blob name is refused when it is empty, absolute, longer than 1,024 characters, or has an empty, '.' or '..' segment, a backslash or a control character.", file: templates/tests/BlobNameTests.cs.sbn }

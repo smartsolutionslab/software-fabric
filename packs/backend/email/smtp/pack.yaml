@@ -1,0 +1,38 @@
+option: backend.email.smtp
+files:
+  - { template: templates/IEmailSender.cs.sbn, target: src/BuildingBlocks/Email/IEmailSender.cs }
+  - { template: templates/EmailMessage.cs.sbn, target: src/BuildingBlocks/Email/EmailMessage.cs }
+  - { template: templates/SmtpSettings.cs.sbn, target: src/BuildingBlocks/Email/SmtpSettings.cs }
+  - { template: templates/SmtpCredentials.cs.sbn, target: src/BuildingBlocks/Email/SmtpCredentials.cs }
+  - { template: templates/MailKitEmailSender.cs.sbn, target: src/BuildingBlocks/Email/MailKitEmailSender.cs }
+  - { template: templates/EmailRegistration.cs.sbn, target: src/BuildingBlocks/Email/Wiring/EmailRegistration.cs }
+  - { template: templates/EmailWiring.cs.sbn, target: src/AppHost/Wiring/EmailWiring.cs }
+  - { template: templates/FakeEmailSender.cs.sbn, target: tests/Fakes/FakeEmailSender.cs }
+  - { template: templates/OnlyTheEmailWiringNamesMailKit.cs.sbn, target: tests/Architecture.Tests/Rules/OnlyTheEmailWiringNamesMailKit.cs }
+  - { template: templates/NoSmtpPasswordInSettings.cs.sbn, target: tests/Architecture.Tests/Rules/NoSmtpPasswordInSettings.cs }
+  - { template: templates/tests/Email.Tests.csproj.sbn, target: tests/Email.Tests/Email.Tests.csproj }
+  - { template: templates/tests/SmtpSettingsTests.cs.sbn, target: tests/Email.Tests/SmtpSettingsTests.cs }
+  - { template: templates/tests/MailKitEmailSenderTests.cs.sbn, target: tests/Email.Tests/MailKitEmailSenderTests.cs }
+  - { template: templates/tests/StallingSmtpServer.cs.sbn, target: tests/Email.Tests/StallingSmtpServer.cs }
+  # Testcontainers starts no Mailpit, as for Keycloak's Mailpit gate (docs/slots.md, the identity-provider vocabulary).
+  - { template: templates/tests/IntegrationEmailTests.cs.sbn, target: tests/Integration.Tests/EmailTests.cs, when: 'project["backend.test.integration"] != "testcontainers"' }
+slots:
+  - { slot: dotnet.package-versions, template: templates/package-version.sbn }
+  - { slot: buildingblocks.packages, template: templates/buildingblocks-package.sbn }
+  # After the base's Mailpit (order 21), whose variable it reads: the parameters exist only when publishing.
+  - { slot: apphost.resources, template: templates/apphost-resources.sbn, order: 22 }
+  # With services, on every service host in the AppHost's loop (ADR-0017).
+  - { slot: apphost.host-wiring, template: templates/apphost-host-wiring.sbn, order: 40 }
+  - { slot: host.services, template: templates/host-services.sbn }
+  - { slot: tests.module-host-services, template: templates/module-host-services.sbn }
+  - { slot: solution.projects, template: templates/solution-projects.sbn }
+  # The e-mail tests' reference to the building block, unless rag gives it already; none with testcontainers, which has no e-mail tests.
+  - { slot: integration-tests.references, template: templates/integration-tests-references.sbn, optional: true }
+agents:
+  agents-md: docs/agents.md
+adr: docs/adr.md
+gates:
+  - { kind: architecture-test, describes: "Only src/BuildingBlocks/Email names MailKit or MimeKit: a module assembly that references either fails, naming the assembly and the library, and so does any source file under src outside that folder that names either, naming the file and the line; modules send through IEmailSender.", file: templates/OnlyTheEmailWiringNamesMailKit.cs.sbn }
+  - { kind: architecture-test, describes: "No appsettings*.json holds the SMTP password (Email:SmtpPassword; it is the AppHost's secret parameter smtp-password) or leave to send unencrypted (Email:AllowUnencryptedSmtp true, which only the AppHost gives, in run mode, for Mailpit); the violation names the file and the setting, never the value.", file: templates/NoSmtpPasswordInSettings.cs.sbn }
+  - { kind: unit-test, describes: "Against the running AppHost (not with testcontainers, which starts no Mailpit): an e-mail sent through the building block's IEmailSender with the run-mode settings reaches Mailpit, and the same send without leave to go unencrypted is refused, since Mailpit offers no TLS, and delivers nothing.", file: templates/tests/IntegrationEmailTests.cs.sbn }
+  - { kind: unit-test, describes: "SmtpSettings reads smtp:// as STARTTLS and smtps:// as TLS from the start, refuses any other connection string, a missing server, and a user name without a password or the reverse, and never shows the password; MailKitEmailSender refuses a server without STARTTLS or TLS before the message is sent, and a cancelled send stops.", file: templates/tests/SmtpSettingsTests.cs.sbn }

@@ -89,7 +89,7 @@ public sealed class EdgeMessagingTests
     {
         var appHost = Generate(Services(transport, realtime))["src/AppHost/AppHost.cs"];
 
-        var edge = appHost[appHost.IndexOf("""var host = builder.AddProject("host", "../Edge/Edge.csproj")""", StringComparison.Ordinal)..appHost.IndexOf("foreach (var (module, project) in builder.ServiceHosts())", StringComparison.Ordinal)];
+        var edge = appHost[appHost.IndexOf("""var host = builder.AddBuiltProject("host", "../Edge/Edge.csproj")""", StringComparison.Ordinal)..appHost.IndexOf("foreach (var (module, project) in builder.ServiceHosts())", StringComparison.Ordinal)];
         edge.ShouldContain(".WithReference(messaging)");
         edge.ShouldContain(".WaitFor(messaging)");
         edge.ShouldContain(transport switch

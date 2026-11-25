@@ -1,0 +1,76 @@
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+/// <summary>
+/// MailKit and MimeKit are the e-mail building block's: <c>src/BuildingBlocks/Email</c> sends over them, and everything
+/// else takes <c>IEmailSender</c>, so another SMTP library or a provider's API changes one folder and no module. The rule
+/// reads what the compiled module assemblies reference, however a type was imported, and parses every source file under
+/// <c>src</c> outside that folder for either library's name: a comment or a string that spells one is prose.
+/// </summary>
+public sealed class OnlyTheEmailWiringNamesMailKit : IArchitectureRule
+{
+    private const string EmailBuildingBlock = "src/BuildingBlocks/Email/";
+
+    private static readonly string[] Libraries = ["MailKit", "MimeKit"];
+
+    public string Description => "Only src/BuildingBlocks/Email names MailKit or MimeKit; modules and hosts send e-mail through IEmailSender.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        List<string> violations = [];
+        foreach (var assembly in model.ModuleAssemblies)
+        {
+            foreach (var reference in assembly.GetReferencedAssemblies().Select(reference => reference.Name!).Order(StringComparer.Ordinal))
+            {
+                if (Library(reference) is { } library)
+                {
+                    violations.Add($"{assembly.GetName().Name} references {library}; its assembly {reference} is the e-mail building block's ({EmailBuildingBlock}), and a module sends through IEmailSender.");
+                }
+            }
+        }
+
+        var root = RepositoryRoot();
+        foreach (var path in Directory.EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/'))
+            .Where(path => !path.Contains("/bin/", StringComparison.Ordinal) && !path.Contains("/obj/", StringComparison.Ordinal))
+            .Where(path => !path.StartsWith(EmailBuildingBlock, StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal))
+        {
+            foreach (var (line, library) in Mentions(File.ReadAllText(Path.Combine(root, path))))
+            {
+                violations.Add($"{path}:{line}: names {library}; only {EmailBuildingBlock} uses it, and everything else takes IEmailSender.");
+            }
+        }
+
+        return violations;
+    }
+
+    /// <summary>The library an assembly belongs to (MimeKit for MimeKit.Core); null for any other assembly.</summary>
+    private static string? Library(string assembly) =>
+        Libraries.FirstOrDefault(library => assembly == library || assembly.StartsWith(library + ".", StringComparison.Ordinal));
+
+    /// <summary>Each line naming either library, once per line and library.</summary>
+    private static IEnumerable<(int Line, string Library)> Mentions(string source) =>
+        CSharpSyntaxTree.ParseText(source).GetRoot()
+            .DescendantNodes()
+            .OfType<IdentifierNameSyntax>()
+            .Where(name => Libraries.Contains(name.Identifier.ValueText, StringComparer.Ordinal))
+            .Select(name => (name.GetLocation().GetLineSpan().StartLinePosition.Line + 1, name.Identifier.ValueText))
+            .Distinct();
+
+    /// <summary>The project root: the directory above the test output that holds build.proj.</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "build.proj")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("build.proj not found above the test output directory.");
+    }
+}

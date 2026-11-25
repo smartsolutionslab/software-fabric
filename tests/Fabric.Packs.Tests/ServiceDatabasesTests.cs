@@ -27,7 +27,7 @@ public sealed class ServiceDatabasesTests
         appHost.ShouldContain(server);
         appHost.ShouldNotContain(".AddDatabase(\"database\")", customMessage: "with services there is no single database.");
         var loop = appHost.IndexOf("foreach (var (module, project) in builder.ServiceHosts())", StringComparison.Ordinal);
-        var service = appHost.IndexOf("var service = builder.AddProject(module, project)", StringComparison.Ordinal);
+        var service = appHost.IndexOf("var service = builder.AddBuiltProject(module, project)", StringComparison.Ordinal);
         appHost.IndexOf(perService, StringComparison.Ordinal).ShouldBeInRange(loop, service, "the loop adds the service's database before the service.");
         var serviceWiring = appHost[service..appHost.IndexOf("host.WithReference(service)", StringComparison.Ordinal)];
         serviceWiring.ShouldContain(".WithReference(database, \"database\")", customMessage: "the service reads its own database under the connection name it already reads.");
@@ -54,7 +54,7 @@ public sealed class ServiceDatabasesTests
 
         appHost.ShouldNotContain("AddProject<Projects.MigrationRunner>(\"migrations\")", customMessage: "with services no run migrates every module.");
         var loop = appHost.IndexOf("foreach (var (module, project) in builder.ServiceHosts())", StringComparison.Ordinal);
-        var service = appHost.IndexOf("var service = builder.AddProject(module, project)", StringComparison.Ordinal);
+        var service = appHost.IndexOf("var service = builder.AddBuiltProject(module, project)", StringComparison.Ordinal);
         var migrations = appHost.IndexOf("var migrations = builder.AddProject<Projects.MigrationRunner>($\"{module}-migrations\")", StringComparison.Ordinal);
         migrations.ShouldBeInRange(loop, service, "the loop adds the service's migration run before the service.");
         var run = appHost[migrations..service];

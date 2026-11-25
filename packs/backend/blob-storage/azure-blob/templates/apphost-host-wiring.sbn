@@ -1,0 +1,3 @@
+
+{{ if project["backend.topology"] == "services" }}    .WithReference(blobs, "blobs"){{ else }}    .WithReference(blobs)
+    .WaitFor(blobs){{ end }}

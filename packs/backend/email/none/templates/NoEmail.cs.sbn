@@ -1,0 +1,24 @@
+namespace {{ namespace }}.Architecture.Tests.Rules;
+
+public sealed class NoEmail : IArchitectureRule
+{
+    private static readonly string[] Libraries = ["MailKit", "MimeKit"];
+
+    public string Description => "No module references MailKit or MimeKit: this project sends no e-mail.";
+
+    public IEnumerable<string> Violations(ArchitectureModel model)
+    {
+        {{ not_null "model" }}
+
+        foreach (var assembly in model.ModuleAssemblies)
+        {
+            foreach (var reference in assembly.GetReferencedAssemblies().Select(reference => reference.Name!).Where(IsEmailLibrary).Order(StringComparer.Ordinal))
+            {
+                yield return $"{assembly.GetName().Name} references {reference}, but this project sends no e-mail (backend.email: none).";
+            }
+        }
+    }
+
+    private static bool IsEmailLibrary(string reference) =>
+        Libraries.Any(library => reference == library || reference.StartsWith(library + ".", StringComparison.Ordinal));
+}

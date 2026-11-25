@@ -57,6 +57,22 @@ public class HostTests(AspireFixture aspire)
     }
 
     {{ test_attribute }}
+    public async Task Every_project_starts_from_the_AppHosts_build()
+    {
+        await aspire.App.ResourceNotifications.WaitForResourceHealthyAsync("host", {{ test_cancellation_token }});
+
+        // The AppHost's build compiles every project it runs, so Aspire runs each with --no-build; one it rebuilt would
+        // build at every start, all at once, and slow the start-up towards the fixture's limit.
+        var rebuilt = aspire.App.Services.GetRequiredService<DistributedApplicationModel>().Resources
+            .OfType<ProjectResource>()
+            .Where(project => !project.GetProjectMetadata().SuppressBuild)
+            .Select(project => project.Name)
+            .ToList();
+
+        {{ equal "string.Join(\", \", rebuilt)" "string.Empty" }}
+    }
+
+    {{ test_attribute }}
     public async Task The_host_reports_itself_healthy()
     {
         using var client = aspire.CreateHostClient();

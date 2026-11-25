@@ -1,0 +1,21 @@
+using {{ namespace }}.BuildingBlocks.Email;
+using Microsoft.Extensions.Configuration;
+
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class EmailRegistration
+{
+    /// <summary>
+    /// Registers the project's one <see cref="IEmailSender"/>: MailKit, through the SMTP server of the connection string
+    /// <c>mail</c>. The settings are read when the sender is first needed, and a missing one fails there, naming it;
+    /// registering connects to nothing.
+    /// </summary>
+    public static IServiceCollection AddEmail(this IServiceCollection services, IConfiguration configuration)
+    {
+        {{ not_null "configuration" }}
+
+        return services
+            .AddSingleton(_ => SmtpSettings.From(configuration))
+            .AddSingleton<IEmailSender, MailKitEmailSender>();
+    }
+}

@@ -67,6 +67,7 @@ files:
   - { template: templates/tests/RetryEveryMethodOptsAClientBackIn.cs.sbn, target: tests/Architecture.Tests/Rules/RetryEveryMethodOptsAClientBackIn.cs }
   - { template: templates/tests/StandardResilienceHandlerOnlyInServiceDefaults.cs.sbn, target: tests/Architecture.Tests/Rules/StandardResilienceHandlerOnlyInServiceDefaults.cs }
   - { template: templates/tests/WorkflowActionsArePinned.cs.sbn, target: tests/Architecture.Tests/Rules/WorkflowActionsArePinned.cs }
+  - { template: templates/tests/TheAppHostRunsWhatItBuilt.cs.sbn, target: tests/Architecture.Tests/Rules/TheAppHostRunsWhatItBuilt.cs }
   - { template: templates/tests/GlobalJsonSelectsTheTestingPlatform.cs.sbn, target: tests/Architecture.Tests/Rules/GlobalJsonSelectsTheTestingPlatform.cs }
   - { template: templates/tests/NoSecretInSettings.cs.sbn, target: tests/Architecture.Tests/Rules/NoSecretInSettings.cs }
   - { template: templates/Host/CurrentUser.cs.sbn, target: src/Host/CurrentUser.cs, when: 'project["backend.auth"] != "none"' }
@@ -141,12 +142,14 @@ declares-slots:
   - { slot: dependabot.nuget-ignore, description: "Entries of the NuGet entry's ignore list in .github/dependabot.yml, indented six spaces: one per package version the contributing pack holds back on purpose, each under a comment saying why and naming the smartsolutionslab/software-fabric issue that lifts the hold (whose change removes the entry)." }
   - { slot: ci.e2e-steps, description: "Steps of the e2e CI job after .NET and Aspire are set up: build, start the application, run the end-to-end tests. No contribution, no job." }
 slots:
+  - { slot: templates.functions, template: templates/functions.sbn }
   # With an identity provider: GET /me, reading the claim the provider names (user_name_claim).
   - { slot: host.endpoints, template: templates/Host/host-endpoints.sbn, order: 10 }
   # With services, /me exists once, on the edge (ADR-0017); edge.* is declared only by the services topology.
   - { slot: edge.endpoints, template: templates/Host/edge-endpoints.sbn, order: 10, optional: true }
   # Mailpit, the inbox for e-mail sent locally, in run mode only: after the identity provider's resources, which
-  # wait for it (E2 on #602, #861). Only with keycloak until e-mail needs it: its realm points SMTP at the host mailpit.
+  # wait for it (E2 on #602, #861). With keycloak, whose realm points SMTP at the host mailpit, or with backend.email
+  # smtp, whose host wiring names it (ADR-0019 R2, R3).
   - { slot: apphost.resources, template: templates/AppHost/mailpit-resources.sbn, order: 21 }
   - { slot: tests.module-host-services, template: templates/Llm/module-host-services.sbn }
   - { slot: dependabot.nuget-ignore, template: templates/dependabot-nuget-ignore.sbn }
@@ -167,6 +170,7 @@ gates:
   - { kind: architecture-test, describes: "With authorization choices (backend.authorization not empty): every policy a module endpoint names is registered by that module's IModulePolicies, and by no other module.", file: templates/tests/EveryEndpointPolicyIsRegisteredByItsModule.cs.sbn }
   - { kind: architecture-test, describes: "With authorization choices (backend.authorization not empty): no two modules register a policy under the same name, whether or not an endpoint or MCP tool names it; the host refuses to start on the same names (ModulePolicyOwners), naming both modules.", file: templates/tests/EveryPolicyIsRegisteredByOneModule.cs.sbn }
   - { kind: architecture-test, describes: "Every workflow step uses an action pinned to a full commit SHA, a local action or a docker image by digest.", file: templates/tests/WorkflowActionsArePinned.cs.sbn }
+  - { kind: architecture-test, describes: "The AppHost adds every project from its own build (AddProject<Projects.X>, or AddBuiltProject with backend.topology services), never AddProject with a path, which Aspire rebuilds at every start.", file: templates/tests/TheAppHostRunsWhatItBuilt.cs.sbn }
   - { kind: architecture-test, describes: "global.json's test.runner is Microsoft.Testing.Platform, without which dotnet test --project fails with MSB1001: Unknown switch; the violation names global.json.", file: templates/tests/GlobalJsonSelectsTheTestingPlatform.cs.sbn }
   - { kind: analyzer, describes: "DateTime.Now, DateTime.UtcNow, DateTimeOffset.Now and DateTimeOffset.UtcNow are banned (RS0030) in every project but the AppHost; the time comes from TimeProvider.", file: templates/TimeBannedSymbols.txt.sbn }
   - { kind: analyzer, describes: "Guid.NewGuid is banned (RS0030) in every project but the AppHost, tests included; every Guid is a time-ordered Guid.CreateVersion7().", file: templates/IdentifierBannedSymbols.txt.sbn }

@@ -9,10 +9,12 @@ public class ValidateCommandTests
 
         run.ExitCode.ShouldBe(0);
         run.Output.ShouldStartWith("valid: profile saas-standard-react");
-        // Its experimental options are the default colour scheme (#694) and font (#699), until a nightly matrix run promotes them.
+        // Its experimental options are the default colour scheme (#694), font (#699), blob storage (ADR-0020) and e-mail (#862), until a nightly matrix run promotes them.
         run.Error.ShouldBe(
             $"warning: frontend.color-scheme=blue is experimental (ADR-0003): it is generated, but not yet passing the test matrix.{Environment.NewLine}" +
-            $"warning: frontend.font=inter is experimental (ADR-0003): it is generated, but not yet passing the test matrix.{Environment.NewLine}");
+            $"warning: frontend.font=inter is experimental (ADR-0003): it is generated, but not yet passing the test matrix.{Environment.NewLine}" +
+            $"warning: backend.blob-storage=none is experimental (ADR-0003): it is generated, but not yet passing the test matrix.{Environment.NewLine}" +
+            $"warning: backend.email=none is experimental (ADR-0003): it is generated, but not yet passing the test matrix.{Environment.NewLine}");
     }
 
     [Fact]

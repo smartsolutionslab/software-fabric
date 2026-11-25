@@ -1,0 +1,13 @@
+## Blob storage
+
+A module keeps files by name in a container of its own, through `ModuleBlobStore<TModule>` (`src/BuildingBlocks/Blobs`), with a type of the module's own as `TModule`, in Infrastructure:
+
+```csharp
+public sealed class InvoiceFiles(ModuleBlobStore<InvoiceFiles> files)
+{
+    public Task UploadAsync(InvoiceId invoice, Stream scan, CancellationToken cancellationToken) =>
+        files.UploadAsync(BlobName.From($"invoices/{invoice}/scan"), scan, cancellationToken);
+}
+```
+
+Locally the files live in Azurite, which the AppHost runs with a data volume; deployed, in an Azure Storage account the app reaches with its Azure identity. A name, once written, keeps its bytes: store new content under a new name. `tests/Integration.Tests/BlobStoreTests.cs` runs the store against the application's Azurite; `tests/Blobs.Tests` checks names, connections and the AppHost's storage without Docker.

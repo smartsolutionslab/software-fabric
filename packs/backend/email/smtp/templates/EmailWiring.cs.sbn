@@ -1,0 +1,42 @@
+using Aspire.Hosting.ApplicationModel;
+
+namespace Aspire.Hosting;
+
+/// <summary>
+/// The host's e-mail. In run mode it sends to the base's Mailpit, unencrypted: Mailpit offers no TLS, and only this local
+/// catcher is allowed none. A deployment gives the host its own SMTP server as the connection string <c>mail</c>
+/// (<c>smtp://</c> for STARTTLS, <c>smtps://</c> for TLS from the start) and its sender as <c>Email:SenderAddress</c>;
+/// a server that requires authentication is signed in to with the parameters <c>smtp-user-name</c> and
+/// <c>smtp-password</c>, which the AppHost declares when publishing.
+/// </summary>
+internal static class EmailWiring
+{
+    /// <param name="host">The host{{ if project["backend.topology"] == "services" }}, or a service host{{ end }}, which sends the e-mail.</param>
+    /// <param name="mailpit">The local mail catcher; null when publishing.</param>
+    /// <param name="smtpUserName">The user the host signs in as when published; null in run mode.</param>
+    /// <param name="smtpPassword">That user's password, a secret parameter; null in run mode.</param>
+    public static IResourceBuilder<ProjectResource> WithEmail(
+        this IResourceBuilder<ProjectResource> host,
+        IResourceBuilder<ContainerResource>? mailpit,
+        IResourceBuilder<ParameterResource>? smtpUserName,
+        IResourceBuilder<ParameterResource>? smtpPassword)
+    {
+        if (mailpit is not null)
+        {
+            var smtp = mailpit.GetEndpoint("smtp");
+            return host
+                .WithEnvironment("ConnectionStrings__mail", ReferenceExpression.Create($"smtp://{smtp.Property(EndpointProperty.Host)}:{smtp.Property(EndpointProperty.Port)}"))
+                .WithEnvironment("Email__SenderAddress", "noreply@example.com")
+                .WithEnvironment("Email__AllowUnencryptedSmtp", "true")
+                .WaitFor(mailpit);
+        }
+
+        if (smtpUserName is not null && smtpPassword is not null)
+        {
+            host.WithEnvironment("Email__SmtpUserName", smtpUserName)
+                .WithEnvironment("Email__SmtpPassword", smtpPassword);
+        }
+
+        return host;
+    }
+}

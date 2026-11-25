@@ -58,6 +58,11 @@ This repo runs the protocol its packs generate (ADR-0004), copied into
   build/). With an issue, it claims that one only if it is eligible. Exit 3:
   nothing eligible. Exit 1: the named issue is not eligible, or the claim
   failed; stop and report it. Claude Code: `/next-issue`.
+- **An issue that waits on something outside the repository** (a release
+  upstream, a nightly failure recurring) says so in a `## Waits on` section;
+  `next.sh` skips it until the section is emptied or removed. Never hold such
+  an issue by taking `agent:ready` off, and never give it `agent:ready` back
+  while its condition is unmet.
 - **Work only on the `agent/<issue>` branch you claimed**, push at
   least every two hours, and end every commit with
   `Agent-Executor: <family>-<runtime>/<detail>`.

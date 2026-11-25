@@ -456,6 +456,139 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
         Origin("for-each-ref", "refs/heads/agent/").ShouldBeEmpty();
     }
 
+    [Fact]
+    public void An_issue_that_waits_on_something_outside_the_repository_is_skipped_naming_it_and_claimed_once_the_section_is_empty()
+    {
+        Issues(
+            Issue(7, "Take Npgsql 11", ReadyBackend, body: "Moves off the release candidate.\n\n## Waits on\n\n- Npgsql.EntityFrameworkCore.PostgreSQL 11.0.0 on NuGet.\n- Profile CI green with it.\n\n## Done when\n\n- No prerelease package.\n"),
+            Issue(9, "Refund an invoice", ReadyBackend));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(0, output);
+        output.ShouldContain("Skipping #7: it waits on: Npgsql.EntityFrameworkCore.PostgreSQL 11.0.0 on NuGet.");
+        output.ShouldContain("9 agent/9");
+        HasBranch("agent/7").ShouldBeFalse();
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+
+        Bash(state, ["-c", ChangeIssue(7, ".body = \"Moves off the release candidate.\\n\\n## Waits on\\n\\n## Done when\\n\\n- No prerelease package.\\n\"")]);
+        var (secondExitCode, secondOutput) = Run("next.sh", "backend", "codex-cloud/lane-backend");
+
+        secondExitCode.ShouldBe(0, secondOutput);
+        secondOutput.Trim().ShouldBe("7 agent/7");
+    }
+
+    [Fact]
+    public void A_named_issue_that_waits_on_something_outside_the_repository_is_refused_naming_it()
+    {
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: "## Waits on\n\nNpgsql.EntityFrameworkCore.PostgreSQL 11.0.0 on NuGet.\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "7");
+
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe("Not claiming #7: it waits on: Npgsql.EntityFrameworkCore.PostgreSQL 11.0.0 on NuGet.");
+        Origin("for-each-ref", "refs/heads/agent/").ShouldBeEmpty();
+        Labels(IssueState(7)).ShouldNotContain("agent:claimed");
+    }
+
+    [Fact]
+    public void Waits_on_in_prose_or_under_another_heading_does_not_hold_an_issue()
+    {
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: "This no longer waits on Npgsql.\n\n## Done when\n\n- Waits on nothing.\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(0, output);
+        output.Trim().ShouldBe("7 agent/7");
+    }
+
+    [Theory]
+    [InlineData("### Waits on")]
+    [InlineData("## Waits on:")]
+    [InlineData("  ## Waits on")]
+    [InlineData("## Waits on ##")]
+    [InlineData("##  Waits  on")]
+    [InlineData("## waits on")]
+    [InlineData("# Waits on")]
+    public void A_waits_on_heading_written_another_way_still_holds_the_issue(string heading)
+    {
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: $"{heading}\r\n\r\nNpgsql 11.0.0 on NuGet.\r\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "7");
+
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe("Not claiming #7: it waits on: Npgsql 11.0.0 on NuGet.");
+    }
+
+    [Theory]
+    [InlineData("Nothing.")]
+    [InlineData("None")]
+    [InlineData("<!-- what this issue waits on, if anything -->")]
+    public void A_waits_on_section_that_says_nothing_does_not_hold_the_issue(string text)
+    {
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: $"## Waits on\n\n{text}\n\n## Done when\n\n- Done.\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(0, output);
+        output.Trim().ShouldBe("7 agent/7");
+    }
+
+    [Fact]
+    public void A_first_line_of_control_characters_alone_does_not_hide_the_reason_after_it()
+    {
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: "## Waits on\n\n\u001b\u0007\nNpgsql 11.0.0 on NuGet.\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "7");
+
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe("Not claiming #7: it waits on: Npgsql 11.0.0 on NuGet.");
+    }
+
+    [Theory]
+    [InlineData("<!-- äääääääääääääääääääää -->\n## Waits on\n\nNpgsql 11.0.0 on NuGet.\n")]
+    [InlineData("## Waits on\n\n<!-- ✓✓✓✓✓✓ -->Npgsql 11.0.0 on NuGet.\n")]
+    public void A_comment_with_text_beyond_ascii_does_not_hide_what_follows_it(string body)
+    {
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: body));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "7");
+
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe("Not claiming #7: it waits on: Npgsql 11.0.0 on NuGet.");
+    }
+
+    [Fact]
+    public void A_body_full_of_unclosed_comments_is_read_in_a_few_seconds_and_still_holds_the_issue()
+    {
+        // Comments are stripped in linear time: a regex rescanning to the end of the body from every unclosed "<!--" took
+        // about ten seconds per issue at GitHub's maximum body size.
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: "## Waits on\n\nNpgsql 11.0.0 on NuGet.\n" + string.Concat(Enumerable.Repeat("<!--", 16000))));
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "7");
+
+        stopwatch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(5));
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe("Not claiming #7: it waits on: Npgsql 11.0.0 on NuGet.");
+    }
+
+    [Fact]
+    public void What_an_issue_waits_on_is_printed_without_control_characters_and_at_most_200_characters_long()
+    {
+        var text = "Npgsql\u001b[31m 11\u0007.0.0 " + new string('x', 300);
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: $"## Waits on\n\n{text}\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "7");
+
+        exitCode.ShouldBe(1, output);
+        var reason = output.Trim()["Not claiming #7: it waits on: ".Length..];
+        reason.ShouldStartWith("Npgsql[31m 11.0.0 xxx");
+        reason.Length.ShouldBe(200);
+        reason.ShouldNotContain('\u001b');
+        reason.ShouldNotContain('\u0007');
+    }
+
     [Theory]
     [InlineData("needs:decision")]
     [InlineData("needs:human")]
