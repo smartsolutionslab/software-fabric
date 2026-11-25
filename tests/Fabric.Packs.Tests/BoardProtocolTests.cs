@@ -503,6 +503,53 @@ public sealed class BoardProtocolTests(BoardProject board) : IClassFixture<Board
     }
 
     [Theory]
+    [InlineData("### Waits on")]
+    [InlineData("## Waits on:")]
+    [InlineData("  ## Waits on")]
+    [InlineData("## Waits on ##")]
+    [InlineData("##  Waits  on")]
+    [InlineData("## waits on")]
+    public void A_waits_on_heading_written_another_way_still_holds_the_issue(string heading)
+    {
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: $"{heading}\r\n\r\nNpgsql 11.0.0 on NuGet.\r\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "7");
+
+        exitCode.ShouldBe(1, output);
+        output.Trim().ShouldBe("Not claiming #7: it waits on: Npgsql 11.0.0 on NuGet.");
+    }
+
+    [Theory]
+    [InlineData("Nothing.")]
+    [InlineData("None")]
+    [InlineData("<!-- what this issue waits on, if anything -->")]
+    public void A_waits_on_section_that_says_nothing_does_not_hold_the_issue(string text)
+    {
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: $"## Waits on\n\n{text}\n\n## Done when\n\n- Done.\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend");
+
+        exitCode.ShouldBe(0, output);
+        output.Trim().ShouldBe("7 agent/7");
+    }
+
+    [Fact]
+    public void What_an_issue_waits_on_is_printed_without_control_characters_and_at_most_200_characters_long()
+    {
+        var text = "Npgsql\u001b[31m 11\u0007.0.0 " + new string('x', 300);
+        Issues(Issue(7, "Take Npgsql 11", ReadyBackend, body: $"## Waits on\n\n{text}\n"));
+
+        var (exitCode, output) = Run("next.sh", "backend", "claude-cloud/lane-backend", "7");
+
+        exitCode.ShouldBe(1, output);
+        var reason = output.Trim()["Not claiming #7: it waits on: ".Length..];
+        reason.ShouldStartWith("Npgsql[31m 11.0.0 xxx");
+        reason.Length.ShouldBe(200);
+        reason.ShouldNotContain('\u001b');
+        reason.ShouldNotContain('\u0007');
+    }
+
+    [Theory]
     [InlineData("needs:decision")]
     [InlineData("needs:human")]
     public void An_issue_escalated_to_nobody_is_not_claimed_again(string escalation)
