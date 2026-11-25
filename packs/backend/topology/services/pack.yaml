@@ -12,6 +12,7 @@ files:
   - { template: templates/Edge/ServiceDocuments.cs.sbn, target: src/Edge/Wiring/ServiceDocuments.cs }
   - { template: templates/ServiceModule.cs.sbn, target: src/Host/Wiring/ServiceModule.cs }
   - { template: templates/ServiceHostProjects.cs.sbn, target: src/AppHost/Wiring/ServiceHostProjects.cs }
+  - { template: templates/BuiltProjects.cs.sbn, target: src/AppHost/Wiring/BuiltProjects.cs }
   - { template: templates/ServiceHostReferences.cs.sbn, target: tests/Architecture.Tests/ServiceHostReferences.cs }
   - { template: templates/ServiceHostEntryPoints.cs.sbn, target: tests/Architecture.Tests/ServiceHostEntryPoints.cs }
   - { template: templates/ModulesDoNotReferenceEachOther.cs.sbn, target: tests/Architecture.Tests/Rules/ModulesDoNotReferenceEachOther.cs }

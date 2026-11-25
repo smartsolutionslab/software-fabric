@@ -75,7 +75,7 @@ public sealed class ServicesKafkaTests
         var files = WithModules(Services, "billing", "shipping");
         var appHost = files["src/AppHost/AppHost.cs"];
 
-        var service = appHost.IndexOf("var service = builder.AddProject(module, project)", StringComparison.Ordinal);
+        var service = appHost.IndexOf("var service = builder.AddBuiltProject(module, project)", StringComparison.Ordinal);
         service.ShouldBeGreaterThanOrEqualTo(0, appHost);
         var serviceWiring = appHost[service..appHost.IndexOf("host.WithReference(service)", StringComparison.Ordinal)];
         serviceWiring.ShouldContain(".WithEnvironment(\"Messaging__ConsumerGroup\", module)", customMessage: "the loop names every service's consumer group after its module.");

@@ -1,2 +1,4 @@
-    <ProjectReference Include="../Edge/Edge.csproj" IsAspireProjectResource="false" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" ExcludeAssets="all" Private="false" />
-    <ProjectReference Include="../Services/*/Host/Host.csproj" IsAspireProjectResource="false" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" ExcludeAssets="all" Private="false" />
+    <ProjectReference Include="../Edge/Edge.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" ExcludeAssets="all" Private="false" />
+    <!-- Each service host gets a Projects type of its own (Aspire names it after the file, and every one is Host.csproj),
+         which tells Aspire the AppHost's build compiled it; AddBuiltProject finds it by path. -->
+    <ProjectReference Include="../Services/*/Host/Host.csproj" AspireProjectMetadataTypeName="Service_%(RecursiveDir)" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" ExcludeAssets="all" Private="false" />

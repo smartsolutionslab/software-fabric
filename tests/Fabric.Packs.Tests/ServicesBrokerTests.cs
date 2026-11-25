@@ -78,7 +78,7 @@ public sealed class ServicesBrokerTests
         var files = WithModules(Services(transport), "billing", "shipping");
         var appHost = files["src/AppHost/AppHost.cs"];
 
-        var service = appHost.IndexOf("var service = builder.AddProject(module, project)", StringComparison.Ordinal);
+        var service = appHost.IndexOf("var service = builder.AddBuiltProject(module, project)", StringComparison.Ordinal);
         service.ShouldBeGreaterThanOrEqualTo(0, appHost);
         var serviceWiring = appHost[service..appHost.IndexOf("host.WithReference(service)", StringComparison.Ordinal)];
         serviceWiring.ShouldContain($".WithEnvironment(\"{variable}\", module)", customMessage: "the loop names every service's queue or subscription after its module.");

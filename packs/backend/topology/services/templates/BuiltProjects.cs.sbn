@@ -1,0 +1,31 @@
+using System.Reflection;
+using Aspire.Hosting.ApplicationModel;
+
+namespace Aspire.Hosting;
+
+/// <summary>
+/// Adds a project the AppHost finds by path (its services, found by convention) and runs it from the AppHost's build,
+/// as <c>AddProject&lt;Projects.X&gt;</c> does: through the <c>Projects</c> type Aspire generates for the AppHost.csproj's
+/// <c>ProjectReference</c> to it, whose metadata says the AppHost's build compiled it. The architecture rule
+/// TheAppHostRunsWhatItBuilt keeps every <c>AddProject</c> by path out of the AppHost.
+/// </summary>
+public static class BuiltProjects
+{
+    private static readonly MethodInfo AddProject = typeof(ProjectResourceBuilderExtensions).GetMethods()
+        .Single(method => method.Name == nameof(ProjectResourceBuilderExtensions.AddProject) && method.IsGenericMethodDefinition
+            && method.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual([typeof(IDistributedApplicationBuilder), typeof(string)]));
+
+    /// <param name="projectPath">The project file; the AppHost.csproj references it, so building the AppHost builds it.</param>
+    public static IResourceBuilder<ProjectResource> AddBuiltProject(this IDistributedApplicationBuilder builder, string name, string projectPath)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        var path = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, projectPath));
+        var project = typeof(BuiltProjects).Assembly.GetTypes()
+            .Where(type => type.Namespace == "Projects" && typeof(IProjectMetadata).IsAssignableFrom(type) && type.GetConstructor(Type.EmptyTypes) is not null)
+            .SingleOrDefault(type => Path.GetFullPath(((IProjectMetadata)Activator.CreateInstance(type)!).ProjectPath) == path)
+            ?? throw new InvalidOperationException($"{path} is not a ProjectReference of the AppHost, so the AppHost's build does not compile it.");
+
+        return (IResourceBuilder<ProjectResource>)AddProject.MakeGenericMethod(project).Invoke(null, [builder, name])!;
+    }
+}
