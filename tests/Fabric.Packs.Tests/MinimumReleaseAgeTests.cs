@@ -108,6 +108,37 @@ public sealed class MinimumReleaseAgeTests
         failingOutput.ShouldContain("sets no minimumReleaseAge", customMessage: failingOutput);
     }
 
+    /// <summary>The gate holds the floor, not only the key: a value below a day fails as a missing one does.</summary>
+    [Theory]
+    [InlineData("1")]
+    [InlineData("1439")]
+    [InlineData("0")]
+    public void The_ci_gate_fails_when_the_workspace_lowers_the_minimum_release_age(string lowered)
+    {
+        using var project = new GeneratedProject("saas-standard-react");
+        var (script, workingDirectory) = CiStep(project.ProjectDirectory);
+
+        var path = Path.Combine(project.ProjectDirectory, "web", "pnpm-workspace.yaml");
+        var lowering = File.ReadAllLines(path).Select(line => line.StartsWith("minimumReleaseAge:", StringComparison.Ordinal) ? $"minimumReleaseAge: {lowered}" : line);
+        File.WriteAllText(path, string.Join('\n', lowering) + "\n");
+
+        var (exitCode, output) = Shell.Run(workingDirectory, "bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", script);
+        exitCode.ShouldNotBe(0, $"\"{Step}\" with minimumReleaseAge: {lowered}:\n{output}");
+        output.ShouldContain("sets no minimumReleaseAge", customMessage: output);
+    }
+
+    /// <summary>An unquoted scoped name (<c>- @scope/name@1.2.3</c>) is not valid YAML, so the example quotes the entry.</summary>
+    [Theory]
+    [MemberData(nameof(Workspaces))]
+    public void The_exclude_example_quotes_the_entry_so_a_scoped_package_parses(string workspace)
+    {
+        var files = Files("saas-standard-react", $"{Dimension}={workspace}");
+
+        files["web/pnpm-workspace.yaml"].ShouldContain("- \"<package>@<version>\"", Case.Sensitive);
+        files["web/pnpm-workspace.yaml"].ShouldContain("Never remove or lower", Case.Sensitive);
+        files["AGENTS.md"].ShouldContain("- \"<package>@<version>\"", Case.Sensitive);
+    }
+
     [Theory]
     [MemberData(nameof(Workspaces))]
     public void The_workspace_agent_rules_take_a_security_fix_through_minimumReleaseAgeExclude_never_by_removing_the_setting(string workspace)
