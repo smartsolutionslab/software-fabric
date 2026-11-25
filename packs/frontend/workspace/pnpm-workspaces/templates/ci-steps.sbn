@@ -4,6 +4,9 @@
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+      - name: The workspace installs only releases a day old
+        run: v=$(pnpm config get minimumReleaseAge); [[ "$v" =~ ^[0-9]+$ ]] && (( v >= 1440 )) || { echo "::error::web/pnpm-workspace.yaml sets no minimumReleaseAge of a day (1440) or more; it has '$v' (AGENTS.md, Frontend workspace)."; exit 1; }
+        working-directory: web
       - name: The lockfile is committed
         run: test -f web/pnpm-lock.yaml || { echo "::error::web/pnpm-lock.yaml is missing. Run pnpm install in web/ and commit it (README, First steps)."; exit 1; }
       - run: pnpm install --frozen-lockfile

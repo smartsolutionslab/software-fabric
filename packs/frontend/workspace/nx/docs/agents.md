@@ -5,3 +5,4 @@
 - Unchanged targets are read from the local cache in `web/.nx/`; never commit it. `pnpm nx reset` clears it.
 - Add a dependency with `pnpm add <name> --filter <package>`; never edit versions by hand without installing.
 - Commit `pnpm-lock.yaml`.
+- `web/pnpm-workspace.yaml` sets `minimumReleaseAge: 1440`, so pnpm installs no release less than a day old. Never remove or lower it. To take a security fix sooner, add only that version to `minimumReleaseAgeExclude` (`- "<package>@<version>"`, quoted) with the reason in the pull request (the advisory), and remove the entry once the version is a day old. Pin exact versions only once they are a day old.
